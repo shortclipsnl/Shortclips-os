@@ -1,0 +1,104 @@
+import { z } from "zod";
+
+/**
+ * Alle configuratie op één plek, met duidelijke fouten wanneer iets ontbreekt.
+ * Secrets komen uitsluitend uit environment variables — nooit uit de database
+ * en nooit uit de client-bundle.
+ */
+const schema = z.object({
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  APP_URL: z.string().url().default("http://localhost:3000"),
+
+  // --- Database ---
+  DATABASE_DRIVER: z.enum(["pglite", "postgres"]).optional(),
+  DATABASE_URL: z.string().optional(),
+  PGLITE_DATA_DIR: z.string().optional(),
+
+  // --- Sessies ---
+  // Minimaal 32 tekens. In productie verplicht; lokaal valt hij terug op een
+  // vaste ontwikkelwaarde zodat je meteen kunt starten.
+  SESSION_SECRET: z.string().min(32).optional(),
+
+  // --- Monday.com ---
+  MONDAY_API_TOKEN: z.string().optional(),
+  MONDAY_WEBHOOK_SECRET: z.string().optional(),
+  MONDAY_API_VERSION: z.string().default("2026-07"),
+
+  // --- Frame.io ---
+  FRAMEIO_TOKEN: z.string().optional(),
+  FRAMEIO_ACCOUNT_ID: z.string().optional(),
+  FRAMEIO_WEBHOOK_SECRET: z.string().optional(),
+
+  // --- Google Drive ---
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REFRESH_TOKEN: z.string().optional(),
+  GOOGLE_DRIVE_ROOT_FOLDER_ID: z.string().optional(),
+
+  // --- Social statistieken ---
+  AYRSHARE_API_KEY: z.string().optional(),
+
+  // --- AI ---
+  ANTHROPIC_API_KEY: z.string().optional(),
+  AI_MODEL: z.string().default("claude-sonnet-5"),
+
+  // --- Achtergrondtaken ---
+  CRON_SECRET: z.string().optional(),
+});
+
+const parsed = schema.safeParse(process.env);
+
+if (!parsed.success) {
+  const details = parsed.error.issues
+    .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
+    .join("\n");
+  throw new Error(`Ongeldige omgevingsvariabelen:\n${details}`);
+}
+
+export const env = parsed.data;
+
+export const isProduction = env.NODE_ENV === "production";
+
+/**
+ * Sessiegeheim. In productie is een expliciet geheim verplicht: zonder dat
+ * zouden sessies na een herstart of op een tweede server ongeldig zijn, en
+ * zou het geheim raadbaar worden.
+ */
+export function sessionSecret(): string {
+  if (env.SESSION_SECRET) return env.SESSION_SECRET;
+  if (isProduction) {
+    throw new Error(
+      "SESSION_SECRET ontbreekt. Genereer er één met: openssl rand -base64 48",
+    );
+  }
+  return "shortclips-os-development-secret-do-not-use-in-production";
+}
+
+/** Welke integraties zijn technisch geconfigureerd? Voedt de health-pagina. */
+export function integrationConfig() {
+  return {
+    monday: {
+      configured: Boolean(env.MONDAY_API_TOKEN),
+      required: ["MONDAY_API_TOKEN"],
+      optional: ["MONDAY_WEBHOOK_SECRET"],
+    },
+    frameio: {
+      configured: Boolean(env.FRAMEIO_TOKEN),
+      required: ["FRAMEIO_TOKEN"],
+      optional: ["FRAMEIO_ACCOUNT_ID", "FRAMEIO_WEBHOOK_SECRET"],
+    },
+    google_drive: {
+      configured: Boolean(
+        env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_REFRESH_TOKEN,
+      ),
+      required: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
+      optional: ["GOOGLE_DRIVE_ROOT_FOLDER_ID"],
+    },
+    ayrshare: {
+      configured: Boolean(env.AYRSHARE_API_KEY),
+      required: ["AYRSHARE_API_KEY"],
+      optional: [],
+    },
+    metricool: { configured: false, required: [], optional: [] },
+  } as const;
+}

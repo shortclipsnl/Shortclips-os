@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "shortclips-os",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/jarnoklijnsma/shortclips-os && export PATH=/Users/jarnoklijnsma/.local/node/current/bin:$PATH && exec node node_modules/next/dist/bin/next dev --port 3100"
+      ],
+      "port": 3100
+    }
+  ]
+}
