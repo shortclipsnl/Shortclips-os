@@ -336,3 +336,47 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
   assignee: one(users, { fields: [tasks.assigneeId], references: [users.id] }),
   dependencies: many(taskDependencies),
 }));
+
+/* ------------------------------------------------------------------ *
+ * Google Agenda — gesynchroniseerde afspraken
+ * Eén afspraak per rij. clientId = null betekent: (nog) geen zekere klant,
+ * belandt in de review in het beheer. Nooit stilletjes gokken.
+ * ------------------------------------------------------------------ */
+
+export const calendarEvents = pgTable(
+  "calendar_events",
+  {
+    id: pk(),
+    source: varchar("source", { length: 32 }).notNull().default("google_calendar"),
+    calendarId: varchar("calendar_id", { length: 320 }).notNull(),
+    calendarName: varchar("calendar_name", { length: 200 }),
+    externalId: varchar("external_id", { length: 320 }).notNull(),
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+    kind: varchar("kind", { length: 32 }).notNull().default("overig"),
+    title: varchar("title", { length: 300 }),
+    description: text("description"),
+    location: varchar("location", { length: 300 }),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    allDay: boolean("all_day").notNull().default(false),
+    attendees: jsonb("attendees").notNull().default(sql`'[]'::jsonb`),
+    htmlLink: text("html_link"),
+    status: varchar("status", { length: 24 }),
+    matchConfidence: varchar("match_confidence", { length: 16 }).notNull().default("none"),
+    matchReason: text("match_reason"),
+    matchedBy: jsonb("matched_by").notNull().default(sql`'[]'::jsonb`),
+    candidates: jsonb("candidates").notNull().default(sql`'[]'::jsonb`),
+    syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [
+    unique("calendar_events_unique").on(t.source, t.calendarId, t.externalId),
+    index("calendar_events_client_idx").on(t.clientId, t.startsAt),
+    index("calendar_events_date_idx").on(t.startsAt),
+    index("calendar_events_kind_idx").on(t.clientId, t.kind),
+  ],
+);
+
+export const calendarEventsRelations = relations(calendarEvents, ({ one }) => ({
+  client: one(clients, { fields: [calendarEvents.clientId], references: [clients.id] }),
+}));

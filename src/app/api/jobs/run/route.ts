@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 import { runDailySignals, runHourlySignals } from "@/server/jobs/maintenance";
 import { pullFrameComments } from "@/server/jobs/frameio-sync";
+import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { pruneSessions } from "@/server/auth/session";
 
 export const runtime = "nodejs";
@@ -18,6 +19,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "signals.daily": runDailySignals,
   "signals.hourly": runHourlySignals,
   "frameio.pull_comments": pullFrameComments,
+  "calendar.sync": runCalendarSync,
   "maintenance.prune_sessions": async () => ({ removed: await pruneSessions() }),
 };
 

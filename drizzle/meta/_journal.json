@@ -15,6 +15,13 @@
       "when": 1791128486731,
       "tag": "0001_powerful_tempest",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791189031379,
+      "tag": "0002_loving_doctor_octopus",
+      "breakpoints": true
     }
   ]
 }
