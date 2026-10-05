@@ -6,6 +6,7 @@ import { integrationConfig } from "@/lib/env";
 import { monday } from "./monday";
 import { frameio } from "./frameio";
 import { drive } from "./drive";
+import { googleCalendar } from "./google-calendar";
 import type { ConnectionTest, Provider } from "./types";
 
 /**
@@ -127,6 +128,45 @@ export const INTEGRATION_SPECS: IntegrationSpec[] = [
     test: () => drive.testConnection(),
   },
   {
+    provider: "google_calendar",
+    name: "Google Agenda",
+    description:
+      "De actuele planning van ShortClips. Leest afspraken — opnamedagen, scriptbesprekingen, evaluaties en publicaties — en koppelt ze aan de juiste klant.",
+    purpose: [
+      "Eerstvolgende opnamedag en aankomende afspraken per klant tonen",
+      "Scriptbesprekingen en evaluatiegesprekken automatisch bijhouden",
+      "Afspraken zonder herkenbare klant markeren voor controle, nooit gokken",
+    ],
+    required: [
+      {
+        key: "GOOGLE_CLIENT_ID",
+        label: "OAuth client-ID (zelfde als Google Drive)",
+        where:
+          "console.cloud.google.com → APIs & Services → Credentials → OAuth client ID (type: Web application)",
+      },
+      {
+        key: "GOOGLE_CLIENT_SECRET",
+        label: "OAuth client secret",
+        where: "Zelfde scherm als het client-ID",
+      },
+      {
+        key: "GOOGLE_REFRESH_TOKEN",
+        label: "Refresh-token mét Agenda-scope",
+        where:
+          "Eenmalig via de OAuth-consent flow met access_type=offline en prompt=consent",
+        scopes:
+          "https://www.googleapis.com/auth/calendar.readonly (naast de Drive-scope)",
+      },
+      {
+        key: "GOOGLE_CALENDAR_IDS",
+        label: "Agenda-id's (optioneel, komma-gescheiden)",
+        where:
+          "Google Agenda → agenda-instellingen → Agenda-id. Leeg = alle agenda's waar het account toegang toe heeft.",
+      },
+    ],
+    test: () => googleCalendar.testConnection(),
+  },
+  {
     provider: "ayrshare",
     name: "Ayrshare",
     description:
@@ -197,4 +237,4 @@ export async function recordTest(provider: Provider, result: ConnectionTest) {
     .where(eq(integrationConnections.provider, provider));
 }
 
-export { monday, frameio, drive };
+export { monday, frameio, drive, googleCalendar };

@@ -1,6 +1,12 @@
 /** Gedeelde vorm van alle externe koppelingen. */
 
-export type Provider = "monday" | "frameio" | "google_drive" | "ayrshare" | "metricool";
+export type Provider =
+  | "monday"
+  | "frameio"
+  | "google_drive"
+  | "google_calendar"
+  | "ayrshare"
+  | "metricool";
 
 export class IntegrationError extends Error {
   constructor(

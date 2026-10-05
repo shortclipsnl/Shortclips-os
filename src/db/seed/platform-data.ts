@@ -172,7 +172,13 @@ export const AUTOMATION_RULES: Array<{
 ];
 
 export const INTEGRATIONS: Array<{
-  provider: "monday" | "frameio" | "google_drive" | "ayrshare" | "metricool";
+  provider:
+    | "monday"
+    | "frameio"
+    | "google_drive"
+    | "google_calendar"
+    | "ayrshare"
+    | "metricool";
   requiredEnv: string[];
   config: Record<string, unknown>;
 }> = [
@@ -190,6 +196,11 @@ export const INTEGRATIONS: Array<{
     provider: "google_drive",
     requiredEnv: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
     config: { webhookPath: "/api/webhooks/drive" },
+  },
+  {
+    provider: "google_calendar",
+    requiredEnv: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
+    config: { note: "Hergebruikt Google-OAuth; scope calendar.readonly vereist" },
   },
   { provider: "ayrshare", requiredEnv: ["AYRSHARE_API_KEY"], config: {} },
   { provider: "metricool", requiredEnv: [], config: { note: "Nog niet ingericht" } },

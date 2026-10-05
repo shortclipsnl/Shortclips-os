@@ -35,6 +35,13 @@ const schema = z.object({
   GOOGLE_REFRESH_TOKEN: z.string().optional(),
   GOOGLE_DRIVE_ROOT_FOLDER_ID: z.string().optional(),
 
+  // --- Google Agenda ---
+  // Hergebruikt dezelfde Google-OAuth (CLIENT_ID/SECRET/REFRESH_TOKEN). De
+  // refresh-token moet dan ook de scope calendar.readonly hebben. Optioneel:
+  // een komma-gescheiden lijst van agenda-id's die gesynchroniseerd worden.
+  // Leeg = alle agenda's waar het account toegang toe heeft.
+  GOOGLE_CALENDAR_IDS: z.string().optional(),
+
   // --- Social statistieken ---
   AYRSHARE_API_KEY: z.string().optional(),
 
@@ -93,6 +100,15 @@ export function integrationConfig() {
       ),
       required: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
       optional: ["GOOGLE_DRIVE_ROOT_FOLDER_ID"],
+    },
+    google_calendar: {
+      // Hergebruikt dezelfde Google-OAuth als Drive; vereist wél de
+      // calendar.readonly-scope op de refresh-token.
+      configured: Boolean(
+        env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_REFRESH_TOKEN,
+      ),
+      required: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
+      optional: ["GOOGLE_CALENDAR_IDS"],
     },
     ayrshare: {
       configured: Boolean(env.AYRSHARE_API_KEY),
