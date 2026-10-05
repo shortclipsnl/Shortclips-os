@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { runDailySignals, runHourlySignals } from "@/server/jobs/maintenance";
 import { pullFrameComments } from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
+import { runMondayClientImport } from "@/server/jobs/monday-import";
 import { pruneSessions } from "@/server/auth/session";
 
 export const runtime = "nodejs";
@@ -20,6 +21,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "signals.hourly": runHourlySignals,
   "frameio.pull_comments": pullFrameComments,
   "calendar.sync": runCalendarSync,
+  "monday.import_clients": runMondayClientImport,
   "maintenance.prune_sessions": async () => ({ removed: await pruneSessions() }),
 };
 

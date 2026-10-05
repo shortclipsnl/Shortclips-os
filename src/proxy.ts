@@ -10,7 +10,9 @@ import type { NextRequest } from "next/server";
  * inlogscherm gaan. De échte controle — bestaat de sessie, welke rechten, welke
  * klanten — gebeurt server-side in `getViewer()` bij elke pagina en actie.
  */
-const PUBLIC_PATHS = ["/login", "/api/webhooks", "/api/health"];
+// /api/jobs is publiek op proxy-niveau, maar wordt door de route zélf beveiligd
+// met CRON_SECRET (anders zou de geplande-taken-cron nooit binnenkomen).
+const PUBLIC_PATHS = ["/login", "/api/webhooks", "/api/health", "/api/jobs"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

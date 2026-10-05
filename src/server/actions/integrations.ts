@@ -11,6 +11,7 @@ import type { Provider } from "@/server/integrations/types";
 import { syncClientDriveFolder } from "@/server/jobs/drive-sync";
 import { pullFrameComments, pullFrameProjects } from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
+import { runMondayClientImport } from "@/server/jobs/monday-import";
 import { runDailySignals, runHourlySignals } from "@/server/jobs/maintenance";
 import { commitImport, dryRunImport } from "@/server/import";
 
@@ -43,6 +44,7 @@ const JOBS: Record<string, () => Promise<{ ok: boolean; error?: string }>> = {
   "frameio.pull_projects": pullFrameProjects,
   "frameio.pull_comments": pullFrameComments,
   "calendar.sync": runCalendarSync,
+  "monday.import_clients": runMondayClientImport,
   "signals.daily": runDailySignals,
   "signals.hourly": runHourlySignals,
 };
