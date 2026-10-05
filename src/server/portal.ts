@@ -16,6 +16,7 @@ import {
   users,
 } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
+import { upcomingAppointmentsForClient } from "@/server/appointments";
 
 /**
  * Alles wat het klantportaal toont — en niets meer.
@@ -60,6 +61,7 @@ export async function getPortalData(viewer: Viewer) {
     documents,
     timeline,
     metrics,
+    appointments,
   ] = await Promise.all([
     // Video's die op de klant wachten
     db.select({
@@ -208,6 +210,8 @@ export async function getPortalData(viewer: Viewer) {
       where dm.client_id = ${clientId}
         and dm.measured_on >= current_date - interval '30 days'
     `),
+    // Afspraken uit Google Agenda die aan deze klant zijn gekoppeld.
+    upcomingAppointmentsForClient(clientId, 8),
   ]);
 
   const metricRow =
@@ -222,6 +226,7 @@ export async function getPortalData(viewer: Viewer) {
     published,
     upcomingShoot: upcomingShoot[0] ?? null,
     upcomingShoots: upcomingShoot,
+    appointments,
     calendar,
     reports,
     documents,

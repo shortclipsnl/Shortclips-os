@@ -29,6 +29,15 @@ import { ScriptDecision, VideoDecision } from "./actions-ui";
 export const metadata: Metadata = { title: "Jouw omgeving" };
 export const dynamic = "force-dynamic";
 
+/** Interne afspraaktypes vertaald naar klanttaal. */
+const APPOINTMENT_LABEL: Record<string, string> = {
+  opname: "Opnamedag",
+  scriptbespreking: "Scriptbespreking",
+  evaluatie: "Evaluatiegesprek",
+  publicatie: "Publicatie",
+  overig: "Afspraak",
+};
+
 export default async function PortalPage() {
   const viewer = await requirePortal();
   const data = await getPortalData(viewer);
@@ -130,6 +139,30 @@ export default async function PortalPage() {
           </div>
         ) : null}
       </Card>
+
+      {/* Aankomende afspraken uit Google Agenda (verschijnt zodra er gekoppelde afspraken zijn) */}
+      {data.appointments.length > 0 ? (
+        <Card>
+          <CardHeader title="Aankomende afspraken" />
+          <ul className="mt-4 space-y-3">
+            {data.appointments.map((a) => (
+              <li key={a.id} className="flex items-start gap-3">
+                <CalendarClock
+                  className="mt-0.5 size-5 shrink-0 text-[var(--color-brand-600)]"
+                  strokeWidth={1.75}
+                />
+                <div className="min-w-0">
+                  <p className="font-medium">{APPOINTMENT_LABEL[a.kind] ?? "Afspraak"}</p>
+                  <p className="text-sm text-[var(--color-ink-muted)]">
+                    {formatDateFull(a.startsAt)} · {relativeDays(a.startsAt)}
+                    {a.location ? ` · ${a.location}` : ""}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       {/* Wat is de volgende stap */}
       <div className="grid gap-5 md:grid-cols-2">

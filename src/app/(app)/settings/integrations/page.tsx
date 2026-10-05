@@ -9,6 +9,7 @@ import { db } from "@/db/client";
 import { syncJobs, integrationEvents } from "@/db/schema";
 import { requirePermission } from "@/server/auth/context";
 import { integrationHealth } from "@/server/integrations/registry";
+import { appointmentReviewStats, unmatchedAppointments } from "@/server/appointments";
 import { env } from "@/lib/env";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, Table } from "@/components/ui";
 import { formatDateTime, relativeDays } from "@/lib/format";
@@ -46,6 +47,11 @@ export default async function IntegrationsPage() {
       receivedAt: integrationEvents.receivedAt, signatureValid: integrationEvents.signatureValid,
       error: integrationEvents.error,
     }).from(integrationEvents).orderBy(desc(integrationEvents.receivedAt)).limit(15),
+  ]);
+
+  const [agendaReview, agendaStats] = await Promise.all([
+    unmatchedAppointments(50),
+    appointmentReviewStats(),
   ]);
 
   return (
@@ -251,6 +257,50 @@ export default async function IntegrationsPage() {
                   </Badge>
                 </td>
                 <td className="sc-td text-[var(--color-ink-muted)]">{formatDateTime(e.receivedAt)}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </Card>
+
+      {/* Google Agenda: afspraken die (nog) geen zekere klant hebben */}
+      <Card>
+        <CardHeader title="Afspraken zonder klant — controleren" />
+        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+          {agendaStats.total === 0
+            ? "Er is nog niets uit Google Agenda gesynchroniseerd."
+            : `${agendaStats.matched} van ${agendaStats.total} afspraken gekoppeld · ${agendaStats.needsReview} te controleren${
+                agendaStats.ambiguous ? ` (waarvan ${agendaStats.ambiguous} met meerdere mogelijke klanten)` : ""
+              }.`}
+        </p>
+        {agendaReview.length === 0 ? (
+          <div className="mt-4">
+            <EmptyState
+              title="Alles gekoppeld"
+              description="Elke gesynchroniseerde afspraak is aan een klant gekoppeld. Twijfelgevallen verschijnen hier — nooit stilletjes bij de verkeerde klant."
+            />
+          </div>
+        ) : (
+          <Table
+            head={
+              <>
+                <th className="sc-th">Afspraak</th>
+                <th className="sc-th">Wanneer</th>
+                <th className="sc-th">Agenda</th>
+                <th className="sc-th">Reden</th>
+              </>
+            }
+          >
+            {agendaReview.map((a) => (
+              <tr key={a.id}>
+                <td className="sc-td font-medium">{a.title ?? "(zonder titel)"}</td>
+                <td className="sc-td text-[var(--color-ink-muted)]">{formatDateTime(a.startsAt)}</td>
+                <td className="sc-td text-[var(--color-ink-muted)]">{a.calendarName ?? "–"}</td>
+                <td className="sc-td">
+                  <Badge tone={a.matchConfidence === "ambiguous" ? "warn" : "neutral"}>
+                    {a.matchConfidence === "ambiguous" ? "meerdere mogelijk" : "geen klant herkend"}
+                  </Badge>
+                </td>
               </tr>
             ))}
           </Table>
