@@ -44,3 +44,7 @@ next-env.d.ts
 .data/
 .env.local
 .env*.local
+
+# Lokale pilot-logins (nooit committen)
+*.local.md
+PILOT-LOGINS*

@@ -5,6 +5,7 @@ import { runDailySignals, runHourlySignals } from "@/server/jobs/maintenance";
 import { pullFrameComments } from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { runMondayClientImport } from "@/server/jobs/monday-import";
+import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { pruneSessions } from "@/server/auth/session";
 
 export const runtime = "nodejs";
@@ -22,6 +23,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "frameio.pull_comments": pullFrameComments,
   "calendar.sync": runCalendarSync,
   "monday.import_clients": runMondayClientImport,
+  "pilot.setup_logins": () => runPilotPortalSetup(),
   "maintenance.prune_sessions": async () => ({ removed: await pruneSessions() }),
 };
 
