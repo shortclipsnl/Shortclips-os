@@ -32,14 +32,19 @@ export type FrameSource = {
   listComments(fileId: string): Promise<FrameComment[]>;
 };
 
+/** Mappen (en version-stacks) waar we doorheen lopen om video's te vinden. */
+function isContainer(file: FrameFile): boolean {
+  return file.type === "folder" || file.type === "version_stack";
+}
+
 /** Welke bestanden zijn video's? Alleen die worden video's in ShortClips OS. */
 function isVideoFile(file: FrameFile): boolean {
-  if (file.type === "folder") return false;
+  if (isContainer(file)) return false;
   if (file.media_type?.toLowerCase().startsWith("video")) return true;
-  return /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(file.name ?? "");
-}
-function isFolder(file: FrameFile): boolean {
-  return file.type === "folder";
+  if (/\.(mp4|mov|m4v|webm|avi|mkv|mpg|mpeg)$/i.test(file.name ?? "")) return true;
+  // In een videoproject is een los bestand zonder herkenbaar type doorgaans
+  // ook een video (bijv. een asset zonder extensie in de naam).
+  return file.type === "file" && !file.media_type;
 }
 
 /**
@@ -181,9 +186,15 @@ async function collectProjectVideos(
     seen.add(folderId);
     folders++;
 
-    const children = await source.listFolderChildren(folderId);
+    let children: FrameFile[] = [];
+    try {
+      children = await source.listFolderChildren(folderId);
+    } catch {
+      // Eén onleesbare (sub)map mag de rest van het project niet blokkeren.
+      continue;
+    }
     for (const child of children) {
-      if (isFolder(child)) queue.push(child.id);
+      if (isContainer(child)) queue.push(child.id);
       else if (isVideoFile(child)) videos.push(child);
     }
   }
