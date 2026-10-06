@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 import { runDailySignals, runHourlySignals } from "@/server/jobs/maintenance";
 import {
+  listFrameProjects,
   normalizeImportedFrameDeliverables,
   pullFrameComments,
   pullFrameDeliverables,
@@ -30,6 +31,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "frameio.pull_comments": pullFrameComments,
   "frameio.pull_deliverables": pullFrameDeliverables,
   "frameio.normalize_imported": normalizeImportedFrameDeliverables,
+  "frameio.list_projects": listFrameProjects,
   "calendar.sync": runCalendarSync,
   "monday.import_clients": runMondayClientImport,
   "sync.frequent": runFrequentSync,

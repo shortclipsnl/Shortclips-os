@@ -155,6 +155,16 @@ export async function pullFrameProjects(
   );
 }
 
+/** Hulpfunctie: geeft alle Frame.io-projectnamen terug (voor handmatig koppelen). */
+export async function listFrameProjects(_triggeredById?: string, source: FrameSource = frameio) {
+  const projects = await source.listProjects();
+  return {
+    ok: true,
+    count: projects.length,
+    projects: projects.map((p) => ({ id: p.id, name: p.name })),
+  };
+}
+
 /** Verzamelt alle video-bestanden van een project (recursief, begrensd). */
 async function collectProjectVideos(
   source: FrameSource,

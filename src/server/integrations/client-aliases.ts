@@ -7,10 +7,12 @@
  * Sleutel = klant-slug (zoals in de database), waarden = alternatieve namen.
  */
 export const CLIENT_ALIASES: Record<string, string[]> = {
-  "shades-by-erik-kuster": ["buildings group", "buildingsgroup", "buildings"],
+  // Frame.io-projectnaam / agenda-titel die afwijkt van de klantnaam.
+  "shades-by-erik-kuster": ["shades by eric kuster", "buildings group", "buildingsgroup"],
   "marco-van-beek-premium-cars": ["marco van beek"],
-  "benz-collector-sneek": ["benz collector", "benzcollector"],
+  "benz-collector-sneek": ["benz collector museum", "benz collector", "benzcollector"],
   "donker-groep": ["donkergroen", "donker groen"],
+  "kavel-10": ["kavel 10 | hetbestebeeld.nl", "hetbestebeeld"],
 };
 
 /** Alle aliassen voor één klant-slug (leeg als er geen zijn). */
