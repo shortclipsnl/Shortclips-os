@@ -9,7 +9,11 @@ import { auditLog } from "@/server/audit";
 import { recordTest, specFor } from "@/server/integrations/registry";
 import type { Provider } from "@/server/integrations/types";
 import { syncClientDriveFolder } from "@/server/jobs/drive-sync";
-import { pullFrameComments, pullFrameProjects } from "@/server/jobs/frameio-sync";
+import {
+  pullFrameComments,
+  pullFrameDeliverables,
+  pullFrameProjects,
+} from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { runMondayClientImport } from "@/server/jobs/monday-import";
 import { runDailySignals, runHourlySignals } from "@/server/jobs/maintenance";
@@ -42,6 +46,7 @@ export async function testIntegration(provider: string): Promise<ActionResult> {
 
 const JOBS: Record<string, () => Promise<{ ok: boolean; error?: string }>> = {
   "frameio.pull_projects": pullFrameProjects,
+  "frameio.pull_deliverables": pullFrameDeliverables,
   "frameio.pull_comments": pullFrameComments,
   "calendar.sync": runCalendarSync,
   "monday.import_clients": runMondayClientImport,

@@ -2,20 +2,262 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
+  clientIntegrations,
+  clients,
   deliverables,
   frameMappings,
   reviewComments,
   reviewThreads,
 } from "@/db/schema";
-import { frameio } from "@/server/integrations/frameio";
+import {
+  frameio,
+  type FrameComment,
+  type FrameFile,
+  type FrameProject,
+} from "@/server/integrations/frameio";
+import { normalizeName } from "@/server/import";
 import { runJob } from "./runner";
 
 /**
- * Opmerkingen en versies uit Frame.io ophalen voor alle video's die aan een
+ * De bron van Frame.io-data. Normaal de echte adapter; in tests injecteren we
+ * een nepbron met vaste projecten/bestanden/opmerkingen, zodat de hele keten
+ * (project → klant → video → feedback) zonder internet te testen is.
+ */
+export type FrameSource = {
+  isConfigured: boolean;
+  listProjects(): Promise<FrameProject[]>;
+  getProject(projectId: string): Promise<FrameProject>;
+  listFolderChildren(folderId: string): Promise<FrameFile[]>;
+  listComments(fileId: string): Promise<FrameComment[]>;
+};
+
+/** Welke bestanden zijn video's? Alleen die worden video's in ShortClips OS. */
+function isVideoFile(file: FrameFile): boolean {
+  if (file.type === "folder") return false;
+  if (file.media_type?.toLowerCase().startsWith("video")) return true;
+  return /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(file.name ?? "");
+}
+function isFolder(file: FrameFile): boolean {
+  return file.type === "folder";
+}
+
+/**
+ * Vertaalt een Frame.io-bestandsstatus naar de ShortClips-videostatus.
+ * Frame.io is het klant-reviewgereedschap, dus een video die daar staat en nog
+ * niet is goedgekeurd, staat per definitie te wachten op de klant. Bewust
+ * voorzichtig — bij twijfel "client_review", nooit zomaar "published".
+ */
+function mapFrameStatus(status?: string): "client_review" | "approved" {
+  const s = (status ?? "").toLowerCase();
+  if (s.includes("approved") || s.includes("complete") || s.includes("accepted")) {
+    return "approved";
+  }
+  return "client_review";
+}
+
+/**
+ * Projecten uit Frame.io ophalen. Elk project wordt vastgelegd in frame_mappings
+ * en — als de projectnaam onmiskenbaar bij precies één klant hoort — automatisch
+ * aan die klant gekoppeld (client_integrations, provider frameio). Bij twijfel
+ * (geen of meerdere klanten) gebeurt dat NIET; dan koppelt een beheerder het
+ * handmatig. Zo belandt een video nooit bij de verkeerde klant.
+ */
+export async function pullFrameProjects(
+  triggeredById?: string,
+  source: FrameSource = frameio,
+) {
+  return runJob(
+    "frameio",
+    "frameio.pull_projects",
+    {},
+    async (ctx) => {
+      const projects = await source.listProjects();
+      ctx.log(`${projects.length} projecten gevonden`);
+      ctx.counters.processed = projects.length;
+
+      const clientRows = await db
+        .select({ id: clients.id, name: clients.name, slug: clients.slug })
+        .from(clients)
+        .where(isNull(clients.deletedAt));
+
+      for (const project of projects) {
+        const existing = await db
+          .select({ id: frameMappings.id })
+          .from(frameMappings)
+          .where(
+            and(eq(frameMappings.entityType, "frame_project"), eq(frameMappings.projectId, project.id)),
+          )
+          .limit(1);
+
+        if (existing[0]) {
+          await db
+            .update(frameMappings)
+            .set({ lastSyncedAt: new Date() })
+            .where(eq(frameMappings.id, existing[0].id));
+          ctx.counters.updated++;
+        } else {
+          await db.insert(frameMappings).values({
+            entityType: "frame_project",
+            projectId: project.id,
+            workspaceId: project.workspace_id ?? null,
+            folderId: project.root_folder_id ?? null,
+            lastSyncedAt: new Date(),
+          });
+          ctx.counters.created++;
+        }
+
+        // Voorzichtige automatische koppeling: alleen bij precies één naamgenoot.
+        const nName = normalizeName(project.name);
+        const hits = clientRows.filter(
+          (c) => normalizeName(c.name) === nName || normalizeName(c.slug) === nName,
+        );
+        if (hits.length === 1) {
+          await db
+            .insert(clientIntegrations)
+            .values({
+              clientId: hits[0]!.id,
+              provider: "frameio",
+              externalId: project.id,
+              externalName: project.name,
+              config: { rootFolderId: project.root_folder_id ?? null },
+              lastSyncedAt: new Date(),
+            })
+            .onConflictDoUpdate({
+              target: [
+                clientIntegrations.clientId,
+                clientIntegrations.provider,
+                clientIntegrations.externalId,
+              ],
+              set: { externalName: project.name, lastSyncedAt: new Date(), updatedAt: new Date() },
+            });
+          ctx.log(`Project "${project.name}" gekoppeld aan klant.`);
+        } else {
+          ctx.log(
+            `Project "${project.name}": ${hits.length === 0 ? "geen" : `${hits.length} mogelijke`} klant — handmatig koppelen.`,
+            "warn",
+          );
+        }
+      }
+    },
+    { triggeredById },
+  );
+}
+
+/** Verzamelt alle video-bestanden van een project (recursief, begrensd). */
+async function collectProjectVideos(
+  source: FrameSource,
+  rootFolderId: string,
+): Promise<FrameFile[]> {
+  const videos: FrameFile[] = [];
+  const queue: string[] = [rootFolderId];
+  const seen = new Set<string>();
+  let folders = 0;
+
+  while (queue.length && folders < 200 && videos.length < 500) {
+    const folderId = queue.shift()!;
+    if (seen.has(folderId)) continue;
+    seen.add(folderId);
+    folders++;
+
+    const children = await source.listFolderChildren(folderId);
+    for (const child of children) {
+      if (isFolder(child)) queue.push(child.id);
+      else if (isVideoFile(child)) videos.push(child);
+    }
+  }
+  return videos;
+}
+
+/**
+ * Maakt/verwerkt video's (deliverables) uit de gekoppelde Frame.io-projecten,
+ * zodat ze in het klantportaal verschijnen. Idempotent op het Frame.io-asset-id.
+ * Daarna haalt `pullFrameComments` de feedback per video op.
+ */
+export async function pullFrameDeliverables(
+  triggeredById?: string,
+  source: FrameSource = frameio,
+) {
+  return runJob(
+    "frameio",
+    "frameio.pull_deliverables",
+    {},
+    async (ctx) => {
+      const links = await db
+        .select({
+          clientId: clientIntegrations.clientId,
+          projectId: clientIntegrations.externalId,
+          config: clientIntegrations.config,
+        })
+        .from(clientIntegrations)
+        .where(eq(clientIntegrations.provider, "frameio"));
+
+      ctx.log(`${links.length} gekoppelde Frame.io-projecten`);
+
+      for (const link of links) {
+        if (!link.projectId) continue;
+        try {
+          const cfg = (link.config ?? {}) as { rootFolderId?: string | null };
+          let rootFolderId = cfg.rootFolderId ?? null;
+          if (!rootFolderId) {
+            const project = await source.getProject(link.projectId);
+            rootFolderId = project.root_folder_id ?? null;
+          }
+          if (!rootFolderId) {
+            ctx.log(`Project ${link.projectId}: geen hoofdmap gevonden.`, "warn");
+            continue;
+          }
+
+          const videos = await collectProjectVideos(source, rootFolderId);
+          ctx.counters.processed += videos.length;
+
+          for (const file of videos) {
+            const status = mapFrameStatus(file.status);
+            const base = {
+              clientId: link.clientId,
+              title: file.name ?? "Video",
+              frameAssetId: file.id,
+              frameProjectId: link.projectId,
+              frameUrl: file.view_url ?? null,
+              updatedAt: new Date(),
+            };
+
+            const [existing] = await db
+              .select({ id: deliverables.id })
+              .from(deliverables)
+              .where(eq(deliverables.frameAssetId, file.id))
+              .limit(1);
+
+            if (existing) {
+              // Status niet terugzetten als het team die al verder heeft gezet;
+              // alleen de Frame.io-metadata bijwerken.
+              await db.update(deliverables).set(base).where(eq(deliverables.id, existing.id));
+              ctx.counters.updated++;
+            } else {
+              await db.insert(deliverables).values({ ...base, status });
+              ctx.counters.created++;
+            }
+          }
+        } catch (error) {
+          ctx.counters.failed++;
+          ctx.log(`Project ${link.projectId}: ${String(error)}`, "warn");
+        }
+      }
+
+      ctx.log(`Klaar: ${ctx.counters.created} nieuwe video's, ${ctx.counters.updated} bijgewerkt.`);
+    },
+    { triggeredById },
+  );
+}
+
+/**
+ * Opmerkingen (klantfeedback) uit Frame.io ophalen voor alle video's die aan een
  * Frame.io-asset gekoppeld zijn. Idempotent: bestaande opmerkingen worden
  * overgeslagen op basis van hun Frame.io-id.
  */
-export async function pullFrameComments(triggeredById?: string) {
+export async function pullFrameComments(
+  triggeredById?: string,
+  source: FrameSource = frameio,
+) {
   return runJob(
     "frameio",
     "frameio.pull_comments",
@@ -36,7 +278,7 @@ export async function pullFrameComments(triggeredById?: string) {
 
       for (const video of linked) {
         try {
-          const comments = await frameio.listComments(video.frameAssetId!);
+          const comments = await source.listComments(video.frameAssetId!);
           ctx.counters.processed += comments.length;
 
           for (const comment of comments) {
@@ -71,48 +313,6 @@ export async function pullFrameComments(triggeredById?: string) {
         } catch (error) {
           ctx.counters.failed++;
           ctx.log(`Video ${video.title}: ${String(error)}`, "warn");
-        }
-      }
-    },
-    { triggeredById },
-  );
-}
-
-/** Projecten uit Frame.io ophalen, zodat ze aan klanten gekoppeld kunnen worden. */
-export async function pullFrameProjects(triggeredById?: string) {
-  return runJob(
-    "frameio",
-    "frameio.pull_projects",
-    {},
-    async (ctx) => {
-      const projects = await frameio.listProjects();
-      ctx.log(`${projects.length} projecten gevonden`);
-      ctx.counters.processed = projects.length;
-
-      for (const project of projects) {
-        const existing = await db
-          .select({ id: frameMappings.id })
-          .from(frameMappings)
-          .where(
-            and(eq(frameMappings.entityType, "frame_project"), eq(frameMappings.projectId, project.id)),
-          )
-          .limit(1);
-
-        if (existing[0]) {
-          await db
-            .update(frameMappings)
-            .set({ lastSyncedAt: new Date() })
-            .where(eq(frameMappings.id, existing[0].id));
-          ctx.counters.updated++;
-        } else {
-          await db.insert(frameMappings).values({
-            entityType: "frame_project",
-            projectId: project.id,
-            workspaceId: project.workspace_id ?? null,
-            folderId: project.root_folder_id ?? null,
-            lastSyncedAt: new Date(),
-          });
-          ctx.counters.created++;
         }
       }
     },

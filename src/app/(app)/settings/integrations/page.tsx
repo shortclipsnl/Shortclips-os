@@ -161,6 +161,7 @@ export default async function IntegrationsPage() {
           />
           <div className="mt-4 flex flex-wrap gap-3">
             <JobButton job="frameio.pull_projects" label="Frame.io-projecten ophalen" />
+            <JobButton job="frameio.pull_deliverables" label="Frame.io-video's ophalen" />
             <JobButton job="frameio.pull_comments" label="Frame.io-feedback ophalen" />
             <JobButton job="signals.daily" label="Dagelijkse signalering" />
             <JobButton job="signals.hourly" label="Opnamecontrole" />

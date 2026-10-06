@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 import { runDailySignals, runHourlySignals } from "@/server/jobs/maintenance";
-import { pullFrameComments } from "@/server/jobs/frameio-sync";
+import { pullFrameComments, pullFrameDeliverables } from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { runMondayClientImport } from "@/server/jobs/monday-import";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
@@ -21,6 +21,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "signals.daily": runDailySignals,
   "signals.hourly": runHourlySignals,
   "frameio.pull_comments": pullFrameComments,
+  "frameio.pull_deliverables": pullFrameDeliverables,
   "calendar.sync": runCalendarSync,
   "monday.import_clients": runMondayClientImport,
   "pilot.setup_logins": () => runPilotPortalSetup(),
