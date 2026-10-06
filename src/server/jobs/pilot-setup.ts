@@ -52,7 +52,8 @@ export async function runPilotPortalSetup(options: {
   clientIds?: string[];
   limit?: number;
 } = {}): Promise<{ ok: boolean; accounts: PilotAccount[]; note?: string }> {
-  const limit = options.limit ?? 3;
+  // Zonder expliciete limiet: een portaallogin voor élke echte klant.
+  const limit = options.limit ?? 500;
 
   // De 'client'-rol (portaal) moet bestaan — die seedt de RBAC-stap.
   const [clientRole] = await db
