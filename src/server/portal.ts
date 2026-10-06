@@ -327,3 +327,58 @@ export async function getPortalVideo(viewer: Viewer, videoId: string) {
     threads: threads.map((t) => ({ ...t, comments: comments.filter((c) => c.threadId === t.id) })),
   };
 }
+
+const IN_PRODUCTION_STATUSES = [
+  "recorded", "footage_upload", "awaiting_editor", "editing", "internal_review",
+  "editor_revision", "approved", "ready_to_publish", "scheduled",
+] as const;
+
+/** Alle video's van de klant, gegroepeerd voor de video-omgeving (§24). */
+export async function getPortalVideos(viewer: Viewer) {
+  const clientId = viewer.clientId;
+  if (!clientId) notFound();
+
+  const rows = await db
+    .select({
+      id: deliverables.id,
+      title: deliverables.title,
+      status: deliverables.status,
+      frameUrl: deliverables.frameUrl,
+      thumbnailUrl: deliverables.thumbnailUrl,
+      publishedAt: deliverables.publishedAt,
+      plannedPublishOn: deliverables.plannedPublishOn,
+      statusChangedAt: deliverables.statusChangedAt,
+    })
+    .from(deliverables)
+    .where(and(eq(deliverables.clientId, clientId), isNull(deliverables.deletedAt)))
+    .orderBy(desc(deliverables.publishedAt), desc(deliverables.statusChangedAt))
+    .limit(1000);
+
+  return {
+    actieNodig: rows.filter((v) => v.status === "client_review" || v.status === "client_revision"),
+    inProductie: rows.filter((v) => (IN_PRODUCTION_STATUSES as readonly string[]).includes(v.status)),
+    gepubliceerd: rows.filter((v) => v.status === "published"),
+    totaal: rows.length,
+  };
+}
+
+/** De vaste contactpersoon van de klant bij ShortClips (§29). */
+export async function getPortalContact(viewer: Viewer) {
+  const clientId = viewer.clientId;
+  if (!clientId) notFound();
+
+  const [row] = await db
+    .select({
+      clientName: clients.name,
+      coordinatorName: users.fullName,
+      coordinatorEmail: users.email,
+      coordinatorAvatar: users.avatarUrl,
+      coordinatorRole: users.primaryRole,
+    })
+    .from(clients)
+    .leftJoin(users, eq(users.id, clients.coordinatorId))
+    .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
+    .limit(1);
+
+  return row ?? null;
+}

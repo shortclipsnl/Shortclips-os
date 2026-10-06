@@ -3,6 +3,7 @@ import { requirePortal } from "@/server/auth/context";
 import { Logo } from "@/components/logo";
 import { Avatar } from "@/components/ui";
 import { UserMenu } from "@/components/layout/user-menu";
+import { PortalNav } from "./portal-nav";
 
 /**
  * Het klantportaal staat bewust los van de interne app: eigen layout, eigen
@@ -32,11 +33,20 @@ export default async function PortalLayout({
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-[1100px] px-5 py-8">{children}</main>
-      <footer className="mx-auto max-w-[1100px] px-5 pb-10 text-xs text-[var(--color-ink-faint)]">
-        Deze omgeving is van jou. Vragen? Neem contact op met je vaste
-        contactpersoon bij ShortClips.
-      </footer>
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-6 px-5 py-6 lg:flex-row lg:gap-8 lg:py-8">
+        <aside className="lg:w-56 lg:shrink-0">
+          <div className="lg:sticky lg:top-8">
+            <PortalNav />
+          </div>
+        </aside>
+        <main className="min-w-0 flex-1">
+          {children}
+          <footer className="mt-10 text-xs text-[var(--color-ink-faint)]">
+            Deze omgeving is van jou. Vragen? Neem contact op met je vaste
+            contactpersoon bij ShortClips.
+          </footer>
+        </main>
+      </div>
     </div>
   );
 }
