@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import {
   CalendarClock,
   CheckCircle2,
@@ -8,22 +9,8 @@ import {
 } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalData } from "@/server/portal";
-import {
-  Card,
-  CardHeader,
-  EmptyState,
-  Stat,
-} from "@/components/ui";
-import {
-  compact,
-  formatDate,
-  formatDateFull,
-  num,
-  periodLabel,
-  plural,
-  relativeDays,
-} from "@/lib/format";
-import { PLATFORM } from "@/lib/statuses";
+import { Card, CardHeader, Stat } from "@/components/ui";
+import { compact, formatDateFull, num, plural, relativeDays } from "@/lib/format";
 import { ScriptDecision, VideoDecision } from "./actions-ui";
 
 export const metadata: Metadata = { title: "Jouw omgeving" };
@@ -230,131 +217,38 @@ export default async function PortalPage() {
         </p>
       </div>
 
-      {/* Planning */}
-      <Card padded={false}>
-        <div className="p-5 pb-3">
-          <CardHeader
-            title="Wanneer publiceren we"
-            subtitle="De eerstvolgende geplande video's."
-          />
-        </div>
-        {data.calendar.length === 0 ? (
-          <EmptyState title="Nog niets ingepland" />
-        ) : (
-          <ul className="divide-y divide-[var(--color-line)]">
-            {data.calendar.slice(0, 8).map((c) => (
-              <li key={c.id} className="flex items-center gap-3 px-5 py-3">
-                <span className="w-28 shrink-0 text-sm text-[var(--color-ink-muted)]">
-                  {formatDate(c.scheduledOn)}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{c.title}</span>
-                <span className="flex gap-1.5">
-                  {(c.platforms as string[]).map((p) => (
-                    <span
-                      key={p}
-                      title={PLATFORM[p]?.label ?? p}
-                      className="size-2.5 rounded-full"
-                      style={{ background: PLATFORM[p]?.color ?? "#999" }}
-                    />
-                  ))}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {/* Gepubliceerd */}
-      <Card padded={false}>
-        <div className="p-5 pb-3">
-          <CardHeader
-            title="Gepubliceerde video's"
-            subtitle={plural(data.published.length, "video", "video's")}
-          />
-        </div>
-        {data.published.length === 0 ? (
-          <EmptyState title="Nog niets gepubliceerd" />
-        ) : (
-          <ul className="divide-y divide-[var(--color-line)]">
-            {data.published.slice(0, 12).map((v) => (
-              <li key={v.id} className="flex items-center gap-3 px-5 py-3">
-                <PlayCircle className="size-4 shrink-0 text-[var(--color-ink-faint)]" strokeWidth={1.75} />
-                <span className="min-w-0 flex-1 truncate text-sm">{v.title}</span>
-                <span className="shrink-0 text-sm text-[var(--color-ink-muted)]">
-                  {formatDate(v.publishedAt)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      {/* Rapportages */}
-      {data.reports.length > 0 ? (
-        <Card padded={false}>
-          <div className="p-5 pb-3">
-            <CardHeader title="Rapportages" />
-          </div>
-          <ul className="divide-y divide-[var(--color-line)]">
-            {data.reports.map((r) => (
-              <li key={r.id} className="px-5 py-4">
-                <p className="font-medium">{r.title}</p>
-                <p className="text-xs text-[var(--color-ink-muted)]">{periodLabel(r.period)}</p>
-                {r.summary ? (
-                  <p className="mt-2 text-sm text-[var(--color-ink-muted)]">{r.summary}</p>
-                ) : null}
-                {r.manualNote ? (
-                  <p className="mt-2 rounded-[var(--radius-sm)] bg-[var(--color-info-soft)] px-3 py-2 text-sm">
-                    {r.manualNote}
-                  </p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      ) : null}
-
-      {/* Documenten */}
-      {data.documents.length > 0 ? (
-        <Card padded={false}>
-          <div className="p-5 pb-3">
-            <CardHeader title="Documenten" />
-          </div>
-          <ul className="divide-y divide-[var(--color-line)]">
-            {data.documents.map((f) => (
-              <li key={f.id}>
-                <a
-                  href={f.externalUrl ?? "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="sc-row-link flex items-center gap-3 px-5 py-3"
-                >
-                  <FileText className="size-4 shrink-0 text-[var(--color-ink-faint)]" strokeWidth={1.75} />
-                  <span className="min-w-0 flex-1 truncate text-sm">{f.name}</span>
-                  <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">{f.category}</span>
-                  <ExternalLink className="size-3.5 shrink-0 text-[var(--color-ink-faint)]" />
-                </a>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      ) : null}
-
-      {/* Contact */}
-      <Card>
-        <CardHeader title="Je contactpersoon" />
-        <p className="mt-3 text-sm">
-          <strong className="font-medium">{data.client.coordinatorName ?? "ShortClips"}</strong>
-          {data.client.coordinatorEmail ? (
-            <>
-              {" · "}
-              <a href={`mailto:${data.client.coordinatorEmail}`} className="text-[var(--color-brand-600)] hover:underline">
-                {data.client.coordinatorEmail}
-              </a>
-            </>
-          ) : null}
-        </p>
-      </Card>
+      {/* Snel naar je onderdelen */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <QuickLink href="/portal/videos" icon={<PlayCircle className="size-5" />} label="Video's" count={data.published.length} />
+        <QuickLink href="/portal/agenda" icon={<CalendarClock className="size-5" />} label="Agenda" count={data.appointments.length} />
+        <QuickLink href="/portal/planning" icon={<FileText className="size-5" />} label="Contentplanning" count={data.calendar.length} />
+        <QuickLink href="/portal/resultaten" icon={<ExternalLink className="size-5" />} label="Resultaten" />
+      </div>
     </div>
+  );
+}
+
+function QuickLink({
+  href,
+  icon,
+  label,
+  count,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  count?: number;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex flex-col gap-2 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4 transition-shadow hover:shadow-md"
+    >
+      <span className="text-[var(--color-brand-600)]">{icon}</span>
+      <span className="text-sm font-medium text-[var(--color-ink)]">{label}</span>
+      {typeof count === "number" && count > 0 ? (
+        <span className="text-xs text-[var(--color-ink-muted)]">{count}</span>
+      ) : null}
+    </Link>
   );
 }

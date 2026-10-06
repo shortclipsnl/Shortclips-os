@@ -18,13 +18,13 @@ export default async function PortalLayout({
 
   return (
     <div className="min-h-screen bg-[var(--color-canvas)]">
-      <header className="border-b border-[var(--color-line)] bg-[var(--color-surface)]">
-        <div className="mx-auto flex h-16 max-w-[1100px] items-center justify-between gap-4 px-5">
-          <Link href="/portal">
-            <Logo size={30} />
+      <header className="bg-[var(--color-ink)] text-white">
+        <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between gap-4 px-5">
+          <Link href="/portal" aria-label="Naar je dashboard">
+            <Logo size={30} onDark />
           </Link>
           <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-[var(--color-ink-muted)] sm:block">
+            <span className="hidden text-sm text-white/75 sm:block">
               {viewer.fullName}
             </span>
             <UserMenu name={viewer.fullName} email={viewer.email} role="client">
