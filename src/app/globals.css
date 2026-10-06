@@ -235,3 +235,63 @@ body {
     background: #fff;
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Klantportaal — donkere "studio"-stijl (ontwerp B).
+ * Overschrijft de app-tokens binnen het portaal, zodat de gedeelde
+ * componenten automatisch donker renderen, plus studio-utilities.
+ * ------------------------------------------------------------------ */
+.portal-studio {
+  --color-canvas: #05061d;
+  --color-surface: #0e1033;
+  --color-surface-sunken: #14143f;
+  --color-surface-2: #14143f;
+  --color-ink: #f3f4fe;
+  --color-ink-muted: #a6a8c8;
+  --color-ink-faint: #70729a;
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-info-soft: rgba(25, 168, 255, 0.14);
+  --color-good-soft: rgba(47, 210, 122, 0.14);
+  --color-bad-soft: rgba(240, 68, 56, 0.16);
+  color-scheme: dark;
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 520px at 78% -8%, rgba(25, 168, 250, 0.16), transparent 60%),
+    radial-gradient(900px 460px at 0% 0%, rgba(75, 60, 220, 0.14), transparent 55%),
+    #05061d;
+}
+.portal-studio .sc-glass {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  backdrop-filter: blur(8px);
+}
+.portal-studio .sc-glow {
+  box-shadow: 0 10px 26px -10px rgba(25, 168, 250, 0.7);
+}
+/* Verticale 9:16 shorts-cover */
+.sc-short {
+  position: relative;
+  border-radius: 15px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  aspect-ratio: 9 / 16;
+  display: grid;
+  place-items: center;
+}
+.sc-short::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 42%, rgba(0, 0, 0, 0.74));
+}
+.sc-short > * { position: relative; z-index: 1; }
+.sc-short .sc-play {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #05061d;
+  display: grid;
+  place-items: center;
+}

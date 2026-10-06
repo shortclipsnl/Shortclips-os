@@ -17,14 +17,14 @@ export default async function PortalLayout({
   const viewer = await requirePortal();
 
   return (
-    <div className="min-h-screen bg-[var(--color-canvas)]">
-      <header className="bg-[var(--color-ink)] text-white">
-        <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between gap-4 px-5">
+    <div className="portal-studio min-h-screen text-[var(--color-ink)]">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-[rgba(5,6,29,0.65)] text-white backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between gap-4 px-5">
           <Link href="/portal" aria-label="Naar je dashboard">
             <Logo size={30} onDark />
           </Link>
           <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-white/75 sm:block">
+            <span className="hidden text-sm text-white/70 sm:block">
               {viewer.fullName}
             </span>
             <UserMenu name={viewer.fullName} email={viewer.email} role="client">
@@ -33,9 +33,9 @@ export default async function PortalLayout({
           </div>
         </div>
       </header>
-      <div className="mx-auto flex max-w-[1180px] flex-col gap-6 px-5 py-6 lg:flex-row lg:gap-8 lg:py-8">
-        <aside className="lg:w-56 lg:shrink-0">
-          <div className="lg:sticky lg:top-8">
+      <div className="mx-auto flex max-w-[1240px] flex-col gap-6 px-5 py-6 lg:flex-row lg:gap-8 lg:py-8">
+        <aside className="lg:w-52 lg:shrink-0">
+          <div className="lg:sticky lg:top-[88px]">
             <PortalNav />
           </div>
         </aside>

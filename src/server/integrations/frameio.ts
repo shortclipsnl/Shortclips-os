@@ -37,6 +37,7 @@ export type FrameFile = {
   view_url?: string;
   created_at?: string;
   updated_at?: string;
+  media_links?: Record<string, unknown>;
 };
 
 export type FrameComment = {

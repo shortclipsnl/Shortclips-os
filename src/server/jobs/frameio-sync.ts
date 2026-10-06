@@ -170,28 +170,34 @@ export async function listFrameProjects(_triggeredById?: string, source: FrameSo
   };
 }
 
-/** Diagnose: toont de structuur van één project (root-map + directe inhoud). */
+/** Diagnose: loopt naar het eerste videobestand en geeft het RUWE object terug
+ *  (om te zien welke velden Frame levert, zoals thumbnail/cover). */
 export async function inspectFrameProject(projectId: string, source: FrameSource = frameio) {
   const project = await source.getProject(projectId);
   const root = project.root_folder_id ?? null;
   if (!root) return { ok: false, note: "geen root_folder_id", project };
-  let children: FrameFile[] = [];
-  try {
-    children = await source.listFolderChildren(root);
-  } catch (e) {
-    return { ok: false, note: `root-map onleesbaar: ${String(e)}`, root };
+
+  const queue: string[] = [root];
+  const seen = new Set<string>();
+  let steps = 0;
+  while (queue.length && steps < 30) {
+    const folderId = queue.shift()!;
+    if (seen.has(folderId)) continue;
+    seen.add(folderId);
+    steps++;
+    let children: FrameFile[] = [];
+    try {
+      children = await source.listFolderChildren(folderId);
+    } catch {
+      continue;
+    }
+    const video = children.find((c) => isVideoFile(c));
+    if (video) {
+      return { ok: true, sampleVideoRaw: video as unknown as Record<string, unknown> };
+    }
+    for (const c of children) if (isContainer(c)) queue.push(c.id);
   }
-  return {
-    ok: true,
-    project: { id: project.id, name: project.name, root },
-    childCount: children.length,
-    children: children.map((c) => ({
-      id: c.id,
-      name: c.name,
-      type: c.type ?? null,
-      media_type: c.media_type ?? null,
-    })),
-  };
+  return { ok: false, note: "geen videobestand gevonden" };
 }
 
 /** Verzamelt alle video-bestanden van een project (recursief, begrensd). */

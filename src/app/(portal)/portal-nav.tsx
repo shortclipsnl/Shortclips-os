@@ -45,8 +45,8 @@ export function PortalNav() {
             className={[
               "flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
               active
-                ? "bg-[var(--color-brand-600)] text-white"
-                : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]",
+                ? "bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] text-white shadow-[0_10px_26px_-10px_rgba(25,168,250,0.7)]"
+                : "text-[var(--color-ink-muted)] hover:bg-white/5 hover:text-[var(--color-ink)]",
             ].join(" ")}
           >
             <Icon className="size-4 shrink-0" strokeWidth={1.75} />
