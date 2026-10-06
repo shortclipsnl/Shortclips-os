@@ -1,6 +1,6 @@
 import "server-only";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   activityEvents,
@@ -412,8 +412,8 @@ export async function getPortalContact(viewer: Viewer): Promise<{
     .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
     .limit(1);
 
-  // Videograaf van de meest recente opnamedag met een toegewezen videograaf.
-  const [shoot] = await db
+  // Videograaf van de meest recente opnamedag; anders de vaste videograaf.
+  let [shoot] = await db
     .select({
       name: users.fullName,
       email: users.email,
@@ -424,6 +424,22 @@ export async function getPortalContact(viewer: Viewer): Promise<{
     .where(and(eq(productionDays.clientId, clientId), isNull(productionDays.deletedAt)))
     .orderBy(desc(productionDays.scheduledOn))
     .limit(1);
+
+  if (!shoot) {
+    // De vaste videograaf met een ingevuld telefoonnummer (echte contactgegevens).
+    [shoot] = await db
+      .select({ name: users.fullName, email: users.email, phone: users.phone })
+      .from(users)
+      .where(
+        and(
+          eq(users.primaryRole, "videographer"),
+          isNull(users.deletedAt),
+          isNotNull(users.phone),
+        ),
+      )
+      .orderBy(asc(users.createdAt))
+      .limit(1);
+  }
 
   return {
     clientName: client?.name ?? "",

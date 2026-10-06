@@ -17,6 +17,7 @@ import { runMondayEditingImport } from "@/server/jobs/monday-editing";
 import { runMondayContractImport } from "@/server/jobs/monday-contracts";
 import { runMondayPlanningImport } from "@/server/jobs/monday-planning";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
+import { setTeamContact } from "@/server/jobs/team";
 import { pruneSessions } from "@/server/auth/session";
 
 export const runtime = "nodejs";
@@ -68,6 +69,17 @@ export async function POST(request: Request) {
 
   const url = new URL(request.url);
   const job = url.searchParams.get("job");
+
+  // Teamlid-telefoonnummer zetten (?name=Milou&phone=+31...).
+  if (job === "team.set_contact") {
+    const name = url.searchParams.get("name");
+    const phone = url.searchParams.get("phone");
+    if (!name || !phone) {
+      return NextResponse.json({ error: "Geef ?name= en ?phone= mee." }, { status: 400 });
+    }
+    const result = await setTeamContact(name, phone);
+    return NextResponse.json({ ok: result.ok, job, result });
+  }
 
   // Diagnose-taak met parameter (projectstructuur bekijken).
   if (job === "frameio.inspect") {
