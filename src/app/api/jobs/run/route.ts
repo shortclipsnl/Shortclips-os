@@ -13,6 +13,7 @@ import {
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { runFrequentSync, runNightlySync } from "@/server/jobs/orchestrator";
 import { runMondayClientImport } from "@/server/jobs/monday-import";
+import { runMondayEditingImport } from "@/server/jobs/monday-editing";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { pruneSessions } from "@/server/auth/session";
 
@@ -35,6 +36,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "frameio.list_projects": listFrameProjects,
   "calendar.sync": runCalendarSync,
   "monday.import_clients": runMondayClientImport,
+  "monday.import_editing": runMondayEditingImport,
   "sync.frequent": runFrequentSync,
   "sync.nightly": runNightlySync,
   "pilot.setup_logins": () => runPilotPortalSetup(),
