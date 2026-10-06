@@ -17,11 +17,12 @@
  *      → het script toont je refresh-token. Zet die als FRAMEIO_REFRESH_TOKEN in
  *      .env.local en herstart de dev-server.
  */
-import { readFileSync } from "node:fs";
-import { URL } from "node:url";
+import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath, URL } from "node:url";
 
 const REDIRECT = "https://localhost:5859/callback";
-const SCOPES = "openid,AdobeID,offline_access,additional_info.roles";
+// Exact de scopes die op de Adobe Web App-credential staan.
+const SCOPES = "openid,email,profile,additional_info.roles,offline_access";
 const TOKEN_URL =
   readEnv("FRAMEIO_IMS_URL") ?? "https://ims-na1.adobelogin.com/ims/token/v3";
 const AUTH_URL = TOKEN_URL.replace("/token/v3", "/authorize/v2");
@@ -102,5 +103,23 @@ if (!res.ok || !data.refresh_token) {
   process.exit(1);
 }
 
-console.log("\n✓ Gelukt. Zet deze regel in .env.local en herstart de dev-server:\n");
-console.log(`FRAMEIO_REFRESH_TOKEN=${data.refresh_token}\n`);
+// Schrijf het refresh-token direct en veilig naar .env.local (nooit tonen).
+const envPath = fileURLToPath(new URL("../.env.local", import.meta.url));
+let envText = "";
+try {
+  envText = readFileSync(envPath, "utf8");
+} catch {
+  /* bestand bestaat nog niet */
+}
+const line = `FRAMEIO_REFRESH_TOKEN=${data.refresh_token}`;
+if (/^FRAMEIO_REFRESH_TOKEN=.*$/m.test(envText)) {
+  envText = envText.replace(/^FRAMEIO_REFRESH_TOKEN=.*$/m, line);
+} else {
+  envText += (envText.endsWith("\n") || envText === "" ? "" : "\n") + line + "\n";
+}
+writeFileSync(envPath, envText);
+
+console.log(
+  `\n✓ Gelukt. FRAMEIO_REFRESH_TOKEN is in .env.local gezet (lengte ${data.refresh_token.length}).` +
+    "\nHerstart de dev-server en test de verbinding.\n",
+);

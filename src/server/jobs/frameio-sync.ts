@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clientIntegrations,
@@ -43,16 +43,25 @@ function isFolder(file: FrameFile): boolean {
 
 /**
  * Vertaalt een Frame.io-bestandsstatus naar de ShortClips-videostatus.
- * Frame.io is het klant-reviewgereedschap, dus een video die daar staat en nog
- * niet is goedgekeurd, staat per definitie te wachten op de klant. Bewust
- * voorzichtig — bij twijfel "client_review", nooit zomaar "published".
+ *
+ * Belangrijk: een bulk-import uit Frame.io bevat vooral al geleverde/afgeronde
+ * video's. Die als "wacht op akkoord" tonen zou de klant honderden valse
+ * actiepunten geven. Daarom standaard "published" (verschijnt in de video-
+ * galerij). Alleen een duidelijk lopende review wordt "client_review"; een
+ * duidelijk goedgekeurde status "approved".
  */
-function mapFrameStatus(status?: string): "client_review" | "approved" {
+function mapFrameStatus(status?: string): "client_review" | "approved" | "published" {
   const s = (status ?? "").toLowerCase();
-  if (s.includes("approved") || s.includes("complete") || s.includes("accepted")) {
-    return "approved";
-  }
-  return "client_review";
+  if (/review|revision|pending|needs|awaiting/.test(s)) return "client_review";
+  if (/approved|accepted/.test(s)) return "approved";
+  return "published";
+}
+
+/** Beste schatting voor de publicatiedatum van een geïmporteerde video. */
+function frameDate(file: FrameFile): Date {
+  const raw = file.updated_at ?? file.created_at;
+  const d = raw ? new Date(raw) : new Date();
+  return Number.isNaN(d.getTime()) ? new Date() : d;
 }
 
 /**
@@ -233,7 +242,11 @@ export async function pullFrameDeliverables(
               await db.update(deliverables).set(base).where(eq(deliverables.id, existing.id));
               ctx.counters.updated++;
             } else {
-              await db.insert(deliverables).values({ ...base, status });
+              await db.insert(deliverables).values({
+                ...base,
+                status,
+                publishedAt: status === "published" ? frameDate(file) : null,
+              });
               ctx.counters.created++;
             }
           }
@@ -247,6 +260,24 @@ export async function pullFrameDeliverables(
     },
     { triggeredById },
   );
+}
+
+/**
+ * Eenmalige correctie: zet uit Frame.io geïmporteerde video's die nog op
+ * "client_review" staan (de oude standaard) om naar "published", zodat ze in de
+ * klant-galerij verschijnen in plaats van als vals actiepunt "wacht op akkoord".
+ * Door het team al verder gezette statussen blijven ongemoeid.
+ */
+export async function normalizeImportedFrameDeliverables() {
+  await db.execute(sql`
+    update deliverables
+       set status = 'published',
+           published_at = coalesce(published_at, created_at, now()),
+           updated_at = now()
+     where frame_asset_id is not null
+       and status = 'client_review'
+  `);
+  return { ok: true };
 }
 
 /**
