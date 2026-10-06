@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 import { runDailySignals, runHourlySignals } from "@/server/jobs/maintenance";
 import {
+  inspectFrameProject,
   listFrameProjects,
   normalizeImportedFrameDeliverables,
   pullFrameComments,
@@ -59,7 +60,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const job = new URL(request.url).searchParams.get("job");
+  const url = new URL(request.url);
+  const job = url.searchParams.get("job");
+
+  // Diagnose-taak met parameter (projectstructuur bekijken).
+  if (job === "frameio.inspect") {
+    const projectId = url.searchParams.get("project");
+    if (!projectId) {
+      return NextResponse.json({ error: "Geef ?project=<id> mee." }, { status: 400 });
+    }
+    const result = await inspectFrameProject(projectId);
+    return NextResponse.json({ ok: true, job, result });
+  }
+
   if (!job || !JOBS[job]) {
     return NextResponse.json(
       { error: "Onbekende taak", beschikbaar: Object.keys(JOBS) },

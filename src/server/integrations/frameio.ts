@@ -191,7 +191,11 @@ export class FrameService {
   }
 
   async getProject(projectId: string): Promise<FrameProject> {
-    return this.request<FrameProject>(`/accounts/${this.requireAccount()}/projects/${projectId}`);
+    // V4 geeft een los object terug als { data: {...} }; lijsten als { data: [...] }.
+    const res = await this.request<{ data?: FrameProject } | FrameProject>(
+      `/accounts/${this.requireAccount()}/projects/${projectId}`,
+    );
+    return (res as { data?: FrameProject }).data ?? (res as FrameProject);
   }
 
   async listFolderChildren(folderId: string): Promise<FrameFile[]> {
@@ -202,7 +206,10 @@ export class FrameService {
   }
 
   async getFile(fileId: string): Promise<FrameFile> {
-    return this.request<FrameFile>(`/accounts/${this.requireAccount()}/files/${fileId}`);
+    const res = await this.request<{ data?: FrameFile } | FrameFile>(
+      `/accounts/${this.requireAccount()}/files/${fileId}`,
+    );
+    return (res as { data?: FrameFile }).data ?? (res as FrameFile);
   }
 
   async listComments(fileId: string): Promise<FrameComment[]> {

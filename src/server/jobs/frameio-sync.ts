@@ -170,6 +170,30 @@ export async function listFrameProjects(_triggeredById?: string, source: FrameSo
   };
 }
 
+/** Diagnose: toont de structuur van één project (root-map + directe inhoud). */
+export async function inspectFrameProject(projectId: string, source: FrameSource = frameio) {
+  const project = await source.getProject(projectId);
+  const root = project.root_folder_id ?? null;
+  if (!root) return { ok: false, note: "geen root_folder_id", project };
+  let children: FrameFile[] = [];
+  try {
+    children = await source.listFolderChildren(root);
+  } catch (e) {
+    return { ok: false, note: `root-map onleesbaar: ${String(e)}`, root };
+  }
+  return {
+    ok: true,
+    project: { id: project.id, name: project.name, root },
+    childCount: children.length,
+    children: children.map((c) => ({
+      id: c.id,
+      name: c.name,
+      type: c.type ?? null,
+      media_type: c.media_type ?? null,
+    })),
+  };
+}
+
 /** Verzamelt alle video-bestanden van een project (recursief, begrensd). */
 async function collectProjectVideos(
   source: FrameSource,
