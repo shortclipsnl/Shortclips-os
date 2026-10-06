@@ -139,17 +139,15 @@ export default async function DashboardPage() {
           tone={data.clients.atRisk.length > 0 ? "warn" : "good"}
           href="/clients"
         />
+        {/* Maandomzet staat bewust niet op het hoofddashboard; die hoort in Finance. */}
         {canSeeFinance ? (
-          <>
-            <Stat label="Maandomzet" value={euro(data.revenue.mrr)} hint="terugkerend, actieve contracten" href="/finance" />
-            <Stat
-              label="Openstaand"
-              value={euro(data.revenue.outstanding)}
-              hint={data.revenue.overdue > 0 ? `${euro(data.revenue.overdue)} vervallen` : "niets vervallen"}
-              tone={data.revenue.overdue > 0 ? "bad" : "neutral"}
-              href="/finance"
-            />
-          </>
+          <Stat
+            label="Openstaand"
+            value={euro(data.revenue.outstanding)}
+            hint={data.revenue.overdue > 0 ? `${euro(data.revenue.overdue)} vervallen` : "niets vervallen"}
+            tone={data.revenue.overdue > 0 ? "bad" : "neutral"}
+            href="/finance"
+          />
         ) : null}
         <Stat
           label="In productie"
