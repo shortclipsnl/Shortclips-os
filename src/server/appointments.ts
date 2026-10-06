@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, gte, isNull } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import { calendarEvents, clients } from "@/db/schema";
 
@@ -52,7 +52,13 @@ export async function unmatchedAppointments(limit = 100): Promise<UnmatchedAppoi
   return db
     .select()
     .from(calendarEvents)
-    .where(and(isNull(calendarEvents.clientId), gte(calendarEvents.startsAt, since)))
+    .where(
+      and(
+        isNull(calendarEvents.clientId),
+        ne(calendarEvents.kind, "intern"),
+        gte(calendarEvents.startsAt, since),
+      ),
+    )
     .orderBy(asc(calendarEvents.startsAt))
     .limit(limit);
 }
@@ -63,12 +69,14 @@ export async function appointmentReviewStats(): Promise<{
   matched: number;
   needsReview: number;
   ambiguous: number;
+  internal: number;
   lastSyncedAt: Date | null;
 }> {
   const rows = await db
     .select({
       clientId: calendarEvents.clientId,
       confidence: calendarEvents.matchConfidence,
+      kind: calendarEvents.kind,
       syncedAt: calendarEvents.syncedAt,
     })
     .from(calendarEvents);
@@ -76,14 +84,16 @@ export async function appointmentReviewStats(): Promise<{
   let matched = 0;
   let needsReview = 0;
   let ambiguous = 0;
+  let internal = 0;
   let lastSyncedAt: Date | null = null;
   for (const r of rows) {
     if (r.clientId) matched++;
+    else if (r.kind === "intern") internal++;
     else needsReview++;
-    if (r.confidence === "ambiguous") ambiguous++;
+    if (!r.clientId && r.confidence === "ambiguous") ambiguous++;
     if (r.syncedAt && (!lastSyncedAt || r.syncedAt > lastSyncedAt)) lastSyncedAt = r.syncedAt;
   }
-  return { total: rows.length, matched, needsReview, ambiguous, lastSyncedAt };
+  return { total: rows.length, matched, needsReview, ambiguous, internal, lastSyncedAt };
 }
 
 /** Naam van een klant opzoeken (voor review-weergave). */

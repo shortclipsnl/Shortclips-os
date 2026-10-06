@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyAppointment,
   extractTitleHint,
+  isInternalAppointment,
   isInternalEmail,
   matchEvent,
   type ClientMatcher,
@@ -117,5 +118,46 @@ describe("afspraak aan de juiste klant koppelen", () => {
     expect(result.clientId).toBeNull();
     expect(result.confidence).toBe("ambiguous");
     expect(result.candidates.length).toBe(2);
+  });
+});
+
+describe("interne afspraken herkennen", () => {
+  it("herkent duidelijk interne afspraken zonder externe deelnemer", () => {
+    // Echte titels uit de ShortClips-agenda.
+    for (const title of [
+      "JISKA VRIJ > ELKE DONDERDAG",
+      "Milou - Kantinedienst",
+      "Kantoordag - Shortclips",
+      "16:00 - VASTE WELKELIJKSE team meeting - EVALUATIE",
+      "16:30 - VRIJDAGMIDDAG BORREL - TEAM SHORTCLIPS",
+      "BRANDING + AAN HET BEDRIJF WERKEN - KANTOOR JARNO",
+      "Behind the scenes maken",
+      "Milou LinkedIn post online (eigen kanaal)",
+      "Factuur Max betalen",
+      "60 MIN SCRIPT TRAINING - MILOU / JISKA",
+      "VERJAARDAG MILOU - 24 JAAR",
+      "Milou Tandarts",
+      "UITBETALING Milou, Rutger en Jiska",
+      "LUNCHEN TEAM",
+      "JISKA mee met opname",
+    ]) {
+      expect(isInternalAppointment(event(title))).toBe(true);
+    }
+  });
+
+  it("markeert een afspraak NIET als intern zodra er iemand van buiten bij zit", () => {
+    // Een lead/partner met externe deelnemer hoort juist wél ter controle.
+    expect(
+      isInternalAppointment(event("Kennismaking WineDrops", ["julian@winedrops.nl"])),
+    ).toBe(false);
+  });
+
+  it("ziet een echte klantopname niet als intern", () => {
+    expect(isInternalAppointment(event("9:00 - 365Werk opnamesessie - 8 shorts"))).toBe(false);
+    expect(isInternalAppointment(event("Shortclips x SHADES monthly shootday"))).toBe(false);
+  });
+
+  it("behandelt interne planningsagenda's als intern", () => {
+    expect(isInternalAppointment(event("Dag vullen"), "Dagindeling - Shortclips")).toBe(true);
   });
 });

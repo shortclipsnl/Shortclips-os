@@ -271,7 +271,7 @@ export default async function IntegrationsPage() {
             ? "Er is nog niets uit Google Agenda gesynchroniseerd."
             : `${agendaStats.matched} van ${agendaStats.total} afspraken gekoppeld · ${agendaStats.needsReview} te controleren${
                 agendaStats.ambiguous ? ` (waarvan ${agendaStats.ambiguous} met meerdere mogelijke klanten)` : ""
-              }.`}
+              }${agendaStats.internal ? ` · ${agendaStats.internal} intern herkend (geen klant nodig)` : ""}.`}
         </p>
         {agendaReview.length === 0 ? (
           <div className="mt-4">

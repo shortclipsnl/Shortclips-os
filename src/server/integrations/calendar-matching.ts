@@ -27,6 +27,7 @@ export type AppointmentKind =
   | "scriptbespreking"
   | "evaluatie"
   | "publicatie"
+  | "intern"
   | "overig";
 
 export type ClientMatcher = {
@@ -68,6 +69,44 @@ export function isInternalEmail(email?: string | null): boolean {
   if (INTERNAL_EMAILS.has(e)) return true;
   const domain = e.split("@")[1] ?? "";
   return INTERNAL_DOMAINS.includes(domain);
+}
+
+/**
+ * Herkent afspraken die duidelijk intern zijn (vrije dagen, kantinediensten,
+ * teammeetings, eigen branding/content, administratie). Die horen niet bij een
+ * klant én niet in de controlelijst — anders verzuipt het team in ruis.
+ *
+ * Conservatief: alleen als er GEEN externe deelnemer is. Zodra er iemand van
+ * buiten bij zit (lead, partner, freelancer) blijft de afspraak ter controle,
+ * zodat we nooit per ongeluk iets klant-relevants verbergen.
+ */
+const INTERNAL_CALENDARS = /(dagindeling|socials)/i;
+const INTERNAL_TITLE_PATTERNS: RegExp[] = [
+  /\bvrij\b/i, /vakantie/i, /verlof/i, /\bziek\b/i,
+  /kantine/i, /kantoordag/i, /\bkantoor\b/i, /borrel/i,
+  /team\s*meeting/i, /teammeeting/i, /weekstart/i, /stand\s*-?\s*up/i,
+  /vaste\s+wekelijkse/i, /wekelijkse\s+team/i,
+  /branding/i, /aan het bedrijf werken/i,
+  /beeldbank/i, /behind the scenes/i, /eigen kanaal/i,
+  /linkedin\s*post/i, /shortclips\s*post/i,
+  /factuur/i, /betalen/i, /uitbetaling/i,
+  /\btraining\b/i, /refresh meeting/i, /editors?\s*meeting/i,
+  /day in the life/i,
+  /verjaardag/i, /tandarts/i, /\blunch/i,
+  /mee met opname/i, /mee\s*filmen/i,
+];
+
+export function isInternalAppointment(
+  event: CalendarEvent,
+  calendarSummary?: string | null,
+): boolean {
+  const hasExternalAttendee = (event.attendees ?? []).some(
+    (a) => a.email && !isInternalEmail(a.email),
+  );
+  if (hasExternalAttendee) return false;
+  if (calendarSummary && INTERNAL_CALENDARS.test(calendarSummary)) return true;
+  const title = event.summary ?? "";
+  return INTERNAL_TITLE_PATTERNS.some((p) => p.test(title));
 }
 
 function emailDomain(email?: string | null): string | null {

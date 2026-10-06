@@ -14,6 +14,7 @@ import {
 } from "@/server/integrations/google-calendar";
 import {
   classifyAppointment,
+  isInternalAppointment,
   matchEvent,
   type ClientMatcher,
 } from "@/server/integrations/calendar-matching";
@@ -167,14 +168,19 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
             continue;
           }
 
-          const kind = classifyAppointment(ev.summary, cal.summary);
           const match = matchEvent(ev, matchers, cal.summary);
           const clientId =
             match.confidence === "high" || match.confidence === "medium"
               ? match.clientId
               : null;
+          // Niet-gekoppelde, duidelijk interne afspraken apart markeren zodat ze
+          // niet in de controlelijst terechtkomen.
+          const kind =
+            !clientId && isInternalAppointment(ev, cal.summary)
+              ? "intern"
+              : classifyAppointment(ev.summary, cal.summary);
           if (clientId) matched++;
-          else needsReview++;
+          else if (kind !== "intern") needsReview++;
 
           const values = {
             source: "google_calendar",
