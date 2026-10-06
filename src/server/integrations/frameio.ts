@@ -65,16 +65,24 @@ export class FrameService {
     private accountId = env.FRAMEIO_ACCOUNT_ID,
     private clientId = env.FRAMEIO_CLIENT_ID,
     private clientSecret = env.FRAMEIO_CLIENT_SECRET,
+    private refreshToken = env.FRAMEIO_REFRESH_TOKEN,
   ) {}
 
   get isConfigured(): boolean {
     return Boolean(this.legacyToken || (this.clientId && this.clientSecret));
   }
 
+  /** Legacy developer tokens vragen om een extra header. */
+  private get legacyHeaders(): Record<string, string> {
+    return this.legacyToken ? { "x-frameio-legacy-token-auth": "true" } : {};
+  }
+
   /**
-   * Bepaalt het Bearer-token. Een legacy developer token gaat er direct in;
-   * anders wisselt de app de Server-to-Server client-credentials via Adobe IMS
-   * om voor een kortlevend access-token (±1 uur), met een minuut marge gecachet.
+   * Bepaalt het Bearer-token via Adobe IMS. Drie routes, in volgorde:
+   *   1. legacy developer token → direct gebruiken;
+   *   2. Web App: refresh-token omwisselen voor een access-token (deze opzet);
+   *   3. Server-to-Server: client-credentials (voor accounts die dat bieden).
+   * Access-tokens worden met een minuut marge in het geheugen gecachet.
    */
   private async token(): Promise<string> {
     if (this.legacyToken) return this.legacyToken;
@@ -88,12 +96,19 @@ export class FrameService {
       return this.accessToken;
     }
 
-    const body = new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: this.clientId,
-      client_secret: this.clientSecret,
-      scope: "openid,AdobeID,frame.s2s.all",
-    });
+    const body = this.refreshToken
+      ? new URLSearchParams({
+          grant_type: "refresh_token",
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+          refresh_token: this.refreshToken,
+        })
+      : new URLSearchParams({
+          grant_type: "client_credentials",
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+          scope: "openid,AdobeID,frame.s2s.all",
+        });
 
     const response = await fetch(env.FRAMEIO_IMS_URL, {
       method: "POST",
@@ -128,6 +143,7 @@ export class FrameService {
       ...options,
       headers: {
         Authorization: `Bearer ${token}`,
+        ...this.legacyHeaders,
         ...(options.headers ?? {}),
       },
     });

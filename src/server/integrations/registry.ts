@@ -71,15 +71,20 @@ export const INTEGRATION_SPECS: IntegrationSpec[] = [
     required: [
       {
         key: "FRAMEIO_CLIENT_ID",
-        label: "Client-ID (Server-to-Server)",
+        label: "Client-ID (OAuth Web App)",
         where:
-          "developer.adobe.com/console → project → Add API → Frame.io → OAuth Server-to-Server → Client ID",
-        scopes: "openid, AdobeID, frame.s2s.all (lezen op projects, folders, files, comments)",
+          "developer.adobe.com/console → project → Add API → Frame.io → OAuth Web App → Client ID",
+        scopes: "redirect-URI: https://localhost:5859/callback",
       },
       {
         key: "FRAMEIO_CLIENT_SECRET",
-        label: "Client secret (Server-to-Server)",
-        where: "Zelfde scherm als het Client-ID in de Adobe Developer Console",
+        label: "Client secret (OAuth Web App)",
+        where: "Zelfde scherm als het Client-ID (Retrieve client secret)",
+      },
+      {
+        key: "FRAMEIO_REFRESH_TOKEN",
+        label: "Refresh-token",
+        where: "Eenmalig via de Adobe-toestemmingsflow: npm run frameio:token",
       },
       {
         key: "FRAMEIO_ACCOUNT_ID",
@@ -88,8 +93,8 @@ export const INTEGRATION_SPECS: IntegrationSpec[] = [
       },
       {
         key: "FRAMEIO_TOKEN",
-        label: "Legacy developer token (alleen voor oudere accounts, i.p.v. client-id/secret)",
-        where: "developer.frame.io → Developer Tokens (alleen als je account niet via Adobe loopt)",
+        label: "Legacy developer token (alleen oudere accounts, i.p.v. bovenstaande)",
+        where: "developer.frame.io → Developer Tokens",
       },
       {
         key: "FRAMEIO_WEBHOOK_SECRET",

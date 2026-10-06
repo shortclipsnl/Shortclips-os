@@ -32,6 +32,9 @@ const schema = z.object({
   FRAMEIO_TOKEN: z.string().optional(),
   FRAMEIO_CLIENT_ID: z.string().optional(),
   FRAMEIO_CLIENT_SECRET: z.string().optional(),
+  // Voor de Web App-flow (gebruiker logt één keer in met Adobe): refresh-token
+  // waarmee de app zelf access-tokens vernieuwt.
+  FRAMEIO_REFRESH_TOKEN: z.string().optional(),
   FRAMEIO_ACCOUNT_ID: z.string().optional(),
   FRAMEIO_WEBHOOK_SECRET: z.string().optional(),
   // Standaard Adobe IMS-tokenendpoint; alleen zetten als Adobe een ander geeft.
@@ -98,11 +101,19 @@ export function integrationConfig() {
       optional: ["MONDAY_WEBHOOK_SECRET"],
     },
     frameio: {
-      // Geconfigureerd via Server-to-Server (client-id + secret) óf een legacy token.
+      // Web App: client-id + secret + refresh-token. Of een legacy token.
+      // (Server-to-Server zou met alleen id+secret kunnen, maar dit account
+      // biedt alleen Web App; dan is de refresh-token nodig.)
       configured: Boolean(
-        (env.FRAMEIO_CLIENT_ID && env.FRAMEIO_CLIENT_SECRET) || env.FRAMEIO_TOKEN,
+        (env.FRAMEIO_CLIENT_ID && env.FRAMEIO_CLIENT_SECRET && env.FRAMEIO_REFRESH_TOKEN) ||
+          env.FRAMEIO_TOKEN,
       ),
-      required: ["FRAMEIO_CLIENT_ID", "FRAMEIO_CLIENT_SECRET", "FRAMEIO_ACCOUNT_ID"],
+      required: [
+        "FRAMEIO_CLIENT_ID",
+        "FRAMEIO_CLIENT_SECRET",
+        "FRAMEIO_REFRESH_TOKEN",
+        "FRAMEIO_ACCOUNT_ID",
+      ],
       optional: ["FRAMEIO_TOKEN", "FRAMEIO_WEBHOOK_SECRET"],
     },
     google_drive: {
