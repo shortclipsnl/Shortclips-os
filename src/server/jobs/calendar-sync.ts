@@ -1,11 +1,13 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   calendarEvents,
   clientContacts,
   clientIntegrations,
   clients,
+  mondayMappings,
+  productionDays,
 } from "@/db/schema";
 import {
   GoogleCalendarService,
@@ -232,8 +234,65 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         }
       }
 
+      // Toekomstige opname-afspraken → opnamedagen (productionDays), zodat
+      // "aankomende opnames" en het klantportaal "volgende opname" de echte
+      // geplande opnames tonen. Google Agenda is hiervoor de centrale bron (§5).
+      const shootEvents = await db
+        .select({
+          id: calendarEvents.id,
+          clientId: calendarEvents.clientId,
+          title: calendarEvents.title,
+          location: calendarEvents.location,
+          startsAt: calendarEvents.startsAt,
+          allDay: calendarEvents.allDay,
+        })
+        .from(calendarEvents)
+        .where(
+          and(
+            eq(calendarEvents.kind, "opname"),
+            isNotNull(calendarEvents.clientId),
+            gte(calendarEvents.startsAt, new Date()),
+          ),
+        );
+
+      let shoots = 0;
+      for (const ev of shootEvents) {
+        if (!ev.clientId || !ev.startsAt) continue;
+        const scheduledOn = ev.startsAt.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+        const startTime = ev.allDay
+          ? null
+          : `${ev.startsAt.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" })}:00`;
+        const base = {
+          clientId: ev.clientId,
+          title: ev.title ?? "Opnamedag",
+          scheduledOn,
+          ...(startTime ? { startTime } : {}),
+          ...(ev.location ? { locationName: ev.location.slice(0, 200) } : {}),
+          status: "planned" as const,
+          updatedAt: new Date(),
+        };
+        const [map] = await db
+          .select({ id: mondayMappings.id, entityId: mondayMappings.entityId })
+          .from(mondayMappings)
+          .where(and(eq(mondayMappings.entityType, "calendar_shoot"), eq(mondayMappings.itemId, ev.id)))
+          .limit(1);
+        if (map?.entityId) {
+          await db.update(productionDays).set(base).where(eq(productionDays.id, map.entityId));
+        } else {
+          const [created] = await db.insert(productionDays).values(base).returning({ id: productionDays.id });
+          await db.insert(mondayMappings).values({
+            entityType: "calendar_shoot",
+            entityId: created!.id,
+            boardId: "google_calendar",
+            itemId: ev.id,
+            lastSyncedAt: new Date(),
+          });
+        }
+        shoots++;
+      }
+
       ctx.log(
-        `Klaar: ${ctx.counters.processed} afspraken, ${matched} gekoppeld, ${needsReview} voor review.`,
+        `Klaar: ${ctx.counters.processed} afspraken, ${matched} gekoppeld, ${needsReview} voor review, ${shoots} opnamedagen afgeleid.`,
       );
     },
     { triggeredById: options.triggeredById },

@@ -15,6 +15,7 @@ import { runFrequentSync, runNightlySync } from "@/server/jobs/orchestrator";
 import { runMondayClientImport } from "@/server/jobs/monday-import";
 import { runMondayEditingImport } from "@/server/jobs/monday-editing";
 import { runMondayContractImport } from "@/server/jobs/monday-contracts";
+import { runMondayPlanningImport } from "@/server/jobs/monday-planning";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { pruneSessions } from "@/server/auth/session";
 
@@ -39,6 +40,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "monday.import_clients": runMondayClientImport,
   "monday.import_editing": runMondayEditingImport,
   "monday.import_contracts": runMondayContractImport,
+  "monday.import_planning": runMondayPlanningImport,
   "sync.frequent": runFrequentSync,
   "sync.nightly": runNightlySync,
   "pilot.setup_logins": () => runPilotPortalSetup(),
