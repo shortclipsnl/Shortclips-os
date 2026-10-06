@@ -4,6 +4,7 @@ import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   activityEvents,
+  clientIntegrations,
   clientReports,
   clients,
   contentCalendar,
@@ -362,23 +363,80 @@ export async function getPortalVideos(viewer: Viewer) {
   };
 }
 
-/** De vaste contactpersoon van de klant bij ShortClips (§29). */
-export async function getPortalContact(viewer: Viewer) {
+/**
+ * De Frame.io-reviewlink van deze klant — daar bekijkt en beoordeelt de klant
+ * z'n video's. Frame.io blijft de review-omgeving; het portaal verwijst ernaar.
+ */
+export async function getPortalFrameUrl(viewer: Viewer): Promise<string | null> {
+  const clientId = viewer.clientId;
+  if (!clientId) return null;
+  const [link] = await db
+    .select({ externalId: clientIntegrations.externalId, externalUrl: clientIntegrations.externalUrl })
+    .from(clientIntegrations)
+    .where(and(eq(clientIntegrations.clientId, clientId), eq(clientIntegrations.provider, "frameio")))
+    .limit(1);
+  if (!link) return null;
+  if (link.externalUrl) return link.externalUrl;
+  return link.externalId ? `https://next.frame.io/project/${link.externalId}` : null;
+}
+
+export type PortalContactPerson = {
+  name: string;
+  role: string;
+  email: string | null;
+  phone: string | null;
+};
+
+/**
+ * De contactpersonen van de klant bij ShortClips (§29): de vaste coördinator en
+ * — indien bekend — de videograaf van de laatste/komende opname. Telefoon en
+ * WhatsApp komen uit het telefoonveld van het teamlid (zodra ingevuld).
+ */
+export async function getPortalContact(viewer: Viewer): Promise<{
+  clientName: string;
+  coordinator: PortalContactPerson | null;
+  videographer: PortalContactPerson | null;
+}> {
   const clientId = viewer.clientId;
   if (!clientId) notFound();
 
-  const [row] = await db
+  const [client] = await db
     .select({
-      clientName: clients.name,
+      name: clients.name,
       coordinatorName: users.fullName,
       coordinatorEmail: users.email,
-      coordinatorAvatar: users.avatarUrl,
-      coordinatorRole: users.primaryRole,
+      coordinatorPhone: users.phone,
     })
     .from(clients)
     .leftJoin(users, eq(users.id, clients.coordinatorId))
     .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
     .limit(1);
 
-  return row ?? null;
+  // Videograaf van de meest recente opnamedag met een toegewezen videograaf.
+  const [shoot] = await db
+    .select({
+      name: users.fullName,
+      email: users.email,
+      phone: users.phone,
+    })
+    .from(productionDays)
+    .innerJoin(users, eq(users.id, productionDays.videographerId))
+    .where(and(eq(productionDays.clientId, clientId), isNull(productionDays.deletedAt)))
+    .orderBy(desc(productionDays.scheduledOn))
+    .limit(1);
+
+  return {
+    clientName: client?.name ?? "",
+    coordinator: client?.coordinatorName
+      ? {
+          name: client.coordinatorName,
+          role: "Vaste contactpersoon",
+          email: client.coordinatorEmail,
+          phone: client.coordinatorPhone,
+        }
+      : null,
+    videographer: shoot
+      ? { name: shoot.name, role: "Videograaf", email: shoot.email, phone: shoot.phone }
+      : null,
+  };
 }

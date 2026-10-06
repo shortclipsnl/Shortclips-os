@@ -8,8 +8,8 @@ import {
   PlayCircle,
 } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalData } from "@/server/portal";
-import { Card, CardHeader, Stat } from "@/components/ui";
+import { getPortalData, getPortalFrameUrl } from "@/server/portal";
+import { buttonClass, Card, CardHeader, Stat } from "@/components/ui";
 import { compact, formatDateFull, num, plural, relativeDays } from "@/lib/format";
 import { ScriptDecision, VideoDecision } from "./actions-ui";
 
@@ -27,7 +27,10 @@ const APPOINTMENT_LABEL: Record<string, string> = {
 
 export default async function PortalPage() {
   const viewer = await requirePortal();
-  const data = await getPortalData(viewer);
+  const [data, frameUrl] = await Promise.all([
+    getPortalData(viewer),
+    getPortalFrameUrl(viewer),
+  ]);
 
   const openActions = data.awaitingApproval.length + data.scriptsToReview.length;
   const firstName = viewer.fullName.split(" ")[0];
@@ -62,6 +65,10 @@ export default async function PortalPage() {
           action={
             openActions === 0 ? (
               <CheckCircle2 className="size-6 text-[var(--color-good)]" strokeWidth={1.75} />
+            ) : frameUrl ? (
+              <a href={frameUrl} target="_blank" rel="noreferrer" className={buttonClass({ variant: "primary", size: "sm" })}>
+                <ExternalLink className="size-4" /> Beoordeel in Frame
+              </a>
             ) : null
           }
         />

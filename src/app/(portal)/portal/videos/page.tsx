@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Video as VideoIcon } from "lucide-react";
+import { ExternalLink, Video as VideoIcon } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalVideos } from "@/server/portal";
-import { Badge, Card, CardHeader, EmptyState } from "@/components/ui";
+import { getPortalFrameUrl, getPortalVideos } from "@/server/portal";
+import { Badge, buttonClass, Card, CardHeader, EmptyState } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Video's" };
@@ -74,16 +74,44 @@ function VideoGrid({ rows }: { rows: Row[] }) {
 
 export default async function PortalVideosPage() {
   const viewer = await requirePortal();
-  const data = await getPortalVideos(viewer);
+  const [data, frameUrl] = await Promise.all([
+    getPortalVideos(viewer),
+    getPortalFrameUrl(viewer),
+  ]);
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Video&apos;s</h1>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Al je video&apos;s op één plek — bekijk, geef feedback en download.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Video&apos;s</h1>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+            Al je video&apos;s op één plek — bekijk, geef feedback en download.
+          </p>
+        </div>
+        {frameUrl ? (
+          <a href={frameUrl} target="_blank" rel="noreferrer" className={buttonClass({ variant: "primary" })}>
+            <ExternalLink className="size-4" /> Beoordeel je video&apos;s in Frame
+          </a>
+        ) : null}
       </div>
+
+      {frameUrl ? (
+        <Card className="border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--color-ink)]">
+                Bekijken en beoordelen gaat in Frame
+              </p>
+              <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">
+                Daar kun je elke video afspelen, op het juiste moment opmerkingen plaatsen en goedkeuren.
+              </p>
+            </div>
+            <a href={frameUrl} target="_blank" rel="noreferrer" className={buttonClass({ variant: "primary" })}>
+              <ExternalLink className="size-4" /> Open Frame
+            </a>
+          </div>
+        </Card>
+      ) : null}
 
       {data.totaal === 0 ? (
         <EmptyState

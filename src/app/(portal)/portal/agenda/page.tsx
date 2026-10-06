@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CalendarDays, MapPin } from "lucide-react";
+import { CalendarDays, MapPin, Users } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { upcomingAppointmentsForClient } from "@/server/appointments";
 import { Badge, Card, EmptyState } from "@/components/ui";
@@ -15,6 +15,22 @@ const KIND_LABEL: Record<string, string> = {
   publicatie: "Publicatie",
   overig: "Afspraak",
 };
+
+const INTERNAL_RE = /(shortclips\.nl|teamshortclips@gmail\.com|jarnoklijnsma9@gmail\.com)/i;
+
+/** Namen van de ShortClips-mensen die bij de afspraak zitten (uit Google Agenda). */
+function shortclipsPeople(attendees: unknown): string[] {
+  if (!Array.isArray(attendees)) return [];
+  const names = new Set<string>();
+  for (const a of attendees as Array<{ email?: string | null; displayName?: string | null }>) {
+    if (!a?.email || !INTERNAL_RE.test(a.email)) continue;
+    const name = (a.displayName ?? a.email.split("@")[0] ?? "")
+      .replace(/\s*-?\s*shortclips.*/i, "")
+      .trim();
+    if (name) names.add(name);
+  }
+  return [...names];
+}
 
 export default async function PortalAgendaPage() {
   const viewer = await requirePortal();
@@ -63,6 +79,12 @@ export default async function PortalAgendaPage() {
                   {a.location ? (
                     <p className="mt-1 flex items-center gap-1 text-xs text-[var(--color-ink-muted)]">
                       <MapPin className="size-3.5" /> {a.location}
+                    </p>
+                  ) : null}
+                  {shortclipsPeople(a.attendees).length > 0 ? (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-[var(--color-ink-muted)]">
+                      <Users className="size-3.5" /> Vanuit ShortClips:{" "}
+                      {shortclipsPeople(a.attendees).join(", ")}
                     </p>
                   ) : null}
                 </div>
