@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    { "path": "/api/jobs/run?job=sync.frequent", "schedule": "*/30 * * * *" },
+    { "path": "/api/jobs/run?job=sync.nightly", "schedule": "0 3 * * *" }
+  ]
+}

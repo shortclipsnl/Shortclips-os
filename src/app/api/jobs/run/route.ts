@@ -9,6 +9,7 @@ import {
   pullFrameProjects,
 } from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
+import { runFrequentSync, runNightlySync } from "@/server/jobs/orchestrator";
 import { runMondayClientImport } from "@/server/jobs/monday-import";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { pruneSessions } from "@/server/auth/session";
@@ -31,6 +32,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "frameio.normalize_imported": normalizeImportedFrameDeliverables,
   "calendar.sync": runCalendarSync,
   "monday.import_clients": runMondayClientImport,
+  "sync.frequent": runFrequentSync,
+  "sync.nightly": runNightlySync,
   "pilot.setup_logins": () => runPilotPortalSetup(),
   "maintenance.prune_sessions": async () => ({ removed: await pruneSessions() }),
 };
