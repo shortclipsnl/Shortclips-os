@@ -70,15 +70,26 @@ export const INTEGRATION_SPECS: IntegrationSpec[] = [
     ],
     required: [
       {
-        key: "FRAMEIO_TOKEN",
-        label: "Bearer-token (server-to-server OAuth of developer token)",
-        where: "developer.frame.io → maak een app aan → genereer een token",
-        scopes: "lezen op projects, folders, files en comments",
+        key: "FRAMEIO_CLIENT_ID",
+        label: "Client-ID (Server-to-Server)",
+        where:
+          "developer.adobe.com/console → project → Add API → Frame.io → OAuth Server-to-Server → Client ID",
+        scopes: "openid, AdobeID, frame.s2s.all (lezen op projects, folders, files, comments)",
+      },
+      {
+        key: "FRAMEIO_CLIENT_SECRET",
+        label: "Client secret (Server-to-Server)",
+        where: "Zelfde scherm als het Client-ID in de Adobe Developer Console",
       },
       {
         key: "FRAMEIO_ACCOUNT_ID",
         label: "Account-ID",
-        where: "Zichtbaar in de URL van je Frame.io-omgeving of via GET /v4/me",
+        where: "Zichtbaar in de URL van je Frame.io-omgeving (?a=…) of via GET /v4/me",
+      },
+      {
+        key: "FRAMEIO_TOKEN",
+        label: "Legacy developer token (alleen voor oudere accounts, i.p.v. client-id/secret)",
+        where: "developer.frame.io → Developer Tokens (alleen als je account niet via Adobe loopt)",
       },
       {
         key: "FRAMEIO_WEBHOOK_SECRET",

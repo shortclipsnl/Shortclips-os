@@ -24,10 +24,18 @@ const schema = z.object({
   MONDAY_WEBHOOK_SECRET: z.string().optional(),
   MONDAY_API_VERSION: z.string().default("2026-07"),
 
-  // --- Frame.io ---
+  // --- Frame.io (V4 via Adobe IMS) ---
+  // Twee manieren om te verbinden:
+  //  1. Server-to-Server (Adobe Developer Console): CLIENT_ID + CLIENT_SECRET,
+  //     die de app zelf omwisselt voor een kortlevend access-token.
+  //  2. Legacy developer token (oudere Frame.io-accounts): FRAMEIO_TOKEN direct.
   FRAMEIO_TOKEN: z.string().optional(),
+  FRAMEIO_CLIENT_ID: z.string().optional(),
+  FRAMEIO_CLIENT_SECRET: z.string().optional(),
   FRAMEIO_ACCOUNT_ID: z.string().optional(),
   FRAMEIO_WEBHOOK_SECRET: z.string().optional(),
+  // Standaard Adobe IMS-tokenendpoint; alleen zetten als Adobe een ander geeft.
+  FRAMEIO_IMS_URL: z.string().default("https://ims-na1.adobelogin.com/ims/token/v3"),
 
   // --- Google Drive ---
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -90,9 +98,12 @@ export function integrationConfig() {
       optional: ["MONDAY_WEBHOOK_SECRET"],
     },
     frameio: {
-      configured: Boolean(env.FRAMEIO_TOKEN),
-      required: ["FRAMEIO_TOKEN"],
-      optional: ["FRAMEIO_ACCOUNT_ID", "FRAMEIO_WEBHOOK_SECRET"],
+      // Geconfigureerd via Server-to-Server (client-id + secret) óf een legacy token.
+      configured: Boolean(
+        (env.FRAMEIO_CLIENT_ID && env.FRAMEIO_CLIENT_SECRET) || env.FRAMEIO_TOKEN,
+      ),
+      required: ["FRAMEIO_CLIENT_ID", "FRAMEIO_CLIENT_SECRET", "FRAMEIO_ACCOUNT_ID"],
+      optional: ["FRAMEIO_TOKEN", "FRAMEIO_WEBHOOK_SECRET"],
     },
     google_drive: {
       configured: Boolean(

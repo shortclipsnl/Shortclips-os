@@ -57,18 +57,62 @@ function unwrap<T>(payload: Page<T>): T[] {
 }
 
 export class FrameService {
+  private accessToken: string | null = null;
+  private expiresAt = 0;
+
   constructor(
-    private token = env.FRAMEIO_TOKEN,
+    private legacyToken = env.FRAMEIO_TOKEN,
     private accountId = env.FRAMEIO_ACCOUNT_ID,
+    private clientId = env.FRAMEIO_CLIENT_ID,
+    private clientSecret = env.FRAMEIO_CLIENT_SECRET,
   ) {}
 
   get isConfigured(): boolean {
-    return Boolean(this.token);
+    return Boolean(this.legacyToken || (this.clientId && this.clientSecret));
   }
 
-  private requireToken(): string {
-    if (!this.token) throw new MissingCredentialsError("frameio", ["FRAMEIO_TOKEN"]);
-    return this.token;
+  /**
+   * Bepaalt het Bearer-token. Een legacy developer token gaat er direct in;
+   * anders wisselt de app de Server-to-Server client-credentials via Adobe IMS
+   * om voor een kortlevend access-token (±1 uur), met een minuut marge gecachet.
+   */
+  private async token(): Promise<string> {
+    if (this.legacyToken) return this.legacyToken;
+    if (!this.clientId || !this.clientSecret) {
+      throw new MissingCredentialsError("frameio", [
+        "FRAMEIO_CLIENT_ID",
+        "FRAMEIO_CLIENT_SECRET",
+      ]);
+    }
+    if (this.accessToken && Date.now() < this.expiresAt - 60_000) {
+      return this.accessToken;
+    }
+
+    const body = new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+      scope: "openid,AdobeID,frame.s2s.all",
+    });
+
+    const response = await fetch(env.FRAMEIO_IMS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new IntegrationError(
+        "frameio",
+        `Access-token ophalen bij Adobe mislukt (HTTP ${response.status})`,
+        response.status,
+        response.status >= 500,
+      );
+    }
+    const data = (await response.json()) as { access_token: string; expires_in: number };
+    this.accessToken = data.access_token;
+    this.expiresAt = Date.now() + data.expires_in * 1000;
+    return this.accessToken;
   }
 
   private requireAccount(): string {
@@ -78,11 +122,12 @@ export class FrameService {
     return this.accountId;
   }
 
-  private request<T>(path: string, options: Parameters<typeof apiFetch>[2] = {}): Promise<T> {
+  private async request<T>(path: string, options: Parameters<typeof apiFetch>[2] = {}): Promise<T> {
+    const token = await this.token();
     return apiFetch<T>("frameio", `${BASE}${path}`, {
       ...options,
       headers: {
-        Authorization: `Bearer ${this.requireToken()}`,
+        Authorization: `Bearer ${token}`,
         ...(options.headers ?? {}),
       },
     });
@@ -90,7 +135,11 @@ export class FrameService {
 
   async testConnection(): Promise<ConnectionTest> {
     if (!this.isConfigured) {
-      return { ok: false, message: "Nog niet ingesteld: FRAMEIO_TOKEN ontbreekt." };
+      return {
+        ok: false,
+        message:
+          "Nog niet ingesteld: Frame.io client-id + secret (Server-to-Server) of een legacy token ontbreekt.",
+      };
     }
     if (!this.accountId) {
       return {
