@@ -12,6 +12,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "rm -rf .data/pglite && npm run db:migrate && npm run db:seed",
     "db:studio": "drizzle-kit studio",
+    "google:token": "node scripts/google-refresh-token.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
