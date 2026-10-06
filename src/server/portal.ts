@@ -16,7 +16,7 @@ import {
   users,
 } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
-import { upcomingAppointmentsForClient } from "@/server/appointments";
+import { nextShootForClient, upcomingAppointmentsForClient } from "@/server/appointments";
 
 /**
  * Alles wat het klantportaal toont — en niets meer.
@@ -218,13 +218,33 @@ export async function getPortalData(viewer: Viewer) {
     ((metrics as unknown as { rows?: Array<Record<string, number>> }).rows ??
       (metrics as unknown as Array<Record<string, number>>))[0] ?? {};
 
+  // "Volgende opname": eerst de handmatige/Monday-opnamedag; is die er niet,
+  // dan de eerstvolgende opname uit Google Agenda, zodat de kaart echte data
+  // toont zodra de agenda gekoppeld is.
+  let nextShoot = upcomingShoot[0] ?? null;
+  if (!nextShoot) {
+    const ev = await nextShootForClient(clientId);
+    if (ev) {
+      const tz = "Europe/Amsterdam";
+      nextShoot = {
+        id: ev.id,
+        title: ev.title ?? "Opnamedag",
+        scheduledOn: ev.startsAt.toLocaleDateString("en-CA", { timeZone: tz }),
+        startTime: ev.allDay
+          ? null
+          : ev.startsAt.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: tz }),
+        locationName: ev.location ?? null,
+      };
+    }
+  }
+
   return {
     client,
     awaitingApproval,
     scriptsToReview,
     inProgress,
     published,
-    upcomingShoot: upcomingShoot[0] ?? null,
+    upcomingShoot: nextShoot,
     upcomingShoots: upcomingShoot,
     appointments,
     calendar,
