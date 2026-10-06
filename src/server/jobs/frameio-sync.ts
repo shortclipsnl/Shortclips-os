@@ -16,6 +16,7 @@ import {
   type FrameProject,
 } from "@/server/integrations/frameio";
 import { normalizeName } from "@/server/import";
+import { aliasesForSlug } from "@/server/integrations/client-aliases";
 import { runJob } from "./runner";
 
 /**
@@ -115,11 +116,13 @@ export async function pullFrameProjects(
           ctx.counters.created++;
         }
 
-        // Voorzichtige automatische koppeling: alleen bij precies één naamgenoot.
+        // Voorzichtige automatische koppeling: alleen bij precies één naamgenoot
+        // (klantnaam, slug of een bekende alias).
         const nName = normalizeName(project.name);
-        const hits = clientRows.filter(
-          (c) => normalizeName(c.name) === nName || normalizeName(c.slug) === nName,
-        );
+        const hits = clientRows.filter((c) => {
+          if (normalizeName(c.name) === nName || normalizeName(c.slug) === nName) return true;
+          return aliasesForSlug(c.slug).some((a) => normalizeName(a) === nName);
+        });
         if (hits.length === 1) {
           await db
             .insert(clientIntegrations)

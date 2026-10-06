@@ -124,7 +124,7 @@ export async function getPortalData(viewer: Viewer) {
         ),
       )
       .orderBy(desc(deliverables.publishedAt))
-      .limit(24),
+      .limit(500),
 
     db.select({
       id: productionDays.id, title: productionDays.title,

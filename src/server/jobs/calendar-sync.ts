@@ -19,6 +19,7 @@ import {
   type ClientMatcher,
 } from "@/server/integrations/calendar-matching";
 import { MissingCredentialsError } from "@/server/integrations/types";
+import { aliasesForSlug } from "@/server/integrations/client-aliases";
 import { runJob } from "./runner";
 
 /**
@@ -57,7 +58,7 @@ export async function buildClientMatchers(): Promise<ClientMatcher[]> {
   for (const r of rows) {
     byClient.set(r.id, {
       id: r.id, name: r.name, slug: r.slug,
-      aliases: [], contactEmails: [], domains: [],
+      aliases: [...aliasesForSlug(r.slug)], contactEmails: [], domains: [],
     });
   }
 
