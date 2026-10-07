@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Geen Next.js dev-indicator linksonder (ook niet lokaal); in productie is hij
+  // sowieso weg.
+  devIndicators: false,
   // Deze pakketten mogen niet gebundeld worden: pg opent native sockets en
   // PGlite laadt een WASM-bestand vanaf schijf.
   serverExternalPackages: ["pg", "@electric-sql/pglite"],

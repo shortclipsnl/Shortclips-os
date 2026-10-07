@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ExternalLink, Play, Video as VideoIcon } from "lucide-react";
+import { Play, Video as VideoIcon } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalFrameUrl, getPortalVideos } from "@/server/portal";
-import { buttonClass } from "@/components/ui";
+import { getPortalVideos } from "@/server/portal";
 import { CoverImage } from "@/components/portal/cover-image";
 import { clientStatusView, statusToneClass } from "@/lib/portal-status";
 import { videoCover } from "../cover";
@@ -59,20 +58,13 @@ function Group({ title, subtitle, rows }: { title: string; subtitle?: string; ro
 
 export default async function PortalVideosPage() {
   const viewer = await requirePortal();
-  const [data, frameUrl] = await Promise.all([getPortalVideos(viewer), getPortalFrameUrl(viewer)]);
+  const data = await getPortalVideos(viewer);
 
   return (
     <div className="flex flex-col gap-7">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[25px] font-bold tracking-tight">Video&apos;s</h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Al je video&apos;s op één plek, bekijk, geef feedback en download.</p>
-        </div>
-        {frameUrl ? (
-          <a href={frameUrl} target="_blank" rel="noreferrer" className={buttonClass({ variant: "accent" })}>
-            <ExternalLink className="size-4" /> Beoordeel je video&apos;s in Frame
-          </a>
-        ) : null}
+      <div>
+        <h1 className="text-[25px] font-bold tracking-tight">Video&apos;s</h1>
+        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Al je video&apos;s op één plek, bekijk, geef feedback en download.</p>
       </div>
 
       {data.totaal === 0 ? (

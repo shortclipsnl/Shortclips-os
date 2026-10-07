@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarClock, CheckCircle2, Clock, ExternalLink, FileText, Play } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock, FileText, Play, Sparkles } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalContact, getPortalData, getPortalFrameUrl } from "@/server/portal";
+import { getPortalContact, getPortalData } from "@/server/portal";
 import { buttonClass } from "@/components/ui";
 import { CountUp } from "@/components/portal/count-up";
 import { compact, formatDateFull, num, relativeDays } from "@/lib/format";
@@ -52,9 +52,8 @@ function ContactCard({ name, role, initials }: { name: string; role: string; ini
 
 export default async function PortalPage() {
   const viewer = await requirePortal();
-  const [data, frameUrl, contact] = await Promise.all([
+  const [data, contact] = await Promise.all([
     getPortalData(viewer),
-    getPortalFrameUrl(viewer),
     getPortalContact(viewer),
   ]);
 
@@ -93,18 +92,11 @@ export default async function PortalPage() {
   return (
     <div className="flex flex-col gap-[18px]">
       {/* Hero */}
-      <div className="flex flex-wrap items-end justify-between gap-3 px-0.5 pt-1">
-        <div>
-          <h1 className="text-[29px] font-bold tracking-tight">Welkom terug, {firstName}</h1>
-          <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-            Alles rond de video&apos;s van {data.client.name}, in één studio-omgeving.
-          </p>
-        </div>
-        {frameUrl ? (
-          <a href={frameUrl} target="_blank" rel="noreferrer" className={buttonClass({ variant: "accent" })}>
-            <ExternalLink className="size-4" /> Beoordeel in Frame
-          </a>
-        ) : null}
+      <div className="px-0.5 pt-1">
+        <h1 className="text-[29px] font-bold tracking-tight">Welkom terug, {firstName}</h1>
+        <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
+          Alles rond de video&apos;s van {data.client.name}, in één studio-omgeving.
+        </p>
       </div>
 
       {/* Statusoverzicht, één oogopslag: waar staan je video's */}
@@ -152,8 +144,8 @@ export default async function PortalPage() {
             <div className="mt-4 flex flex-col gap-3">
               {data.awaitingApproval.slice(0, 4).map((v) => {
                 const dl = deadlineText(reviewDeadline(v.statusChangedAt));
-                const reviewUrl = v.frameUrl ?? frameUrl ?? `/portal/videos/${v.id}`;
-                const external = Boolean(v.frameUrl ?? frameUrl);
+                const reviewUrl = v.frameUrl ?? `/portal/videos/${v.id}`;
+                const external = Boolean(v.frameUrl);
                 return (
                   <div key={v.id} className="rounded-[14px] border border-white/10 bg-white/[0.04] p-3">
                     <div className="flex items-start gap-3.5">
@@ -237,6 +229,23 @@ export default async function PortalPage() {
           ) : null}
         </section>
       </div>
+
+      {/* Update van Shortclips — de maandelijkse insight, zodra er een rapport is */}
+      {data.reports.length > 0 ? (
+        <section className="sc-glass p-5" style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.07), rgba(255,255,255,0.02))" }}>
+          <div className="flex items-center gap-2">
+            <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]"><Sparkles className="size-4" /></span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#4bc4ff]">Update van Shortclips</span>
+          </div>
+          <h3 className="mt-2.5 text-[15px] font-semibold">{data.reports[0]!.title}</h3>
+          {data.reports[0]!.summary || data.reports[0]!.manualNote ? (
+            <p className="mt-1 text-[13.5px] leading-relaxed text-[var(--color-ink-muted)]">
+              {data.reports[0]!.summary ?? data.reports[0]!.manualNote}
+            </p>
+          ) : null}
+          <Link href="/portal/resultaten" className="mt-3 inline-block text-[13px] font-semibold text-[#4bc4ff]">Bekijk je resultaten →</Link>
+        </section>
+      ) : null}
 
       {/* Waar we mee bezig zijn */}
       <section className="sc-glass p-5">

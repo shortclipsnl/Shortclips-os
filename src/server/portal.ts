@@ -592,6 +592,7 @@ export type PortalContactPerson = {
   role: string;
   email: string | null;
   phone: string | null;
+  avatarUrl: string | null;
 };
 
 /**
@@ -613,6 +614,7 @@ export async function getPortalContact(viewer: Viewer): Promise<{
       coordinatorName: users.fullName,
       coordinatorEmail: users.email,
       coordinatorPhone: users.phone,
+      coordinatorAvatar: users.avatarUrl,
     })
     .from(clients)
     .leftJoin(users, eq(users.id, clients.coordinatorId))
@@ -625,6 +627,7 @@ export async function getPortalContact(viewer: Viewer): Promise<{
       name: users.fullName,
       email: users.email,
       phone: users.phone,
+      avatarUrl: users.avatarUrl,
     })
     .from(productionDays)
     .innerJoin(users, eq(users.id, productionDays.videographerId))
@@ -635,7 +638,7 @@ export async function getPortalContact(viewer: Viewer): Promise<{
   if (!shoot) {
     // De vaste videograaf met een ingevuld telefoonnummer (echte contactgegevens).
     [shoot] = await db
-      .select({ name: users.fullName, email: users.email, phone: users.phone })
+      .select({ name: users.fullName, email: users.email, phone: users.phone, avatarUrl: users.avatarUrl })
       .from(users)
       .where(
         and(
@@ -656,10 +659,11 @@ export async function getPortalContact(viewer: Viewer): Promise<{
           role: "Vaste contactpersoon",
           email: client.coordinatorEmail,
           phone: client.coordinatorPhone,
+          avatarUrl: client.coordinatorAvatar ?? null,
         }
       : null,
     videographer: shoot
-      ? { name: shoot.name, role: "Videograaf", email: shoot.email, phone: shoot.phone }
+      ? { name: shoot.name, role: "Videograaf", email: shoot.email, phone: shoot.phone, avatarUrl: shoot.avatarUrl ?? null }
       : null,
   };
 }

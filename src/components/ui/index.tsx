@@ -258,11 +258,27 @@ export function Avatar({
   name,
   color,
   size = 28,
+  src,
 }: {
   name: string;
   color?: string | null;
   size?: number;
+  src?: string | null;
 }) {
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={name}
+        title={name}
+        width={size}
+        height={size}
+        style={{ width: size, height: size }}
+        className="inline-block shrink-0 rounded-full object-cover"
+      />
+    );
+  }
   const letters = name
     .split(/\s+/)
     .filter(Boolean)

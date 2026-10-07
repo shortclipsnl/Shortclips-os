@@ -137,7 +137,7 @@ function ContactCard({ person, focus, showWhatsApp = false }: { person: PortalCo
   return (
     <Card>
       <div className="flex items-center gap-4">
-        <Avatar name={person.name} size={52} />
+        <Avatar name={person.name} size={52} src={person.avatarUrl} />
         <div className="min-w-0">
           <p className="text-base font-semibold text-[var(--color-ink)]">{person.name}</p>
           <p className="text-sm text-[var(--color-ink-muted)]">{person.role}</p>
@@ -174,7 +174,7 @@ export function TeamContent({
         {coordinator ? (
           <ContactCard person={coordinator} focus="Voor planning, scripts, feedback, resultaten en alles rond de samenwerking." />
         ) : (
-          <ContactCard person={{ name: "Shortclips", role: "Je team", email: "info@shortclips.nl", phone: null }} focus="Voor planning, scripts, feedback, resultaten en alles rond de samenwerking." />
+          <ContactCard person={{ name: "Shortclips", role: "Je team", email: "info@shortclips.nl", phone: null, avatarUrl: null }} focus="Voor planning, scripts, feedback, resultaten en alles rond de samenwerking." />
         )}
         {videographer ? (
           <ContactCard person={videographer} focus="Voor vragen rondom een aankomende opnamedag en de opnames zelf." showWhatsApp />
