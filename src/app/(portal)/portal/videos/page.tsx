@@ -5,7 +5,6 @@ import { requirePortal } from "@/server/auth/context";
 import { getPortalFrameUrl, getPortalVideos } from "@/server/portal";
 import { buttonClass } from "@/components/ui";
 import { CoverImage } from "@/components/portal/cover-image";
-import { formatDate } from "@/lib/format";
 import { clientStatusView, statusToneClass } from "@/lib/portal-status";
 import { videoCover } from "../cover";
 
@@ -25,7 +24,6 @@ type Row = {
 function Tile({ v }: { v: Row }) {
   const view = clientStatusView(v.status);
   const s = { label: view.label, cls: statusToneClass(view.tone) };
-  const date = v.publishedAt ?? v.statusChangedAt;
   // Echte Frame-omslag via de proxy (vers gehouden); de kleur-omslag blijft als
   // zachte placeholder eronder staan tot de afbeelding is ingeladen.
   const cover = v.frameAssetId ? `/api/frame/thumb/${v.id}` : null;
@@ -40,7 +38,6 @@ function Tile({ v }: { v: Row }) {
         <span className="sc-play"><Play className="size-[18px] translate-x-0.5" fill="currentColor" /></span>
         <span className="absolute inset-x-3 bottom-3">
           <span className="block truncate text-[12.5px] font-semibold text-white">{v.title}</span>
-          {date ? <span className="block text-[11px] text-white/60">{formatDate(date)}</span> : null}
         </span>
       </article>
     </Link>

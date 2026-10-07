@@ -477,10 +477,25 @@ export async function getPortalVideos(viewer: Viewer) {
     .limit(1000);
 
   const clean = rows.map((v) => ({ ...v, title: cleanVideoTitle(v.title) }));
+
+  // Gepubliceerd: één kaart per video. Frame levert per video meerdere bestanden
+  // (9:16/4:5/1:1, .mov/.mp4) die naar dezelfde schone titel opschonen — die
+  // vouwen we samen (nieuwste eerst, want gesorteerd op publishedAt). De Monday-
+  // afgeleide titels (bv. "KKFH") vouwen we bewust NIET samen.
+  const seen = new Set<string>();
+  const gepubliceerd: typeof clean = [];
+  for (const v of clean) {
+    if (v.status !== "published") continue;
+    const key = v.title.toLowerCase().trim();
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    gepubliceerd.push(v);
+  }
+
   return {
     actieNodig: clean.filter((v) => v.status === "client_review"),
     inProductie: clean.filter((v) => (IN_PRODUCTION_STATUSES as readonly string[]).includes(v.status)),
-    gepubliceerd: clean.filter((v) => v.status === "published"),
+    gepubliceerd,
     totaal: rows.length,
   };
 }

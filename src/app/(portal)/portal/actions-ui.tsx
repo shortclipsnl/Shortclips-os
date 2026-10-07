@@ -2,78 +2,45 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, MessageSquare } from "lucide-react";
+import { Check, ExternalLink, Loader2 } from "lucide-react";
 import {
   approveScript,
   approveVideo,
   commentOnScript,
-  requestChanges,
 } from "@/server/actions/portal";
-import { Button, ErrorNote, InfoNote } from "@/components/ui";
+import { Button, buttonClass, ErrorNote, InfoNote } from "@/components/ui";
 
-export function VideoDecision({ videoId }: { videoId: string }) {
-  const [mode, setMode] = useState<"idle" | "feedback">("idle");
-  const [body, setBody] = useState("");
+export function VideoDecision({ videoId, frameUrl }: { videoId: string; frameUrl?: string | null }) {
   const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
 
   return (
     <div className="space-y-3">
-      {mode === "idle" ? (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="accent"
-            disabled={pending}
-            onClick={() =>
-              start(async () => {
-                const res = await approveVideo(videoId);
-                setResult(res);
-                if (res.ok) router.refresh();
-              })
-            }
-          >
-            {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-            Goedkeuren
-          </Button>
-          <Button variant="secondary" onClick={() => setMode("feedback")}>
-            <MessageSquare className="size-4" />
-            Aanpassing vragen
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <textarea
-            className="sc-input resize-y"
-            rows={4}
-            placeholder="Wat zou je graag anders zien? Wees zo concreet mogelijk, bijvoorbeeld met een tijdstip uit de video."
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-          />
-          <div className="flex gap-2">
-            <Button
-              disabled={pending || body.trim().length === 0}
-              onClick={() =>
-                start(async () => {
-                  const res = await requestChanges(videoId, { body });
-                  setResult(res);
-                  if (res.ok) {
-                    setBody("");
-                    setMode("idle");
-                    router.refresh();
-                  }
-                })
-              }
-            >
-              {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-              Versturen
-            </Button>
-            <Button variant="ghost" onClick={() => setMode("idle")}>
-              Annuleren
-            </Button>
-          </div>
-        </div>
-      )}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="accent"
+          disabled={pending}
+          onClick={() =>
+            start(async () => {
+              const res = await approveVideo(videoId);
+              setResult(res);
+              if (res.ok) router.refresh();
+            })
+          }
+        >
+          {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+          Goedkeuren
+        </Button>
+        {frameUrl ? (
+          <a href={frameUrl} target="_blank" rel="noreferrer" className={buttonClass({ variant: "secondary" })}>
+            <ExternalLink className="size-4" /> Aanpassing vragen in Frame
+          </a>
+        ) : null}
+      </div>
+      <p className="text-xs text-[var(--color-ink-muted)]">
+        Geef je feedback met tijdcode in Frame, zo blijft alles in één gebundelde ronde bij de juiste video.
+      </p>
 
       {result ? (
         result.ok ? <InfoNote tone="good">{result.message}</InfoNote> : <ErrorNote>{result.message}</ErrorNote>

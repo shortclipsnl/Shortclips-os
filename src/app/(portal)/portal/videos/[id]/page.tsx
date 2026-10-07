@@ -171,7 +171,7 @@ export default async function PortalVideoDetailPage({
             subtitle="Eén gebundelde feedbackronde per video. Geef je feedback het liefst met tijdcode in Frame."
           />
           <div className="mt-4">
-            <VideoDecision videoId={video.id} />
+            <VideoDecision videoId={video.id} frameUrl={video.frameUrl} />
           </div>
         </Card>
       ) : inFeedback ? (
