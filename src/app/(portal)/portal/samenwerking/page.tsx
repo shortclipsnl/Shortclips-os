@@ -4,12 +4,11 @@ import { requirePortal } from "@/server/auth/context";
 import { getPortalCollaboration, getPortalContact, getPortalData } from "@/server/portal";
 import { CountUp } from "@/components/portal/count-up";
 import { formatDate } from "@/lib/format";
+import { clientStatusView } from "@/lib/portal-status";
 import { TeamContent, WerkwijzeContent } from "./_content";
 
 export const metadata: Metadata = { title: "Samenwerking" };
 export const dynamic = "force-dynamic";
-
-const READY_STATUSES = new Set(["approved", "ready_to_publish", "scheduled"]);
 
 const TABS = [
   { id: "afspraken", label: "Afspraken" },
@@ -83,14 +82,15 @@ export default async function PortalSamenwerkingPage({
     getPortalContact(viewer),
   ]);
 
-  const now = new Date();
-  const klaar = data.inProgress.filter((v) => READY_STATUSES.has(v.status)).length;
-  const inProductie = data.inProgress.length - klaar;
-  const gepubliceerd = data.published.filter(
-    (v) => v.publishedAt && new Date(v.publishedAt).getMonth() === now.getMonth() && new Date(v.publishedAt).getFullYear() === now.getFullYear(),
-  ).length;
+  // Zelfde telling als het dashboard, zodat de aantallen overal gelijk zijn.
+  const counts = { montage: 0, ingepland: 0 };
+  for (const v of data.inProgress) {
+    const k = clientStatusView(v.status).key;
+    if (k === "montage") counts.montage++;
+    else if (k === "ingepland") counts.ingepland++;
+  }
+  const online = data.published.length;
   const quota = collab.monthlyQuota;
-  const pct = quota > 0 ? Math.min(100, Math.round((gepubliceerd / quota) * 100)) : 0;
 
   return (
     <div className="flex flex-col gap-7">
@@ -113,25 +113,13 @@ export default async function PortalSamenwerkingPage({
           </div>
         </section>
         <section className="sc-glass p-6">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Deze maand</span>
-          {quota > 0 ? (
-            <div className="mt-4">
-              <div className="flex items-end justify-between">
-                <span className="text-[28px] font-bold leading-none tabular-nums">
-                  <CountUp value={gepubliceerd} /><span className="text-[var(--color-ink-faint)]">/{quota}</span>
-                </span>
-                <span className="text-[13px] text-[var(--color-ink-muted)]">gepubliceerd</span>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-gradient-to-r from-[#19a8ff] to-[#1b5fe0]" style={{ width: `${pct}%` }} />
-              </div>
-            </div>
-          ) : null}
-          <div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-[12px] border border-white/10 bg-white/5">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Je video&apos;s</span>
+          <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-[12px] border border-white/10 bg-white/5">
             {[
-              { label: "in productie", value: inProductie },
-              { label: "wacht op jou", value: data.awaitingApproval.length },
-              { label: "klaar", value: klaar },
+              { label: "In montage (nu)", value: counts.montage },
+              { label: "Wacht op jou (nu)", value: data.awaitingApproval.length },
+              { label: "Ingepland (nu)", value: counts.ingepland },
+              { label: "Online (totaal)", value: online },
             ].map((s) => (
               <div key={s.label} className="bg-[rgba(10,12,38,0.6)] p-3">
                 <CountUp value={s.value} className="block text-[20px] font-bold tabular-nums leading-none" />

@@ -36,10 +36,8 @@ function Tile({ v }: { v: Row }) {
         {cover ? <CoverImage src={cover} /> : null}
         <span className={`absolute left-2.5 top-2.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${s.cls}`}>{s.label}</span>
         <span className="sc-play"><Play className="size-[18px] translate-x-0.5" fill="currentColor" /></span>
-        <span className="absolute inset-x-3 bottom-3">
-          <span className="block truncate text-[12.5px] font-semibold text-white">{v.title}</span>
-        </span>
       </article>
+      <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-snug text-[var(--color-ink)] group-hover:text-[#9fdcff]">{v.title}</p>
     </Link>
   );
 }

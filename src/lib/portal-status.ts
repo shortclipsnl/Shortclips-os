@@ -73,7 +73,18 @@ export function cleanVideoTitle(raw: string | null | undefined): string {
   t = t.replace(/^\s*\d{1,3}(?!\d)\s*[-.]?\s*/, "");  // leidende nummering (niet midden in een getal)
   t = t.replace(/\s{2,}/g, " ").replace(/^[\s-]+|[\s-]+$/g, "").trim();
   if (!t) return String(raw).trim();
+  // Volledig in hoofdletters → zinskapitaal (zodat caps en gewone letters gelijk zijn).
+  if (/[A-Z]/.test(t) && !/[a-z]/.test(t)) t = t.toLowerCase();
   return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/**
+ * Sleutel om dubbele video's samen te voegen: schone titel, kleine letters,
+ * zonder eindleesteken. Zo vallen "Hoe wordt een kozijn gemaakt?" en
+ * "HOE WORDT EEN KOZIJN GEMAAKT" samen.
+ */
+export function videoTitleKey(raw: string | null | undefined): string {
+  return cleanVideoTitle(raw).toLowerCase().replace(/[?!.…\s]+$/g, "").trim();
 }
 
 /** Alleen deze status betekent dat de klant een video moet beoordelen. */

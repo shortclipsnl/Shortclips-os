@@ -133,7 +133,7 @@ function waNumber(phone: string): string {
   return phone.replace(/[^\d]/g, "").replace(/^0/, "31");
 }
 
-function ContactCard({ person, focus }: { person: PortalContactPerson; focus?: string }) {
+function ContactCard({ person, focus, showWhatsApp = false }: { person: PortalContactPerson; focus?: string; showWhatsApp?: boolean }) {
   return (
     <Card>
       <div className="flex items-center gap-4">
@@ -151,10 +151,10 @@ function ContactCard({ person, focus }: { person: PortalContactPerson; focus?: s
           <a href={`mailto:${person.email}`} className={buttonClass({ variant: "primary", size: "sm" })}><Mail className="size-4" /> E-mail</a>
         ) : null}
         {person.phone ? (
-          <>
-            <a href={`tel:${person.phone}`} className={buttonClass({ variant: "secondary", size: "sm" })}><Phone className="size-4" /> Bellen</a>
-            <a href={`https://wa.me/${waNumber(person.phone)}`} target="_blank" rel="noreferrer" className={buttonClass({ variant: "secondary", size: "sm" })}><MessageCircle className="size-4" /> WhatsApp</a>
-          </>
+          <a href={`tel:${person.phone}`} className={buttonClass({ variant: "secondary", size: "sm" })}><Phone className="size-4" /> Bellen</a>
+        ) : null}
+        {person.phone && showWhatsApp ? (
+          <a href={`https://wa.me/${waNumber(person.phone)}`} target="_blank" rel="noreferrer" className={buttonClass({ variant: "secondary", size: "sm" })}><MessageCircle className="size-4" /> WhatsApp</a>
         ) : null}
       </div>
     </Card>
@@ -177,7 +177,7 @@ export function TeamContent({
           <ContactCard person={{ name: "Shortclips", role: "Je team", email: "info@shortclips.nl", phone: null }} focus="Voor planning, scripts, feedback, resultaten en alles rond de samenwerking." />
         )}
         {videographer ? (
-          <ContactCard person={videographer} focus="Voor vragen rondom een aankomende opnamedag en de opnames zelf." />
+          <ContactCard person={videographer} focus="Voor vragen rondom een aankomende opnamedag en de opnames zelf." showWhatsApp />
         ) : null}
       </div>
 

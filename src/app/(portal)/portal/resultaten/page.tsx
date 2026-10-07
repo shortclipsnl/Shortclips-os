@@ -65,22 +65,24 @@ export default async function PortalResultatenPage({
             Hoe je content presteert, gecombineerd over je kanalen.
           </p>
         </div>
-        <div className="inline-flex gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1">
-          {PERIODS.map((p) => {
-            const active = p.days === days;
-            return (
-              <Link
-                key={p.days}
-                href={`/portal/resultaten?periode=${p.days}`}
-                className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
-                  active ? "bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-                }`}
-              >
-                {p.label}
-              </Link>
-            );
-          })}
-        </div>
+        {r.hasData ? (
+          <div className="inline-flex gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1">
+            {PERIODS.map((p) => {
+              const active = p.days === days;
+              return (
+                <Link
+                  key={p.days}
+                  href={`/portal/resultaten?periode=${p.days}`}
+                  className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+                    active ? "bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                  }`}
+                >
+                  {p.label}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
 
       {r.hasData ? (

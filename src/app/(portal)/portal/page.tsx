@@ -9,8 +9,6 @@ import { compact, formatDateFull, num, relativeDays } from "@/lib/format";
 import { clientStatusView, deadlineText, reviewDeadline, statusToneClass } from "@/lib/portal-status";
 import { videoCover } from "./cover";
 
-const MONTH_NL = new Intl.DateTimeFormat("nl-NL", { month: "long" });
-
 export const metadata: Metadata = { title: "Jouw omgeving" };
 export const dynamic = "force-dynamic";
 
@@ -64,14 +62,9 @@ export default async function PortalPage() {
   const firstName = viewer.fullName.split(" ")[0];
   const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 
-  // Maandoverzicht, zelfde bronnen als de rest van het portaal, zodat de cijfers
-  // nergens uit elkaar lopen. Verdeeld over de 6 klantstatussen.
-  const now = new Date();
-  const monthName = MONTH_NL.format(now);
-  const gepubliceerdDezeMaand = data.published.filter(
-    (v) => v.publishedAt && new Date(v.publishedAt).getMonth() === now.getMonth() && new Date(v.publishedAt).getFullYear() === now.getFullYear(),
-  ).length;
-  const afgesproken = data.client.monthlyVideoQuota ?? 0;
+  // Statusoverzicht, zelfde bronnen als de rest van het portaal zodat de
+  // aantallen overal gelijk zijn. Online = totaal; de rest = wat er nu loopt.
+  const online = data.published.length;
   const counts = { opname: 0, montage: 0, ingepland: 0 };
   for (const v of data.inProgress) {
     const k = clientStatusView(v.status).key;
@@ -81,21 +74,20 @@ export default async function PortalPage() {
   }
   const anyOverdue = data.awaitingApproval.some((v) => deadlineText(reviewDeadline(v.statusChangedAt))?.urgent);
 
-  // Eén zin maandstatus (vervangt losse tellers).
+  // Eén zin statusoverzicht (vervangt losse tellers).
   const parts: string[] = [];
-  if (afgesproken > 0) parts.push(`${gepubliceerdDezeMaand} van ${afgesproken} video's online`);
-  else if (gepubliceerdDezeMaand > 0) parts.push(`${gepubliceerdDezeMaand} video's online`);
+  if (online > 0) parts.push(`${online} video's online`);
   if (counts.montage > 0) parts.push(`${counts.montage} in montage`);
   if (openActions > 0) parts.push(`${openActions} wacht op jouw beoordeling`);
   if (counts.ingepland > 0) parts.push(`${counts.ingepland} ingepland`);
-  const monthSentence = parts.length ? `${parts.join(", ")}.` : "Nog geen activiteit deze maand.";
+  const monthSentence = parts.length ? `${parts.join(", ")}.` : "Er loopt op dit moment niets.";
 
   const breakdown = [
-    { label: "Opname", value: counts.opname },
-    { label: "In montage", value: counts.montage },
-    { label: "Jouw beoordeling", value: openActions },
-    { label: "Ingepland", value: counts.ingepland },
-    { label: "Online", value: gepubliceerdDezeMaand },
+    { label: "Opname (nu)", value: counts.opname },
+    { label: "In montage (nu)", value: counts.montage },
+    { label: "Wacht op jou (nu)", value: openActions },
+    { label: "Ingepland (nu)", value: counts.ingepland },
+    { label: "Online (totaal)", value: online },
   ];
 
   return (
@@ -115,10 +107,10 @@ export default async function PortalPage() {
         ) : null}
       </div>
 
-      {/* Maandoverzicht, één oogopslag: waar staan we deze maand */}
+      {/* Statusoverzicht, één oogopslag: waar staan je video's */}
       <section className="sc-glass p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold capitalize">{monthName}</h2>
+          <h2 className="text-base font-semibold">Je video&apos;s</h2>
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
               anyOverdue ? "bg-[var(--color-warn-soft)] text-[#ffb020]" : "bg-[var(--color-good-soft)] text-[#2fd27a]"
@@ -152,7 +144,9 @@ export default async function PortalPage() {
                 <CheckCircle2 className="size-5" /> Niets openstaand
               </span>
             )}
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Actie nodig</span>
+            {openActions > 0 ? (
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Actie nodig</span>
+            ) : null}
           </div>
           {data.awaitingApproval.length > 0 ? (
             <div className="mt-4 flex flex-col gap-3">

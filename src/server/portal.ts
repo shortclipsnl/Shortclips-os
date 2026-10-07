@@ -29,6 +29,20 @@ import { cleanVideoTitle } from "@/lib/portal-status";
  * komen hier principieel niet voorbij.
  */
 
+/** Vouwt dubbele video's (formaatvarianten) samen op schone titel — overal
+ *  dezelfde logica, zodat de aantallen op homepage en Video's gelijk zijn. */
+function dedupByTitle<T extends { title: string }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const r of rows) {
+    const key = r.title.toLowerCase().replace(/[?!.…\s]+$/g, "").trim();
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    out.push(r);
+  }
+  return out;
+}
+
 export async function getPortalData(viewer: Viewer) {
   const clientId = viewer.clientId;
   if (!clientId) notFound();
@@ -253,7 +267,7 @@ export async function getPortalData(viewer: Viewer) {
     awaitingApproval: awaitingApproval.map((v) => ({ ...v, title: cleanVideoTitle(v.title) })),
     scriptsToReview,
     inProgress: inProgress.map((v) => ({ ...v, title: cleanVideoTitle(v.title) })),
-    published: published.map((v) => ({ ...v, title: cleanVideoTitle(v.title) })),
+    published: dedupByTitle(published.map((v) => ({ ...v, title: cleanVideoTitle(v.title) }))),
     upcomingShoot: nextShoot,
     upcomingShoots: upcomingShoot,
     appointments,
@@ -491,15 +505,7 @@ export async function getPortalVideos(viewer: Viewer) {
   // (9:16/4:5/1:1, .mov/.mp4) die naar dezelfde schone titel opschonen — die
   // vouwen we samen (nieuwste eerst, want gesorteerd op publishedAt). De Monday-
   // afgeleide titels (bv. "KKFH") vouwen we bewust NIET samen.
-  const seen = new Set<string>();
-  const gepubliceerd: typeof clean = [];
-  for (const v of clean) {
-    if (v.status !== "published") continue;
-    const key = v.title.toLowerCase().trim();
-    if (key && seen.has(key)) continue;
-    if (key) seen.add(key);
-    gepubliceerd.push(v);
-  }
+  const gepubliceerd = dedupByTitle(clean.filter((v) => v.status === "published"));
 
   return {
     actieNodig: clean.filter((v) => v.status === "client_review"),

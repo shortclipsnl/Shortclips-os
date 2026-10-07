@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Check, CheckCircle2, Download, ExternalLink, Play } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, ExternalLink, Play } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalVideo } from "@/server/portal";
 import { Badge, buttonClass, Card, CardHeader } from "@/components/ui";
@@ -21,22 +21,23 @@ const STATUS_TO_STEP: Record<string, number> = {
   approved: 4, ready_to_publish: 4, scheduled: 4, published: 5, analysis_available: 5,
 };
 
-/** Wie is nu aan zet? */
-function whoseTurn(status: string): string {
-  if (status === "client_review") return "Jij, bekijk de video en geef je akkoord of feedback.";
-  if (status === "client_revision") return "Shortclips, we verwerken je feedback.";
-  if (status === "published" || status === "analysis_available") return "Klaar, de video staat online.";
-  if (status === "scheduled" || status === "ready_to_publish" || status === "approved") return "Shortclips, ingepland voor publicatie.";
-  return "Shortclips, we werken aan je video.";
+/** Wie is nu aan zet, en de uitleg daarbij. */
+function turnInfo(status: string): { who: string | null; explain: string } {
+  if (status === "client_review") return { who: "Jij", explain: "Bekijk de video en geef je akkoord of feedback." };
+  if (status === "client_revision") return { who: "Shortclips", explain: "We verwerken je feedback." };
+  if (status === "published" || status === "analysis_available") return { who: null, explain: "Deze video staat online." };
+  if (status === "scheduled" || status === "ready_to_publish" || status === "approved") return { who: "Shortclips", explain: "Ingepland voor publicatie." };
+  return { who: "Shortclips", explain: "We werken aan je video." };
 }
 
 function ProgressTimeline({ status }: { status: string }) {
   const current = STATUS_TO_STEP[status] ?? 0;
+  const turn = turnInfo(status);
   return (
     <Card>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-[var(--color-ink)]">Waar staat deze video?</h2>
-        <span className="text-xs text-[var(--color-ink-muted)]">Nu aan zet: {whoseTurn(status).split(", ")[0]}</span>
+        <span className="text-xs text-[var(--color-ink-muted)]">{turn.who ? `Nu aan zet: ${turn.who}` : "Deze video staat online"}</span>
       </div>
       <ol className="flex gap-1 overflow-x-auto pb-1">
         {FLOW.map((label, i) => {
@@ -65,7 +66,7 @@ function ProgressTimeline({ status }: { status: string }) {
         })}
       </ol>
       <p className="mt-4 rounded-lg bg-[var(--color-surface-2)] px-3 py-2 text-[13px] text-[var(--color-ink-muted)]">
-        {whoseTurn(status)}
+        {turn.explain}
       </p>
     </Card>
   );
@@ -83,6 +84,7 @@ export default async function PortalVideoDetailPage({
   const needsDecision = waitingOnClient(video.status);
   const inFeedback = feedbackBeingProcessed(video.status);
   const dl = needsDecision ? deadlineText(reviewDeadline(video.statusChangedAt)) : null;
+  const expectedNewVersion = inFeedback ? reviewDeadline(video.statusChangedAt) : null;
 
   return (
     <div className="space-y-6">
@@ -128,40 +130,30 @@ export default async function PortalVideoDetailPage({
         </div>
       ) : null}
 
-      {/* Speler / bekijken, Frame.io draait achter de schermen */}
-      <Card padded={false}>
-        <div className="flex aspect-video items-center justify-center rounded-t-xl bg-[var(--color-ink)]/[0.04]">
-          <div className="flex size-14 items-center justify-center rounded-full bg-[var(--color-brand-600)] text-white">
-            <Play className="size-6 translate-x-0.5" />
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 p-4">
-          {video.frameUrl ? (
-            <>
-              <a
-                href={video.frameUrl}
-                target="_blank"
-                rel="noreferrer"
-                className={buttonClass({ variant: needsDecision ? "accent" : "primary" })}
-              >
-                <ExternalLink className="size-4" /> {needsDecision ? "Bekijk en geef feedback" : "Bekijk video"}
-              </a>
-              <a
-                href={video.frameUrl}
-                target="_blank"
-                rel="noreferrer"
-                className={buttonClass({ variant: "secondary" })}
-              >
-                <Download className="size-4" /> Downloaden
-              </a>
-            </>
-          ) : (
-            <p className="text-sm text-[var(--color-ink-muted)]">
-              De video wordt klaargezet. Je kunt &apos;m hier straks bekijken en beoordelen.
-            </p>
-          )}
-        </div>
-      </Card>
+      {/* Bekijken gebeurt in Frame (review + download). Alleen een speler tonen
+          als er echt iets af te spelen valt. */}
+      {video.frameUrl ? (
+        <a href={video.frameUrl} target="_blank" rel="noreferrer" className="group block">
+          <Card padded={false} className="overflow-hidden">
+            <div className="flex aspect-video items-center justify-center bg-[var(--color-ink)]/[0.06]">
+              <span className="flex size-14 items-center justify-center rounded-full bg-[var(--color-brand-600)] text-white transition-transform group-hover:scale-105">
+                <Play className="size-6 translate-x-0.5" fill="currentColor" />
+              </span>
+            </div>
+            <div className="flex items-center gap-2 p-4 text-sm font-semibold text-[var(--color-brand-600)]">
+              <ExternalLink className="size-4" />
+              {needsDecision ? "Bekijk en geef feedback in Frame" : "Bekijk en download in Frame"}
+            </div>
+          </Card>
+        </a>
+      ) : (
+        <Card className="flex items-center gap-3 text-sm text-[var(--color-ink-muted)]">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-faint)]">
+            <Play className="size-4" />
+          </span>
+          De video wordt klaargezet. Je kunt &apos;m hier straks bekijken.
+        </Card>
+      )}
 
       {/* Jouw beoordeling, alleen wanneer de klant echt aan zet is */}
       {needsDecision ? (
@@ -182,7 +174,7 @@ export default async function PortalVideoDetailPage({
               Feedback ontvangen{video.statusChangedAt ? ` op ${formatDate(video.statusChangedAt)}` : ""}
             </p>
             <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-              We verwerken je feedback en zetten binnenkort een nieuwe versie klaar. Je hoeft nu niets te doen.
+              We verwerken je feedback{expectedNewVersion ? ` en verwachten een nieuwe versie rond ${formatDate(expectedNewVersion)}` : " en zetten een nieuwe versie klaar"}. Je hoeft nu niets te doen.
             </p>
           </div>
         </Card>
