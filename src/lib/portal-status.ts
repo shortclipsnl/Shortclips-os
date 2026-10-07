@@ -55,6 +55,27 @@ export function statusToneClass(tone: Tone | string): string {
   }
 }
 
+/**
+ * Maakt van een Frame-bestandsnaam een leesbare videotitel voor de klant:
+ * haalt extensie, versie (V3/06V3), 'Shortclips', leidende nummering en
+ * formaat-tokens (9:16, 4:5, 1-1) weg. Een titel zonder bestandsruis (bv. een
+ * Monday-titel of de klantnaam) blijft ongewijzigd.
+ */
+export function cleanVideoTitle(raw: string | null | undefined): string {
+  if (!raw) return "";
+  let t = String(raw).trim();
+  t = t.replace(/\.(mp4|mov|m4v|mkv|webm|wav|mp3|png|jpg)$/i, "");
+  t = t.replace(/[_]+/g, " ");                        // underscores eerst, anders blokkeren ze word-boundaries
+  t = t.replace(/[\s-]*shortclips[\w-]*/gi, " ");
+  t = t.replace(/\b\d{1,3}\s*v\d{1,2}\b/gi, " ");     // 06V3, 03 V4
+  t = t.replace(/\bv\d{1,2}\b/gi, " ");               // losse V3/V4
+  t = t.replace(/\b(9[\s:x-]?16|16[\s:x-]?9|4[-:]?5|5[-:]?4|1[-:]1)\b/gi, " "); // formaten (9:16/4:5/1:1)
+  t = t.replace(/^\s*\d{1,3}(?!\d)\s*[-.]?\s*/, "");  // leidende nummering (niet midden in een getal)
+  t = t.replace(/\s{2,}/g, " ").replace(/^[\s-]+|[\s-]+$/g, "").trim();
+  if (!t) return String(raw).trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 /** Alleen deze status betekent dat de klant een video moet beoordelen. */
 export function waitingOnClient(status: string): boolean {
   return status === "client_review";

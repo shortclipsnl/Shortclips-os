@@ -19,6 +19,7 @@ import {
 } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 import { nextShootForClient, upcomingAppointmentsForClient } from "@/server/appointments";
+import { cleanVideoTitle } from "@/lib/portal-status";
 
 /**
  * Alles wat het klantportaal toont — en niets meer.
@@ -249,10 +250,10 @@ export async function getPortalData(viewer: Viewer) {
 
   return {
     client,
-    awaitingApproval,
+    awaitingApproval: awaitingApproval.map((v) => ({ ...v, title: cleanVideoTitle(v.title) })),
     scriptsToReview,
-    inProgress,
-    published,
+    inProgress: inProgress.map((v) => ({ ...v, title: cleanVideoTitle(v.title) })),
+    published: published.map((v) => ({ ...v, title: cleanVideoTitle(v.title) })),
     upcomingShoot: nextShoot,
     upcomingShoots: upcomingShoot,
     appointments,
@@ -443,7 +444,7 @@ export async function getPortalVideo(viewer: Viewer, videoId: string) {
     : [];
 
   return {
-    video,
+    video: { ...video, title: cleanVideoTitle(video.title) },
     threads: threads.map((t) => ({ ...t, comments: comments.filter((c) => c.threadId === t.id) })),
   };
 }
@@ -475,10 +476,11 @@ export async function getPortalVideos(viewer: Viewer) {
     .orderBy(desc(deliverables.publishedAt), desc(deliverables.statusChangedAt))
     .limit(1000);
 
+  const clean = rows.map((v) => ({ ...v, title: cleanVideoTitle(v.title) }));
   return {
-    actieNodig: rows.filter((v) => v.status === "client_review"),
-    inProductie: rows.filter((v) => (IN_PRODUCTION_STATUSES as readonly string[]).includes(v.status)),
-    gepubliceerd: rows.filter((v) => v.status === "published"),
+    actieNodig: clean.filter((v) => v.status === "client_review"),
+    inProductie: clean.filter((v) => (IN_PRODUCTION_STATUSES as readonly string[]).includes(v.status)),
+    gepubliceerd: clean.filter((v) => v.status === "published"),
     totaal: rows.length,
   };
 }
