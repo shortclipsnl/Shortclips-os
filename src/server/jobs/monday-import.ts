@@ -102,23 +102,37 @@ export async function runMondayClientImport() {
       const amName = col(item, H.accountManager);
       const coordinatorId = amName ? userByName.get(normalizeName(amName.split(",")[0])) ?? null : null;
 
-      const base = {
-        name,
-        status: "active" as const,
-        ...(revenue ? { monthlyRevenue: revenue } : {}),
-        ...(startedOn ? { startedOn } : {}),
-        ...(coordinatorId ? { coordinatorId } : {}),
-        updatedAt: new Date(),
-      };
+      const [existing] = await db
+        .select({ id: clients.id, managedFields: clients.managedFields, deletedAt: clients.deletedAt })
+        .from(clients)
+        .where(eq(clients.slug, slug))
+        .limit(1);
 
-      const [existing] = await db.select({ id: clients.id }).from(clients).where(eq(clients.slug, slug)).limit(1);
+      // Handmatig verwijderde klant niet opnieuw tot leven wekken.
+      if (existing?.deletedAt) {
+        ctx.log(`Klant "${name}" is handmatig verwijderd — overgeslagen.`);
+        continue;
+      }
+
+      // Velden die in Klantenbeheer handmatig zijn gezet laat Monday met rust.
+      const locked = new Set(existing?.managedFields ?? []);
+      const base: Record<string, unknown> = { updatedAt: new Date() };
+      if (!locked.has("name")) base.name = name;
+      if (!locked.has("status")) base.status = "active";
+      if (revenue && !locked.has("monthlyRevenue")) base.monthlyRevenue = revenue;
+      if (startedOn && !locked.has("startedOn")) base.startedOn = startedOn;
+      if (coordinatorId && !locked.has("coordinatorId")) base.coordinatorId = coordinatorId;
+
       let clientId: string;
       if (existing) {
         await db.update(clients).set(base).where(eq(clients.id, existing.id));
         clientId = existing.id;
         ctx.counters.updated++;
       } else {
-        const [created] = await db.insert(clients).values({ slug, ...base }).returning({ id: clients.id });
+        const [created] = await db
+          .insert(clients)
+          .values({ slug, name, status: "active", monthlyRevenue: revenue ?? undefined, startedOn: startedOn ?? undefined, coordinatorId: coordinatorId ?? undefined })
+          .returning({ id: clients.id });
         clientId = created!.id;
         ctx.counters.created++;
       }

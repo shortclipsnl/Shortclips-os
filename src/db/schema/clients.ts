@@ -59,6 +59,16 @@ export const clients = pgTable(
     lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
     notes: text("notes"),
+    /**
+     * Velden die handmatig (via Klantenbeheer) zijn gezet en dus NIET door de
+     * Monday-import overschreven mogen worden. Zo blijft een handmatige wijziging
+     * (bijv. status op "gestopt" of een andere coördinator) staan, terwijl Monday
+     * de overige velden gewoon blijft bijwerken.
+     */
+    managedFields: jsonb("managed_fields")
+      .notNull()
+      .default(sql`'[]'::jsonb`)
+      .$type<string[]>(),
     ...timestamps,
     ...softDelete,
   },

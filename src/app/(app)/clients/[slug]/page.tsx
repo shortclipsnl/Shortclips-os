@@ -144,6 +144,11 @@ export default async function ClientPage({
                 Website <ExternalLink className="size-3.5" />
               </a>
             ) : null}
+            {viewer.permissions.has("clients:write") ? (
+              <LinkButton href={`/clients/${slug}/edit`} variant="secondary" size="sm">
+                Bewerken
+              </LinkButton>
+            ) : null}
           </div>
         </div>
       </div>

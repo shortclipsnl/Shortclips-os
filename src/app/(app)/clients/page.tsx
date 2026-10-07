@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireInternal } from "@/server/auth/context";
 import { listClients } from "@/server/clients";
-import { Avatar, Badge, Card, EmptyState, PageHeader, Table } from "@/components/ui";
+import { Avatar, Badge, Card, EmptyState, LinkButton, PageHeader, Table } from "@/components/ui";
 import {
   euro,
   formatDate,
@@ -13,12 +13,34 @@ import { CLIENT_STATUS, RISK_LEVEL } from "@/lib/statuses";
 export const metadata: Metadata = { title: "Klanten" };
 export const dynamic = "force-dynamic";
 
-export default async function ClientsPage() {
-  const viewer = await requireInternal();
-  const rows = await listClients(viewer);
-  const canSeeFinance = viewer.permissions.has("finance:read");
+const STOPPED = new Set(["paused", "churned"]);
+const FILTERS = [
+  { key: "actief", label: "Actief" },
+  { key: "gestopt", label: "Gestopt" },
+  { key: "alle", label: "Alle" },
+] as const;
 
-  const totalRevenue = rows
+export default async function ClientsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const viewer = await requireInternal();
+  const all = await listClients(viewer);
+  const canSeeFinance = viewer.permissions.has("finance:read");
+  const canWrite = viewer.permissions.has("clients:write");
+
+  const filterKey = (await searchParams).status ?? "actief";
+  const rows =
+    filterKey === "gestopt"
+      ? all.filter((r) => STOPPED.has(r.status))
+      : filterKey === "alle"
+        ? all
+        : all.filter((r) => !STOPPED.has(r.status));
+
+  const activeCount = all.filter((r) => !STOPPED.has(r.status)).length;
+  const stoppedCount = all.filter((r) => STOPPED.has(r.status)).length;
+  const totalRevenue = all
     .filter((r) => r.status === "active")
     .reduce((s, r) => s + Number(r.monthlyRevenue), 0);
 
@@ -28,15 +50,36 @@ export default async function ClientsPage() {
         title="Klanten"
         description={
           canSeeFinance
-            ? `${rows.length} klanten · ${euro(totalRevenue)} terugkerende maandomzet`
-            : `${rows.length} klanten`
+            ? `${activeCount} actief · ${stoppedCount} gestopt · ${euro(totalRevenue)} terugkerende maandomzet`
+            : `${activeCount} actief · ${stoppedCount} gestopt`
         }
+        actions={canWrite ? <LinkButton href="/clients/new">Nieuwe klant</LinkButton> : undefined}
       />
+
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {FILTERS.map((f) => {
+          const count = f.key === "gestopt" ? stoppedCount : f.key === "alle" ? all.length : activeCount;
+          const active = f.key === filterKey;
+          return (
+            <Link
+              key={f.key}
+              href={f.key === "actief" ? "/clients" : `/clients?status=${f.key}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                active
+                  ? "bg-[var(--color-ink)] text-white"
+                  : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+              }`}
+            >
+              {f.label} ({count})
+            </Link>
+          );
+        })}
+      </div>
 
       <Card padded={false}>
         {rows.length === 0 ? (
           <EmptyState
-            title="Nog geen klanten"
+            title="Geen klanten in deze weergave"
             description="Klanten verschijnen hier zodra ze zijn aangemaakt of geïmporteerd uit Monday."
           />
         ) : (

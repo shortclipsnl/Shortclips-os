@@ -7,6 +7,7 @@ import {
   eq,
   inArray,
   isNull,
+  ne,
   sql,
 } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -300,3 +301,54 @@ export async function getClientHub(viewer: Viewer, slug: string) {
 }
 
 export type ClientHub = Awaited<ReturnType<typeof getClientHub>>;
+
+/** Interne teamleden die als coördinator of videograaf toewijsbaar zijn. */
+export async function listAssignableUsers() {
+  return db
+    .select({ id: users.id, fullName: users.fullName, primaryRole: users.primaryRole })
+    .from(users)
+    .where(and(ne(users.primaryRole, "client"), eq(users.status, "active"), isNull(users.deletedAt)))
+    .orderBy(asc(users.fullName));
+}
+
+/** De bewerkbare velden van één klant + primaire contactpersoon, voor Klantenbeheer. */
+export async function getClientForEdit(viewer: Viewer, slug: string) {
+  const [client] = await db
+    .select({
+      id: clients.id,
+      slug: clients.slug,
+      name: clients.name,
+      legalName: clients.legalName,
+      sector: clients.sector,
+      website: clients.website,
+      logoUrl: clients.logoUrl,
+      color: clients.color,
+      status: clients.status,
+      coordinatorId: clients.coordinatorId,
+      videographerId: clients.videographerId,
+      monthlyVideoQuota: clients.monthlyVideoQuota,
+      monthlyRevenue: clients.monthlyRevenue,
+      startedOn: clients.startedOn,
+      notes: clients.notes,
+      managedFields: clients.managedFields,
+    })
+    .from(clients)
+    .where(and(eq(clients.slug, slug), isNull(clients.deletedAt)))
+    .limit(1);
+  if (!client) notFound();
+  assertClientAccess(viewer, client.id);
+
+  const [contact] = await db
+    .select({
+      id: clientContacts.id,
+      fullName: clientContacts.fullName,
+      email: clientContacts.email,
+      phone: clientContacts.phone,
+    })
+    .from(clientContacts)
+    .where(and(eq(clientContacts.clientId, client.id), isNull(clientContacts.deletedAt)))
+    .orderBy(desc(clientContacts.isPrimary))
+    .limit(1);
+
+  return { client, contact: contact ?? null };
+}
