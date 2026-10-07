@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarClock, CheckCircle2, Clock, ExternalLink, FileText, Play, UserRound } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock, ExternalLink, FileText, Play } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalData, getPortalFrameUrl } from "@/server/portal";
 import { buttonClass } from "@/components/ui";
@@ -9,7 +9,6 @@ import { compact, formatDateFull, num, relativeDays } from "@/lib/format";
 import { clientStatusView, deadlineText, reviewDeadline, statusToneClass } from "@/lib/portal-status";
 import { videoCover } from "./cover";
 
-const READY_STATUSES = new Set(["approved", "ready_to_publish", "scheduled"]);
 const MONTH_NL = new Intl.DateTimeFormat("nl-NL", { month: "long" });
 
 export const metadata: Metadata = { title: "Jouw omgeving" };
@@ -66,26 +65,38 @@ export default async function PortalPage() {
   const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 
   // Maandoverzicht, zelfde bronnen als de rest van het portaal, zodat de cijfers
-  // nergens uit elkaar lopen.
+  // nergens uit elkaar lopen. Verdeeld over de 6 klantstatussen.
   const now = new Date();
   const monthName = MONTH_NL.format(now);
-  const klaarVoorPublicatie = data.inProgress.filter((v) => READY_STATUSES.has(v.status)).length;
-  const inProductie = data.inProgress.length - klaarVoorPublicatie;
   const gepubliceerdDezeMaand = data.published.filter(
     (v) => v.publishedAt && new Date(v.publishedAt).getMonth() === now.getMonth() && new Date(v.publishedAt).getFullYear() === now.getFullYear(),
   ).length;
   const afgesproken = data.client.monthlyVideoQuota ?? 0;
-  const anyOverdue = data.awaitingApproval.some((v) => {
-    const t = deadlineText(reviewDeadline(v.statusChangedAt));
-    return t?.urgent;
-  });
-  const monthStats = [
-    afgesproken > 0 ? { label: "afgesproken", value: afgesproken } : null,
-    { label: "in productie", value: inProductie },
-    { label: "wacht op jou", value: openActions },
-    { label: "klaar voor publicatie", value: klaarVoorPublicatie },
-    { label: "gepubliceerd", value: gepubliceerdDezeMaand },
-  ].filter(Boolean) as Array<{ label: string; value: number }>;
+  const counts = { opname: 0, montage: 0, ingepland: 0 };
+  for (const v of data.inProgress) {
+    const k = clientStatusView(v.status).key;
+    if (k === "opname") counts.opname++;
+    else if (k === "montage") counts.montage++;
+    else if (k === "ingepland") counts.ingepland++;
+  }
+  const anyOverdue = data.awaitingApproval.some((v) => deadlineText(reviewDeadline(v.statusChangedAt))?.urgent);
+
+  // Eén zin maandstatus (vervangt losse tellers).
+  const parts: string[] = [];
+  if (afgesproken > 0) parts.push(`${gepubliceerdDezeMaand} van ${afgesproken} video's online`);
+  else if (gepubliceerdDezeMaand > 0) parts.push(`${gepubliceerdDezeMaand} video's online`);
+  if (counts.montage > 0) parts.push(`${counts.montage} in montage`);
+  if (openActions > 0) parts.push(`${openActions} wacht op jouw beoordeling`);
+  if (counts.ingepland > 0) parts.push(`${counts.ingepland} ingepland`);
+  const monthSentence = parts.length ? `${parts.join(", ")}.` : "Nog geen activiteit deze maand.";
+
+  const breakdown = [
+    { label: "Opname", value: counts.opname },
+    { label: "In montage", value: counts.montage },
+    { label: "Jouw beoordeling", value: openActions },
+    { label: "Ingepland", value: counts.ingepland },
+    { label: "Online", value: gepubliceerdDezeMaand },
+  ];
 
   return (
     <div className="flex flex-col gap-[18px]">
@@ -117,21 +128,15 @@ export default async function PortalPage() {
             {anyOverdue ? "Je aandacht gevraagd" : "Op schema"}
           </span>
         </div>
+        <p className="mt-2 text-[15px] text-[var(--color-ink)]">{monthSentence}</p>
         <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-[14px] border border-white/10 bg-white/5 sm:grid-cols-3 lg:grid-cols-5">
-          {monthStats.map((s) => (
+          {breakdown.map((s) => (
             <div key={s.label} className="bg-[rgba(10,12,38,0.6)] p-3.5">
               <CountUp value={s.value} className="block text-[22px] font-bold tabular-nums leading-none" />
               <div className="mt-1.5 text-[11.5px] font-medium text-[var(--color-ink-muted)]">{s.label}</div>
             </div>
           ))}
         </div>
-        {data.upcomingShoot ? (
-          <div className="mt-3.5 flex items-center gap-2 text-[13px] text-[var(--color-ink-muted)]">
-            <CalendarClock className="size-4 text-[#4bc4ff]" />
-            Volgende opname: <span className="font-semibold text-[var(--color-ink)]">{formatDateFull(data.upcomingShoot.scheduledOn)}</span>
-            <span className="text-[var(--color-ink-faint)]">· {relativeDays(data.upcomingShoot.scheduledOn)}</span>
-          </div>
-        ) : null}
       </section>
 
       {/* Bento: wacht op jou + volgende opname */}
@@ -200,31 +205,42 @@ export default async function PortalPage() {
         </section>
 
         <section className="sc-glass p-5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Volgende opname</span>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Komt eraan</span>
+            <Link href="/portal/planning" className="text-[13px] font-semibold text-[#4bc4ff]">Planning →</Link>
+          </div>
           {data.upcomingShoot ? (
             <div className="mt-3 flex gap-3.5">
-              <div className="flex size-[62px] shrink-0 flex-col items-center justify-center rounded-[15px] border border-white/10 bg-gradient-to-br from-[rgba(25,168,255,0.22)] to-[rgba(27,95,224,0.22)]">
-                <span className="text-xl font-bold leading-none">{new Date(data.upcomingShoot.scheduledOn).getDate()}</span>
-                <span className="mt-1 text-[10.5px] uppercase tracking-wider text-[var(--color-ink-muted)]">
+              <div className="flex size-[54px] shrink-0 flex-col items-center justify-center rounded-[14px] border border-white/10 bg-gradient-to-br from-[rgba(25,168,255,0.22)] to-[rgba(27,95,224,0.22)]">
+                <span className="text-lg font-bold leading-none">{new Date(data.upcomingShoot.scheduledOn).getDate()}</span>
+                <span className="mt-0.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-muted)]">
                   {new Date(data.upcomingShoot.scheduledOn).toLocaleDateString("nl-NL", { month: "short" })}
                 </span>
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-[15px] font-semibold">Opnamedag</div>
-                <div className="mt-1 text-[13px] text-[var(--color-ink-muted)]">
+                <div className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">
                   {relativeDays(data.upcomingShoot.scheduledOn)}
                   {data.upcomingShoot.startTime ? ` · vanaf ${data.upcomingShoot.startTime.slice(0, 5)}` : ""}
+                  {contact.videographer ? ` · ${contact.videographer.name.split(" ")[0]} (videograaf)` : ""}
                 </div>
-                {contact.videographer ? (
-                  <div className="mt-2 flex items-center gap-1.5 text-[13px] text-[var(--color-ink-muted)]">
-                    <UserRound className="size-3.5" /> {contact.videographer.name.split(" ")[0]} · videograaf
-                  </div>
-                ) : null}
               </div>
             </div>
-          ) : (
-            <p className="mt-3 text-sm text-[var(--color-ink-muted)]">Nog geen opname gepland. Je contactpersoon neemt contact met je op.</p>
-          )}
+          ) : null}
+          {data.appointments.filter((a) => a.kind !== "opname").slice(0, 2).map((a) => (
+            <div key={a.id} className="mt-2.5 flex items-center gap-3 border-t border-white/10 pt-2.5 first:border-t-0">
+              <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[rgba(25,168,255,0.1)] text-[#4bc4ff]">
+                <CalendarClock className="size-[18px]" strokeWidth={1.8} />
+              </span>
+              <div className="min-w-0 text-[13px]">
+                <div className="font-semibold">{KIND_LABEL[a.kind] ?? "Afspraak"}</div>
+                <div className="text-[var(--color-ink-muted)]">{formatDateFull(a.startsAt)} · {relativeDays(a.startsAt)}</div>
+              </div>
+            </div>
+          ))}
+          {!data.upcomingShoot && data.appointments.filter((a) => a.kind !== "opname").length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--color-ink-muted)]">Nog niets gepland. Je contactpersoon neemt contact met je op.</p>
+          ) : null}
         </section>
       </div>
 
@@ -245,8 +261,8 @@ export default async function PortalPage() {
         )}
       </section>
 
-      {/* Resultaten + afspraken */}
-      <div className="grid gap-[18px] lg:grid-cols-[1.6fr_1fr]">
+      {/* Resultaten, 30 dagen (alleen tonen als er cijfers zijn, nooit nullen) */}
+      {data.metrics.views + data.metrics.reach + data.metrics.engagements > 0 ? (
         <section>
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold">Resultaten, 30 dagen</h2>
@@ -259,28 +275,7 @@ export default async function PortalPage() {
             <Metric k="Volgers" v={`+${num(data.metrics.followerGrowth)}`} />
           </div>
         </section>
-
-        <section className="sc-glass p-5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Aankomende afspraken</span>
-          {data.appointments.length === 0 ? (
-            <p className="mt-3 text-sm text-[var(--color-ink-muted)]">Nog geen afspraken gepland.</p>
-          ) : (
-            <div className="mt-2.5">
-              {data.appointments.slice(0, 4).map((a) => (
-                <div key={a.id} className="flex items-center gap-3 border-t border-white/10 py-2.5 first:border-t-0">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-[11px] bg-[rgba(25,168,255,0.1)] text-[#4bc4ff]">
-                    <CalendarClock className="size-[19px]" strokeWidth={1.8} />
-                  </span>
-                  <div>
-                    <div className="text-sm font-semibold">{KIND_LABEL[a.kind] ?? "Afspraak"}</div>
-                    <div className="text-[12.5px] text-[var(--color-ink-muted)]">{formatDateFull(a.startsAt)} · {relativeDays(a.startsAt)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
+      ) : null}
 
       {/* Contact */}
       <section>
