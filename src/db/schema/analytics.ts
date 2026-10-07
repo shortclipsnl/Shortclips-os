@@ -149,6 +149,12 @@ export const dailyMetrics = pgTable(
     followers: integer("followers").notNull().default(0),
     followerDelta: integer("follower_delta").notNull().default(0),
     postsPublished: integer("posts_published").notNull().default(0),
+    /** Waardevolle interacties: shares + saves (reels). */
+    shares: integer("shares").notNull().default(0),
+    saves: integer("saves").notNull().default(0),
+    /** Totale kijktijd (seconden) en reels-weergaven → gem. kijkduur. */
+    watchSeconds: integer("watch_seconds").notNull().default(0),
+    videoViews: integer("video_views").notNull().default(0),
     source: varchar("source", { length: 32 }).notNull().default("aggregate"),
     ...timestamps,
   },

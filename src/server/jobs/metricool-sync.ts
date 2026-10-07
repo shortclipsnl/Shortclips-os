@@ -12,7 +12,7 @@ import {
 } from "@/server/integrations/metricool";
 import { runJob } from "./runner";
 
-type Source = Pick<MetricoolService, "listBrands" | "accountTimeline">;
+type Source = Pick<MetricoolService, "listBrands" | "timeline">;
 
 /**
  * Koppelt Metricool-merken automatisch aan klanten op naam (+ bekende aliassen),
@@ -74,16 +74,29 @@ export async function linkMetricoolBrands(triggeredById?: string, source: Source
   );
 }
 
-/** Welke daily_metrics-kolom bij welke Metricool-account-metric hoort. */
+/** Welke daily_metrics-kolom bij welke Metricool-metric (+ subject) hoort. */
 const METRIC_MAP = [
-  { field: "views", metric: "views" },
-  { field: "reach", metric: "reach" },
-  { field: "engagements", metric: "postsInteractions" },
-  { field: "followerDelta", metric: "delta_followers" },
-  { field: "followers", metric: "Followers" },
+  { field: "views", subject: "account", metric: "views" },
+  { field: "reach", subject: "account", metric: "reach" },
+  { field: "engagements", subject: "account", metric: "postsInteractions" },
+  { field: "followerDelta", subject: "account", metric: "delta_followers" },
+  { field: "followers", subject: "account", metric: "Followers" },
+  // Waardevolle interacties + kijktijd komen uit de reels-cijfers.
+  { field: "shares", subject: "reels", metric: "shares" },
+  { field: "saves", subject: "reels", metric: "saved" },
+  { field: "watchSeconds", subject: "reels", metric: "ig_reels_video_view_total_time" },
+  { field: "videoViews", subject: "reels", metric: "videoviews" },
 ] as const;
 
-type DayAgg = { views: number; reach: number; engagements: number; followerDelta: number; followers: number };
+type DayAgg = {
+  views: number; reach: number; engagements: number; followerDelta: number; followers: number;
+  shares: number; saves: number; watchSeconds: number; videoViews: number;
+};
+
+const EMPTY_AGG = (): DayAgg => ({
+  views: 0, reach: 0, engagements: 0, followerDelta: 0, followers: 0,
+  shares: 0, saves: 0, watchSeconds: 0, videoViews: 0,
+});
 
 /** Metricool-netwerk → ons platform-enum (voor de per-platform uitsplitsing). */
 const NETWORK_PLATFORM: Record<string, "instagram" | "tiktok" | "facebook"> = {
@@ -139,12 +152,12 @@ export async function pullMetricoolMetrics(
         for (const network of METRICOOL_NETWORKS) {
           const perDay = new Map<string, DayAgg>();
           const add = (date: string, field: keyof DayAgg, value: number) => {
-            const r = perDay.get(date) ?? { views: 0, reach: 0, engagements: 0, followerDelta: 0, followers: 0 };
+            const r = perDay.get(date) ?? EMPTY_AGG();
             r[field] += value;
             perDay.set(date, r);
           };
-          for (const { field, metric } of METRIC_MAP) {
-            const points = await source.accountTimeline(blogId, userId, network, metric, fromISO, toISO);
+          for (const { field, subject, metric } of METRIC_MAP) {
+            const points = await source.timeline(blogId, userId, network, subject, metric, fromISO, toISO);
             for (const p of points) add(p.date, field as keyof DayAgg, p.value);
           }
           if (perDay.size === 0) continue;
@@ -159,6 +172,10 @@ export async function pullMetricoolMetrics(
               engagements: Math.max(0, Math.round(a.engagements)),
               followers: Math.max(0, Math.round(a.followers)),
               followerDelta: Math.round(a.followerDelta),
+              shares: Math.max(0, Math.round(a.shares)),
+              saves: Math.max(0, Math.round(a.saves)),
+              watchSeconds: Math.max(0, Math.round(a.watchSeconds)),
+              videoViews: Math.max(0, Math.round(a.videoViews)),
               source: "metricool",
             });
           }

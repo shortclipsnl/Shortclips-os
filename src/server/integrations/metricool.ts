@@ -41,14 +41,15 @@ export class MetricoolService {
   }
 
   /**
-   * Dagwaarden van één account-metric voor een merk op één netwerk. Geeft een
-   * lege reeks terug wanneer het netwerk/metric voor dit merk niet beschikbaar
-   * is (bijv. netwerk niet gekoppeld) — zodat één netwerk de rest niet blokkeert.
+   * Dagwaarden van één metric voor een merk op één netwerk/subject (account,
+   * reels, posts…). Geeft een lege reeks terug wanneer het netwerk/metric voor
+   * dit merk niet beschikbaar is — zodat één netwerk de rest niet blokkeert.
    */
-  async accountTimeline(
+  async timeline(
     blogId: number,
     userId: number,
     network: string,
+    subject: string,
     metric: string,
     fromISO: string,
     toISO: string,
@@ -60,7 +61,7 @@ export class MetricoolService {
         {
           headers: this.headers,
           retries: 0,
-          query: { from: fromISO, to: toISO, network, subject: "account", metric, blogId, userId },
+          query: { from: fromISO, to: toISO, network, subject, metric, blogId, userId },
         },
       );
       const values = res.data?.[0]?.values ?? [];

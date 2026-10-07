@@ -31,12 +31,17 @@ function Delta({ pct }: { pct: number | null }) {
   );
 }
 
-function Metric({ label, value, prefix = "", pct }: { label: string; value: number; prefix?: string; pct?: number | null }) {
+function Metric({ label, value, text, prefix = "", pct, hint }: { label: string; value?: number; text?: string; prefix?: string; pct?: number | null; hint?: string }) {
   return (
     <Card>
       <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">{label}</p>
-      <CountUp value={value} prefix={prefix} className="mt-1 block text-2xl font-semibold tabular-nums text-[var(--color-ink)]" />
+      {text !== undefined ? (
+        <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--color-ink)]">{text}</p>
+      ) : (
+        <CountUp value={value ?? 0} prefix={prefix} className="mt-1 block text-2xl font-semibold tabular-nums text-[var(--color-ink)]" />
+      )}
       {pct !== undefined ? <Delta pct={pct} /> : null}
+      {hint ? <p className="mt-0.5 text-[11px] text-[var(--color-ink-faint)]">{hint}</p> : null}
     </Card>
   );
 }
@@ -82,8 +87,16 @@ export default async function PortalResultatenPage({
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Metric label="Weergaven" value={r.metrics.views} pct={r.deltas.views} />
-            <Metric label="Bereik" value={r.metrics.reach} pct={r.deltas.reach} />
-            <Metric label="Interacties" value={r.metrics.engagements} pct={r.deltas.engagements} />
+            {r.avgWatchSeconds > 0 ? (
+              <Metric label="Gem. kijkduur" text={`${r.avgWatchSeconds}s`} hint="hoe lang kijkers bleven" />
+            ) : (
+              <Metric label="Bereik" value={r.metrics.reach} pct={r.deltas.reach} />
+            )}
+            {r.valuableInteractions > 0 ? (
+              <Metric label="Waardevolle interacties" value={r.valuableInteractions} hint="shares + saves" />
+            ) : (
+              <Metric label="Interacties" value={r.metrics.engagements} pct={r.deltas.engagements} />
+            )}
             <Metric label="Nieuwe volgers" value={r.metrics.followerGrowth} prefix={r.metrics.followerGrowth >= 0 ? "+" : ""} />
           </div>
 

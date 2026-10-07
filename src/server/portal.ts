@@ -283,6 +283,8 @@ export type PortalResults = {
   metrics: { views: number; reach: number; engagements: number; followerGrowth: number };
   deltas: { views: number | null; reach: number | null; engagements: number | null };
   byPlatform: PortalPlatformResult[];
+  valuableInteractions: number;
+  avgWatchSeconds: number;
   insight: string | null;
   hasData: boolean;
 };
@@ -299,7 +301,9 @@ export async function getPortalResults(viewer: Viewer, days = 30): Promise<Porta
   const res = await db.execute(sql`
     with cur as (
       select coalesce(sum(views),0)::int v, coalesce(sum(reach),0)::int r,
-             coalesce(sum(engagements),0)::int e, coalesce(sum(follower_delta),0)::int f
+             coalesce(sum(engagements),0)::int e, coalesce(sum(follower_delta),0)::int f,
+             coalesce(sum(shares),0)::int sh, coalesce(sum(saves),0)::int sv,
+             coalesce(sum(watch_seconds),0)::int ws, coalesce(sum(video_views),0)::int vv
       from daily_metrics
       where client_id = ${clientId}
         and measured_on >= current_date - (${days} * interval '1 day')
@@ -312,7 +316,8 @@ export async function getPortalResults(viewer: Viewer, days = 30): Promise<Porta
         and measured_on >= current_date - (${2 * days} * interval '1 day')
         and measured_on <  current_date - (${days} * interval '1 day')
     )
-    select cur.v cv, cur.r cr, cur.e ce, cur.f cf, prev.v pv, prev.r pr, prev.e pe, prev.f pf, prev.n pn
+    select cur.v cv, cur.r cr, cur.e ce, cur.f cf, cur.sh csh, cur.sv csv, cur.ws cws, cur.vv cvv,
+           prev.v pv, prev.r pr, prev.e pe, prev.f pf, prev.n pn
     from cur, prev
   `);
 
@@ -323,6 +328,9 @@ export async function getPortalResults(viewer: Viewer, days = 30): Promise<Porta
   const n = (k: string) => Number(row[k] ?? 0);
   const cur = { views: n("cv"), reach: n("cr"), engagements: n("ce"), followerGrowth: n("cf") };
   const prev = { views: n("pv"), reach: n("pr"), engagements: n("pe") };
+  const valuableInteractions = n("csh") + n("csv");
+  const videoViews = n("cvv");
+  const avgWatchSeconds = videoViews > 0 ? Math.round(n("cws") / videoViews) : 0;
   // Alleen vergelijken als de vorige periode voldoende data heeft — anders geeft
   // een bijna-lege basis onzinnige percentages (bv. +3000%).
   const prevCovered = n("pn") >= Math.ceil(days * 0.8);
@@ -371,11 +379,12 @@ export async function getPortalResults(viewer: Viewer, days = 30): Promise<Porta
       else if (deltas.reach < -4) parts.push(`Het bereik ligt ${Math.abs(deltas.reach)}% lager dan de vorige ${days} dagen; we sturen bij op de onderwerpen die het best werken.`);
       else parts.push(`Het bereik is stabiel t.o.v. de vorige ${days} dagen.`);
     }
+    if (avgWatchSeconds > 0) parts.push(`Kijkers bleven gemiddeld ${avgWatchSeconds} seconden kijken.`);
     if (cur.followerGrowth > 0) parts.push(`Je kwam er ${cur.followerGrowth} volger${cur.followerGrowth === 1 ? "" : "s"} bij.`);
     insight = parts.join(" ");
   }
 
-  return { days, metrics: cur, deltas, byPlatform, insight, hasData };
+  return { days, metrics: cur, deltas, byPlatform, valuableInteractions, avgWatchSeconds, insight, hasData };
 }
 
 /** Klantfeedback op één video — uitsluitend de draden die voor de klant zijn. */
