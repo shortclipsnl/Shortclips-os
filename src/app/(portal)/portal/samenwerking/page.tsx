@@ -1,15 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BookOpen, CalendarCheck, UserRound } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalCollaboration, getPortalContact, getPortalData } from "@/server/portal";
 import { CountUp } from "@/components/portal/count-up";
 import { formatDate } from "@/lib/format";
+import { TeamContent, WerkwijzeContent } from "./_content";
 
 export const metadata: Metadata = { title: "Samenwerking" };
 export const dynamic = "force-dynamic";
 
 const READY_STATUSES = new Set(["approved", "ready_to_publish", "scheduled"]);
+
+const TABS = [
+  { id: "afspraken", label: "Afspraken" },
+  { id: "werkwijze", label: "Werkwijze" },
+  { id: "team", label: "Team" },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
 
 const AFSPRAKEN = [
   { k: "Looptijd", v: "Minimaal 3 maanden, daarna maandelijks opzegbaar met één kalendermaand." },
@@ -35,8 +42,41 @@ function Row({ k, v }: { k: string; v: string }) {
   );
 }
 
-export default async function PortalSamenwerkingPage() {
+function AfsprakenContent() {
+  return (
+    <section className="sc-glass p-6 sm:p-7">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-[#4bc4ff]">De afspraken</span>
+      <h2 className="mt-1 text-[22px] font-bold tracking-tight">Zo leggen we het vast</h2>
+      <p className="mt-2 max-w-2xl text-[13.5px] text-[var(--color-ink-muted)]">
+        Deze afspraken gelden voor elk niveau en zijn onderdeel van de overeenkomst.
+      </p>
+      <dl className="mt-5 grid gap-2.5">
+        {AFSPRAKEN.map((a) => (
+          <div key={a.k} className="grid gap-1 rounded-[13px] border border-[#2e90fa]/20 bg-[rgba(46,144,250,0.05)] p-4 sm:grid-cols-[200px_1fr] sm:gap-5">
+            <dt className="flex items-center gap-2 text-[14px] font-semibold text-[#5bc0ff]">
+              <span className="size-1.5 shrink-0 rounded-full bg-[#2e90fa]" />
+              {a.k}
+            </dt>
+            <dd className="text-[13.5px] text-[var(--color-ink-muted)]">{a.v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-5 text-[13px] font-semibold text-[#4bc4ff]">
+        Wijzigingen op deze afspraken leggen we schriftelijk vast bij de offerte.
+      </p>
+    </section>
+  );
+}
+
+export default async function PortalSamenwerkingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const viewer = await requirePortal();
+  const { tab: tabParam } = await searchParams;
+  const tab: TabId = TABS.some((t) => t.id === tabParam) ? (tabParam as TabId) : "afspraken";
+
   const [data, collab, contact] = await Promise.all([
     getPortalData(viewer),
     getPortalCollaboration(viewer),
@@ -57,12 +97,12 @@ export default async function PortalSamenwerkingPage() {
       <div>
         <h1 className="text-[25px] font-bold tracking-tight">Samenwerking</h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Wat we hebben afgesproken, hoeveel content je krijgt en waar we deze maand staan.
+          Wat we hebben afgesproken, hoe we werken en wie je team is.
         </p>
       </div>
 
+      {/* Altijd zichtbaar: huidige samenwerking + deze maand */}
       <div className="grid gap-[18px] lg:grid-cols-2">
-        {/* Huidige samenwerking */}
         <section className="sc-glass p-6">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Huidige samenwerking</span>
           <div className="mt-4">
@@ -72,8 +112,6 @@ export default async function PortalSamenwerkingPage() {
             <Row k="Publicatie" v="Inbegrepen" />
           </div>
         </section>
-
-        {/* Deze maand */}
         <section className="sc-glass p-6">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Deze maand</span>
           {quota > 0 ? (
@@ -104,65 +142,29 @@ export default async function PortalSamenwerkingPage() {
         </section>
       </div>
 
-      {/* Afspraken, "Zo leggen we het vast" */}
-      <section id="afspraken" className="sc-glass scroll-mt-24 p-6 sm:p-7">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-[#4bc4ff]">De afspraken</span>
-        <h2 className="mt-1 text-[22px] font-bold tracking-tight">Zo leggen we het vast</h2>
-        <p className="mt-2 max-w-2xl text-[13.5px] text-[var(--color-ink-muted)]">
-          Deze afspraken gelden voor elk niveau en zijn onderdeel van de overeenkomst.
-        </p>
-        <dl className="mt-5 grid gap-2.5">
-          {AFSPRAKEN.map((a) => (
-            <div
-              key={a.k}
-              className="grid gap-1 rounded-[13px] border border-[#2e90fa]/20 bg-[rgba(46,144,250,0.05)] p-4 sm:grid-cols-[200px_1fr] sm:gap-5"
+      {/* Tabs: Afspraken · Werkwijze · Team */}
+      <nav className="flex flex-wrap gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1 sm:w-fit">
+        {TABS.map((t) => {
+          const active = t.id === tab;
+          return (
+            <Link
+              key={t.id}
+              href={`/portal/samenwerking?tab=${t.id}`}
+              scroll={false}
+              aria-current={active ? "page" : undefined}
+              className={`rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors ${
+                active ? "bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+              }`}
             >
-              <dt className="flex items-center gap-2 text-[14px] font-semibold text-[#5bc0ff]">
-                <span className="size-1.5 shrink-0 rounded-full bg-[#2e90fa]" />
-                {a.k}
-              </dt>
-              <dd className="text-[13.5px] text-[var(--color-ink-muted)]">{a.v}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="mt-5 text-[13px] font-semibold text-[#4bc4ff]">
-          Wijzigingen op deze afspraken leggen we schriftelijk vast bij de offerte.
-        </p>
-      </section>
+              {t.label}
+            </Link>
+          );
+        })}
+      </nav>
 
-      {/* Snelkoppelingen */}
-      <div className="grid gap-[18px] sm:grid-cols-2">
-        <Link href="/portal/werkwijze" className="group flex items-center gap-4 rounded-[16px] border border-white/10 bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.06]">
-          <span className="grid size-11 shrink-0 place-items-center rounded-[12px] bg-[rgba(25,168,255,0.1)] text-[#4bc4ff]"><BookOpen className="size-5" strokeWidth={1.8} /></span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold">Werkwijze</span>
-            <span className="block text-[13px] text-[var(--color-ink-muted)]">De opnamedag, afspraken en rolverdeling.</span>
-          </span>
-          <ArrowRight className="size-5 shrink-0 text-[var(--color-ink-faint)] transition-transform group-hover:translate-x-0.5" />
-        </Link>
-        <Link href="/portal/agenda" className="group flex items-center gap-4 rounded-[16px] border border-white/10 bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.06]">
-          <span className="grid size-11 shrink-0 place-items-center rounded-[12px] bg-[rgba(25,168,255,0.1)] text-[#4bc4ff]"><CalendarCheck className="size-5" strokeWidth={1.8} /></span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold">Agenda &amp; planning</span>
-            <span className="block text-[13px] text-[var(--color-ink-muted)]">Je opnamedagen en afspraken.</span>
-          </span>
-          <ArrowRight className="size-5 shrink-0 text-[var(--color-ink-faint)] transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      </div>
-
-      {/* Je contactpersoon */}
-      {contact.coordinator ? (
-        <Link href="/portal/contact" className="group flex items-center gap-4 rounded-[16px] border border-white/10 bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.06]">
-          <span className="grid size-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#1b6fe8] to-[#22a7ff] font-semibold text-white">
-            {contact.coordinator.name.split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase()}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold">{contact.coordinator.name}</span>
-            <span className="block text-[13px] text-[var(--color-ink-muted)]">Je vaste contactpersoon, planning, scripts, feedback en resultaten.</span>
-          </span>
-          <UserRound className="size-5 shrink-0 text-[var(--color-ink-faint)]" />
-        </Link>
-      ) : null}
+      {tab === "afspraken" ? <AfsprakenContent /> : null}
+      {tab === "werkwijze" ? <WerkwijzeContent /> : null}
+      {tab === "team" ? <TeamContent coordinator={contact.coordinator} videographer={contact.videographer} /> : null}
     </div>
   );
 }

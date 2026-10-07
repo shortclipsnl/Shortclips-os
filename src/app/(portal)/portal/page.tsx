@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BookOpen, CalendarClock, CheckCircle2, Clock, ExternalLink, FileText, Play, UserRound } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock, ExternalLink, FileText, Play, UserRound } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalData, getPortalFrameUrl } from "@/server/portal";
 import { buttonClass } from "@/components/ui";
@@ -287,28 +287,13 @@ export default async function PortalPage() {
         <h2 className="mb-3 text-base font-semibold">Je contactpersonen</h2>
         <div className="grid gap-[18px] sm:grid-cols-2">
           {contact.coordinator ? (
-            <Link href="/portal/contact"><ContactCard name={contact.coordinator.name} role={contact.coordinator.role} initials={initials(contact.coordinator.name)} /></Link>
+            <Link href="/portal/samenwerking?tab=team"><ContactCard name={contact.coordinator.name} role={contact.coordinator.role} initials={initials(contact.coordinator.name)} /></Link>
           ) : null}
           {contact.videographer ? (
-            <Link href="/portal/contact"><ContactCard name={contact.videographer.name} role={contact.videographer.role} initials={initials(contact.videographer.name)} /></Link>
+            <Link href="/portal/samenwerking?tab=team"><ContactCard name={contact.videographer.name} role={contact.videographer.role} initials={initials(contact.videographer.name)} /></Link>
           ) : null}
         </div>
       </section>
-
-      {/* Werkwijze & afspraken, altijd bij de hand */}
-      <Link
-        href="/portal/werkwijze"
-        className="group flex items-center gap-4 rounded-[16px] border border-white/10 bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.06]"
-      >
-        <span className="grid size-11 shrink-0 place-items-center rounded-[12px] bg-[rgba(25,168,255,0.1)] text-[#4bc4ff]">
-          <BookOpen className="size-5" strokeWidth={1.8} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-semibold">Werkwijze &amp; afspraken</span>
-          <span className="block text-[13px] text-[var(--color-ink-muted)]">Hoe een opnamedag verloopt, wat we afspraken en wie wat doet.</span>
-        </span>
-        <ArrowRight className="size-5 shrink-0 text-[var(--color-ink-faint)] transition-transform group-hover:translate-x-0.5" />
-      </Link>
 
       <footer className="pt-2 text-xs text-[var(--color-ink-faint)]">
         <FileText className="mb-0.5 mr-1 inline size-3.5" /> Alles in dit portaal komt automatisch uit onze systemen, je hoeft niets handmatig bij te houden.

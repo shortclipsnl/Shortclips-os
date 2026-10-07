@@ -5,32 +5,26 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   BarChart3,
-  BookOpen,
-  CalendarDays,
   CalendarRange,
   FileText,
   Handshake,
   LayoutDashboard,
   MoreHorizontal,
-  UserRound,
   Video,
   X,
 } from "lucide-react";
 
 const ITEMS = [
-  { href: "/portal", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/portal/agenda", label: "Agenda", icon: CalendarDays },
+  { href: "/portal", label: "Overzicht", icon: LayoutDashboard },
   { href: "/portal/videos", label: "Video's", icon: Video },
   { href: "/portal/scripts", label: "Scripts", icon: FileText },
-  { href: "/portal/planning", label: "Contentplanning", icon: CalendarRange },
+  { href: "/portal/planning", label: "Planning", icon: CalendarRange },
   { href: "/portal/resultaten", label: "Resultaten", icon: BarChart3 },
   { href: "/portal/samenwerking", label: "Samenwerking", icon: Handshake },
-  { href: "/portal/werkwijze", label: "Werkwijze", icon: BookOpen },
-  { href: "/portal/contact", label: "Contact", icon: UserRound },
 ];
 
-/** De vaste tabs onderin op mobiel; de rest zit onder "Meer". */
-const PRIMARY = ["/portal", "/portal/videos", "/portal/agenda", "/portal/resultaten"];
+/** De vaste tabs onderin op mobiel; de rest (Scripts, Samenwerking) zit onder "Meer". */
+const PRIMARY = ["/portal", "/portal/videos", "/portal/planning", "/portal/resultaten"];
 
 function useIsActive() {
   const pathname = usePathname();
