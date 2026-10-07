@@ -55,6 +55,9 @@ const schema = z.object({
 
   // --- Social statistieken ---
   AYRSHARE_API_KEY: z.string().optional(),
+  // Metricool: één user-token (X-Mc-Auth) voor het hele account. De user-id en
+  // de merk-id's (blogId) worden automatisch uit /settings/brands gehaald.
+  METRICOOL_USER_TOKEN: z.string().optional(),
 
   // --- AI ---
   ANTHROPIC_API_KEY: z.string().optional(),

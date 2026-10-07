@@ -4,6 +4,7 @@ import { runMondayEditingImport } from "./monday-editing";
 import { runMondayContractImport } from "./monday-contracts";
 import { runMondayPlanningImport } from "./monday-planning";
 import { runCalendarSync } from "./calendar-sync";
+import { runMetricoolSync } from "./metricool-sync";
 import {
   pullFrameComments,
   pullFrameDeliverables,
@@ -54,6 +55,7 @@ export async function runNightlySync() {
   results.push(await step("frameio.pull_projects", () => pullFrameProjects()));
   results.push(await step("frameio.pull_deliverables", () => pullFrameDeliverables()));
   results.push(await step("calendar.sync", () => runCalendarSync()));
+  results.push(await step("metricool.sync", () => runMetricoolSync()));
   results.push(await step("signals.daily", () => runDailySignals()));
   return { ok: results.every((r) => r.ok), results };
 }

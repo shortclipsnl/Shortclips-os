@@ -3,20 +3,19 @@ import { BarChart3 } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalData } from "@/server/portal";
 import { Card } from "@/components/ui";
+import { CountUp } from "@/components/portal/count-up";
 
 export const metadata: Metadata = { title: "Resultaten" };
 export const dynamic = "force-dynamic";
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, prefix = "" }: { label: string; value: number; prefix?: string }) {
   return (
     <Card>
       <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--color-ink)]">{value}</p>
+      <CountUp value={value} prefix={prefix} className="mt-1 block text-2xl font-semibold tabular-nums text-[var(--color-ink)]" />
     </Card>
   );
 }
-
-const nf = new Intl.NumberFormat("nl-NL");
 
 export default async function PortalResultatenPage() {
   const viewer = await requirePortal();
@@ -29,16 +28,16 @@ export default async function PortalResultatenPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Resultaten</h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Hoe je video&apos;s presteren — afgelopen 30 dagen.
+          Hoe je content presteert — afgelopen 30 dagen, gecombineerd over je kanalen.
         </p>
       </div>
 
       {hasData ? (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Metric label="Weergaven" value={nf.format(m.views)} />
-          <Metric label="Bereik" value={nf.format(m.reach)} />
-          <Metric label="Interacties" value={nf.format(m.engagements)} />
-          <Metric label="Nieuwe volgers" value={`+${nf.format(m.followerGrowth)}`} />
+          <Metric label="Weergaven" value={m.views} />
+          <Metric label="Bereik" value={m.reach} />
+          <Metric label="Interacties" value={m.engagements} />
+          <Metric label="Nieuwe volgers" value={m.followerGrowth} prefix={m.followerGrowth >= 0 ? "+" : ""} />
         </div>
       ) : (
         <Card className="flex flex-col items-start gap-3 border-dashed p-6">
