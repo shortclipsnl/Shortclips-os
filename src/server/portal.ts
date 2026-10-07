@@ -263,6 +263,81 @@ export async function getPortalData(viewer: Viewer) {
   };
 }
 
+export type PortalResults = {
+  days: number;
+  metrics: { views: number; reach: number; engagements: number; followerGrowth: number };
+  deltas: { views: number | null; reach: number | null; engagements: number | null };
+  insight: string | null;
+  hasData: boolean;
+};
+
+/**
+ * Resultaten met inzicht (§Resultaten): kerncijfers over de gekozen periode,
+ * de verandering t.o.v. de vorige even lange periode, en een korte "wat valt
+ * op"-samenvatting — allemaal uit de echte cijfers (Metricool via daily_metrics).
+ */
+export async function getPortalResults(viewer: Viewer, days = 30): Promise<PortalResults> {
+  const clientId = viewer.clientId;
+  if (!clientId) notFound();
+
+  const res = await db.execute(sql`
+    with cur as (
+      select coalesce(sum(views),0)::int v, coalesce(sum(reach),0)::int r,
+             coalesce(sum(engagements),0)::int e, coalesce(sum(follower_delta),0)::int f
+      from daily_metrics
+      where client_id = ${clientId}
+        and measured_on >= current_date - (${days} * interval '1 day')
+    ), prev as (
+      select coalesce(sum(views),0)::int v, coalesce(sum(reach),0)::int r,
+             coalesce(sum(engagements),0)::int e, coalesce(sum(follower_delta),0)::int f,
+             count(*)::int n
+      from daily_metrics
+      where client_id = ${clientId}
+        and measured_on >= current_date - (${2 * days} * interval '1 day')
+        and measured_on <  current_date - (${days} * interval '1 day')
+    )
+    select cur.v cv, cur.r cr, cur.e ce, cur.f cf, prev.v pv, prev.r pr, prev.e pe, prev.f pf, prev.n pn
+    from cur, prev
+  `);
+
+  const row =
+    ((res as unknown as { rows?: Array<Record<string, number>> }).rows ??
+      (res as unknown as Array<Record<string, number>>))[0] ?? {};
+
+  const n = (k: string) => Number(row[k] ?? 0);
+  const cur = { views: n("cv"), reach: n("cr"), engagements: n("ce"), followerGrowth: n("cf") };
+  const prev = { views: n("pv"), reach: n("pr"), engagements: n("pe") };
+  // Alleen vergelijken als de vorige periode voldoende data heeft — anders geeft
+  // een bijna-lege basis onzinnige percentages (bv. +3000%).
+  const prevCovered = n("pn") >= Math.ceil(days * 0.8);
+  const pct = (c: number, p: number): number | null =>
+    prevCovered && p > 0 ? Math.round(((c - p) / p) * 100) : null;
+  const deltas = {
+    views: pct(cur.views, prev.views),
+    reach: pct(cur.reach, prev.reach),
+    engagements: pct(cur.engagements, prev.engagements),
+  };
+
+  const hasData = cur.views + cur.reach + cur.engagements + Math.abs(cur.followerGrowth) > 0;
+
+  // "Wat valt op": alleen stellen wat de cijfers onderbouwen.
+  let insight: string | null = null;
+  if (hasData) {
+    const nf = new Intl.NumberFormat("nl-NL");
+    const parts: string[] = [];
+    parts.push(`Je content is deze periode ${nf.format(cur.views)} keer bekeken en bereikte ${nf.format(cur.reach)} mensen.`);
+    if (deltas.reach !== null) {
+      if (deltas.reach > 4) parts.push(`Dat is ${deltas.reach}% meer bereik dan de vorige ${days} dagen — mooie groei.`);
+      else if (deltas.reach < -4) parts.push(`Het bereik ligt ${Math.abs(deltas.reach)}% lager dan de vorige ${days} dagen; we sturen bij op de onderwerpen die het best werken.`);
+      else parts.push(`Het bereik is stabiel t.o.v. de vorige ${days} dagen.`);
+    }
+    if (cur.followerGrowth > 0) parts.push(`Je kwam er ${cur.followerGrowth} volger${cur.followerGrowth === 1 ? "" : "s"} bij.`);
+    insight = parts.join(" ");
+  }
+
+  return { days, metrics: cur, deltas, insight, hasData };
+}
+
 /** Klantfeedback op één video — uitsluitend de draden die voor de klant zijn. */
 export async function getPortalVideo(viewer: Viewer, videoId: string) {
   const clientId = viewer.clientId;

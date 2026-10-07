@@ -93,7 +93,9 @@ type DayAgg = { views: number; reach: number; engagements: number; followerDelta
 export async function pullMetricoolMetrics(
   triggeredById?: string,
   source: Source = metricool,
-  days = 92,
+  // ~6,5 maand historie: genoeg om 30d én 3-maands periodes te vergelijken met
+  // een volledige vorige periode.
+  days = 200,
 ) {
   return runJob(
     "metricool",
