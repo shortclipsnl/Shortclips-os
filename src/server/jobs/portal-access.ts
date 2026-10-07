@@ -1,7 +1,7 @@
 import "server-only";
-import { and, eq, inArray, isNull, isNotNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, isNotNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, users } from "@/db/schema";
+import { clientIntegrations, clients, users } from "@/db/schema";
 
 /**
  * Houdt de portaaltoegang gelijk met de samenwerkingsstatus (uit Monday):
@@ -44,4 +44,55 @@ export async function enforcePortalAccess(): Promise<{ ok: boolean; suspended: n
   }
 
   return { ok: true, suspended, reactivated };
+}
+
+/**
+ * Read-only overzicht van de portaaldekking: hoeveel (echte) klanten hebben al
+ * een actief portaalaccount en welke actieve klanten nog niet. Handig om vóór
+ * livegang te zien of iedereen een login heeft. Verandert niets.
+ */
+export async function portalAccessReport(): Promise<{
+  ok: boolean;
+  activeClients: number;
+  realClients: number;
+  withPortalUser: number;
+  placeholderLogins: number;
+  realEmailLogins: number;
+  missingPortal: { name: string; status: string }[];
+}> {
+  // Echte klanten = klanten met een Monday-koppeling (zoals pilot-setup kiest).
+  const realRows = await db
+    .selectDistinct({ id: clientIntegrations.clientId })
+    .from(clientIntegrations)
+    .where(eq(clientIntegrations.provider, "monday"));
+  const realIds = new Set(realRows.map((r) => r.id));
+
+  const clientRows = await db
+    .select({ id: clients.id, name: clients.name, status: clients.status })
+    .from(clients)
+    .where(isNull(clients.deletedAt));
+
+  const portalUsers = await db
+    .select({ clientId: users.clientId, email: users.email })
+    .from(users)
+    .where(and(eq(users.primaryRole, "client"), eq(users.status, "active"), isNull(users.deletedAt)));
+  const hasPortal = new Set(portalUsers.filter((r) => r.clientId).map((r) => r.clientId!));
+  const placeholderLogins = portalUsers.filter((r) =>
+    r.email.toLowerCase().endsWith("@pilot.shortclips.nl"),
+  ).length;
+
+  const activeClients = clientRows.filter((c) => c.status === "active");
+  const missingPortal = activeClients
+    .filter((c) => !hasPortal.has(c.id))
+    .map((c) => ({ name: c.name, status: c.status }));
+
+  return {
+    ok: true,
+    activeClients: activeClients.length,
+    realClients: clientRows.filter((c) => realIds.has(c.id)).length,
+    withPortalUser: clientRows.filter((c) => hasPortal.has(c.id)).length,
+    placeholderLogins,
+    realEmailLogins: portalUsers.length - placeholderLogins,
+    missingPortal,
+  };
 }

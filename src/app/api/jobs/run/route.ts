@@ -19,7 +19,7 @@ import { runMondayPlanningImport } from "@/server/jobs/monday-planning";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, runMetricoolSync } from "@/server/jobs/metricool-sync";
 import { setTeamContact } from "@/server/jobs/team";
-import { enforcePortalAccess } from "@/server/jobs/portal-access";
+import { enforcePortalAccess, portalAccessReport } from "@/server/jobs/portal-access";
 import { runClientNotifications } from "@/server/jobs/notifications";
 import { pruneSessions } from "@/server/auth/session";
 
@@ -52,6 +52,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "sync.nightly": runNightlySync,
   "pilot.setup_logins": () => runPilotPortalSetup(),
   "portal.enforce_access": enforcePortalAccess,
+  "portal.coverage": portalAccessReport,
   "portal.notify_clients": runClientNotifications,
   "maintenance.prune_sessions": async () => ({ removed: await pruneSessions() }),
 };
