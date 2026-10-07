@@ -263,10 +263,19 @@ export async function getPortalData(viewer: Viewer) {
   };
 }
 
+export type PortalPlatformResult = {
+  platform: string;
+  views: number;
+  reach: number;
+  engagements: number;
+  followerGrowth: number;
+};
+
 export type PortalResults = {
   days: number;
   metrics: { views: number; reach: number; engagements: number; followerGrowth: number };
   deltas: { views: number | null; reach: number | null; engagements: number | null };
+  byPlatform: PortalPlatformResult[];
   insight: string | null;
   hasData: boolean;
 };
@@ -320,6 +329,30 @@ export async function getPortalResults(viewer: Viewer, days = 30): Promise<Porta
 
   const hasData = cur.views + cur.reach + cur.engagements + Math.abs(cur.followerGrowth) > 0;
 
+  // Per-platform uitsplitsing over dezelfde periode.
+  const platRes = await db.execute(sql`
+    select platform,
+           coalesce(sum(views),0)::int v, coalesce(sum(reach),0)::int r,
+           coalesce(sum(engagements),0)::int e, coalesce(sum(follower_delta),0)::int f
+    from daily_metrics
+    where client_id = ${clientId}
+      and platform is not null
+      and measured_on >= current_date - (${days} * interval '1 day')
+    group by platform
+    having coalesce(sum(views),0) + coalesce(sum(reach),0) > 0
+    order by coalesce(sum(views),0) desc
+  `);
+  const platRows =
+    (platRes as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+    (platRes as unknown as Array<Record<string, unknown>>);
+  const byPlatform: PortalPlatformResult[] = platRows.map((p) => ({
+    platform: String(p.platform),
+    views: Number(p.v ?? 0),
+    reach: Number(p.r ?? 0),
+    engagements: Number(p.e ?? 0),
+    followerGrowth: Number(p.f ?? 0),
+  }));
+
   // "Wat valt op": alleen stellen wat de cijfers onderbouwen.
   let insight: string | null = null;
   if (hasData) {
@@ -335,7 +368,7 @@ export async function getPortalResults(viewer: Viewer, days = 30): Promise<Porta
     insight = parts.join(" ");
   }
 
-  return { days, metrics: cur, deltas, insight, hasData };
+  return { days, metrics: cur, deltas, byPlatform, insight, hasData };
 }
 
 /** Klantfeedback op één video — uitsluitend de draden die voor de klant zijn. */

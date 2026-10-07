@@ -85,6 +85,13 @@ const METRIC_MAP = [
 
 type DayAgg = { views: number; reach: number; engagements: number; followerDelta: number; followers: number };
 
+/** Metricool-netwerk → ons platform-enum (voor de per-platform uitsplitsing). */
+const NETWORK_PLATFORM: Record<string, "instagram" | "tiktok" | "facebook"> = {
+  Instagram: "instagram",
+  Tiktok: "tiktok",
+  Facebook: "facebook",
+};
+
 /**
  * Haalt per gekoppelde klant de dagcijfers op (gecombineerd over Instagram,
  * TikTok en Facebook) en schrijft ze naar daily_metrics. Idempotent: vervangt
@@ -124,21 +131,40 @@ export async function pullMetricoolMetrics(
           continue;
         }
 
-        const perDay = new Map<string, DayAgg>();
-        const add = (date: string, field: keyof DayAgg, value: number) => {
-          const row = perDay.get(date) ?? { views: 0, reach: 0, engagements: 0, followerDelta: 0, followers: 0 };
-          row[field] += value;
-          perDay.set(date, row);
-        };
+        // Per netwerk apart verzamelen → per-platform rijen in daily_metrics
+        // (de gecombineerde cijfers blijven de som over de platforms).
+        type Row = typeof dailyMetrics.$inferInsert;
+        const rows: Row[] = [];
 
         for (const network of METRICOOL_NETWORKS) {
+          const perDay = new Map<string, DayAgg>();
+          const add = (date: string, field: keyof DayAgg, value: number) => {
+            const r = perDay.get(date) ?? { views: 0, reach: 0, engagements: 0, followerDelta: 0, followers: 0 };
+            r[field] += value;
+            perDay.set(date, r);
+          };
           for (const { field, metric } of METRIC_MAP) {
             const points = await source.accountTimeline(blogId, userId, network, metric, fromISO, toISO);
             for (const p of points) add(p.date, field as keyof DayAgg, p.value);
           }
+          if (perDay.size === 0) continue;
+          const platform = NETWORK_PLATFORM[network];
+          for (const [date, a] of perDay) {
+            rows.push({
+              clientId: link.clientId,
+              platform,
+              measuredOn: date,
+              views: Math.max(0, Math.round(a.views)),
+              reach: Math.max(0, Math.round(a.reach)),
+              engagements: Math.max(0, Math.round(a.engagements)),
+              followers: Math.max(0, Math.round(a.followers)),
+              followerDelta: Math.round(a.followerDelta),
+              source: "metricool",
+            });
+          }
         }
 
-        if (perDay.size === 0) {
+        if (rows.length === 0) {
           ctx.log(`Merk ${link.blogId}: geen cijfers (netwerk niet gekoppeld?).`, "warn");
           continue;
         }
@@ -154,18 +180,6 @@ export async function pullMetricoolMetrics(
             ),
           );
 
-        const rows = [...perDay.entries()].map(([date, a]) => ({
-          clientId: link.clientId,
-          platform: null,
-          measuredOn: date,
-          views: Math.max(0, Math.round(a.views)),
-          reach: Math.max(0, Math.round(a.reach)),
-          engagements: Math.max(0, Math.round(a.engagements)),
-          followers: Math.max(0, Math.round(a.followers)),
-          followerDelta: Math.round(a.followerDelta),
-          source: "metricool",
-        }));
-
         // In blokken invoegen (PGlite/Postgres-parametergrens).
         for (let i = 0; i < rows.length; i += 200) {
           await db.insert(dailyMetrics).values(rows.slice(i, i + 200));
@@ -173,7 +187,7 @@ export async function pullMetricoolMetrics(
 
         ctx.counters.processed++;
         ctx.counters.created += rows.length;
-        ctx.log(`Merk ${link.blogId}: ${rows.length} dagen cijfers.`);
+        ctx.log(`Merk ${link.blogId}: ${rows.length} platform-dagen.`);
       }
     },
     { triggeredById },

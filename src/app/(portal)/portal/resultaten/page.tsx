@@ -5,6 +5,8 @@ import { requirePortal } from "@/server/auth/context";
 import { getPortalResults } from "@/server/portal";
 import { Card } from "@/components/ui";
 import { CountUp } from "@/components/portal/count-up";
+import { compact } from "@/lib/format";
+import { PLATFORM } from "@/lib/statuses";
 
 export const metadata: Metadata = { title: "Resultaten" };
 export const dynamic = "force-dynamic";
@@ -97,6 +99,37 @@ export default async function PortalResultatenPage({
                 </div>
               </div>
             </Card>
+          ) : null}
+
+          {r.byPlatform.length >= 2 ? (
+            <section>
+              <h2 className="mb-3 text-sm font-semibold text-[var(--color-ink)]">Per platform</h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {r.byPlatform.map((p) => (
+                  <Card key={p.platform}>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="size-2.5 shrink-0 rounded-full ring-1 ring-white/40"
+                        style={{ background: PLATFORM[p.platform]?.color ?? "#888" }}
+                      />
+                      <span className="text-sm font-semibold text-[var(--color-ink)]">
+                        {PLATFORM[p.platform]?.label ?? p.platform}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)]">Weergaven</div>
+                        <div className="mt-0.5 text-lg font-semibold tabular-nums text-[var(--color-ink)]">{compact(p.views)}</div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)]">Bereik</div>
+                        <div className="mt-0.5 text-lg font-semibold tabular-nums text-[var(--color-ink)]">{compact(p.reach)}</div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </section>
           ) : null}
 
           <p className="text-xs text-[var(--color-ink-faint)]">
