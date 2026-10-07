@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CalendarDays, MapPin, Send, Users } from "lucide-react";
+import { CalendarDays, Film, MapPin, Send, Users } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalData } from "@/server/portal";
 import { EmptyState } from "@/components/ui";
@@ -33,12 +33,18 @@ function shortclipsPeople(attendees: unknown): string[] {
 type Item = {
   key: string;
   date: Date;
-  type: "afspraak" | "publicatie";
+  type: "afspraak" | "publicatie" | "oplevering";
   title: string;
   time?: string | null;
   location?: string | null;
   people?: string[];
   platforms?: string[];
+};
+
+const TYPE_STYLE: Record<Item["type"], { label: string; cls: string }> = {
+  afspraak: { label: "Afspraak", cls: "bg-[rgba(25,168,255,0.12)] text-[#4bc4ff]" },
+  publicatie: { label: "Publicatie", cls: "bg-[rgba(47,210,122,0.12)] text-[#2fd27a]" },
+  oplevering: { label: "Verwachte oplevering", cls: "bg-[rgba(255,176,32,0.12)] text-[#ffb020]" },
 };
 
 export default async function PortalPlanningPage() {
@@ -65,6 +71,15 @@ export default async function PortalPlanningPage() {
       title: c.title,
       platforms: (c.platforms as string[] | null) ?? [],
     });
+  }
+  // Verwachte opleveringen van video's die nu in productie zijn.
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  for (const v of data.inProgress) {
+    if (!v.plannedPublishOn) continue;
+    const d = new Date(v.plannedPublishOn);
+    if (Number.isNaN(d.getTime()) || d < startOfToday) continue;
+    items.push({ key: `o-${v.id}`, date: d, type: "oplevering", title: v.title });
   }
   items.sort((x, y) => x.date.getTime() - y.date.getTime());
 
@@ -96,11 +111,9 @@ export default async function PortalPlanningPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                      it.type === "publicatie" ? "bg-[rgba(47,210,122,0.12)] text-[#2fd27a]" : "bg-[rgba(25,168,255,0.12)] text-[#4bc4ff]"
-                    }`}>
-                      {it.type === "publicatie" ? <Send className="size-3" /> : <CalendarDays className="size-3" />}
-                      {it.type === "publicatie" ? "Publicatie" : "Afspraak"}
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${TYPE_STYLE[it.type].cls}`}>
+                      {it.type === "publicatie" ? <Send className="size-3" /> : it.type === "oplevering" ? <Film className="size-3" /> : <CalendarDays className="size-3" />}
+                      {TYPE_STYLE[it.type].label}
                     </span>
                     <span className="text-[12.5px] text-[var(--color-ink-muted)]">{formatDateFull(it.date)} · {relativeDays(it.date)}</span>
                   </div>

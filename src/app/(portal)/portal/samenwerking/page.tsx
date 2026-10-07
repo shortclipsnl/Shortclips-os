@@ -106,7 +106,9 @@ export default async function PortalSamenwerkingPage({
         <section className="sc-glass p-6">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Huidige samenwerking</span>
           <div className="mt-4">
+            {collab.packageName ? <Row k="Pakket" v={collab.packageName} /> : null}
             <Row k="Afgesproken per maand" v={quota > 0 ? `${quota} shorts` : "In overleg"} />
+            {collab.shootDaysPerMonth > 0 ? <Row k="Opnamedagen per maand" v={`${collab.shootDaysPerMonth}`} /> : null}
             <Row k="Startdatum" v={collab.contract?.startsOn ? formatDate(collab.contract.startsOn) : collab.startedOn ? formatDate(collab.startedOn) : "—"} />
             <Row k="Opzegtermijn" v={collab.contract ? `${Math.round(collab.contract.noticePeriodDays / 30)} kalendermaand` : "1 kalendermaand"} />
             <Row k="Publicatie" v="Inbegrepen" />

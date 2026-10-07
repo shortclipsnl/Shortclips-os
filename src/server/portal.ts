@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import {
   activityEvents,
   clientIntegrations,
+  clientPackages,
   clientReports,
   clients,
   contentCalendar,
@@ -538,6 +539,8 @@ export async function getPortalFrameUrl(viewer: Viewer): Promise<string | null> 
  */
 export async function getPortalCollaboration(viewer: Viewer): Promise<{
   monthlyQuota: number;
+  packageName: string | null;
+  shootDaysPerMonth: number;
   startedOn: string | null;
   contract: { startsOn: string; endsOn: string | null; noticePeriodDays: number } | null;
 }> {
@@ -548,6 +551,14 @@ export async function getPortalCollaboration(viewer: Viewer): Promise<{
     .select({ quota: clients.monthlyVideoQuota, startedOn: clients.startedOn })
     .from(clients)
     .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
+    .limit(1);
+
+  // Afgesproken pakket: als het quota-veld leeg is, val terug op het actieve pakket.
+  const [pkg] = await db
+    .select({ name: clientPackages.name, videosPerMonth: clientPackages.videosPerMonth, shootDays: clientPackages.shootDaysPerMonth })
+    .from(clientPackages)
+    .where(and(eq(clientPackages.clientId, clientId), eq(clientPackages.isActive, true)))
+    .orderBy(desc(clientPackages.startsOn))
     .limit(1);
 
   const [contract] = await db
@@ -568,7 +579,9 @@ export async function getPortalCollaboration(viewer: Viewer): Promise<{
     .limit(1);
 
   return {
-    monthlyQuota: client?.quota ?? 0,
+    monthlyQuota: (client?.quota ?? 0) || (pkg?.videosPerMonth ?? 0),
+    packageName: pkg?.name ?? null,
+    shootDaysPerMonth: pkg?.shootDays ?? 0,
     startedOn: client?.startedOn ?? null,
     contract: contract ?? null,
   };
