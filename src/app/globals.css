@@ -87,6 +87,9 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Reserveer altijd ruimte voor de scrollbar, zodat de layout (en dus het
+     menu) niet horizontaal verspringt tussen korte en lange pagina's. */
+  scrollbar-gutter: stable;
 }
 
 body {

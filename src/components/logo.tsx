@@ -1,8 +1,11 @@
 import { cn } from "@/lib/cn";
 
+/** Verhouding van het officiële logo-bestand (564×279). */
+const LOGO_RATIO = 564 / 279;
+
 /**
- * ShortClips-merkteken: blauwe gradient-mark met witte play-driehoek, plus
- * het woordmerk. Geen bestandsafhankelijkheid, dus altijd scherp.
+ * Het officiële ShortClips-merkteken (alleen de play-mark), als SVG — handig
+ * voor kleine icoonplekken. Het volledige logo met woordmerk: <Logo />.
  */
 export function LogoMark({ size = 32, className }: { size?: number; className?: string }) {
   return (
@@ -26,39 +29,32 @@ export function LogoMark({ size = 32, className }: { size?: number; className?: 
   );
 }
 
+/**
+ * Het officiële ShortClips-logo (play-mark + woordmerk). `size` is de hoogte in
+ * pixels. Op donkere vlakken het witte woordmerk (`onDark`), op lichte vlakken
+ * het navy woordmerk — zelfde logo, overal consistent.
+ */
 export function Logo({
   size = 32,
-  showSubtitle = false,
   onDark = false,
   className,
 }: {
   size?: number;
-  showSubtitle?: boolean;
-  /** Op donkere vlakken moet het woordmerk wit zijn in plaats van indigo. */
   onDark?: boolean;
   className?: string;
 }) {
+  const height = Math.round(size * 1.15);
+  const width = Math.round(height * LOGO_RATIO);
   return (
-    <div className={cn("flex items-center gap-2.5", className)}>
-      <LogoMark size={size} />
-      <div className="leading-none">
-        <span
-          className="font-semibold tracking-tight"
-          style={{ fontSize: size * 0.55 }}
-        >
-          <span className={onDark ? "text-white" : "text-[var(--color-ink)]"}>
-            Short
-          </span>
-          <span className={onDark ? "text-[var(--color-brand-300)]" : "text-[var(--color-brand-500)]"}>
-            clips
-          </span>
-        </span>
-        {showSubtitle ? (
-          <div className={cn("mt-1 text-2xs font-semibold tracking-[0.18em] uppercase", onDark ? "text-white/50" : "text-[var(--color-ink-faint)]")}>
-            Operating System
-          </div>
-        ) : null}
-      </div>
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={onDark ? "/shortclips-logo-ondark.png" : "/shortclips-logo-onlight.png"}
+      alt="ShortClips"
+      width={width}
+      height={height}
+      style={{ height, width }}
+      className={cn("block shrink-0 select-none", className)}
+      draggable={false}
+    />
   );
 }
