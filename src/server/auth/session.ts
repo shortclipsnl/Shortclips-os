@@ -8,6 +8,9 @@ import { isProduction } from "@/lib/env";
 
 export const SESSION_COOKIE = "sc_os_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** Harde bovengrens: een sessie verloopt altijd 30 dagen na aanmaak, ook bij
+ *  dagelijks gebruik (glijdende 7-daagse inactiviteit blijft daarnaast gelden). */
+const SESSION_ABSOLUTE_MAX_MS = 30 * 24 * 60 * 60 * 1000;
 /** Bij elke request verlengen zou te veel schrijven; dit is de drempel. */
 const REFRESH_AFTER_MS = 60 * 60 * 1000;
 
@@ -67,6 +70,7 @@ export async function readSession(): Promise<SessionUser | null> {
     .select({
       sessionId: sessions.id,
       lastSeenAt: sessions.lastSeenAt,
+      createdAt: sessions.createdAt,
       id: users.id,
       email: users.email,
       fullName: users.fullName,
@@ -91,15 +95,22 @@ export async function readSession(): Promise<SessionUser | null> {
   if (!row) return null;
   if (row.deletedAt || row.status !== "active") return null;
 
+  // Harde 30-dagen-grens vanaf aanmaak, ongeacht activiteit.
+  if (Date.now() - new Date(row.createdAt).getTime() > SESSION_ABSOLUTE_MAX_MS) {
+    await db.update(sessions).set({ revokedAt: new Date() }).where(eq(sessions.id, row.sessionId));
+    return null;
+  }
+
   // Vergelijking in constante tijd, zodat de hash niet via timing lekt.
   const a = Buffer.from(tokenHash);
   const b = Buffer.from(hashToken(token));
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
 
   if (Date.now() - new Date(row.lastSeenAt).getTime() > REFRESH_AFTER_MS) {
+    const absoluteCap = new Date(row.createdAt).getTime() + SESSION_ABSOLUTE_MAX_MS;
     await db
       .update(sessions)
-      .set({ lastSeenAt: new Date(), expiresAt: new Date(Date.now() + SESSION_TTL_MS) })
+      .set({ lastSeenAt: new Date(), expiresAt: new Date(Math.min(Date.now() + SESSION_TTL_MS, absoluteCap)) })
       .where(eq(sessions.id, row.sessionId));
   }
 
