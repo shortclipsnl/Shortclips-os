@@ -80,7 +80,9 @@ export async function getPortalData(viewer: Viewer) {
         and(
           eq(deliverables.clientId, clientId),
           isNull(deliverables.deletedAt),
-          inArray(deliverables.status, ["client_review", "client_revision"]),
+          // Alleen écht "jouw beoordeling" is actie nodig; "In aanpassing"
+          // (client_revision) is aan ons — die staat bij "in productie".
+          eq(deliverables.status, "client_review"),
         ),
       )
       .orderBy(asc(deliverables.statusChangedAt)),
@@ -108,7 +110,11 @@ export async function getPortalData(viewer: Viewer) {
         and(
           eq(deliverables.clientId, clientId),
           isNull(deliverables.deletedAt),
-          inArray(deliverables.status, ["editing", "approved", "ready_to_publish", "scheduled"]),
+          inArray(deliverables.status, [
+            "recorded", "footage_upload", "awaiting_editor", "editing",
+            "internal_review", "editor_revision", "client_revision",
+            "approved", "ready_to_publish", "scheduled",
+          ]),
         ),
       )
       .orderBy(asc(deliverables.plannedPublishOn))
@@ -383,6 +389,7 @@ export async function getPortalVideo(viewer: Viewer, videoId: string) {
       status: deliverables.status,
       frameUrl: deliverables.frameUrl,
       plannedPublishOn: deliverables.plannedPublishOn,
+      statusChangedAt: deliverables.statusChangedAt,
       approvedAt: deliverables.approvedAt,
       publishedAt: deliverables.publishedAt,
       clientId: deliverables.clientId,
@@ -443,7 +450,7 @@ export async function getPortalVideo(viewer: Viewer, videoId: string) {
 
 const IN_PRODUCTION_STATUSES = [
   "recorded", "footage_upload", "awaiting_editor", "editing", "internal_review",
-  "editor_revision", "approved", "ready_to_publish", "scheduled",
+  "editor_revision", "client_revision", "approved", "ready_to_publish", "scheduled",
 ] as const;
 
 /** Alle video's van de klant, gegroepeerd voor de video-omgeving (§24). */
@@ -469,7 +476,7 @@ export async function getPortalVideos(viewer: Viewer) {
     .limit(1000);
 
   return {
-    actieNodig: rows.filter((v) => v.status === "client_review" || v.status === "client_revision"),
+    actieNodig: rows.filter((v) => v.status === "client_review"),
     inProductie: rows.filter((v) => (IN_PRODUCTION_STATUSES as readonly string[]).includes(v.status)),
     gepubliceerd: rows.filter((v) => v.status === "published"),
     totaal: rows.length,

@@ -5,38 +5,12 @@ import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalData, getPortalFrameUrl } from "@/server/portal";
 import { buttonClass } from "@/components/ui";
 import { CountUp } from "@/components/portal/count-up";
-import { compact, formatDate, formatDateFull, num, relativeDays } from "@/lib/format";
+import { compact, formatDateFull, num, relativeDays } from "@/lib/format";
+import { clientStatusView, deadlineText, reviewDeadline, statusToneClass } from "@/lib/portal-status";
 import { videoCover } from "./cover";
 
 const READY_STATUSES = new Set(["approved", "ready_to_publish", "scheduled"]);
 const MONTH_NL = new Intl.DateTimeFormat("nl-NL", { month: "long" });
-
-/** Reactietermijn: 3 werkdagen na oplevering (conform de afspraken). */
-function reviewDeadline(from: Date | string | null | undefined): Date | null {
-  if (!from) return null;
-  const d = new Date(from);
-  if (Number.isNaN(d.getTime())) return null;
-  let added = 0;
-  while (added < 3) {
-    d.setDate(d.getDate() + 1);
-    const day = d.getDay();
-    if (day !== 0 && day !== 6) added++;
-  }
-  return d;
-}
-
-function deadlineText(d: Date | null): { text: string; urgent: boolean } | null {
-  if (!d) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(d);
-  due.setHours(0, 0, 0, 0);
-  const days = Math.round((due.getTime() - today.getTime()) / 86_400_000);
-  if (days < 0) return { text: `Graag z.s.m. — termijn was ${formatDate(d)}`, urgent: true };
-  if (days === 0) return { text: "Reageer bij voorkeur vandaag", urgent: true };
-  if (days === 1) return { text: `Reageer bij voorkeur voor morgen (${formatDate(d)})`, urgent: true };
-  return { text: `Reageer bij voorkeur voor ${formatDate(d)} · nog ${days} dagen`, urgent: days <= 2 };
-}
 
 export const metadata: Metadata = { title: "Jouw omgeving" };
 export const dynamic = "force-dynamic";
@@ -49,17 +23,9 @@ const KIND_LABEL: Record<string, string> = {
   overig: "Afspraak",
 };
 
-function prodLabel(status: string): { label: string; cls: string } {
-  if (status === "editing") return { label: "In edit", cls: "bg-[var(--color-info-soft)] text-[#4bc4ff]" };
-  if (status === "internal_review" || status === "editor_revision")
-    return { label: "Controle", cls: "bg-[var(--color-warn-soft)] text-[#ffb020]" };
-  if (status === "scheduled" || status === "ready_to_publish" || status === "approved")
-    return { label: "Klaar", cls: "bg-[var(--color-good-soft)] text-[#2fd27a]" };
-  return { label: "In productie", cls: "bg-[var(--color-info-soft)] text-[#4bc4ff]" };
-}
-
 function ShortTile({ title, status }: { title: string; status: string }) {
-  const s = prodLabel(status);
+  const v = clientStatusView(status);
+  const s = { label: v.label, cls: statusToneClass(v.tone) };
   return (
     <article className="sc-short" style={{ background: videoCover(title) }}>
       <span className={`absolute left-2.5 top-2.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${s.cls}`}>
@@ -186,8 +152,9 @@ export default async function PortalPage() {
           {data.awaitingApproval.length > 0 ? (
             <div className="mt-4 flex flex-col gap-3">
               {data.awaitingApproval.slice(0, 4).map((v) => {
-                const isRevision = v.status === "client_revision";
-                const dl = isRevision ? null : deadlineText(reviewDeadline(v.statusChangedAt));
+                const dl = deadlineText(reviewDeadline(v.statusChangedAt));
+                const reviewUrl = v.frameUrl ?? frameUrl ?? `/portal/videos/${v.id}`;
+                const external = Boolean(v.frameUrl ?? frameUrl);
                 return (
                   <div key={v.id} className="rounded-[14px] border border-white/10 bg-white/[0.04] p-3">
                     <div className="flex items-start gap-3.5">
@@ -201,34 +168,28 @@ export default async function PortalPage() {
                       )}
                       <div className="min-w-0 flex-1">
                         <Link href={`/portal/videos/${v.id}`} className="block truncate text-sm font-semibold hover:text-[#9fdcff]">{v.title}</Link>
-                        <div className="mt-0.5 text-[12.5px] text-[var(--color-ink-muted)]">
-                          {isRevision ? "Je feedback is binnen — wij verwerken 'm" : "Klaar om te bekijken"}
-                        </div>
+                        <div className="mt-0.5 text-[12.5px] text-[var(--color-ink-muted)]">Klaar om te bekijken</div>
                         {dl ? (
                           <div className={`mt-1 flex items-center gap-1 text-[12px] ${dl.urgent ? "text-[#ffb020]" : "text-[var(--color-ink-faint)]"}`}>
                             <Clock className="size-3.5" /> {dl.text}
                           </div>
                         ) : null}
                       </div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${isRevision ? "bg-[var(--color-info-soft)] text-[#4bc4ff]" : "bg-[var(--color-warn-soft)] text-[#ffb020]"}`}>
-                        {isRevision ? "In behandeling" : "Jouw akkoord"}
-                      </span>
+                      <span className="shrink-0 rounded-full bg-[var(--color-warn-soft)] px-2.5 py-1 text-[11px] font-semibold text-[#ffb020]">Jouw beoordeling</span>
                     </div>
-                    {!isRevision ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <a
-                          href={v.frameUrl ?? frameUrl ?? `/portal/videos/${v.id}`}
-                          target={v.frameUrl ?? frameUrl ? "_blank" : undefined}
-                          rel="noreferrer"
-                          className={buttonClass({ variant: "accent", size: "sm" })}
-                        >
-                          <Play className="size-3.5" fill="currentColor" /> Bekijk video
-                        </a>
-                        <Link href={`/portal/videos/${v.id}`} className={buttonClass({ variant: "secondary", size: "sm" })}>
-                          Goedkeuren of feedback
-                        </Link>
-                      </div>
-                    ) : null}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        href={reviewUrl}
+                        target={external ? "_blank" : undefined}
+                        rel="noreferrer"
+                        className={buttonClass({ variant: "accent", size: "sm" })}
+                      >
+                        <Play className="size-3.5" fill="currentColor" /> Bekijk en geef feedback
+                      </a>
+                      <Link href={`/portal/videos/${v.id}`} className={buttonClass({ variant: "secondary", size: "sm" })}>
+                        Details
+                      </Link>
+                    </div>
                   </div>
                 );
               })}

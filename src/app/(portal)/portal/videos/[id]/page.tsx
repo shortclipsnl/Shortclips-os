@@ -1,23 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Check, CheckCircle2, Download, ExternalLink, MessageSquare, Play } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Download, ExternalLink, Play } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalVideo } from "@/server/portal";
-import { Badge, buttonClass, Card, CardHeader, EmptyState } from "@/components/ui";
+import { Badge, buttonClass, Card, CardHeader } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { clientStatusView, deadlineText, feedbackBeingProcessed, reviewDeadline, waitingOnClient } from "@/lib/portal-status";
 import { VideoDecision } from "../../actions-ui";
 
 export const metadata: Metadata = { title: "Video" };
 export const dynamic = "force-dynamic";
 
-/** De levensloop van een video zoals de klant 'm ziet (§contentflow). */
-const FLOW = ["Script", "Opname", "Edit", "Jouw akkoord", "Goedgekeurd", "Ingepland", "Gepubliceerd"] as const;
+/** De zes klantstatussen als levensloop (§projectstatus). */
+const FLOW = ["Script", "Opname", "In montage", "Jouw beoordeling", "Ingepland", "Online"] as const;
 
 /** Welke stap is nu actief, op basis van de interne status. */
 const STATUS_TO_STEP: Record<string, number> = {
   recorded: 1, footage_upload: 2, awaiting_editor: 2, editing: 2,
-  internal_review: 2, editor_revision: 2, client_review: 3, client_revision: 3,
-  approved: 4, ready_to_publish: 5, scheduled: 5, published: 6, analysis_available: 6,
+  internal_review: 2, editor_revision: 2, client_revision: 2, client_review: 3,
+  approved: 4, ready_to_publish: 4, scheduled: 4, published: 5, analysis_available: 5,
 };
 
 /** Wie is nu aan zet? */
@@ -25,8 +26,7 @@ function whoseTurn(status: string): string {
   if (status === "client_review") return "Jij — bekijk de video en geef je akkoord of feedback.";
   if (status === "client_revision") return "ShortClips — we verwerken je feedback.";
   if (status === "published" || status === "analysis_available") return "Klaar — de video staat online.";
-  if (status === "scheduled" || status === "ready_to_publish") return "ShortClips — ingepland voor publicatie.";
-  if (status === "approved") return "ShortClips — we plannen de publicatie in.";
+  if (status === "scheduled" || status === "ready_to_publish" || status === "approved") return "ShortClips — ingepland voor publicatie.";
   return "ShortClips — we werken aan je video.";
 }
 
@@ -71,23 +71,6 @@ function ProgressTimeline({ status }: { status: string }) {
   );
 }
 
-function statusLabel(status: string): { label: string; tone: "warn" | "info" | "good" | "neutral" } {
-  switch (status) {
-    case "client_review":
-      return { label: "Wacht op jouw akkoord", tone: "warn" };
-    case "client_revision":
-      return { label: "We verwerken je feedback", tone: "info" };
-    case "approved":
-    case "ready_to_publish":
-    case "scheduled":
-      return { label: "Klaar voor publicatie", tone: "good" };
-    case "published":
-      return { label: "Gepubliceerd", tone: "neutral" };
-    default:
-      return { label: "In productie", tone: "info" };
-  }
-}
-
 export default async function PortalVideoDetailPage({
   params,
 }: {
@@ -96,8 +79,10 @@ export default async function PortalVideoDetailPage({
   const { id } = await params;
   const viewer = await requirePortal();
   const { video, threads } = await getPortalVideo(viewer, id);
-  const s = statusLabel(video.status);
-  const needsDecision = video.status === "client_review" || video.status === "client_revision";
+  const view = clientStatusView(video.status);
+  const needsDecision = waitingOnClient(video.status);
+  const inFeedback = feedbackBeingProcessed(video.status);
+  const dl = needsDecision ? deadlineText(reviewDeadline(video.statusChangedAt)) : null;
 
   return (
     <div className="space-y-6">
@@ -112,8 +97,16 @@ export default async function PortalVideoDetailPage({
         <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-tight">{video.title}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Badge tone={s.tone}>{s.label}</Badge>
-            {video.plannedPublishOn ? (
+            <Badge tone={view.tone}>{view.label}</Badge>
+            {view.sublabel ? (
+              <span className="text-xs text-[var(--color-ink-muted)]">{view.sublabel}</span>
+            ) : null}
+            {dl ? (
+              <span className={`text-xs font-medium ${dl.urgent ? "text-[#ffb020]" : "text-[var(--color-ink-muted)]"}`}>
+                {dl.text}
+              </span>
+            ) : null}
+            {video.plannedPublishOn && !needsDecision ? (
               <span className="text-xs text-[var(--color-ink-muted)]">
                 Verwachte publicatie: {formatDate(video.plannedPublishOn)}
               </span>
@@ -149,9 +142,9 @@ export default async function PortalVideoDetailPage({
                 href={video.frameUrl}
                 target="_blank"
                 rel="noreferrer"
-                className={buttonClass({ variant: "primary" })}
+                className={buttonClass({ variant: needsDecision ? "accent" : "primary" })}
               >
-                <ExternalLink className="size-4" /> Bekijk video
+                <ExternalLink className="size-4" /> {needsDecision ? "Bekijk en geef feedback" : "Bekijk video"}
               </a>
               <a
                 href={video.frameUrl}
@@ -164,39 +157,43 @@ export default async function PortalVideoDetailPage({
             </>
           ) : (
             <p className="text-sm text-[var(--color-ink-muted)]">
-              De video wordt klaargezet. Je kunt 'm hier straks bekijken en downloaden.
+              De video wordt klaargezet. Je kunt &apos;m hier straks bekijken en beoordelen.
             </p>
           )}
         </div>
       </Card>
 
-      {/* Goedkeuren / aanpassing vragen */}
+      {/* Jouw beoordeling — alleen wanneer de klant echt aan zet is */}
       {needsDecision ? (
         <Card>
           <CardHeader
-            title="Wat vind je ervan?"
-            subtitle="Keur de video goed, of vraag een aanpassing aan. Je feedback komt direct bij ons team."
+            title="Keur goed of vraag een aanpassing"
+            subtitle="Eén gebundelde feedbackronde per video. Geef je feedback het liefst met tijdcode in Frame."
           />
           <div className="mt-4">
             <VideoDecision videoId={video.id} />
           </div>
         </Card>
+      ) : inFeedback ? (
+        <Card className="flex items-start gap-3 border-[#4bc4ff]/30 bg-[rgba(25,168,255,0.07)]">
+          <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[#4bc4ff]" />
+          <div>
+            <p className="text-sm font-semibold text-[var(--color-ink)]">
+              Feedback ontvangen{video.statusChangedAt ? ` op ${formatDate(video.statusChangedAt)}` : ""}
+            </p>
+            <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+              We verwerken je feedback en zetten binnenkort een nieuwe versie klaar. Je hoeft nu niets te doen.
+            </p>
+          </div>
+        </Card>
       ) : null}
 
-      {/* Feedbackgeschiedenis */}
-      <Card padded={false}>
-        <div className="p-5 pb-3">
-          <CardHeader title="Feedback" />
-        </div>
-        {threads.length === 0 ? (
-          <div className="px-5 pb-5">
-            <EmptyState
-              title="Nog geen feedback"
-              description="Opmerkingen die je plaatst, verschijnen hier."
-              icon={<MessageSquare className="size-6" />}
-            />
+      {/* Feedbackgeschiedenis — alleen tonen als er echt feedback bij deze video hoort */}
+      {threads.length > 0 ? (
+        <Card padded={false}>
+          <div className="p-5 pb-3">
+            <CardHeader title="Jouw feedback op deze video" />
           </div>
-        ) : (
           <ul className="divide-y divide-[var(--color-line)]">
             {threads.map((t) => (
               <li key={t.id} className="px-5 py-4">
@@ -220,8 +217,8 @@ export default async function PortalVideoDetailPage({
               </li>
             ))}
           </ul>
-        )}
-      </Card>
+        </Card>
+      ) : null}
     </div>
   );
 }

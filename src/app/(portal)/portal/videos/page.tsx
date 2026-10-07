@@ -6,6 +6,7 @@ import { getPortalFrameUrl, getPortalVideos } from "@/server/portal";
 import { buttonClass } from "@/components/ui";
 import { CoverImage } from "@/components/portal/cover-image";
 import { formatDate } from "@/lib/format";
+import { clientStatusView, statusToneClass } from "@/lib/portal-status";
 import { videoCover } from "../cover";
 
 export const metadata: Metadata = { title: "Video's" };
@@ -21,25 +22,9 @@ type Row = {
   statusChangedAt: Date | null;
 };
 
-function statusChip(status: string): { label: string; cls: string } {
-  switch (status) {
-    case "client_review":
-      return { label: "Jouw akkoord", cls: "bg-[var(--color-warn-soft)] text-[#ffb020]" };
-    case "client_revision":
-      return { label: "In aanpassing", cls: "bg-[var(--color-info-soft)] text-[#4bc4ff]" };
-    case "approved":
-    case "ready_to_publish":
-    case "scheduled":
-      return { label: "Klaar", cls: "bg-[var(--color-good-soft)] text-[#2fd27a]" };
-    case "published":
-      return { label: "Gepubliceerd", cls: "bg-white/10 text-[var(--color-ink-muted)]" };
-    default:
-      return { label: "In edit", cls: "bg-[var(--color-info-soft)] text-[#4bc4ff]" };
-  }
-}
-
 function Tile({ v }: { v: Row }) {
-  const s = statusChip(v.status);
+  const view = clientStatusView(v.status);
+  const s = { label: view.label, cls: statusToneClass(view.tone) };
   const date = v.publishedAt ?? v.statusChangedAt;
   // Echte Frame-omslag via de proxy (vers gehouden); de kleur-omslag blijft als
   // zachte placeholder eronder staan tot de afbeelding is ingeladen.
@@ -103,9 +88,9 @@ export default async function PortalVideosPage() {
         </div>
       ) : (
         <>
-          <Group title="Actie nodig" subtitle="Deze video's wachten op jouw akkoord of feedback." rows={data.actieNodig} />
-          <Group title="In productie" subtitle="Waar we nu aan werken." rows={data.inProductie} />
-          <Group title="Gepubliceerd" subtitle={`${data.gepubliceerd.length} video's`} rows={data.gepubliceerd.slice(0, 40)} />
+          <Group title="Jouw beoordeling" subtitle="Deze video's wachten op jouw akkoord." rows={data.actieNodig} />
+          <Group title="In productie" subtitle="Hier zijn wij mee bezig — je hoeft nu niets te doen." rows={data.inProductie} />
+          <Group title="Online" subtitle={`${data.gepubliceerd.length} video's`} rows={data.gepubliceerd.slice(0, 40)} />
         </>
       )}
     </div>
