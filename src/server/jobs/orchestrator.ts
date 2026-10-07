@@ -11,6 +11,7 @@ import {
   pullFrameProjects,
 } from "./frameio-sync";
 import { runDailySignals, runHourlySignals } from "./maintenance";
+import { enforcePortalAccess } from "./portal-access";
 
 /**
  * Orkestratie van alle koppelingen, zodat één geplande taak (cron) het hele
@@ -49,6 +50,9 @@ export async function runFrequentSync() {
 export async function runNightlySync() {
   const results: StepResult[] = [];
   results.push(await step("monday.import_clients", () => runMondayClientImport()));
+  // Direct na de klant-import: portaaltoegang gelijktrekken met de nieuwe
+  // samenwerkingsstatussen (gestopte klanten dicht, actieve weer open).
+  results.push(await step("portal.enforce_access", () => enforcePortalAccess()));
   results.push(await step("monday.import_editing", () => runMondayEditingImport()));
   results.push(await step("monday.import_contracts", () => runMondayContractImport()));
   results.push(await step("monday.import_planning", () => runMondayPlanningImport()));

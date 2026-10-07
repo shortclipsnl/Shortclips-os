@@ -19,6 +19,7 @@ import { runMondayPlanningImport } from "@/server/jobs/monday-planning";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, runMetricoolSync } from "@/server/jobs/metricool-sync";
 import { setTeamContact } from "@/server/jobs/team";
+import { enforcePortalAccess } from "@/server/jobs/portal-access";
 import { pruneSessions } from "@/server/auth/session";
 
 export const runtime = "nodejs";
@@ -49,6 +50,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "sync.frequent": runFrequentSync,
   "sync.nightly": runNightlySync,
   "pilot.setup_logins": () => runPilotPortalSetup(),
+  "portal.enforce_access": enforcePortalAccess,
   "maintenance.prune_sessions": async () => ({ removed: await pruneSessions() }),
 };
 
