@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requirePortal } from "@/server/auth/context";
 import { Logo } from "@/components/logo";
 import { Avatar } from "@/components/ui";
 import { UserMenu } from "@/components/layout/user-menu";
 import { PortalNav, PortalMobileNav } from "./portal-nav";
+
+/** Klantgerichte tabtitel: "Shortclips" (geen interne "OS"-toevoeging). */
+export const metadata: Metadata = {
+  title: { default: "Shortclips", template: "%s · Shortclips" },
+};
 
 /**
  * Het klantportaal staat bewust los van de interne app: eigen layout, eigen
@@ -43,7 +49,7 @@ export default async function PortalLayout({
           {children}
           <footer className="mt-10 text-xs text-[var(--color-ink-faint)]">
             Deze omgeving is van jou. Vragen? Neem contact op met je vaste
-            contactpersoon bij ShortClips.
+            contactpersoon bij Shortclips.
           </footer>
         </main>
       </div>

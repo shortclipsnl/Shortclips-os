@@ -46,7 +46,7 @@ export function VideoDecision({ videoId }: { videoId: string }) {
           <textarea
             className="sc-input resize-y"
             rows={4}
-            placeholder="Wat zou je graag anders zien? Wees zo concreet mogelijk — bijvoorbeeld met een tijdstip uit de video."
+            placeholder="Wat zou je graag anders zien? Wees zo concreet mogelijk, bijvoorbeeld met een tijdstip uit de video."
             value={body}
             onChange={(e) => setBody(e.target.value)}
           />

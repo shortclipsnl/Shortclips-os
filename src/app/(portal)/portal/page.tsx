@@ -65,7 +65,7 @@ export default async function PortalPage() {
   const firstName = viewer.fullName.split(" ")[0];
   const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 
-  // Maandoverzicht — zelfde bronnen als de rest van het portaal, zodat de cijfers
+  // Maandoverzicht, zelfde bronnen als de rest van het portaal, zodat de cijfers
   // nergens uit elkaar lopen.
   const now = new Date();
   const monthName = MONTH_NL.format(now);
@@ -94,7 +94,7 @@ export default async function PortalPage() {
         <div>
           <h1 className="text-[29px] font-bold tracking-tight">Welkom terug, {firstName}</h1>
           <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-            Alles rond de video&apos;s van {data.client.name} — in één studio-omgeving.
+            Alles rond de video&apos;s van {data.client.name}, in één studio-omgeving.
           </p>
         </div>
         {frameUrl ? (
@@ -104,7 +104,7 @@ export default async function PortalPage() {
         ) : null}
       </div>
 
-      {/* Maandoverzicht — één oogopslag: waar staan we deze maand */}
+      {/* Maandoverzicht, één oogopslag: waar staan we deze maand */}
       <section className="sc-glass p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-semibold capitalize">{monthName}</h2>
@@ -249,7 +249,7 @@ export default async function PortalPage() {
       <div className="grid gap-[18px] lg:grid-cols-[1.6fr_1fr]">
         <section>
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold">Resultaten — 30 dagen</h2>
+            <h2 className="text-base font-semibold">Resultaten, 30 dagen</h2>
             <Link href="/portal/resultaten" className="text-[13px] font-semibold text-[#4bc4ff]">Meer →</Link>
           </div>
           <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
@@ -295,7 +295,7 @@ export default async function PortalPage() {
         </div>
       </section>
 
-      {/* Werkwijze & afspraken — altijd bij de hand */}
+      {/* Werkwijze & afspraken, altijd bij de hand */}
       <Link
         href="/portal/werkwijze"
         className="group flex items-center gap-4 rounded-[16px] border border-white/10 bg-white/[0.03] p-5 transition-colors hover:bg-white/[0.06]"
@@ -311,7 +311,7 @@ export default async function PortalPage() {
       </Link>
 
       <footer className="pt-2 text-xs text-[var(--color-ink-faint)]">
-        <FileText className="mb-0.5 mr-1 inline size-3.5" /> Alles in dit portaal komt automatisch uit onze systemen — je hoeft niets handmatig bij te houden.
+        <FileText className="mb-0.5 mr-1 inline size-3.5" /> Alles in dit portaal komt automatisch uit onze systemen, je hoeft niets handmatig bij te houden.
       </footer>
     </div>
   );

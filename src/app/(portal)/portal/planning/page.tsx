@@ -33,7 +33,7 @@ export default async function PortalPlanningPage() {
       {items.length === 0 ? (
         <EmptyState
           title="Je contentplanning wordt voorbereid"
-          description="Zodra de publicatiedata voor je komende video's bekend zijn, verschijnen ze hier automatisch — met datum en platform. Je hoeft nu niets te doen."
+          description="Zodra de publicatiedata voor je komende video's bekend zijn, verschijnen ze hier automatisch, met datum en platform. Je hoeft nu niets te doen."
           icon={<CalendarRange className="size-6" />}
         />
       ) : (

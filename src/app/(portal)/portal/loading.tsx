@@ -1,4 +1,4 @@
-/** Skeleton die de dashboard-layout nabootst — rustiger dan een lege pagina. */
+/** Skeleton die de dashboard-layout nabootst, rustiger dan een lege pagina. */
 function Bar({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded-md bg-white/5 ${className}`} />;
 }

@@ -17,12 +17,12 @@ const AFSPRAKEN = [
   { k: "Duur opnamedag", v: "Een opnamedag duurt gemiddeld 4 tot 7 uur." },
   { k: "Feedbackrondes", v: "Per video is één gebundelde feedbackronde inbegrepen. Alle feedback wordt in één keer volledig aangeleverd. Extra aanvullingen nadat de feedbackronde is verwerkt, gelden als een nieuwe feedbackronde en kosten € 75 per ronde." },
   { k: "Scripts", v: "Scripts worden vooraf afgestemd en vóór de opnamedag definitief akkoord gegeven. Kleine aanpassingen in woordkeuze op locatie zijn mogelijk. Grote inhoudelijke wijzigingen na akkoord zijn niet inbegrepen." },
-  { k: "Opnieuw opnemen", v: "Bij wijzigingen aan een eerder goedgekeurd script wordt € 95 per opnieuw opgenomen video berekend. Bij een fout vanuit ShortClips is dit kosteloos." },
+  { k: "Opnieuw opnemen", v: "Bij wijzigingen aan een eerder goedgekeurd script wordt € 95 per opnieuw opgenomen video berekend. Bij een fout vanuit Shortclips is dit kosteloos." },
   { k: "Extra content op locatie", v: "Extra video's kunnen tijdens een opnamedag worden opgenomen wanneer de planning dit toelaat. Dit geldt uitsluitend voor short video content en wordt aanvullend gefactureerd volgens het geldende tarief." },
   { k: "Beoordelingstermijn", v: "3 werkdagen na oplevering. Geen reactie binnen 5 werkdagen geldt als akkoord." },
   { k: "Annulering", v: "Kosteloos tot 7 werkdagen voorafgaand aan de opnamedag. Bij annulering binnen 7 werkdagen wordt € 395 excl. btw in rekening gebracht. Bij annulering binnen 24 uur voor de opnamedag wordt 100% van de opnamedag in rekening gebracht." },
   { k: "Reistijd", v: "Onze reiskosten bedragen € 0,35 per km." },
-  { k: "Raw footage", v: "Blijft bij ShortClips. Op verzoek beschikbaar voor € 450 per opnamedag, binnen 90 dagen." },
+  { k: "Raw footage", v: "Blijft bij Shortclips. Op verzoek beschikbaar voor € 450 per opnamedag, binnen 90 dagen." },
   { k: "Responstijd", v: "Binnen één werkdag, maandag tot en met vrijdag van 09:00 tot 17:00." },
 ];
 
@@ -104,7 +104,7 @@ export default async function PortalSamenwerkingPage() {
         </section>
       </div>
 
-      {/* Afspraken — "Zo leggen we het vast" */}
+      {/* Afspraken, "Zo leggen we het vast" */}
       <section id="afspraken" className="sc-glass scroll-mt-24 p-6 sm:p-7">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-[#4bc4ff]">De afspraken</span>
         <h2 className="mt-1 text-[22px] font-bold tracking-tight">Zo leggen we het vast</h2>
@@ -158,7 +158,7 @@ export default async function PortalSamenwerkingPage() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-[15px] font-semibold">{contact.coordinator.name}</span>
-            <span className="block text-[13px] text-[var(--color-ink-muted)]">Je vaste contactpersoon — planning, scripts, feedback en resultaten.</span>
+            <span className="block text-[13px] text-[var(--color-ink-muted)]">Je vaste contactpersoon, planning, scripts, feedback en resultaten.</span>
           </span>
           <UserRound className="size-5 shrink-0 text-[var(--color-ink-faint)]" />
         </Link>

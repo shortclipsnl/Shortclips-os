@@ -65,22 +65,26 @@ export function UserMenu({
               {ROLE_LABELS[role] ?? role}
             </p>
           </div>
-          <div className="py-1">
-            <Link
-              href="/account"
-              className="flex items-center gap-2.5 px-4 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-              onClick={() => setOpen(false)}
-            >
-              <User className="size-4" strokeWidth={1.75} /> Mijn account
-            </Link>
-            <Link
-              href="/settings"
-              className="flex items-center gap-2.5 px-4 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-              onClick={() => setOpen(false)}
-            >
-              <Settings className="size-4" strokeWidth={1.75} /> Instellingen
-            </Link>
-          </div>
+          {/* Interne beheer-links alleen voor teamleden; klanten zien ze niet
+              (voor hen leidden ze alleen terug naar het portaal). */}
+          {role !== "client" ? (
+            <div className="py-1">
+              <Link
+                href="/account"
+                className="flex items-center gap-2.5 px-4 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+                onClick={() => setOpen(false)}
+              >
+                <User className="size-4" strokeWidth={1.75} /> Mijn account
+              </Link>
+              <Link
+                href="/settings"
+                className="flex items-center gap-2.5 px-4 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+                onClick={() => setOpen(false)}
+              >
+                <Settings className="size-4" strokeWidth={1.75} /> Instellingen
+              </Link>
+            </div>
+          ) : null}
           <form action={logoutAction} className="border-t border-[var(--color-line)]">
             <button
               type="submit"

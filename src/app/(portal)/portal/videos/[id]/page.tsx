@@ -23,11 +23,11 @@ const STATUS_TO_STEP: Record<string, number> = {
 
 /** Wie is nu aan zet? */
 function whoseTurn(status: string): string {
-  if (status === "client_review") return "Jij — bekijk de video en geef je akkoord of feedback.";
-  if (status === "client_revision") return "ShortClips — we verwerken je feedback.";
-  if (status === "published" || status === "analysis_available") return "Klaar — de video staat online.";
-  if (status === "scheduled" || status === "ready_to_publish" || status === "approved") return "ShortClips — ingepland voor publicatie.";
-  return "ShortClips — we werken aan je video.";
+  if (status === "client_review") return "Jij, bekijk de video en geef je akkoord of feedback.";
+  if (status === "client_revision") return "Shortclips, we verwerken je feedback.";
+  if (status === "published" || status === "analysis_available") return "Klaar, de video staat online.";
+  if (status === "scheduled" || status === "ready_to_publish" || status === "approved") return "Shortclips, ingepland voor publicatie.";
+  return "Shortclips, we werken aan je video.";
 }
 
 function ProgressTimeline({ status }: { status: string }) {
@@ -36,7 +36,7 @@ function ProgressTimeline({ status }: { status: string }) {
     <Card>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-[var(--color-ink)]">Waar staat deze video?</h2>
-        <span className="text-xs text-[var(--color-ink-muted)]">Nu aan zet: {whoseTurn(status).split(" — ")[0]}</span>
+        <span className="text-xs text-[var(--color-ink-muted)]">Nu aan zet: {whoseTurn(status).split(", ")[0]}</span>
       </div>
       <ol className="flex gap-1 overflow-x-auto pb-1">
         {FLOW.map((label, i) => {
@@ -118,7 +118,7 @@ export default async function PortalVideoDetailPage({
       {/* Voortgangslijn: van script tot gepubliceerd */}
       <ProgressTimeline status={video.status} />
 
-      {/* Akkoord-bonnetje — zwart op wit wie wanneer akkoord gaf */}
+      {/* Akkoord-bonnetje, zwart op wit wie wanneer akkoord gaf */}
       {["approved", "ready_to_publish", "scheduled", "published"].includes(video.status) && video.approvedAt ? (
         <div className="flex items-center gap-3 rounded-[14px] border border-[var(--color-good)]/30 bg-[var(--color-good-soft)] px-4 py-3">
           <CheckCircle2 className="size-5 shrink-0 text-[var(--color-good)]" />
@@ -128,7 +128,7 @@ export default async function PortalVideoDetailPage({
         </div>
       ) : null}
 
-      {/* Speler / bekijken — Frame.io draait achter de schermen */}
+      {/* Speler / bekijken, Frame.io draait achter de schermen */}
       <Card padded={false}>
         <div className="flex aspect-video items-center justify-center rounded-t-xl bg-[var(--color-ink)]/[0.04]">
           <div className="flex size-14 items-center justify-center rounded-full bg-[var(--color-brand-600)] text-white">
@@ -163,7 +163,7 @@ export default async function PortalVideoDetailPage({
         </div>
       </Card>
 
-      {/* Jouw beoordeling — alleen wanneer de klant echt aan zet is */}
+      {/* Jouw beoordeling, alleen wanneer de klant echt aan zet is */}
       {needsDecision ? (
         <Card>
           <CardHeader
@@ -188,7 +188,7 @@ export default async function PortalVideoDetailPage({
         </Card>
       ) : null}
 
-      {/* Feedbackgeschiedenis — alleen tonen als er echt feedback bij deze video hoort */}
+      {/* Feedbackgeschiedenis, alleen tonen als er echt feedback bij deze video hoort */}
       {threads.length > 0 ? (
         <Card padded={false}>
           <div className="p-5 pb-3">

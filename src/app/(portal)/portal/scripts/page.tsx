@@ -9,9 +9,9 @@ import { ScriptDecision } from "../actions-ui";
 export const metadata: Metadata = { title: "Scripts" };
 export const dynamic = "force-dynamic";
 
-/** Leeswijzer "Zo lees je de scripts" — compacte versie van het PDF. */
+/** Leeswijzer "Zo lees je de scripts", compacte versie van het PDF. */
 const SCRIPT_PARTS = [
-  { n: "01", title: "De opening", body: "De eerste seconden bepalen of iemand blijft kijken. Ze zijn bewust scherp en soms directer dan je gewend bent — dat is opzet." },
+  { n: "01", title: "De opening", body: "De eerste seconden bepalen of iemand blijft kijken. Ze zijn bewust scherp en soms directer dan je gewend bent, dat is opzet." },
   { n: "02", title: "De kernboodschap", body: "Eén boodschap per video. Twee punten? Dan splitsen wij het in twee video's." },
   { n: "03", title: "Het bewijs", body: "Een voorbeeld, cijfer of case die de boodschap geloofwaardig maakt. Hier let je het scherpst op." },
   { n: "04", title: "De afsluiting", body: "Een oproep alleen als die past. Video's gericht op bereik werken vaak beter zonder." },
@@ -42,11 +42,11 @@ export default async function PortalScriptsPage() {
       <div>
         <h1 className="text-[25px] font-bold tracking-tight">Scripts</h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Bekijk je scripts, geef feedback en keur ze goed — altijd vóór de opnamedag.
+          Bekijk je scripts, geef feedback en keur ze goed, altijd vóór de opnamedag.
         </p>
       </div>
 
-      {/* Komende opnamedag — waar deze scripts voor zijn */}
+      {/* Komende opnamedag, waar deze scripts voor zijn */}
       {shoot ? (
         <section className="sc-glass p-5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Komende opnamedag</span>
@@ -121,7 +121,7 @@ export default async function PortalScriptsPage() {
           Elk script heeft vier vaste delen. Weet je hoe ze werken, dan lees je sneller en gerichter mee.
         </p>
 
-        {/* De vier delen — groot, genummerd, makkelijk te scannen */}
+        {/* De vier delen, groot, genummerd, makkelijk te scannen */}
         <ol className="mt-5 flex flex-col divide-y divide-white/10">
           {SCRIPT_PARTS.map((p) => (
             <li key={p.n} className="flex items-start gap-4 py-4 first:pt-0">
@@ -136,10 +136,10 @@ export default async function PortalScriptsPage() {
           ))}
         </ol>
 
-        {/* Wat jij controleert — de enige actie die van jou wordt gevraagd */}
+        {/* Wat jij controleert, de enige actie die van jou wordt gevraagd */}
         <div className="mt-6 rounded-[16px] border border-[#2fd27a]/30 bg-[rgba(47,210,122,0.07)] p-5 sm:p-6">
           <div className="text-[16px] font-bold">Waar jíj op let bij het lezen</div>
-          <p className="mt-1 text-[13.5px] text-[var(--color-ink)]/70">Loop deze vier vragen na — meer hoef je niet te doen.</p>
+          <p className="mt-1 text-[13.5px] text-[var(--color-ink)]/70">Loop deze vier vragen na, meer hoef je niet te doen.</p>
           <ul className="mt-4 flex flex-col gap-3">
             {CHECK_QUESTIONS.map((q, i) => (
               <li key={q} className="flex items-center gap-3 text-[15px] leading-snug">
@@ -150,7 +150,7 @@ export default async function PortalScriptsPage() {
           </ul>
         </div>
 
-        {/* Wat je NIET hoeft te doen + waarom — rustig, ondersteunend */}
+        {/* Wat je NIET hoeft te doen + waarom, rustig, ondersteunend */}
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <div>
             <div className="text-[14px] font-semibold text-[var(--color-ink)]">Dit hoef je níét te doen</div>

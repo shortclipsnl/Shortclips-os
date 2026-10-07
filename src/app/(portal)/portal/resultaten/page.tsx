@@ -57,7 +57,7 @@ export default async function PortalResultatenPage({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Resultaten</h1>
           <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            Hoe je content presteert — gecombineerd over je kanalen.
+            Hoe je content presteert, gecombineerd over je kanalen.
           </p>
         </div>
         <div className="inline-flex gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1">
@@ -145,7 +145,7 @@ export default async function PortalResultatenPage({
             <p className="text-sm font-semibold text-[var(--color-ink)]">Je resultaten worden gekoppeld</p>
             <p className="mt-1 max-w-xl text-sm text-[var(--color-ink-muted)]">
               Zodra je kanalen verbonden zijn, verschijnen hier automatisch je weergaven, bereik,
-              interacties en volgersgroei — per periode en met wat erin opvalt. Je hoeft nu niets te doen.
+              interacties en volgersgroei, per periode en met wat erin opvalt. Je hoeft nu niets te doen.
             </p>
           </div>
         </Card>

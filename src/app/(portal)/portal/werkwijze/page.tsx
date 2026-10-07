@@ -64,7 +64,7 @@ export default async function PortalWerkwijzePage() {
       <div>
         <h1 className="text-[25px] font-bold tracking-tight">Werkwijze</h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Hoe een opnamedag verloopt en wie wat doet — altijd bij de hand. De afspraken vind je bij{" "}
+          Hoe een opnamedag verloopt en wie wat doet, altijd bij de hand. De afspraken vind je bij{" "}
           <a href="/portal/samenwerking" className="font-semibold text-[#4bc4ff]">Samenwerking</a>.
         </p>
       </div>
@@ -141,7 +141,7 @@ export default async function PortalWerkwijzePage() {
               <thead>
                 <tr className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
                   <th className="pb-3 pr-4 font-semibold">Onderdeel</th>
-                  <th className="pb-3 pr-4 font-semibold">ShortClips</th>
+                  <th className="pb-3 pr-4 font-semibold">Shortclips</th>
                   <th className="pb-3 font-semibold">Jullie</th>
                 </tr>
               </thead>

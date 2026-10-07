@@ -62,7 +62,7 @@ export default async function PortalContactPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Contact</h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Wie je waarvoor kunt bereiken bij ShortClips.
+          Wie je waarvoor kunt bereiken bij Shortclips.
         </p>
       </div>
 
@@ -71,7 +71,7 @@ export default async function PortalContactPage() {
           <ContactCard person={coordinator} focus="Voor planning, scripts, feedback, resultaten en alles rond de samenwerking." />
         ) : (
           <ContactCard
-            person={{ name: "ShortClips", role: "Je team", email: "info@shortclips.nl", phone: null }}
+            person={{ name: "Shortclips", role: "Je team", email: "info@shortclips.nl", phone: null }}
             focus="Voor planning, scripts, feedback, resultaten en alles rond de samenwerking."
           />
         )}

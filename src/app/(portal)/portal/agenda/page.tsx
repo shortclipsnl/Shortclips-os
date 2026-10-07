@@ -18,7 +18,7 @@ const KIND_LABEL: Record<string, string> = {
 
 const INTERNAL_RE = /(shortclips\.nl|teamshortclips@gmail\.com|jarnoklijnsma9@gmail\.com)/i;
 
-/** Namen van de ShortClips-mensen die bij de afspraak zitten (uit Google Agenda). */
+/** Namen van de Shortclips-mensen die bij de afspraak zitten (uit Google Agenda). */
 function shortclipsPeople(attendees: unknown): string[] {
   if (!Array.isArray(attendees)) return [];
   const names = new Set<string>();
@@ -43,7 +43,7 @@ export default async function PortalAgendaPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Agenda</h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Je opnamedagen, besprekingen en andere afspraken met ShortClips.
+          Je opnamedagen, besprekingen en andere afspraken met Shortclips.
         </p>
       </div>
 
@@ -83,7 +83,7 @@ export default async function PortalAgendaPage() {
                   ) : null}
                   {shortclipsPeople(a.attendees).length > 0 ? (
                     <p className="mt-1 flex items-center gap-1 text-xs text-[var(--color-ink-muted)]">
-                      <Users className="size-3.5" /> Vanuit ShortClips:{" "}
+                      <Users className="size-3.5" /> Vanuit Shortclips:{" "}
                       {shortclipsPeople(a.attendees).join(", ")}
                     </p>
                   ) : null}

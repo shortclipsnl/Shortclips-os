@@ -71,7 +71,7 @@ export default async function PortalVideosPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[25px] font-bold tracking-tight">Video&apos;s</h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Al je video&apos;s op één plek — bekijk, geef feedback en download.</p>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Al je video&apos;s op één plek, bekijk, geef feedback en download.</p>
         </div>
         {frameUrl ? (
           <a href={frameUrl} target="_blank" rel="noreferrer" className={buttonClass({ variant: "accent" })}>
@@ -89,7 +89,7 @@ export default async function PortalVideosPage() {
       ) : (
         <>
           <Group title="Jouw beoordeling" subtitle="Deze video's wachten op jouw akkoord." rows={data.actieNodig} />
-          <Group title="In productie" subtitle="Hier zijn wij mee bezig — je hoeft nu niets te doen." rows={data.inProductie} />
+          <Group title="In productie" subtitle="Hier zijn wij mee bezig, je hoeft nu niets te doen." rows={data.inProductie} />
           <Group title="Online" subtitle={`${data.gepubliceerd.length} video's`} rows={data.gepubliceerd.slice(0, 40)} />
         </>
       )}
