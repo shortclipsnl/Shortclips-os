@@ -12,6 +12,7 @@ import {
 } from "./frameio-sync";
 import { runDailySignals, runHourlySignals } from "./maintenance";
 import { enforcePortalAccess } from "./portal-access";
+import { runClientNotifications } from "./notifications";
 
 /**
  * Orkestratie van alle koppelingen, zodat één geplande taak (cron) het hele
@@ -40,6 +41,9 @@ export async function runFrequentSync() {
   results.push(await step("calendar.sync", () => runCalendarSync()));
   results.push(await step("frameio.pull_comments", () => pullFrameComments()));
   results.push(await step("signals.hourly", () => runHourlySignals()));
+  // Klant op de hoogte brengen (video/script klaar, opname morgen). Idempotent,
+  // dus veilig om vaak te draaien.
+  results.push(await step("portal.notify_clients", () => runClientNotifications()));
   return { ok: results.every((r) => r.ok), results };
 }
 

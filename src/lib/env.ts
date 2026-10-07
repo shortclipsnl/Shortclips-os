@@ -65,6 +65,14 @@ const schema = z.object({
 
   // --- Achtergrondtaken ---
   CRON_SECRET: z.string().optional(),
+
+  // --- E-mail (klantnotificaties) ---
+  // Resend als verzender. Zonder sleutel blijft e-mail slapend: notificaties
+  // worden wél in het portaal gezet, maar er gaat geen mail uit.
+  RESEND_API_KEY: z.string().optional(),
+  // Afzender, bijv. "ShortClips <portal@shortclips.nl>". Domein moet in Resend
+  // geverifieerd zijn.
+  MAIL_FROM: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -141,5 +149,10 @@ export function integrationConfig() {
       optional: [],
     },
     metricool: { configured: false, required: [], optional: [] },
+    email: {
+      configured: Boolean(env.RESEND_API_KEY && env.MAIL_FROM),
+      required: ["RESEND_API_KEY", "MAIL_FROM"],
+      optional: [],
+    },
   } as const;
 }
