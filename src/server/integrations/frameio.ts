@@ -213,6 +213,21 @@ export class FrameService {
     return (res as { data?: FrameFile }).data ?? (res as FrameFile);
   }
 
+  /**
+   * De omslag (thumbnail) van een videobestand. Frame levert media_links alleen
+   * als je er expliciet om vraagt via `include=media_links.thumbnail`, en dan als
+   * een ondertekende URL die na enkele uren verloopt — vandaar dat we 'm vers
+   * ophalen wanneer nodig (zie de thumbnail-proxy).
+   */
+  async getFileThumbnail(fileId: string): Promise<string | null> {
+    const res = await this.request<{ data?: FrameFile } | FrameFile>(
+      `/accounts/${this.requireAccount()}/files/${fileId}?include=media_links.thumbnail`,
+    );
+    const file = (res as { data?: FrameFile }).data ?? (res as FrameFile);
+    const links = file.media_links as { thumbnail?: { url?: string } } | undefined;
+    return links?.thumbnail?.url ?? null;
+  }
+
   async listComments(fileId: string): Promise<FrameComment[]> {
     const result = await this.request<Page<FrameComment>>(
       `/accounts/${this.requireAccount()}/files/${fileId}/comments`,

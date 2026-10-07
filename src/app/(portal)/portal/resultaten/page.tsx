@@ -33,23 +33,28 @@ export default async function PortalResultatenPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Weergaven" value={nf.format(m.views)} />
-        <Metric label="Bereik" value={nf.format(m.reach)} />
-        <Metric label="Interacties" value={nf.format(m.engagements)} />
-        <Metric label="Nieuwe volgers" value={`+${nf.format(m.followerGrowth)}`} />
-      </div>
-
-      {!hasData ? (
-        <Card className="flex items-center gap-3 border-dashed">
-          <BarChart3 className="size-5 shrink-0 text-[var(--color-ink-muted)]" strokeWidth={1.75} />
-          <p className="text-sm text-[var(--color-ink-muted)]">
-            De statistieken van Instagram, TikTok, YouTube en Facebook worden binnenkort automatisch
-            gekoppeld. Dan zie je hier per platform en gecombineerd je views, bereik, interacties,
-            volgersgroei en je best presterende video&apos;s.
-          </p>
+      {hasData ? (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Metric label="Weergaven" value={nf.format(m.views)} />
+          <Metric label="Bereik" value={nf.format(m.reach)} />
+          <Metric label="Interacties" value={nf.format(m.engagements)} />
+          <Metric label="Nieuwe volgers" value={`+${nf.format(m.followerGrowth)}`} />
+        </div>
+      ) : (
+        <Card className="flex flex-col items-start gap-3 border-dashed p-6">
+          <span className="grid size-10 place-items-center rounded-xl bg-[var(--color-surface-2)] text-[var(--color-brand-600)]">
+            <BarChart3 className="size-5" strokeWidth={1.75} />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-[var(--color-ink)]">Je resultaten worden gekoppeld</p>
+            <p className="mt-1 max-w-xl text-sm text-[var(--color-ink-muted)]">
+              Zodra je kanalen verbonden zijn, verschijnen hier automatisch je weergaven, bereik,
+              interacties, volgersgroei en je best presterende video&apos;s — per platform en gecombineerd.
+              Je hoeft nu niets te doen.
+            </p>
+          </div>
         </Card>
-      ) : null}
+      )}
     </div>
   );
 }

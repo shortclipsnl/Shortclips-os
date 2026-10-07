@@ -3,7 +3,7 @@ import { requirePortal } from "@/server/auth/context";
 import { Logo } from "@/components/logo";
 import { Avatar } from "@/components/ui";
 import { UserMenu } from "@/components/layout/user-menu";
-import { PortalNav } from "./portal-nav";
+import { PortalNav, PortalMobileNav } from "./portal-nav";
 
 /**
  * Het klantportaal staat bewust los van de interne app: eigen layout, eigen
@@ -34,12 +34,12 @@ export default async function PortalLayout({
         </div>
       </header>
       <div className="mx-auto flex max-w-[1240px] flex-col gap-6 px-5 py-6 lg:flex-row lg:gap-8 lg:py-8">
-        <aside className="lg:w-52 lg:shrink-0">
+        <aside className="hidden lg:block lg:w-52 lg:shrink-0">
           <div className="lg:sticky lg:top-[88px]">
             <PortalNav />
           </div>
         </aside>
-        <main className="min-w-0 flex-1">
+        <main className="min-w-0 flex-1 pb-24 lg:pb-0">
           {children}
           <footer className="mt-10 text-xs text-[var(--color-ink-faint)]">
             Deze omgeving is van jou. Vragen? Neem contact op met je vaste
@@ -47,6 +47,9 @@ export default async function PortalLayout({
           </footer>
         </main>
       </div>
+
+      {/* Mobiele bottom-tab-bar (buiten de flow, vast onderin) */}
+      <PortalMobileNav />
     </div>
   );
 }

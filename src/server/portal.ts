@@ -8,6 +8,7 @@ import {
   clientReports,
   clients,
   contentCalendar,
+  contracts,
   deliverables,
   files,
   productionDays,
@@ -39,6 +40,7 @@ export async function getPortalData(viewer: Viewer) {
       color: clients.color,
       logoUrl: clients.logoUrl,
       monthlyVideoQuota: clients.monthlyVideoQuota,
+      startedOn: clients.startedOn,
       coordinatorName: users.fullName,
       coordinatorEmail: users.email,
     })
@@ -273,6 +275,8 @@ export async function getPortalVideo(viewer: Viewer, videoId: string) {
       status: deliverables.status,
       frameUrl: deliverables.frameUrl,
       plannedPublishOn: deliverables.plannedPublishOn,
+      approvedAt: deliverables.approvedAt,
+      publishedAt: deliverables.publishedAt,
       clientId: deliverables.clientId,
     })
     .from(deliverables)
@@ -345,6 +349,7 @@ export async function getPortalVideos(viewer: Viewer) {
       title: deliverables.title,
       status: deliverables.status,
       frameUrl: deliverables.frameUrl,
+      frameAssetId: deliverables.frameAssetId,
       thumbnailUrl: deliverables.thumbnailUrl,
       publishedAt: deliverables.publishedAt,
       plannedPublishOn: deliverables.plannedPublishOn,
@@ -378,6 +383,48 @@ export async function getPortalFrameUrl(viewer: Viewer): Promise<string | null> 
   if (!link) return null;
   if (link.externalUrl) return link.externalUrl;
   return link.externalId ? `https://next.frame.io/project/${link.externalId}` : null;
+}
+
+/**
+ * De samenwerking in cijfers (§samenwerkingsoverzicht): wat is afgesproken en
+ * sinds wanneer. De lopende afspraken zelf staan op de Werkwijze-pagina.
+ */
+export async function getPortalCollaboration(viewer: Viewer): Promise<{
+  monthlyQuota: number;
+  startedOn: string | null;
+  contract: { startsOn: string; endsOn: string | null; noticePeriodDays: number } | null;
+}> {
+  const clientId = viewer.clientId;
+  if (!clientId) notFound();
+
+  const [client] = await db
+    .select({ quota: clients.monthlyVideoQuota, startedOn: clients.startedOn })
+    .from(clients)
+    .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
+    .limit(1);
+
+  const [contract] = await db
+    .select({
+      startsOn: contracts.startsOn,
+      endsOn: contracts.endsOn,
+      noticePeriodDays: contracts.noticePeriodDays,
+    })
+    .from(contracts)
+    .where(
+      and(
+        eq(contracts.clientId, clientId),
+        eq(contracts.status, "active"),
+        isNull(contracts.deletedAt),
+      ),
+    )
+    .orderBy(desc(contracts.startsOn))
+    .limit(1);
+
+  return {
+    monthlyQuota: client?.quota ?? 0,
+    startedOn: client?.startedOn ?? null,
+    contract: contract ?? null,
+  };
 }
 
 export type PortalContactPerson = {

@@ -32,8 +32,8 @@ export default async function PortalPlanningPage() {
 
       {items.length === 0 ? (
         <EmptyState
-          title="Nog niets ingepland"
-          description="Zodra we publicatiedata vastleggen, zie je hier je volledige planning."
+          title="Je contentplanning wordt voorbereid"
+          description="Zodra de publicatiedata voor je komende video's bekend zijn, verschijnen ze hier automatisch — met datum en platform. Je hoeft nu niets te doen."
           icon={<CalendarRange className="size-6" />}
         />
       ) : (

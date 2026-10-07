@@ -12,7 +12,7 @@ function waNumber(phone: string): string {
   return phone.replace(/[^\d]/g, "").replace(/^0/, "31");
 }
 
-function ContactCard({ person }: { person: PortalContactPerson }) {
+function ContactCard({ person, focus }: { person: PortalContactPerson; focus?: string }) {
   return (
     <Card>
       <div className="flex items-center gap-4">
@@ -22,6 +22,11 @@ function ContactCard({ person }: { person: PortalContactPerson }) {
           <p className="text-sm text-[var(--color-ink-muted)]">{person.role}</p>
         </div>
       </div>
+      {focus ? (
+        <p className="mt-3 rounded-lg bg-[var(--color-surface-2)] px-3 py-2 text-[13px] text-[var(--color-ink-muted)]">
+          {focus}
+        </p>
+      ) : null}
       <div className="mt-5 flex flex-wrap gap-2">
         {person.email ? (
           <a href={`mailto:${person.email}`} className={buttonClass({ variant: "primary", size: "sm" })}>
@@ -63,13 +68,16 @@ export default async function PortalContactPage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         {coordinator ? (
-          <ContactCard person={coordinator} />
+          <ContactCard person={coordinator} focus="Voor planning, scripts, feedback, resultaten en alles rond de samenwerking." />
         ) : (
           <ContactCard
             person={{ name: "ShortClips", role: "Je team", email: "info@shortclips.nl", phone: null }}
+            focus="Voor planning, scripts, feedback, resultaten en alles rond de samenwerking."
           />
         )}
-        {videographer ? <ContactCard person={videographer} /> : null}
+        {videographer ? (
+          <ContactCard person={videographer} focus="Voor vragen rondom een aankomende opnamedag en de opnames zelf." />
+        ) : null}
       </div>
 
       <p className="text-xs text-[var(--color-ink-muted)]">

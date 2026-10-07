@@ -4,6 +4,7 @@ import { ExternalLink, Play, Video as VideoIcon } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalFrameUrl, getPortalVideos } from "@/server/portal";
 import { buttonClass } from "@/components/ui";
+import { CoverImage } from "@/components/portal/cover-image";
 import { formatDate } from "@/lib/format";
 import { videoCover } from "../cover";
 
@@ -14,6 +15,7 @@ type Row = {
   id: string;
   title: string;
   status: string;
+  frameAssetId: string | null;
   thumbnailUrl: string | null;
   publishedAt: Date | null;
   statusChangedAt: Date | null;
@@ -39,16 +41,16 @@ function statusChip(status: string): { label: string; cls: string } {
 function Tile({ v }: { v: Row }) {
   const s = statusChip(v.status);
   const date = v.publishedAt ?? v.statusChangedAt;
+  // Echte Frame-omslag via de proxy (vers gehouden); de kleur-omslag blijft als
+  // zachte placeholder eronder staan tot de afbeelding is ingeladen.
+  const cover = v.frameAssetId ? `/api/frame/thumb/${v.id}` : null;
   return (
     <Link href={`/portal/videos/${v.id}`} className="group block">
       <article
-        className="sc-short transition-transform group-hover:-translate-y-0.5"
-        style={v.thumbnailUrl ? undefined : { background: videoCover(v.title) }}
+        className="sc-short transition-transform duration-200 group-hover:-translate-y-0.5"
+        style={{ background: videoCover(v.title) }}
       >
-        {v.thumbnailUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={v.thumbnailUrl} alt="" className="absolute inset-0 size-full object-cover" />
-        ) : null}
+        {cover ? <CoverImage src={cover} /> : null}
         <span className={`absolute left-2.5 top-2.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${s.cls}`}>{s.label}</span>
         <span className="sc-play"><Play className="size-[18px] translate-x-0.5" fill="currentColor" /></span>
         <span className="absolute inset-x-3 bottom-3">
