@@ -7,6 +7,7 @@ import { Avatar, Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { formatDateFull, periodLabel } from "@/lib/format";
 import { PLATFORM, PUBLICATION_STATUS } from "@/lib/statuses";
 import { cn } from "@/lib/cn";
+import { Planner } from "./planner";
 
 export const metadata: Metadata = { title: "Planning" };
 export const dynamic = "force-dynamic";
@@ -45,6 +46,18 @@ export default async function CalendarPage({
     }),
     listClients(viewer),
   ]);
+
+  const canWrite = viewer.permissions.has("calendar:write");
+  const asPlanner = params.weergave === "planner";
+  const plannerTo = new Date();
+  plannerTo.setDate(plannerTo.getDate() + 120);
+  const plannerItems = asPlanner
+    ? await listCalendar(viewer, {
+        from: new Date().toISOString().slice(0, 10),
+        to: plannerTo.toISOString().slice(0, 10),
+        clientSlug: params.klant,
+      })
+    : [];
 
   const byDay = new Map<string, CalendarItem[]>();
   for (const item of items) {
@@ -91,6 +104,19 @@ export default async function CalendarPage({
             >
               {asList ? "Kalender" : "Lijst"}
             </Link>
+            {canWrite ? (
+              <Link
+                href={withParam("weergave", asPlanner ? undefined : "planner")}
+                className={cn(
+                  "px-3 py-1.5 text-sm",
+                  asPlanner
+                    ? "rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] font-medium text-white"
+                    : "sc-card hover:bg-[var(--color-surface-sunken)]",
+                )}
+              >
+                Planner bewerken
+              </Link>
+            ) : null}
           </div>
         }
       />
@@ -114,7 +140,22 @@ export default async function CalendarPage({
         ))}
       </div>
 
-      {asList ? (
+      {asPlanner ? (
+        <Planner
+          items={plannerItems.map((i) => ({
+            id: i.id,
+            title: i.title,
+            scheduledOn: i.scheduledOn,
+            status: i.status,
+            platforms: (i.platforms as string[]) ?? [],
+            clientName: i.clientName,
+            clientColor: i.clientColor,
+          }))}
+          clients={clientList
+            .filter((c) => c.status === "active")
+            .map((c) => ({ id: c.id, name: c.name }))}
+        />
+      ) : asList ? (
         <Card padded={false}>
           {items.length === 0 ? (
             <EmptyState title="Niets gepland in deze periode" />
