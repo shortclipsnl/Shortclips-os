@@ -1,6 +1,6 @@
 import "server-only";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clients,
@@ -50,6 +50,84 @@ export async function listProductionDays(viewer: Viewer, when: "komend" | "verle
         : desc(productionDays.scheduledOn),
     )
     .limit(200);
+}
+
+/** Opnamestatistieken voor één maand (YYYY-MM): hoeveel gepland, afgerond, nog
+ *  te doen, en of alle opnames die al hadden moeten plaatsvinden ook echt zijn
+ *  uitgevoerd. Data komt uit production_days (gevoed door Google Agenda/Monday). */
+export async function getMonthShootStats(viewer: Viewer, month?: string) {
+  const m = month ?? new Date().toISOString().slice(0, 7);
+  const [y, mm] = m.split("-").map(Number);
+  const start = `${m}-01`;
+  const next = new Date(Date.UTC(y!, mm!, 1)).toISOString().slice(0, 10); // 1e van de volgende maand
+
+  const [row] = await db
+    .select({
+      planned: sql<number>`count(*) filter (where ${productionDays.status} <> 'cancelled')`,
+      completed: sql<number>`count(*) filter (where ${productionDays.status} = 'completed')`,
+      cancelled: sql<number>`count(*) filter (where ${productionDays.status} = 'cancelled')`,
+      todo: sql<number>`count(*) filter (where ${productionDays.status} not in ('completed','cancelled'))`,
+      pastNotDone: sql<number>`count(*) filter (where ${productionDays.status} not in ('completed','cancelled') and ${productionDays.scheduledOn} < ${today()})`,
+    })
+    .from(productionDays)
+    .where(
+      and(
+        isNull(productionDays.deletedAt),
+        gte(productionDays.scheduledOn, start),
+        lt(productionDays.scheduledOn, next),
+        scopeToClients(viewer, productionDays.clientId),
+      ),
+    );
+
+  const planned = Number(row?.planned ?? 0);
+  const pastNotDone = Number(row?.pastNotDone ?? 0);
+  return {
+    month: m,
+    planned,
+    completed: Number(row?.completed ?? 0),
+    cancelled: Number(row?.cancelled ?? 0),
+    todo: Number(row?.todo ?? 0),
+    pastNotDone,
+    allDone: pastNotDone === 0,
+  };
+}
+
+/** De eerstvolgende geplande opname per actieve klant. */
+export async function nextShootPerClient(viewer: Viewer) {
+  const rows = await db
+    .select({
+      clientId: productionDays.clientId,
+      clientName: clients.name,
+      clientSlug: clients.slug,
+      clientColor: clients.color,
+      scheduledOn: productionDays.scheduledOn,
+      status: productionDays.status,
+      videographerName: users.fullName,
+    })
+    .from(productionDays)
+    .innerJoin(clients, eq(clients.id, productionDays.clientId))
+    .leftJoin(users, eq(users.id, productionDays.videographerId))
+    .where(
+      and(
+        isNull(productionDays.deletedAt),
+        isNull(clients.deletedAt),
+        eq(clients.status, "active"),
+        gte(productionDays.scheduledOn, today()),
+        ne(productionDays.status, "cancelled"),
+        scopeToClients(viewer, productionDays.clientId),
+      ),
+    )
+    .orderBy(asc(productionDays.scheduledOn))
+    .limit(400);
+
+  const seen = new Set<string>();
+  const out: typeof rows = [];
+  for (const r of rows) {
+    if (seen.has(r.clientId)) continue;
+    seen.add(r.clientId);
+    out.push(r);
+  }
+  return out;
 }
 
 export async function getProductionDay(viewer: Viewer, id: string) {

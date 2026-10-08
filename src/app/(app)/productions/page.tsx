@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CalendarCheck, CheckCircle2 } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
-import { listProductionDays } from "@/server/productions";
-import { Avatar, Badge, Card, EmptyState, PageHeader } from "@/components/ui";
-import { daysUntil, formatDateFull, plural, relativeDays } from "@/lib/format";
+import { getMonthShootStats, listProductionDays, nextShootPerClient } from "@/server/productions";
+import { Avatar, Badge, Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
+import { daysUntil, formatDate, formatDateFull, plural, relativeDays } from "@/lib/format";
 import { PRODUCTION_STATUS } from "@/lib/statuses";
 
 export const metadata: Metadata = { title: "Opnames" };
@@ -18,17 +18,18 @@ export default async function ProductionsPage({
   const viewer = await requireInternal();
   const params = await searchParams;
   const when = params.periode === "verleden" ? "verleden" : "komend";
-  const rows = await listProductionDays(viewer, when);
+  const [rows, monthStats, nextPerClient] = await Promise.all([
+    listProductionDays(viewer, when),
+    getMonthShootStats(viewer),
+    nextShootPerClient(viewer),
+  ]);
+  const monthLabel = new Date(`${monthStats.month}-01`).toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
 
   return (
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
         title="Opnames"
-        description={
-          when === "komend"
-            ? `${rows.length} geplande opnamedagen`
-            : `${rows.length} afgeronde opnamedagen`
-        }
+        description="Gesynchroniseerd vanuit Google Agenda"
         actions={
           <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
             <Link
@@ -54,6 +55,56 @@ export default async function ProductionsPage({
           </div>
         }
       />
+
+      {/* Maandoverzicht: gepland / afgerond / nog te doen deze maand. */}
+      <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Stat label={`Gepland in ${monthLabel}`} value={monthStats.planned} />
+        <Stat label="Afgerond" value={monthStats.completed} tone={monthStats.completed > 0 ? "good" : undefined} />
+        <Stat label="Nog te doen" value={monthStats.todo} tone={monthStats.todo > 0 ? "warn" : undefined} />
+      </div>
+
+      <Card
+        className={`mb-5 ${monthStats.allDone ? "border-[var(--color-good)]/30 bg-[var(--color-good-soft)]/40" : "border-[var(--color-bad)]/25 bg-[var(--color-bad-soft)]/40"}`}
+      >
+        <div className="flex items-start gap-3 text-sm">
+          {monthStats.allDone ? (
+            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[var(--color-good)]" strokeWidth={1.75} />
+          ) : (
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-[var(--color-bad)]" strokeWidth={1.75} />
+          )}
+          <p>
+            {monthStats.allDone
+              ? `Alle opnames die deze maand al gepland stonden, zijn uitgevoerd.`
+              : `${monthStats.pastNotDone} opname${monthStats.pastNotDone === 1 ? "" : "s"} die deze maand had${monthStats.pastNotDone === 1 ? "" : "den"} moeten plaatsvinden, ${monthStats.pastNotDone === 1 ? "is" : "zijn"} nog niet afgerond.`}
+          </p>
+        </div>
+      </Card>
+
+      {nextPerClient.length > 0 ? (
+        <Card className="mb-5" padded={false}>
+          <CardHeader title="Volgende opname per klant" className="px-4 pt-4" />
+          <ul className="mt-2 divide-y divide-[var(--color-line)]">
+            {nextPerClient.map((n) => (
+              <li key={n.clientId}>
+                <Link
+                  href={`/clients/${n.clientSlug}?tab=opnames`}
+                  className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-2)]"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Avatar name={n.clientName} color={n.clientColor} size={24} />
+                    <span className="font-medium">{n.clientName}</span>
+                  </span>
+                  <span className="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]">
+                    <CalendarCheck className="size-4 text-[var(--color-ink-faint)]" />
+                    {formatDate(n.scheduledOn)}
+                    {n.videographerName ? ` · ${n.videographerName}` : ""}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       {rows.length === 0 ? (
         <Card>
