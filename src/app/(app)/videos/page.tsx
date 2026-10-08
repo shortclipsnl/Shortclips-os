@@ -6,10 +6,9 @@ import { requireInternal } from "@/server/auth/context";
 import { getVideoHighlights, listVideos } from "@/server/videos";
 import { Avatar, Badge, Card, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import {
-  daysSince,
   formatDate,
 } from "@/lib/format";
-import { VIDEO_STATUS, stageOverdue, type VideoStage } from "@/lib/statuses";
+import { VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 import { ViewSwitch } from "./view-switch";
 import { Kanban } from "./kanban";
 
@@ -157,18 +156,28 @@ export default async function VideosPage({
               <>
                 <th className="sc-th">Video</th>
                 <th className="sc-th">Klant</th>
-                <th className="sc-th">Status</th>
                 <th className="sc-th">Editor</th>
-                <th className="sc-th text-right">In stap</th>
+                <th className="sc-th">Fase</th>
                 <th className="sc-th">Deadline</th>
-                <th className="sc-th text-right">Feedback</th>
+                <th className="sc-th">Status</th>
               </>
             }
           >
             {rows.map((v) => {
-              const days = daysSince(v.statusChangedAt);
-              const late = stageOverdue(v.status, days);
-              const overdue = v.dueOn && v.dueOn < new Date().toISOString().slice(0, 10);
+              const today = new Date().toISOString().slice(0, 10);
+              const soon = new Date();
+              soon.setDate(soon.getDate() + 3);
+              const soonStr = soon.toISOString().slice(0, 10);
+              const overdue = v.dueOn && v.dueOn < today;
+              const nearing = v.dueOn && v.dueOn >= today && v.dueOn <= soonStr;
+              const waiting = v.status === "client_review" || v.status === "client_revision";
+              const health = overdue
+                ? { label: "Te laat", tone: "bad" as const }
+                : waiting
+                  ? { label: "Wacht op feedback", tone: "neutral" as const }
+                  : nearing
+                    ? { label: "Deadline nadert", tone: "warn" as const }
+                    : { label: "Op schema", tone: "good" as const };
               return (
                 <tr key={v.id} className="sc-row-link">
                   <td className="sc-td">
@@ -182,24 +191,13 @@ export default async function VideosPage({
                       {v.clientName}
                     </Link>
                   </td>
-                  <td className="sc-td">
-                    <Badge tone={VIDEO_STATUS[v.status as VideoStage]?.tone ?? "neutral"}>
-                      {VIDEO_STATUS[v.status as VideoStage]?.label ?? v.status}
-                    </Badge>
-                  </td>
                   <td className="sc-td text-[var(--color-ink-muted)]">{v.editorName ?? "—"}</td>
-                  <td className={`sc-td text-right tabular-nums ${late ? "font-semibold text-[var(--color-warn)]" : "text-[var(--color-ink-muted)]"}`}>
-                    {days} d
-                  </td>
+                  <td className="sc-td text-[var(--color-ink-muted)]">{VIDEO_STATUS[v.status as VideoStage]?.short ?? v.status}</td>
                   <td className={`sc-td ${overdue ? "font-medium text-[var(--color-bad)]" : "text-[var(--color-ink-muted)]"}`}>
                     {v.dueOn ? formatDate(v.dueOn) : "—"}
                   </td>
-                  <td className="sc-td text-right">
-                    {Number(v.openComments) > 0 ? (
-                      <Badge tone="warn">{Number(v.openComments)}</Badge>
-                    ) : (
-                      <span className="text-[var(--color-ink-faint)]">–</span>
-                    )}
+                  <td className="sc-td">
+                    <Badge tone={health.tone}>{health.label}</Badge>
                   </td>
                 </tr>
               );
