@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientContacts, clients } from "@/db/schema";
+import { clientContacts, clientIntegrations, clients } from "@/db/schema";
 import {
   assertClientAccess,
   ForbiddenError,
@@ -284,6 +284,47 @@ export async function setClientStatus(slug: string, status: ClientStatus): Promi
     revalidatePath("/clients");
     revalidatePath(`/clients/${slug}`);
     return { ok: true, slug };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/** Een koppeling van een klant aan- of uitzetten (bijv. een foute koppeling
+ *  tijdelijk loskoppelen). De externe ID's zelf blijven via de import/matching
+ *  lopen; hier regel je alleen of de koppeling actief meedraait. */
+export async function toggleClientIntegration(
+  integrationId: string,
+  isActive: boolean,
+  slug: string,
+): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("clients:write");
+    const [row] = await db
+      .select({ id: clientIntegrations.id, clientId: clientIntegrations.clientId, provider: clientIntegrations.provider })
+      .from(clientIntegrations)
+      .where(eq(clientIntegrations.id, integrationId))
+      .limit(1);
+    if (!row) return { ok: false, message: "Koppeling niet gevonden." };
+    assertClientAccess(viewer, row.clientId);
+
+    await db
+      .update(clientIntegrations)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(clientIntegrations.id, integrationId));
+
+    await auditLog({
+      viewer,
+      action: "client.integration_toggled",
+      entityType: "client_integration",
+      entityId: integrationId,
+      clientId: row.clientId,
+      changes: { provider: row.provider, isActive },
+    });
+
+    revalidatePath(`/clients/${slug}/edit`);
+    revalidatePath(`/clients/${slug}`);
+    return { ok: true };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;

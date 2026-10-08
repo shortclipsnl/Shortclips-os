@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireInternal } from "@/server/auth/context";
 import { getClientForEdit, listAssignableUsers } from "@/server/clients";
-import { Card, PageHeader } from "@/components/ui";
+import { Card, CardHeader, PageHeader } from "@/components/ui";
 import { ClientForm } from "../../_form";
+import { IntegrationToggles } from "../../_integrations";
 
 export const metadata: Metadata = { title: "Klant bewerken" };
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function EditClientPage({
   const viewer = await requireInternal();
   if (!viewer.permissions.has("clients:write")) redirect(`/clients/${slug}`);
 
-  const [{ client, contact }, users] = await Promise.all([
+  const [{ client, contact, integrations }, users] = await Promise.all([
     getClientForEdit(viewer, slug),
     listAssignableUsers(),
   ]);
@@ -54,6 +55,15 @@ export default async function EditClientPage({
           canDelete={viewer.permissions.has("clients:delete")}
         />
       </Card>
+
+      <div className="mt-5">
+        <Card>
+          <CardHeader title="Koppelingen" subtitle="Bronnen die aan deze klant hangen (Monday, Frame.io, agenda, …)." />
+          <div className="mt-3">
+            <IntegrationToggles slug={slug} integrations={integrations} />
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }

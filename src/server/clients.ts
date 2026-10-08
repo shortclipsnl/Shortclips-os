@@ -302,6 +302,31 @@ export async function getClientHub(viewer: Viewer, slug: string) {
 
 export type ClientHub = Awaited<ReturnType<typeof getClientHub>>;
 
+/** Compacte lijst voor de Klantenbeheer-console: status, verantwoordelijke,
+ *  shorts/maand en of er een (echte) portaallogin is. */
+export async function listClientsAdmin(viewer: Viewer) {
+  return db
+    .select({
+      id: clients.id,
+      slug: clients.slug,
+      name: clients.name,
+      color: clients.color,
+      status: clients.status,
+      monthlyVideoQuota: clients.monthlyVideoQuota,
+      coordinatorName: users.fullName,
+      portalEmail: sql<string | null>`(
+        select u.email from users u
+        where u.client_id = clients.id and u.primary_role = 'client'
+          and u.status = 'active' and u.deleted_at is null
+        order by u.created_at asc limit 1
+      )`,
+    })
+    .from(clients)
+    .leftJoin(users, eq(users.id, clients.coordinatorId))
+    .where(and(isNull(clients.deletedAt), scopeToClients(viewer, clients.id)))
+    .orderBy(asc(clients.name));
+}
+
 /** Interne teamleden die als coördinator of videograaf toewijsbaar zijn. */
 export async function listAssignableUsers() {
   return db
@@ -350,5 +375,17 @@ export async function getClientForEdit(viewer: Viewer, slug: string) {
     .orderBy(desc(clientContacts.isPrimary))
     .limit(1);
 
-  return { client, contact: contact ?? null };
+  const integrations = await db
+    .select({
+      id: clientIntegrations.id,
+      provider: clientIntegrations.provider,
+      externalName: clientIntegrations.externalName,
+      externalUrl: clientIntegrations.externalUrl,
+      isActive: clientIntegrations.isActive,
+    })
+    .from(clientIntegrations)
+    .where(eq(clientIntegrations.clientId, client.id))
+    .orderBy(asc(clientIntegrations.provider));
+
+  return { client, contact: contact ?? null, integrations };
 }
