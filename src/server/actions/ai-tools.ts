@@ -7,6 +7,7 @@ import { aiKnowledge, aiOutputs, clientAiProfiles, clients } from "@/db/schema";
 import { assertClientAccess, ForbiddenError, requirePermission } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { runJsonPrompt, type AiDoc, type AiImage } from "@/server/ai/client";
+import { extractDocxText } from "@/server/ai/docx";
 import {
   captionProfileToText,
   centralKnowledgeText,
@@ -30,6 +31,16 @@ async function clientName(clientId: string): Promise<string> {
 
 function docFrom(pdfBase64?: string | null): AiDoc[] {
   return pdfBase64 ? [{ base64: pdfBase64, mediaType: "application/pdf" }] : [];
+}
+
+/** Voegt tekst uit een geüpload Word-bestand toe aan de geplakte scripttekst. */
+async function mergeDocx(scriptText?: string, docxBase64?: string): Promise<string> {
+  let text = scriptText ?? "";
+  if (docxBase64) {
+    const extracted = await extractDocxText(docxBase64);
+    if (extracted) text = `${text}\n\n${extracted}`.trim();
+  }
+  return text;
 }
 
 async function saveOutput(params: {
@@ -65,12 +76,14 @@ export async function generateCaptions(input: {
   clientId: string;
   scriptText?: string;
   pdfBase64?: string;
+  docxBase64?: string;
 }): Promise<AiActionResult<ShortCaption[]>> {
   try {
     const viewer = await requirePermission("ai:read");
     assertClientAccess(viewer, input.clientId);
-    if (!input.scriptText?.trim() && !input.pdfBase64) {
-      return { ok: false, message: "Plak scripttekst of upload een PDF." };
+    const scriptText = await mergeDocx(input.scriptText, input.docxBase64);
+    if (!scriptText.trim() && !input.pdfBase64) {
+      return { ok: false, message: "Plak scripttekst of upload een PDF/Word-bestand." };
     }
 
     const name = await clientName(input.clientId);
@@ -108,7 +121,7 @@ Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder omliggende teks
   }
 ]
 
-${input.scriptText?.trim() ? `De scripts:\n\n${input.scriptText.trim()}` : "De scripts staan in het bijgevoegde document."}`;
+${scriptText.trim() ? `De scripts:\n\n${scriptText.trim()}` : "De scripts staan in het bijgevoegde document."}`;
 
     const res = await runJsonPrompt<ShortCaption[]>({
       system,
@@ -126,12 +139,62 @@ ${input.scriptText?.trim() ? `De scripts:\n\n${input.scriptText.trim()}` : "De s
       clientId: input.clientId,
       tool: "caption",
       title: `${data.length} captions`,
-      inputSummary: (input.scriptText ?? "PDF-upload").slice(0, 200),
+      inputSummary: (scriptText || "PDF-upload").slice(0, 200),
       output: data,
       userId: viewer.id,
     });
     await auditLog({ viewer, action: "ai.captions_generated", entityType: "client", entityId: input.clientId, clientId: input.clientId, changes: { shorts: data.length } });
     return { ok: true, data };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/** Genereert de captions voor één specifieke short opnieuw (verse variatie). */
+export async function regenerateOneCaption(input: {
+  clientId: string;
+  shortTitle: string;
+  hook: string;
+  scriptText?: string;
+  pdfBase64?: string;
+}): Promise<AiActionResult<ShortCaption>> {
+  try {
+    const viewer = await requirePermission("ai:read");
+    assertClientAccess(viewer, input.clientId);
+
+    const name = await clientName(input.clientId);
+    const profile = await getClientAiProfile(input.clientId);
+    const caption = captionProfileToText((profile?.captionProfile as CaptionProfile) ?? null);
+
+    const system = `${SHORTCLIPS_IDENTITY}
+
+Je maakt captions voor klant "${name}". Houd je aan dit captionprofiel:
+${caption}
+
+Baseer de caption op de inhoud van het script en de hook. Instagram mag wat meer toelichting bevatten; TikTok is korter en directer. Gebruik passende emoji's en relevante hashtags, geen generieke. Verzin geen contactgegevens.`;
+
+    const user = `Genereer UITSLUITEND voor de volgende short nieuwe, frisse captions (andere invalshoek dan voorheen) voor Instagram en TikTok.
+
+Short: "${input.shortTitle}"
+Hook: "${input.hook}"
+${input.scriptText?.trim() ? `\nContext (volledige scripts):\n${input.scriptText.trim()}` : input.pdfBase64 ? "\nDe scripts staan in het bijgevoegde document." : ""}
+
+Geef UITSLUITEND geldige JSON terug in dit formaat:
+{
+  "shortTitle": "${input.shortTitle}",
+  "hook": "${input.hook}",
+  "instagram": { "caption": "...", "hashtags": ["#.."] },
+  "tiktok": { "caption": "...", "hashtags": ["#.."] }
+}`;
+
+    const res = await runJsonPrompt<ShortCaption>({ system, user, documents: docFrom(input.pdfBase64), maxTokens: 2000 });
+    if (!res.ok) {
+      return res.reason === "no_provider"
+        ? { ok: false, reason: "no_provider", message: "Er is nog geen AI-sleutel ingesteld." }
+        : { ok: false, message: res.error ?? "Genereren mislukt." };
+    }
+    return { ok: true, data: res.data };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
@@ -169,6 +232,7 @@ export async function generateBriefing(input: {
   clientId: string;
   scriptText?: string;
   pdfBase64?: string;
+  docxBase64?: string;
   projectName?: string;
   editorName?: string;
   deadline?: string;
@@ -176,8 +240,9 @@ export async function generateBriefing(input: {
   try {
     const viewer = await requirePermission("ai:read");
     assertClientAccess(viewer, input.clientId);
-    if (!input.scriptText?.trim() && !input.pdfBase64) {
-      return { ok: false, message: "Plak scripttekst of upload een PDF." };
+    const scriptText = await mergeDocx(input.scriptText, input.docxBase64);
+    if (!scriptText.trim() && !input.pdfBase64) {
+      return { ok: false, message: "Plak scripttekst of upload een PDF/Word-bestand." };
     }
 
     const name = await clientName(input.clientId);
@@ -228,7 +293,7 @@ Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder omliggende teks
   ]
 }
 
-${input.scriptText?.trim() ? `De scripts:\n\n${input.scriptText.trim()}` : "De scripts staan in het bijgevoegde document."}`;
+${scriptText.trim() ? `De scripts:\n\n${scriptText.trim()}` : "De scripts staan in het bijgevoegde document."}`;
 
     const res = await runJsonPrompt<EditorBriefing>({
       system,
@@ -245,7 +310,7 @@ ${input.scriptText?.trim() ? `De scripts:\n\n${input.scriptText.trim()}` : "De s
       clientId: input.clientId,
       tool: "briefing",
       title: input.projectName?.trim() || `Briefing ${res.data.shorts?.length ?? 0} shorts`,
-      inputSummary: (input.scriptText ?? "PDF-upload").slice(0, 200),
+      inputSummary: (scriptText || "PDF-upload").slice(0, 200),
       output: res.data,
       userId: viewer.id,
     });

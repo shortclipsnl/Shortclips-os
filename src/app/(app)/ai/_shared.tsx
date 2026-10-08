@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, History } from "lucide-react";
 
 /** Leest een bestand als base64 (zonder de data:-prefix). */
 export function fileToBase64(file: File): Promise<string> {
@@ -36,6 +36,53 @@ export function CopyButton({ text, label = "Kopiëren" }: { text: string; label?
       {done ? <Check className="size-3.5 text-[var(--color-good)]" /> : <Copy className="size-3.5" />}
       {done ? "Gekopieerd" : label}
     </button>
+  );
+}
+
+export type HistoryEntry<T> = {
+  id: string;
+  title: string | null;
+  clientName: string;
+  createdAt: string;
+  output: T;
+};
+
+export function HistoryPanel<T>({ items, onLoad }: { items: HistoryEntry<T>[]; onLoad: (output: T) => void }) {
+  const [open, setOpen] = useState(false);
+  if (items.length === 0) return null;
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-medium"
+      >
+        <History className="size-4 text-[var(--color-ink-faint)]" />
+        Eerder gegenereerd ({items.length})
+        <span className="ml-auto text-xs text-[var(--color-ink-faint)]">{open ? "verbergen" : "tonen"}</span>
+      </button>
+      {open ? (
+        <ul className="divide-y divide-[var(--color-line)] border-t border-[var(--color-line)]">
+          {items.map((it) => (
+            <li key={it.id}>
+              <button
+                type="button"
+                onClick={() => onLoad(it.output)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm hover:bg-[var(--color-surface-2)]"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{it.title ?? "Zonder titel"}</span>
+                  <span className="block truncate text-xs text-[var(--color-ink-muted)]">{it.clientName}</span>
+                </span>
+                <span className="shrink-0 text-xs text-[var(--color-ink-faint)]">
+                  {new Date(it.createdAt).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 

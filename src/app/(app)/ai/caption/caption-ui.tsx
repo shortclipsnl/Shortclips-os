@@ -2,25 +2,41 @@
 
 import { useState, useTransition } from "react";
 import { Loader2, RefreshCw, Sparkles, Upload } from "lucide-react";
-import { generateCaptions, type ShortCaption } from "@/server/actions/ai-tools";
+import { generateCaptions, regenerateOneCaption, type ShortCaption } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote } from "@/components/ui";
-import { CopyButton, NoProviderNote, fileToBase64 } from "../_shared";
+import { CopyButton, HistoryPanel, NoProviderNote, fileToBase64, type HistoryEntry } from "../_shared";
 
 type ClientOption = { id: string; name: string };
 
-export function CaptionMaker({ clients, aiReady }: { clients: ClientOption[]; aiReady: boolean }) {
+export function CaptionMaker({
+  clients,
+  aiReady,
+  recent,
+}: {
+  clients: ClientOption[];
+  aiReady: boolean;
+  recent: HistoryEntry<ShortCaption[]>[];
+}) {
   const [clientId, setClientId] = useState("");
   const [scriptText, setScriptText] = useState("");
-  const [pdfName, setPdfName] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  const [docxBase64, setDocxBase64] = useState<string | null>(null);
   const [results, setResults] = useState<ShortCaption[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  async function onPdf(file: File | undefined) {
+  async function onFile(file: File | undefined) {
     if (!file) return;
-    setPdfName(file.name);
-    setPdfBase64(await fileToBase64(file));
+    setFileName(file.name);
+    const b64 = await fileToBase64(file);
+    if (file.name.toLowerCase().endsWith(".docx")) {
+      setDocxBase64(b64);
+      setPdfBase64(null);
+    } else {
+      setPdfBase64(b64);
+      setDocxBase64(null);
+    }
   }
 
   function run() {
@@ -30,18 +46,16 @@ export function CaptionMaker({ clients, aiReady }: { clients: ClientOption[]; ai
     }
     setErr(null);
     start(async () => {
-      const res = await generateCaptions({ clientId, scriptText, pdfBase64: pdfBase64 ?? undefined });
-      if (res.ok) {
-        setResults(res.data);
-      } else {
-        setErr(res.message);
-      }
+      const res = await generateCaptions({ clientId, scriptText, pdfBase64: pdfBase64 ?? undefined, docxBase64: docxBase64 ?? undefined });
+      if (res.ok) setResults(res.data);
+      else setErr(res.message);
     });
   }
 
   return (
     <div className="space-y-5">
       {!aiReady ? <NoProviderNote /> : null}
+      <HistoryPanel items={recent} onLoad={(o) => setResults(o)} />
 
       <Card>
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
@@ -53,11 +67,11 @@ export function CaptionMaker({ clients, aiReady }: { clients: ClientOption[]; ai
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-            <label className="sc-label mt-4">Script-PDF (optioneel)</label>
+            <label className="sc-label mt-4">Script-bestand (PDF of Word)</label>
             <label className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] px-3 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]">
               <Upload className="size-4" />
-              {pdfName ?? "PDF kiezen"}
-              <input type="file" accept="application/pdf" className="hidden" onChange={(e) => onPdf(e.target.files?.[0])} />
+              {fileName ?? "Bestand kiezen"}
+              <input type="file" accept=".pdf,.docx,application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
             </label>
           </div>
           <div>
@@ -79,7 +93,7 @@ export function CaptionMaker({ clients, aiReady }: { clients: ClientOption[]; ai
           {results ? (
             <Button variant="secondary" onClick={run} disabled={pending}>
               <RefreshCw className="size-4" />
-              Opnieuw
+              Alles opnieuw
             </Button>
           ) : null}
         </div>
@@ -93,7 +107,15 @@ export function CaptionMaker({ clients, aiReady }: { clients: ClientOption[]; ai
             <CopyButton label="Alles kopiëren" text={results.map((r, i) => exportShort(r, i)).join("\n\n———\n\n")} />
           </div>
           {results.map((short, i) => (
-            <ShortBlock key={i} index={i} short={short} onChange={(next) => setResults((cur) => cur!.map((s, j) => (j === i ? next : s)))} />
+            <ShortBlock
+              key={i}
+              index={i}
+              short={short}
+              clientId={clientId}
+              scriptText={scriptText}
+              pdfBase64={pdfBase64}
+              onChange={(next) => setResults((cur) => cur!.map((s, j) => (j === i ? next : s)))}
+            />
           ))}
         </div>
       ) : null}
@@ -107,13 +129,48 @@ function exportShort(s: ShortCaption, i: number): string {
   return `SHORT ${i + 1}: ${s.shortTitle}\n\n[Instagram]\n${ig}\n\n[TikTok]\n${tt}`;
 }
 
-function ShortBlock({ index, short, onChange }: { index: number; short: ShortCaption; onChange: (s: ShortCaption) => void }) {
+function ShortBlock({
+  index,
+  short,
+  clientId,
+  scriptText,
+  pdfBase64,
+  onChange,
+}: {
+  index: number;
+  short: ShortCaption;
+  clientId: string;
+  scriptText: string;
+  pdfBase64: string | null;
+  onChange: (s: ShortCaption) => void;
+}) {
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+
+  function regen() {
+    start(async () => {
+      const res = await regenerateOneCaption({
+        clientId,
+        shortTitle: short.shortTitle,
+        hook: short.hook,
+        scriptText,
+        pdfBase64: pdfBase64 ?? undefined,
+      });
+      if (res.ok) onChange(res.data);
+      else setErr(res.message);
+    });
+  }
+
   return (
     <Card>
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">
           Short {index + 1}: <span className="font-normal text-[var(--color-ink-muted)]">{short.shortTitle}</span>
         </h3>
+        <Button size="sm" variant="ghost" onClick={regen} disabled={pending}>
+          {pending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+          Opnieuw
+        </Button>
       </div>
       {short.hook ? <p className="mb-3 text-xs text-[var(--color-ink-faint)]">Hook: {short.hook}</p> : null}
       <div className="grid gap-4 md:grid-cols-2">
@@ -130,6 +187,7 @@ function ShortBlock({ index, short, onChange }: { index: number; short: ShortCap
           onCaption={(v) => onChange({ ...short, tiktok: { ...short.tiktok, caption: v } })}
         />
       </div>
+      {err ? <div className="mt-2"><ErrorNote>{err}</ErrorNote></div> : null}
     </Card>
   );
 }
@@ -153,9 +211,7 @@ function Platform({
         <CopyButton text={full} />
       </div>
       <textarea className="sc-input resize-y text-sm" rows={5} value={caption} onChange={(e) => onCaption(e.target.value)} />
-      {hashtags.length ? (
-        <p className="mt-2 text-xs text-[var(--color-brand-600)]">{hashtags.join(" ")}</p>
-      ) : null}
+      {hashtags.length ? <p className="mt-2 text-xs text-[var(--color-brand-600)]">{hashtags.join(" ")}</p> : null}
     </div>
   );
 }

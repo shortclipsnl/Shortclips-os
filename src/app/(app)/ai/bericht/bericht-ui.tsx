@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { AlertTriangle, Loader2, Sparkles, Upload, X } from "lucide-react";
 import { generateReply, type ReplyDraft } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote, InfoNote } from "@/components/ui";
-import { CopyButton, NoProviderNote, fileToBase64 } from "../_shared";
+import { CopyButton, HistoryPanel, NoProviderNote, fileToBase64, type HistoryEntry } from "../_shared";
 
 type ClientOption = { id: string; name: string };
 type Img = { name: string; base64: string; mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif" };
@@ -17,7 +17,15 @@ const TONES = [
   { value: "uitgebreider", label: "Uitgebreider" },
 ] as const;
 
-export function BerichtAssistent({ clients, aiReady }: { clients: ClientOption[]; aiReady: boolean }) {
+export function BerichtAssistent({
+  clients,
+  aiReady,
+  recent,
+}: {
+  clients: ClientOption[];
+  aiReady: boolean;
+  recent: HistoryEntry<ReplyDraft>[];
+}) {
   const [clientId, setClientId] = useState("");
   const [messageText, setMessageText] = useState("");
   const [channelHint, setChannelHint] = useState<"auto" | "whatsapp" | "email">("auto");
@@ -67,6 +75,7 @@ export function BerichtAssistent({ clients, aiReady }: { clients: ClientOption[]
   return (
     <div className="space-y-5">
       {!aiReady ? <NoProviderNote /> : null}
+      <HistoryPanel items={recent} onLoad={(o) => { setResult(o); setDraft(o.reply); }} />
 
       <Card>
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">

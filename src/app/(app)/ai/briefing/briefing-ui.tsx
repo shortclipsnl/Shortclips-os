@@ -4,26 +4,42 @@ import { useState, useTransition } from "react";
 import { Loader2, Sparkles, Upload } from "lucide-react";
 import { generateBriefing, type EditorBriefing } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote } from "@/components/ui";
-import { CopyButton, NoProviderNote, fileToBase64 } from "../_shared";
+import { CopyButton, HistoryPanel, NoProviderNote, fileToBase64, type HistoryEntry } from "../_shared";
 
 type ClientOption = { id: string; name: string };
 
-export function BriefingMaker({ clients, aiReady }: { clients: ClientOption[]; aiReady: boolean }) {
+export function BriefingMaker({
+  clients,
+  aiReady,
+  recent,
+}: {
+  clients: ClientOption[];
+  aiReady: boolean;
+  recent: HistoryEntry<EditorBriefing>[];
+}) {
   const [clientId, setClientId] = useState("");
   const [projectName, setProjectName] = useState("");
   const [editorName, setEditorName] = useState("");
   const [deadline, setDeadline] = useState("");
   const [scriptText, setScriptText] = useState("");
-  const [pdfName, setPdfName] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  const [docxBase64, setDocxBase64] = useState<string | null>(null);
   const [result, setResult] = useState<EditorBriefing | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  async function onPdf(file: File | undefined) {
+  async function onFile(file: File | undefined) {
     if (!file) return;
-    setPdfName(file.name);
-    setPdfBase64(await fileToBase64(file));
+    setFileName(file.name);
+    const b64 = await fileToBase64(file);
+    if (file.name.toLowerCase().endsWith(".docx")) {
+      setDocxBase64(b64);
+      setPdfBase64(null);
+    } else {
+      setPdfBase64(b64);
+      setDocxBase64(null);
+    }
   }
 
   function run() {
@@ -33,7 +49,7 @@ export function BriefingMaker({ clients, aiReady }: { clients: ClientOption[]; a
     }
     setErr(null);
     start(async () => {
-      const res = await generateBriefing({ clientId, projectName, editorName, deadline, scriptText, pdfBase64: pdfBase64 ?? undefined });
+      const res = await generateBriefing({ clientId, projectName, editorName, deadline, scriptText, pdfBase64: pdfBase64 ?? undefined, docxBase64: docxBase64 ?? undefined });
       if (res.ok) setResult(res.data);
       else setErr(res.message);
     });
@@ -42,6 +58,7 @@ export function BriefingMaker({ clients, aiReady }: { clients: ClientOption[]; a
   return (
     <div className="space-y-5">
       {!aiReady ? <NoProviderNote /> : null}
+      <HistoryPanel items={recent} onLoad={(o) => setResult(o)} />
 
       <Card>
         <div className="grid gap-4 md:grid-cols-4">
@@ -74,11 +91,11 @@ export function BriefingMaker({ clients, aiReady }: { clients: ClientOption[]; a
             <textarea className="sc-input resize-y font-mono text-xs" rows={10} placeholder="Plak de scripts van de opnamesessie." value={scriptText} onChange={(e) => setScriptText(e.target.value)} />
           </div>
           <div>
-            <label className="sc-label">of Script-PDF</label>
+            <label className="sc-label">of Script-bestand (PDF/Word)</label>
             <label className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] px-3 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]">
               <Upload className="size-4" />
-              {pdfName ?? "PDF kiezen"}
-              <input type="file" accept="application/pdf" className="hidden" onChange={(e) => onPdf(e.target.files?.[0])} />
+              {fileName ?? "Bestand kiezen"}
+              <input type="file" accept=".pdf,.docx,application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
             </label>
           </div>
         </div>
