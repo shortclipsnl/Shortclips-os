@@ -99,6 +99,21 @@ export default async function TeamPage() {
   const stats = ((editorStats as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
     (editorStats as unknown as Array<Record<string, unknown>>)) as Array<Record<string, unknown>>;
 
+  // Operationele kern bovenaan, daarna de overige specialisten.
+  const CORE = ["jarno", "milou", "jiska", "rutger"];
+  const firstName = (n: string) => n.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+  const isCore = (n: string) => CORE.includes(firstName(n));
+  const sortedPeople = [...people].sort((a, b) => {
+    const ia = CORE.indexOf(firstName(a.fullName));
+    const ib = CORE.indexOf(firstName(b.fullName));
+    if (ia !== -1 || ib !== -1) {
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    }
+    return a.fullName.localeCompare(b.fullName);
+  });
+
   return (
     <div className="mx-auto max-w-[1300px]">
       <PageHeader
@@ -125,7 +140,7 @@ export default async function TeamPage() {
             </>
           }
         >
-          {people.map((p) => {
+          {sortedPeople.map((p) => {
             const open = Number(p.openVideos);
             const capacity = p.weeklyVideoCapacity;
             const load = capacity > 0 ? (open / capacity) * 100 : 0;
@@ -138,7 +153,8 @@ export default async function TeamPage() {
                     <span>
                       <span className="flex items-center gap-2 font-medium">
                         {p.fullName}
-                        {p.status !== "active" ? <Badge tone="neutral">Gedeactiveerd</Badge> : null}
+                        {isCore(p.fullName) ? <Badge tone="info">Kern</Badge> : null}
+                        {p.status === "suspended" ? <Badge tone="neutral">Gedeactiveerd</Badge> : null}
                       </span>
                       <span className="block text-xs text-[var(--color-ink-muted)]">
                         {p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}
