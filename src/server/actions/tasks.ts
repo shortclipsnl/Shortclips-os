@@ -78,7 +78,82 @@ export async function createTask(input: z.input<typeof createSchema>): Promise<A
     });
 
     revalidatePath("/tasks");
+    revalidatePath("/dashboard");
     return { ok: true, message: "Taak aangemaakt." };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+const updateSchema = z.object({
+  title: z.string().trim().min(1).max(240).optional(),
+  assigneeId: z.string().uuid().nullable().optional(),
+  priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
+  dueOn: z.string().nullable().optional(),
+});
+
+export async function updateTask(
+  taskId: string,
+  input: z.input<typeof updateSchema>,
+): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("tasks:write");
+    const parsed = updateSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
+
+    const [task] = await db
+      .select({ id: tasks.id, clientId: tasks.clientId })
+      .from(tasks)
+      .where(eq(tasks.id, taskId))
+      .limit(1);
+    if (!task) return { ok: false, message: "Taak niet gevonden." };
+    if (task.clientId) assertClientAccess(viewer, task.clientId);
+
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (parsed.data.title !== undefined) patch.title = parsed.data.title;
+    if (parsed.data.assigneeId !== undefined) patch.assigneeId = parsed.data.assigneeId;
+    if (parsed.data.priority !== undefined) patch.priority = parsed.data.priority;
+    if (parsed.data.dueOn !== undefined) patch.dueOn = parsed.data.dueOn || null;
+
+    await db.update(tasks).set(patch).where(eq(tasks.id, taskId));
+
+    await auditLog({
+      viewer,
+      action: "task.updated",
+      entityType: "task",
+      entityId: taskId,
+      clientId: task.clientId,
+      changes: parsed.data as Record<string, unknown>,
+    });
+
+    revalidatePath("/tasks");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+export async function deleteTask(taskId: string): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("tasks:write");
+    const [task] = await db
+      .select({ id: tasks.id, clientId: tasks.clientId })
+      .from(tasks)
+      .where(eq(tasks.id, taskId))
+      .limit(1);
+    if (!task) return { ok: false, message: "Taak niet gevonden." };
+    if (task.clientId) assertClientAccess(viewer, task.clientId);
+
+    await db.update(tasks).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(tasks.id, taskId));
+
+    await auditLog({ viewer, action: "task.deleted", entityType: "task", entityId: taskId, clientId: task.clientId });
+
+    revalidatePath("/tasks");
+    revalidatePath("/dashboard");
+    return { ok: true };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
