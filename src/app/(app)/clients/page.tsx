@@ -3,11 +3,7 @@ import Link from "next/link";
 import { requireInternal } from "@/server/auth/context";
 import { listClients } from "@/server/clients";
 import { Avatar, Badge, Card, EmptyState, LinkButton, PageHeader, Table } from "@/components/ui";
-import {
-  euro,
-  formatDate,
-  num,
-} from "@/lib/format";
+import { formatDate, num } from "@/lib/format";
 import { CLIENT_STATUS, RISK_LEVEL } from "@/lib/statuses";
 
 export const metadata: Metadata = { title: "Klanten" };
@@ -27,7 +23,6 @@ export default async function ClientsPage({
 }) {
   const viewer = await requireInternal();
   const all = await listClients(viewer);
-  const canSeeFinance = viewer.permissions.has("finance:read");
   const canWrite = viewer.permissions.has("clients:write");
 
   const filterKey = (await searchParams).status ?? "actief";
@@ -40,19 +35,12 @@ export default async function ClientsPage({
 
   const activeCount = all.filter((r) => !STOPPED.has(r.status)).length;
   const stoppedCount = all.filter((r) => STOPPED.has(r.status)).length;
-  const totalRevenue = all
-    .filter((r) => r.status === "active")
-    .reduce((s, r) => s + Number(r.monthlyRevenue), 0);
 
   return (
     <div className="mx-auto max-w-[1400px]">
       <PageHeader
         title="Klanten"
-        description={
-          canSeeFinance
-            ? `${activeCount} actief · ${stoppedCount} gestopt · ${euro(totalRevenue)} terugkerende maandomzet`
-            : `${activeCount} actief · ${stoppedCount} gestopt`
-        }
+        description={`${activeCount} actief · ${stoppedCount} gestopt`}
         actions={canWrite ? <LinkButton href="/clients/new">Nieuwe klant</LinkButton> : undefined}
       />
 
@@ -87,12 +75,11 @@ export default async function ClientsPage({
             head={
               <>
                 <th className="sc-th">Klant</th>
-                <th className="sc-th">Coördinator</th>
-                <th className="sc-th text-right">Deze maand</th>
+                <th className="sc-th">Verantwoordelijke</th>
+                <th className="sc-th text-right">Shorts deze maand</th>
                 <th className="sc-th text-right">In productie</th>
                 <th className="sc-th text-right">Bij klant</th>
                 <th className="sc-th">Volgende opname</th>
-                {canSeeFinance ? <th className="sc-th text-right">Per maand</th> : null}
                 <th className="sc-th">Status</th>
               </>
             }
@@ -139,19 +126,17 @@ export default async function ClientsPage({
                       <Badge tone="warn">niet gepland</Badge>
                     )}
                   </td>
-                  {canSeeFinance ? (
-                    <td className="sc-td text-right tabular-nums">{euro(c.monthlyRevenue)}</td>
-                  ) : null}
                   <td className="sc-td">
-                    {c.riskLevel !== "none" ? (
-                      <Badge tone={RISK_LEVEL[c.riskLevel]?.tone ?? "neutral"}>
-                        {RISK_LEVEL[c.riskLevel]?.label}
-                      </Badge>
-                    ) : (
+                    <div className="flex items-center gap-1.5">
                       <Badge tone={CLIENT_STATUS[c.status]?.tone ?? "neutral"}>
                         {CLIENT_STATUS[c.status]?.label ?? c.status}
                       </Badge>
-                    )}
+                      {c.riskLevel !== "none" ? (
+                        <Badge tone={RISK_LEVEL[c.riskLevel]?.tone ?? "neutral"}>
+                          {RISK_LEVEL[c.riskLevel]?.label}
+                        </Badge>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               );
