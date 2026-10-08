@@ -21,7 +21,6 @@ import {
 import {
   daysSince,
   daysUntil,
-  euro,
   formatDate,
   periodLabel,
   plural,
@@ -47,7 +46,6 @@ export default async function DashboardPage() {
   if (viewer.isEditorOnly) return <EditorDashboard viewer={viewer} />;
 
   const data = await getDashboard(viewer);
-  const canSeeFinance = viewer.permissions.has("finance:read");
 
   const firstName = viewer.fullName.split(" ")[0];
   const hour = new Date().getHours();
@@ -81,9 +79,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Wat vraagt nú aandacht */}
-      {(urgentShoots.length > 0 ||
-        data.videos.late.length > 0 ||
-        (canSeeFinance && data.revenue.overdueCount > 0)) && (
+      {(urgentShoots.length > 0 || data.videos.late.length > 0) && (
         <Card className="border-[var(--color-bad)]/25 bg-[var(--color-bad-soft)]/40" padded={false}>
           <div className="flex items-start gap-3 p-4">
             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-[var(--color-bad)]" strokeWidth={2} />
@@ -114,16 +110,6 @@ export default async function DashboardPage() {
                     </Link>
                   </li>
                 ) : null}
-                {canSeeFinance && data.revenue.overdueCount > 0 ? (
-                  <li>
-                    <Link href="/finance" className="hover:underline">
-                      <strong className="font-medium text-[var(--color-ink)]">
-                        {plural(data.revenue.overdueCount, "factuur", "facturen")}
-                      </strong>{" "}
-                      vervallen ({euro(data.revenue.overdue)})
-                    </Link>
-                  </li>
-                ) : null}
               </ul>
             </div>
           </div>
@@ -139,16 +125,6 @@ export default async function DashboardPage() {
           tone={data.clients.atRisk.length > 0 ? "warn" : "good"}
           href="/clients"
         />
-        {/* Maandomzet staat bewust niet op het hoofddashboard; die hoort in Finance. */}
-        {canSeeFinance ? (
-          <Stat
-            label="Openstaand"
-            value={euro(data.revenue.outstanding)}
-            hint={data.revenue.overdue > 0 ? `${euro(data.revenue.overdue)} vervallen` : "niets vervallen"}
-            tone={data.revenue.overdue > 0 ? "bad" : "neutral"}
-            href="/finance"
-          />
-        ) : null}
         <Stat
           label="In productie"
           value={data.videos.open}
@@ -495,8 +471,7 @@ export default async function DashboardPage() {
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium">{c.clientName}</span>
                           <span className="block text-xs text-[var(--color-ink-muted)]">
-                            {c.autoRenew ? "verlengt automatisch" : "verlengt niet automatisch"} ·{" "}
-                            {euro(c.monthlyValue)}/mnd
+                            {c.autoRenew ? "verlengt automatisch" : "verlengt niet automatisch"}
                           </span>
                         </span>
                         <Badge tone={days < 60 ? "bad" : "warn"}>over {days} d</Badge>

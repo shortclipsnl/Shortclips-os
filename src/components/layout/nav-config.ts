@@ -30,7 +30,6 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/analytics", label: "Resultaten", icon: "TrendingUp", permissions: ["analytics:read"], match: "/analytics" },
       { href: "/insights", label: "AI-inzichten", icon: "Sparkles", permissions: ["ai:read"], match: "/insights" },
       { href: "/team", label: "Team", icon: "Users", permissions: ["team:read", "editors:read"], match: "/team" },
-      { href: "/finance", label: "Finance", icon: "Euro", permissions: ["finance:read"], match: "/finance" },
     ],
   },
   {
