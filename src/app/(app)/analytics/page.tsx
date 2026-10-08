@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ dagen?: string; klanten?: string }>;
+  searchParams: Promise<{ dagen?: string; klanten?: string; klant?: string }>;
 }) {
   await requirePermission("analytics:read");
   const params = await searchParams;
@@ -29,8 +29,9 @@ export default async function AnalyticsPage({
       : klanten === "gestopt"
         ? sql`and c.status in ('paused','churned')`
         : sql``;
+  const klantCond = params.klant ? sql`and c.slug = ${params.klant}` : sql``;
 
-  const [totals, perClient, perPlatform, topVideos] = await Promise.all([
+  const [totals, prevTotals, perClient, perPlatform, topVideos] = await Promise.all([
     db.execute(sql`
       select
         coalesce(sum(dm.views), 0)::int as views,
@@ -40,7 +41,20 @@ export default async function AnalyticsPage({
         coalesce(sum(dm.posts_published), 0)::int as posts
       from daily_metrics dm
       join clients c on c.id = dm.client_id and c.deleted_at is null
-      where dm.measured_on >= current_date - ${sql.raw(`interval '${days} days'`)} ${statusCond}
+      where dm.measured_on >= current_date - ${sql.raw(`interval '${days} days'`)} ${statusCond} ${klantCond}
+    `),
+
+    db.execute(sql`
+      select
+        coalesce(sum(dm.views), 0)::int as views,
+        coalesce(sum(dm.reach), 0)::int as reach,
+        coalesce(sum(dm.engagements), 0)::int as engagements,
+        coalesce(sum(dm.follower_delta), 0)::int as follower_growth,
+        coalesce(sum(dm.posts_published), 0)::int as posts
+      from daily_metrics dm
+      join clients c on c.id = dm.client_id and c.deleted_at is null
+      where dm.measured_on >= current_date - ${sql.raw(`interval '${2 * days} days'`)}
+        and dm.measured_on < current_date - ${sql.raw(`interval '${days} days'`)} ${statusCond} ${klantCond}
     `),
 
     db.execute(sql`
@@ -64,7 +78,7 @@ export default async function AnalyticsPage({
       from daily_metrics dm
       join clients c on c.id = dm.client_id and c.deleted_at is null
       where dm.measured_on >= current_date - ${sql.raw(`interval '${days} days'`)}
-        and dm.platform is not null ${statusCond}
+        and dm.platform is not null ${statusCond} ${klantCond}
       group by dm.platform
       order by views desc
     `),
@@ -80,7 +94,7 @@ export default async function AnalyticsPage({
       join publications p on p.deliverable_id = d.id
       join social_metrics sm on sm.publication_id = p.id
       where d.deleted_at is null and d.status = 'published'
-        and d.published_at >= current_date - ${sql.raw(`interval '${days} days'`)}
+        and d.published_at >= current_date - ${sql.raw(`interval '${days} days'`)} ${klantCond}
       group by d.id, d.title, c.name, c.slug, c.color, d.published_at
       order by views desc
       limit 15
@@ -91,15 +105,30 @@ export default async function AnalyticsPage({
     ((r as { rows?: T[] }).rows ?? (r as T[])) as T[];
 
   const t = rows<Record<string, number>>(totals)[0] ?? {};
+  const prev = rows<Record<string, number>>(prevTotals)[0] ?? {};
   const clientRows = rows<Record<string, string | number>>(perClient);
   const platformRows = rows<Record<string, string | number>>(perPlatform);
   const videoRows = rows<Record<string, string | number>>(topVideos);
+
+  const deltaPct = (cur: number, p: number): number | null => (p > 0 ? Math.round(((cur - p) / p) * 100) : null);
+  const deltaHint = (cur: number, p: number): string | undefined => {
+    const d = deltaPct(cur, p);
+    if (d === null) return undefined;
+    return `${d >= 0 ? "+" : ""}${d}% vs vorige periode`;
+  };
+  const deltaTone = (cur: number, p: number): "good" | "bad" | undefined => {
+    const d = deltaPct(cur, p);
+    if (d === null) return undefined;
+    return d >= 0 ? "good" : "bad";
+  };
+  const selectedName = params.klant ? String(clientRows.find((c) => String(c.slug) === params.klant)?.name ?? params.klant) : null;
+  const keep = `dagen=${days}${klanten !== "actief" ? `&klanten=${klanten}` : ""}`;
 
   return (
     <div className="mx-auto max-w-[1300px]">
       <PageHeader
         title="Resultaten"
-        description={`${klanten === "gestopt" ? "Gestopte klanten" : klanten === "alle" ? "Alle klanten" : "Actieve klanten"}, afgelopen ${days} dagen · live uit Metricool`}
+        description={`${selectedName ?? (klanten === "gestopt" ? "Gestopte klanten" : klanten === "alle" ? "Alle klanten" : "Actieve klanten")}, afgelopen ${days} dagen · live uit Metricool`}
         actions={
           <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
             {[7, 30, 90].map((d) => (
@@ -139,12 +168,22 @@ export default async function AnalyticsPage({
         ))}
       </div>
 
+      {/* Klant-selectie: hele weergave inzoomen op één klant. */}
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        <Link href={`/analytics?${keep}`} className={chip(!params.klant)}>Alle klanten</Link>
+        {clientRows.slice(0, 14).map((c) => (
+          <Link key={String(c.id)} href={`/analytics?${keep}&klant=${c.slug}`} className={chip(params.klant === String(c.slug))}>
+            {String(c.name)}
+          </Link>
+        ))}
+      </div>
+
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Stat label="Weergaven" value={compact(Number(t.views ?? 0))} />
-        <Stat label="Bereik" value={compact(Number(t.reach ?? 0))} />
-        <Stat label="Interacties" value={compact(Number(t.engagements ?? 0))} />
-        <Stat label="Volgersgroei" value={`+${num(Number(t.follower_growth ?? 0))}`} />
-        <Stat label="Publicaties" value={num(Number(t.posts ?? 0))} />
+        <Stat label="Weergaven" value={compact(Number(t.views ?? 0))} hint={deltaHint(Number(t.views ?? 0), Number(prev.views ?? 0))} tone={deltaTone(Number(t.views ?? 0), Number(prev.views ?? 0))} />
+        <Stat label="Bereik" value={compact(Number(t.reach ?? 0))} hint={deltaHint(Number(t.reach ?? 0), Number(prev.reach ?? 0))} tone={deltaTone(Number(t.reach ?? 0), Number(prev.reach ?? 0))} />
+        <Stat label="Interacties" value={compact(Number(t.engagements ?? 0))} hint={deltaHint(Number(t.engagements ?? 0), Number(prev.engagements ?? 0))} tone={deltaTone(Number(t.engagements ?? 0), Number(prev.engagements ?? 0))} />
+        <Stat label="Volgersgroei" value={`${Number(t.follower_growth ?? 0) >= 0 ? "+" : ""}${num(Number(t.follower_growth ?? 0))}`} hint={deltaHint(Number(t.follower_growth ?? 0), Number(prev.follower_growth ?? 0))} tone={deltaTone(Number(t.follower_growth ?? 0), Number(prev.follower_growth ?? 0))} />
+        <Stat label="Publicaties" value={num(Number(t.posts ?? 0))} hint={deltaHint(Number(t.posts ?? 0), Number(prev.posts ?? 0))} />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
@@ -271,4 +310,12 @@ export default async function AnalyticsPage({
       </p>
     </div>
   );
+}
+
+function chip(active: boolean): string {
+  return `rounded-full px-3 py-1 text-xs font-medium ${
+    active
+      ? "bg-[var(--color-ink)] text-white"
+      : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+  }`;
 }
