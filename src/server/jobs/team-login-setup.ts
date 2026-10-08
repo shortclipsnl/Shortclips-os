@@ -1,0 +1,60 @@
+import "server-only";
+import { randomBytes } from "node:crypto";
+import { writeFileSync } from "node:fs";
+import path from "node:path";
+import { and, eq, isNull, ne } from "drizzle-orm";
+import { db } from "@/db/client";
+import { roles, teamMembers, userRoles, users } from "@/db/schema";
+import { hashPassword } from "@/server/auth/password";
+
+/**
+ * Geeft elk zichtbaar teamlid een eigen, persoonlijk inlogwachtwoord (in plaats
+ * van het gedeelde dev-wachtwoord). Rol-gebaseerde rechten zijn al ingebouwd, dus
+ * iedereen krijgt toegang tot dezelfde actuele omgeving, met rechten die bij de
+ * rol passen. De wachtwoorden worden NIET in de chat getoond, maar weggeschreven
+ * naar team-logins.local.md in de projectmap (één keer doorgeven, daarna wissen).
+ */
+function tempPassword(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const b = randomBytes(14);
+  let out = "";
+  for (const x of b) out += alphabet[x % alphabet.length];
+  return `${out.slice(0, 5)}-${out.slice(5, 10)}-${out.slice(10, 14)}`;
+}
+
+export async function setupTeamLogins(): Promise<{ ok: boolean; count: number; file: string }> {
+  // Zichtbare teamleden (team_members niet verwijderd), geen klantaccounts.
+  const members = await db
+    .select({ id: users.id, fullName: users.fullName, email: users.email, role: users.primaryRole })
+    .from(users)
+    .innerJoin(teamMembers, eq(teamMembers.userId, users.id))
+    .where(and(isNull(teamMembers.deletedAt), isNull(users.deletedAt), ne(users.primaryRole, "client")))
+    .orderBy(users.fullName);
+
+  const lines: string[] = [
+    "# Shortclips — interne logins",
+    "",
+    "Persoonlijke inloggegevens per teamlid. Geef ze één keer door en verwijder dit bestand daarna.",
+    "Inloggen op het interne dashboard (niet het klantportaal).",
+    "",
+    "| Naam | Rol | E-mail | Tijdelijk wachtwoord |",
+    "|---|---|---|---|",
+  ];
+
+  let count = 0;
+  for (const m of members) {
+    const pw = tempPassword();
+    await db.update(users).set({ passwordHash: await hashPassword(pw), status: "active", updatedAt: new Date() }).where(eq(users.id, m.id));
+
+    // Zorg dat de rol-koppeling (en dus de rechten) bestaat.
+    const [role] = await db.select({ id: roles.id }).from(roles).where(eq(roles.key, m.role)).limit(1);
+    if (role) await db.insert(userRoles).values({ userId: m.id, roleId: role.id }).onConflictDoNothing();
+
+    lines.push(`| ${m.fullName} | ${m.role} | ${m.email} | ${pw} |`);
+    count++;
+  }
+
+  const file = path.resolve(process.cwd(), "team-logins.local.md");
+  writeFileSync(file, lines.join("\n") + "\n", "utf8");
+  return { ok: true, count, file };
+}

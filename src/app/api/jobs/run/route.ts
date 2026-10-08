@@ -22,6 +22,7 @@ import { setTeamContact } from "@/server/jobs/team";
 import { enforcePortalAccess, portalAccessReport } from "@/server/jobs/portal-access";
 import { seedAiKnowledge } from "@/server/jobs/ai-seed";
 import { curateTeam } from "@/server/jobs/team-curate";
+import { setupTeamLogins } from "@/server/jobs/team-login-setup";
 import { runClientNotifications } from "@/server/jobs/notifications";
 import { pruneSessions } from "@/server/auth/session";
 
@@ -58,6 +59,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "portal.notify_clients": runClientNotifications,
   "ai.seed_knowledge": seedAiKnowledge,
   "team.curate": curateTeam,
+  "team.setup_logins": setupTeamLogins,
   "maintenance.prune_sessions": async () => ({ removed: await pruneSessions() }),
 };
 
