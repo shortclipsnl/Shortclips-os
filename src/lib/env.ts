@@ -60,8 +60,12 @@ const schema = z.object({
   METRICOOL_USER_TOKEN: z.string().optional(),
 
   // --- AI ---
+  // Zonder sleutel blijven de AI Tools slapend (net als e-mail): de schermen
+  // werken, maar er wordt niets gegenereerd.
   ANTHROPIC_API_KEY: z.string().optional(),
-  AI_MODEL: z.string().default("claude-sonnet-5"),
+  // Model voor de AI Tools. Opus = hoogste kwaliteit; zet op claude-sonnet-5-5
+  // of claude-haiku-5-5 om de kosten te drukken (zie AI Tools-documentatie).
+  AI_MODEL: z.string().default("claude-opus-5-5"),
 
   // --- Achtergrondtaken ---
   CRON_SECRET: z.string().optional(),

@@ -43,6 +43,13 @@
       "when": 1791444000000,
       "tag": "0005_finance_owner_only",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791451870830,
+      "tag": "0006_shocking_albert_cleary",
+      "breakpoints": true
     }
   ]
 }
