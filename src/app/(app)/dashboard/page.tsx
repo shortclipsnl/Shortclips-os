@@ -144,18 +144,16 @@ export default async function DashboardPage() {
         <Stat label="Openstaande taken" value={top.openTasks} hint="alle medewerkers" href="/tasks" />
       </div>
 
-      {/* Pipeline */}
-      <Card padded={false}>
-        <div className="px-5 pt-5">
-          <CardHeader
-            title="Video pipeline"
-            subtitle="Waar staat het werk vast? Klik door naar de betreffende stap."
-            action={
-              <Link href="/videos" className="text-sm font-medium text-[var(--color-brand-600)] hover:underline">
-                Alles bekijken
-              </Link>
-            }
-          />
+      {/* Pipeline — prominent, in de huisstijl */}
+      <Card padded={false} className="overflow-hidden ring-1 ring-[var(--color-indigo-ink)]/15">
+        <div className="flex items-center justify-between gap-2 bg-[var(--color-indigo-ink)] px-5 py-3 text-white">
+          <div>
+            <h2 className="text-base font-bold tracking-tight">Video pipeline</h2>
+            <p className="text-xs text-white/70">Waar staat het werk vast? Klik door naar de betreffende stap.</p>
+          </div>
+          <Link href="/videos" className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/25">
+            Alles bekijken
+          </Link>
         </div>
         <PipelineStrip buckets={data.pipeline} ages={Object.fromEntries(data.stageAges)} />
       </Card>
