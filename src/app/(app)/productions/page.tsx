@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, CalendarCheck, CheckCircle2 } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
-import { getMonthShootStats, listProductionDays, nextShootPerClient } from "@/server/productions";
+import { getMonthShootStats, getShootOverview, listProductionDays, nextShootPerClient } from "@/server/productions";
 import { Avatar, Badge, Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { daysUntil, formatDate, formatDateFull, plural, relativeDays } from "@/lib/format";
 import { PRODUCTION_STATUS } from "@/lib/statuses";
@@ -18,11 +18,14 @@ export default async function ProductionsPage({
   const viewer = await requireInternal();
   const params = await searchParams;
   const when = params.periode === "verleden" ? "verleden" : "komend";
-  const [rows, monthStats, nextPerClient] = await Promise.all([
+  const [rows, monthStats, nextPerClient, overview] = await Promise.all([
     listProductionDays(viewer, when),
     getMonthShootStats(viewer),
     nextShootPerClient(viewer),
+    getShootOverview(viewer),
   ]);
+  const komend = await listProductionDays(viewer, "komend");
+  const next = komend[0] ?? null;
   const monthLabel = new Date(`${monthStats.month}-01`).toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
 
   return (
@@ -56,12 +59,28 @@ export default async function ProductionsPage({
         }
       />
 
-      {/* Maandoverzicht: gepland / afgerond / nog te doen deze maand. */}
-      <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* Overzicht: deze week / deze maand / eerstvolgende + per videograaf. */}
+      <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Deze week" value={overview.thisWeek} hint="komende 7 dagen" href="/productions" />
         <Stat label={`Gepland in ${monthLabel}`} value={monthStats.planned} />
-        <Stat label="Afgerond" value={monthStats.completed} tone={monthStats.completed > 0 ? "good" : undefined} />
-        <Stat label="Nog te doen" value={monthStats.todo} tone={monthStats.todo > 0 ? "warn" : undefined} />
+        <Stat label="Afgerond deze maand" value={monthStats.completed} tone={monthStats.completed > 0 ? "good" : undefined} />
+        <Stat
+          label="Eerstvolgende opname"
+          value={next ? new Date(next.scheduledOn).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }) : "—"}
+          hint={next ? next.clientName : "niets gepland"}
+        />
       </div>
+
+      {overview.perVideographer.length > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Deze maand per videograaf:</span>
+          {overview.perVideographer.map((v) => (
+            <span key={v.name} className="rounded-full bg-[var(--color-surface-2)] px-3 py-1 text-xs">
+              {v.name} · <strong>{v.count}</strong>
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       <Card
         className={`mb-5 ${monthStats.allDone ? "border-[var(--color-good)]/30 bg-[var(--color-good-soft)]/40" : "border-[var(--color-bad)]/25 bg-[var(--color-bad-soft)]/40"}`}

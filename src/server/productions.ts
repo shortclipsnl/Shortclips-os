@@ -1,6 +1,6 @@
 import "server-only";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lt, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clients,
@@ -89,6 +89,34 @@ export async function getMonthShootStats(viewer: Viewer, month?: string) {
     todo: Number(row?.todo ?? 0),
     pastNotDone,
     allDone: pastNotDone === 0,
+  };
+}
+
+/** Snelle cijfers voor bovenaan de Opnames-pagina. */
+export async function getShootOverview(viewer: Viewer) {
+  const day = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  const monthStart = new Date().toISOString().slice(0, 7) + "-01";
+
+  const [weekRow] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(productionDays)
+    .where(and(isNull(productionDays.deletedAt), gte(productionDays.scheduledOn, day(0)), lte(productionDays.scheduledOn, day(7)), ne(productionDays.status, "cancelled"), scopeToClients(viewer, productionDays.clientId)));
+
+  const perVideographer = await db
+    .select({ name: users.fullName, n: sql<number>`count(*)` })
+    .from(productionDays)
+    .leftJoin(users, eq(users.id, productionDays.videographerId))
+    .where(and(isNull(productionDays.deletedAt), gte(productionDays.scheduledOn, monthStart), ne(productionDays.status, "cancelled"), scopeToClients(viewer, productionDays.clientId)))
+    .groupBy(users.fullName)
+    .orderBy(desc(sql`count(*)`));
+
+  return {
+    thisWeek: Number(weekRow?.n ?? 0),
+    perVideographer: perVideographer.map((p) => ({ name: p.name ?? "Niet toegewezen", count: Number(p.n) })),
   };
 }
 
