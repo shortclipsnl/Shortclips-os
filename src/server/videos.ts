@@ -104,23 +104,62 @@ export async function getVideoHighlights(viewer: Viewer) {
   if (viewer.isEditorOnly) base.push(eq(deliverables.editorId, viewer.id));
   const today = new Date().toISOString().slice(0, 10);
 
-  const [row] = await db
-    .select({
-      late: sql<number>`count(*) filter (where ${deliverables.dueOn} < ${today} and ${deliverables.status} not in ('published','analysis_available'))`,
-      atClient: sql<number>`count(*) filter (where ${deliverables.status} in ('client_review','client_revision'))`,
-      awaitingEditor: sql<number>`count(*) filter (where ${deliverables.status} = 'awaiting_editor')`,
-      inProduction: sql<number>`count(*) filter (where ${deliverables.status} not in ('published','analysis_available'))`,
-      oldestAtClient: sql<number>`coalesce(max(extract(day from now() - ${deliverables.statusChangedAt})) filter (where ${deliverables.status} in ('client_review','client_revision')), 0)`,
-    })
-    .from(deliverables)
-    .where(and(...base));
+  const activeStages = VIDEO_STAGES.filter((s) => s !== "published" && s !== "analysis_available");
+  const listSel = {
+    id: deliverables.id,
+    title: deliverables.title,
+    clientName: clients.name,
+    clientSlug: clients.slug,
+    clientColor: clients.color,
+    editorName: users.fullName,
+  };
+
+  const [row, lateList, atClientList, awaitingEditorList] = await Promise.all([
+    db
+      .select({
+        late: sql<number>`count(*) filter (where ${deliverables.dueOn} < ${today} and ${deliverables.status} not in ('published','analysis_available'))`,
+        atClient: sql<number>`count(*) filter (where ${deliverables.status} in ('client_review','client_revision'))`,
+        awaitingEditor: sql<number>`count(*) filter (where ${deliverables.status} = 'awaiting_editor')`,
+        inProduction: sql<number>`count(*) filter (where ${deliverables.status} not in ('published','analysis_available'))`,
+        oldestAtClient: sql<number>`coalesce(max(extract(day from now() - ${deliverables.statusChangedAt})) filter (where ${deliverables.status} in ('client_review','client_revision')), 0)`,
+      })
+      .from(deliverables)
+      .where(and(...base)),
+    db
+      .select(listSel)
+      .from(deliverables)
+      .innerJoin(clients, eq(clients.id, deliverables.clientId))
+      .leftJoin(users, eq(users.id, deliverables.editorId))
+      .where(and(...base, lt(deliverables.dueOn, today), inArray(deliverables.status, activeStages)))
+      .orderBy(asc(deliverables.dueOn))
+      .limit(8),
+    db
+      .select(listSel)
+      .from(deliverables)
+      .innerJoin(clients, eq(clients.id, deliverables.clientId))
+      .leftJoin(users, eq(users.id, deliverables.editorId))
+      .where(and(...base, inArray(deliverables.status, ["client_review", "client_revision"])))
+      .orderBy(asc(deliverables.statusChangedAt))
+      .limit(8),
+    db
+      .select(listSel)
+      .from(deliverables)
+      .innerJoin(clients, eq(clients.id, deliverables.clientId))
+      .leftJoin(users, eq(users.id, deliverables.editorId))
+      .where(and(...base, eq(deliverables.status, "awaiting_editor")))
+      .orderBy(asc(deliverables.dueOn))
+      .limit(8),
+  ]);
 
   return {
-    late: Number(row?.late ?? 0),
-    atClient: Number(row?.atClient ?? 0),
-    awaitingEditor: Number(row?.awaitingEditor ?? 0),
-    inProduction: Number(row?.inProduction ?? 0),
-    oldestAtClientDays: Math.round(Number(row?.oldestAtClient ?? 0)),
+    late: Number(row[0]?.late ?? 0),
+    atClient: Number(row[0]?.atClient ?? 0),
+    awaitingEditor: Number(row[0]?.awaitingEditor ?? 0),
+    inProduction: Number(row[0]?.inProduction ?? 0),
+    oldestAtClientDays: Math.round(Number(row[0]?.oldestAtClient ?? 0)),
+    lateList,
+    atClientList,
+    awaitingEditorList,
   };
 }
 

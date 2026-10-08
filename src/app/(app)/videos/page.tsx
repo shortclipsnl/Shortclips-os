@@ -97,17 +97,17 @@ export default async function VideosPage({
         </Card>
       ) : null}
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Te laat" value={highlights.late} tone={highlights.late > 0 ? "bad" : undefined} href="/videos?filter=te-laat" />
-        <Stat
-          label="Wacht op klant"
-          value={highlights.atClient}
-          hint={highlights.oldestAtClientDays > 0 ? `oudste: ${highlights.oldestAtClientDays} dagen` : undefined}
-          tone={highlights.atClient > 0 ? "warn" : undefined}
-          href="/videos?filter=bij-klant"
-        />
-        <Stat label="Wacht op editor" value={highlights.awaitingEditor} href="/videos?status=awaiting_editor" />
-        <Stat label="In productie" value={highlights.inProduction} href="/videos?filter=actief" />
+      <div className="mb-5 grid gap-3 lg:grid-cols-3">
+        <DrillCard title="Te laat" count={highlights.late} accent="var(--color-bad)" href="/videos?filter=te-laat"
+          items={highlights.lateList.map((v) => ({ id: v.id, primary: v.clientName, secondary: v.title }))} empty="Niets te laat" />
+        <DrillCard title="Wacht op klant" count={highlights.atClient} accent="var(--color-warn)" href="/videos?filter=bij-klant"
+          items={highlights.atClientList.map((v) => ({ id: v.id, primary: v.clientName, secondary: v.title }))} empty="Niets bij de klant" />
+        <DrillCard title="Wacht op editor" count={highlights.awaitingEditor} accent="var(--color-info)" href="/videos?status=awaiting_editor"
+          items={highlights.awaitingEditorList.map((v) => ({ id: v.id, primary: v.editorName ?? "Geen editor", secondary: v.title }))} empty="Niets bij een editor" />
+      </div>
+
+      <div className="mb-5">
+        <Stat label="In productie" value={highlights.inProduction} hint={`${highlights.awaitingEditor} wacht op editor`} href="/videos?filter=actief" />
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -204,6 +204,45 @@ export default async function VideosPage({
             })}
           </Table>
         </Card>
+      )}
+    </div>
+  );
+}
+
+function DrillCard({
+  title,
+  count,
+  accent,
+  href,
+  items,
+  empty,
+}: {
+  title: string;
+  count: number;
+  accent: string;
+  href: string;
+  items: { id: string; primary: string; secondary: string }[];
+  empty: string;
+}) {
+  return (
+    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)]">
+      <Link href={href} className="flex items-center justify-between gap-2 bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white hover:bg-[var(--color-indigo-soft)]">
+        <span className="text-sm font-semibold">{title}</span>
+        <span className="text-2xl font-bold tabular-nums" style={{ color: count > 0 ? accent : "rgba(255,255,255,.6)" }}>{count}</span>
+      </Link>
+      {items.length === 0 ? (
+        <p className="px-4 py-3 text-xs text-[var(--color-ink-faint)]">{empty}</p>
+      ) : (
+        <ul className="divide-y divide-[var(--color-line)]">
+          {items.map((it) => (
+            <li key={it.id}>
+              <Link href={`/videos/${it.id}`} className="block px-4 py-2 hover:bg-[var(--color-surface-2)]">
+                <span className="block truncate text-sm font-medium" style={{ borderLeft: `3px solid ${accent}`, paddingLeft: 8 }}>{it.primary}</span>
+                <span className="mt-0.5 block truncate pl-[11px] text-xs text-[var(--color-ink-muted)]">{it.secondary}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
