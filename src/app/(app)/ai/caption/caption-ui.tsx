@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2, RefreshCw, Sparkles, Upload } from "lucide-react";
-import { generateCaptions, regenerateOneCaption, type ShortCaption } from "@/server/actions/ai-tools";
+import { CalendarPlus, Check, Loader2, RefreshCw, Sparkles, Upload } from "lucide-react";
+import { addCaptionToPlanning, generateCaptions, regenerateOneCaption, type ShortCaption } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote } from "@/components/ui";
 import { CopyButton, HistoryPanel, NoProviderNote, fileToBase64, type HistoryEntry } from "../_shared";
 
@@ -145,6 +145,8 @@ function ShortBlock({
   onChange: (s: ShortCaption) => void;
 }) {
   const [pending, start] = useTransition();
+  const [planning, startPlanning] = useTransition();
+  const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   function regen() {
@@ -161,16 +163,36 @@ function ShortBlock({
     });
   }
 
+  function toPlanning() {
+    setErr(null);
+    startPlanning(async () => {
+      const res = await addCaptionToPlanning({
+        clientId,
+        shortTitle: short.shortTitle,
+        instagramCaption: short.instagram.caption,
+        tiktokCaption: short.tiktok.caption,
+      });
+      if (res.ok) setSaved(true);
+      else setErr(res.message ?? "Mislukt");
+    });
+  }
+
   return (
     <Card>
-      <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">
           Short {index + 1}: <span className="font-normal text-[var(--color-ink-muted)]">{short.shortTitle}</span>
         </h3>
-        <Button size="sm" variant="ghost" onClick={regen} disabled={pending}>
-          {pending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-          Opnieuw
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant="ghost" onClick={toPlanning} disabled={planning || saved}>
+            {saved ? <Check className="size-3.5 text-[var(--color-good)]" /> : planning ? <Loader2 className="size-3.5 animate-spin" /> : <CalendarPlus className="size-3.5" />}
+            {saved ? "In planning" : "Naar contentplanning"}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={regen} disabled={pending}>
+            {pending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+            Opnieuw
+          </Button>
+        </div>
       </div>
       {short.hook ? <p className="mb-3 text-xs text-[var(--color-ink-faint)]">Hook: {short.hook}</p> : null}
       <div className="grid gap-4 md:grid-cols-2">

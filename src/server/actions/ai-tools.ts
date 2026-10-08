@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { aiKnowledge, aiOutputs, clientAiProfiles, clients } from "@/db/schema";
+import { aiKnowledge, aiOutputs, clientAiProfiles, clients, contentCalendar } from "@/db/schema";
 import { assertClientAccess, ForbiddenError, requirePermission } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { runJsonPrompt, type AiDoc, type AiImage } from "@/server/ai/client";
@@ -195,6 +195,46 @@ Geef UITSLUITEND geldige JSON terug in dit formaat:
         : { ok: false, message: res.error ?? "Genereren mislukt." };
     }
     return { ok: true, data: res.data };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Zet een goedgekeurde caption in de contentplanning van de klant. Komt als
+ * concept-publicatie (status 'to_prepare') op de planner; het team zet daar de
+ * datum en zet 'm op 'ingepland', waarna de klant 'm in zijn portaal ziet.
+ */
+export async function addCaptionToPlanning(input: {
+  clientId: string;
+  shortTitle: string;
+  instagramCaption: string;
+  tiktokCaption: string;
+}): Promise<SimpleResult> {
+  try {
+    const viewer = await requirePermission("calendar:write");
+    assertClientAccess(viewer, input.clientId);
+    const title = input.shortTitle.trim() || "Nieuwe publicatie";
+    const today = new Date().toISOString().slice(0, 10);
+
+    const [created] = await db
+      .insert(contentCalendar)
+      .values({
+        clientId: input.clientId,
+        title,
+        scheduledOn: today,
+        status: "to_prepare",
+        platforms: ["instagram", "tiktok"],
+        caption: input.instagramCaption.trim() || null,
+        notes: input.tiktokCaption.trim() ? `TikTok-caption:\n${input.tiktokCaption.trim()}` : null,
+        ownerId: viewer.id,
+      })
+      .returning({ id: contentCalendar.id });
+
+    await auditLog({ viewer, action: "ai.caption_to_planning", entityType: "calendar_item", entityId: created!.id, clientId: input.clientId });
+    revalidatePath("/calendar");
+    return { ok: true, id: created!.id };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;

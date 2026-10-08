@@ -20,6 +20,7 @@ import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, runMetricoolSync } from "@/server/jobs/metricool-sync";
 import { setTeamContact } from "@/server/jobs/team";
 import { enforcePortalAccess, portalAccessReport } from "@/server/jobs/portal-access";
+import { seedAiKnowledge } from "@/server/jobs/ai-seed";
 import { runClientNotifications } from "@/server/jobs/notifications";
 import { pruneSessions } from "@/server/auth/session";
 
@@ -54,6 +55,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "portal.enforce_access": enforcePortalAccess,
   "portal.coverage": portalAccessReport,
   "portal.notify_clients": runClientNotifications,
+  "ai.seed_knowledge": seedAiKnowledge,
   "maintenance.prune_sessions": async () => ({ removed: await pruneSessions() }),
 };
 
