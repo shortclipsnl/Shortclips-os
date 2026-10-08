@@ -47,11 +47,11 @@ export function ClientsBoard({ clients, canWrite }: { clients: BoardClient[]; ca
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Column title="Actieve klanten" count={active.length} tone="good">
+        <Column title="Actieve klanten" count={active.length} variant="active">
           {active.map((c) => <ClientCard key={c.id} c={c} canWrite={canWrite} />)}
           {active.length === 0 ? <Empty /> : null}
         </Column>
-        <Column title="Niet-actieve klanten" count={inactive.length} tone="neutral">
+        <Column title="Niet-actieve klanten" count={inactive.length} variant="inactive">
           {inactive.map((c) => <ClientCard key={c.id} c={c} canWrite={canWrite} />)}
           {inactive.length === 0 ? <Empty /> : null}
         </Column>
@@ -60,12 +60,17 @@ export function ClientsBoard({ clients, canWrite }: { clients: BoardClient[]; ca
   );
 }
 
-function Column({ title, count, tone, children }: { title: string; count: number; tone: "good" | "neutral"; children: React.ReactNode }) {
+function Column({ title, count, variant, children }: { title: string; count: number; variant: "active" | "inactive"; children: React.ReactNode }) {
+  const active = variant === "active";
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <Badge tone={tone}>{count}</Badge>
+      <div
+        className={`mb-3 flex items-center justify-between rounded-[var(--radius-md)] px-4 py-2.5 ${
+          active ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink)]"
+        }`}
+      >
+        <h2 className="text-sm font-bold tracking-tight">{title}</h2>
+        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${active ? "bg-white/20" : "bg-[var(--color-ink)]/10 text-[var(--color-ink-muted)]"}`}>{count}</span>
       </div>
       <div className="space-y-2">{children}</div>
     </div>

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AlertTriangle, CalendarCheck, CheckCircle2 } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getMonthShootStats, getShootOverview, listProductionDays, nextShootPerClient } from "@/server/productions";
-import { Avatar, Badge, Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
+import { Avatar, Badge, Card, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { daysUntil, formatDate, formatDateFull, plural, relativeDays } from "@/lib/format";
 import { PRODUCTION_STATUS } from "@/lib/statuses";
 
@@ -100,8 +100,8 @@ export default async function ProductionsPage({
       </Card>
 
       {nextPerClient.length > 0 ? (
-        <Card className="mb-5" padded={false}>
-          <CardHeader title="Volgende opname per klant" className="px-4 pt-4" />
+        <Card className="mb-5 overflow-hidden" padded={false}>
+          <div className="bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">Volgende opname per klant</div>
           <ul className="mt-2 divide-y divide-[var(--color-line)]">
             {nextPerClient.map((n) => (
               <li key={n.clientId}>

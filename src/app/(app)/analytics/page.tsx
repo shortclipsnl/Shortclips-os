@@ -178,6 +178,10 @@ export default async function AnalyticsPage({
         ))}
       </div>
 
+      <div className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">
+        Belangrijkste resultaten · {selectedName ?? (klanten === "gestopt" ? "gestopte klanten" : klanten === "alle" ? "alle klanten" : "actieve klanten")}
+      </div>
+
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Stat label="Weergaven" value={compact(Number(t.views ?? 0))} hint={deltaHint(Number(t.views ?? 0), Number(prev.views ?? 0))} tone={deltaTone(Number(t.views ?? 0), Number(prev.views ?? 0))} />
         <Stat label="Bereik" value={compact(Number(t.reach ?? 0))} hint={deltaHint(Number(t.reach ?? 0), Number(prev.reach ?? 0))} tone={deltaTone(Number(t.reach ?? 0), Number(prev.reach ?? 0))} />
