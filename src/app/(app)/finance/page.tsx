@@ -77,11 +77,12 @@ export default async function FinancePage() {
     <div className="mx-auto max-w-[1300px]">
       <PageHeader
         title="Finance"
-        description={`${periodLabel(period)} · alleen zichtbaar voor rollen met financiële rechten`}
+        description={`${periodLabel(period)} · uitsluitend zichtbaar voor de eigenaar`}
       />
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Stat label="MRR" value={euro(mrr)} hint="terugkerende maandomzet" />
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <Stat label="Maandomzet (MRR)" value={euro(mrr)} hint="terugkerend per maand" />
+        <Stat label="Verwachte jaaromzet" value={euro(mrr * 12)} hint="MRR × 12" />
         <Stat label="Openstaand" value={euro(outstanding)} hint={`${invoiceRows.filter((i) => i.status !== "paid" && i.status !== "draft").length} facturen`} />
         <Stat
           label="Vervallen"

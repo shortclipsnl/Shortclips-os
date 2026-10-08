@@ -36,6 +36,13 @@
       "when": 1791399498024,
       "tag": "0004_complete_mother_askani",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791444000000,
+      "tag": "0005_finance_owner_only",
+      "breakpoints": true
     }
   ]
 }

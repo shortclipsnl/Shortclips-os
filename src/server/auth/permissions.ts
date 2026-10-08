@@ -121,10 +121,10 @@ export const ROLE_DEFINITIONS: Array<{
   {
     key: "admin",
     name: "Beheerder",
-    description: "Technisch en functioneel beheer, zonder financiële mutaties.",
+    description: "Technisch en functioneel beheer. Finance is uitsluitend voor de eigenaar.",
     sortOrder: 20,
     permissions: ALL_PERMISSIONS.filter(
-      (p) => p !== "finance:write" && !p.startsWith("portal:"),
+      (p) => !p.startsWith("finance:") && !p.startsWith("portal:"),
     ),
   },
   {
@@ -199,14 +199,12 @@ export const ROLE_DEFINITIONS: Array<{
   {
     key: "finance",
     name: "Finance",
-    description: "Facturatie, betalingen, kosten en marges.",
+    description:
+      "Rapportage en klantoverzicht. Let op: het Finance-onderdeel (omzet, kosten, marges) is uitsluitend zichtbaar voor de eigenaar.",
     sortOrder: 70,
     permissions: [
       "clients:read",
       "clients:read_all",
-      "finance:read",
-      "finance:write",
-      "finance:read_costs",
       "editors:read",
       "reports:read",
       "analytics:read",
