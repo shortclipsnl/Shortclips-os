@@ -12,6 +12,7 @@ import {
   Badge,
   Card,
   CardHeader,
+  EmptyState,
   LinkButton,
   PageHeader,
   Table,
@@ -114,96 +115,103 @@ export default async function TeamPage() {
     return a.fullName.localeCompare(b.fullName);
   });
 
+  const internal = sortedPeople.filter((p) => p.isInternal);
+  const freelancers = sortedPeople.filter((p) => !p.isInternal);
+
+  const personRow = (p: (typeof sortedPeople)[number]) => {
+    const open = Number(p.openVideos);
+    const capacity = p.weeklyVideoCapacity;
+    const load = capacity > 0 ? (open / capacity) * 100 : 0;
+    const overloaded = capacity > 0 && open > capacity;
+    return (
+      <tr key={p.id}>
+        <td className="sc-td">
+          <span className="flex items-center gap-2.5">
+            <Avatar name={p.fullName} color={p.color} size={26} />
+            <span>
+              <span className="flex items-center gap-2 font-medium">
+                {p.fullName}
+                {isCore(p.fullName) ? <Badge tone="info">Kern</Badge> : null}
+                {p.status === "suspended" ? <Badge tone="neutral">Gedeactiveerd</Badge> : null}
+              </span>
+              <span className="block text-xs text-[var(--color-ink-muted)]">{p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}</span>
+            </span>
+          </span>
+        </td>
+        <td className="sc-td text-[var(--color-ink-muted)]">{ROLE_LABELS[p.role] ?? p.role}</td>
+        <td className="sc-td text-right tabular-nums">
+          {Number(p.openTasks)}
+          {Number(p.overdueTasks) > 0 ? <span className="ml-1.5 text-xs font-medium text-[var(--color-bad)]">({Number(p.overdueTasks)} te laat)</span> : null}
+        </td>
+        <td className="sc-td text-right tabular-nums">{open || "—"}</td>
+        <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{capacity || "—"}</td>
+        <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{Number(p.upcomingShoots) || "—"}</td>
+        <td className="sc-td">
+          {capacity === 0 ? (
+            <span className="text-[var(--color-ink-faint)]">n.v.t.</span>
+          ) : overloaded ? (
+            <Badge tone="bad">overbelast ({pct(load, 0)})</Badge>
+          ) : load > 80 ? (
+            <Badge tone="warn">vol ({pct(load, 0)})</Badge>
+          ) : (
+            <Badge tone="good">ruimte ({pct(load, 0)})</Badge>
+          )}
+        </td>
+        {canWrite ? (
+          <td className="sc-td text-right">
+            <Link href={`/team/${p.id}/edit`} className="text-sm text-[var(--color-brand-600)] hover:underline">Bewerken</Link>
+          </td>
+        ) : null}
+      </tr>
+    );
+  };
+
+  const head = (
+    <>
+      <th className="sc-th">Naam</th>
+      <th className="sc-th">Rol</th>
+      <th className="sc-th text-right">Open taken</th>
+      <th className="sc-th text-right">Video&apos;s in bewerking</th>
+      <th className="sc-th text-right">Capaciteit/week</th>
+      <th className="sc-th text-right">Opnames gepland</th>
+      <th className="sc-th">Belasting</th>
+      {canWrite ? <th className="sc-th" /> : null}
+    </>
+  );
+
   return (
     <div className="mx-auto max-w-[1300px]">
       <PageHeader
         title="Team"
-        description="Bezetting, openstaand werk en editorprestaties."
+        description="Intern team en freelancers, met openstaand werk."
         actions={canWrite ? <LinkButton href="/team/new">Nieuw teamlid</LinkButton> : undefined}
       />
 
-      <Card padded={false} className="mb-5">
-        <div className="p-5 pb-3">
-          <CardHeader title="Bezetting" subtitle="Wie heeft wat openstaan." />
-        </div>
-        <Table
-          head={
-            <>
-              <th className="sc-th">Naam</th>
-              <th className="sc-th">Rol</th>
-              <th className="sc-th text-right">Open taken</th>
-              <th className="sc-th text-right">Video&apos;s in bewerking</th>
-              <th className="sc-th text-right">Capaciteit/week</th>
-              <th className="sc-th text-right">Opnames gepland</th>
-              <th className="sc-th">Belasting</th>
-              {canWrite ? <th className="sc-th" /> : null}
-            </>
-          }
-        >
-          {sortedPeople.map((p) => {
-            const open = Number(p.openVideos);
-            const capacity = p.weeklyVideoCapacity;
-            const load = capacity > 0 ? (open / capacity) * 100 : 0;
-            const overloaded = capacity > 0 && open > capacity;
-            return (
-              <tr key={p.id}>
-                <td className="sc-td">
-                  <span className="flex items-center gap-2.5">
-                    <Avatar name={p.fullName} color={p.color} size={26} />
-                    <span>
-                      <span className="flex items-center gap-2 font-medium">
-                        {p.fullName}
-                        {isCore(p.fullName) ? <Badge tone="info">Kern</Badge> : null}
-                        {p.status === "suspended" ? <Badge tone="neutral">Gedeactiveerd</Badge> : null}
-                      </span>
-                      <span className="block text-xs text-[var(--color-ink-muted)]">
-                        {p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}
-                        {!p.isInternal ? " · freelance" : ""}
-                      </span>
-                    </span>
-                  </span>
-                </td>
-                <td className="sc-td text-[var(--color-ink-muted)]">
-                  {ROLE_LABELS[p.role] ?? p.role}
-                </td>
-                <td className="sc-td text-right tabular-nums">
-                  {Number(p.openTasks)}
-                  {Number(p.overdueTasks) > 0 ? (
-                    <span className="ml-1.5 text-xs font-medium text-[var(--color-bad)]">
-                      ({Number(p.overdueTasks)} te laat)
-                    </span>
-                  ) : null}
-                </td>
-                <td className="sc-td text-right tabular-nums">{open || "—"}</td>
-                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">
-                  {capacity || "—"}
-                </td>
-                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">
-                  {Number(p.upcomingShoots) || "—"}
-                </td>
-                <td className="sc-td">
-                  {capacity === 0 ? (
-                    <span className="text-[var(--color-ink-faint)]">n.v.t.</span>
-                  ) : overloaded ? (
-                    <Badge tone="bad">overbelast ({pct(load, 0)})</Badge>
-                  ) : load > 80 ? (
-                    <Badge tone="warn">vol ({pct(load, 0)})</Badge>
-                  ) : (
-                    <Badge tone="good">ruimte ({pct(load, 0)})</Badge>
-                  )}
-                </td>
-                {canWrite ? (
-                  <td className="sc-td text-right">
-                    <Link href={`/team/${p.id}/edit`} className="text-sm text-[var(--color-brand-600)] hover:underline">
-                      Bewerken
-                    </Link>
-                  </td>
-                ) : null}
-              </tr>
-            );
-          })}
-        </Table>
-      </Card>
+      <details open className="mb-4 group">
+        <summary className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-semibold text-white">
+          Team Shortclips
+          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">{internal.length}</span>
+          <span className="ml-auto text-xs font-normal text-white/70">in-/uitklappen</span>
+        </summary>
+        <Card padded={false} className="mt-2">
+          <Table head={head}>{internal.map(personRow)}</Table>
+        </Card>
+      </details>
+
+      <details open className="mb-5 group">
+        <summary className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-4 py-2.5 text-sm font-semibold text-[var(--color-ink)]">
+          Freelancers
+          <span className="rounded-full bg-[var(--color-ink)]/10 px-2 py-0.5 text-xs text-[var(--color-ink-muted)]">{freelancers.length}</span>
+          <span className="ml-auto text-xs font-normal text-[var(--color-ink-muted)]">in-/uitklappen</span>
+        </summary>
+        {freelancers.length === 0 ? (
+          <Card className="mt-2"><EmptyState title="Geen freelancers" /></Card>
+        ) : (
+          <Card padded={false} className="mt-2">
+            <Table head={head}>{freelancers.map(personRow)}</Table>
+          </Card>
+        )}
+      </details>
 
       {stats.length > 0 ? (
         <Card padded={false}>
