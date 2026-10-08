@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { AlertTriangle } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
-import { listVideos } from "@/server/videos";
-import { Avatar, Badge, Card, EmptyState, PageHeader, Table } from "@/components/ui";
+import { getVideoHighlights, listVideos } from "@/server/videos";
+import { Avatar, Badge, Card, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import {
   daysSince,
   formatDate,
@@ -37,11 +38,14 @@ export default async function VideosPage({
       ? undefined
       : "actief";
 
-  const rows = await listVideos(viewer, {
-    preset,
-    status: params.status,
-    clientSlug: params.klant,
-  });
+  const [rows, highlights] = await Promise.all([
+    listVideos(viewer, {
+      preset,
+      status: params.status,
+      clientSlug: params.klant,
+    }),
+    getVideoHighlights(viewer),
+  ]);
 
   const view = params.weergave === "kanban" ? "kanban" : "lijst";
 
@@ -63,6 +67,49 @@ export default async function VideosPage({
           </Suspense>
         }
       />
+
+      {/* Aandachtsblokken: automatisch uit Monday (fase + deadline). */}
+      {highlights.late > 0 || highlights.atClient > 0 ? (
+        <Card className="mb-4 border-[var(--color-bad)]/25 bg-[var(--color-bad-soft)]/40">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-[var(--color-bad)]" strokeWidth={1.75} />
+            <div className="text-sm">
+              <p className="font-semibold">Vraagt nu aandacht</p>
+              <ul className="mt-1 space-y-0.5 text-[var(--color-ink-muted)]">
+                {highlights.late > 0 ? (
+                  <li>
+                    <Link href="/videos?filter=te-laat" className="font-medium text-[var(--color-bad)] hover:underline">
+                      {highlights.late} video&apos;s over de deadline
+                    </Link>{" "}
+                    — moeten met voorrang afgerond worden.
+                  </li>
+                ) : null}
+                {highlights.atClient > 0 ? (
+                  <li>
+                    <Link href="/videos?filter=bij-klant" className="font-medium text-[var(--color-ink)] hover:underline">
+                      {highlights.atClient} video&apos;s wachten op klantfeedback
+                    </Link>
+                    {highlights.oldestAtClientDays > 0 ? ` — langst wachtende: ${highlights.oldestAtClientDays} dagen.` : "."}
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Te laat" value={highlights.late} tone={highlights.late > 0 ? "bad" : undefined} href="/videos?filter=te-laat" />
+        <Stat
+          label="Wacht op klant"
+          value={highlights.atClient}
+          hint={highlights.oldestAtClientDays > 0 ? `oudste: ${highlights.oldestAtClientDays} dagen` : undefined}
+          tone={highlights.atClient > 0 ? "warn" : undefined}
+          href="/videos?filter=bij-klant"
+        />
+        <Stat label="Wacht op editor" value={highlights.awaitingEditor} href="/videos?status=awaiting_editor" />
+        <Stat label="In productie" value={highlights.inProduction} href="/videos?filter=actief" />
+      </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
         {PRESETS.map((p) => {

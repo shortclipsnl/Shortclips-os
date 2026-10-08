@@ -96,6 +96,34 @@ export async function listVideos(viewer: Viewer, filter: VideoFilter = {}) {
     .limit(400);
 }
 
+/** Aandachtscijfers voor de highlight-blokken boven de videolijst. Respecteert
+ *  klantscope en editor-only, net als listVideos. Voedt zich uit Monday (fase +
+ *  deadline) via de deliverables-tabel. */
+export async function getVideoHighlights(viewer: Viewer) {
+  const base = [isNull(deliverables.deletedAt), scopeToClients(viewer, deliverables.clientId)];
+  if (viewer.isEditorOnly) base.push(eq(deliverables.editorId, viewer.id));
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [row] = await db
+    .select({
+      late: sql<number>`count(*) filter (where ${deliverables.dueOn} < ${today} and ${deliverables.status} not in ('published','analysis_available'))`,
+      atClient: sql<number>`count(*) filter (where ${deliverables.status} in ('client_review','client_revision'))`,
+      awaitingEditor: sql<number>`count(*) filter (where ${deliverables.status} = 'awaiting_editor')`,
+      inProduction: sql<number>`count(*) filter (where ${deliverables.status} not in ('published','analysis_available'))`,
+      oldestAtClient: sql<number>`coalesce(max(extract(day from now() - ${deliverables.statusChangedAt})) filter (where ${deliverables.status} in ('client_review','client_revision')), 0)`,
+    })
+    .from(deliverables)
+    .where(and(...base));
+
+  return {
+    late: Number(row?.late ?? 0),
+    atClient: Number(row?.atClient ?? 0),
+    awaitingEditor: Number(row?.awaitingEditor ?? 0),
+    inProduction: Number(row?.inProduction ?? 0),
+    oldestAtClientDays: Math.round(Number(row?.oldestAtClient ?? 0)),
+  };
+}
+
 export type VideoRow = Awaited<ReturnType<typeof listVideos>>[number];
 
 export async function getVideo(viewer: Viewer, id: string) {
