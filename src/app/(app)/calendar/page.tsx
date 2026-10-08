@@ -92,6 +92,11 @@ export default async function CalendarPage({
         description={`${items.length} items in ${periodLabel(period)}`}
         actions={
           <div className="flex items-center gap-2">
+            {canWrite ? (
+              <Link href="/calendar/plannen" className="rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--color-indigo-soft)]">
+                Automatisch plannen
+              </Link>
+            ) : null}
             <Link href={withParam("maand", fmt(prev))} className="sc-card px-3 py-1.5 text-sm hover:bg-[var(--color-surface-sunken)]">
               ←
             </Link>
