@@ -17,11 +17,18 @@ export const dynamic = "force-dynamic";
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ dagen?: string }>;
+  searchParams: Promise<{ dagen?: string; klanten?: string }>;
 }) {
   await requirePermission("analytics:read");
   const params = await searchParams;
   const days = Number(params.dagen) || 30;
+  const klanten = params.klanten === "gestopt" ? "gestopt" : params.klanten === "alle" ? "alle" : "actief";
+  const statusCond =
+    klanten === "actief"
+      ? sql`and c.status = 'active'`
+      : klanten === "gestopt"
+        ? sql`and c.status in ('paused','churned')`
+        : sql``;
 
   const [totals, perClient, perPlatform, topVideos] = await Promise.all([
     db.execute(sql`
@@ -32,19 +39,20 @@ export default async function AnalyticsPage({
         coalesce(sum(dm.follower_delta), 0)::int as follower_growth,
         coalesce(sum(dm.posts_published), 0)::int as posts
       from daily_metrics dm
-      where dm.measured_on >= current_date - ${sql.raw(`interval '${days} days'`)}
+      join clients c on c.id = dm.client_id and c.deleted_at is null
+      where dm.measured_on >= current_date - ${sql.raw(`interval '${days} days'`)} ${statusCond}
     `),
 
     db.execute(sql`
-      select c.id, c.name, c.slug, c.color,
+      select c.id, c.name, c.slug, c.color, c.status,
         coalesce(sum(dm.views), 0)::int as views,
         coalesce(sum(dm.reach), 0)::int as reach,
         coalesce(sum(dm.follower_delta), 0)::int as follower_growth
       from clients c
       left join daily_metrics dm
         on dm.client_id = c.id and dm.measured_on >= current_date - ${sql.raw(`interval '${days} days'`)}
-      where c.deleted_at is null and c.status = 'active'
-      group by c.id, c.name, c.slug, c.color
+      where c.deleted_at is null ${statusCond}
+      group by c.id, c.name, c.slug, c.color, c.status
       order by views desc
     `),
 
@@ -54,8 +62,9 @@ export default async function AnalyticsPage({
         coalesce(sum(dm.reach), 0)::int as reach,
         coalesce(sum(dm.follower_delta), 0)::int as follower_growth
       from daily_metrics dm
+      join clients c on c.id = dm.client_id and c.deleted_at is null
       where dm.measured_on >= current_date - ${sql.raw(`interval '${days} days'`)}
-        and dm.platform is not null
+        and dm.platform is not null ${statusCond}
       group by dm.platform
       order by views desc
     `),
@@ -90,13 +99,13 @@ export default async function AnalyticsPage({
     <div className="mx-auto max-w-[1300px]">
       <PageHeader
         title="Resultaten"
-        description={`Alle klanten samen, afgelopen ${days} dagen`}
+        description={`${klanten === "gestopt" ? "Gestopte klanten" : klanten === "alle" ? "Alle klanten" : "Actieve klanten"}, afgelopen ${days} dagen · live uit Metricool`}
         actions={
           <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
             {[7, 30, 90].map((d) => (
               <Link
                 key={d}
-                href={`/analytics?dagen=${d}`}
+                href={`/analytics?dagen=${d}${klanten !== "actief" ? `&klanten=${klanten}` : ""}`}
                 className={
                   days === d
                     ? "rounded-[4px] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white"
@@ -109,6 +118,26 @@ export default async function AnalyticsPage({
           </div>
         }
       />
+
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {([
+          { key: "actief", label: "Actieve klanten" },
+          { key: "gestopt", label: "Gestopte klanten" },
+          { key: "alle", label: "Alle klanten" },
+        ] as const).map((f) => (
+          <Link
+            key={f.key}
+            href={`/analytics?dagen=${days}${f.key !== "actief" ? `&klanten=${f.key}` : ""}`}
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              klanten === f.key
+                ? "bg-[var(--color-ink)] text-white"
+                : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+            }`}
+          >
+            {f.label}
+          </Link>
+        ))}
+      </div>
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Stat label="Weergaven" value={compact(Number(t.views ?? 0))} />
