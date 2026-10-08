@@ -8,7 +8,7 @@ import {
   Send,
 } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
-import { getDashboard } from "@/server/dashboard";
+import { getDashboard, getDashboardTopStats } from "@/server/dashboard";
 import {
   Avatar,
   Badge,
@@ -45,7 +45,7 @@ export default async function DashboardPage() {
   // Editors krijgen een eigen, smaller dashboard met uitsluitend hun werk.
   if (viewer.isEditorOnly) return <EditorDashboard viewer={viewer} />;
 
-  const data = await getDashboard(viewer);
+  const [data, top] = await Promise.all([getDashboard(viewer), getDashboardTopStats(viewer)]);
 
   const firstName = viewer.fullName.split(" ")[0];
   const hour = new Date().getHours();
@@ -117,38 +117,31 @@ export default async function DashboardPage() {
       )}
 
       {/* Kerncijfers */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Stat
           label="Actieve klanten"
-          value={data.clients.active}
+          value={top.activeClients}
           hint={data.clients.atRisk.length > 0 ? `${data.clients.atRisk.length} met aandachtspunt` : "geen risico's"}
           tone={data.clients.atRisk.length > 0 ? "warn" : "good"}
           href="/clients"
         />
+        <Stat label="Opnames deze week" value={top.opnamesThisWeek} hint="komende 7 dagen" href="/productions" />
+        <Stat label="Video's in editing" value={top.inEditing} hint={`${data.videos.awaitingEditor} wacht op editor`} href="/videos?status=editing" />
         <Stat
-          label="In productie"
-          value={data.videos.open}
-          hint={`${data.videos.awaitingEditor} wacht op editor`}
-          href="/videos"
+          label="Deadline nadert"
+          value={top.dueSoon}
+          hint="binnen 5 werkdagen"
+          tone={top.dueSoon > 0 ? "warn" : "neutral"}
+          href="/videos?filter=actief"
         />
         <Stat
-          label="Bij de klant"
-          value={data.videos.atClient}
-          hint={
-            data.videos.stalledAtClient[0]
-              ? `oudste: ${daysSince(data.videos.stalledAtClient[0].statusChangedAt)} dagen`
-              : "niets openstaand"
-          }
-          tone={data.videos.stalledAtClient.some((v) => daysSince(v.statusChangedAt) > 5) ? "warn" : "neutral"}
-          href="/videos?filter=bij-klant"
-        />
-        <Stat
-          label="Te laat"
-          value={data.videos.late.length}
-          hint="video's over deadline"
-          tone={data.videos.late.length > 0 ? "bad" : "good"}
+          label="Over deadline"
+          value={top.overDeadline}
+          hint="moet met voorrang"
+          tone={top.overDeadline > 0 ? "bad" : "good"}
           href="/videos?filter=te-laat"
         />
+        <Stat label="Openstaande taken" value={top.openTasks} hint="alle medewerkers" href="/tasks" />
       </div>
 
       {/* Pipeline */}

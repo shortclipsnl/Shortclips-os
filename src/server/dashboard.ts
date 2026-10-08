@@ -487,3 +487,32 @@ export async function getDashboard(viewer: Viewer) {
 }
 
 export type DashboardData = Awaited<ReturnType<typeof getDashboard>>;
+
+/** De zes compacte kerncijfers bovenaan het dashboard. */
+export async function getDashboardTopStats(viewer: Viewer) {
+  const day = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  const today = day(0);
+  const active = ["recorded", "footage_upload", "awaiting_editor", "editing", "internal_review", "editor_revision", "client_review", "client_revision", "approved", "ready_to_publish", "scheduled"] as const;
+
+  const [clientsRow, shootsRow, editingRow, dueSoonRow, overRow, tasksRow] = await Promise.all([
+    db.select({ n: count() }).from(clients).where(and(isNull(clients.deletedAt), eq(clients.status, "active"), scopeToClients(viewer, clients.id))),
+    db.select({ n: count() }).from(productionDays).where(and(isNull(productionDays.deletedAt), gte(productionDays.scheduledOn, today), lte(productionDays.scheduledOn, day(7)), ne(productionDays.status, "cancelled"), scopeToClients(viewer, productionDays.clientId))),
+    db.select({ n: count() }).from(deliverables).where(and(isNull(deliverables.deletedAt), eq(deliverables.status, "editing"), scopeToClients(viewer, deliverables.clientId))),
+    db.select({ n: count() }).from(deliverables).where(and(isNull(deliverables.deletedAt), gte(deliverables.dueOn, today), lte(deliverables.dueOn, day(5)), inArray(deliverables.status, [...active]), scopeToClients(viewer, deliverables.clientId))),
+    db.select({ n: count() }).from(deliverables).where(and(isNull(deliverables.deletedAt), lt(deliverables.dueOn, today), inArray(deliverables.status, [...active]), scopeToClients(viewer, deliverables.clientId))),
+    db.select({ n: count() }).from(tasks).where(and(isNull(tasks.deletedAt), inArray(tasks.status, ["todo", "in_progress", "blocked"]), scopeToClients(viewer, tasks.clientId))),
+  ]);
+
+  return {
+    activeClients: Number(clientsRow[0]?.n ?? 0),
+    opnamesThisWeek: Number(shootsRow[0]?.n ?? 0),
+    inEditing: Number(editingRow[0]?.n ?? 0),
+    dueSoon: Number(dueSoonRow[0]?.n ?? 0),
+    overDeadline: Number(overRow[0]?.n ?? 0),
+    openTasks: Number(tasksRow[0]?.n ?? 0),
+  };
+}
