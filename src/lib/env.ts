@@ -63,9 +63,12 @@ const schema = z.object({
   // Zonder sleutel blijven de AI Tools slapend (net als e-mail): de schermen
   // werken, maar er wordt niets gegenereerd.
   ANTHROPIC_API_KEY: z.string().optional(),
-  // Model voor de AI Tools. Opus = hoogste kwaliteit; zet op claude-sonnet-5-5
-  // of claude-haiku-5-5 om de kosten te drukken (zie AI Tools-documentatie).
-  AI_MODEL: z.string().default("claude-opus-5-5"),
+  // Model voor de AI Tools. Sonnet = beste prijs/kwaliteit; claude-opus-5-5 voor
+  // hoogste kwaliteit, claude-haiku-5-5 voor laagste kosten.
+  AI_MODEL: z.string().default("claude-sonnet-5-5"),
+  // Optioneel: YouTube Data API-sleutel voor echte kanaalcijfers in het
+  // bedrijfsonderzoek (Google Cloud, gratis quota).
+  YOUTUBE_API_KEY: z.string().optional(),
 
   // --- Achtergrondtaken ---
   CRON_SECRET: z.string().optional(),

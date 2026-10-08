@@ -105,6 +105,84 @@ export async function runJsonPrompt<T>(input: AiRunInput): Promise<
   return { ok: true, data: parsed, model: res.model };
 }
 
+/**
+ * Onderzoeksmodus: laat Claude zelf het web doorzoeken en pagina's ophalen
+ * (web search + web fetch, server-side bij Anthropic). Zo is de analyse
+ * gebaseerd op actuele, controleerbare bronnen in plaats van verzonnen tekst.
+ * Handelt pause_turn af (lang lopend onderzoek) tot het model klaar is.
+ */
+export async function runResearch(input: {
+  system: string;
+  user: string;
+  maxUses?: number;
+  maxTokens?: number;
+}): Promise<AiResult> {
+  if (!env.ANTHROPIC_API_KEY) return { ok: false, reason: "no_provider" };
+
+  try {
+    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    const model = aiModel();
+    const maxUses = input.maxUses ?? 12;
+
+    const tools = [
+      { type: "web_search_20260209", name: "web_search", max_uses: maxUses },
+      { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxUses },
+    ];
+
+    const messages: Anthropic.MessageParam[] = [{ role: "user", content: input.user }];
+    let guard = 0;
+    let last: Anthropic.Message | null = null;
+
+    // Lus voor pause_turn: het model kan tussendoor pauzeren bij lang onderzoek.
+    while (guard++ < 10) {
+      const body = {
+        model,
+        max_tokens: input.maxTokens ?? 16000,
+        system: input.system,
+        messages,
+        tools,
+      } as unknown as Anthropic.MessageCreateParamsNonStreaming;
+
+      const response = await client.messages.create(body);
+      last = response;
+      if (response.stop_reason === "refusal") {
+        return { ok: false, reason: "error", error: "Het model weigerde dit verzoek." };
+      }
+      if (response.stop_reason === "pause_turn") {
+        messages.push({ role: "assistant", content: response.content });
+        continue;
+      }
+      break;
+    }
+
+    const text = (last?.content ?? [])
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("\n")
+      .trim();
+
+    return { ok: true, text, model };
+  } catch (error) {
+    if (error instanceof Anthropic.APIError) {
+      return { ok: false, reason: "error", error: `${error.status ?? ""} ${error.message}`.trim() };
+    }
+    return { ok: false, reason: "error", error: String(error) };
+  }
+}
+
+export async function runJsonResearch<T>(input: {
+  system: string;
+  user: string;
+  maxUses?: number;
+  maxTokens?: number;
+}): Promise<{ ok: true; data: T; model: string } | { ok: false; reason: "no_provider" | "error"; error?: string }> {
+  const res = await runResearch(input);
+  if (!res.ok) return res;
+  const parsed = extractJson<T>(res.text);
+  if (parsed === null) return { ok: false, reason: "error", error: "Kon het onderzoeksresultaat niet lezen (geen geldige JSON)." };
+  return { ok: true, data: parsed, model: res.model };
+}
+
 function extractJson<T>(text: string): T | null {
   const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
   try {

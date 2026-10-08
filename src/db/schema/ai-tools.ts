@@ -73,6 +73,44 @@ export const aiOutputs = pgTable(
   (t) => [index("ai_outputs_client_idx").on(t.clientId, t.tool)],
 );
 
+/**
+ * Bedrijfsonderzoek / sales-analyse per (potentiële) klant. Invoer + het
+ * gestructureerde onderzoeksresultaat (jsonb) + bronlinks. Status: 'concept'
+ * (nog niet onderzocht), 'klaar' (onderzoek uitgevoerd).
+ */
+export const salesResearch = pgTable(
+  "sales_research",
+  {
+    id: pk(),
+    /** Optioneel gekoppeld aan een bestaande klant. */
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+    companyName: varchar("company_name", { length: 200 }).notNull(),
+    website: varchar("website", { length: 300 }),
+    instagram: varchar("instagram", { length: 300 }),
+    tiktok: varchar("tiktok", { length: 300 }),
+    linkedin: varchar("linkedin", { length: 300 }),
+    facebook: varchar("facebook", { length: 300 }),
+    youtube: varchar("youtube", { length: 300 }),
+    branche: varchar("branche", { length: 160 }),
+    extra: text("extra"),
+    status: varchar("status", { length: 24 }).notNull().default("concept"),
+    /** Gestructureerd resultaat (bedrijf, social-analyse, pijnpunten, kansen,
+     *  video-ideeën, concurrenten, slide-selectie). */
+    result: jsonb("result").notNull().default(sql`'{}'::jsonb`),
+    /** Bronlinks: [{ label, url, checkedAt }]. */
+    sources: jsonb("sources").notNull().default(sql`'[]'::jsonb`),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+    ...softDelete,
+  },
+  (t) => [index("sales_research_client_idx").on(t.clientId)],
+);
+
+export const salesResearchRelations = relations(salesResearch, ({ one }) => ({
+  client: one(clients, { fields: [salesResearch.clientId], references: [clients.id] }),
+  createdBy: one(users, { fields: [salesResearch.createdById], references: [users.id] }),
+}));
+
 export const clientAiProfilesRelations = relations(clientAiProfiles, ({ one }) => ({
   client: one(clients, { fields: [clientAiProfiles.clientId], references: [clients.id] }),
 }));
