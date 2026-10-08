@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -11,6 +12,7 @@ import {
   Badge,
   Card,
   CardHeader,
+  LinkButton,
   PageHeader,
   Table,
 } from "@/components/ui";
@@ -35,6 +37,7 @@ const ROLE_LABELS: Record<string, string> = {
 export default async function TeamPage() {
   const viewer = await requirePermission("team:read");
   const canSeeCosts = viewer.permissions.has("finance:read_costs");
+  const canWrite = viewer.permissions.has("team:write");
 
   const [people, editorStats] = await Promise.all([
     db.select({
@@ -42,6 +45,7 @@ export default async function TeamPage() {
       fullName: users.fullName,
       email: users.email,
       role: users.primaryRole,
+      status: users.status,
       jobTitle: teamMembers.jobTitle,
       color: teamMembers.color,
       weeklyVideoCapacity: teamMembers.weeklyVideoCapacity,
@@ -100,6 +104,7 @@ export default async function TeamPage() {
       <PageHeader
         title="Team"
         description="Bezetting, openstaand werk en editorprestaties."
+        actions={canWrite ? <LinkButton href="/team/new">Nieuw teamlid</LinkButton> : undefined}
       />
 
       <Card padded={false} className="mb-5">
@@ -116,6 +121,7 @@ export default async function TeamPage() {
               <th className="sc-th text-right">Capaciteit/week</th>
               <th className="sc-th text-right">Opnames gepland</th>
               <th className="sc-th">Belasting</th>
+              {canWrite ? <th className="sc-th" /> : null}
             </>
           }
         >
@@ -130,7 +136,10 @@ export default async function TeamPage() {
                   <span className="flex items-center gap-2.5">
                     <Avatar name={p.fullName} color={p.color} size={26} />
                     <span>
-                      <span className="block font-medium">{p.fullName}</span>
+                      <span className="flex items-center gap-2 font-medium">
+                        {p.fullName}
+                        {p.status !== "active" ? <Badge tone="neutral">Gedeactiveerd</Badge> : null}
+                      </span>
                       <span className="block text-xs text-[var(--color-ink-muted)]">
                         {p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}
                         {!p.isInternal ? " · freelance" : ""}
@@ -167,6 +176,13 @@ export default async function TeamPage() {
                     <Badge tone="good">ruimte ({pct(load, 0)})</Badge>
                   )}
                 </td>
+                {canWrite ? (
+                  <td className="sc-td text-right">
+                    <Link href={`/team/${p.id}/edit`} className="text-sm text-[var(--color-brand-600)] hover:underline">
+                      Bewerken
+                    </Link>
+                  </td>
+                ) : null}
               </tr>
             );
           })}
