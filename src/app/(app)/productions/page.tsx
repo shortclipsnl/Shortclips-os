@@ -17,7 +17,9 @@ export default async function ProductionsPage({
 }) {
   const viewer = await requireInternal();
   const params = await searchParams;
-  const when = params.periode === "verleden" ? "verleden" : "komend";
+  const when =
+    params.periode === "verleden" ? "verleden" : params.periode === "deze-week" ? "deze-week" : "komend";
+  const todayStr = new Date().toISOString().slice(0, 10);
   const [rows, monthStats, nextPerClient, overview] = await Promise.all([
     listProductionDays(viewer, when),
     getMonthShootStats(viewer),
@@ -35,33 +37,30 @@ export default async function ProductionsPage({
         description="Gesynchroniseerd vanuit Google Agenda"
         actions={
           <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
-            <Link
-              href="/productions"
-              className={
-                when === "komend"
-                  ? "rounded-[4px] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white"
-                  : "px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)]"
-              }
-            >
-              Komend
-            </Link>
-            <Link
-              href="/productions?periode=verleden"
-              className={
-                when === "verleden"
-                  ? "rounded-[4px] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white"
-                  : "px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)]"
-              }
-            >
-              Geweest
-            </Link>
+            {([
+              { key: "deze-week", label: "Deze week", href: "/productions?periode=deze-week" },
+              { key: "komend", label: "Komend", href: "/productions" },
+              { key: "verleden", label: "Geweest", href: "/productions?periode=verleden" },
+            ] as const).map((opt) => (
+              <Link
+                key={opt.key}
+                href={opt.href}
+                className={
+                  when === opt.key
+                    ? "rounded-[4px] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white"
+                    : "px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)]"
+                }
+              >
+                {opt.label}
+              </Link>
+            ))}
           </div>
         }
       />
 
       {/* Overzicht: deze week / deze maand / eerstvolgende + per videograaf. */}
       <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Deze week" value={overview.thisWeek} hint="komende 7 dagen" href="/productions" />
+        <Stat label="Deze week" value={overview.thisWeek} hint="komende 7 dagen" href="/productions?periode=deze-week" />
         <Stat label={`Gepland in ${monthLabel}`} value={monthStats.planned} />
         <Stat label="Afgerond deze maand" value={monthStats.completed} tone={monthStats.completed > 0 ? "good" : undefined} />
         <Stat
@@ -128,7 +127,13 @@ export default async function ProductionsPage({
       {rows.length === 0 ? (
         <Card>
           <EmptyState
-            title={when === "komend" ? "Geen opnamedagen gepland" : "Geen opnamedagen in het verleden"}
+            title={
+              when === "deze-week"
+                ? "Geen opnames deze week (ma t/m zo)"
+                : when === "komend"
+                  ? "Geen opnamedagen gepland"
+                  : "Geen opnamedagen in het verleden"
+            }
           />
         </Card>
       ) : (
@@ -136,21 +141,24 @@ export default async function ProductionsPage({
           {rows.map((d) => {
             const days = daysUntil(d.scheduledOn);
             const blockers = Number(d.openBlockers) + Number(d.unapprovedScripts);
-            const atRisk = when === "komend" && days <= 2 && blockers > 0;
+            const atRisk = when !== "verleden" && days <= 2 && days >= 0 && blockers > 0;
+            const isToday = d.scheduledOn === todayStr;
             return (
               <Link key={d.id} href={`/productions/${d.id}`} className="block">
                 <Card
                   className={
-                    atRisk
-                      ? "border-[var(--color-bad)]/30 transition-shadow hover:shadow-[var(--shadow-raised)]"
-                      : "transition-shadow hover:shadow-[var(--shadow-raised)]"
+                    isToday
+                      ? "ring-2 ring-[var(--color-indigo-ink)] transition-shadow hover:shadow-[var(--shadow-raised)]"
+                      : atRisk
+                        ? "border-[var(--color-bad)]/30 transition-shadow hover:shadow-[var(--shadow-raised)]"
+                        : "transition-shadow hover:shadow-[var(--shadow-raised)]"
                   }
                 >
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="flex min-w-0 items-start gap-4">
-                      <div className="w-16 shrink-0 rounded-[var(--radius-md)] bg-[var(--color-surface-sunken)] py-2 text-center">
-                        <p className="text-2xs tracking-wide text-[var(--color-ink-faint)] uppercase">
-                          {new Date(d.scheduledOn).toLocaleDateString("nl-NL", { month: "short" })}
+                      <div className={`w-16 shrink-0 rounded-[var(--radius-md)] py-2 text-center ${isToday ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-surface-sunken)]"}`}>
+                        <p className={`text-2xs tracking-wide uppercase ${isToday ? "text-white/70" : "text-[var(--color-ink-faint)]"}`}>
+                          {isToday ? "Vandaag" : new Date(d.scheduledOn).toLocaleDateString("nl-NL", { month: "short" })}
                         </p>
                         <p className="text-xl leading-tight font-semibold tabular-nums">
                           {new Date(d.scheduledOn).getDate()}
@@ -178,7 +186,7 @@ export default async function ProductionsPage({
                       <Badge tone={PRODUCTION_STATUS[d.status]?.tone ?? "neutral"}>
                         {PRODUCTION_STATUS[d.status]?.label ?? d.status}
                       </Badge>
-                      {when === "komend" ? (
+                      {when !== "verleden" ? (
                         <span className="text-xs text-[var(--color-ink-muted)]">
                           {relativeDays(d.scheduledOn)}
                         </span>
@@ -188,7 +196,7 @@ export default async function ProductionsPage({
                           <AlertTriangle className="size-3.5" />
                           {plural(blockers, "punt open", "punten open")}
                         </span>
-                      ) : blockers > 0 && when === "komend" ? (
+                      ) : blockers > 0 && when !== "verleden" ? (
                         <Badge tone="warn">{plural(blockers, "punt open", "punten open")}</Badge>
                       ) : null}
                     </div>

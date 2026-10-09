@@ -14,7 +14,23 @@ import { assertClientAccess, scopeToClients, type Viewer } from "@/server/auth/c
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export async function listProductionDays(viewer: Viewer, when: "komend" | "verleden" = "komend") {
+/** Maandag (start) en de eerstvolgende maandag (einde, exclusief) van de
+ *  huidige kalenderweek — zodat "Deze week" altijd ma t/m zo beslaat. */
+function currentWeekRange(): { start: string; end: string } {
+  const now = new Date();
+  const dow = (now.getDay() + 6) % 7; // ma=0 … zo=6
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - dow);
+  const nextMonday = new Date(monday);
+  nextMonday.setDate(monday.getDate() + 7);
+  return { start: monday.toISOString().slice(0, 10), end: nextMonday.toISOString().slice(0, 10) };
+}
+
+export async function listProductionDays(
+  viewer: Viewer,
+  when: "komend" | "verleden" | "deze-week" = "komend",
+) {
+  const week = when === "deze-week" ? currentWeekRange() : null;
   return db
     .select({
       id: productionDays.id,
@@ -38,16 +54,18 @@ export async function listProductionDays(viewer: Viewer, when: "komend" | "verle
     .where(
       and(
         isNull(productionDays.deletedAt),
-        when === "komend"
-          ? gte(productionDays.scheduledOn, today())
-          : lt(productionDays.scheduledOn, today()),
+        week
+          ? and(gte(productionDays.scheduledOn, week.start), lt(productionDays.scheduledOn, week.end))
+          : when === "komend"
+            ? gte(productionDays.scheduledOn, today())
+            : lt(productionDays.scheduledOn, today()),
         scopeToClients(viewer, productionDays.clientId),
       ),
     )
     .orderBy(
-      when === "komend"
-        ? asc(productionDays.scheduledOn)
-        : desc(productionDays.scheduledOn),
+      when === "verleden"
+        ? desc(productionDays.scheduledOn)
+        : asc(productionDays.scheduledOn),
     )
     .limit(200);
 }
