@@ -6,9 +6,17 @@ import { requireInternal } from "@/server/auth/context";
 import { getVideoHighlights, listVideos } from "@/server/videos";
 import { Avatar, Badge, Card, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import {
+  daysSince,
   formatDate,
 } from "@/lib/format";
-import { VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
+import { VIDEO_STATUS, VIDEO_WAITING_ON, stageOverdue, type VideoStage } from "@/lib/statuses";
+
+const WAITING_ON: Record<string, { label: string; color: string }> = {
+  client: { label: "Klant", color: "var(--color-warn)" },
+  editor: { label: "Editor", color: "var(--color-brand-600)" },
+  shortclips: { label: "Eigen team", color: "var(--color-indigo-ink)" },
+  none: { label: "—", color: "var(--color-ink-faint)" },
+};
 import { ViewSwitch } from "./view-switch";
 import { Kanban } from "./kanban";
 
@@ -156,8 +164,10 @@ export default async function VideosPage({
               <>
                 <th className="sc-th">Video</th>
                 <th className="sc-th">Klant</th>
-                <th className="sc-th">Editor</th>
                 <th className="sc-th">Fase</th>
+                <th className="sc-th">Wacht op</th>
+                <th className="sc-th">In fase</th>
+                <th className="sc-th">Editor</th>
                 <th className="sc-th">Deadline</th>
                 <th className="sc-th">Status</th>
               </>
@@ -171,13 +181,19 @@ export default async function VideosPage({
               const overdue = v.dueOn && v.dueOn < today;
               const nearing = v.dueOn && v.dueOn >= today && v.dueOn <= soonStr;
               const waiting = v.status === "client_review" || v.status === "client_revision";
+              const inPhase = daysSince(v.statusChangedAt);
+              const stuck = stageOverdue(v.status, inPhase);
+              const waitOn = WAITING_ON[VIDEO_WAITING_ON[v.status as VideoStage] ?? "none"];
+              const fase = VIDEO_STATUS[v.status as VideoStage];
               const health = overdue
                 ? { label: "Te laat", tone: "bad" as const }
-                : waiting
-                  ? { label: "Wacht op feedback", tone: "neutral" as const }
-                  : nearing
-                    ? { label: "Deadline nadert", tone: "warn" as const }
-                    : { label: "Op schema", tone: "good" as const };
+                : stuck
+                  ? { label: "Loopt vast", tone: "bad" as const }
+                  : waiting
+                    ? { label: "Wacht op feedback", tone: "neutral" as const }
+                    : nearing
+                      ? { label: "Deadline nadert", tone: "warn" as const }
+                      : { label: "Op schema", tone: "good" as const };
               return (
                 <tr key={v.id} className="sc-row-link">
                   <td className="sc-td">
@@ -191,8 +207,23 @@ export default async function VideosPage({
                       {v.clientName}
                     </Link>
                   </td>
+                  <td className="sc-td">
+                    <Badge tone={fase?.tone ?? "neutral"}>{fase?.short ?? v.status}</Badge>
+                  </td>
+                  <td className="sc-td">
+                    {waitOn.label === "—" ? (
+                      <span className="text-[var(--color-ink-faint)]">—</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: waitOn.color }}>
+                        <span className="size-2 rounded-full" style={{ background: waitOn.color }} />
+                        {waitOn.label}
+                      </span>
+                    )}
+                  </td>
+                  <td className={`sc-td tabular-nums ${stuck ? "font-semibold text-[var(--color-bad)]" : "text-[var(--color-ink-muted)]"}`}>
+                    {inPhase} d
+                  </td>
                   <td className="sc-td text-[var(--color-ink-muted)]">{v.editorName ?? "—"}</td>
-                  <td className="sc-td text-[var(--color-ink-muted)]">{VIDEO_STATUS[v.status as VideoStage]?.short ?? v.status}</td>
                   <td className={`sc-td ${overdue ? "font-medium text-[var(--color-bad)]" : "text-[var(--color-ink-muted)]"}`}>
                     {v.dueOn ? formatDate(v.dueOn) : "—"}
                   </td>
