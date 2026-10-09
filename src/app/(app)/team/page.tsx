@@ -101,7 +101,7 @@ export default async function TeamPage() {
     (editorStats as unknown as Array<Record<string, unknown>>)) as Array<Record<string, unknown>>;
 
   // Operationele kern bovenaan, daarna de overige specialisten.
-  const CORE = ["jarno", "milou", "jiska", "rutger"];
+  const CORE = ["jarno", "milou", "jeska", "rutger"];
   const firstName = (n: string) => n.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
   const isCore = (n: string) => CORE.includes(firstName(n));
   const sortedPeople = [...people].sort((a, b) => {
