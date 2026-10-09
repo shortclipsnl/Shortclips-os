@@ -315,6 +315,8 @@ export async function getDashboard(viewer: Viewer) {
         editorName: users.fullName,
         open: count(),
         overdue: sql<number>`count(*) filter (where deliverables.due_on < ${today()})`,
+        dueSoon: sql<number>`count(*) filter (where deliverables.due_on >= ${today()} and deliverables.due_on <= ${dateIn(3)})`,
+        nextDue: sql<string | null>`min(deliverables.due_on) filter (where deliverables.due_on >= ${today()})`,
       })
       .from(deliverables)
       .innerJoin(users, eq(users.id, deliverables.editorId))

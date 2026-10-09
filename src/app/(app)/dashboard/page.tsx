@@ -15,6 +15,7 @@ import {
 import { RISK_LEVEL, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 import { PipelineStrip } from "./pipeline-strip";
 import { EditorDashboard } from "./editor-view";
+import { DayScheduleStrip } from "./day-schedule";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -104,6 +105,9 @@ export default async function DashboardPage() {
         <NavyStat label="Deadlines" value={top.overDeadline} hint={`${top.dueSoon} naderen`} accent={top.overDeadline > 0 ? "var(--color-bad)" : undefined} href="/videos?filter=te-laat" />
         <NavyStat label="Openstaande taken" value={top.openTasks} hint="alle medewerkers" href="/tasks" />
       </div>
+
+      {/* Dagindeling Shortclips — vaste dagstructuur, compact */}
+      <DayScheduleStrip />
 
       {/* Pipeline — prominent, in de huisstijl */}
       <Card padded={false} className="overflow-hidden ring-1 ring-[var(--color-indigo-ink)]/15">
@@ -221,22 +225,58 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Editorbelasting — hoog op de homepage, zodat direct zichtbaar is hoeveel werk bij de editors ligt. */}
-      <Card padded={false} className="overflow-hidden">
-        <div className="bg-[var(--color-indigo-ink)] px-5 py-3 text-sm font-bold tracking-tight text-white">Editorbelasting</div>
+      {/* Editorbelasting — prominent: hoeveel werk ligt waar, en wie is overbelast. */}
+      <Card padded={false} className="overflow-hidden ring-1 ring-[var(--color-indigo-ink)]/15">
+        <div className="flex items-center justify-between gap-2 bg-[var(--color-indigo-ink)] px-5 py-3 text-white">
+          <div>
+            <h2 className="text-base font-bold tracking-tight">Editorbelasting</h2>
+            <p className="text-xs text-white/70">Hoeveel video&apos;s liggen er per editor, en wie heeft nog ruimte?</p>
+          </div>
+          <div className="hidden shrink-0 items-center gap-3 text-2xs text-white/70 sm:flex">
+            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-[var(--color-good)]" />normaal</span>
+            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-[var(--color-warn)]" />hoog</span>
+            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-[var(--color-bad)]" />overbelast</span>
+          </div>
+        </div>
         {data.editors.length === 0 ? (
-          <EmptyState title="Geen lopend editwerk" />
+          <EmptyState title="Geen lopend editwerk" description="Er staan nu geen video's in de editfase." />
         ) : (
-          <ul className="divide-y divide-[var(--color-line)] sm:grid sm:grid-cols-2 sm:divide-y-0 sm:[&>li]:border-b sm:[&>li]:border-[var(--color-line)]">
-            {data.editors.map((e) => (
-              <li key={e.editorId} className="flex items-center gap-3 px-5 py-3">
-                <Avatar name={e.editorName} size={26} />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{e.editorName}</span>
-                {Number(e.overdue) > 0 ? <Badge tone="bad">{Number(e.overdue)} te laat</Badge> : null}
-                <span className="text-sm font-semibold tabular-nums">{Number(e.open)}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+            {data.editors.map((e) => {
+              const open = Number(e.open);
+              const overdue = Number(e.overdue);
+              const soon = Number(e.dueSoon);
+              const level = editorLevel(open, overdue);
+              const maxOpen = Math.max(6, ...data.editors.map((x) => Number(x.open)));
+              return (
+                <div key={e.editorId} className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3.5">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={e.editorName} size={34} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold">{e.editorName}</div>
+                      <div className="text-xs" style={{ color: level.color }}>{level.label}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold leading-none tabular-nums">{open}</div>
+                      <div className="text-2xs text-[var(--color-ink-faint)]">in behandeling</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
+                    <span className="block h-full rounded-full" style={{ width: `${Math.min(100, (open / maxOpen) * 100)}%`, background: level.color }} />
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    {overdue > 0 ? <Badge tone="bad">{overdue} te laat</Badge> : null}
+                    {soon > 0 ? <Badge tone="warn">{soon} deadline ≤3d</Badge> : null}
+                    {e.nextDue ? (
+                      <span className="text-2xs text-[var(--color-ink-muted)]">eerstvolgende deadline {formatDate(e.nextDue)}</span>
+                    ) : overdue === 0 && soon === 0 ? (
+                      <span className="text-2xs text-[var(--color-ink-faint)]">geen deadline binnenkort</span>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </Card>
 
@@ -334,6 +374,13 @@ export default async function DashboardPage() {
       </div>
     </div>
   );
+}
+
+/** Belastingniveau van een editor op basis van openstaande en te late video's. */
+function editorLevel(open: number, overdue: number): { label: string; color: string } {
+  if (overdue > 0 || open >= 7) return { label: "Mogelijk overbelast", color: "var(--color-bad)" };
+  if (open >= 4) return { label: "Hoge belasting", color: "var(--color-warn)" };
+  return { label: "Normale belasting", color: "var(--color-good)" };
 }
 
 function NavyStat({
