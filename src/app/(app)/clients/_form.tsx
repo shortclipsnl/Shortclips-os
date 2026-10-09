@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, Upload } from "lucide-react";
 import {
   createClient,
   deleteClient,
@@ -152,8 +152,8 @@ export function ClientForm({
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Logo-URL">
-          <input className="sc-input" value={draft.logoUrl} onChange={(e) => set("logoUrl", e.target.value)} placeholder="https://…" />
+        <Field label="Klantlogo" hint="Upload een afbeelding (PNG/JPG/SVG) of plak een logo-URL.">
+          <LogoPicker value={draft.logoUrl} onChange={(v) => set("logoUrl", v)} name={draft.name} />
         </Field>
         <Field label="Accentkleur" hint="Hex, bijv. #2E90FA.">
           <div className="flex items-center gap-2">
@@ -275,6 +275,92 @@ function DangerZone({
       ) : null}
 
       {result && !result.ok ? <ErrorNote>{result.message}</ErrorNote> : null}
+    </div>
+  );
+}
+
+/** Verkleint een geüploade afbeelding naar max 256px en levert een data-URL,
+ *  zodat het logo direct opgeslagen kan worden zonder externe opslag. SVG blijft
+ *  ongewijzigd (vector). */
+function readLogo(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (file.type === "image/svg+xml") {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error("Lezen mislukt"));
+      r.readAsDataURL(file);
+      return;
+    }
+    const r = new FileReader();
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 256;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas niet beschikbaar"));
+        ctx.drawImage(img, 0, 0, w, h);
+        const type = file.type === "image/png" ? "image/png" : "image/jpeg";
+        resolve(canvas.toDataURL(type, 0.9));
+      };
+      img.onerror = () => reject(new Error("Ongeldige afbeelding"));
+      img.src = String(r.result);
+    };
+    r.onerror = () => reject(new Error("Lezen mislukt"));
+    r.readAsDataURL(file);
+  });
+}
+
+function LogoPicker({ value, onChange, name }: { value: string; onChange: (v: string) => void; name: string }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function onFile(file?: File) {
+    if (!file) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      onChange(await readLogo(file));
+    } catch {
+      setErr("Kon dit bestand niet verwerken. Kies een PNG, JPG of SVG.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex items-start gap-3">
+      <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)]">
+        {value ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={value} alt={name || "Logo"} className="size-full object-contain" />
+        ) : (
+          <span className="text-2xs text-[var(--color-ink-faint)]">geen logo</span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-sunken)]">
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+            Logo uploaden
+          </button>
+          {value ? (
+            <button type="button" onClick={() => onChange("")} className="rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-bad)]">
+              Verwijderen
+            </button>
+          ) : null}
+          <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+        </div>
+        <input className="sc-input text-xs" value={value.startsWith("data:") ? "" : value} onChange={(e) => onChange(e.target.value)} placeholder="of plak een logo-URL (https://…)" />
+        {err ? <p className="text-xs text-[var(--color-bad)]">{err}</p> : null}
+      </div>
     </div>
   );
 }

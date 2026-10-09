@@ -20,6 +20,7 @@ export default async function ClientsPage() {
     name: c.name,
     status: c.status,
     color: c.color,
+    logoUrl: c.logoUrl,
     coordinatorName: c.coordinatorName,
     nextShoot: c.nextShoot,
     inProduction: Number(c.inProduction),

@@ -15,6 +15,7 @@ export type BoardClient = {
   name: string;
   status: string;
   color: string | null;
+  logoUrl: string | null;
   coordinatorName: string | null;
   nextShoot: string | null;
   inProduction: number;
@@ -90,11 +91,20 @@ function ClientCard({ c, canWrite }: { c: BoardClient; canWrite: boolean }) {
   return (
     <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5 hover:shadow-[var(--shadow-raised)]">
       <Link href={`/clients/${c.slug}`} className="flex min-w-0 flex-1 items-center gap-3">
-        <Avatar name={c.name} color={c.color} size={34} />
+        {c.logoUrl ? (
+          <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] p-0.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={c.logoUrl} alt="" className="max-h-full max-w-full object-contain" />
+          </span>
+        ) : (
+          <Avatar name={c.name} color={c.color} size={34} />
+        )}
         <span className="min-w-0">
           <span className="flex items-center gap-2">
             <span className="truncate font-medium">{c.name}</span>
-            <Badge tone={CLIENT_STATUS[c.status]?.tone ?? "neutral"}>{CLIENT_STATUS[c.status]?.label ?? c.status}</Badge>
+            {stopped ? (
+              <Badge tone={CLIENT_STATUS[c.status]?.tone ?? "neutral"}>{CLIENT_STATUS[c.status]?.label ?? c.status}</Badge>
+            ) : null}
           </span>
           <span className="mt-0.5 block truncate text-xs text-[var(--color-ink-muted)]">
             {c.shortsPerMonth > 0 ? `${c.shortsPerMonth} shorts/maand` : "shorts/maand onbekend"}

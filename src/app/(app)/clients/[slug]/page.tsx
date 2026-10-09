@@ -124,30 +124,41 @@ export default async function ClientPage({
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {c.riskLevel !== "none" ? (
-              <Badge tone={RISK_LEVEL[c.riskLevel]?.tone ?? "neutral"}>
-                {RISK_LEVEL[c.riskLevel]?.label}
-              </Badge>
-            ) : (
-              <Badge tone={CLIENT_STATUS[c.status]?.tone ?? "neutral"}>
-                {CLIENT_STATUS[c.status]?.label}
-              </Badge>
-            )}
-            {c.website ? (
-              <a
-                href={c.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-[var(--color-brand-600)] hover:underline"
-              >
-                Website <ExternalLink className="size-3.5" />
-              </a>
-            ) : null}
-            {viewer.permissions.has("clients:write") ? (
-              <LinkButton href={`/clients/${slug}/edit`} variant="secondary" size="sm">
-                Bewerken
-              </LinkButton>
+          <div className="flex items-start gap-4">
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {c.riskLevel !== "none" ? (
+                  <Badge tone={RISK_LEVEL[c.riskLevel]?.tone ?? "neutral"}>
+                    {RISK_LEVEL[c.riskLevel]?.label}
+                  </Badge>
+                ) : (
+                  <Badge tone={c.status === "active" ? "ink" : CLIENT_STATUS[c.status]?.tone ?? "neutral"}>
+                    {CLIENT_STATUS[c.status]?.label}
+                  </Badge>
+                )}
+                {c.website ? (
+                  <a
+                    href={c.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-[var(--color-brand-600)] hover:underline"
+                  >
+                    Website <ExternalLink className="size-3.5" />
+                  </a>
+                ) : null}
+                {viewer.permissions.has("clients:write") ? (
+                  <LinkButton href={`/clients/${slug}/edit`} variant="secondary" size="sm">
+                    Bewerken
+                  </LinkButton>
+                ) : null}
+              </div>
+            </div>
+            {/* Klantlogo rechts, voor snelle herkenning. */}
+            {c.logoUrl ? (
+              <div className="grid h-16 w-24 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-1.5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={c.logoUrl} alt={`${c.name} logo`} className="max-h-full max-w-full object-contain" />
+              </div>
             ) : null}
           </div>
         </div>
