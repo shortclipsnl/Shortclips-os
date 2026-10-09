@@ -11,8 +11,32 @@ import {
   requirePermission,
 } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
+import { notify } from "@/server/notifications";
 
 export type ActionResult = { ok: boolean; message?: string };
+
+/** Meldt de nieuwe verantwoordelijke dat er een taak aan hem/haar is toegewezen.
+ *  Niet melden als iemand een taak aan zichzelf toewijst. */
+async function notifyAssigned(
+  assigneeId: string | null | undefined,
+  byName: string,
+  byId: string,
+  taskId: string,
+  title: string,
+) {
+  if (!assigneeId || assigneeId === byId) return;
+  await notify({
+    userIds: [assigneeId],
+    type: "task_assigned",
+    level: "info",
+    title: `Taak toegewezen door ${byName}`,
+    body: title,
+    href: `/tasks?persoon=${assigneeId}`,
+    entityType: "task",
+    entityId: taskId,
+    dedupeKey: `task_assigned:${taskId}:${assigneeId}`,
+  });
+}
 
 export async function setTaskStatus(taskId: string, status: string): Promise<ActionResult> {
   try {
@@ -72,9 +96,24 @@ export async function createTasksBulk(input: { lines: string; assigneeId?: strin
     if (titles.length === 0) return { ok: false, message: "Typ minstens één taak." };
 
     const assigneeId = input.assigneeId && /^[0-9a-f-]{36}$/i.test(input.assigneeId) ? input.assigneeId : null;
-    await db.insert(tasks).values(
+    const inserted = await db.insert(tasks).values(
       titles.map((title) => ({ title: title.slice(0, 240), assigneeId, status: "todo" as const, createdById: viewer.id })),
-    );
+    ).returning({ id: tasks.id });
+
+    // Eén melding voor de hele batch als die aan iemand anders is toegewezen.
+    if (assigneeId && assigneeId !== viewer.id && inserted[0]) {
+      await notify({
+        userIds: [assigneeId],
+        type: "task_assigned",
+        level: "info",
+        title: `${titles.length} ${titles.length === 1 ? "taak" : "taken"} toegewezen door ${viewer.fullName}`,
+        body: titles.slice(0, 5).join(" · "),
+        href: `/tasks?persoon=${assigneeId}`,
+        entityType: "task",
+        entityId: inserted[0].id,
+        dedupeKey: `task_assigned_bulk:${inserted[0].id}:${assigneeId}`,
+      });
+    }
 
     revalidatePath("/tasks");
     revalidatePath("/dashboard");
@@ -92,7 +131,7 @@ export async function createTask(input: z.input<typeof createSchema>): Promise<A
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
     if (parsed.data.clientId) assertClientAccess(viewer, parsed.data.clientId);
 
-    await db.insert(tasks).values({
+    const [created] = await db.insert(tasks).values({
       title: parsed.data.title,
       clientId: parsed.data.clientId ?? null,
       assigneeId: parsed.data.assigneeId ?? null,
@@ -100,7 +139,9 @@ export async function createTask(input: z.input<typeof createSchema>): Promise<A
       dueOn: parsed.data.dueOn || null,
       status: "todo",
       createdById: viewer.id,
-    });
+    }).returning({ id: tasks.id });
+
+    await notifyAssigned(parsed.data.assigneeId, viewer.fullName, viewer.id, created!.id, parsed.data.title);
 
     revalidatePath("/tasks");
     revalidatePath("/dashboard");
@@ -128,7 +169,7 @@ export async function updateTask(
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
 
     const [task] = await db
-      .select({ id: tasks.id, clientId: tasks.clientId })
+      .select({ id: tasks.id, clientId: tasks.clientId, assigneeId: tasks.assigneeId, title: tasks.title })
       .from(tasks)
       .where(eq(tasks.id, taskId))
       .limit(1);
@@ -142,6 +183,11 @@ export async function updateTask(
     if (parsed.data.dueOn !== undefined) patch.dueOn = parsed.data.dueOn || null;
 
     await db.update(tasks).set(patch).where(eq(tasks.id, taskId));
+
+    // Overdragen aan een ander teamlid → die persoon krijgt een melding.
+    if (parsed.data.assigneeId !== undefined && parsed.data.assigneeId !== task.assigneeId) {
+      await notifyAssigned(parsed.data.assigneeId, viewer.fullName, viewer.id, taskId, parsed.data.title ?? task.title);
+    }
 
     await auditLog({
       viewer,
