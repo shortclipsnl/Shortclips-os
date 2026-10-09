@@ -7,7 +7,7 @@ import { bulkCreateCalendarItems, extractScriptTitles } from "@/server/actions/c
 import { Button, Card, ErrorNote, InfoNote } from "@/components/ui";
 import { fileToBase64, NoProviderNote } from "../../ai/_shared";
 
-type ClientOption = { id: string; name: string };
+type ClientOption = { id: string; name: string; weeklyTarget?: number };
 
 const PLATFORMS = [
   { value: "tiktok", label: "TikTok" },
@@ -22,6 +22,18 @@ const SLOTS: Record<number, number[]> = { 1: [2], 2: [2, 5], 3: [1, 3, 5], 4: [1
 
 function iso(d: Date) {
   return d.toISOString().slice(0, 10);
+}
+/** Valt een datum in het weekend, dan de eerstvolgende werkdag (maandag). */
+function nextWeekday(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  const wd = d.getDay(); // 0=zo, 6=za
+  if (wd === 6) d.setDate(d.getDate() + 2);
+  else if (wd === 0) d.setDate(d.getDate() + 1);
+  return iso(d);
+}
+function isWeekend(dateStr: string): boolean {
+  const wd = new Date(dateStr + "T00:00:00").getDay();
+  return wd === 0 || wd === 6;
 }
 function mondayOf(dateStr: string): Date {
   const d = new Date(dateStr + "T00:00:00");
@@ -58,6 +70,8 @@ export function AutoPlanner({ clients, aiReady }: { clients: ClientOption[]; aiR
   const [titles, setTitles] = useState<string[]>([]);
   const [perWeek, setPerWeek] = useState(2);
   const [startDate, setStartDate] = useState(iso(new Date()));
+  // Handmatig aangepaste datums per rij-index (overschrijven de auto-planning).
+  const [dateEdits, setDateEdits] = useState<Record<number, string>>({});
   const [platforms, setPlatforms] = useState<string[]>(["tiktok", "instagram"]);
   const [err, setErr] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
@@ -65,7 +79,19 @@ export function AutoPlanner({ clients, aiReady }: { clients: ClientOption[]; aiR
   const [saving, startSave] = useTransition();
   const router = useRouter();
 
-  const dates = useMemo(() => planDates(titles.length, perWeek, startDate), [titles.length, perWeek, startDate]);
+  const autoDates = useMemo(() => planDates(titles.length, perWeek, startDate), [titles.length, perWeek, startDate]);
+  // Effectieve datum per rij: handmatige keuze wint, anders de werkdag-planning.
+  const dates = useMemo(
+    () => titles.map((_, i) => dateEdits[i] ?? nextWeekday(autoDates[i] ?? startDate)),
+    [titles, autoDates, dateEdits, startDate],
+  );
+
+  // Bij het kiezen van een klant het publicatieritme (per week) overnemen.
+  function onClientChange(id: string) {
+    setClientId(id);
+    const target = clients.find((c) => c.id === id)?.weeklyTarget;
+    if (target && target > 0) setPerWeek(target);
+  }
 
   async function onFile(file?: File) {
     if (!file) return;
@@ -110,7 +136,7 @@ export function AutoPlanner({ clients, aiReady }: { clients: ClientOption[]; aiR
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
           <div>
             <label className="sc-label">Klant</label>
-            <select className="sc-input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
+            <select className="sc-input" value={clientId} onChange={(e) => onClientChange(e.target.value)}>
               <option value="">Kies een klant…</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -166,22 +192,32 @@ export function AutoPlanner({ clients, aiReady }: { clients: ClientOption[]; aiR
           </div>
 
           <InfoNote>
-            <span className="text-sm">Video&apos;s worden verdeeld op werkdagen (ma–vr). Controleer hieronder; je kunt titels en datums nog aanpassen voordat je opslaat.</span>
+            <span className="text-sm">Publicaties worden automatisch verdeeld op werkdagen (ma–vr); zaterdag en zondag worden overgeslagen. De frequentie volgt standaard het ingestelde ritme van de klant. Je kunt elke datum hieronder handmatig aanpassen voordat je opslaat.</span>
           </InfoNote>
 
           <ul className="mt-3 divide-y divide-[var(--color-line)]">
-            {titles.map((t, i) => (
-              <li key={i} className="flex flex-wrap items-center gap-2 py-2">
-                <span className="w-6 text-xs text-[var(--color-ink-faint)]">{i + 1}.</span>
-                <input className="sc-input h-8 min-w-48 flex-1 py-0 text-sm" value={t} onChange={(e) => setTitles((cur) => cur.map((x, j) => (j === i ? e.target.value : x)))} />
-                <span className="text-xs text-[var(--color-ink-muted)]">
-                  {dates[i] ? new Date(dates[i] + "T00:00:00").toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" }) : "—"}
-                </span>
-                <button type="button" onClick={() => setTitles((cur) => cur.filter((_, j) => j !== i))} className="rounded p-1 text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]" aria-label="Verwijderen">
-                  <Trash2 className="size-4" />
-                </button>
-              </li>
-            ))}
+            {titles.map((t, i) => {
+              const weekend = isWeekend(dates[i]!);
+              return (
+                <li key={i} className="flex flex-wrap items-center gap-2 py-2">
+                  <span className="w-6 text-xs text-[var(--color-ink-faint)]">{i + 1}.</span>
+                  <input className="sc-input h-8 min-w-48 flex-1 py-0 text-sm" value={t} onChange={(e) => setTitles((cur) => cur.map((x, j) => (j === i ? e.target.value : x)))} />
+                  <input
+                    type="date"
+                    className="sc-input h-8 w-36 py-0 text-sm"
+                    value={dates[i]}
+                    onChange={(e) => setDateEdits((cur) => ({ ...cur, [i]: e.target.value }))}
+                  />
+                  <span className={`w-20 text-xs ${weekend ? "font-medium text-[var(--color-warn)]" : "text-[var(--color-ink-muted)]"}`}>
+                    {new Date(dates[i] + "T00:00:00").toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" })}
+                    {weekend ? " ⚠" : ""}
+                  </span>
+                  <button type="button" onClick={() => setTitles((cur) => cur.filter((_, j) => j !== i))} className="rounded p-1 text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]" aria-label="Verwijderen">
+                    <Trash2 className="size-4" />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
 
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[var(--color-line)] pt-4">

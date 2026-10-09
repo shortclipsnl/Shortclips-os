@@ -13,11 +13,17 @@ export const dynamic = "force-dynamic";
 
 export default async function AutoPlanPage() {
   const viewer = await requireInternal();
-  const activeClients = await db
-    .select({ id: clients.id, name: clients.name })
+  const rows = await db
+    .select({ id: clients.id, name: clients.name, quota: clients.monthlyVideoQuota })
     .from(clients)
     .where(and(isNull(clients.deletedAt), eq(clients.status, "active")))
     .orderBy(asc(clients.name));
+  // Publicatieritme per week afgeleid uit het maandelijkse shorts-quotum (±4,33 weken/maand).
+  const activeClients = rows.map((c) => ({
+    id: c.id,
+    name: c.name,
+    weeklyTarget: c.quota > 0 ? Math.max(1, Math.min(5, Math.round(c.quota / 4.33))) : 0,
+  }));
 
   return (
     <div className="mx-auto max-w-[1000px]">
