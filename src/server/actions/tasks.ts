@@ -60,6 +60,31 @@ const createSchema = z.object({
   dueOn: z.string().nullish(),
 });
 
+/** Meerdere taken in één keer: elke tekstregel wordt een taak (snelle invoer). */
+export async function createTasksBulk(input: { lines: string; assigneeId?: string | null }): Promise<ActionResult & { created?: number }> {
+  try {
+    const viewer = await requirePermission("tasks:write");
+    const titles = input.lines
+      .split(/\r?\n/)
+      .map((l) => l.replace(/^[-*•\s]+/, "").trim())
+      .filter((l) => l.length > 0)
+      .slice(0, 100);
+    if (titles.length === 0) return { ok: false, message: "Typ minstens één taak." };
+
+    const assigneeId = input.assigneeId && /^[0-9a-f-]{36}$/i.test(input.assigneeId) ? input.assigneeId : null;
+    await db.insert(tasks).values(
+      titles.map((title) => ({ title: title.slice(0, 240), assigneeId, status: "todo" as const, createdById: viewer.id })),
+    );
+
+    revalidatePath("/tasks");
+    revalidatePath("/dashboard");
+    return { ok: true, created: titles.length };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 export async function createTask(input: z.input<typeof createSchema>): Promise<ActionResult> {
   try {
     const viewer = await requirePermission("tasks:write");

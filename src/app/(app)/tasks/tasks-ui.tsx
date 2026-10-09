@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Plus, Trash2 } from "lucide-react";
-import { createTask, deleteTask, setTaskStatus, updateTask } from "@/server/actions/tasks";
+import { createTask, createTasksBulk, deleteTask, setTaskStatus, updateTask } from "@/server/actions/tasks";
 import { Avatar, Button, ErrorNote } from "@/components/ui";
 import { cn } from "@/lib/cn";
 
@@ -36,6 +36,63 @@ const prioDot: Record<string, string> = {
   high: "var(--color-warn)",
   urgent: "var(--color-bad)",
 };
+
+/** Supersnelle invoer: typ taken, één per regel. Elke regel wordt een taak. */
+export function QuickTaskLines({ users, defaultAssignee }: { users: UserOption[]; defaultAssignee?: string }) {
+  const [lines, setLines] = useState("");
+  const [assigneeId, setAssigneeId] = useState(defaultAssignee ?? "");
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+
+  function add() {
+    if (!lines.trim()) return;
+    start(async () => {
+      const res = await createTasksBulk({ lines, assigneeId: assigneeId || null });
+      if (res.ok) {
+        setLines("");
+        setErr(null);
+        router.refresh();
+      } else {
+        setErr(res.message ?? "Mislukt");
+      }
+    });
+  }
+
+  const count = lines.split(/\r?\n/).filter((l) => l.replace(/^[-*•\s]+/, "").trim().length > 0).length;
+
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-[var(--color-ink-muted)]">Snel toevoegen — typ taken, één per regel:</span>
+        <select className="sc-input ml-auto h-8 w-40 py-0 text-xs" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} aria-label="Toewijzen aan">
+          <option value="">Algemeen / niet toegewezen</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>{u.fullName}</option>
+          ))}
+        </select>
+      </div>
+      <textarea
+        className="sc-input resize-y text-sm leading-relaxed"
+        rows={4}
+        placeholder={"• Montage Koops afmaken\n• Script Luxewagen inplannen\n• Feedback KKFH verwerken"}
+        value={lines}
+        onChange={(e) => setLines(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) add();
+        }}
+      />
+      <div className="mt-2 flex items-center gap-3">
+        <Button onClick={add} disabled={pending || count === 0} size="sm">
+          {pending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+          {count > 0 ? `${count} ${count === 1 ? "taak" : "taken"} toevoegen` : "Toevoegen"}
+        </Button>
+        <span className="text-xs text-[var(--color-ink-faint)]">Tip: ⌘/Ctrl + Enter om toe te voegen.</span>
+      </div>
+      {err ? <div className="mt-2"><ErrorNote>{err}</ErrorNote></div> : null}
+    </div>
+  );
+}
 
 export function NewTaskForm({ users, clients }: { users: UserOption[]; clients: ClientOption[] }) {
   const [title, setTitle] = useState("");

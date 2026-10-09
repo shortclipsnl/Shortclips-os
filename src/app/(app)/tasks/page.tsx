@@ -6,7 +6,7 @@ import { clients, tasks, users } from "@/db/schema";
 import { requireInternal, scopeToClients } from "@/server/auth/context";
 import { listAssignableUsers } from "@/server/clients";
 import { Avatar, Card, EmptyState, PageHeader } from "@/components/ui";
-import { NewTaskForm, TaskItem, type TaskItemData } from "./tasks-ui";
+import { QuickTaskLines, TaskItem, type TaskItemData } from "./tasks-ui";
 
 export const metadata: Metadata = { title: "Taken" };
 export const dynamic = "force-dynamic";
@@ -26,11 +26,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const canWrite = viewer.permissions.has("tasks:write");
   const persoon = (await searchParams).persoon;
 
-  const [assignable, activeClients, allOpen] = await Promise.all([
+  const [assignable, allOpen] = await Promise.all([
     canWrite ? listAssignableUsers() : Promise.resolve([]),
-    canWrite
-      ? db.select({ id: clients.id, name: clients.name }).from(clients).where(and(isNull(clients.deletedAt), eq(clients.status, "active"))).orderBy(asc(clients.name))
-      : Promise.resolve([]),
     db
       .select({ id: tasks.id, assigneeId: tasks.assigneeId, dueOn: tasks.dueOn })
       .from(tasks)
@@ -105,7 +102,11 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         </Link>
       </div>
 
-      {canWrite ? <div className="mb-4"><NewTaskForm users={userOptions} clients={activeClients} /></div> : null}
+      {canWrite ? (
+        <div className="mb-4">
+          <QuickTaskLines users={userOptions} defaultAssignee={selected?.id} />
+        </div>
+      ) : null}
 
       {!persoon ? (
         <Card>
