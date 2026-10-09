@@ -105,7 +105,7 @@ export async function getVideoHighlights(viewer: Viewer) {
   const today = new Date().toISOString().slice(0, 10);
 
   const activeStages = VIDEO_STAGES.filter((s) => s !== "published" && s !== "analysis_available");
-  const listSel = {
+  const base2 = {
     id: deliverables.id,
     title: deliverables.title,
     clientName: clients.name,
@@ -113,6 +113,8 @@ export async function getVideoHighlights(viewer: Viewer) {
     clientColor: clients.color,
     editorName: users.fullName,
   };
+  const overdueDays = { ...base2, days: sql<number>`(current_date - ${deliverables.dueOn})` };
+  const stuckDays = { ...base2, days: sql<number>`floor(extract(epoch from (now() - ${deliverables.statusChangedAt})) / 86400)::int` };
 
   const [row, lateList, atClientList, awaitingEditorList] = await Promise.all([
     db
@@ -126,7 +128,7 @@ export async function getVideoHighlights(viewer: Viewer) {
       .from(deliverables)
       .where(and(...base)),
     db
-      .select(listSel)
+      .select(overdueDays)
       .from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
       .leftJoin(users, eq(users.id, deliverables.editorId))
@@ -134,7 +136,7 @@ export async function getVideoHighlights(viewer: Viewer) {
       .orderBy(asc(deliverables.dueOn))
       .limit(8),
     db
-      .select(listSel)
+      .select(stuckDays)
       .from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
       .leftJoin(users, eq(users.id, deliverables.editorId))
@@ -142,12 +144,12 @@ export async function getVideoHighlights(viewer: Viewer) {
       .orderBy(asc(deliverables.statusChangedAt))
       .limit(8),
     db
-      .select(listSel)
+      .select(stuckDays)
       .from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
       .leftJoin(users, eq(users.id, deliverables.editorId))
       .where(and(...base, eq(deliverables.status, "awaiting_editor")))
-      .orderBy(asc(deliverables.dueOn))
+      .orderBy(asc(deliverables.statusChangedAt))
       .limit(8),
   ]);
 

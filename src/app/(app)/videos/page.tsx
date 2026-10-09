@@ -99,11 +99,11 @@ export default async function VideosPage({
 
       <div className="mb-5 grid gap-3 lg:grid-cols-3">
         <DrillCard title="Te laat" count={highlights.late} accent="var(--color-bad)" href="/videos?filter=te-laat"
-          items={highlights.lateList.map((v) => ({ id: v.id, primary: v.clientName, secondary: v.title }))} empty="Niets te laat" />
+          items={highlights.lateList.map((v) => ({ id: v.id, primary: v.clientName, secondary: v.title, meta: `${Number(v.days)} d te laat` }))} empty="Niets te laat" />
         <DrillCard title="Wacht op klant" count={highlights.atClient} accent="var(--color-warn)" href="/videos?filter=bij-klant"
-          items={highlights.atClientList.map((v) => ({ id: v.id, primary: v.clientName, secondary: v.title }))} empty="Niets bij de klant" />
+          items={highlights.atClientList.map((v) => ({ id: v.id, primary: v.clientName, secondary: v.title, meta: `${Number(v.days)} d geen reactie` }))} empty="Niets bij de klant" />
         <DrillCard title="Wacht op editor" count={highlights.awaitingEditor} accent="var(--color-info)" href="/videos?status=awaiting_editor"
-          items={highlights.awaitingEditorList.map((v) => ({ id: v.id, primary: v.editorName ?? "Geen editor", secondary: v.title }))} empty="Niets bij een editor" />
+          items={highlights.awaitingEditorList.map((v) => ({ id: v.id, primary: v.editorName ?? "Geen editor", secondary: v.title, meta: `${Number(v.days)} d bij editor` }))} empty="Niets bij een editor" />
       </div>
 
       <div className="mb-5">
@@ -221,7 +221,7 @@ function DrillCard({
   count: number;
   accent: string;
   href: string;
-  items: { id: string; primary: string; secondary: string }[];
+  items: { id: string; primary: string; secondary: string; meta?: string }[];
   empty: string;
 }) {
   return (
@@ -237,7 +237,10 @@ function DrillCard({
           {items.map((it) => (
             <li key={it.id}>
               <Link href={`/videos/${it.id}`} className="block px-4 py-2 hover:bg-[var(--color-surface-2)]">
-                <span className="block truncate text-sm font-medium" style={{ borderLeft: `3px solid ${accent}`, paddingLeft: 8 }}>{it.primary}</span>
+                <span className="flex items-center justify-between gap-2" style={{ borderLeft: `3px solid ${accent}`, paddingLeft: 8 }}>
+                  <span className="truncate text-sm font-medium">{it.primary}</span>
+                  {it.meta ? <span className="shrink-0 text-xs font-semibold" style={{ color: accent }}>{it.meta}</span> : null}
+                </span>
                 <span className="mt-0.5 block truncate pl-[11px] text-xs text-[var(--color-ink-muted)]">{it.secondary}</span>
               </Link>
             </li>
