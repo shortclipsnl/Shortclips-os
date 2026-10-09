@@ -102,7 +102,7 @@ export default async function VideoPage({
           </Card>
 
           {pendingApproval ? (
-            <div className="rounded-[var(--radius-lg)] border border-[var(--color-lime)]/30 bg-[var(--color-lime-soft)] px-4 py-3 text-sm">
+            <div className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-3 text-sm">
               <strong className="font-semibold">Wacht op goedkeuring van de klant</strong> —
               aangevraagd {relativeDays(pendingApproval.requestedAt)}.
             </div>

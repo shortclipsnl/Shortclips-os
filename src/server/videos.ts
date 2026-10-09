@@ -165,6 +165,57 @@ export async function getVideoHighlights(viewer: Viewer) {
   };
 }
 
+/**
+ * "Video's om te checken": alles wat rondom de interne controle speelt.
+ * - teControleren: klaar voor interne controle (internal_review)
+ * - feedbackOntvangen: interne feedback gegeven, editor past aan (editor_revision)
+ * - goedgekeurd: intern goedgekeurd (approved), recent
+ * Elk met de Frame.io-link, zodat je direct naar de juiste video doorklikt.
+ */
+export async function getReviewQueue(viewer: Viewer) {
+  const base = [isNull(deliverables.deletedAt), scopeToClients(viewer, deliverables.clientId)];
+  if (viewer.isEditorOnly) base.push(eq(deliverables.editorId, viewer.id));
+
+  const cols = {
+    id: deliverables.id,
+    title: deliverables.title,
+    status: deliverables.status,
+    statusChangedAt: deliverables.statusChangedAt,
+    dueOn: deliverables.dueOn,
+    frameUrl: deliverables.frameUrl,
+    clientName: clients.name,
+    clientSlug: clients.slug,
+    clientColor: clients.color,
+    editorName: users.fullName,
+    openComments: sql<number>`(
+      select count(*) from review_threads rt
+      where rt.deliverable_id = ${deliverables.id}
+        and rt.is_resolved = false and rt.deleted_at is null
+    )`,
+    days: sql<number>`floor(extract(epoch from (now() - ${deliverables.statusChangedAt})) / 86400)::int`,
+  };
+
+  const forStatuses = (statuses: VideoStage[], order: "asc" | "desc") =>
+    db
+      .select(cols)
+      .from(deliverables)
+      .innerJoin(clients, eq(clients.id, deliverables.clientId))
+      .leftJoin(users, eq(users.id, deliverables.editorId))
+      .where(and(...base, inArray(deliverables.status, statuses)))
+      .orderBy(order === "asc" ? asc(deliverables.statusChangedAt) : desc(deliverables.statusChangedAt))
+      .limit(30);
+
+  const [teControleren, feedbackOntvangen, goedgekeurd] = await Promise.all([
+    forStatuses(["internal_review"], "asc"),
+    forStatuses(["editor_revision"], "asc"),
+    forStatuses(["approved"], "desc"),
+  ]);
+
+  return { teControleren, feedbackOntvangen, goedgekeurd };
+}
+
+export type ReviewQueueItem = Awaited<ReturnType<typeof getReviewQueue>>["teControleren"][number];
+
 export type VideoRow = Awaited<ReturnType<typeof listVideos>>[number];
 
 export async function getVideo(viewer: Viewer, id: string) {
