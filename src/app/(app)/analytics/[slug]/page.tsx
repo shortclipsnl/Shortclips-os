@@ -8,6 +8,8 @@ import { requirePermission, assertClientAccess } from "@/server/auth/context";
 import { Card, CardHeader, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import { compact, formatDate, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
+import { ClientSelector, type SelectorClient } from "../client-selector";
+import { VideoThumb } from "../video-thumb";
 
 export const metadata: Metadata = { title: "Klantresultaten" };
 export const dynamic = "force-dynamic";
@@ -25,49 +27,104 @@ export default async function ClientResultsPage({
   const { slug } = await params;
   const days = Number((await searchParams).dagen) || 90;
 
-  const [client] = await db.select({ id: clients.id, name: clients.name, color: clients.color, quota: clients.monthlyVideoQuota }).from(clients).where(and(eq(clients.slug, slug), isNull(clients.deletedAt))).limit(1);
+  const [client] = await db
+    .select({ id: clients.id, name: clients.name, color: clients.color, quota: clients.monthlyVideoQuota })
+    .from(clients)
+    .where(and(eq(clients.slug, slug), isNull(clients.deletedAt)))
+    .limit(1);
   if (!client) notFound();
   assertClientAccess(viewer, client.id);
   const cid = client.id;
-
   const dInt = `interval '${days} days'`;
-  const [totals, perMonth, perPlatform, topVideos, bottomVideos, publishedRow] = await Promise.all([
-    db.execute(sql`
-      select coalesce(sum(views),0)::int views, coalesce(sum(reach),0)::int reach, coalesce(sum(engagements),0)::int engagements,
-             coalesce(sum(follower_delta),0)::int follower_growth, coalesce(sum(shares),0)::int shares, coalesce(sum(saves),0)::int saves,
-             coalesce(sum(posts_published),0)::int posts
-      from daily_metrics where client_id = ${cid} and measured_on >= current_date - ${sql.raw(dInt)}`),
-    db.execute(sql`
-      select to_char(measured_on,'YYYY-MM') maand, coalesce(sum(views),0)::int views, coalesce(sum(follower_delta),0)::int volgers
-      from daily_metrics where client_id = ${cid} and measured_on >= current_date - interval '12 months'
-      group by 1 order by 1`),
-    db.execute(sql`
-      select platform, coalesce(sum(views),0)::int views, coalesce(sum(reach),0)::int reach, coalesce(sum(follower_delta),0)::int volgers
-      from daily_metrics where client_id = ${cid} and platform is not null and measured_on >= current_date - ${sql.raw(dInt)}
-      group by 1 order by 2 desc`),
-    db.execute(sql`
-      select d.id, d.title, d.published_at, max(sm.views)::int views, max(sm.likes)::int likes
-      from deliverables d join publications p on p.deliverable_id = d.id join social_metrics sm on sm.publication_id = p.id
-      where d.client_id = ${cid} and d.deleted_at is null and d.status = 'published'
-      group by d.id, d.title, d.published_at order by views desc limit 5`),
-    db.execute(sql`
-      select d.id, d.title, d.published_at, max(sm.views)::int views
-      from deliverables d join publications p on p.deliverable_id = d.id join social_metrics sm on sm.publication_id = p.id
-      where d.client_id = ${cid} and d.deleted_at is null and d.status = 'published'
-      group by d.id, d.title, d.published_at order by views asc limit 5`),
-    db.execute(sql`select count(*)::int n from deliverables where client_id = ${cid} and deleted_at is null and status = 'published'`),
-  ]);
+  const dPrev = `interval '${2 * days} days'`;
+
+  const [totals, prevTotals, inter, perMonth, perPlatform, videoRows, publishedRow, allClientsRaw] =
+    await Promise.all([
+      db.execute(sql`
+        select coalesce(sum(views),0)::int views, coalesce(sum(reach),0)::int reach, coalesce(sum(engagements),0)::int engagements,
+               coalesce(sum(follower_delta),0)::int follower_growth, coalesce(sum(posts_published),0)::int posts
+        from daily_metrics where client_id = ${cid} and measured_on >= current_date - ${sql.raw(dInt)}`),
+      db.execute(sql`
+        select coalesce(sum(views),0)::int views, coalesce(sum(reach),0)::int reach, coalesce(sum(engagements),0)::int engagements,
+               coalesce(sum(follower_delta),0)::int follower_growth
+        from daily_metrics where client_id = ${cid}
+          and measured_on >= current_date - ${sql.raw(dPrev)} and measured_on < current_date - ${sql.raw(dInt)}`),
+      // Diepe interactiecijfers per video (laatste cumulatieve meting per publicatie), in de periode.
+      db.execute(sql`
+        with pm as (
+          select publication_id, max(likes) likes, max(comments) comments, max(shares) shares,
+                 max(saves) saves, max(profile_visits) profile_visits, max(watch_time_seconds) watch_seconds,
+                 max(avg_watch_seconds) avg_watch, max(completion_rate) completion
+          from social_metrics where client_id = ${cid} group by publication_id
+        )
+        select coalesce(sum(pm.likes),0)::int likes, coalesce(sum(pm.comments),0)::int comments,
+               coalesce(sum(pm.shares),0)::int shares, coalesce(sum(pm.saves),0)::int saves,
+               coalesce(sum(pm.profile_visits),0)::int profile_visits, coalesce(sum(pm.watch_seconds),0)::bigint watch_seconds,
+               avg(pm.avg_watch) filter (where pm.avg_watch is not null) avg_watch,
+               avg(pm.completion) filter (where pm.completion is not null) completion
+        from publications p join pm on pm.publication_id = p.id
+        where p.client_id = ${cid} and p.deleted_at is null and p.published_at >= current_date - ${sql.raw(dInt)}`),
+      db.execute(sql`
+        select to_char(measured_on,'YYYY-MM') maand, coalesce(sum(views),0)::int views
+        from daily_metrics where client_id = ${cid} and measured_on >= current_date - interval '12 months'
+        group by 1 order by 1`),
+      db.execute(sql`
+        select platform, coalesce(sum(views),0)::int views, coalesce(sum(reach),0)::int reach, coalesce(sum(follower_delta),0)::int volgers
+        from daily_metrics where client_id = ${cid} and platform is not null and measured_on >= current_date - ${sql.raw(dInt)}
+        group by 1 order by 2 desc`),
+      // Alle gepubliceerde video's van deze klant, met cijfers samengevoegd over platforms.
+      db.execute(sql`
+        with pm as (
+          select publication_id, max(views) views, max(likes) likes, max(comments) comments,
+                 max(shares) shares, max(saves) saves, max(avg_watch_seconds) avg_watch, max(completion_rate) completion
+          from social_metrics where client_id = ${cid} group by publication_id
+        )
+        select d.id, d.title, d.thumbnail_url, d.frame_url, d.duration_seconds, d.published_at,
+               string_agg(distinct p.platform::text, ',') platforms,
+               coalesce(sum(pm.views),0)::int views, coalesce(sum(pm.likes),0)::int likes,
+               coalesce(sum(pm.comments),0)::int comments, coalesce(sum(pm.shares),0)::int shares,
+               coalesce(sum(pm.saves),0)::int saves,
+               avg(pm.avg_watch) filter (where pm.avg_watch is not null) avg_watch,
+               avg(pm.completion) filter (where pm.completion is not null) completion
+        from deliverables d
+        left join publications p on p.deliverable_id = d.id and p.deleted_at is null
+        left join pm on pm.publication_id = p.id
+        where d.client_id = ${cid} and d.deleted_at is null and d.status = 'published'
+        group by d.id, d.title, d.thumbnail_url, d.frame_url, d.duration_seconds, d.published_at
+        order by views desc, d.published_at desc nulls last`),
+      db.execute(sql`select count(*)::int n from deliverables where client_id = ${cid} and deleted_at is null and status = 'published'`),
+      db.execute(sql`select slug, name, color, status from clients where deleted_at is null order by (status = 'active') desc, name`),
+    ]);
 
   const t = rows<Record<string, number>>(totals)[0] ?? {};
+  const prev = rows<Record<string, number>>(prevTotals)[0] ?? {};
+  const ix = rows<Record<string, number>>(inter)[0] ?? {};
   const months = rows<Record<string, string | number>>(perMonth);
   const platforms = rows<Record<string, string | number>>(perPlatform);
-  const top = rows<Record<string, string | number>>(topVideos);
-  const bottom = rows<Record<string, string | number>>(bottomVideos);
+  const videos = rows<VideoRow>(videoRows);
   const publishedTotal = Number(rows<Record<string, number>>(publishedRow)[0]?.n ?? 0);
+  const selectorClients = rows<Record<string, string | null>>(allClientsRaw).map((c) => ({
+    slug: String(c.slug), name: String(c.name), color: c.color ? String(c.color) : null, status: String(c.status),
+  })) as SelectorClient[];
+
   const avgViews = publishedTotal > 0 ? Math.round(Number(t.views ?? 0) / publishedTotal) : 0;
   const maxMonth = Math.max(1, ...months.map((m) => Number(m.views)));
+  const completionPct = ix.completion != null ? Math.round(Number(ix.completion) * 100) : null;
+  const avgWatch = ix.avg_watch != null ? Number(ix.avg_watch) : null;
 
-  const hasData = Number(t.views ?? 0) > 0 || months.length > 0;
+  const deltaPct = (cur: number, p: number): number | null => (p > 0 ? Math.round(((cur - p) / p) * 100) : null);
+  const deltaHint = (cur: number, p: number): string | undefined => {
+    const d = deltaPct(cur, p);
+    return d === null ? undefined : `${d >= 0 ? "+" : ""}${d}% vs vorige periode`;
+  };
+  const deltaTone = (cur: number, p: number): "good" | "bad" | undefined => {
+    const d = deltaPct(cur, p);
+    return d === null ? undefined : d >= 0 ? "good" : "bad";
+  };
+
+  const hasData = Number(t.views ?? 0) > 0 || months.length > 0 || videos.length > 0;
+  const top = videos.slice(0, 5);
+  const bottom = videos.filter((v) => Number(v.views) > 0).slice(-5).reverse();
 
   return (
     <div className="mx-auto max-w-[1100px]">
@@ -86,21 +143,29 @@ export default async function ClientResultsPage({
         }
       />
 
+      <ClientSelector clients={selectorClients} currentSlug={slug} />
+
       {!hasData ? (
         <Card><EmptyState title="Nog geen resultaten" description="Zodra Metricool cijfers voor deze klant levert, verschijnen ze hier." /></Card>
       ) : (
         <>
-          <div className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">Overzicht</div>
-          <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">Algemene prestaties</div>
+          <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             <Stat label="Gepubliceerde video's" value={num(publishedTotal)} />
-            <Stat label="Weergaven" value={compact(Number(t.views ?? 0))} />
-            <Stat label="Bereik" value={compact(Number(t.reach ?? 0))} />
+            <Stat label="Weergaven" value={compact(Number(t.views ?? 0))} hint={deltaHint(Number(t.views ?? 0), Number(prev.views ?? 0))} tone={deltaTone(Number(t.views ?? 0), Number(prev.views ?? 0))} />
+            <Stat label="Bereik" value={compact(Number(t.reach ?? 0))} hint={deltaHint(Number(t.reach ?? 0), Number(prev.reach ?? 0))} tone={deltaTone(Number(t.reach ?? 0), Number(prev.reach ?? 0))} />
             <Stat label="Gem. per video" value={compact(avgViews)} />
-            <Stat label="Nieuwe volgers" value={`${Number(t.follower_growth ?? 0) >= 0 ? "+" : ""}${num(Number(t.follower_growth ?? 0))}`} />
-            <Stat label="Interacties" value={compact(Number(t.engagements ?? 0))} hint={`${num(Number(t.shares ?? 0))} shares · ${num(Number(t.saves ?? 0))} saves`} />
+            <Stat label="Nieuwe volgers" value={`${Number(t.follower_growth ?? 0) >= 0 ? "+" : ""}${num(Number(t.follower_growth ?? 0))}`} hint={deltaHint(Number(t.follower_growth ?? 0), Number(prev.follower_growth ?? 0))} tone={deltaTone(Number(t.follower_growth ?? 0), Number(prev.follower_growth ?? 0))} />
+            <Stat label="Likes" value={compact(Number(ix.likes ?? 0))} />
+            <Stat label="Reacties" value={compact(Number(ix.comments ?? 0))} />
+            <Stat label="Shares" value={compact(Number(ix.shares ?? 0))} />
+            <Stat label="Saves" value={compact(Number(ix.saves ?? 0))} />
+            <Stat label="Profielbezoeken" value={compact(Number(ix.profile_visits ?? 0))} />
+            <Stat label="Gem. kijktijd" value={avgWatch != null ? `${avgWatch.toFixed(1)}s` : "—"} hint={avgWatch == null ? "niet op elk platform" : undefined} />
+            <Stat label="Uitkijkpercentage" value={completionPct != null ? `${completionPct}%` : "—"} hint={completionPct == null ? "niet op elk platform" : undefined} />
           </div>
 
-          <div className="grid gap-5 xl:grid-cols-2">
+          <div className="mb-5 grid gap-5 xl:grid-cols-2">
             {/* Weergaven per maand */}
             <Card padded={false}>
               <CardHeader title="Weergaven per maand" className="p-5 pb-2" />
@@ -133,36 +198,100 @@ export default async function ClientResultsPage({
                 </Table>
               )}
             </Card>
-
-            {/* Best presterend */}
-            <Card padded={false}>
-              <CardHeader title="Best presterende video's" className="p-5 pb-2" />
-              {top.length === 0 ? <EmptyState title="Nog geen gepubliceerde video's" /> : <VideoList items={top} metric />}
-            </Card>
-
-            {/* Minst presterend */}
-            <Card padded={false}>
-              <CardHeader title="Minst presterende video's" className="p-5 pb-2" />
-              {bottom.length === 0 ? <EmptyState title="Nog geen data" /> : <VideoList items={bottom} metric />}
-            </Card>
           </div>
+
+          {/* Gepubliceerde video's — met thumbnail, platform en resultaten per video */}
+          <div className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">Gepubliceerde video&apos;s</div>
+          {videos.length === 0 ? (
+            <Card><EmptyState title="Nog geen gepubliceerde video's" description="Zodra er video's live staan en Metricool cijfers levert, verschijnen ze hier." /></Card>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {videos.slice(0, 24).map((v) => <VideoCard key={v.id} v={v} />)}
+              </div>
+              {videos.length > 24 ? (
+                <p className="mt-2 text-xs text-[var(--color-ink-muted)]">De 24 best bekeken van {videos.length} gepubliceerde video&apos;s worden getoond.</p>
+              ) : null}
+            </>
+          )}
+
+          {bottom.length > 0 ? (
+            <div className="mt-5 grid gap-5 xl:grid-cols-2">
+              <Card padded={false}>
+                <CardHeader title="Best presterende video's" className="p-5 pb-2" />
+                <VideoList items={top} />
+              </Card>
+              <Card padded={false}>
+                <CardHeader title="Minst presterende video's" className="p-5 pb-2" />
+                <VideoList items={bottom} />
+              </Card>
+            </div>
+          ) : null}
+
+          <p className="mt-4 text-xs text-[var(--color-ink-muted)]">
+            Cijfers komen uit dagelijkse snapshots (Metricool). Weergaven en interacties zijn vrijwel actueel; bereik,
+            kijktijd en uitkijkpercentage lopen bij de meeste platforms één tot drie dagen achter en zijn niet op elk
+            platform via de API beschikbaar. Ontbrekende waarden worden als "—" getoond; er worden geen cijfers geschat.
+          </p>
         </>
       )}
     </div>
   );
 }
 
-function VideoList({ items, metric }: { items: Record<string, string | number>[]; metric?: boolean }) {
+type VideoRow = {
+  id: string; title: string; thumbnail_url: string | null; frame_url: string | null;
+  duration_seconds: number | null; published_at: string | null; platforms: string | null;
+  views: number; likes: number; comments: number; shares: number; saves: number;
+  avg_watch: number | null; completion: number | null;
+};
+
+function platformList(s: string | null): string[] {
+  return s ? s.split(",").filter(Boolean) : [];
+}
+
+function VideoCard({ v }: { v: VideoRow }) {
+  return (
+    <Link href={`/analytics/video/${v.id}`} className="group overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] transition-shadow hover:shadow-[var(--shadow-raised)]">
+      <VideoThumb src={v.thumbnail_url} title={v.title} ratio="aspect-[4/3]" />
+      <div className="p-3">
+        <div className="flex items-center gap-1.5">
+          {platformList(v.platforms).map((p) => (
+            <span key={p} className="size-2.5 rounded-full" style={{ background: PLATFORM[p]?.color ?? "#999" }} title={PLATFORM[p]?.label ?? p} />
+          ))}
+          {v.published_at ? <span className="ml-auto text-2xs text-[var(--color-ink-faint)]">{formatDate(String(v.published_at).slice(0, 10))}</span> : null}
+        </div>
+        <p className="mt-1 line-clamp-2 min-h-[2.4em] text-sm font-medium group-hover:text-[var(--color-brand-600)]">{v.title}</p>
+        <div className="mt-2 grid grid-cols-3 gap-1 text-center">
+          <Metric label="Weergaven" value={compact(Number(v.views))} />
+          <Metric label="Likes" value={compact(Number(v.likes))} />
+          <Metric label="Uitkijk" value={v.completion != null ? `${Math.round(Number(v.completion) * 100)}%` : "—"} />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[var(--radius-sm)] bg-[var(--color-surface-sunken)] py-1.5">
+      <div className="text-sm font-bold tabular-nums leading-none">{value}</div>
+      <div className="mt-0.5 text-2xs text-[var(--color-ink-faint)]">{label}</div>
+    </div>
+  );
+}
+
+function VideoList({ items }: { items: VideoRow[] }) {
   return (
     <ul className="divide-y divide-[var(--color-line)]">
       {items.map((v) => (
-        <li key={String(v.id)}>
-          <Link href={`/videos/${v.id}`} className="flex items-center justify-between gap-3 px-5 py-2.5 hover:bg-[var(--color-surface-2)]">
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-medium">{String(v.title)}</span>
+        <li key={v.id}>
+          <Link href={`/analytics/video/${v.id}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-[var(--color-surface-2)]">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{v.title}</span>
               {v.published_at ? <span className="block text-xs text-[var(--color-ink-faint)]">{formatDate(String(v.published_at).slice(0, 10))}</span> : null}
             </span>
-            {metric ? <span className="shrink-0 text-sm font-semibold tabular-nums">{compact(Number(v.views))}</span> : null}
+            <span className="shrink-0 text-sm font-semibold tabular-nums">{compact(Number(v.views))}</span>
           </Link>
         </li>
       ))}

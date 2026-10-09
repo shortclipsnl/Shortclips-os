@@ -10,6 +10,7 @@ import {
 import { Avatar, Card, CardHeader, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import { compact, formatDate, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
+import { ClientSelector, type SelectorClient } from "./client-selector";
 
 export const metadata: Metadata = { title: "Resultaten" };
 export const dynamic = "force-dynamic";
@@ -104,11 +105,23 @@ export default async function AnalyticsPage({
   const rows = <T,>(r: unknown): T[] =>
     ((r as { rows?: T[] }).rows ?? (r as T[])) as T[];
 
+  const allClientsRaw = await db.execute(sql`
+    select slug, name, color, status from clients
+    where deleted_at is null
+    order by (status = 'active') desc, name
+  `);
+
   const t = rows<Record<string, number>>(totals)[0] ?? {};
   const prev = rows<Record<string, number>>(prevTotals)[0] ?? {};
   const clientRows = rows<Record<string, string | number>>(perClient);
   const platformRows = rows<Record<string, string | number>>(perPlatform);
   const videoRows = rows<Record<string, string | number>>(topVideos);
+  const selectorClients = rows<Record<string, string | null>>(allClientsRaw).map((c) => ({
+    slug: String(c.slug),
+    name: String(c.name),
+    color: c.color ? String(c.color) : null,
+    status: String(c.status),
+  })) as SelectorClient[];
 
   const deltaPct = (cur: number, p: number): number | null => (p > 0 ? Math.round(((cur - p) / p) * 100) : null);
   const deltaHint = (cur: number, p: number): string | undefined => {
@@ -168,15 +181,8 @@ export default async function AnalyticsPage({
         ))}
       </div>
 
-      {/* Klant-selectie: open een volledige, aparte resultatenpagina per klant. */}
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        <span className="rounded-full bg-[var(--color-surface-2)] px-3 py-1 text-xs font-medium text-[var(--color-ink-muted)]">Open een klant voor volledige resultaten:</span>
-        {clientRows.slice(0, 16).map((c) => (
-          <Link key={String(c.id)} href={`/analytics/${c.slug}`} className={chip(false)}>
-            {String(c.name)}
-          </Link>
-        ))}
-      </div>
+      {/* Prominente klantselector: open een volledige, aparte resultatenpagina per klant. */}
+      <ClientSelector clients={selectorClients} />
 
       <div className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">
         Belangrijkste resultaten · {selectedName ?? (klanten === "gestopt" ? "gestopte klanten" : klanten === "alle" ? "alle klanten" : "actieve klanten")}
@@ -316,10 +322,3 @@ export default async function AnalyticsPage({
   );
 }
 
-function chip(active: boolean): string {
-  return `rounded-full px-3 py-1 text-xs font-medium ${
-    active
-      ? "bg-[var(--color-ink)] text-white"
-      : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-  }`;
-}
