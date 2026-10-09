@@ -18,6 +18,7 @@ export type BoardClient = {
   coordinatorName: string | null;
   nextShoot: string | null;
   inProduction: number;
+  shortsPerMonth: number;
 };
 
 const STOPPED = new Set(["paused", "churned"]);
@@ -96,7 +97,8 @@ function ClientCard({ c, canWrite }: { c: BoardClient; canWrite: boolean }) {
             <Badge tone={CLIENT_STATUS[c.status]?.tone ?? "neutral"}>{CLIENT_STATUS[c.status]?.label ?? c.status}</Badge>
           </span>
           <span className="mt-0.5 block truncate text-xs text-[var(--color-ink-muted)]">
-            {c.coordinatorName ?? "geen verantwoordelijke"}
+            {c.shortsPerMonth > 0 ? `${c.shortsPerMonth} shorts/maand` : "shorts/maand onbekend"}
+            {` · ${c.coordinatorName ?? "geen verantwoordelijke"}`}
             {c.inProduction > 0 ? ` · ${c.inProduction} lopend` : ""}
             {c.nextShoot ? ` · opname ${formatDate(c.nextShoot)}` : ""}
           </span>

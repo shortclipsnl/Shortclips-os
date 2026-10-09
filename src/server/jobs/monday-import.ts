@@ -9,15 +9,38 @@ import { runJob } from "./runner";
 /* Board- en kolom-id's uit de ShortClips Monday-omgeving. */
 const HOOFDBOARD = "5095883798";
 const CONTACTEN = "5102088079";
+/** Monday-groep met de gestopte/niet-actieve klanten ("🚫 Niet actieve klanten"). */
+const INACTIVE_GROUP = "group_mm5p1npd";
 
 const H = {
   status: "color_mkx2a8g3",
   revenue: "numeric_mm0ae0q9",
   startDate: "date_mm0d59r5",
+  shorts: "color_mm066b0c",
   platforms: "dropdown_mm7jszaj",
   agendaNames: "text_mm7qatwy",
   accountManager: "multiple_person_mm5sv241",
 };
+
+type ClientStatus = "active" | "onboarding" | "churned";
+
+/**
+ * Bepaalt de ShortClips-status van een Monday-klant. De twee Monday-groepen
+ * ("✅ Actieve klanten" / "🚫 Niet actieve klanten") zijn de door het team
+ * onderhouden waarheid; de statuskolom verfijnt dat verder.
+ */
+function mapStatus(item: MondayItem): ClientStatus {
+  const s = col(item, H.status).toLowerCase();
+  if (item.group?.id === INACTIVE_GROUP || s.includes("niet actief")) return "churned";
+  if (s.includes("start project")) return "onboarding";
+  return "active"; // "Actief klant", "Factuur verzonden" of actieve groep zonder status
+}
+
+/** "6 shorts" → 6. Shorts per maand uit de statuskolom "Afname aantal shorts". */
+function parseShorts(item: MondayItem): number | null {
+  const m = col(item, H.shorts).match(/\d+/);
+  return m ? Number(m[0]) : null;
+}
 const C = {
   bedrijf: "text_mm651sdq",
   naam: "text_mm65zza2",
@@ -84,18 +107,23 @@ export async function runMondayClientImport() {
       if (first) userByName.set(normalizeName(first), u.id);
     }
 
-    // 1) HOOFDBOARD → klanten.
+    // 1) HOOFDBOARD → klanten. We importeren ALLE klanten, dus ook gestopte en
+    // niet-actieve, zodat het dashboard het volledige klantenbestand toont. Het
+    // onderscheid actief/niet-actief komt uit de status (zie mapStatus).
     const hoofd = await monday.listItems(HOOFDBOARD, 200);
-    const active = hoofd.filter((i) => col(i, H.status).toLowerCase().includes("actief klant"));
-    ctx.log(`${active.length} actieve klanten van ${hoofd.length} in HOOFDBOARD`);
+    const items = hoofd.filter((i) => i.state === "active" && i.name.trim());
+    const activeCount = items.filter((i) => mapStatus(i) !== "churned").length;
+    ctx.log(`${items.length} klanten in HOOFDBOARD (${activeCount} actief, ${items.length - activeCount} niet-actief)`);
 
     const clientByMondayItem = new Map<string, string>(); // monday item id -> client id
     const clientBySlug = new Map<string, string>();
 
-    for (const item of active) {
+    for (const item of items) {
       ctx.counters.processed++;
       const name = item.name.trim();
       const slug = slugify(name);
+      const status = mapStatus(item);
+      const shorts = parseShorts(item);
       const revenue = parseMoney(col(item, H.revenue));
       const startText = col(item, H.startDate);
       const startedOn = /^\d{4}-\d{2}-\d{2}/.test(startText) ? startText.slice(0, 10) : null;
@@ -118,7 +146,8 @@ export async function runMondayClientImport() {
       const locked = new Set(existing?.managedFields ?? []);
       const base: Record<string, unknown> = { updatedAt: new Date() };
       if (!locked.has("name")) base.name = name;
-      if (!locked.has("status")) base.status = "active";
+      if (!locked.has("status")) base.status = status;
+      if (shorts != null && !locked.has("monthlyVideoQuota")) base.monthlyVideoQuota = shorts;
       if (revenue && !locked.has("monthlyRevenue")) base.monthlyRevenue = revenue;
       if (startedOn && !locked.has("startedOn")) base.startedOn = startedOn;
       if (coordinatorId && !locked.has("coordinatorId")) base.coordinatorId = coordinatorId;
@@ -131,7 +160,7 @@ export async function runMondayClientImport() {
       } else {
         const [created] = await db
           .insert(clients)
-          .values({ slug, name, status: "active", monthlyRevenue: revenue ?? undefined, startedOn: startedOn ?? undefined, coordinatorId: coordinatorId ?? undefined })
+          .values({ slug, name, status, monthlyVideoQuota: shorts ?? undefined, monthlyRevenue: revenue ?? undefined, startedOn: startedOn ?? undefined, coordinatorId: coordinatorId ?? undefined })
           .returning({ id: clients.id });
         clientId = created!.id;
         ctx.counters.created++;

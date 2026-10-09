@@ -23,6 +23,7 @@ export default async function ClientsPage() {
     coordinatorName: c.coordinatorName,
     nextShoot: c.nextShoot,
     inProduction: Number(c.inProduction),
+    shortsPerMonth: Number(c.monthlyVideoQuota),
   }));
 
   const activeCount = clients.filter((c) => !STOPPED.has(c.status)).length;
