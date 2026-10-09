@@ -11,14 +11,16 @@ import { teamMembers, users } from "@/db/schema";
  */
 
 // Naamcorrecties (oude voornaam -> nieuwe volledige naam).
-const RENAMES: Record<string, string> = { sam: "Sem", nynke: "Nienke" };
+const RENAMES: Record<string, string> = { sam: "Sem", nynke: "Nienke", jiska: "Jeska Batema" };
+// Placeholder-personen (voornaam) die ik eerder onterecht aanmaakte en nu weer
+// opruim (soft-delete gebruiker + teamlid). Baatema bleek de achternaam van Jeska.
+const REMOVE = ["baatema"];
 
 // Voornaam -> { functie, intern? }. Intern = Team Shortclips, anders freelancer.
 const TEAM: Record<string, { title: string; internal: boolean }> = {
   jarno: { title: "Founder & Creative Director", internal: true },
   milou: { title: "Content Strategist & Social Media Manager", internal: true },
-  jiska: { title: "Content Strategist & Social Media Manager", internal: true },
-  baatema: { title: "Team Shortclips", internal: true },
+  jeska: { title: "Content Strategist & Social Media Manager", internal: true },
   rutger: { title: "Head of Content", internal: true },
   fabian: { title: "Short Video Creative", internal: false },
   max: { title: "Brand Designer", internal: false },
@@ -35,10 +37,16 @@ export async function curateTeam(): Promise<{ ok: boolean; getoond: number; verb
   let added = 0;
   let renamed = 0;
 
-  // 0. Naamcorrecties toepassen (bijv. Sam -> Sem, Nynke -> Nienke).
+  // 0. Naamcorrecties + opruimen placeholders.
   const allUsers = await db.select({ id: users.id, fullName: users.fullName }).from(users);
   for (const u of allUsers) {
     const fn = firstName(u.fullName);
+    if (REMOVE.includes(fn)) {
+      // Placeholder opruimen: teamlid én gebruiker soft-deleten.
+      await db.update(teamMembers).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(teamMembers.userId, u.id));
+      await db.update(users).set({ deletedAt: new Date(), status: "suspended", updatedAt: new Date() }).where(eq(users.id, u.id));
+      continue;
+    }
     if (RENAMES[fn] && u.fullName.trim() !== RENAMES[fn]) {
       await db.update(users).set({ fullName: RENAMES[fn], updatedAt: new Date() }).where(eq(users.id, u.id));
       renamed++;
