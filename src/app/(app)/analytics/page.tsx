@@ -168,11 +168,11 @@ export default async function AnalyticsPage({
         ))}
       </div>
 
-      {/* Klant-selectie: hele weergave inzoomen op één klant. */}
+      {/* Klant-selectie: open een volledige, aparte resultatenpagina per klant. */}
       <div className="mb-4 flex flex-wrap gap-1.5">
-        <Link href={`/analytics?${keep}`} className={chip(!params.klant)}>Alle klanten</Link>
-        {clientRows.slice(0, 14).map((c) => (
-          <Link key={String(c.id)} href={`/analytics?${keep}&klant=${c.slug}`} className={chip(params.klant === String(c.slug))}>
+        <span className="rounded-full bg-[var(--color-surface-2)] px-3 py-1 text-xs font-medium text-[var(--color-ink-muted)]">Open een klant voor volledige resultaten:</span>
+        {clientRows.slice(0, 16).map((c) => (
+          <Link key={String(c.id)} href={`/analytics/${c.slug}`} className={chip(false)}>
             {String(c.name)}
           </Link>
         ))}
@@ -208,7 +208,7 @@ export default async function AnalyticsPage({
             {clientRows.map((c) => (
               <tr key={String(c.id)} className="sc-row-link">
                 <td className="sc-td">
-                  <Link href={`/clients/${c.slug}`} className="flex items-center gap-2 hover:underline">
+                  <Link href={`/analytics/${c.slug}`} className="flex items-center gap-2 hover:underline">
                     <Avatar name={String(c.name)} color={c.color ? String(c.color) : null} size={22} />
                     {String(c.name)}
                   </Link>
