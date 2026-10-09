@@ -1,23 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  AlertTriangle,
-  CalendarClock,
-  Clock,
-  FileWarning,
-  Send,
-} from "lucide-react";
+import { AlertTriangle, CalendarClock, Clock } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getDashboard, getDashboardTopStats } from "@/server/dashboard";
-import {
-  Avatar,
-  Badge,
-  Card,
-  CardHeader,
-  EmptyState,
-  LinkButton,
-  Stat,
-} from "@/components/ui";
+import { Avatar, Badge, Card, CardHeader, EmptyState, LinkButton } from "@/components/ui";
 import {
   daysSince,
   daysUntil,
@@ -26,13 +12,7 @@ import {
   plural,
   relativeDays,
 } from "@/lib/format";
-import {
-  PLATFORM,
-  RISK_LEVEL,
-  SCRIPT_STATUS,
-  VIDEO_STATUS,
-  type VideoStage,
-} from "@/lib/statuses";
+import { RISK_LEVEL, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 import { PipelineStrip } from "./pipeline-strip";
 import { EditorDashboard } from "./editor-view";
 
@@ -117,31 +97,12 @@ export default async function DashboardPage() {
       )}
 
       {/* Kerncijfers */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <Stat
-          label="Actieve klanten"
-          value={top.activeClients}
-          hint={data.clients.atRisk.length > 0 ? `${data.clients.atRisk.length} met aandachtspunt` : "geen risico's"}
-          tone={data.clients.atRisk.length > 0 ? "warn" : "good"}
-          href="/clients"
-        />
-        <Stat label="Opnames deze week" value={top.opnamesThisWeek} hint="komende 7 dagen" href="/productions" />
-        <Stat label="Video's in editing" value={top.inEditing} hint={`${data.videos.awaitingEditor} wacht op editor`} href="/videos?status=editing" />
-        <Stat
-          label="Deadline nadert"
-          value={top.dueSoon}
-          hint="binnen 5 werkdagen"
-          tone={top.dueSoon > 0 ? "warn" : "neutral"}
-          href="/videos?filter=actief"
-        />
-        <Stat
-          label="Over deadline"
-          value={top.overDeadline}
-          hint="moet met voorrang"
-          tone={top.overDeadline > 0 ? "bad" : "good"}
-          href="/videos?filter=te-laat"
-        />
-        <Stat label="Openstaande taken" value={top.openTasks} hint="alle medewerkers" href="/tasks" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <NavyStat label="Actieve klanten" value={top.activeClients} hint={data.clients.atRisk.length > 0 ? `${data.clients.atRisk.length} met aandachtspunt` : "geen risico's"} href="/clients" />
+        <NavyStat label="Opnames" value={top.opnamesThisWeek} hint="deze week" href="/productions" />
+        <NavyStat label="Video's" value={data.videos.open} hint={`${top.inEditing} in editing`} href="/videos?filter=actief" />
+        <NavyStat label="Deadlines" value={top.overDeadline} hint={`${top.dueSoon} naderen`} accent={top.overDeadline > 0 ? "var(--color-bad)" : undefined} href="/videos?filter=te-laat" />
+        <NavyStat label="Openstaande taken" value={top.openTasks} hint="alle medewerkers" href="/tasks" />
       </div>
 
       {/* Pipeline — prominent, in de huisstijl */}
@@ -260,105 +221,24 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-3">
-        {/* Scripts */}
-        <Card padded={false}>
-          <div className="p-5 pb-3">
-            <CardHeader title="Scripts wachten op goedkeuring" />
-          </div>
-          {data.scripts.length === 0 ? (
-            <EmptyState title="Alle scripts zijn rond" icon={<FileWarning className="size-6" />} />
-          ) : (
-            <ul className="divide-y divide-[var(--color-line)]">
-              {data.scripts.slice(0, 6).map((s) => (
-                <li key={s.id}>
-                  <Link href={`/scripts/${s.id}`} className="sc-row-link flex items-center gap-3 px-5 py-3">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{s.title}</span>
-                      <span className="block truncate text-xs text-[var(--color-ink-muted)]">
-                        {s.clientName}
-                        {s.shootOn ? ` · opname ${relativeDays(s.shootOn)}` : ""}
-                      </span>
-                    </span>
-                    <Badge tone={SCRIPT_STATUS[s.status]?.tone ?? "neutral"}>
-                      {SCRIPT_STATUS[s.status]?.label ?? s.status}
-                    </Badge>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        {/* Publicaties deze week */}
-        <Card padded={false}>
-          <div className="p-5 pb-3">
-            <CardHeader
-              title="Deze week publiceren"
-              action={
-                <Link href="/calendar" className="text-sm font-medium text-[var(--color-brand-600)] hover:underline">
-                  Kalender
-                </Link>
-              }
-            />
-          </div>
-          {data.publishThisWeek.length === 0 ? (
-            <EmptyState title="Niets ingepland deze week" icon={<Send className="size-6" />} />
-          ) : (
-            <ul className="divide-y divide-[var(--color-line)]">
-              {data.publishThisWeek.slice(0, 6).map((p) => (
-                <li key={p.id} className="flex items-center gap-3 px-5 py-3">
-                  <Avatar name={p.clientName} color={p.clientColor} size={26} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{p.title}</span>
-                    <span className="block truncate text-xs text-[var(--color-ink-muted)]">
-                      {p.clientName} · {relativeDays(p.scheduledOn)}
-                    </span>
-                  </span>
-                  <span className="flex gap-1">
-                    {(p.platforms as string[]).slice(0, 3).map((pl) => (
-                      <span
-                        key={pl}
-                        title={PLATFORM[pl]?.label ?? pl}
-                        className="size-2 rounded-full"
-                        style={{ background: PLATFORM[pl]?.color ?? "#999" }}
-                      />
-                    ))}
-                  </span>
-                  <Badge tone={p.status === "scheduled" ? "good" : p.status === "ready" ? "info" : "warn"}>
-                    {p.status === "scheduled" ? "ingepland" : p.status === "ready" ? "klaar" : "voorbereiden"}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        {/* Wie moet wat */}
-        <Card padded={false}>
-          <div className="p-5 pb-3">
-            <CardHeader title="Wie moet wat" subtitle="Openstaande taken per persoon." />
-          </div>
-          {data.tasks.length === 0 ? (
-            <EmptyState title="Geen openstaande taken" />
-          ) : (
-            <ul className="divide-y divide-[var(--color-line)]">
-              {data.tasks.map((t) => (
-                <li key={t.assigneeId} className="flex items-center gap-3 px-5 py-3">
-                  <Avatar name={t.assigneeName ?? "?"} size={26} />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                    {t.assigneeName}
-                  </span>
-                  {Number(t.overdue) > 0 ? (
-                    <Badge tone="bad">{Number(t.overdue)} te laat</Badge>
-                  ) : null}
-                  <span className="text-sm font-semibold tabular-nums">{Number(t.total)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
+      {/* Editorbelasting — hoog op de homepage, zodat direct zichtbaar is hoeveel werk bij de editors ligt. */}
+      <Card padded={false} className="overflow-hidden">
+        <div className="bg-[var(--color-indigo-ink)] px-5 py-3 text-sm font-bold tracking-tight text-white">Editorbelasting</div>
+        {data.editors.length === 0 ? (
+          <EmptyState title="Geen lopend editwerk" />
+        ) : (
+          <ul className="divide-y divide-[var(--color-line)] sm:grid sm:grid-cols-2 sm:divide-y-0 sm:[&>li]:border-b sm:[&>li]:border-[var(--color-line)]">
+            {data.editors.map((e) => (
+              <li key={e.editorId} className="flex items-center gap-3 px-5 py-3">
+                <Avatar name={e.editorName} size={26} />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{e.editorName}</span>
+                {Number(e.overdue) > 0 ? <Badge tone="bad">{Number(e.overdue)} te laat</Badge> : null}
+                <span className="text-sm font-semibold tabular-nums">{Number(e.open)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       <div className="grid gap-5 xl:grid-cols-3">
         {/* Klanten met risico */}
@@ -421,29 +301,6 @@ export default async function DashboardPage() {
         </Card>
 
         <div className="space-y-5">
-          {/* Editorcapaciteit */}
-          <Card padded={false}>
-            <div className="p-5 pb-3">
-              <CardHeader title="Editorbelasting" />
-            </div>
-            {data.editors.length === 0 ? (
-              <EmptyState title="Geen lopend editwerk" />
-            ) : (
-              <ul className="divide-y divide-[var(--color-line)]">
-                {data.editors.map((e) => (
-                  <li key={e.editorId} className="flex items-center gap-3 px-5 py-3">
-                    <Avatar name={e.editorName} size={26} />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                      {e.editorName}
-                    </span>
-                    {Number(e.overdue) > 0 ? <Badge tone="bad">{Number(e.overdue)} te laat</Badge> : null}
-                    <span className="text-sm font-semibold tabular-nums">{Number(e.open)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
           {/* Contracten */}
           <Card padded={false}>
             <div className="p-5 pb-3">
@@ -476,5 +333,30 @@ export default async function DashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function NavyStat({
+  label,
+  value,
+  hint,
+  href,
+  accent,
+}: {
+  label: string;
+  value: number | string;
+  hint?: string;
+  href: string;
+  accent?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="block rounded-[var(--radius-lg)] bg-[var(--color-indigo-ink)] px-4 py-4 text-white transition-shadow hover:shadow-[var(--shadow-raised)]"
+    >
+      <div className="text-xs font-semibold uppercase tracking-wide text-white/60">{label}</div>
+      <div className="mt-1 text-3xl font-bold tabular-nums" style={accent ? { color: accent } : undefined}>{value}</div>
+      {hint ? <div className="mt-0.5 text-xs text-white/55">{hint}</div> : null}
+    </Link>
   );
 }
