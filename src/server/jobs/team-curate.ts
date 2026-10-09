@@ -10,8 +10,9 @@ import { teamMembers, users } from "@/db/schema";
  * hun gebruikersrecord en koppelingen blijven intact. Idempotent.
  */
 
-// Naamcorrecties (oude voornaam -> nieuwe volledige naam).
-const RENAMES: Record<string, string> = { sam: "Sem", nynke: "Nienke", jiska: "Jeska Batema" };
+// Naamcorrecties (oude voornaam -> nieuwe volledige naam). Nynke is Fries; zowel
+// een eerdere "Nienke"-schrijfwijze als "nynke" worden naar "Nynke" gezet.
+const RENAMES: Record<string, string> = { sam: "Sem", nynke: "Nynke", nienke: "Nynke", jiska: "Jeska Batema" };
 // Placeholder-personen (voornaam) die ik eerder onterecht aanmaakte en nu weer
 // opruim (soft-delete gebruiker + teamlid). Baatema bleek de achternaam van Jeska.
 const REMOVE = ["baatema"];
@@ -24,7 +25,7 @@ const TEAM: Record<string, { title: string; internal: boolean }> = {
   rutger: { title: "Head of Content", internal: true },
   fabian: { title: "Short Video Creative", internal: false },
   max: { title: "Brand Designer", internal: false },
-  nienke: { title: "Presentatrice", internal: false },
+  nynke: { title: "Presentatrice", internal: false },
   quinn: { title: "Short Video Creative", internal: false },
   sem: { title: "Short Video Creative", internal: false },
 };
