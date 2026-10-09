@@ -39,6 +39,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/ai/briefing", label: "Editor Briefing", icon: "ClipboardList", permissions: ["ai:read"], match: "/ai/briefing" },
       { href: "/ai/bericht", label: "Klantbericht", icon: "MessagesSquare", permissions: ["ai:read"], match: "/ai/bericht" },
       { href: "/ai/bedrijfsonderzoek", label: "Bedrijfsonderzoek", icon: "Search", permissions: ["ai:read"], match: "/ai/bedrijfsonderzoek" },
+      { href: "/ai/geschiedenis", label: "AI-geschiedenis", icon: "History", permissions: ["ai:read"], match: "/ai/geschiedenis" },
       { href: "/ai/kennisbank", label: "AI-kennisbank", icon: "BookOpen", permissions: ["ai:read"], match: "/ai/kennisbank" },
     ],
   },
