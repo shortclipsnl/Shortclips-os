@@ -50,6 +50,39 @@ const STARTER: Array<{ category: string; title: string; body: string }> = [
       "Bij twijfel of onvoldoende informatie: niets verzinnen, maar aangeven welke informatie nog ontbreekt.",
     ].map((l) => `- ${l}`).join("\n"),
   },
+  {
+    category: "bedrijf",
+    title: "Over Shortclips",
+    body: [
+      "Shortclips is een short video bureau en fungeert als de externe contentafdeling van klanten; vestigingen in Amsterdam en Sneek.",
+      "We maken korte verticale video's (short-form) voor Instagram Reels, TikTok en YouTube Shorts.",
+      "We werken in een vast ritme: strategie, scripts, opnamedagen, editing, goedkeuring, publicatie en resultaten — in één doorlopend proces.",
+      "Content is organisch of organisch + advertentie, afhankelijk van de afspraak met de klant.",
+      "Toon en uitstraling zijn premium; we spreken en werken vanuit het team ('wij').",
+    ].map((l) => `- ${l}`).join("\n"),
+  },
+  {
+    category: "werkwijze",
+    title: "Productieproces van opname tot publicatie",
+    body: [
+      "Vaste volgorde per video: script schrijven → script goedkeuren → opnamedag (draaidag) → editing → interne controle → klantcontrole → goedgekeurd → inplannen → publiceren → resultaten.",
+      "Scripts worden eerst intern en daarna door de klant goedgekeurd voordat er wordt opgenomen.",
+      "Na de edit volgt eerst interne controle, daarna pas de klantcontrole.",
+      "Publicatie gebeurt standaard op werkdagen (maandag t/m vrijdag); weekend wordt overgeslagen.",
+      "Het afgesproken aantal shorts per maand (afname) staat per klant vast in Monday.",
+      "Bestanden en versies staan in Frame.io; klant- en projectgegevens in Monday.",
+    ].map((l) => `- ${l}`).join("\n"),
+  },
+  {
+    category: "afspraken",
+    title: "Afspraken rondom deadlines en feedback",
+    body: [
+      "Elke productiefase heeft een streeftijd; video's die daar overheen gaan krijgen voorrang en worden als 'te laat' gemarkeerd.",
+      "Klantfeedback is nodig om door te kunnen; we vragen de klant tijdig (binnen enkele werkdagen) te reageren en sturen een herinnering als het te lang stil blijft.",
+      "Beloof nooit een exacte opleverdatum of doorlooptijd zonder dat die is afgestemd; verwijs bij twijfel naar de planning in het dashboard.",
+      "Tarieven, contractduur en editkosten staan per klant in Monday — nooit zelf prijzen of bedragen verzinnen; haal ze uit het financieel overzicht of verwijs naar Jarno.",
+    ].map((l) => `- ${l}`).join("\n"),
+  },
 ];
 
 export async function seedAiKnowledge(): Promise<{ ok: boolean; added: number; skipped: number }> {
