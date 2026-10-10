@@ -118,8 +118,17 @@ export default async function VideosPage({
       {/* Video's om te checken — interne controle, automatisch gevuld uit de pipeline. */}
       <ReviewQueue queue={reviewQueue} />
 
-      <div className="mb-5">
-        <Stat label="In productie" value={highlights.inProduction} hint={`${highlights.awaitingEditor} wacht op editor`} href="/videos?filter=actief" />
+      <div className="mb-4 flex flex-wrap items-center gap-4">
+        <div className="min-w-48">
+          <Stat label="In productie" value={highlights.inProduction} hint={`${highlights.awaitingEditor} wacht op editor`} href="/videos?filter=actief" />
+        </div>
+        {/* Vaste statuskleuren — consequent door het hele Editing Dashboard. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[var(--color-ink-muted)]">
+          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[var(--color-bad)]" />Te laat</span>
+          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[var(--color-warn)]" />Wacht op klant</span>
+          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[var(--color-brand-600)]" />Wacht op editor</span>
+          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[var(--color-good)]" />Afgerond</span>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -191,10 +200,10 @@ export default async function VideosPage({
               const fase = VIDEO_STATUS[v.status as VideoStage];
               const health = overdue
                 ? { label: "Te laat", tone: "bad" as const }
-                : stuck
-                  ? { label: "Loopt vast", tone: "bad" as const }
-                  : waiting
-                    ? { label: "Wacht op feedback", tone: "neutral" as const }
+                : waiting
+                  ? { label: "Wacht op klant", tone: "warn" as const }
+                  : stuck
+                    ? { label: "Loopt vast", tone: "bad" as const }
                     : nearing
                       ? { label: "Deadline nadert", tone: "warn" as const }
                       : { label: "Op schema", tone: "neutral" as const };
