@@ -38,32 +38,20 @@ export default async function ClientResultsPage({
   const dInt = `interval '${days} days'`;
   const dPrev = `interval '${2 * days} days'`;
 
-  const [totals, prevTotals, inter, perMonth, perPlatform, videoRows, publishedRow, allClientsRaw] =
+  const [totals, prevTotals, perMonth, perPlatform, videoRows, publishedRow, allClientsRaw] =
     await Promise.all([
       db.execute(sql`
         select coalesce(sum(views),0)::int views, coalesce(sum(reach),0)::int reach, coalesce(sum(engagements),0)::int engagements,
-               coalesce(sum(follower_delta),0)::int follower_growth, coalesce(sum(posts_published),0)::int posts
+               coalesce(sum(follower_delta),0)::int follower_growth, coalesce(sum(posts_published),0)::int posts,
+               coalesce(sum(likes),0)::int likes, coalesce(sum(comments),0)::int comments,
+               coalesce(sum(shares),0)::int shares, coalesce(sum(saves),0)::int saves,
+               coalesce(sum(watch_seconds),0)::bigint watch_seconds, coalesce(sum(video_views),0)::bigint video_views
         from daily_metrics where client_id = ${cid} and measured_on >= current_date - ${sql.raw(dInt)}`),
       db.execute(sql`
         select coalesce(sum(views),0)::int views, coalesce(sum(reach),0)::int reach, coalesce(sum(engagements),0)::int engagements,
                coalesce(sum(follower_delta),0)::int follower_growth
         from daily_metrics where client_id = ${cid}
           and measured_on >= current_date - ${sql.raw(dPrev)} and measured_on < current_date - ${sql.raw(dInt)}`),
-      // Diepe interactiecijfers per video (laatste cumulatieve meting per publicatie), in de periode.
-      db.execute(sql`
-        with pm as (
-          select publication_id, max(likes) likes, max(comments) comments, max(shares) shares,
-                 max(saves) saves, max(profile_visits) profile_visits, max(watch_time_seconds) watch_seconds,
-                 max(avg_watch_seconds) avg_watch, max(completion_rate) completion
-          from social_metrics where client_id = ${cid} group by publication_id
-        )
-        select coalesce(sum(pm.likes),0)::int likes, coalesce(sum(pm.comments),0)::int comments,
-               coalesce(sum(pm.shares),0)::int shares, coalesce(sum(pm.saves),0)::int saves,
-               coalesce(sum(pm.profile_visits),0)::int profile_visits, coalesce(sum(pm.watch_seconds),0)::bigint watch_seconds,
-               avg(pm.avg_watch) filter (where pm.avg_watch is not null) avg_watch,
-               avg(pm.completion) filter (where pm.completion is not null) completion
-        from publications p join pm on pm.publication_id = p.id
-        where p.client_id = ${cid} and p.deleted_at is null and p.published_at >= current_date - ${sql.raw(dInt)}`),
       db.execute(sql`
         select to_char(measured_on,'YYYY-MM') maand, coalesce(sum(views),0)::int views
         from daily_metrics where client_id = ${cid} and measured_on >= current_date - interval '12 months'
@@ -98,7 +86,6 @@ export default async function ClientResultsPage({
 
   const t = rows<Record<string, number>>(totals)[0] ?? {};
   const prev = rows<Record<string, number>>(prevTotals)[0] ?? {};
-  const ix = rows<Record<string, number>>(inter)[0] ?? {};
   const months = rows<Record<string, string | number>>(perMonth);
   const platforms = rows<Record<string, string | number>>(perPlatform);
   const videos = rows<VideoRow>(videoRows);
@@ -109,8 +96,11 @@ export default async function ClientResultsPage({
 
   const avgViews = publishedTotal > 0 ? Math.round(Number(t.views ?? 0) / publishedTotal) : 0;
   const maxMonth = Math.max(1, ...months.map((m) => Number(m.views)));
-  const completionPct = ix.completion != null ? Math.round(Number(ix.completion) * 100) : null;
-  const avgWatch = ix.avg_watch != null ? Number(ix.avg_watch) : null;
+  // Gemiddelde kijktijd = totale kijktijd / videoweergaven (uit Metricool reels).
+  const videoViews = Number(t.video_views ?? 0);
+  const avgWatch = videoViews > 0 ? Number(t.watch_seconds ?? 0) / videoViews : null;
+  // Uitkijkpercentage/retentie levert Metricool niet; blijft "—".
+  const completionPct: number | null = null;
 
   const deltaPct = (cur: number, p: number): number | null => (p > 0 ? Math.round(((cur - p) / p) * 100) : null);
   const deltaHint = (cur: number, p: number): string | undefined => {
@@ -156,13 +146,13 @@ export default async function ClientResultsPage({
             <Stat label="Bereik" value={compact(Number(t.reach ?? 0))} hint={deltaHint(Number(t.reach ?? 0), Number(prev.reach ?? 0))} tone={deltaTone(Number(t.reach ?? 0), Number(prev.reach ?? 0))} />
             <Stat label="Gem. per video" value={compact(avgViews)} />
             <Stat label="Nieuwe volgers" value={`${Number(t.follower_growth ?? 0) >= 0 ? "+" : ""}${num(Number(t.follower_growth ?? 0))}`} hint={deltaHint(Number(t.follower_growth ?? 0), Number(prev.follower_growth ?? 0))} tone={deltaTone(Number(t.follower_growth ?? 0), Number(prev.follower_growth ?? 0))} />
-            <Stat label="Likes" value={compact(Number(ix.likes ?? 0))} />
-            <Stat label="Reacties" value={compact(Number(ix.comments ?? 0))} />
-            <Stat label="Shares" value={compact(Number(ix.shares ?? 0))} />
-            <Stat label="Saves" value={compact(Number(ix.saves ?? 0))} />
-            <Stat label="Profielbezoeken" value={compact(Number(ix.profile_visits ?? 0))} />
-            <Stat label="Gem. kijktijd" value={avgWatch != null ? `${avgWatch.toFixed(1)}s` : "—"} hint={avgWatch == null ? "niet op elk platform" : undefined} />
-            <Stat label="Uitkijkpercentage" value={completionPct != null ? `${completionPct}%` : "—"} hint={completionPct == null ? "niet op elk platform" : undefined} />
+            <Stat label="Likes" value={compact(Number(t.likes ?? 0))} />
+            <Stat label="Reacties" value={compact(Number(t.comments ?? 0))} />
+            <Stat label="Shares" value={compact(Number(t.shares ?? 0))} />
+            <Stat label="Saves" value={compact(Number(t.saves ?? 0))} />
+            <Stat label="Gem. kijktijd" value={avgWatch != null ? `${avgWatch.toFixed(1)}s` : "—"} hint={avgWatch == null ? "geen reels-data" : undefined} />
+            <Stat label="Profielbezoeken" value="—" hint="niet via Metricool" />
+            <Stat label="Uitkijkpercentage" value={completionPct != null ? `${completionPct}%` : "—"} hint="niet via Metricool" />
           </div>
 
           <div className="mb-5 grid gap-5 xl:grid-cols-2">

@@ -82,6 +82,8 @@ const METRIC_MAP = [
   { field: "followerDelta", subject: "account", metric: "delta_followers" },
   { field: "followers", subject: "account", metric: "Followers" },
   // Waardevolle interacties + kijktijd komen uit de reels-cijfers.
+  { field: "likes", subject: "reels", metric: "likes" },
+  { field: "comments", subject: "reels", metric: "comments" },
   { field: "shares", subject: "reels", metric: "shares" },
   { field: "saves", subject: "reels", metric: "saved" },
   { field: "watchSeconds", subject: "reels", metric: "ig_reels_video_view_total_time" },
@@ -90,12 +92,12 @@ const METRIC_MAP = [
 
 type DayAgg = {
   views: number; reach: number; engagements: number; followerDelta: number; followers: number;
-  shares: number; saves: number; watchSeconds: number; videoViews: number;
+  likes: number; comments: number; shares: number; saves: number; watchSeconds: number; videoViews: number;
 };
 
 const EMPTY_AGG = (): DayAgg => ({
   views: 0, reach: 0, engagements: 0, followerDelta: 0, followers: 0,
-  shares: 0, saves: 0, watchSeconds: 0, videoViews: 0,
+  likes: 0, comments: 0, shares: 0, saves: 0, watchSeconds: 0, videoViews: 0,
 });
 
 /** Metricool-netwerk → ons platform-enum (voor de per-platform uitsplitsing). */
@@ -172,6 +174,8 @@ export async function pullMetricoolMetrics(
               engagements: Math.max(0, Math.round(a.engagements)),
               followers: Math.max(0, Math.round(a.followers)),
               followerDelta: Math.round(a.followerDelta),
+              likes: Math.max(0, Math.round(a.likes)),
+              comments: Math.max(0, Math.round(a.comments)),
               shares: Math.max(0, Math.round(a.shares)),
               saves: Math.max(0, Math.round(a.saves)),
               watchSeconds: Math.max(0, Math.round(a.watchSeconds)),

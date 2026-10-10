@@ -57,6 +57,13 @@
       "when": 1791473209751,
       "tag": "0007_milky_karnak",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791620625727,
+      "tag": "0008_powerful_electro",
+      "breakpoints": true
     }
   ]
 }

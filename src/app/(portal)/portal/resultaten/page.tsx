@@ -100,6 +100,8 @@ export default async function PortalResultatenPage({
               <Metric label="Interacties" value={r.metrics.engagements} pct={r.deltas.engagements} />
             )}
             <Metric label="Nieuwe volgers" value={r.metrics.followerGrowth} prefix={r.metrics.followerGrowth >= 0 ? "+" : ""} />
+            {r.likes > 0 ? <Metric label="Likes" value={r.likes} /> : null}
+            {r.comments > 0 ? <Metric label="Reacties" value={r.comments} /> : null}
           </div>
 
           {r.insight ? (

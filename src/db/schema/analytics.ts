@@ -149,6 +149,9 @@ export const dailyMetrics = pgTable(
     followers: integer("followers").notNull().default(0),
     followerDelta: integer("follower_delta").notNull().default(0),
     postsPublished: integer("posts_published").notNull().default(0),
+    /** Likes en reacties (reels), per klant/platform/dag uit Metricool. */
+    likes: integer("likes").notNull().default(0),
+    comments: integer("comments").notNull().default(0),
     /** Waardevolle interacties: shares + saves (reels). */
     shares: integer("shares").notNull().default(0),
     saves: integer("saves").notNull().default(0),

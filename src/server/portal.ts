@@ -298,6 +298,8 @@ export type PortalResults = {
   metrics: { views: number; reach: number; engagements: number; followerGrowth: number };
   deltas: { views: number | null; reach: number | null; engagements: number | null };
   byPlatform: PortalPlatformResult[];
+  likes: number;
+  comments: number;
   valuableInteractions: number;
   avgWatchSeconds: number;
   insight: string | null;
@@ -317,6 +319,7 @@ export async function getPortalResults(viewer: Viewer, days = 30): Promise<Porta
     with cur as (
       select coalesce(sum(views),0)::int v, coalesce(sum(reach),0)::int r,
              coalesce(sum(engagements),0)::int e, coalesce(sum(follower_delta),0)::int f,
+             coalesce(sum(likes),0)::int lk, coalesce(sum(comments),0)::int cm,
              coalesce(sum(shares),0)::int sh, coalesce(sum(saves),0)::int sv,
              coalesce(sum(watch_seconds),0)::int ws, coalesce(sum(video_views),0)::int vv
       from daily_metrics
@@ -331,7 +334,7 @@ export async function getPortalResults(viewer: Viewer, days = 30): Promise<Porta
         and measured_on >= current_date - (${2 * days} * interval '1 day')
         and measured_on <  current_date - (${days} * interval '1 day')
     )
-    select cur.v cv, cur.r cr, cur.e ce, cur.f cf, cur.sh csh, cur.sv csv, cur.ws cws, cur.vv cvv,
+    select cur.v cv, cur.r cr, cur.e ce, cur.f cf, cur.lk clk, cur.cm ccm, cur.sh csh, cur.sv csv, cur.ws cws, cur.vv cvv,
            prev.v pv, prev.r pr, prev.e pe, prev.f pf, prev.n pn
     from cur, prev
   `);
@@ -343,6 +346,8 @@ export async function getPortalResults(viewer: Viewer, days = 30): Promise<Porta
   const n = (k: string) => Number(row[k] ?? 0);
   const cur = { views: n("cv"), reach: n("cr"), engagements: n("ce"), followerGrowth: n("cf") };
   const prev = { views: n("pv"), reach: n("pr"), engagements: n("pe") };
+  const likes = n("clk");
+  const comments = n("ccm");
   const valuableInteractions = n("csh") + n("csv");
   const videoViews = n("cvv");
   const avgWatchSeconds = videoViews > 0 ? Math.round(n("cws") / videoViews) : 0;
@@ -399,7 +404,7 @@ export async function getPortalResults(viewer: Viewer, days = 30): Promise<Porta
     insight = parts.join(" ");
   }
 
-  return { days, metrics: cur, deltas, byPlatform, valuableInteractions, avgWatchSeconds, insight, hasData };
+  return { days, metrics: cur, deltas, byPlatform, likes, comments, valuableInteractions, avgWatchSeconds, insight, hasData };
 }
 
 /** Klantfeedback op één video — uitsluitend de draden die voor de klant zijn. */
