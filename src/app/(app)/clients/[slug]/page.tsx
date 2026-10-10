@@ -47,6 +47,7 @@ import {
   type VideoStage,
 } from "@/lib/statuses";
 import { ClientTabs, type TabDef } from "./tabs";
+import { FinanceMonths } from "./finance-months";
 
 export const dynamic = "force-dynamic";
 
@@ -884,6 +885,24 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
           </dl>
         </Card>
       </div>
+
+      {/* Maandstaten: echte nettowinst per maand incl. handmatige directe kosten. */}
+      <Card padded={false} className="overflow-hidden">
+        <div className="flex items-center justify-between gap-2 bg-[var(--color-indigo-ink)] px-5 py-2.5 text-white">
+          <div>
+            <div className="text-sm font-bold">Maandstaten — echte nettowinst</div>
+            <div className="text-2xs text-white/60">Omzet, meerwerk en editkosten automatisch uit Monday; vul opname-, strategie- en overige kosten in voor de werkelijke nettowinst.</div>
+          </div>
+        </div>
+        <FinanceMonths
+          clientId={c.id}
+          canWrite={hub.canWriteFinance}
+          months={hub.financeMonths.map((m) => ({
+            id: m.id, period: m.period, revenue: m.revenue, extraRevenue: m.extraRevenue, editCost: m.editCost,
+            shootCost: m.shootCost, strategyCost: m.strategyCost, otherCost: m.otherCost, note: m.note,
+          }))}
+        />
+      </Card>
 
       <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-3 text-xs text-[var(--color-ink-muted)]">
         <strong className="font-semibold text-[var(--color-ink)]">Opbrengst na editkosten</strong> is de afnameprijs minus de editkosten — dezelfde berekening als Monday&apos;s formule &quot;Netto opbrengst per maand&quot; (Monday-formules zijn niet los via de API uitleesbaar, dus we berekenen hem uit dezelfde Monday-invoer; de uitkomst is identiek). Het is winst ná editkosten. Overige kosten zoals opname, strategie en overhead staan niet in Monday en zijn hier <strong>niet</strong> op nul gezet — daarom is de <strong className="font-semibold text-[var(--color-ink)]">echte nettowinst onbekend</strong> tot die kosten beschikbaar zijn.

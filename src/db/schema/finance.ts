@@ -153,3 +153,42 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
   }),
   client: one(clients, { fields: [payments.clientId], references: [clients.id] }),
 }));
+
+/* ------------------------------------------------------------------ *
+ * Maandelijkse kosten-/winststaat per klant (#9/#10 vervolg)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Eén rij per klant per maand. De omzet-/editkostenvelden worden automatisch
+ * gevuld (snapshot uit Monday), de directe kosten (opname, strategie, overig)
+ * vult het team handmatig in. Zo ontstaat echte nettowinst én maandhistorie
+ * zonder dat elke maand alles opnieuw hoeft te worden ingevoerd.
+ */
+export const clientFinanceMonths = pgTable(
+  "client_finance_months",
+  {
+    id: pk(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    /** Maand als YYYY-MM. */
+    period: varchar("period", { length: 7 }).notNull(),
+    /** Automatisch uit Monday (snapshot). */
+    revenue: numeric("revenue", { precision: 12, scale: 2 }).notNull().default("0"),
+    extraRevenue: numeric("extra_revenue", { precision: 12, scale: 2 }).notNull().default("0"),
+    editCost: numeric("edit_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+    /** Handmatige directe kosten. */
+    shootCost: numeric("shoot_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+    strategyCost: numeric("strategy_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+    otherCost: numeric("other_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+    note: text("note"),
+    /** auto = door de maand-job gezet, manual = handmatig bijgewerkt. */
+    source: varchar("source", { length: 16 }).notNull().default("auto"),
+    updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [
+    unique("client_finance_months_unique").on(t.clientId, t.period),
+    index("client_finance_months_period_idx").on(t.period),
+  ],
+);

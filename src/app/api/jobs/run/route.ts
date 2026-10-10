@@ -21,6 +21,7 @@ import { linkMetricoolBrands, pullMetricoolMetrics, runMetricoolSync } from "@/s
 import { setTeamContact } from "@/server/jobs/team";
 import { enforcePortalAccess, portalAccessReport } from "@/server/jobs/portal-access";
 import { seedAiKnowledge } from "@/server/jobs/ai-seed";
+import { snapshotFinanceMonth } from "@/server/jobs/finance-snapshot";
 import { curateTeam } from "@/server/jobs/team-curate";
 import { setupTeamLogins } from "@/server/jobs/team-login-setup";
 import { runClientNotifications } from "@/server/jobs/notifications";
@@ -58,6 +59,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "portal.coverage": portalAccessReport,
   "portal.notify_clients": runClientNotifications,
   "ai.seed_knowledge": seedAiKnowledge,
+  "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,
   "team.setup_logins": setupTeamLogins,
   "maintenance.prune_sessions": async () => ({ removed: await pruneSessions() }),

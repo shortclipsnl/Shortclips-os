@@ -19,6 +19,7 @@ import {
   clientPackages,
   clientReports,
   clients,
+  clientFinanceMonths,
   contentCalendar,
   contracts,
   deliverables,
@@ -278,9 +279,20 @@ export async function getClientHub(viewer: Viewer, slug: string) {
     views: 0, reach: 0, engagements: 0, follower_growth: 0,
   };
 
+  const financeMonths = canSeeFinance
+    ? await db
+        .select()
+        .from(clientFinanceMonths)
+        .where(eq(clientFinanceMonths.clientId, client.id))
+        .orderBy(desc(clientFinanceMonths.period))
+        .limit(24)
+    : [];
+
   return {
     client,
     contacts,
+    financeMonths,
+    canWriteFinance: viewer.permissions.has("finance:write"),
     package: packages[0] ?? null,
     contract: contract[0] ?? null,
     videographer: videographer[0] ?? null,
