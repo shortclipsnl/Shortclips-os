@@ -47,6 +47,7 @@ export const NAVIGATION: NavGroup[] = [
     title: "Beheer",
     items: [
       { href: "/klantenbeheer", label: "Klantenbeheer", icon: "UserCog", permissions: ["clients:write"], match: "/klantenbeheer" },
+      { href: "/editkosten", label: "Editkosten", icon: "Scissors", permissions: ["finance:read"], match: "/editkosten" },
       { href: "/settings/integrations", label: "Koppelingen", icon: "Plug", permissions: ["integrations:read"], match: "/settings/integrations" },
       { href: "/settings", label: "Instellingen", icon: "Settings", permissions: ["settings:read", "users:read"], match: "/settings" },
     ],

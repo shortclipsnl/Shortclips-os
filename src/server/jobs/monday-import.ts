@@ -18,6 +18,7 @@ const H = {
   startDate: "date_mm0d59r5",
   shorts: "color_mm066b0c",
   editCost: "color_mm4sh1q2", // "Editkosten per video" (€25/€35/€48/€65)
+  editor: "color_mm509p0c", // "Editor" (Sam/Fabian/Alex/Sem/Noah/Quinn)
   contractMonths: "numeric_mm0jdqmx", // "Contractduur in maanden"
   stopDate: "date_mm6a8rqt", // "Stopdatum klant" (leeg = loopt)
   platforms: "dropdown_mm7jszaj",
@@ -129,6 +130,9 @@ export async function runMondayClientImport() {
       const shorts = parseShorts(item);
       const revenue = parseMoney(col(item, H.revenue));
       const editCost = parseMoney(col(item, H.editCost)); // "€48" → 48.00
+      // Editor uit Monday; "Sam" is in ons team "Sem".
+      const editorRaw = col(item, H.editor).trim();
+      const editorName = editorRaw ? (editorRaw.toLowerCase() === "sam" ? "Sem" : editorRaw) : null;
       const contractMonthsText = col(item, H.contractMonths).replace(/[^\d]/g, "");
       const contractMonths = contractMonthsText ? Number(contractMonthsText) : null;
       const stopText = col(item, H.stopDate);
@@ -158,6 +162,7 @@ export async function runMondayClientImport() {
       if (shorts != null && !locked.has("monthlyVideoQuota")) base.monthlyVideoQuota = shorts;
       if (revenue && !locked.has("monthlyRevenue")) base.monthlyRevenue = revenue;
       if (editCost && !locked.has("editCostPerVideo")) base.editCostPerVideo = editCost;
+      if (editorName && !locked.has("editorName")) base.editorName = editorName;
       if (contractMonths != null && !locked.has("contractMonths")) base.contractMonths = contractMonths;
       // Stopdatum altijd meenemen (ook leegmaken als die in Monday is gewist).
       if (!locked.has("endedOn")) base.endedOn = endedOn;
@@ -172,7 +177,7 @@ export async function runMondayClientImport() {
       } else {
         const [created] = await db
           .insert(clients)
-          .values({ slug, name, status, monthlyVideoQuota: shorts ?? undefined, monthlyRevenue: revenue ?? undefined, editCostPerVideo: editCost ?? undefined, contractMonths: contractMonths ?? undefined, endedOn: endedOn ?? undefined, startedOn: startedOn ?? undefined, coordinatorId: coordinatorId ?? undefined })
+          .values({ slug, name, status, monthlyVideoQuota: shorts ?? undefined, monthlyRevenue: revenue ?? undefined, editCostPerVideo: editCost ?? undefined, editorName: editorName ?? undefined, contractMonths: contractMonths ?? undefined, endedOn: endedOn ?? undefined, startedOn: startedOn ?? undefined, coordinatorId: coordinatorId ?? undefined })
           .returning({ id: clients.id });
         clientId = created!.id;
         ctx.counters.created++;

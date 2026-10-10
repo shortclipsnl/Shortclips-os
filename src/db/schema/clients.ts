@@ -61,6 +61,8 @@ export const clients = pgTable(
     editCostPerVideo: numeric("edit_cost_per_video", { precision: 10, scale: 2 }),
     contractMonths: integer("contract_months"),
     endedOn: date("ended_on"),
+    /** Toegewezen editor volgens Monday (HOOFDBOARD kolom "Editor"). */
+    editorName: varchar("editor_name", { length: 80 }),
     lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
     notes: text("notes"),
