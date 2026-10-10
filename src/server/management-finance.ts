@@ -57,7 +57,29 @@ export async function getManagementFinance() {
   const year = new Date().getFullYear().toString();
   const yearRealized = months.filter((m) => m.period.startsWith(year)).reduce((a, m) => a + m.income, 0);
 
+  // Officiële boekhouding (geïmporteerd uit Digiboox): per maand + jaartotaal.
+  const bookMonths = companyRows
+    .filter((c) => c.bookSource && (Number(c.bookRevenue) || Number(c.bookCost) || Number(c.bookFinanceIncome)))
+    .map((c) => {
+      const revenue = Number(c.bookRevenue);
+      const cost = Number(c.bookCost);
+      const financeIncome = Number(c.bookFinanceIncome);
+      return { period: c.period, revenue, cost, financeIncome, result: revenue + financeIncome - cost, importedAt: c.bookImportedAt };
+    })
+    .sort((a, b) => a.period.localeCompare(b.period));
+  const bookThisYear = bookMonths.filter((m) => m.period.startsWith(year));
+  const book = {
+    hasData: bookMonths.length > 0,
+    months: bookMonths,
+    lastImportedAt: bookMonths.reduce<Date | null>((a, m) => (m.importedAt && (!a || m.importedAt > a) ? m.importedAt : a), null),
+    yearRevenue: bookThisYear.reduce((a, m) => a + m.revenue, 0),
+    yearCost: bookThisYear.reduce((a, m) => a + m.cost, 0),
+    yearFinanceIncome: bookThisYear.reduce((a, m) => a + m.financeIncome, 0),
+    yearResult: bookThisYear.reduce((a, m) => a + m.result, 0),
+  };
+
   return {
+    book,
     mrr,
     expectedNextMonth: mrr + pipelineMonthly,
     yearRealized,

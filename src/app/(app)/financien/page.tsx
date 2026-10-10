@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import { getManagementFinance } from "@/server/management-finance";
 import { Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
-import { compact, euro } from "@/lib/format";
-import { CompanyMonthRow, FixedCostManager, SalesLeadManager, type CompanyMonth } from "./financien-ui";
+import { compact, euro, formatDate } from "@/lib/format";
+import { CompanyMonthRow, DigibooxImport, FixedCostManager, SalesLeadManager, type CompanyMonth } from "./financien-ui";
+
+function monthLabel(p: string) {
+  const [y, m] = p.split("-").map(Number);
+  return new Date(y!, (m ?? 1) - 1, 1).toLocaleDateString("nl-NL", { month: "short", year: "numeric" });
+}
 
 export const metadata: Metadata = { title: "Financiën" };
 export const dynamic = "force-dynamic";
@@ -26,6 +31,57 @@ export default async function FinancienPage() {
         <Stat label={`Gerealiseerd ${new Date().getFullYear()}`} value={euro(d.yearRealized)} />
         <Stat label="Vaste lasten / maand" value={euro(d.fixedTotal)} />
       </div>
+
+      {/* Boekhouding (Digiboox) — officiële cijfers */}
+      <Card padded={false} className="mb-6 overflow-hidden ring-1 ring-[var(--color-brand-600)]/15">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--color-brand-700,#0B2447)] px-5 py-3 text-white">
+          <div>
+            <h2 className="text-base font-bold tracking-tight">Boekhouding · Digiboox</h2>
+            <p className="text-xs text-white/70">
+              Officiële omzet, kosten en resultaat uit de boekhouding.
+              {d.book.lastImportedAt ? ` Laatst ingelezen ${formatDate(d.book.lastImportedAt)}.` : " Nog niet ingelezen — upload hieronder je export."}
+            </p>
+          </div>
+          {d.book.hasData ? (
+            <div className="flex gap-4 text-right">
+              <div><div className="text-2xs uppercase tracking-wide text-white/60">Omzet {new Date().getFullYear()}</div><div className="text-lg font-bold tabular-nums">{euro(d.book.yearRevenue)}</div></div>
+              <div><div className="text-2xs uppercase tracking-wide text-white/60">Kosten</div><div className="text-lg font-bold tabular-nums">{euro(d.book.yearCost)}</div></div>
+              <div><div className="text-2xs uppercase tracking-wide text-white/60">Resultaat</div><div className="text-lg font-bold tabular-nums">{euro(d.book.yearResult)}</div></div>
+            </div>
+          ) : null}
+        </div>
+
+        {d.book.hasData ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-[var(--color-line)] text-left text-xs text-[var(--color-ink-faint)]">
+                  <th className="px-4 py-2 font-medium">Maand</th>
+                  <th className="px-3 py-2 text-right font-medium">Omzet</th>
+                  <th className="px-3 py-2 text-right font-medium">Financiële baten</th>
+                  <th className="px-3 py-2 text-right font-medium">Kosten</th>
+                  <th className="px-3 py-2 text-right font-medium">Resultaat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...d.book.months].reverse().map((m) => (
+                  <tr key={m.period} className="border-b border-[var(--color-line)]">
+                    <td className="px-4 py-2 font-medium">{monthLabel(m.period)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{euro(m.revenue)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-[var(--color-ink-muted)]">{m.financeIncome ? euro(m.financeIncome) : "–"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-[var(--color-ink-muted)]">{euro(m.cost)}</td>
+                    <td className={`px-3 py-2 text-right font-semibold tabular-nums ${m.result >= 0 ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}`}>{euro(m.result)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState title="Nog geen boekhoudcijfers" description="Upload je Digiboox-export om omzet, kosten en resultaat per maand automatisch te vullen." />
+        )}
+
+        <DigibooxImport />
+      </Card>
 
       {/* Winstoverzicht per maand */}
       <Card padded={false} className="mb-6 overflow-hidden ring-1 ring-[var(--color-indigo-ink)]/15">

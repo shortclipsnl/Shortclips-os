@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Plus, Trash2 } from "lucide-react";
+import { Check, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { deleteFixedCost, deleteSalesLead, upsertCompanyMonth, upsertFixedCost, upsertSalesLead } from "@/server/actions/management-finance";
+import { importDigibooxFinance, type DigibooxImportResult } from "@/server/actions/digiboox-import";
 import { Button } from "@/components/ui";
 
 const eur = (n: number) => `€ ${n.toLocaleString("nl-NL", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -141,6 +142,70 @@ export function SalesLeadManager({ items }: { items: Lead[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/* --- Digiboox-import: boekhoud-exports (.xlsx) inlezen --- */
+export function DigibooxImport() {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [names, setNames] = useState<string[]>([]);
+  const [pending, start] = useTransition();
+  const [result, setResult] = useState<DigibooxImportResult | null>(null);
+  const router = useRouter();
+
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    setNames(Array.from(e.target.files ?? []).map((f) => f.name));
+    setResult(null);
+  }
+  function upload() {
+    const files = inputRef.current?.files;
+    if (!files || files.length === 0) return;
+    const fd = new FormData();
+    for (const f of Array.from(files)) fd.append("files", f);
+    start(async () => {
+      const res = await importDigibooxFinance(fd);
+      setResult(res);
+      if (res.ok) {
+        setNames([]);
+        if (inputRef.current) inputRef.current.value = "";
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <div className="p-5 pt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <input ref={inputRef} type="file" accept=".xlsx" multiple onChange={onPick}
+          className="block max-w-full text-sm text-[var(--color-ink-muted)] file:mr-3 file:rounded-[var(--radius-sm)] file:border file:border-[var(--color-line-strong)] file:bg-[var(--color-surface)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-[var(--color-ink)] hover:file:bg-[var(--color-surface-sunken)]" />
+        <Button onClick={upload} disabled={pending || names.length === 0} size="sm">
+          {pending ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />} Inlezen
+        </Button>
+      </div>
+      <p className="mt-2 text-2xs text-[var(--color-ink-faint)]">
+        Kies in Digiboox de export <strong>Mutaties</strong> (omzet/kosten per maand) en/of <strong>Winst- en verliesrekening</strong> (jaartotaal). Meerdere bestanden tegelijk mag.
+      </p>
+
+      {result ? (
+        <div className={`mt-3 rounded-[var(--radius-sm)] px-3 py-2 text-xs ${result.ok ? "bg-[var(--color-good-soft)] text-[#14633a]" : "bg-[var(--color-warn-soft)] text-[#8a5300]"}`}>
+          {result.ok ? (
+            <>
+              <strong>{result.imported} maand(en) bijgewerkt</strong> uit de boekhouding.
+              {result.year ? <> Jaartotaal ({result.year.label}): omzet {eur(result.year.revenue)}, kosten {eur(result.year.cost)}, resultaat <strong>{eur(result.year.result)}</strong>.</> : null}
+            </>
+          ) : (
+            <>Niet gelukt: {result.message}</>
+          )}
+          {result.files && result.files.length > 0 ? (
+            <ul className="mt-1.5 space-y-0.5 text-2xs opacity-80">
+              {result.files.map((f, i) => (
+                <li key={i}>• {f.name} — {f.kind}{f.months ? `, ${f.months} maanden` : ""}{f.warnings.length ? ` (${f.warnings.join("; ")})` : ""}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

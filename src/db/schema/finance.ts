@@ -209,6 +209,17 @@ export const companyFinanceMonths = pgTable(
     freelanceCost: numeric("freelance_cost", { precision: 12, scale: 2 }).notNull().default("0"),
     staffCost: numeric("staff_cost", { precision: 12, scale: 2 }).notNull().default("0"),
     otherCost: numeric("other_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+    /* --- Officiële boekhouding (geïmporteerd uit Digiboox) --- */
+    /** Opbrengsten/omzet volgens de boekhouding. */
+    bookRevenue: numeric("book_revenue", { precision: 12, scale: 2 }).notNull().default("0"),
+    /** Kosten volgens de boekhouding. */
+    bookCost: numeric("book_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+    /** Financiële baten (bijv. rente) volgens de boekhouding. */
+    bookFinanceIncome: numeric("book_finance_income", { precision: 12, scale: 2 }).notNull().default("0"),
+    /** Bron van de boekhoudcijfers, bijv. "digiboox". Null = niet geïmporteerd. */
+    bookSource: varchar("book_source", { length: 24 }),
+    /** Wanneer de boekhoudcijfers voor deze maand zijn ingelezen. */
+    bookImportedAt: timestamp("book_imported_at", { withTimezone: true }),
     note: text("note"),
     updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
