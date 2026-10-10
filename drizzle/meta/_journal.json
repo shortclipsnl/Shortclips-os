@@ -99,6 +99,13 @@
       "when": 1791643782777,
       "tag": "0013_worthless_corsair",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791652095624,
+      "tag": "0014_crazy_strong_guy",
+      "breakpoints": true
     }
   ]
 }

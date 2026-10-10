@@ -362,3 +362,24 @@ export const editorAssignmentsRelations = relations(
     }),
   }),
 );
+
+/* ------------------------------------------------------------------ *
+ * Editor-tarieven en capaciteit (eigen editing dashboard)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Per editor een vast tarief per video en een weekcapaciteit. De editingkosten
+ * worden hiermee automatisch berekend (aantal video's × tarief), met de
+ * mogelijkheid tot een afwijkend tarief per project via deliverables.editCost.
+ */
+export const editorRates = pgTable("editor_rates", {
+  id: pk(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** Standaardtarief per gemonteerde video (ex btw). */
+  ratePerVideo: numeric("rate_per_video", { precision: 10, scale: 2 }).notNull().default("0"),
+  /** Hoeveel video's deze editor per week aankan (voor de capaciteitsverdeling). */
+  capacityPerWeek: integer("capacity_per_week").notNull().default(0),
+  ...timestamps,
+}, (t) => [unique("editor_rates_user_unique").on(t.userId)]);
