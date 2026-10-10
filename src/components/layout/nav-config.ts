@@ -49,6 +49,7 @@ export const NAVIGATION: NavGroup[] = [
   {
     title: "Beheer",
     items: [
+      { href: "/financien", label: "Financiën", icon: "Landmark", permissions: ["finance:read"], match: "/financien" },
       { href: "/klantenbeheer", label: "Klantenbeheer", icon: "UserCog", permissions: ["clients:write"], match: "/klantenbeheer" },
       { href: "/editkosten", label: "Winst & editkosten", icon: "Euro", permissions: ["finance:read"], match: "/editkosten" },
       { href: "/settings/integrations", label: "Koppelingen", icon: "Plug", permissions: ["integrations:read"], match: "/settings/integrations" },

@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  boolean,
   date,
   index,
   integer,
@@ -192,3 +193,53 @@ export const clientFinanceMonths = pgTable(
     index("client_finance_months_period_idx").on(t.period),
   ],
 );
+
+/* ------------------------------------------------------------------ *
+ * Financieel managementdashboard (uitsluitend eigenaar)
+ * ------------------------------------------------------------------ */
+
+/** Bedrijfsbrede cijfers per maand (handmatig of later uit de boekhouding):
+ *  omzetdoel en kostencategorieën die niet per klant bekend zijn. */
+export const companyFinanceMonths = pgTable(
+  "company_finance_months",
+  {
+    id: pk(),
+    period: varchar("period", { length: 7 }).notNull(), // YYYY-MM
+    revenueTarget: numeric("revenue_target", { precision: 12, scale: 2 }).notNull().default("0"),
+    freelanceCost: numeric("freelance_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+    staffCost: numeric("staff_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+    otherCost: numeric("other_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+    note: text("note"),
+    updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [unique("company_finance_months_unique").on(t.period)],
+);
+
+/** Vaste lasten (terugkerende maandelijkse kosten), per categorie. */
+export const fixedCosts = pgTable("fixed_costs", {
+  id: pk(),
+  category: varchar("category", { length: 40 }).notNull().default("overig"),
+  name: varchar("name", { length: 160 }).notNull(),
+  monthlyAmount: numeric("monthly_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  isActive: boolean("is_active").notNull().default(true),
+  note: text("note"),
+  ...timestamps,
+  ...softDelete,
+});
+
+/** Offertes en potentiële klanten (verwachte omzet, los van gerealiseerd). */
+export const salesLeads = pgTable("sales_leads", {
+  id: pk(),
+  company: varchar("company", { length: 200 }).notNull(),
+  contactName: varchar("contact_name", { length: 160 }),
+  expectedMonthly: numeric("expected_monthly", { precision: 12, scale: 2 }).notNull().default("0"),
+  expectedValue: numeric("expected_value", { precision: 12, scale: 2 }).notNull().default("0"),
+  startOn: date("start_on"),
+  /** lead, offerte, onderhandeling, gewonnen, verloren. */
+  status: varchar("status", { length: 24 }).notNull().default("lead"),
+  note: text("note"),
+  ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+  ...timestamps,
+  ...softDelete,
+});
