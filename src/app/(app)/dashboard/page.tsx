@@ -59,43 +59,65 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Wat vraagt nú aandacht */}
-      {(urgentShoots.length > 0 || data.videos.late.length > 0) && (
-        <Card className="border-[var(--color-bad)]/25 bg-[var(--color-bad-soft)]/40" padded={false}>
-          <div className="flex items-start gap-3 p-4">
-            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-[var(--color-bad)]" strokeWidth={2} />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-[var(--color-ink)]">
-                Vraagt nu aandacht
-              </p>
-              <ul className="mt-2 space-y-1.5 text-sm text-[var(--color-ink-muted)]">
-                {urgentShoots.map((s) => (
-                  <li key={s.id}>
-                    <Link href={`/productions/${s.id}`} className="hover:underline">
-                      <strong className="font-medium text-[var(--color-ink)]">
-                        {s.clientName}
-                      </strong>{" "}
-                      — opname {relativeDays(s.scheduledOn)},{" "}
-                      {plural(Number(s.unapprovedScripts), "script niet goedgekeurd", "scripts niet goedgekeurd")}{" "}
-                      en {plural(Number(s.openBlockers), "blokkerend checklistpunt", "blokkerende checklistpunten")} open
-                    </Link>
-                  </li>
-                ))}
-                {data.videos.late.length > 0 ? (
-                  <li>
-                    <Link href="/videos?filter=te-laat" className="hover:underline">
-                      <strong className="font-medium text-[var(--color-ink)]">
-                        {plural(data.videos.late.length, "video", "video's")}
-                      </strong>{" "}
-                      {data.videos.late.length === 1 ? "staat" : "staan"} over de deadline
-                    </Link>
-                  </li>
-                ) : null}
-              </ul>
+      {/* Wat vraagt nú aandacht — prominent, met reden, verantwoordelijke, dagen en directe link. */}
+      {(() => {
+        const stalledClient = data.videos.stalledAtClient.filter((v) => daysSince(v.statusChangedAt) > 3);
+        const count = data.videos.late.length + stalledClient.length + urgentShoots.length;
+        if (count === 0) return null;
+        return (
+          <Card padded={false} className="overflow-hidden border-[var(--color-bad)]/40 ring-1 ring-[var(--color-bad)]/20">
+            <div className="flex items-center gap-2.5 bg-[var(--color-bad)] px-5 py-3 text-white">
+              <AlertTriangle className="size-5 shrink-0" strokeWidth={2.25} />
+              <h2 className="text-base font-bold tracking-tight">Vraagt nu aandacht</h2>
+              <span className="ml-auto rounded-full bg-white/20 px-2.5 py-0.5 text-sm font-semibold">{count}</span>
             </div>
-          </div>
-        </Card>
-      )}
+            <ul className="divide-y divide-[var(--color-line)]">
+              {data.videos.late.map((v) => {
+                const days = Math.max(1, -daysUntil(v.dueOn));
+                return (
+                  <li key={`late-${v.id}`}>
+                    <Link href={`/videos/${v.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--color-bad-soft)]/40">
+                      <span className="size-2.5 shrink-0 rounded-full bg-[var(--color-bad)]" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{v.clientName} — {v.title}</span>
+                        <span className="block truncate text-xs text-[var(--color-ink-muted)]">Video over de deadline · {v.editorName ?? "geen editor"}</span>
+                      </span>
+                      <span className="shrink-0 text-xs font-semibold text-[var(--color-bad)]">{plural(days, "dag", "dagen")} te laat</span>
+                    </Link>
+                  </li>
+                );
+              })}
+              {stalledClient.map((v) => (
+                <li key={`stall-${v.id}`}>
+                  <Link href={`/videos/${v.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--color-warn-soft)]/40">
+                    <span className="size-2.5 shrink-0 rounded-full bg-[var(--color-warn)]" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{v.clientName} — {v.title}</span>
+                      <span className="block truncate text-xs text-[var(--color-ink-muted)]">Wacht op reactie van de klant</span>
+                    </span>
+                    <span className="shrink-0 text-xs font-semibold text-[var(--color-warn)]">{plural(daysSince(v.statusChangedAt), "dag", "dagen")} geen reactie</span>
+                  </Link>
+                </li>
+              ))}
+              {urgentShoots.map((s) => {
+                const open = Number(s.openBlockers) + Number(s.unapprovedScripts);
+                return (
+                  <li key={`shoot-${s.id}`}>
+                    <Link href={`/productions/${s.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--color-warn-soft)]/40">
+                      <span className="size-2.5 shrink-0 rounded-full bg-[var(--color-warn)]" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{s.clientName} — opname {relativeDays(s.scheduledOn)}</span>
+                        <span className="block truncate text-xs text-[var(--color-ink-muted)]">Opname nog niet rond · {s.videographerName ?? "geen videograaf"}</span>
+                      </span>
+                      <span className="shrink-0 text-xs font-semibold text-[var(--color-warn)]">{plural(open, "punt", "punten")} open</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        );
+      })()}
 
       {/* Kerncijfers */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
