@@ -131,9 +131,9 @@ export function ItemActions({ id, kind, hasTask }: { id: string; kind: string; h
           <ListPlus className="size-3.5" /> Naar taken
         </button>
       ) : null}
-      {kind === "action" ? (
+      {kind === "action" || kind === "agenda" ? (
         <button type="button" disabled={pending} onClick={() => run(() => toggleMeetingItem(id))}
-          className="rounded p-1 text-[var(--color-ink-faint)] hover:text-[var(--color-good)]" aria-label="Afvinken">
+          className="rounded p-1 text-[var(--color-ink-faint)] hover:text-[var(--color-good)]" aria-label={kind === "agenda" ? "Behandeld" : "Afvinken"}>
           <Check className="size-4" />
         </button>
       ) : null}

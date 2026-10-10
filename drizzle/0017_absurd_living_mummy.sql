@@ -1,0 +1,1 @@
+ALTER TABLE "team_meetings" ADD COLUMN "is_weekly" boolean DEFAULT false NOT NULL;

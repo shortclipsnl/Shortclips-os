@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { desc } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
+import { CalendarClock } from "lucide-react";
 import { db } from "@/db/client";
-import { teamMeetings } from "@/db/schema";
+import { meetingItems, teamMeetings } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { listAssignableUsers } from "@/server/clients";
+import { ensureWeeklyMeeting } from "@/server/meetings";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { NewMeetingForm } from "./meetings-ui";
@@ -18,17 +20,36 @@ function dateTime(d: Date): string {
 
 export default async function MeetingsPage() {
   await requireInternal();
-  const [members, meetings] = await Promise.all([
+  // Zorg dat de vaste woensdag-16:00-meeting bestaat (met carry-over).
+  const weeklyId = await ensureWeeklyMeeting();
+  const [members, meetings, weekly, weeklyCount] = await Promise.all([
     listAssignableUsers(),
     db.select().from(teamMeetings).orderBy(desc(teamMeetings.scheduledAt)).limit(100),
+    db.select().from(teamMeetings).where(eq(teamMeetings.id, weeklyId)).limit(1),
+    db.select({ n: sql<number>`count(*)` }).from(meetingItems).where(eq(meetingItems.meetingId, weeklyId)),
   ]);
   const now = Date.now();
-  const upcoming = meetings.filter((m) => new Date(m.scheduledAt).getTime() >= now - 2 * 60 * 60 * 1000).reverse();
+  const w = weekly[0]!;
+  const agendaCount = Number(weeklyCount[0]?.n ?? 0);
+  // De wekelijkse meeting niet dubbel in de "komende" lijst.
+  const upcoming = meetings.filter((m) => m.id !== weeklyId && new Date(m.scheduledAt).getTime() >= now - 2 * 60 * 60 * 1000).reverse();
   const past = meetings.filter((m) => new Date(m.scheduledAt).getTime() < now - 2 * 60 * 60 * 1000);
 
   return (
     <div className="mx-auto max-w-[1000px]">
-      <PageHeader title="Teammeetings" description="Bereid meetings voor met een agenda, leg besluiten en actiepunten vast en koppel actiepunten direct aan Taken." />
+      <PageHeader title="Teammeetings" description="Verzamel de hele week bespreekpunten voor de vaste teammeeting; leg besluiten en actiepunten vast en koppel actiepunten direct aan Taken." />
+
+      {/* Vaste wekelijkse teammeeting */}
+      <Link href={`/meetings/${weeklyId}`} className="mb-5 block overflow-hidden rounded-[var(--radius-lg)] bg-[var(--color-indigo-ink)] text-white transition-shadow hover:shadow-[var(--shadow-raised)]">
+        <div className="flex flex-wrap items-center gap-3 p-5">
+          <CalendarClock className="size-6 shrink-0 text-[var(--color-brand-400)]" />
+          <div className="min-w-0 flex-1">
+            <div className="text-base font-bold tracking-tight">Vaste teammeeting · {dateTime(new Date(w.scheduledAt))}</div>
+            <div className="text-xs text-white/70">Iedereen voegt de hele week bespreekpunten toe. {agendaCount} bespreekpunt{agendaCount === 1 ? "" : "en"} klaar · niet-behandelde punten gaan automatisch mee naar volgende week.</div>
+          </div>
+          <span className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium">Bespreekpunten toevoegen →</span>
+        </div>
+      </Link>
 
       <div className="mb-5"><NewMeetingForm members={members} /></div>
 

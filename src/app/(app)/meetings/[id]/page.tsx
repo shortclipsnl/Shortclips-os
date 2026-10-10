@@ -58,7 +58,12 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
             <ul className="divide-y divide-[var(--color-line)]">
               {agenda.map((i) => (
                 <li key={i.id} className="flex items-center gap-3 px-4 py-2.5">
-                  <span className="min-w-0 flex-1 text-sm">{i.body}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block text-sm ${i.isDone ? "text-[var(--color-ink-faint)] line-through" : ""}`}>{i.body}</span>
+                    <span className="block text-2xs text-[var(--color-ink-faint)]">
+                      toegevoegd door {(i.createdById && nameById.get(i.createdById)) || "onbekend"}{i.isDone ? " · behandeld" : ""}
+                    </span>
+                  </span>
                   <ItemActions id={i.id} kind={i.kind} hasTask={false} />
                 </li>
               ))}

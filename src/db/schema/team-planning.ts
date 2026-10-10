@@ -58,6 +58,8 @@ export const teamMeetings = pgTable(
     title: varchar("title", { length: 200 }).notNull(),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
     location: varchar("location", { length: 160 }),
+    /** Vaste wekelijkse teammeeting (woensdag 16:00) — voedt de carry-over. */
+    isWeekly: boolean("is_weekly").notNull().default(false),
     /** Deelnemers als user-id's. */
     participantIds: jsonb("participant_ids").notNull().default(sql`'[]'::jsonb`).$type<string[]>(),
     notes: text("notes"),
