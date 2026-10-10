@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -87,4 +88,26 @@ export const meetingItems = pgTable(
     ...timestamps,
   },
   (t) => [index("meeting_items_meeting_idx").on(t.meetingId, t.kind)],
+);
+
+/* ------------------------------------------------------------------ *
+ * Dagelijkse checklist — gedeelde bevestigingen per dag (#1)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Eén rij = een bevestigd checklistonderdeel op een bepaalde dag. Een onderdeel
+ * wordt pas "afgerond" (groen) als iemand het bevestigt; het verstrijken van de
+ * tijd alléén markeert niets als voltooid. Gedeeld, zodat het hele team ziet wat
+ * al is gedaan.
+ */
+export const checklistChecks = pgTable(
+  "checklist_checks",
+  {
+    id: pk(),
+    onDate: date("on_date").notNull(),
+    slotKey: varchar("slot_key", { length: 32 }).notNull(),
+    confirmedById: uuid("confirmed_by_id").references(() => users.id, { onDelete: "set null" }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [unique("checklist_checks_unique").on(t.onDate, t.slotKey)],
 );

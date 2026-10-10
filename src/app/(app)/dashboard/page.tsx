@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, Clock } from "lucide-react";
+import { eq } from "drizzle-orm";
+import { db } from "@/db/client";
+import { checklistChecks, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { getDashboard, getDashboardTopStats } from "@/server/dashboard";
 import { Avatar, Badge, Card, CardHeader, EmptyState, LinkButton } from "@/components/ui";
@@ -28,6 +31,15 @@ export default async function DashboardPage() {
   if (viewer.isEditorOnly) return <EditorDashboard viewer={viewer} />;
 
   const [data, top] = await Promise.all([getDashboard(viewer), getDashboardTopStats(viewer)]);
+
+  // Dagchecklist: bevestigingen van vandaag (NL-kalenderdag), gedeeld met het team.
+  const todayNL = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const checkRows = await db
+    .select({ slotKey: checklistChecks.slotKey, name: users.fullName, at: checklistChecks.confirmedAt })
+    .from(checklistChecks)
+    .leftJoin(users, eq(users.id, checklistChecks.confirmedById))
+    .where(eq(checklistChecks.onDate, todayNL));
+  const checks = Object.fromEntries(checkRows.map((r) => [r.slotKey, { name: r.name ?? "iemand", at: r.at.toISOString() }]));
 
   const firstName = viewer.fullName.split(" ")[0];
   const hour = new Date().getHours();
@@ -158,7 +170,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Dagindeling Shortclips — vaste dagstructuur, compact */}
-      <DayScheduleStrip />
+      <DayScheduleStrip checks={checks} />
 
       {/* Pipeline — prominent, in de huisstijl */}
       <Card padded={false} className="overflow-hidden ring-1 ring-[var(--color-indigo-ink)]/15">
