@@ -74,7 +74,7 @@ function authorized(request: Request): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export async function POST(request: Request) {
+async function handle(request: Request) {
   if (!authorized(request)) {
     return NextResponse.json(
       { error: "Niet toegestaan. Zet CRON_SECRET en stuur die mee als Bearer-token." },
@@ -116,3 +116,8 @@ export async function POST(request: Request) {
   const result = await JOBS[job]!();
   return NextResponse.json({ ok: true, job, result });
 }
+
+// Zowel POST (handmatig/scripts) als GET (Vercel Cron gebruikt standaard GET en
+// stuurt CRON_SECRET als Bearer mee). Beide vereisen dezelfde autorisatie.
+export const POST = handle;
+export const GET = handle;
