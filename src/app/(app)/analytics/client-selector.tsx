@@ -37,37 +37,29 @@ export function ClientSelector({
   }
 
   return (
-    <div className="relative mb-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-lg)] bg-[var(--color-indigo-ink)] px-4 py-3 text-white">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="text-xs font-semibold uppercase tracking-wide text-white/55">Klant</span>
-          {current ? (
-            <span className="flex min-w-0 items-center gap-2.5">
-              <Avatar name={current.name} color={current.color} size={30} />
-              <span className="truncate text-lg font-bold tracking-tight">{current.name}</span>
-            </span>
-          ) : (
-            <span className="text-lg font-bold tracking-tight text-white/80">Kies een klant</span>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setOpen((v) => !v);
-            setTimeout(() => inputRef.current?.focus(), 0);
-          }}
-          className="inline-flex shrink-0 items-center gap-2 rounded-[var(--radius-sm)] bg-white/15 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/25"
-        >
-          {current ? "Andere klant" : "Klant kiezen"}
-          <ChevronDown className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
-        </button>
-      </div>
+    <div className="relative mb-5 max-w-md">
+      {/* Het hele veld is aanklikbaar; het pijltje staat direct naast de klantnaam. */}
+      <button
+        type="button"
+        onClick={() => {
+          setOpen((v) => !v);
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }}
+        className="inline-flex max-w-full items-center gap-2.5 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-3.5 py-2.5 text-left text-white transition-colors hover:bg-[var(--color-indigo-soft)]"
+      >
+        <span className="text-2xs font-semibold uppercase tracking-wide text-white/50">Klant</span>
+        {current ? <Avatar name={current.name} color={current.color} size={26} /> : null}
+        <span className="min-w-0 truncate text-base font-bold tracking-tight">
+          {current ? current.name : "Kies een klant"}
+        </span>
+        <ChevronDown className={`size-5 shrink-0 text-white/80 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
 
       {open ? (
         <>
           {/* Klik buiten de lijst sluit de dropdown. */}
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1.5 w-full max-w-md overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] shadow-[var(--shadow-raised)]">
+          <div className="absolute left-0 z-20 mt-1.5 w-full overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] shadow-[var(--shadow-raised)]">
             <div className="flex items-center gap-2 border-b border-[var(--color-line)] px-3 py-2">
               <Search className="size-4 text-[var(--color-ink-faint)]" />
               <input
