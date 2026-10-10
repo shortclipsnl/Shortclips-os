@@ -96,7 +96,7 @@ export default async function ClientPage({
     { key: "documenten", label: "Documenten" },
     { key: "taken", label: "Taken", count: hub.tasks.length },
     { key: "contacten", label: "Contacten", count: hub.contacts.length },
-    ...(hub.canSeeFinance ? [{ key: "contract", label: "Contract & facturatie" }] : []),
+    ...(hub.canSeeFinance ? [{ key: "financieel", label: "Financieel" }, { key: "contract", label: "Contract & facturatie" }] : []),
     { key: "inzichten", label: "AI-inzichten", count: hub.insights.length },
     { key: "koppelingen", label: "Koppelingen" },
     { key: "activiteit", label: "Activiteit" },
@@ -187,6 +187,7 @@ export default async function ClientPage({
       {active === "documenten" ? <FilesTab hub={hub} /> : null}
       {active === "taken" ? <TasksTab hub={hub} /> : null}
       {active === "contacten" ? <ContactsTab hub={hub} /> : null}
+      {active === "financieel" && hub.canSeeFinance ? <FinanceTab hub={hub} /> : null}
       {active === "contract" && hub.canSeeFinance ? <ContractTab hub={hub} /> : null}
       {active === "inzichten" ? <InsightsTab hub={hub} /> : null}
       {active === "koppelingen" ? <IntegrationsTab hub={hub} /> : null}
@@ -788,6 +789,116 @@ function ContactsTab({ hub }: { hub: ClientHub }) {
 }
 
 /* ------------------------ Contract & facturatie -------------------- */
+
+function FinanceTab({ hub }: { hub: ClientHub }) {
+  const c = hub.client;
+  const revenue = Number(c.monthlyRevenue) || 0;
+  const shorts = c.monthlyVideoQuota || 0;
+  const editPer = c.editCostPerVideo != null ? Number(c.editCostPerVideo) : null;
+
+  const revPerShort = shorts > 0 ? revenue / shorts : null;
+  const totalEditMonth = editPer != null && shorts > 0 ? editPer * shorts : null;
+  const grossMonth = totalEditMonth != null ? revenue - totalEditMonth : null;
+  const marginPct = grossMonth != null && revenue > 0 ? Math.round((grossMonth / revenue) * 100) : null;
+
+  // Looptijd en totale (geschatte) omzet o.b.v. het maandbedrag.
+  const start = c.startedOn ? new Date(c.startedOn) : null;
+  const end = c.endedOn ? new Date(c.endedOn) : new Date();
+  const monthsActive = start ? Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.44))) : null;
+  const totalRevenue = monthsActive != null ? revenue * monthsActive : null;
+
+  // Einddatum: stopdatum (als gestopt), anders start + contractduur.
+  let endDate: string | null = c.endedOn ?? null;
+  if (!endDate && start && c.contractMonths) {
+    const d = new Date(start);
+    d.setMonth(d.getMonth() + c.contractMonths);
+    endDate = d.toISOString().slice(0, 10);
+  }
+
+  // Meest voorkomende editor uit de video's van deze klant.
+  const editorCount = new Map<string, number>();
+  for (const v of hub.videos) if (v.editorName) editorCount.set(v.editorName, (editorCount.get(v.editorName) ?? 0) + 1);
+  const topEditor = [...editorCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  const monday = hub.integrations.find((i) => i.provider === "monday");
+  const lastSynced = monday?.lastSyncedAt ?? null;
+  const unknown = <span className="text-[var(--color-ink-faint)]">onbekend</span>;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-[var(--color-ink-muted)]">Automatisch uit Monday. Alle bedragen exclusief btw.</p>
+        <span className="text-xs text-[var(--color-ink-faint)]">
+          Laatst bijgewerkt: {lastSynced ? formatDateTime(lastSynced) : "nog niet gesynchroniseerd"}
+        </span>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* Omzet */}
+        <Card padded={false} className="overflow-hidden">
+          <div className="bg-[var(--color-indigo-ink)] px-5 py-2.5 text-sm font-bold text-white">Omzet</div>
+          <dl className="divide-y divide-[var(--color-line)]">
+            <FinRow label="Maandelijkse contractwaarde" value={euro(revenue)} strong />
+            <FinRow label="Shorts per maand" value={shorts > 0 ? String(shorts) : unknown} />
+            <FinRow label="Omzet per short" value={revPerShort != null ? euro(revPerShort) : unknown} />
+            <FinRow label="Totale omzet (geschat)" value={totalRevenue != null ? euro(totalRevenue) : unknown} hint={monthsActive != null ? `${monthsActive} maanden × maandbedrag` : undefined} />
+            <FinRow label="Aanvullende omzet (meerwerk)" value={<span className="text-[var(--color-ink-faint)]">niet in Monday</span>} />
+          </dl>
+        </Card>
+
+        {/* Contract */}
+        <Card padded={false} className="overflow-hidden">
+          <div className="bg-[var(--color-indigo-ink)] px-5 py-2.5 text-sm font-bold text-white">Contract</div>
+          <dl className="divide-y divide-[var(--color-line)]">
+            <FinRow label="Startdatum" value={c.startedOn ? formatDateFull(c.startedOn) : unknown} />
+            <FinRow label="Contractduur" value={c.contractMonths ? `${c.contractMonths} maanden` : unknown} />
+            <FinRow label={c.endedOn ? "Stopdatum" : "Einddatum / verlenging"} value={endDate ? formatDateFull(endDate) : unknown} />
+            <FinRow label="Status" value={<Badge tone={c.status === "active" ? "ink" : CLIENT_STATUS[c.status]?.tone ?? "neutral"}>{CLIENT_STATUS[c.status]?.label ?? c.status}</Badge>} />
+          </dl>
+        </Card>
+
+        {/* Productiekosten */}
+        <Card padded={false} className="overflow-hidden">
+          <div className="bg-[var(--color-indigo-ink)] px-5 py-2.5 text-sm font-bold text-white">Productiekosten</div>
+          <dl className="divide-y divide-[var(--color-line)]">
+            <FinRow label="Editkosten per short" value={editPer != null ? euro(editPer) : unknown} />
+            <FinRow label="Totale editkosten per maand" value={totalEditMonth != null ? euro(totalEditMonth) : unknown} hint={editPer != null && shorts > 0 ? `${euro(editPer)} × ${shorts}` : undefined} />
+            <FinRow label="Editor" value={topEditor ?? unknown} />
+            <FinRow label="Overige directe kosten" value={<span className="text-[var(--color-ink-faint)]">niet in Monday</span>} hint="opname, strategie, overhead" />
+          </dl>
+        </Card>
+
+        {/* Rendement */}
+        <Card padded={false} className="overflow-hidden">
+          <div className="bg-[var(--color-indigo-ink)] px-5 py-2.5 text-sm font-bold text-white">Rendement</div>
+          <dl className="divide-y divide-[var(--color-line)]">
+            <FinRow label="Omzet per short" value={revPerShort != null ? euro(revPerShort) : unknown} />
+            <FinRow label="Editkosten per short" value={editPer != null ? euro(editPer) : unknown} />
+            <FinRow label="Brutowinst per maand" value={grossMonth != null ? euro(grossMonth) : unknown} hint="omzet − editkosten" strong />
+            <FinRow label="Brutomarge" value={marginPct != null ? `${marginPct}%` : unknown} />
+            <FinRow label="Nettowinst" value={<span className="text-[var(--color-ink-faint)]">onbekend</span>} hint="vereist overige kosten" />
+          </dl>
+        </Card>
+      </div>
+
+      <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-3 text-xs text-[var(--color-ink-muted)]">
+        <strong className="font-semibold text-[var(--color-ink)]">Brutowinst</strong> is de maandomzet minus de <em>bekende</em> directe kosten (editkosten uit Monday). Overige kosten zoals opname, strategie en overhead staan niet in Monday en zijn hier <strong>niet</strong> op nul gezet — daarom is de <strong className="font-semibold text-[var(--color-ink)]">nettowinst onbekend</strong> tot die kosten beschikbaar zijn.
+      </div>
+    </div>
+  );
+}
+
+function FinRow({ label, value, hint, strong }: { label: string; value: React.ReactNode; hint?: string; strong?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-4 px-5 py-2.5">
+      <dt className="text-sm text-[var(--color-ink-muted)]">
+        {label}
+        {hint ? <span className="mt-0.5 block text-2xs text-[var(--color-ink-faint)]">{hint}</span> : null}
+      </dt>
+      <dd className={`text-right text-sm tabular-nums ${strong ? "font-bold" : "font-medium"}`}>{value}</dd>
+    </div>
+  );
+}
 
 function ContractTab({ hub }: { hub: ClientHub }) {
   const contract = hub.contract;

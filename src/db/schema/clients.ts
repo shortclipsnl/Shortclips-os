@@ -56,6 +56,11 @@ export const clients = pgTable(
     monthlyRevenue: numeric("monthly_revenue", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
+    /** Financiële velden uit Monday (HOOFDBOARD). editCostPerVideo = editkosten
+     *  per short; contractMonths = contractduur; endedOn = stopdatum (leeg = loopt). */
+    editCostPerVideo: numeric("edit_cost_per_video", { precision: 10, scale: 2 }),
+    contractMonths: integer("contract_months"),
+    endedOn: date("ended_on"),
     lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
     notes: text("notes"),

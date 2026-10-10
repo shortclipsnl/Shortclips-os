@@ -17,6 +17,9 @@ const H = {
   revenue: "numeric_mm0ae0q9",
   startDate: "date_mm0d59r5",
   shorts: "color_mm066b0c",
+  editCost: "color_mm4sh1q2", // "Editkosten per video" (€25/€35/€48/€65)
+  contractMonths: "numeric_mm0jdqmx", // "Contractduur in maanden"
+  stopDate: "date_mm6a8rqt", // "Stopdatum klant" (leeg = loopt)
   platforms: "dropdown_mm7jszaj",
   agendaNames: "text_mm7qatwy",
   accountManager: "multiple_person_mm5sv241",
@@ -125,6 +128,11 @@ export async function runMondayClientImport() {
       const status = mapStatus(item);
       const shorts = parseShorts(item);
       const revenue = parseMoney(col(item, H.revenue));
+      const editCost = parseMoney(col(item, H.editCost)); // "€48" → 48.00
+      const contractMonthsText = col(item, H.contractMonths).replace(/[^\d]/g, "");
+      const contractMonths = contractMonthsText ? Number(contractMonthsText) : null;
+      const stopText = col(item, H.stopDate);
+      const endedOn = /^\d{4}-\d{2}-\d{2}/.test(stopText) ? stopText.slice(0, 10) : null;
       const startText = col(item, H.startDate);
       const startedOn = /^\d{4}-\d{2}-\d{2}/.test(startText) ? startText.slice(0, 10) : null;
       const amName = col(item, H.accountManager);
@@ -149,6 +157,10 @@ export async function runMondayClientImport() {
       if (!locked.has("status")) base.status = status;
       if (shorts != null && !locked.has("monthlyVideoQuota")) base.monthlyVideoQuota = shorts;
       if (revenue && !locked.has("monthlyRevenue")) base.monthlyRevenue = revenue;
+      if (editCost && !locked.has("editCostPerVideo")) base.editCostPerVideo = editCost;
+      if (contractMonths != null && !locked.has("contractMonths")) base.contractMonths = contractMonths;
+      // Stopdatum altijd meenemen (ook leegmaken als die in Monday is gewist).
+      if (!locked.has("endedOn")) base.endedOn = endedOn;
       if (startedOn && !locked.has("startedOn")) base.startedOn = startedOn;
       if (coordinatorId && !locked.has("coordinatorId")) base.coordinatorId = coordinatorId;
 
@@ -160,7 +172,7 @@ export async function runMondayClientImport() {
       } else {
         const [created] = await db
           .insert(clients)
-          .values({ slug, name, status, monthlyVideoQuota: shorts ?? undefined, monthlyRevenue: revenue ?? undefined, startedOn: startedOn ?? undefined, coordinatorId: coordinatorId ?? undefined })
+          .values({ slug, name, status, monthlyVideoQuota: shorts ?? undefined, monthlyRevenue: revenue ?? undefined, editCostPerVideo: editCost ?? undefined, contractMonths: contractMonths ?? undefined, endedOn: endedOn ?? undefined, startedOn: startedOn ?? undefined, coordinatorId: coordinatorId ?? undefined })
           .returning({ id: clients.id });
         clientId = created!.id;
         ctx.counters.created++;
