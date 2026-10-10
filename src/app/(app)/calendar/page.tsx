@@ -9,7 +9,7 @@ import { PLATFORM, PUBLICATION_STATUS } from "@/lib/statuses";
 import { cn } from "@/lib/cn";
 import { Planner } from "./planner";
 
-export const metadata: Metadata = { title: "Planning" };
+export const metadata: Metadata = { title: "Contentplanning" };
 export const dynamic = "force-dynamic";
 
 const WEEKDAYS = ["ma", "di", "wo", "do", "vr", "za", "zo"];

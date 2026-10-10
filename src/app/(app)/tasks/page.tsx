@@ -11,7 +11,7 @@ import { QuickTaskLines, TaskItem, type TaskItemData } from "./tasks-ui";
 export const metadata: Metadata = { title: "Taken" };
 export const dynamic = "force-dynamic";
 
-const CORE = ["milou", "jeska", "rutger", "jarno"];
+const CORE = ["milou", "jiska", "rutger", "jarno"];
 const firstName = (n: string) => n.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
 const OPEN = ["todo", "in_progress", "blocked"] as const;
 
@@ -110,7 +110,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
       {!persoon ? (
         <Card>
-          <EmptyState title="Kies een persoon" description="Klik hierboven op Milou, Jeska, Rutger, Jarno of Algemeen om de taken te zien." />
+          <EmptyState title="Kies een persoon" description="Klik hierboven op Milou, Jiska, Rutger, Jarno of Algemeen om de taken te zien." />
         </Card>
       ) : (
         <div className="space-y-5">

@@ -11,8 +11,9 @@ import { teamMembers, users } from "@/db/schema";
  */
 
 // Naamcorrecties (oude voornaam -> nieuwe volledige naam). Nynke is Fries; zowel
-// een eerdere "Nienke"-schrijfwijze als "nynke" worden naar "Nynke" gezet.
-const RENAMES: Record<string, string> = { sam: "Sem", nynke: "Nynke", nienke: "Nynke", jiska: "Jeska Batema" };
+// een eerdere "Nienke"-schrijfwijze als "nynke" worden naar "Nynke" gezet. De
+// naam wordt exact "Jiska" geschreven (een eerdere "Jeska Batema" wordt hersteld).
+const RENAMES: Record<string, string> = { sam: "Sem", nynke: "Nynke", nienke: "Nynke", jiska: "Jiska", jeska: "Jiska" };
 // Placeholder-personen (voornaam) die ik eerder onterecht aanmaakte en nu weer
 // opruim (soft-delete gebruiker + teamlid). Baatema bleek de achternaam van Jeska.
 const REMOVE = ["baatema"];
@@ -20,8 +21,8 @@ const REMOVE = ["baatema"];
 // Voornaam -> { functie, intern? }. Intern = Team Shortclips, anders freelancer.
 const TEAM: Record<string, { title: string; internal: boolean }> = {
   jarno: { title: "Founder & Creative Director", internal: true },
-  milou: { title: "Content Strategist & Social Media Manager", internal: true },
-  jeska: { title: "Content Strategist & Social Media Manager", internal: true },
+  milou: { title: "Content Creative", internal: true },
+  jiska: { title: "Content Creative", internal: true },
   rutger: { title: "Head of Content", internal: true },
   fabian: { title: "Short Video Creative", internal: false },
   max: { title: "Brand Designer", internal: false },

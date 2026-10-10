@@ -7,7 +7,7 @@ import { Avatar, Badge, Card, EmptyState, PageHeader, Stat } from "@/components/
 import { daysUntil, formatDate, formatDateFull, plural, relativeDays } from "@/lib/format";
 import { PRODUCTION_STATUS } from "@/lib/statuses";
 
-export const metadata: Metadata = { title: "Opnames" };
+export const metadata: Metadata = { title: "Opnameplanning" };
 export const dynamic = "force-dynamic";
 
 export default async function ProductionsPage({
@@ -33,7 +33,7 @@ export default async function ProductionsPage({
   return (
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
-        title="Opnames"
+        title="Opnameplanning"
         description="Gesynchroniseerd vanuit Google Agenda"
         actions={
           <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
