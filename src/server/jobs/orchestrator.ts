@@ -3,6 +3,7 @@ import { runMondayClientImport } from "./monday-import";
 import { runMondayEditingImport } from "./monday-editing";
 import { runMondayContractImport } from "./monday-contracts";
 import { runMondayPlanningImport } from "./monday-planning";
+import { runMondayLeaveImport } from "./monday-leave";
 import { runCalendarSync } from "./calendar-sync";
 import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
@@ -61,6 +62,7 @@ export async function runNightlySync() {
   results.push(await step("monday.import_editing", () => runMondayEditingImport()));
   results.push(await step("monday.import_contracts", () => runMondayContractImport()));
   results.push(await step("monday.import_planning", () => runMondayPlanningImport()));
+  results.push(await step("monday.import_leave", () => runMondayLeaveImport()));
   results.push(await step("frameio.pull_projects", () => pullFrameProjects()));
   results.push(await step("frameio.pull_deliverables", () => pullFrameDeliverables()));
   results.push(await step("calendar.sync", () => runCalendarSync()));
