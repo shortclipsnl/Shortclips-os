@@ -42,7 +42,10 @@ export default async function EditingPage() {
                   <Avatar name={e.editor_name} size={34} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{e.editor_name}</div>
-                    <div className="text-xs" style={{ color: level.color }}>{level.label}</div>
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs" style={{ color: level.color }}>
+                      {level.label}
+                      {e.leave ? <span className="rounded-full bg-[var(--color-warn-soft)] px-1.5 py-0.5 text-2xs font-medium text-[#8a5300]">afwezig {formatDate(e.leave.start_on)}–{formatDate(e.leave.end_on)}</span> : null}
+                    </div>
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold leading-none tabular-nums">{open}</div>

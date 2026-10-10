@@ -22,7 +22,7 @@ function overlaps(a: { startOn: string; endOn: string }, b: { startOn: string; e
 
 export default async function LeavePage() {
   const viewer = await requireInternal();
-  const canApprove = viewer.permissions.has("team:write");
+  const canApprove = viewer.primaryRole === "owner";
   const today = new Date().toISOString().slice(0, 10);
 
   const [mine, pending, approved] = await Promise.all([

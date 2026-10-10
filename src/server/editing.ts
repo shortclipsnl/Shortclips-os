@@ -22,8 +22,10 @@ export type EditingClientRow = {
 
 /** Overzicht voor het editing dashboard: per editor en per klant, incl. de
  *  automatisch berekende editingkosten (afwijkend tarief per project wint). */
+export type LeaveWindow = { user_id: string; start_on: string; end_on: string };
+
 export async function getEditingDashboard(_viewer: Viewer) {
-  const [editorRes, clientRes] = await Promise.all([
+  const [editorRes, clientRes, leaveRes] = await Promise.all([
     db.execute(sql`
       select u.id editor_id, u.full_name editor_name,
         coalesce(er.rate_per_video,0)::float rate, coalesce(er.capacity_per_week,0)::int capacity,
@@ -56,10 +58,21 @@ export async function getEditingDashboard(_viewer: Viewer) {
       group by c.id, c.slug, c.name, c.color, c.monthly_video_quota, c.edit_cost_per_video
       order by in_production desc, name
     `),
+    // Goedgekeurd verlof dat nu of binnen 14 dagen speelt — zodat je bij het
+    // verdelen van editwerk rekening kunt houden met afwezigheid.
+    db.execute(sql`
+      select user_id, min(start_on) start_on, max(end_on) end_on
+      from leave_requests
+      where status = 'approved' and end_on >= current_date and start_on <= current_date + interval '14 days'
+      group by user_id
+    `),
   ]);
 
+  const leaveByUser = new Map<string, LeaveWindow>();
+  for (const l of rows<LeaveWindow>(leaveRes)) leaveByUser.set(l.user_id, l);
+
   return {
-    editors: rows<EditorRow>(editorRes),
+    editors: rows<EditorRow>(editorRes).map((e) => ({ ...e, leave: leaveByUser.get(e.editor_id) ?? null })),
     clients: rows<EditingClientRow>(clientRes),
   };
 }

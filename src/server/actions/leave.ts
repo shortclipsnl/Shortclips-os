@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { leaveRequests } from "@/db/schema";
-import { requireInternal, requirePermission, ForbiddenError } from "@/server/auth/context";
+import { requireInternal, ForbiddenError } from "@/server/auth/context";
 import { notify } from "@/server/notifications";
 
 export type ActionResult = { ok: boolean; message?: string };
@@ -41,7 +41,7 @@ export async function requestLeave(input: z.input<typeof requestSchema>): Promis
 
     // Meld de goedkeurders (team:write) dat er een aanvraag open staat.
     await notify({
-      roles: ["owner", "admin"],
+      roles: ["owner"],
       type: "leave_requested",
       level: "info",
       title: `Verlofaanvraag van ${viewer.fullName}`,
@@ -60,10 +60,11 @@ export async function requestLeave(input: z.input<typeof requestSchema>): Promis
   }
 }
 
-/** Een aanvraag goedkeuren of afwijzen (alleen met team:write). */
+/** Een aanvraag goedkeuren of afwijzen — uitsluitend door de eigenaar (Jarno). */
 export async function reviewLeave(id: string, decision: "approved" | "rejected"): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("team:write");
+    const viewer = await requireInternal();
+    if (viewer.primaryRole !== "owner") return { ok: false, message: "Alleen Jarno kan verlof goedkeuren of afwijzen." };
     const [req] = await db
       .select({ id: leaveRequests.id, userId: leaveRequests.userId, startOn: leaveRequests.startOn, endOn: leaveRequests.endOn })
       .from(leaveRequests)
