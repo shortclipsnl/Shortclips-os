@@ -8,8 +8,10 @@ import {
   deliverables,
   invoices,
   productionDays,
+  users,
 } from "@/db/schema";
 import { dispatch } from "@/server/automation";
+import { notify } from "@/server/notifications";
 import { runJob } from "./runner";
 
 const day = (offset: number) => {
@@ -209,5 +211,57 @@ export async function runHourlySignals() {
       });
     }
     ctx.log(`${ctx.counters.processed} opnames met openstaande punten`);
+  });
+}
+
+/**
+ * Dagelijkse deadline-herinnering per editor: één melding met het aantal video's
+ * dat te laat is of waarvan de deadline binnen 2 dagen valt. In-app, dus geen
+ * externe sleutel nodig. Dedupe per dag, zodat niemand dubbele meldingen krijgt.
+ */
+export async function runEditorDeadlineReminders() {
+  return runJob("monday", "reminders.editor_deadlines", {}, async (ctx) => {
+    const today = day(0);
+    const soon = day(2);
+    const editorStages = ["editing", "editor_revision", "awaiting_editor", "internal_review"] as const;
+
+    const rows = await db
+      .select({
+        editorId: deliverables.editorId,
+        editorName: users.fullName,
+        overdue: sql<number>`count(*) filter (where ${deliverables.dueOn} < ${today})`,
+        dueSoon: sql<number>`count(*) filter (where ${deliverables.dueOn} >= ${today} and ${deliverables.dueOn} <= ${soon})`,
+      })
+      .from(deliverables)
+      .innerJoin(users, eq(users.id, deliverables.editorId))
+      .where(
+        and(
+          isNull(deliverables.deletedAt),
+          inArray(deliverables.status, [...editorStages]),
+          lte(deliverables.dueOn, soon),
+        ),
+      )
+      .groupBy(deliverables.editorId, users.fullName);
+
+    for (const r of rows) {
+      const overdue = Number(r.overdue);
+      const dueSoon = Number(r.dueSoon);
+      if (overdue + dueSoon === 0 || !r.editorId) continue;
+      ctx.counters.processed++;
+      const parts: string[] = [];
+      if (overdue > 0) parts.push(`${overdue} te laat`);
+      if (dueSoon > 0) parts.push(`${dueSoon} met deadline binnen 2 dagen`);
+      await notify({
+        userIds: [r.editorId],
+        type: "editor_deadlines",
+        level: overdue > 0 ? "warning" : "info",
+        title: overdue > 0 ? "Je hebt video's over de deadline" : "Deadlines komen eraan",
+        body: `${parts.join(" · ")}. Pak deze met voorrang op.`,
+        href: "/videos?filter=mijn-werk",
+        dedupeKey: `editor_deadlines:${r.editorId}:${today}`,
+      });
+      ctx.counters.updated++;
+    }
+    ctx.log(`${ctx.counters.updated} editors een deadline-herinnering gestuurd`);
   });
 }
