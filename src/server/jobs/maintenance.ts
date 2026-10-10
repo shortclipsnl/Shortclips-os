@@ -8,6 +8,7 @@ import {
   deliverables,
   invoices,
   productionDays,
+  tasks,
   users,
 } from "@/db/schema";
 import { dispatch } from "@/server/automation";
@@ -263,5 +264,53 @@ export async function runEditorDeadlineReminders() {
       ctx.counters.updated++;
     }
     ctx.log(`${ctx.counters.updated} editors een deadline-herinnering gestuurd`);
+  });
+}
+
+/**
+ * Dagelijkse taak-herinnering per teamlid: één melding met het aantal taken dat
+ * te laat is of met een deadline binnen 2 dagen. In-app, dedupe per dag.
+ */
+export async function runTaskDeadlineReminders() {
+  return runJob("monday", "reminders.task_deadlines", {}, async (ctx) => {
+    const today = day(0);
+    const soon = day(2);
+    const rows = await db
+      .select({
+        assigneeId: tasks.assigneeId,
+        overdue: sql<number>`count(*) filter (where ${tasks.dueOn} < ${today})`,
+        dueSoon: sql<number>`count(*) filter (where ${tasks.dueOn} >= ${today} and ${tasks.dueOn} <= ${soon})`,
+      })
+      .from(tasks)
+      .where(
+        and(
+          isNull(tasks.deletedAt),
+          inArray(tasks.status, ["todo", "in_progress", "blocked"]),
+          lte(tasks.dueOn, soon),
+        ),
+      )
+      .groupBy(tasks.assigneeId);
+
+    for (const r of rows) {
+      if (!r.assigneeId) continue;
+      const overdue = Number(r.overdue);
+      const dueSoon = Number(r.dueSoon);
+      if (overdue + dueSoon === 0) continue;
+      ctx.counters.processed++;
+      const parts: string[] = [];
+      if (overdue > 0) parts.push(`${overdue} te laat`);
+      if (dueSoon > 0) parts.push(`${dueSoon} binnen 2 dagen`);
+      await notify({
+        userIds: [r.assigneeId],
+        type: "task_deadlines",
+        level: overdue > 0 ? "warning" : "info",
+        title: overdue > 0 ? "Je hebt taken over de deadline" : "Taken met een deadline",
+        body: `${parts.join(" · ")}.`,
+        href: "/tasks",
+        dedupeKey: `task_deadlines:${r.assigneeId}:${today}`,
+      });
+      ctx.counters.updated++;
+    }
+    ctx.log(`${ctx.counters.updated} teamleden een taak-herinnering gestuurd`);
   });
 }

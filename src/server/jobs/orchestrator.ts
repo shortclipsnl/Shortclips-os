@@ -11,7 +11,7 @@ import {
   pullFrameDeliverables,
   pullFrameProjects,
 } from "./frameio-sync";
-import { runDailySignals, runEditorDeadlineReminders, runHourlySignals } from "./maintenance";
+import { runDailySignals, runEditorDeadlineReminders, runHourlySignals, runTaskDeadlineReminders } from "./maintenance";
 import { enforcePortalAccess } from "./portal-access";
 import { runClientNotifications } from "./notifications";
 
@@ -68,5 +68,6 @@ export async function runNightlySync() {
   results.push(await step("finance.snapshot_month", () => snapshotFinanceMonth()));
   results.push(await step("signals.daily", () => runDailySignals()));
   results.push(await step("reminders.editor_deadlines", () => runEditorDeadlineReminders()));
+  results.push(await step("reminders.task_deadlines", () => runTaskDeadlineReminders()));
   return { ok: results.every((r) => r.ok), results };
 }
