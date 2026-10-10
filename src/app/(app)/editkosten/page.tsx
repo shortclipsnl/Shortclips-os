@@ -37,6 +37,24 @@ export default async function EditCostsPage() {
     return { ...m, income, manualCosts, net, hasManual: manualCosts > 0, marginPct: income > 0 ? Math.round((net / income) * 100) : 0 };
   });
   const maxNet = Math.max(1, ...months.map((m) => Math.abs(m.net)));
+  const latestPeriod = months.length ? months[months.length - 1]!.period : null;
+
+  // Netto per klant voor de laatste maand (wie is het meest/minst winstgevend).
+  const perClientRes = latestPeriod
+    ? await db.execute(sql`
+        select c.name, c.slug,
+          (m.revenue + m.extra_revenue)::float income,
+          m.edit_cost::float edit,
+          (m.shoot_cost + m.strategy_cost + m.other_cost)::float manual
+        from client_finance_months m
+        join clients c on c.id = m.client_id and c.deleted_at is null
+        where m.period = ${latestPeriod}
+      `)
+    : null;
+  type PRow = { name: string; slug: string; income: number; edit: number; manual: number };
+  const perClient = (perClientRes ? rows2<PRow>(perClientRes) : [])
+    .map((r) => ({ ...r, net: r.income - r.edit - r.manual, margin: r.income > 0 ? Math.round(((r.income - r.edit - r.manual) / r.income) * 100) : 0 }))
+    .sort((a, b) => b.net - a.net);
 
   const rows = await db
     .select({
@@ -129,6 +147,25 @@ export default async function EditCostsPage() {
           </div>
         )}
       </Card>
+
+      {/* Netto per klant — laatste maand */}
+      {perClient.length > 0 ? (
+        <Card padded={false} className="mb-5">
+          <CardHeader title={`Netto per klant · ${monthLabel(latestPeriod!)}`} subtitle="Wie is het meest en minst winstgevend deze maand (na editkosten en ingevulde directe kosten)." className="p-5 pb-2" />
+          <Table head={<><th className="sc-th">Klant</th><th className="sc-th text-right">Omzet</th><th className="sc-th text-right">Editkosten</th><th className="sc-th text-right">Directe kosten</th><th className="sc-th text-right">Netto</th><th className="sc-th text-right">Marge</th></>}>
+            {perClient.map((r) => (
+              <tr key={r.slug} className="sc-row-link">
+                <td className="sc-td"><Link href={`/clients/${r.slug}?tab=financieel`} className="font-medium hover:underline">{r.name}</Link></td>
+                <td className="sc-td text-right tabular-nums">{euro(r.income)}</td>
+                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">−{euro(r.edit)}</td>
+                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{r.manual > 0 ? `−${euro(r.manual)}` : "—"}</td>
+                <td className="sc-td text-right font-semibold tabular-nums">{euro(r.net)}</td>
+                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{r.margin}%</td>
+              </tr>
+            ))}
+          </Table>
+        </Card>
+      ) : null}
 
       <div className="mb-3 text-sm font-semibold text-[var(--color-ink-muted)]">Editkosten (verwacht, uit de contracten)</div>
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
