@@ -85,6 +85,27 @@
   border-color: var(--color-line);
 }
 
+/* Loginpagina — verticale teamfoto-marquee (van boven naar beneden). De lijst
+   staat dubbel gestapeld, dus -50% → 0 laat de foto's naadloos naar beneden
+   bewegen en herhaalt zonder sprong. */
+@keyframes sc-marquee-down {
+  from {
+    transform: translateY(-50%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.sc-marquee-track {
+  animation: sc-marquee-down 60s linear infinite;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sc-marquee-track {
+    animation: none;
+  }
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   /* Reserveer altijd ruimte voor de scrollbar, zodat de layout (en dus het
