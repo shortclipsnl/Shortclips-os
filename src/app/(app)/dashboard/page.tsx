@@ -16,6 +16,7 @@ import { RISK_LEVEL, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 import { PipelineStrip } from "./pipeline-strip";
 import { EditorDashboard } from "./editor-view";
 import { DayScheduleStrip } from "./day-schedule";
+import { AttentionPopups, type Signal } from "./attention-popups";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
@@ -36,8 +37,36 @@ export default async function DashboardPage() {
     (s) => daysUntil(s.scheduledOn) <= 2 && (Number(s.openBlockers) > 0 || Number(s.unapprovedScripts) > 0),
   );
 
+  // Signalen voor de pop-up meldingen: urgent (rood) blijft terugkomen tot opgelost.
+  const popupSignals: Signal[] = [
+    ...data.videos.late.map((v) => ({
+      id: `late-${v.id}`,
+      severity: "urgent" as const,
+      title: "Video over de deadline",
+      detail: `${v.clientName} — ${v.title} staat ${Math.max(1, -daysUntil(v.dueOn))} dag(en) over de deadline.`,
+      href: `/videos/${v.id}`,
+    })),
+    ...data.videos.stalledAtClient
+      .filter((v) => daysSince(v.statusChangedAt) > 3)
+      .map((v) => ({
+        id: `stall-${v.id}`,
+        severity: "warn" as const,
+        title: "Klant reageert niet",
+        detail: `${v.clientName} — ${v.title}: al ${daysSince(v.statusChangedAt)} werkdagen geen feedback.`,
+        href: `/videos/${v.id}`,
+      })),
+    ...urgentShoots.map((s) => ({
+      id: `shoot-${s.id}`,
+      severity: "warn" as const,
+      title: "Opname nog voorbereiden",
+      detail: `${s.clientName} — opname ${relativeDays(s.scheduledOn)} is nog niet rond.`,
+      href: `/productions/${s.id}`,
+    })),
+  ];
+
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
+      <AttentionPopups signals={popupSignals} />
       {/* Kop */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
