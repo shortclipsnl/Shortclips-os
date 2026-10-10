@@ -1,0 +1,27 @@
+import type { Metadata } from "next";
+import { listLeads } from "@/server/leads";
+import { PageHeader, Stat } from "@/components/ui";
+import { LeadsBoard } from "./leads-ui";
+
+export const metadata: Metadata = { title: "Leads" };
+export const dynamic = "force-dynamic";
+
+export default async function LeadsPage() {
+  const { rows, summary, segments, sources } = await listLeads();
+
+  return (
+    <div className="mx-auto max-w-[1300px]">
+      <PageHeader title="Leads" description="Alle leads en offertes — overgenomen uit Monday. Wijzig de status en opvolgdatum direct in de lijst." />
+
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <Stat label="Totaal" value={String(summary.total)} />
+        <Stat label="Open" value={String(summary.open)} hint="lead/offerte/onderhandeling" />
+        <Stat label="Te laat op te volgen" value={String(summary.overdue)} tone={summary.overdue > 0 ? "bad" : undefined} />
+        <Stat label="Gewonnen" value={String(summary.won)} tone="good" />
+        <Stat label="Verloren" value={String(summary.lost)} />
+      </div>
+
+      <LeadsBoard rows={rows} segments={segments} sources={sources} />
+    </div>
+  );
+}

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, companyFinanceMonths, fixedCosts, salesLeads } from "@/db/schema";
 import { requirePermission } from "@/server/auth/context";
@@ -23,7 +23,18 @@ export async function getManagementFinance() {
     `),
     db.select().from(companyFinanceMonths).orderBy(asc(companyFinanceMonths.period)),
     db.select().from(fixedCosts).where(isNull(fixedCosts.deletedAt)).orderBy(asc(fixedCosts.category), asc(fixedCosts.name)),
-    db.select().from(salesLeads).where(isNull(salesLeads.deletedAt)).orderBy(desc(salesLeads.createdAt)),
+    // Alleen echte offertes (met verwacht bedrag) of handmatig toegevoegde leads;
+    // het volledige leadregister (uit Monday) staat op /leads.
+    db
+      .select()
+      .from(salesLeads)
+      .where(
+        and(
+          isNull(salesLeads.deletedAt),
+          or(gt(salesLeads.expectedMonthly, "0"), gt(salesLeads.expectedValue, "0"), isNull(salesLeads.mondayStatus)),
+        ),
+      )
+      .orderBy(desc(salesLeads.createdAt)),
   ]);
 
   const mrr = activeClients.reduce((a, c) => a + Number(c.revenue || 0) + Number(c.extra || 0), 0);

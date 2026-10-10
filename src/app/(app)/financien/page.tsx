@@ -137,7 +137,10 @@ export default async function FinancienPage() {
         {/* Offertes & pipeline */}
         <Card padded={false}>
           <CardHeader title="Offertes & verwachte omzet" subtitle={`${d.pipeline.count} open · ${euro(d.pipeline.monthly)}/maand verwacht · ${compact(d.pipeline.value)} contractwaarde`} className="p-5 pb-2" />
-          <div className="mx-5 mb-1 rounded-[var(--radius-sm)] bg-[var(--color-warn-soft)] px-3 py-1.5 text-2xs text-[#8a5300]">Verwachte omzet staat los van de gerealiseerde omzet hierboven.</div>
+          <div className="mx-5 mb-1 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] bg-[var(--color-warn-soft)] px-3 py-1.5 text-2xs text-[#8a5300]">
+            <span>Verwachte omzet staat los van de gerealiseerde omzet hierboven.</span>
+            <a href="/leads" className="font-semibold underline">Alle leads →</a>
+          </div>
           <SalesLeadManager items={d.leads.map((l) => ({ id: l.id, company: l.company, contactName: l.contactName, expectedMonthly: l.expectedMonthly, expectedValue: l.expectedValue, startOn: l.startOn, status: l.status, note: l.note }))} />
         </Card>
       </div>

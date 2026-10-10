@@ -18,6 +18,7 @@ export const NAVIGATION: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
       { href: "/clients", label: "Klanten", icon: "Building2", permissions: ["clients:read"], match: "/clients" },
+      { href: "/leads", label: "Leads", icon: "Target", permissions: ["clients:read"], match: "/leads" },
       { href: "/videos", label: "Editing Dashboard", icon: "Clapperboard", permissions: ["videos:read"], match: "/videos" },
       { href: "/productions", label: "Opnameplanning", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
       { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },

@@ -239,18 +239,44 @@ export const fixedCosts = pgTable("fixed_costs", {
   ...softDelete,
 });
 
-/** Offertes en potentiële klanten (verwachte omzet, los van gerealiseerd). */
-export const salesLeads = pgTable("sales_leads", {
-  id: pk(),
-  company: varchar("company", { length: 200 }).notNull(),
-  contactName: varchar("contact_name", { length: 160 }),
-  expectedMonthly: numeric("expected_monthly", { precision: 12, scale: 2 }).notNull().default("0"),
-  expectedValue: numeric("expected_value", { precision: 12, scale: 2 }).notNull().default("0"),
-  startOn: date("start_on"),
-  /** lead, offerte, onderhandeling, gewonnen, verloren. */
-  status: varchar("status", { length: 24 }).notNull().default("lead"),
-  note: text("note"),
-  ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
-  ...timestamps,
-  ...softDelete,
-});
+/** Offertes en potentiële klanten (verwachte omzet, los van gerealiseerd).
+ *  Tevens het volledige leads-register (overgenomen uit Monday). */
+export const salesLeads = pgTable(
+  "sales_leads",
+  {
+    id: pk(),
+    company: varchar("company", { length: 200 }).notNull(),
+    contactName: varchar("contact_name", { length: 160 }),
+    expectedMonthly: numeric("expected_monthly", { precision: 12, scale: 2 }).notNull().default("0"),
+    expectedValue: numeric("expected_value", { precision: 12, scale: 2 }).notNull().default("0"),
+    startOn: date("start_on"),
+    /** lead, offerte, onderhandeling, gewonnen, verloren. */
+    status: varchar("status", { length: 24 }).notNull().default("lead"),
+    note: text("note"),
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    /* --- Leadregister (uit Monday LEADS 2026 DASHBOARD) --- */
+    /** Waar de lead binnenkwam: Website, Socials, Netwerk, Meta advertentie… */
+    source: varchar("source", { length: 40 }),
+    phone: varchar("phone", { length: 40 }),
+    email: varchar("email", { length: 160 }),
+    website: varchar("website", { length: 200 }),
+    /** Vrij tekstveld met budgetindicatie uit Monday. */
+    budget: varchar("budget", { length: 120 }),
+    firstContactOn: date("first_contact_on"),
+    /** Uiterste opvolgdatum (SOP). */
+    followUpOn: date("follow_up_on"),
+    /** Website-audit: klasse A/B/C en score 0-100. */
+    leadClass: varchar("lead_class", { length: 8 }),
+    leadScore: integer("lead_score"),
+    auditOutcome: varchar("audit_outcome", { length: 80 }),
+    auditNextStep: varchar("audit_next_step", { length: 120 }),
+    salesBrief: text("sales_brief"),
+    /** Jaargang/segment uit de Monday-groep, bijv. "2026" of "2025". */
+    segment: varchar("segment", { length: 24 }),
+    /** Ruwe Monday-status, voor volledige getrouwheid naast onze bucket. */
+    mondayStatus: varchar("monday_status", { length: 60 }),
+    ...timestamps,
+    ...softDelete,
+  },
+  (t) => [index("sales_leads_status_idx").on(t.status), index("sales_leads_followup_idx").on(t.followUpOn)],
+);
