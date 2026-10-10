@@ -1,6 +1,8 @@
 # Resultaten automatisch koppelen — hoe het werkt en wat ervoor nodig is
 
-_Toelichting bij feedbackpunt 3. Gebaseerd op de huidige code van ShortClips OS, niet op aannames._
+_Toelichting bij feedbackpunt 3. Gebaseerd op de huidige code van ShortClips OS én een live-test tegen de Metricool API._
+
+> **Update na implementatie.** Likes en reacties worden nu wél automatisch opgehaald via Metricool (getest: `reels/likes` en `reels/comments` leveren data) en staan op de Resultaten-pagina en in het klantportaal. Uit de live-test bleek ook: van de 13 Metricool-merken is **YouTube bij geen enkel merk gekoppeld** (Instagram 11, TikTok 8, Facebook 5), en Metricool v2 heeft **geen endpoint voor cijfers per losse post** — per-short blijft dus afhankelijk van Ayrshare. De rest van dit document is daarop bijgewerkt.
 
 ## Kort antwoord
 
@@ -36,11 +38,12 @@ Gedeeltelijk, afhankelijk van de metric:
 | Saves | ✅ ja (Reels) | Ayrshare per post |
 | Volgers / volgersgroei | ✅ ja | n.v.t. (accountniveau) |
 | Kijktijd (totaal/gemiddeld) | ✅ deels (Reels-kijktijd) | Ayrshare per post |
-| **Likes** | ❌ nog niet opgehaald | Ayrshare of uitbreiding Metricool-mapping |
-| **Reacties (comments)** | ❌ nog niet opgehaald | Ayrshare of uitbreiding Metricool-mapping |
+| **Likes** | ✅ ja (toegevoegd via Metricool reels) | — |
+| **Reacties (comments)** | ✅ ja (toegevoegd via Metricool reels) | — |
+| Profielbezoeken | ❌ niet via Metricool | Ayrshare / platform-API |
 | Uitkijkpercentage / retentiegrafiek | ❌ niet via Metricool | Ayrshare / platform-API (beperkt beschikbaar) |
 
-Likes en reacties zijn technisch wél op te halen, maar de huidige Metricool-synchronisatie vult die kolommen nog niet in. Dat is een kleine uitbreiding.
+Likes en reacties zijn nu toegevoegd en worden automatisch opgehaald. Profielbezoeken en uitkijkpercentage levert de Metricool-API niet; die tonen "—" en worden niet geschat.
 
 ### 3. Kunnen we resultaten per klant én per individuele short bekijken?
 
@@ -85,10 +88,10 @@ Benodigd:
 | Onderdeel | Werkt nu automatisch? | Koppeling |
 |---|---|---|
 | Resultaten per klant (IG/TikTok/FB) | ✅ ja | Metricool (actief) |
+| Likes & reacties (per klant) | ✅ ja (toegevoegd) | Metricool (actief) |
 | In klantportaal tonen (per klant) | ✅ ja | Metricool (actief) |
-| YouTube Shorts | ❌ nee | Ayrshare of YouTube API |
-| Likes & reacties (per klant) | ❌ nog niet | Metricool uitbreiden of Ayrshare |
-| Resultaten per losse short | ❌ nog niet | Ayrshare (bouwen) |
+| YouTube Shorts | ❌ nee (0 merken gekoppeld in Metricool) | Metricool-koppeling in YouTube, of Ayrshare/YouTube API |
+| Resultaten per losse short | ❌ nog niet (Metricool heeft geen per-post API) | Ayrshare (bouwen) |
 | Per-video in portaal | ❌ nog niet (scherm klaar) | Ayrshare (bouwen) |
 | Verversfrequentie | 1×/nacht | (verhoogbaar) |
 
