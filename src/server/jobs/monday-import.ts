@@ -21,6 +21,8 @@ const H = {
   editor: "color_mm509p0c", // "Editor" (Sam/Fabian/Alex/Sem/Noah/Quinn)
   contractMonths: "numeric_mm0jdqmx", // "Contractduur in maanden"
   stopDate: "date_mm6a8rqt", // "Stopdatum klant" (leeg = loopt)
+  extraWork: "numeric_mm7ap7rm", // "Meerwerk deze maand (ex btw)"
+  netMonthly: "formula_mm50qky8", // "Netto opbrengst per maand" (afnameprijs − editkosten), bijv. "€1,235.00"
   platforms: "dropdown_mm7jszaj",
   agendaNames: "text_mm7qatwy",
   accountManager: "multiple_person_mm5sv241",
@@ -72,6 +74,14 @@ function slugify(input: string): string {
 function parseMoney(text: string): string | null {
   const n = Number(text.replace(/[^\d.,-]/g, "").replace(",", "."));
   return Number.isFinite(n) && n > 0 ? n.toFixed(2) : null;
+}
+/** Bedrag uit een Monday-formule, formaat "€1,235.00" (komma = duizendtal,
+ *  punt = decimaal). Mag 0 of negatief zijn (anders dan parseMoney). */
+function parseEuroFormula(text: string): string | null {
+  const cleaned = text.replace(/[^\d.,-]/g, "").replace(/,/g, "");
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n.toFixed(2) : null;
 }
 /** Linked HOOFDBOARD-item-id's uit een board_relation-kolom. */
 function linkedIds(item: MondayItem, columnId: string): string[] {
@@ -130,6 +140,8 @@ export async function runMondayClientImport() {
       const shorts = parseShorts(item);
       const revenue = parseMoney(col(item, H.revenue));
       const editCost = parseMoney(col(item, H.editCost)); // "€48" → 48.00
+      const extraRevenue = parseMoney(col(item, H.extraWork)); // meerwerk (leeg = null)
+      const netMonthly = parseEuroFormula(col(item, H.netMonthly)); // "€1,235.00" → 1235.00
       // Editor uit Monday; "Sam" is in ons team "Sem".
       const editorRaw = col(item, H.editor).trim();
       const editorName = editorRaw ? (editorRaw.toLowerCase() === "sam" ? "Sem" : editorRaw) : null;
@@ -163,6 +175,9 @@ export async function runMondayClientImport() {
       if (revenue && !locked.has("monthlyRevenue")) base.monthlyRevenue = revenue;
       if (editCost && !locked.has("editCostPerVideo")) base.editCostPerVideo = editCost;
       if (editorName && !locked.has("editorName")) base.editorName = editorName;
+      // Meerwerk en netto opbrengst altijd meenemen (ook leegmaken in Monday).
+      if (!locked.has("extraRevenue")) base.extraRevenue = extraRevenue;
+      if (!locked.has("netMonthlyMonday")) base.netMonthlyMonday = netMonthly;
       if (contractMonths != null && !locked.has("contractMonths")) base.contractMonths = contractMonths;
       // Stopdatum altijd meenemen (ook leegmaken als die in Monday is gewist).
       if (!locked.has("endedOn")) base.endedOn = endedOn;
@@ -177,7 +192,7 @@ export async function runMondayClientImport() {
       } else {
         const [created] = await db
           .insert(clients)
-          .values({ slug, name, status, monthlyVideoQuota: shorts ?? undefined, monthlyRevenue: revenue ?? undefined, editCostPerVideo: editCost ?? undefined, editorName: editorName ?? undefined, contractMonths: contractMonths ?? undefined, endedOn: endedOn ?? undefined, startedOn: startedOn ?? undefined, coordinatorId: coordinatorId ?? undefined })
+          .values({ slug, name, status, monthlyVideoQuota: shorts ?? undefined, monthlyRevenue: revenue ?? undefined, editCostPerVideo: editCost ?? undefined, editorName: editorName ?? undefined, extraRevenue: extraRevenue ?? undefined, netMonthlyMonday: netMonthly ?? undefined, contractMonths: contractMonths ?? undefined, endedOn: endedOn ?? undefined, startedOn: startedOn ?? undefined, coordinatorId: coordinatorId ?? undefined })
           .returning({ id: clients.id });
         clientId = created!.id;
         ctx.counters.created++;

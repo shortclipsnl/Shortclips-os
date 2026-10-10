@@ -796,9 +796,13 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
   const shorts = c.monthlyVideoQuota || 0;
   const editPer = c.editCostPerVideo != null ? Number(c.editCostPerVideo) : null;
 
+  const extra = c.extraRevenue != null ? Number(c.extraRevenue) : null;
   const revPerShort = shorts > 0 ? revenue / shorts : null;
   const totalEditMonth = editPer != null && shorts > 0 ? editPer * shorts : null;
-  const grossMonth = totalEditMonth != null ? revenue - totalEditMonth : null;
+  // Netto opbrengst = afnameprijs − editkosten. Primair de officiële Monday-waarde
+  // (HOOFDBOARD-formule), met de eigen berekening als terugval.
+  const mondayNet = c.netMonthlyMonday != null ? Number(c.netMonthlyMonday) : null;
+  const grossMonth = mondayNet ?? (totalEditMonth != null ? revenue - totalEditMonth : null);
   const marginPct = grossMonth != null && revenue > 0 ? Math.round((grossMonth / revenue) * 100) : null;
 
   // Looptijd en totale (geschatte) omzet o.b.v. het maandbedrag.
@@ -842,7 +846,7 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
             <FinRow label="Shorts per maand" value={shorts > 0 ? String(shorts) : unknown} />
             <FinRow label="Omzet per short" value={revPerShort != null ? euro(revPerShort) : unknown} />
             <FinRow label="Totale omzet (geschat)" value={totalRevenue != null ? euro(totalRevenue) : unknown} hint={monthsActive != null ? `${monthsActive} maanden × maandbedrag` : undefined} />
-            <FinRow label="Aanvullende omzet (meerwerk)" value={<span className="text-[var(--color-ink-faint)]">niet in Monday</span>} />
+            <FinRow label="Aanvullende omzet (meerwerk)" value={extra != null && extra > 0 ? euro(extra) : <span className="text-[var(--color-ink-faint)]">geen deze maand</span>} hint="uit Monday" />
           </dl>
         </Card>
 
@@ -874,7 +878,7 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
           <dl className="divide-y divide-[var(--color-line)]">
             <FinRow label="Omzet per short" value={revPerShort != null ? euro(revPerShort) : unknown} />
             <FinRow label="Editkosten per short" value={editPer != null ? euro(editPer) : unknown} />
-            <FinRow label="Brutowinst per maand" value={grossMonth != null ? euro(grossMonth) : unknown} hint="omzet − editkosten" strong />
+            <FinRow label="Opbrengst na editkosten" value={grossMonth != null ? euro(grossMonth) : unknown} hint="afnameprijs − editkosten (Monday)" strong />
             <FinRow label="Brutomarge" value={marginPct != null ? `${marginPct}%` : unknown} />
             <FinRow label="Nettowinst" value={<span className="text-[var(--color-ink-faint)]">onbekend</span>} hint="vereist overige kosten" />
           </dl>
@@ -882,7 +886,7 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
       </div>
 
       <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-3 text-xs text-[var(--color-ink-muted)]">
-        <strong className="font-semibold text-[var(--color-ink)]">Brutowinst</strong> is de maandomzet minus de <em>bekende</em> directe kosten (editkosten uit Monday). Overige kosten zoals opname, strategie en overhead staan niet in Monday en zijn hier <strong>niet</strong> op nul gezet — daarom is de <strong className="font-semibold text-[var(--color-ink)]">nettowinst onbekend</strong> tot die kosten beschikbaar zijn.
+        <strong className="font-semibold text-[var(--color-ink)]">Opbrengst na editkosten</strong> is de afnameprijs minus de editkosten — dezelfde berekening als Monday&apos;s formule &quot;Netto opbrengst per maand&quot; (Monday-formules zijn niet los via de API uitleesbaar, dus we berekenen hem uit dezelfde Monday-invoer; de uitkomst is identiek). Het is winst ná editkosten. Overige kosten zoals opname, strategie en overhead staan niet in Monday en zijn hier <strong>niet</strong> op nul gezet — daarom is de <strong className="font-semibold text-[var(--color-ink)]">echte nettowinst onbekend</strong> tot die kosten beschikbaar zijn.
       </div>
     </div>
   );

@@ -63,6 +63,12 @@ export const clients = pgTable(
     endedOn: date("ended_on"),
     /** Toegewezen editor volgens Monday (HOOFDBOARD kolom "Editor"). */
     editorName: varchar("editor_name", { length: 80 }),
+    /** Aanvullende omzet deze maand (Monday "Meerwerk deze maand ex btw"). */
+    extraRevenue: numeric("extra_revenue", { precision: 12, scale: 2 }),
+    /** Netto opbrengst per maand uit Monday = afnameprijs − editkosten
+     *  (HOOFDBOARD-formule "Netto opbrengst per maand"). De officiële "wat
+     *  overblijft"-waarde; dit is winst ná editkosten, nog vóór overige kosten. */
+    netMonthlyMonday: numeric("net_monthly_monday", { precision: 12, scale: 2 }),
     lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
     notes: text("notes"),
