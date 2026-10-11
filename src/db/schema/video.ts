@@ -55,6 +55,18 @@ export const deliverables = pgTable(
       onDelete: "set null",
     }),
     dueOn: date("due_on"),
+    /** Hoe de deadline is bepaald: "auto" = berekend uit opnamedatum + 14
+     *  werkdagen; "manual" = handmatig vastgezet (wordt niet overschreven). */
+    dueOnSource: varchar("due_on_source", { length: 8 }).notNull().default("auto"),
+    /** Heuristisch voorgestelde opnamedag (nog te bevestigen in het
+     *  koppel-controleoverzicht). linkConfidence: high/medium/low. */
+    suggestedProductionDayId: uuid("suggested_production_day_id").references(
+      () => productionDays.id,
+      { onDelete: "set null" },
+    ),
+    linkConfidence: varchar("link_confidence", { length: 8 }),
+    /** true zodra iemand de koppeling heeft bevestigd of afgewezen. */
+    linkReviewed: boolean("link_reviewed").notNull().default(false),
     /** Verwachte publicatiedatum; de echte planning staat in content_calendar. */
     plannedPublishOn: date("planned_publish_on"),
     aspectRatio: varchar("aspect_ratio", { length: 12 }).notNull().default("9:16"),

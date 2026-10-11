@@ -25,6 +25,7 @@ import { enforcePortalAccess, portalAccessReport } from "@/server/jobs/portal-ac
 import { seedAiKnowledge } from "@/server/jobs/ai-seed";
 import { seedAutomationRules } from "@/server/jobs/automations-seed";
 import { runProductionPhaseAdvance } from "@/server/jobs/production-phases";
+import { runLinkSuggestions } from "@/server/jobs/link-suggestions";
 import { snapshotFinanceMonth } from "@/server/jobs/finance-snapshot";
 import { curateTeam } from "@/server/jobs/team-curate";
 import { setupTeamLogins } from "@/server/jobs/team-login-setup";
@@ -69,6 +70,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "ai.seed_knowledge": seedAiKnowledge,
   "automations.seed": seedAutomationRules,
   "production.advance_phases": runProductionPhaseAdvance,
+  "editing.suggest_opname_links": runLinkSuggestions,
   "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,
   "team.setup_logins": setupTeamLogins,
