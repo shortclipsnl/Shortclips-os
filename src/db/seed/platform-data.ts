@@ -169,6 +169,92 @@ export const AUTOMATION_RULES: Array<{
     conditions: { publishInDays: 1, statusNot: ["scheduled", "published"] },
     actions: [{ type: "notify_owner_of_item", level: "warning" }],
   },
+
+  /* ---- Scripts: minder handwerk rond checken & goedkeuren ---- */
+  {
+    key: "script_to_client_review_notifies_client",
+    name: "Script naar klantcontrole → klant informeren",
+    description:
+      "Zodra een script op klantcontrole komt, krijgt de klant een melding in het portaal en wordt er een goedkeuring aangemaakt.",
+    trigger: "script.status_changed",
+    conditions: { to: "client_review" },
+    actions: [
+      { type: "create_approval", kind: "script" },
+      { type: "notify_client", title: "Nieuw script om te checken", level: "info" },
+    ],
+  },
+  {
+    key: "script_approved_plans_shoot",
+    name: "Script goedgekeurd → opnamedag inplannen",
+    description:
+      "Keurt de klant een script goed, dan ontstaat automatisch een taak om de opnamedag in te plannen en wordt de coördinator geïnformeerd.",
+    trigger: "script.status_changed",
+    conditions: { to: "approved" },
+    actions: [
+      { type: "notify_coordinator", title: "Script goedgekeurd — opnamedag inplannen", level: "info" },
+      { type: "create_task", title: "Opnamedag inplannen (script goedgekeurd)", priority: "high" },
+    ],
+  },
+  {
+    key: "script_changes_requested_alerts_staff",
+    name: "Klant vraagt scriptwijziging → team waarschuwen",
+    description:
+      "Plaatst de klant een opmerking op een script, dan krijgt de coördinator direct een melding en een taak om de feedback te verwerken.",
+    trigger: "script.status_changed",
+    conditions: { to: "revising" },
+    actions: [
+      { type: "notify_coordinator", title: "Klant vroeg een scriptwijziging", level: "warning" },
+      { type: "create_task", title: "Scriptfeedback verwerken", priority: "high" },
+    ],
+  },
+  {
+    key: "script_silent_reminds_client",
+    name: "Script wacht te lang op de klant → herinneren",
+    description:
+      "Staat een script langer dan drie werkdagen op klantcontrole, dan krijgt de klant een herinnering en de coördinator een opvolgtaak.",
+    trigger: "schedule.daily",
+    conditions: { awaitingClientScriptDays: 3 },
+    actions: [
+      { type: "notify_client", title: "Herinnering: er staat nog een script voor je klaar", level: "info" },
+      { type: "create_task", title: "Klant opvolgen over openstaand script", priority: "normal" },
+    ],
+  },
+
+  /* ---- Videofeedback: minder handwerk rond revisies ---- */
+  {
+    key: "video_client_revision_routes_to_editor",
+    name: "Klant vraagt videowijziging → naar editor routeren",
+    description:
+      "Vraagt de klant een wijziging op een video, dan krijgt de coördinator een melding en ontstaat er een taak om de feedback naar de editor te zetten.",
+    trigger: "video.status_changed",
+    conditions: { to: "client_revision" },
+    actions: [
+      { type: "notify_coordinator", title: "Klant vroeg een videowijziging", level: "warning" },
+      { type: "create_task", title: "Videofeedback naar editor zetten", priority: "high" },
+    ],
+  },
+  {
+    key: "frame_comment_notifies_coordinator",
+    name: "Nieuwe Frame.io-opmerking → coördinator melden",
+    description:
+      "Komt er via Frame.io een nieuwe opmerking binnen, dan ziet de coördinator dat meteen in ShortClips OS — geen Frame.io-controle meer nodig.",
+    trigger: "frameio.comment_created",
+    conditions: {},
+    actions: [
+      { type: "notify_coordinator", title: "Nieuwe opmerking op een video (Frame.io)", level: "info" },
+    ],
+  },
+  {
+    key: "client_silent_5_days_reminds_client",
+    name: "Klant reageert 5 dagen niet → klant herinneren",
+    description:
+      "Wacht een video langer dan vijf dagen op klantfeedback, dan krijgt ook de klant zelf een herinnering (naast de opvolgtaak voor de coördinator).",
+    trigger: "schedule.daily",
+    conditions: { awaitingClientDays: 5 },
+    actions: [
+      { type: "notify_client", title: "Herinnering: er wacht nog een video op je feedback", level: "info" },
+    ],
+  },
 ];
 
 export const INTEGRATIONS: Array<{

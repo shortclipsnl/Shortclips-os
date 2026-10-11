@@ -8,6 +8,7 @@ import {
   deliverables,
   invoices,
   productionDays,
+  scripts,
   tasks,
   users,
 } from "@/db/schema";
@@ -100,6 +101,41 @@ export async function runDailySignals() {
       });
     }
     ctx.log(`${stale.length} video's wachten te lang op de klant`);
+
+    // 2b. Scripts die te lang op klantcontrole wachten (>3 dagen)
+    const staleScripts = await db
+      .select({
+        id: scripts.id,
+        clientId: scripts.clientId,
+        title: scripts.title,
+        coordinatorId: clients.coordinatorId,
+      })
+      .from(scripts)
+      .innerJoin(clients, eq(clients.id, scripts.clientId))
+      .where(
+        and(
+          isNull(scripts.deletedAt),
+          eq(scripts.status, "client_review"),
+          lt(scripts.updatedAt, sql`now() - interval '3 days'`),
+        ),
+      );
+
+    for (const script of staleScripts) {
+      ctx.counters.processed++;
+      await dispatch({
+        trigger: "schedule.daily",
+        clientId: script.clientId,
+        entityType: "script",
+        entityId: script.id,
+        data: {
+          awaitingClientScriptDays: 3,
+          title: `Script wacht op klant: ${script.title}`,
+          coordinatorId: script.coordinatorId,
+          href: `/scripts/${script.id}`,
+        },
+      });
+    }
+    ctx.log(`${staleScripts.length} scripts wachten te lang op de klant`);
 
     // 3. Vervallen facturen
     const overdue = await db

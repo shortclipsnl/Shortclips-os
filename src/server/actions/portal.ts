@@ -168,7 +168,7 @@ export async function approveScript(scriptId: string): Promise<ActionResult> {
 
     await db
       .update(scripts)
-      .set({ status: "approved", approvedAt: new Date(), updatedAt: new Date() })
+      .set({ status: "approved", approvedAt: new Date(), approvedById: viewer.id, updatedAt: new Date() })
       .where(eq(scripts.id, scriptId));
 
     await recordActivity({
@@ -179,6 +179,15 @@ export async function approveScript(scriptId: string): Promise<ActionResult> {
       entityId: scriptId,
       actor: { id: viewer.id, fullName: viewer.fullName },
       isClientVisible: true,
+    });
+
+    // Automatiseringen aftrappen (bijv. opnamedag inplannen).
+    await dispatch({
+      trigger: "script.status_changed",
+      clientId: script.clientId,
+      entityType: "script",
+      entityId: scriptId,
+      data: { from: "client_review", to: "approved", actorId: viewer.id },
     });
 
     revalidatePath("/portal");
@@ -225,6 +234,15 @@ export async function commentOnScript(
       entityId: scriptId,
       actor: { id: viewer.id, fullName: viewer.fullName },
       isClientVisible: true,
+    });
+
+    // Automatiseringen aftrappen (team informeren + feedback verwerken).
+    await dispatch({
+      trigger: "script.status_changed",
+      clientId: script.clientId,
+      entityType: "script",
+      entityId: scriptId,
+      data: { from: "client_review", to: "revising", actorId: viewer.id },
     });
 
     revalidatePath("/portal");
