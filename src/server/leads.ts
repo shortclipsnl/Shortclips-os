@@ -1,7 +1,8 @@
 import "server-only";
 import { desc, eq, isNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
-import { salesLeads, users } from "@/db/schema";
+import { clients, salesLeads, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 
 export const LEAD_STATUSES = ["lead", "offerte", "onderhandeling", "gewonnen", "verloren"] as const;
@@ -26,12 +27,14 @@ export type LeadRow = {
   segment: string | null;
   note: string | null;
   ownerName: string | null;
+  convertedClientSlug: string | null;
 };
 
 /** Alle leads + samenvatting. Intern (sales is een teamfunctie). */
 export async function listLeads() {
   await requireInternal();
 
+  const convertedClient = alias(clients, "converted_client");
   const rows = await db
     .select({
       id: salesLeads.id,
@@ -51,9 +54,11 @@ export async function listLeads() {
       segment: salesLeads.segment,
       note: salesLeads.note,
       ownerName: users.fullName,
+      convertedClientSlug: convertedClient.slug,
     })
     .from(salesLeads)
     .leftJoin(users, eq(users.id, salesLeads.ownerId))
+    .leftJoin(convertedClient, eq(convertedClient.id, salesLeads.convertedClientId))
     .where(isNull(salesLeads.deletedAt))
     .orderBy(sql`${salesLeads.followUpOn} asc nulls last`, desc(salesLeads.updatedAt));
 

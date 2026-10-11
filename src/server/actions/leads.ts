@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { salesLeads } from "@/db/schema";
-import { requireInternal, ForbiddenError } from "@/server/auth/context";
+import { clients, salesLeads } from "@/db/schema";
+import { requireInternal, requirePermission, ForbiddenError } from "@/server/auth/context";
 import { dispatch } from "@/server/automation";
+import { createClient } from "@/server/actions/clients";
 
-export type ActionResult = { ok: boolean; message?: string };
+export type ActionResult = { ok: boolean; message?: string; slug?: string };
 
 function wrap<T>(fn: () => Promise<T>) {
   return fn().catch((e) => {
@@ -55,5 +56,51 @@ export async function setLeadFollowUp(input: z.infer<typeof followUpSchema>): Pr
     await db.update(salesLeads).set({ followUpOn: p.data.followUpOn, updatedAt: new Date() }).where(eq(salesLeads.id, p.data.id));
     revalidatePath("/leads");
     return { ok: true };
+  });
+}
+
+/**
+ * Een lead omzetten naar een klant — zonder gegevens opnieuw in te voeren.
+ * Neemt bedrijfsnaam, contactpersoon, contactgegevens, website, verwacht
+ * maandbedrag en startdatum over, maakt de klant aan (incl. contract- en
+ * contactpersoon-skelet) en markeert de lead als gewonnen + gekoppeld.
+ * Vereist clients:write; voorkomt dubbele klanten door de koppeling te bewaren.
+ */
+export async function convertLeadToClient(leadId: string): Promise<ActionResult> {
+  return wrap(async () => {
+    await requirePermission("clients:write");
+
+    const [lead] = await db.select().from(salesLeads).where(eq(salesLeads.id, leadId)).limit(1);
+    if (!lead) return { ok: false, message: "Lead niet gevonden." };
+
+    // Al omgezet? Dan de bestaande klant teruggeven (geen dubbele klant).
+    if (lead.convertedClientId) {
+      const [existing] = await db.select({ slug: clients.slug }).from(clients).where(eq(clients.id, lead.convertedClientId)).limit(1);
+      if (existing) return { ok: true, slug: existing.slug, message: "Deze lead is al een klant." };
+    }
+
+    const expectedMonthly = Number(lead.expectedMonthly) > 0 ? String(lead.expectedMonthly) : null;
+    const res = await createClient({
+      name: lead.company,
+      website: lead.website,
+      status: "active",
+      monthlyRevenue: expectedMonthly,
+      startedOn: lead.startOn,
+      notes: [lead.note, lead.source ? `Bron: ${lead.source}` : null].filter(Boolean).join("\n") || null,
+      contactName: lead.contactName,
+      contactEmail: lead.email,
+      contactPhone: lead.phone,
+    });
+    if (!res.ok || !res.slug) return { ok: false, message: res.message ?? "Aanmaken klant mislukt." };
+
+    const [created] = await db.select({ id: clients.id }).from(clients).where(eq(clients.slug, res.slug)).limit(1);
+    await db
+      .update(salesLeads)
+      .set({ status: "gewonnen", convertedClientId: created?.id ?? null, updatedAt: new Date() })
+      .where(eq(salesLeads.id, leadId));
+
+    revalidatePath("/leads");
+    revalidatePath("/clients");
+    return { ok: true, slug: res.slug };
   });
 }

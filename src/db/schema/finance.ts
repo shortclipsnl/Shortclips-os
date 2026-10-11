@@ -254,6 +254,9 @@ export const salesLeads = pgTable(
     status: varchar("status", { length: 24 }).notNull().default("lead"),
     note: text("note"),
     ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    /** Gezet zodra de lead is omgezet naar een klant — zo geen dubbele klanten
+     *  en direct klikbaar naar het klantdossier. */
+    convertedClientId: uuid("converted_client_id").references(() => clients.id, { onDelete: "set null" }),
     /* --- Leadregister (uit Monday LEADS 2026 DASHBOARD) --- */
     /** Waar de lead binnenkwam: Website, Socials, Netwerk, Meta advertentie… */
     source: varchar("source", { length: 40 }),

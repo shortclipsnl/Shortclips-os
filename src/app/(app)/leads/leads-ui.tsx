@@ -2,8 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Search } from "lucide-react";
-import { setLeadFollowUp, setLeadStatus } from "@/server/actions/leads";
+import { ArrowRightCircle, Check, Loader2, Search } from "lucide-react";
+import { convertLeadToClient, setLeadFollowUp, setLeadStatus } from "@/server/actions/leads";
 import type { LeadRow } from "@/server/leads";
 
 const STATUSES = ["lead", "offerte", "onderhandeling", "gewonnen", "verloren"] as const;
@@ -85,12 +85,13 @@ export function LeadsBoard({ rows, segments, sources }: { rows: LeadRow[]; segme
               <th className="px-2 py-2 font-medium">Contact</th>
               <th className="px-2 py-2 font-medium">Opvolgen</th>
               <th className="px-2 py-2 font-medium">Deal closer</th>
+              <th className="px-2 py-2 font-medium" />
             </tr>
           </thead>
           <tbody>
             {filtered.map((r) => <LeadRowView key={r.id} r={r} today={today} />)}
             {filtered.length === 0 ? (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen leads met deze filters.</td></tr>
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen leads met deze filters.</td></tr>
             ) : null}
           </tbody>
         </table>
@@ -153,6 +154,39 @@ function LeadRowView({ r, today }: { r: LeadRow; today: string }) {
           title={followUp ? `Opvolgen voor ${fmtDate(followUp)}` : "Geen opvolgdatum"} />
       </td>
       <td className="px-2 py-2 text-xs text-[var(--color-ink-muted)]">{r.ownerName ?? "–"}</td>
+      <td className="px-2 py-2 text-right">
+        <ConvertCell id={r.id} convertedSlug={r.convertedClientSlug} />
+      </td>
     </tr>
+  );
+}
+
+function ConvertCell({ id, convertedSlug }: { id: string; convertedSlug: string | null }) {
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  const router = useRouter();
+
+  if (convertedSlug) {
+    return (
+      <a href={`/clients/${convertedSlug}`} className="inline-flex items-center gap-1 rounded-full bg-[var(--color-good-soft)] px-2.5 py-1 text-2xs font-medium text-[#14633a] hover:underline" title="Deze lead is al een klant">
+        <Check className="size-3.5" /> Klant
+      </a>
+    );
+  }
+  return (
+    <span className="inline-flex flex-col items-end gap-0.5">
+      <button type="button" disabled={pending}
+        onClick={() => start(async () => {
+          setErr(null);
+          const res = await convertLeadToClient(id);
+          if (res.ok && res.slug) router.push(`/clients/${res.slug}`);
+          else { setErr(res.message ?? "Mislukt"); router.refresh(); }
+        })}
+        className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-1 text-2xs font-medium text-[var(--color-brand-700)] hover:bg-[var(--color-surface-sunken)]"
+        title="Zet deze lead om naar een klant (neemt gegevens automatisch over)">
+        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <ArrowRightCircle className="size-3.5" />} Naar klant
+      </button>
+      {err ? <span className="text-2xs text-[var(--color-bad)]">{err}</span> : null}
+    </span>
   );
 }
