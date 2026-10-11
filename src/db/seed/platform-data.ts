@@ -312,6 +312,50 @@ export const AUTOMATION_RULES: Array<{
       { type: "notify_owner", title: "Vakantie goedgekeurd — teamcapaciteit daalt, controleer de planning", level: "info" },
     ],
   },
+
+  /* ---- Tijd-gestuurde herinneringen (overgenomen uit Monday) ---- */
+  {
+    key: "contract_45d_plan_evaluation",
+    name: "Contract loopt over 45 dagen af → evaluatie inplannen",
+    description:
+      "Vijfenveertig dagen voor de einddatum komt er een taak om de verlenging/evaluatie in te plannen en wordt de coördinator geïnformeerd.",
+    trigger: "schedule.daily",
+    conditions: { contractDaysLeft: 45 },
+    actions: [
+      { type: "create_task", title: "Contractverlenging/evaluatie inplannen", priority: "normal" },
+      { type: "notify_coordinator", title: "Contract loopt over 45 dagen af — evaluatie inplannen", level: "info" },
+    ],
+  },
+  {
+    key: "contract_7d_warns_owner",
+    name: "Contract loopt over 7 dagen af → eigenaar waarschuwen",
+    description: "Een week voor de einddatum krijgt de eigenaar een waarschuwing.",
+    trigger: "schedule.daily",
+    conditions: { contractDaysLeft: 7 },
+    actions: [{ type: "notify_owner", level: "warning" }],
+  },
+  {
+    key: "contract_expires_today",
+    name: "Contract verloopt vandaag → eigenaar + taak",
+    description: "Op de einddatum zelf krijgt de eigenaar een kritieke melding en ontstaat er een actietaak.",
+    trigger: "schedule.daily",
+    conditions: { contractDaysLeft: 0 },
+    actions: [
+      { type: "notify_owner", level: "critical" },
+      { type: "create_task", title: "Contract verloopt vandaag — verlengen of afsluiten", priority: "high" },
+    ],
+  },
+  {
+    key: "shoot_missing_videographer",
+    name: "Opname zonder videograaf → coördinator melden",
+    description:
+      "Staat er binnen 7 of 2 dagen een opname zonder videograaf, dan krijgt de coördinator een melding om iemand in te plannen.",
+    trigger: "schedule.daily",
+    conditions: { videographerMissing: true },
+    actions: [
+      { type: "notify_coordinator", title: "Opname zonder videograaf — plan iemand in", level: "warning" },
+    ],
+  },
 ];
 
 export const INTEGRATIONS: Array<{

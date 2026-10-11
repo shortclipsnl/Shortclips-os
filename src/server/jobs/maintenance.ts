@@ -67,6 +67,54 @@ export async function runDailySignals() {
     }
     ctx.log(`${expiring.length} aflopende contracten gesignaleerd`);
 
+    // 1b. Contract-aftelling op vaste mijlpalen (45 / 7 / 0 dagen voor einde).
+    const tierByDate = new Map<string, number>([
+      [day(45), 45],
+      [day(7), 7],
+      [day(0), 0],
+    ]);
+    const tierContracts = await db
+      .select({
+        id: contracts.id,
+        clientId: contracts.clientId,
+        endsOn: contracts.endsOn,
+        clientName: clients.name,
+        coordinatorId: clients.coordinatorId,
+        slug: clients.slug,
+      })
+      .from(contracts)
+      .innerJoin(clients, eq(clients.id, contracts.clientId))
+      .where(
+        and(
+          eq(contracts.status, "active"),
+          isNull(contracts.deletedAt),
+          inArray(contracts.endsOn, [day(45), day(7), day(0)]),
+        ),
+      );
+
+    for (const contract of tierContracts) {
+      const tier = tierByDate.get(contract.endsOn ?? "");
+      if (tier === undefined) continue;
+      ctx.counters.processed++;
+      await dispatch({
+        trigger: "schedule.daily",
+        clientId: contract.clientId,
+        entityType: "contract",
+        entityId: contract.id,
+        data: {
+          contractDaysLeft: tier,
+          dedupe: `contract-${tier}`,
+          title:
+            tier === 0
+              ? `Contract ${contract.clientName} verloopt vandaag`
+              : `Contract ${contract.clientName} loopt over ${tier} dagen af`,
+          coordinatorId: contract.coordinatorId,
+          href: `/clients/${contract.slug}?tab=contract`,
+        },
+      });
+    }
+    ctx.log(`${tierContracts.length} contracten op een mijlpaal (45/7/0 dagen)`);
+
     // 2. Video's die te lang op klantfeedback wachten
     const stale = await db
       .select({
@@ -195,6 +243,50 @@ export async function runDailySignals() {
       });
     }
     ctx.log(`${tomorrow.length} publicaties morgen`);
+
+    // 5. Opnames over 7 of 2 dagen zonder videograaf (Monday: "Wie gaat filmen?").
+    const shootTier = new Map<string, number>([
+      [day(7), 7],
+      [day(2), 2],
+    ]);
+    const shootsNoFilmer = await db
+      .select({
+        id: productionDays.id,
+        clientId: productionDays.clientId,
+        scheduledOn: productionDays.scheduledOn,
+        title: productionDays.title,
+        coordinatorId: productionDays.coordinatorId,
+      })
+      .from(productionDays)
+      .where(
+        and(
+          isNull(productionDays.deletedAt),
+          isNull(productionDays.videographerId),
+          inArray(productionDays.scheduledOn, [day(7), day(2)]),
+          inArray(productionDays.status, ["planned", "confirmed"]),
+        ),
+      );
+
+    for (const shoot of shootsNoFilmer) {
+      const tier = shootTier.get(shoot.scheduledOn ?? "");
+      if (tier === undefined) continue;
+      ctx.counters.processed++;
+      await dispatch({
+        trigger: "schedule.daily",
+        clientId: shoot.clientId,
+        entityType: "production_day",
+        entityId: shoot.id,
+        data: {
+          videographerMissing: true,
+          shootDaysLeft: tier,
+          dedupe: `shoot-nofilmer-${tier}`,
+          title: `Opname over ${tier} dagen zonder videograaf: ${shoot.title}`,
+          coordinatorId: shoot.coordinatorId,
+          href: `/productions/${shoot.id}`,
+        },
+      });
+    }
+    ctx.log(`${shootsNoFilmer.length} opnames zonder videograaf (7/2 dagen)`);
   });
 }
 

@@ -171,7 +171,7 @@ async function runAction(action: Action, event: AutomationEvent): Promise<unknow
         href: "/portal",
         entityType: event.entityType,
         entityId: event.entityId,
-        dedupeKey: `${action.type}:${event.entityId}:${(event.data?.to as string) ?? ""}`,
+        dedupeKey: `${action.type}:${event.entityId}:${(event.data?.to as string) ?? (event.data?.dedupe as string) ?? ""}`,
       });
       return { notified: count };
     }
@@ -189,7 +189,7 @@ async function runAction(action: Action, event: AutomationEvent): Promise<unknow
         href: (event.data?.href as string) ?? undefined,
         entityType: event.entityType,
         entityId: event.entityId,
-        dedupeKey: `${event.trigger}:${event.entityId}:${(event.data?.to as string) ?? ""}`,
+        dedupeKey: `${event.trigger}:${event.entityId}:${(event.data?.to as string) ?? (event.data?.dedupe as string) ?? ""}`,
       });
       return { notified: count };
     }
@@ -205,7 +205,7 @@ async function runAction(action: Action, event: AutomationEvent): Promise<unknow
         href: (event.data?.href as string) ?? undefined,
         entityType: event.entityType,
         entityId: event.entityId,
-        dedupeKey: `${event.trigger}:${event.entityId}:${(event.data?.to as string) ?? ""}`,
+        dedupeKey: `${event.trigger}:${event.entityId}:${(event.data?.to as string) ?? (event.data?.dedupe as string) ?? ""}`,
       });
       return { notified: count };
     }
@@ -220,7 +220,7 @@ async function runAction(action: Action, event: AutomationEvent): Promise<unknow
         href: "/finance",
         entityType: event.entityType,
         entityId: event.entityId,
-        dedupeKey: `${event.trigger}:${event.entityId}:${(event.data?.to as string) ?? ""}`,
+        dedupeKey: `${event.trigger}:${event.entityId}:${(event.data?.to as string) ?? (event.data?.dedupe as string) ?? ""}`,
       });
       return { notified: count };
     }
