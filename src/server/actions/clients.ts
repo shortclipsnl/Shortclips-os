@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientContacts, clientIntegrations, clients } from "@/db/schema";
+import { clientContacts, clientIntegrations, clients, contracts } from "@/db/schema";
 import {
   assertClientAccess,
   ForbiddenError,
@@ -101,6 +101,44 @@ async function upsertPrimaryContact(
   }
 }
 
+/**
+ * Zet bij een nieuwe klant automatisch de ontbrekende skeletten klaar — zoals
+ * Monday cross-board deed: een contactpersoon-placeholder én een contract-shell.
+ * Idempotent: alleen aanmaken wat er nog niet is.
+ */
+async function provisionClientSkeleton(
+  clientId: string,
+  opts: { startedOn?: string | null; monthlyRevenue?: string | null },
+): Promise<void> {
+  const [contact] = await db
+    .select({ id: clientContacts.id })
+    .from(clientContacts)
+    .where(and(eq(clientContacts.clientId, clientId), isNull(clientContacts.deletedAt)))
+    .limit(1);
+  if (!contact) {
+    await db.insert(clientContacts).values({
+      clientId,
+      fullName: "Contactpersoon nog aanvullen",
+      isPrimary: true,
+    });
+  }
+
+  const [contract] = await db
+    .select({ id: contracts.id })
+    .from(contracts)
+    .where(and(eq(contracts.clientId, clientId), isNull(contracts.deletedAt)))
+    .limit(1);
+  if (!contract) {
+    await db.insert(contracts).values({
+      clientId,
+      startsOn: opts.startedOn || new Date().toISOString().slice(0, 10),
+      monthlyValue: opts.monthlyRevenue || "0",
+      reference: "Nog aanvullen",
+      notes: "Automatisch aangemaakt bij nieuwe klant.",
+    });
+  }
+}
+
 export async function createClient(input: ClientInput): Promise<ActionResult> {
   try {
     const viewer = await requirePermission("clients:write");
@@ -140,6 +178,12 @@ export async function createClient(input: ClientInput): Promise<ActionResult> {
 
     const clientId = created!.id;
     await upsertPrimaryContact(clientId, input);
+    // Zoals in Monday: bij een nieuwe klant meteen een contract- en
+    // contactpersoon-skelet klaarzetten, zodat niets handmatig hoeft.
+    await provisionClientSkeleton(clientId, {
+      startedOn: clean(input.startedOn),
+      monthlyRevenue: clean(input.monthlyRevenue),
+    });
 
     await auditLog({
       viewer,
