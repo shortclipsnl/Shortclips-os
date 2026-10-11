@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { salesLeads } from "@/db/schema";
 import { requireInternal, ForbiddenError } from "@/server/auth/context";
+import { dispatch } from "@/server/automation";
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -28,6 +29,13 @@ export async function setLeadStatus(input: z.infer<typeof statusSchema>): Promis
     const p = statusSchema.safeParse(input);
     if (!p.success) return { ok: false, message: "Ongeldige status." };
     await db.update(salesLeads).set({ status: p.data.status, updatedAt: new Date() }).where(eq(salesLeads.id, p.data.id));
+
+    // Automatiseringen aftrappen bij winst/offerte (zoals in Monday).
+    const trigger = p.data.status === "gewonnen" ? "lead.won" : p.data.status === "offerte" ? "lead.quote_sent" : null;
+    if (trigger) {
+      await dispatch({ trigger, entityType: "sales_lead", entityId: p.data.id, data: { to: p.data.status, href: "/leads" } });
+    }
+
     revalidatePath("/leads");
     return { ok: true };
   });

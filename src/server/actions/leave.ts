@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { leaveRequests } from "@/db/schema";
 import { requireInternal, ForbiddenError } from "@/server/auth/context";
 import { notify } from "@/server/notifications";
+import { dispatch } from "@/server/automation";
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -88,6 +89,11 @@ export async function reviewLeave(id: string, decision: "approved" | "rejected")
       entityId: id,
       dedupeKey: `leave_reviewed:${id}:${decision}`,
     });
+
+    // Bij goedkeuring: capaciteit daalt → automatisering (eigenaar waarschuwen).
+    if (decision === "approved") {
+      await dispatch({ trigger: "leave.approved", entityType: "leave_request", entityId: id, data: { to: "approved", href: "/verlof" } });
+    }
 
     revalidatePath("/verlof");
     return { ok: true };

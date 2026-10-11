@@ -255,6 +255,63 @@ export const AUTOMATION_RULES: Array<{
       { type: "notify_client", title: "Herinnering: er wacht nog een video op je feedback", level: "info" },
     ],
   },
+
+  /* ---- Overgenomen uit Monday: team- en eigenaarmeldingen ---- */
+  {
+    key: "video_internal_review_notifies_team",
+    name: "Video klaar met edit → interne review melden",
+    description:
+      "Zodra een video op interne review komt, krijgt de coördinator een melding dat de edit klaar is om te controleren.",
+    trigger: "video.status_changed",
+    conditions: { to: "internal_review" },
+    actions: [
+      { type: "notify_coordinator", title: "Video klaar met edit — staat voor interne review", level: "info" },
+    ],
+  },
+  {
+    key: "video_delivered_notifies_team",
+    name: "Video afgerond → opgeleverd melden",
+    description:
+      "Is een video goedgekeurd/afgerond, dan krijgt de coördinator een melding dat die definitief is opgeleverd.",
+    trigger: "video.status_changed",
+    conditions: { to: "approved" },
+    actions: [
+      { type: "notify_coordinator", title: "Video afgerond en opgeleverd 🎉", level: "info" },
+    ],
+  },
+  {
+    key: "lead_won_notifies_owner",
+    name: "Lead gewonnen → eigenaar melden",
+    description:
+      "Gaat een lead op Gewonnen, dan krijgt de eigenaar een melding om de nieuwe klant in het klantenbeheer te zetten.",
+    trigger: "lead.won",
+    conditions: {},
+    actions: [
+      { type: "notify_owner", title: "🎉 Nieuwe klant gewonnen — zet 'm in het klantenbeheer", level: "success" },
+    ],
+  },
+  {
+    key: "lead_quote_sent_notifies_owner",
+    name: "Offerte verstuurd → opvolgherinnering",
+    description:
+      "Zet je een lead op Offerte, dan komt er een melding om binnen drie werkdagen op te volgen.",
+    trigger: "lead.quote_sent",
+    conditions: {},
+    actions: [
+      { type: "notify_owner", title: "📋 Offerte verstuurd — volg binnen 3 werkdagen op", level: "info" },
+    ],
+  },
+  {
+    key: "leave_approved_notifies_owner",
+    name: "Vakantie goedgekeurd → capaciteit controleren",
+    description:
+      "Na goedkeuring van verlof krijgt de eigenaar een melding dat de teamcapaciteit daalt, om de planning te controleren.",
+    trigger: "leave.approved",
+    conditions: {},
+    actions: [
+      { type: "notify_owner", title: "Vakantie goedgekeurd — teamcapaciteit daalt, controleer de planning", level: "info" },
+    ],
+  },
 ];
 
 export const INTEGRATIONS: Array<{
