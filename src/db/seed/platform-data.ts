@@ -356,6 +356,35 @@ export const AUTOMATION_RULES: Array<{
       { type: "notify_coordinator", title: "Opname zonder videograaf — plan iemand in", level: "warning" },
     ],
   },
+
+  /* ---- Lead-intake (webhook) + e-mail (vereist RESEND_API_KEY) ---- */
+  {
+    key: "lead_created_notifies_owner",
+    name: "Nieuwe lead binnen → eigenaar melden",
+    description:
+      "Komt er via het aanmeldformulier (Meta-advertentie/Framer) een nieuwe lead binnen, dan krijgt de eigenaar meteen een melding om dezelfde werkdag terug te bellen.",
+    trigger: "lead.created",
+    conditions: {},
+    actions: [
+      { type: "notify_owner", title: "📞 Nieuwe lead binnen — bel dezelfde werkdag terug", level: "success" },
+    ],
+  },
+  {
+    key: "contract_28d_email_and_notify",
+    name: "Contract loopt over 28 dagen af → evaluatie mailen",
+    description:
+      "Achtentwintig dagen voor de einddatum gaat er een e-mail uit om de evaluatie/verlenging in te plannen (als e-mail is ingesteld), plus een melding voor de eigenaar.",
+    trigger: "schedule.daily",
+    conditions: { contractDaysLeft: 28 },
+    actions: [
+      {
+        type: "send_email",
+        subject: "Contract loopt over 28 dagen af — plan de evaluatie in",
+        body: "Een klantcontract loopt over vier weken af. Plan de evaluatie/verlenging in. Open ShortClips OS voor de details.",
+      },
+      { type: "notify_owner", level: "warning" },
+    ],
+  },
 ];
 
 export const INTEGRATIONS: Array<{

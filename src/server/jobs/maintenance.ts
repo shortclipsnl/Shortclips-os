@@ -70,6 +70,7 @@ export async function runDailySignals() {
     // 1b. Contract-aftelling op vaste mijlpalen (45 / 7 / 0 dagen voor einde).
     const tierByDate = new Map<string, number>([
       [day(45), 45],
+      [day(28), 28],
       [day(7), 7],
       [day(0), 0],
     ]);
@@ -88,7 +89,7 @@ export async function runDailySignals() {
         and(
           eq(contracts.status, "active"),
           isNull(contracts.deletedAt),
-          inArray(contracts.endsOn, [day(45), day(7), day(0)]),
+          inArray(contracts.endsOn, [day(45), day(28), day(7), day(0)]),
         ),
       );
 
@@ -113,7 +114,7 @@ export async function runDailySignals() {
         },
       });
     }
-    ctx.log(`${tierContracts.length} contracten op een mijlpaal (45/7/0 dagen)`);
+    ctx.log(`${tierContracts.length} contracten op een mijlpaal (45/28/7/0 dagen)`);
 
     // 2. Video's die te lang op klantfeedback wachten
     const stale = await db

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   approvals,
@@ -12,6 +12,8 @@ import {
   users,
 } from "@/db/schema";
 import { notify } from "./notifications";
+import { sendEmail } from "./email";
+import { env } from "@/lib/env";
 import {
   logError,
 } from "./audit";
@@ -263,6 +265,29 @@ async function runAction(action: Action, event: AutomationEvent): Promise<unknow
         return { completed: true };
       }
       return { completed: false, published: remaining.length, total: all.length };
+    }
+
+    case "send_email": {
+      // E-mail aan een rol (standaard de eigenaar). Zonder RESEND_API_KEY/
+      // MAIL_FROM is dit een nette no-op, zodat de regel niet faalt.
+      const roles = (action.roles as string[] | undefined) ?? ["owner"];
+      const rows = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(
+          and(
+            inArray(users.primaryRole, roles as ("owner")[]),
+            eq(users.status, "active"),
+            isNull(users.deletedAt),
+          ),
+        );
+      const to = rows.map((r) => r.email).filter(Boolean);
+      if (to.length === 0) return { skipped: "geen ontvanger" };
+      const subject = String(action.subject ?? event.data?.title ?? "Melding van ShortClips OS");
+      const bodyText = String(action.body ?? event.data?.title ?? subject);
+      const link = event.data?.href ? `${env.APP_URL}${event.data.href}` : env.APP_URL;
+      const result = await sendEmail({ to, subject, text: `${bodyText}\n\n${link}` });
+      return result;
     }
 
     default:

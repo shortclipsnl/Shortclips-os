@@ -73,6 +73,11 @@ const schema = z.object({
   // --- Achtergrondtaken ---
   CRON_SECRET: z.string().optional(),
 
+  // --- Lead-intake webhook (Meta-advertentie / Framer-formulier) ---
+  // Gedeeld geheim dat het externe formulier meestuurt (header x-webhook-secret
+  // of ?secret=). Zonder deze waarde is het endpoint dicht.
+  LEADS_WEBHOOK_SECRET: z.string().optional(),
+
   // --- E-mail (klantnotificaties) ---
   // Resend als verzender. Zonder sleutel blijft e-mail slapend: notificaties
   // worden wél in het portaal gezet, maar er gaat geen mail uit.
