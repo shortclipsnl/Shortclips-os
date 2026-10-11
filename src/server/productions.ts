@@ -40,6 +40,7 @@ export async function listProductionDays(
       endTime: productionDays.endTime,
       locationName: productionDays.locationName,
       status: productionDays.status,
+      phase: productionDays.phase,
       clientName: clients.name,
       clientSlug: clients.slug,
       clientColor: clients.color,

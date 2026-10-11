@@ -88,6 +88,12 @@ export const productionDays = pgTable(
     locationName: varchar("location_name", { length: 200 }),
     locationAddress: text("location_address"),
     status: productionStatusEnum("status").notNull().default("planned"),
+    /** Projectfase die automatisch meeloopt met de opnamedatum (overgenomen uit
+     *  Monday): nieuw → scripting (−14d) → opnamevoorbereiding (−3d) →
+     *  opname (0d) → editing (+1d). Los van `status` (planning/bevestiging). */
+    phase: varchar("phase", { length: 24 }).notNull().default("nieuw"),
+    /** Datum waarop de huidige fase inging. */
+    phaseEnteredOn: date("phase_entered_on"),
     videographerId: uuid("videographer_id").references(() => users.id, {
       onDelete: "set null",
     }),

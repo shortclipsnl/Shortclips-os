@@ -10,6 +10,15 @@ import { PRODUCTION_STATUS } from "@/lib/statuses";
 export const metadata: Metadata = { title: "Opnameplanning" };
 export const dynamic = "force-dynamic";
 
+/** Projectfase die automatisch meeloopt met de opnamedatum. */
+const PHASE_LABEL: Record<string, string> = {
+  nieuw: "Nieuw",
+  scripting: "Scripting",
+  opnamevoorbereiding: "Voorbereiding",
+  opname: "Opnamedag",
+  editing: "Editing",
+};
+
 export default async function ProductionsPage({
   searchParams,
 }: {
@@ -186,6 +195,9 @@ export default async function ProductionsPage({
                       <Badge tone={PRODUCTION_STATUS[d.status]?.tone ?? "neutral"}>
                         {PRODUCTION_STATUS[d.status]?.label ?? d.status}
                       </Badge>
+                      <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-2xs font-medium text-[var(--color-ink-muted)]" title="Projectfase (loopt automatisch mee met de opnamedatum)">
+                        {PHASE_LABEL[d.phase] ?? d.phase}
+                      </span>
                       {when !== "verleden" ? (
                         <span className="text-xs text-[var(--color-ink-muted)]">
                           {relativeDays(d.scheduledOn)}

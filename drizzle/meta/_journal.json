@@ -141,6 +141,13 @@
       "when": 1791664156012,
       "tag": "0019_orange_solo",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791737159211,
+      "tag": "0020_small_the_fury",
+      "breakpoints": true
     }
   ]
 }

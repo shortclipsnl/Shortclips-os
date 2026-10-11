@@ -24,6 +24,7 @@ import { setTeamContact } from "@/server/jobs/team";
 import { enforcePortalAccess, portalAccessReport } from "@/server/jobs/portal-access";
 import { seedAiKnowledge } from "@/server/jobs/ai-seed";
 import { seedAutomationRules } from "@/server/jobs/automations-seed";
+import { runProductionPhaseAdvance } from "@/server/jobs/production-phases";
 import { snapshotFinanceMonth } from "@/server/jobs/finance-snapshot";
 import { curateTeam } from "@/server/jobs/team-curate";
 import { setupTeamLogins } from "@/server/jobs/team-login-setup";
@@ -67,6 +68,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "portal.notify_clients": runClientNotifications,
   "ai.seed_knowledge": seedAiKnowledge,
   "automations.seed": seedAutomationRules,
+  "production.advance_phases": runProductionPhaseAdvance,
   "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,
   "team.setup_logins": setupTeamLogins,
