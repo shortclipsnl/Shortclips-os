@@ -13,6 +13,8 @@ export default async function ClientsPage() {
   const viewer = await requireInternal();
   const all = await listClients(viewer);
   const canWrite = viewer.permissions.has("clients:write");
+  // Maandprijs is financieel → uitsluitend voor de eigenaar (finance:read).
+  const canSeeRevenue = viewer.permissions.has("finance:read");
 
   const clients: BoardClient[] = all.map((c) => ({
     id: c.id,
@@ -25,6 +27,7 @@ export default async function ClientsPage() {
     nextShoot: c.nextShoot,
     inProduction: Number(c.inProduction),
     shortsPerMonth: Number(c.monthlyVideoQuota),
+    monthlyRevenue: canSeeRevenue ? Number(c.monthlyRevenue ?? 0) : null,
   }));
 
   const activeCount = clients.filter((c) => !STOPPED.has(c.status)).length;

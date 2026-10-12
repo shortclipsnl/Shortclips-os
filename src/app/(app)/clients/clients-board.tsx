@@ -7,7 +7,7 @@ import { Loader2, Search } from "lucide-react";
 import { setClientStatus } from "@/server/actions/clients";
 import { Avatar, Badge } from "@/components/ui";
 import { CLIENT_STATUS } from "@/lib/statuses";
-import { formatDate } from "@/lib/format";
+import { euro, formatDate } from "@/lib/format";
 
 export type BoardClient = {
   id: string;
@@ -20,7 +20,20 @@ export type BoardClient = {
   nextShoot: string | null;
   inProduction: number;
   shortsPerMonth: number;
+  monthlyRevenue: number | null;
 };
+
+/** Kleine gekleurde chip voor scanbaarheid. */
+function Chip({ children, tone }: { children: React.ReactNode; tone: "blue" | "indigo" | "amber" | "grey" | "green" }) {
+  const cls = {
+    blue: "bg-[var(--color-info-soft)] text-[#0060a8]",
+    indigo: "bg-[var(--color-indigo-ink)] text-white",
+    amber: "bg-[var(--color-warn-soft)] text-[#8a5300]",
+    green: "bg-[var(--color-good-soft)] text-[#1d6b4c]",
+    grey: "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]",
+  }[tone];
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-medium ${cls}`}>{children}</span>;
+}
 
 const STOPPED = new Set(["paused", "churned"]);
 
@@ -117,18 +130,17 @@ function ClientCard({ c, canWrite }: { c: BoardClient; canWrite: boolean }) {
         ) : (
           <Avatar name={c.name} color={c.color} size={34} />
         )}
-        <span className="min-w-0">
+        <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className="truncate font-medium">{c.name}</span>
-            {stopped ? (
-              <Badge tone={CLIENT_STATUS[c.status]?.tone ?? "neutral"}>{CLIENT_STATUS[c.status]?.label ?? c.status}</Badge>
-            ) : null}
+            <Badge tone={CLIENT_STATUS[c.status]?.tone ?? "neutral"}>{CLIENT_STATUS[c.status]?.label ?? c.status}</Badge>
           </span>
-          <span className="mt-0.5 block truncate text-xs text-[var(--color-ink-muted)]">
-            {c.shortsPerMonth > 0 ? `${c.shortsPerMonth} shorts/maand` : "shorts/maand onbekend"}
-            {` · ${c.coordinatorName ?? "geen verantwoordelijke"}`}
-            {c.inProduction > 0 ? ` · ${c.inProduction} lopend` : ""}
-            {c.nextShoot ? ` · opname ${formatDate(c.nextShoot)}` : ""}
+          <span className="mt-1 flex flex-wrap items-center gap-1">
+            <Chip tone="blue">{c.shortsPerMonth > 0 ? `${c.shortsPerMonth} shorts/mnd` : "shorts ?"}</Chip>
+            {c.monthlyRevenue !== null ? <Chip tone="indigo">{euro(c.monthlyRevenue)}/mnd</Chip> : null}
+            {c.inProduction > 0 ? <Chip tone="amber">{c.inProduction} lopend</Chip> : null}
+            {c.nextShoot ? <Chip tone="green">opname {formatDate(c.nextShoot)}</Chip> : null}
+            <Chip tone="grey">{c.coordinatorName ?? "geen verantwoordelijke"}</Chip>
           </span>
         </span>
       </Link>
