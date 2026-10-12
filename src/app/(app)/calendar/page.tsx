@@ -8,6 +8,7 @@ import { formatDateFull, periodLabel } from "@/lib/format";
 import { PLATFORM, PUBLICATION_STATUS } from "@/lib/statuses";
 import { cn } from "@/lib/cn";
 import { Planner } from "./planner";
+import { CalDateCell, CalStatusCell } from "./calendar-cells";
 
 export const metadata: Metadata = { title: "Contentplanning" };
 export const dynamic = "force-dynamic";
@@ -26,6 +27,7 @@ export default async function CalendarPage({
   }>;
 }) {
   const viewer = await requireInternal();
+  const canWriteCal = viewer.permissions.has("calendar:write");
   const params = await searchParams;
 
   const now = new Date();
@@ -168,8 +170,12 @@ export default async function CalendarPage({
             <ul className="divide-y divide-[var(--color-line)]">
               {items.map((i) => (
                 <li key={i.id} className="flex items-center gap-3 px-5 py-3">
-                  <span className="w-28 shrink-0 text-sm text-[var(--color-ink-muted)]">
-                    {formatDateFull(i.scheduledOn)}
+                  <span className="w-32 shrink-0">
+                    {canWriteCal ? (
+                      <CalDateCell id={i.id} scheduledOn={i.scheduledOn} />
+                    ) : (
+                      <span className="text-sm text-[var(--color-ink-muted)]">{formatDateFull(i.scheduledOn)}</span>
+                    )}
                   </span>
                   <Avatar name={i.clientName} color={i.clientColor} size={22} />
                   <span className="min-w-0 flex-1">
@@ -185,9 +191,13 @@ export default async function CalendarPage({
                       <span key={p} title={PLATFORM[p]?.label} className="size-2 rounded-full" style={{ background: PLATFORM[p]?.color ?? "#999" }} />
                     ))}
                   </span>
-                  <Badge tone={PUBLICATION_STATUS[i.status]?.tone ?? "neutral"}>
-                    {PUBLICATION_STATUS[i.status]?.label ?? i.status}
-                  </Badge>
+                  {canWriteCal ? (
+                    <CalStatusCell id={i.id} status={i.status} />
+                  ) : (
+                    <Badge tone={PUBLICATION_STATUS[i.status]?.tone ?? "neutral"}>
+                      {PUBLICATION_STATUS[i.status]?.label ?? i.status}
+                    </Badge>
+                  )}
                 </li>
               ))}
             </ul>
