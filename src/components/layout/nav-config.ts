@@ -20,6 +20,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/clients", label: "Klanten", icon: "Building2", permissions: ["clients:read"], match: "/clients" },
       { href: "/leads", label: "Leads", icon: "Target", permissions: ["clients:read"], match: "/leads" },
       { href: "/videos", label: "Editing Dashboard", icon: "Clapperboard", permissions: ["videos:read"], match: "/videos" },
+      { href: "/editing", label: "Editors", icon: "Scissors", permissions: ["videos:read"], match: "/editing" },
       { href: "/productions", label: "Opnameplanning", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
       { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },
       { href: "/tasks", label: "Taken", icon: "CircleCheck", permissions: ["tasks:read"], match: "/tasks" },
@@ -29,7 +30,6 @@ export const NAVIGATION: NavGroup[] = [
     title: "Inzicht",
     items: [
       { href: "/analytics", label: "Resultaten", icon: "TrendingUp", permissions: ["analytics:read"], match: "/analytics" },
-      { href: "/editing", label: "Editors", icon: "Scissors", permissions: ["videos:read"], match: "/editing" },
       { href: "/koppelingen", label: "Koppelingen", icon: "Link2", permissions: ["videos:write"], match: "/koppelingen" },
       { href: "/insights", label: "AI-inzichten", icon: "Sparkles", permissions: ["ai:read"], match: "/insights" },
       { href: "/team", label: "Team", icon: "Users", permissions: ["team:read", "editors:read"], match: "/team" },

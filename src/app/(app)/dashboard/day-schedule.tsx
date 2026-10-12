@@ -67,7 +67,7 @@ export function DayScheduleStrip({ checks }: { checks: ChecklistState }) {
         <span className="flex items-center gap-2 text-2xs text-white/60">
           {mins != null ? <span className="tabular-nums">{hhmm(now)} NL</span> : null}
           <span className="rounded-full bg-[var(--color-good)]/25 px-2 py-0.5">{doneCount}/{SLOTS.length} afgerond</span>
-          {lateCount > 0 ? <span className="rounded-full bg-[var(--color-bad)]/30 px-2 py-0.5">{lateCount} te laat</span> : null}
+          {lateCount > 0 ? <span className="rounded-full bg-[var(--color-warn)]/30 px-2 py-0.5">{lateCount} nog te bevestigen</span> : null}
         </span>
       </div>
 
@@ -87,7 +87,7 @@ export function DayScheduleStrip({ checks }: { checks: ChecklistState }) {
             const late = now >= s.to && !confirmed;
             const left = ((s.from - DAY_START) / SPAN) * 100;
             const width = Math.max(1.5, ((s.to - s.from) / SPAN) * 100);
-            const bg = confirmed ? "var(--color-good)" : late ? "var(--color-bad)" : "rgba(255,255,255,0.3)";
+            const bg = confirmed ? "var(--color-good)" : late ? "var(--color-warn)" : "rgba(255,255,255,0.3)";
             return <div key={s.key} className="absolute top-1/2 h-3 -translate-y-1/2 rounded-full" style={{ left: `${left}%`, width: `${width}%`, background: bg }} title={s.label} />;
           })}
           {withinDay ? (
@@ -114,7 +114,7 @@ function ChecklistBlock({ slot, check, active, passed, canConfirm }: { slot: Slo
   const confirmed = Boolean(check);
   const late = passed && !confirmed;
 
-  const bg = confirmed ? "bg-[var(--color-good)]/90" : active ? "bg-[var(--color-brand-600)]" : late ? "bg-[var(--color-bad)]/85" : "bg-[var(--color-indigo-ink)]";
+  const bg = confirmed ? "bg-[var(--color-good)]/90" : active ? "bg-[var(--color-brand-600)]" : late ? "bg-[var(--color-warn)]/85" : "bg-[var(--color-indigo-ink)]";
   const statusText = confirmed ? "Afgerond" : late ? "Nog bevestigen" : active ? "Nu bezig" : "Komt nog";
 
   function toggle() {
