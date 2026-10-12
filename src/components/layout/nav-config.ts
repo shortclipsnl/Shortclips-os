@@ -55,6 +55,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/klantenbeheer", label: "Klantenbeheer", icon: "UserCog", permissions: ["clients:write"], match: "/klantenbeheer" },
       { href: "/editkosten", label: "Winst & editkosten", icon: "Euro", permissions: ["finance:read"], match: "/editkosten" },
       { href: "/settings/integrations", label: "Koppelingen", icon: "Plug", permissions: ["integrations:read"], match: "/settings/integrations" },
+      { href: "/migratie", label: "Monday-migratie", icon: "Database", permissions: ["integrations:read"], match: "/migratie" },
       { href: "/settings", label: "Instellingen", icon: "Settings", permissions: ["settings:read", "users:read"], match: "/settings" },
     ],
   },
