@@ -40,3 +40,16 @@ export function subWorkingDays(dateStr: string, n: number): string {
 export function daysBetween(a: string, b: string): number {
   return Math.abs(Math.round((parse(a).getTime() - parse(b).getTime()) / 86_400_000));
 }
+
+/** Aantal werkdagen (ma–vr) in een periode, inclusief begin- en einddatum. */
+export function workingDaysBetween(start: string, end: string): number {
+  let a = parse(start);
+  const b = parse(end);
+  if (b < a) return 0;
+  let count = 0;
+  while (a <= b) {
+    if (!isWeekend(a)) count++;
+    a = new Date(a.getTime() + 86_400_000);
+  }
+  return count;
+}

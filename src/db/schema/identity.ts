@@ -31,6 +31,12 @@ export const users = pgTable(
     status: userStatusEnum("status").notNull().default("invited"),
     /** Hoofdrol. Fijnmazige rechten lopen via user_roles → role_permissions. */
     primaryRole: userRoleEnum("primary_role").notNull().default("editor"),
+    /** Of dit een vaste medewerker is (true) of freelancer (false) — voor het
+     *  team-overzicht. */
+    isStaff: boolean("is_staff").notNull().default(true),
+    /** Totaal aantal vakantieuren per jaar (contract), bijv. 128 (jaar) of 75
+     *  (7-maanden). Basis voor het vakantiesaldo. */
+    leaveHoursTotal: integer("leave_hours_total").notNull().default(128),
     /**
      * Alleen gevuld voor portal-gebruikers (rol `client`). Dwingt af dat een
      * klantaccount nooit buiten de eigen klant kan kijken.

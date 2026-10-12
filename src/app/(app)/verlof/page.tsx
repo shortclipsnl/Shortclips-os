@@ -5,7 +5,8 @@ import { leaveRequests, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { Avatar, Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/format";
-import { RequestLeaveForm, ReviewButtons, CancelButton } from "./leave-ui";
+import { getLeaveBalances } from "@/server/leave-balance";
+import { RequestLeaveForm, ReviewButtons, CancelButton, LeaveBalances } from "./leave-ui";
 
 export const metadata: Metadata = { title: "Vakantieplanning" };
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export default async function LeavePage() {
   const canApprove = viewer.primaryRole === "owner";
   const today = new Date().toISOString().slice(0, 10);
 
+  const balances = await getLeaveBalances();
   const [mine, pending, approved] = await Promise.all([
     db.select().from(leaveRequests).where(eq(leaveRequests.userId, viewer.id)).orderBy(desc(leaveRequests.startOn)),
     canApprove
@@ -61,6 +63,11 @@ export default async function LeavePage() {
 
       <div className="mb-5">
         <RequestLeaveForm />
+      </div>
+
+      <div className="mb-6">
+        <h2 className="mb-2 text-sm font-semibold text-[var(--color-ink)]">Vakantiesaldo per teamlid <span className="font-normal text-[var(--color-ink-faint)]">· op uren (8 u per werkdag)</span></h2>
+        <LeaveBalances balances={balances} canEdit={canApprove} />
       </div>
 
       {canApprove && pending.length > 0 ? (

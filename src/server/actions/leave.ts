@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { leaveRequests } from "@/db/schema";
+import { leaveRequests, users } from "@/db/schema";
 import { requireInternal, ForbiddenError } from "@/server/auth/context";
 import { notify } from "@/server/notifications";
 import { dispatch } from "@/server/automation";
@@ -55,6 +55,21 @@ export async function requestLeave(input: z.input<typeof requestSchema>): Promis
 
     revalidatePath("/verlof");
     return { ok: true, message: "Aanvraag ingediend." };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/** Het totaal aantal vakantieuren (contract) van een teamlid zetten — eigenaar. */
+export async function setLeaveHours(userId: string, hours: number): Promise<ActionResult> {
+  try {
+    const viewer = await requireInternal();
+    if (viewer.primaryRole !== "owner") return { ok: false, message: "Alleen Jarno kan de vakantieuren aanpassen." };
+    const h = Math.max(0, Math.min(2000, Math.round(hours)));
+    await db.update(users).set({ leaveHoursTotal: h, updatedAt: new Date() }).where(eq(users.id, userId));
+    revalidatePath("/verlof");
+    return { ok: true };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
