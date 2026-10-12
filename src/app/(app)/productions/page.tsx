@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, CalendarCheck, CheckCircle2 } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
-import { getMonthShootStats, getShootOverview, listProductionDays, nextShootPerClient } from "@/server/productions";
+import { getMonthShootStats, getShootOverview, listProductionDays, listVideographerOptions, nextShootPerClient } from "@/server/productions";
+import { ProdStatusCell, VideographerCell } from "./prod-cells";
 import { Avatar, Badge, Card, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { daysUntil, formatDate, formatDateFull, plural, relativeDays } from "@/lib/format";
 import { PRODUCTION_STATUS } from "@/lib/statuses";
@@ -29,12 +30,14 @@ export default async function ProductionsPage({
   const when =
     params.periode === "verleden" ? "verleden" : params.periode === "deze-week" ? "deze-week" : "komend";
   const todayStr = new Date().toISOString().slice(0, 10);
-  const [rows, monthStats, nextPerClient, overview] = await Promise.all([
+  const [rows, monthStats, nextPerClient, overview, videographers] = await Promise.all([
     listProductionDays(viewer, when),
     getMonthShootStats(viewer),
     nextShootPerClient(viewer),
     getShootOverview(viewer),
+    listVideographerOptions(),
   ]);
+  const canWriteProd = viewer.permissions.has("productions:write");
   const komend = await listProductionDays(viewer, "komend");
   const next = komend[0] ?? null;
   const monthLabel = new Date(`${monthStats.month}-01`).toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
@@ -192,9 +195,16 @@ export default async function ProductionsPage({
                     </div>
 
                     <div className="flex flex-col items-end gap-2">
-                      <Badge tone={PRODUCTION_STATUS[d.status]?.tone ?? "neutral"}>
-                        {PRODUCTION_STATUS[d.status]?.label ?? d.status}
-                      </Badge>
+                      {canWriteProd ? (
+                        <ProdStatusCell id={d.id} status={d.status} />
+                      ) : (
+                        <Badge tone={PRODUCTION_STATUS[d.status]?.tone ?? "neutral"}>
+                          {PRODUCTION_STATUS[d.status]?.label ?? d.status}
+                        </Badge>
+                      )}
+                      {canWriteProd ? (
+                        <VideographerCell id={d.id} videographerId={d.videographerId} options={videographers} />
+                      ) : null}
                       <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-2xs font-medium text-[var(--color-ink-muted)]" title="Projectfase (loopt automatisch mee met de opnamedatum)">
                         {PHASE_LABEL[d.phase] ?? d.phase}
                       </span>

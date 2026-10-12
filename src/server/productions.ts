@@ -45,6 +45,7 @@ export async function listProductionDays(
       clientSlug: clients.slug,
       clientColor: clients.color,
       videographerName: users.fullName,
+      videographerId: productionDays.videographerId,
       scriptCount: sql<number>`(select count(*) from scripts sc where sc.production_day_id = production_days.id and sc.deleted_at is null)`,
       unapprovedScripts: sql<number>`(select count(*) from scripts sc where sc.production_day_id = production_days.id and sc.deleted_at is null and sc.status not in ('approved','ready_to_shoot','shot'))`,
       openBlockers: sql<number>`(select count(*) from production_checklist_items ci where ci.production_day_id = production_days.id and ci.is_blocking = true and ci.is_done = false)`,
@@ -227,3 +228,18 @@ export async function getProductionDay(viewer: Viewer, id: string) {
 }
 
 export type ProductionDetail = Awaited<ReturnType<typeof getProductionDay>>;
+
+/** Videografen voor de inline-keuzelijst: expliciete videografen én iedereen
+ *  die al eens heeft gefilmd. */
+export async function listVideographerOptions(): Promise<{ id: string; fullName: string }[]> {
+  const res = await db.execute(sql`
+    select u.id, u.full_name as "fullName"
+    from users u
+    where u.deleted_at is null and u.status = 'active'
+      and (u.primary_role = 'videographer' or exists (
+        select 1 from production_days p where p.videographer_id = u.id and p.deleted_at is null
+      ))
+    order by u.full_name
+  `);
+  return ((res as unknown as { rows?: { id: string; fullName: string }[] }).rows ?? []);
+}

@@ -81,3 +81,34 @@ export async function changeProductionStatus(
     throw error;
   }
 }
+
+/** Videograaf toewijzen/wisselen vanuit de opnameplanning. */
+export async function setProductionVideographer(dayId: string, userId: string | null): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("productions:write");
+    const [day] = await db
+      .select({ id: productionDays.id, clientId: productionDays.clientId, videographerId: productionDays.videographerId })
+      .from(productionDays)
+      .where(eq(productionDays.id, dayId))
+      .limit(1);
+    if (!day) return { ok: false, message: "Opnamedag niet gevonden." };
+    assertClientAccess(viewer, day.clientId);
+
+    await db.update(productionDays).set({ videographerId: userId, updatedAt: new Date() }).where(eq(productionDays.id, dayId));
+
+    await auditLog({
+      viewer,
+      action: "production.videographer_assigned",
+      entityType: "production_day",
+      entityId: dayId,
+      clientId: day.clientId,
+      changes: { van: day.videographerId, naar: userId },
+    });
+
+    revalidatePath("/productions");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
