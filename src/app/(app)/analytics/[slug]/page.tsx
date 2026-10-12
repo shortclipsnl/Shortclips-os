@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FileText } from "lucide-react";
+import { getLatestInsights, insightsAvailable } from "@/server/insights";
+import { InsightsPanel } from "./insights-ui";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients } from "@/db/schema";
@@ -116,6 +118,8 @@ export default async function ClientResultsPage({
   const hasData = Number(t.views ?? 0) > 0 || months.length > 0 || videos.length > 0;
   const top = videos.slice(0, 5);
   const bottom = videos.filter((v) => Number(v.views) > 0).slice(-5).reverse();
+  const latestInsights = await getLatestInsights(client.id);
+  const aiOn = insightsAvailable();
 
   return (
     <div className="mx-auto max-w-[1100px]">
@@ -231,6 +235,14 @@ export default async function ClientResultsPage({
             kijktijd en uitkijkpercentage lopen bij de meeste platforms één tot drie dagen achter en zijn niet op elk
             platform via de API beschikbaar. Ontbrekende waarden worden als "—" getoond; er worden geen cijfers geschat.
           </p>
+
+          <InsightsPanel
+            slug={slug}
+            days={days}
+            available={aiOn}
+            insights={latestInsights?.insights ?? null}
+            generatedAt={latestInsights ? new Date(latestInsights.createdAt).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : null}
+          />
         </>
       )}
     </div>
