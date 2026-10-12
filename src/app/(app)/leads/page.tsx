@@ -15,10 +15,10 @@ export default async function LeadsPage() {
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
         <Stat label="Totaal" value={String(summary.total)} />
-        <Stat label="Open" value={String(summary.open)} hint="lead/offerte/onderhandeling" />
-        <Stat label="Te laat op te volgen" value={String(summary.overdue)} tone={summary.overdue > 0 ? "bad" : undefined} />
+        <Stat label="Open" value={String(summary.open)} hint="lead/offerte/onderhandeling" tone="info" />
+        <Stat label="Te laat op te volgen" value={String(summary.overdue)} tone={summary.overdue > 0 ? "bad" : "good"} />
         <Stat label="Gewonnen" value={String(summary.won)} tone="good" />
-        <Stat label="Verloren" value={String(summary.lost)} />
+        <Stat label="Verloren" value={String(summary.lost)} tone="warn" />
       </div>
 
       <QuickAddLead />

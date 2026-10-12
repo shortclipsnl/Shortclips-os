@@ -94,12 +94,19 @@ export function LeadsBoard({ rows, segments, sources }: { rows: LeadRow[]; segme
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-1">
-          {(["open", "lead", "offerte", "onderhandeling", "gewonnen", "verloren", "alle"] as const).map((s) => (
-            <button key={s} type="button" onClick={() => setStatus(s)}
-              className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${status === s ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
-              {s}
-            </button>
-          ))}
+          {(["open", "lead", "offerte", "onderhandeling", "gewonnen", "verloren", "alle"] as const).map((s) => {
+            const dot: Record<string, string> = {
+              lead: "var(--color-ink-faint)", offerte: "#1b5fe0", onderhandeling: "#8338d9",
+              gewonnen: "var(--color-good)", verloren: "var(--color-bad)",
+            };
+            return (
+              <button key={s} type="button" onClick={() => setStatus(s)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium capitalize ${status === s ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
+                {dot[s] ? <span className="size-2 rounded-full" style={{ background: dot[s] }} /> : null}
+                {s}
+              </button>
+            );
+          })}
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <select className="sc-input h-8 w-auto py-0 text-xs" value={segment} onChange={(e) => setSegment(e.target.value)} aria-label="Jaargang">
@@ -163,7 +170,8 @@ function LeadRowView({ r, today }: { r: LeadRow; today: string }) {
   const overdue = ["lead", "offerte", "onderhandeling"].includes(status) && followUp && followUp <= today;
 
   return (
-    <tr className="border-b border-[var(--color-line)] last:border-0 hover:bg-[var(--color-surface-sunken)]/40">
+    <tr className="border-b border-[var(--color-line)] last:border-0 hover:bg-[var(--color-surface-sunken)]/40"
+      style={{ boxShadow: `inset 3px 0 0 ${({ gewonnen: "var(--color-good)", verloren: "var(--color-bad)", offerte: "#1b5fe0", onderhandeling: "#8338d9" } as Record<string, string>)[status] ?? "transparent"}` }}>
       <td className="px-3 py-2">
         <div className="font-medium text-[var(--color-ink)]">{r.company}</div>
         <div className="text-2xs text-[var(--color-ink-faint)]">
