@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FileText } from "lucide-react";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients } from "@/db/schema";
@@ -123,12 +124,19 @@ export default async function ClientResultsPage({
         title={client.name}
         description={`Volledige resultaten · afgelopen ${days} dagen · live uit Metricool`}
         actions={
-          <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
-            {[30, 90, 365].map((d) => (
-              <Link key={d} href={`/analytics/${slug}?dagen=${d}`} className={days === d ? "rounded-[4px] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white" : "px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)]"}>
-                {d === 365 ? "1 jaar" : `${d} dagen`}
-              </Link>
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
+              {[30, 90, 365].map((d) => (
+                <Link key={d} href={`/analytics/${slug}?dagen=${d}`} className={days === d ? "rounded-[4px] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white" : "px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)]"}>
+                  {d === 365 ? "1 jaar" : `${d} dagen`}
+                </Link>
+              ))}
+            </div>
+            <a href={`/rapport/${slug}?dagen=${days}`} target="_blank" rel="noopener"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-700)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+              title="Genereer een klantenrapportage (PDF)">
+              <FileText className="size-4" /> Genereer rapportage
+            </a>
           </div>
         }
       />
