@@ -20,25 +20,30 @@ const PLATFORMS = [
 // Werkdag-slots per frequentie (1=ma … 5=vr).
 const SLOTS: Record<number, number[]> = { 1: [2], 2: [2, 5], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5] };
 
+// Alle datumberekeningen in UTC, zodat parsen en formatteren niet een dag
+// verschuiven (anders belanden werkdagen door de tijdzone op het weekend).
 function iso(d: Date) {
   return d.toISOString().slice(0, 10);
 }
+function parseUTC(dateStr: string): Date {
+  return new Date(dateStr.slice(0, 10) + "T00:00:00Z");
+}
 /** Valt een datum in het weekend, dan de eerstvolgende werkdag (maandag). */
 function nextWeekday(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
-  const wd = d.getDay(); // 0=zo, 6=za
-  if (wd === 6) d.setDate(d.getDate() + 2);
-  else if (wd === 0) d.setDate(d.getDate() + 1);
+  const d = parseUTC(dateStr);
+  const wd = d.getUTCDay(); // 0=zo, 6=za
+  if (wd === 6) d.setUTCDate(d.getUTCDate() + 2);
+  else if (wd === 0) d.setUTCDate(d.getUTCDate() + 1);
   return iso(d);
 }
 function isWeekend(dateStr: string): boolean {
-  const wd = new Date(dateStr + "T00:00:00").getDay();
+  const wd = parseUTC(dateStr).getUTCDay();
   return wd === 0 || wd === 6;
 }
 function mondayOf(dateStr: string): Date {
-  const d = new Date(dateStr + "T00:00:00");
-  const wd = (d.getDay() + 6) % 7; // ma=0
-  d.setDate(d.getDate() - wd);
+  const d = parseUTC(dateStr);
+  const wd = (d.getUTCDay() + 6) % 7; // ma=0
+  d.setUTCDate(d.getUTCDate() - wd);
   return d;
 }
 /** Verdeel `count` video's over werkdagen vanaf startDate met `perWeek` per week. */
@@ -50,7 +55,7 @@ function planDates(count: number, perWeek: number, startDate: string): string[] 
   while (out.length < count && week < 104) {
     for (const slot of slots) {
       const d = new Date(monday);
-      d.setDate(d.getDate() + week * 7 + (slot - 1));
+      d.setUTCDate(d.getUTCDate() + week * 7 + (slot - 1));
       if (iso(d) >= startDate) {
         out.push(iso(d));
         if (out.length >= count) break;
@@ -111,6 +116,15 @@ export function AutoPlanner({ clients, aiReady }: { clients: ClientOption[]; aiR
     });
   }
 
+  /** Zonder AI: de geplakte tekst als titels gebruiken (één per regel). */
+  function useManualTitles() {
+    if (!clientId) { setErr("Kies eerst een klant."); return; }
+    const lines = scriptText.split(/\r?\n/).map((s) => s.replace(/^[-*•\d.\s]+/, "").trim()).filter(Boolean);
+    if (lines.length === 0) { setErr("Plak eerst één titel per regel."); return; }
+    setErr(null); setResult(null);
+    setTitles(lines);
+  }
+
   function togglePlatform(p: string) {
     setPlatforms((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]));
   }
@@ -151,11 +165,15 @@ export function AutoPlanner({ clients, aiReady }: { clients: ClientOption[]; aiR
             <textarea className="sc-input resize-y font-mono text-xs" rows={8} placeholder="Plak de scripts; de AI haalt de videotitels eruit." value={scriptText} onChange={(e) => setScriptText(e.target.value)} />
           </div>
         </div>
-        <div className="mt-4 border-t border-[var(--color-line)] pt-4">
-          <Button onClick={recognize} disabled={recognizing}>
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--color-line)] pt-4">
+          <Button onClick={recognize} disabled={recognizing || !aiReady} title={aiReady ? undefined : "Vereist ANTHROPIC_API_KEY"}>
             {recognizing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-            Titels herkennen
+            Titels herkennen (AI)
           </Button>
+          <Button variant="secondary" onClick={useManualTitles}>
+            Titels handmatig gebruiken (1 per regel)
+          </Button>
+          <span className="text-2xs text-[var(--color-ink-faint)]">Zonder AI: plak hierboven één titel per regel en kies “handmatig”.</span>
         </div>
         {err ? <div className="mt-3"><ErrorNote>{err}</ErrorNote></div> : null}
       </Card>
