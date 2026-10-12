@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import {
   requirePermission,
 } from "@/server/auth/context";
+import { Monitor } from "lucide-react";
 import { Avatar, Card, CardHeader, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import { compact, formatDate, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
@@ -143,20 +144,31 @@ export default async function AnalyticsPage({
         title="Resultaten"
         description={`${selectedName ?? (klanten === "gestopt" ? "Gestopte klanten" : klanten === "alle" ? "Alle klanten" : "Actieve klanten")}, afgelopen ${days} dagen · live uit Metricool`}
         actions={
-          <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
-            {[7, 30, 90].map((d) => (
-              <Link
-                key={d}
-                href={`/analytics?dagen=${d}${klanten !== "actief" ? `&klanten=${klanten}` : ""}`}
-                className={
-                  days === d
-                    ? "rounded-[4px] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white"
-                    : "px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)]"
-                }
-              >
-                {d} dagen
-              </Link>
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
+              {[7, 30, 90].map((d) => (
+                <Link
+                  key={d}
+                  href={`/analytics?dagen=${d}${klanten !== "actief" ? `&klanten=${klanten}` : ""}`}
+                  className={
+                    days === d
+                      ? "rounded-[4px] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white"
+                      : "px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)]"
+                  }
+                >
+                  {d} dagen
+                </Link>
+              ))}
+            </div>
+            <a
+              href="/scherm"
+              target="_blank"
+              rel="noopener"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+              title="Open het resultatenscherm voor het grote scherm op kantoor"
+            >
+              <Monitor className="size-4" /> Kantoorscherm
+            </a>
           </div>
         }
       />
