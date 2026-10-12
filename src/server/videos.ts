@@ -96,6 +96,21 @@ export async function listVideos(viewer: Viewer, filter: VideoFilter = {}) {
     .limit(400);
 }
 
+/** Editors voor de inline-keuzelijst: expliciete editors én iedereen die al
+ *  eens een video heeft geëdit. */
+export async function listEditorOptions(): Promise<{ id: string; fullName: string }[]> {
+  const res = await db.execute(sql`
+    select u.id, u.full_name as "fullName"
+    from users u
+    where u.deleted_at is null and u.status = 'active'
+      and (u.primary_role = 'editor' or exists (
+        select 1 from deliverables d where d.editor_id = u.id and d.deleted_at is null
+      ))
+    order by u.full_name
+  `);
+  return ((res as unknown as { rows?: { id: string; fullName: string }[] }).rows ?? []);
+}
+
 /** Aandachtscijfers voor de highlight-blokken boven de videolijst. Respecteert
  *  klantscope en editor-only, net als listVideos. Voedt zich uit Monday (fase +
  *  deadline) via de deliverables-tabel. */

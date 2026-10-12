@@ -174,6 +174,31 @@ export async function assignEditor(
   }
 }
 
+/** Deadline (klantlevering) handmatig zetten of wissen vanuit de lijst.
+ *  Een handmatige datum wordt gemarkeerd als "manual" en niet meer automatisch
+ *  overschreven door de opnamedatum-herberekening. */
+export async function setVideoDeadline(videoId: string, dueOn: string | null): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    if (dueOn && !/^\d{4}-\d{2}-\d{2}$/.test(dueOn)) return { ok: false, message: "Ongeldige datum." };
+    const video = await loadVideo(videoId);
+    if (!video) return { ok: false, message: "Video niet gevonden." };
+    assertClientAccess(viewer, video.clientId);
+
+    await db
+      .update(deliverables)
+      .set({ dueOn: dueOn ?? null, dueOnSource: dueOn ? "manual" : "auto", updatedAt: new Date() })
+      .where(eq(deliverables.id, videoId));
+
+    revalidatePath(`/videos/${videoId}`);
+    revalidatePath("/videos");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 const commentSchema = z.object({
   body: z.string().trim().min(1, "Schrijf eerst een opmerking.").max(4000),
   visibility: z.enum(["internal", "client"]),
