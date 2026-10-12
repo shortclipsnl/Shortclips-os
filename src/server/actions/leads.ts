@@ -47,6 +47,37 @@ const followUpSchema = z.object({
   followUpOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
 });
 
+const createLeadSchema = z.object({
+  company: z.string().trim().min(1, "Geef een bedrijfs-/leadnaam op.").max(200),
+  contactName: z.string().trim().max(160).optional(),
+  email: z.string().trim().max(160).optional(),
+  phone: z.string().trim().max(40).optional(),
+  source: z.string().trim().max(40).optional(),
+});
+
+/** Handmatig een nieuwe lead toevoegen vanuit het leadsoverzicht. */
+export async function createLead(input: z.infer<typeof createLeadSchema>): Promise<ActionResult> {
+  return wrap(async () => {
+    await requireInternal();
+    const p = createLeadSchema.safeParse(input);
+    if (!p.success) return { ok: false, message: p.error.issues[0]?.message };
+    const v = p.data;
+    await db.insert(salesLeads).values({
+      company: v.company,
+      contactName: v.contactName || null,
+      email: v.email || null,
+      phone: v.phone || null,
+      source: v.source || "Handmatig",
+      status: "lead",
+      segment: String(new Date().getFullYear()),
+      firstContactOn: new Date().toISOString().slice(0, 10),
+      note: "Handmatig toegevoegd.",
+    });
+    revalidatePath("/leads");
+    return { ok: true };
+  });
+}
+
 /** Opvolgdatum zetten of wissen. */
 export async function setLeadFollowUp(input: z.infer<typeof followUpSchema>): Promise<ActionResult> {
   return wrap(async () => {

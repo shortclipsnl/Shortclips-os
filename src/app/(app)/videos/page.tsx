@@ -5,6 +5,7 @@ import { AlertTriangle, ExternalLink, MessageSquare } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getReviewQueue, getVideoHighlights, listEditorOptions, listVideos, type ReviewQueueItem } from "@/server/videos";
 import { DeadlineCell, EditorCell, StatusCell } from "./editable-cells";
+import { EditorFilter } from "./editor-filter";
 import { Avatar, Badge, Card, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import {
   daysSince,
@@ -35,7 +36,7 @@ const PRESETS = [
 export default async function VideosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ weergave?: string; filter?: string; status?: string; klant?: string }>;
+  searchParams: Promise<{ weergave?: string; filter?: string; status?: string; klant?: string; editor?: string }>;
 }) {
   const viewer = await requireInternal();
   const params = await searchParams;
@@ -51,6 +52,7 @@ export default async function VideosPage({
       preset,
       status: params.status,
       clientSlug: params.klant,
+      editorId: params.editor,
     }),
     getVideoHighlights(viewer),
     getReviewQueue(viewer),
@@ -163,6 +165,7 @@ export default async function VideosPage({
             {VIDEO_STATUS[params.status as VideoStage]?.label} ✕
           </Link>
         ) : null}
+        <span className="ml-auto"><EditorFilter editors={editors} current={params.editor} /></span>
       </div>
 
       {rows.length === 0 ? (
@@ -173,7 +176,7 @@ export default async function VideosPage({
           />
         </Card>
       ) : view === "kanban" ? (
-        <Kanban rows={rows} />
+        <Kanban rows={rows} canEdit={canEdit} />
       ) : (
         <Card padded={false}>
           <Table

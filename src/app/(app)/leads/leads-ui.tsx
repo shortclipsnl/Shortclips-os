@@ -2,9 +2,54 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRightCircle, Check, Loader2, Search } from "lucide-react";
-import { convertLeadToClient, setLeadFollowUp, setLeadStatus } from "@/server/actions/leads";
+import { ArrowRightCircle, Check, Loader2, Plus, Search } from "lucide-react";
+import { convertLeadToClient, createLead, setLeadFollowUp, setLeadStatus } from "@/server/actions/leads";
 import type { LeadRow } from "@/server/leads";
+
+/** Snel een nieuwe lead toevoegen (handmatig, naast de webhook-intake). */
+export function QuickAddLead() {
+  const [open, setOpen] = useState(false);
+  const [company, setCompany] = useState("");
+  const [contact, setContact] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+
+  function add() {
+    if (!company.trim()) return;
+    start(async () => {
+      const res = await createLead({ company, contactName: contact || undefined, email: email || undefined, phone: phone || undefined });
+      if (res.ok) { setCompany(""); setContact(""); setEmail(""); setPhone(""); setErr(null); setOpen(false); router.refresh(); }
+      else setErr(res.message ?? "Mislukt");
+    });
+  }
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)}
+        className="mb-4 inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-ink)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">
+        <Plus className="size-4" /> Nieuwe lead
+      </button>
+    );
+  }
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3">
+      <input className="sc-input h-8 min-w-44 flex-1 py-0 text-sm" placeholder="Bedrijf / lead *" value={company}
+        onChange={(e) => setCompany(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} autoFocus />
+      <input className="sc-input h-8 w-36 py-0 text-sm" placeholder="Contactpersoon" value={contact} onChange={(e) => setContact(e.target.value)} />
+      <input className="sc-input h-8 w-44 py-0 text-sm" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <input className="sc-input h-8 w-36 py-0 text-sm" placeholder="Telefoon" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <button type="button" onClick={add} disabled={pending || !company.trim()}
+        className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-ink)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+        {pending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Toevoegen
+      </button>
+      <button type="button" onClick={() => setOpen(false)} className="px-2 py-1.5 text-xs text-[var(--color-ink-muted)]">Annuleren</button>
+      {err ? <span className="text-xs text-[var(--color-bad)]">{err}</span> : null}
+    </div>
+  );
+}
 
 const STATUSES = ["lead", "offerte", "onderhandeling", "gewonnen", "verloren"] as const;
 type Status = (typeof STATUSES)[number];

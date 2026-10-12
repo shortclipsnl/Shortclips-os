@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { listLeads } from "@/server/leads";
 import { PageHeader, Stat } from "@/components/ui";
-import { LeadsBoard } from "./leads-ui";
+import { LeadsBoard, QuickAddLead } from "./leads-ui";
 
 export const metadata: Metadata = { title: "Leads" };
 export const dynamic = "force-dynamic";
@@ -21,6 +21,7 @@ export default async function LeadsPage() {
         <Stat label="Verloren" value={String(summary.lost)} />
       </div>
 
+      <QuickAddLead />
       <LeadsBoard rows={rows} segments={segments} sources={sources} />
     </div>
   );
