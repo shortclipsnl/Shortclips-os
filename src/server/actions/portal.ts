@@ -8,6 +8,7 @@ import { approvals, deliverables, reviewComments, reviewThreads, scripts } from 
 import { ForbiddenError, requirePortal } from "@/server/auth/context";
 import { auditLog, recordActivity } from "@/server/audit";
 import { dispatch } from "@/server/automation";
+import { syncContentForDeliverable } from "@/server/content-sync";
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -67,9 +68,12 @@ export async function approveVideo(videoId: string): Promise<ActionResult> {
       entityId: videoId,
       data: { from: video.status, to: "approved", title: video.title },
     });
+    // Direct als gekoppeld record in de contentplanning zetten.
+    await syncContentForDeliverable(videoId);
 
     revalidatePath("/portal");
     revalidatePath(`/portal/videos/${videoId}`);
+    revalidatePath("/calendar");
     return { ok: true, message: "Bedankt. De video staat op goedgekeurd." };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };

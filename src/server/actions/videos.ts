@@ -18,6 +18,7 @@ import {
 } from "@/server/auth/context";
 import { auditLog, recordActivity } from "@/server/audit";
 import { dispatch } from "@/server/automation";
+import { syncContentForDeliverable } from "@/server/content-sync";
 import { VIDEO_STAGES, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 
 export type ActionResult = { ok: boolean; message?: string };
@@ -117,8 +118,12 @@ export async function changeVideoStatus(
       }),
     ]);
 
+    // Koppeling met de contentplanning gelijktrekken (één gekoppeld record).
+    await syncContentForDeliverable(videoId);
+
     revalidatePath(`/videos/${videoId}`);
     revalidatePath("/videos");
+    revalidatePath("/calendar");
     revalidatePath("/dashboard");
     return { ok: true, message: `Status gewijzigd naar ${label}.` };
   } catch (error) {

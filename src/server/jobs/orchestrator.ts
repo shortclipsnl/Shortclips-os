@@ -7,6 +7,7 @@ import { runMondayLeaveImport } from "./monday-leave";
 import { runMondayLeadsImport } from "./monday-leads";
 import { runProductionPhaseAdvance } from "./production-phases";
 import { runLinkSuggestions } from "./link-suggestions";
+import { runContentSync } from "./content-sync";
 import { runCalendarSync } from "./calendar-sync";
 import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
@@ -69,6 +70,7 @@ export async function runNightlySync() {
   results.push(await step("monday.import_leads", () => runMondayLeadsImport()));
   results.push(await step("production.advance_phases", () => runProductionPhaseAdvance()));
   results.push(await step("editing.suggest_opname_links", () => runLinkSuggestions()));
+  results.push(await step("content.sync_from_videos", () => runContentSync()));
   results.push(await step("frameio.pull_projects", () => pullFrameProjects()));
   results.push(await step("frameio.pull_deliverables", () => pullFrameDeliverables()));
   results.push(await step("calendar.sync", () => runCalendarSync()));
