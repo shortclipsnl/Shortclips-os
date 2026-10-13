@@ -7,6 +7,7 @@ import {
   users,
 } from "@/db/schema";
 import { requirePermission } from "@/server/auth/context";
+import { isCoreStaff, coreStaffRank } from "@/server/core-staff";
 import {
   Avatar,
   Badge,
@@ -24,6 +25,16 @@ import {
 
 export const metadata: Metadata = { title: "Team" };
 export const dynamic = "force-dynamic";
+
+function MiniStat({ label, value, tone, hint }: { label: string; value: number; tone?: string; hint?: string }) {
+  return (
+    <div className="rounded-[var(--radius-sm)] bg-[var(--color-surface-sunken)] py-1.5">
+      <div className="text-base font-bold leading-none tabular-nums" style={tone ? { color: tone } : undefined}>{value || "—"}</div>
+      <div className="mt-0.5 text-2xs text-[var(--color-ink-faint)]">{label}</div>
+      {hint ? <div className="text-2xs font-medium text-[var(--color-bad)]">{hint}</div> : null}
+    </div>
+  );
+}
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "Eigenaar",
@@ -100,119 +111,101 @@ export default async function TeamPage() {
   const stats = ((editorStats as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
     (editorStats as unknown as Array<Record<string, unknown>>)) as Array<Record<string, unknown>>;
 
-  // Operationele kern bovenaan, daarna de overige specialisten.
-  const CORE = ["jarno", "milou", "jiska", "rutger"];
-  const firstName = (n: string) => n.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
-  const isCore = (n: string) => CORE.includes(firstName(n));
-  const sortedPeople = [...people].sort((a, b) => {
-    const ia = CORE.indexOf(firstName(a.fullName));
-    const ib = CORE.indexOf(firstName(b.fullName));
-    if (ia !== -1 || ib !== -1) {
-      if (ia === -1) return 1;
-      if (ib === -1) return -1;
-      return ia - ib;
-    }
-    return a.fullName.localeCompare(b.fullName);
-  });
+  // Vaste medewerkers = het kernteam (Janno, Milou, Jiska, Rutger). De rest
+  // (editors, content creators, overige videografen) tonen we als freelancers.
+  const core = people
+    .filter((p) => isCoreStaff(p.email))
+    .sort((a, b) => coreStaffRank(a.email) - coreStaffRank(b.email));
+  const freelancers = people
+    .filter((p) => !isCoreStaff(p.email))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
-  const internal = sortedPeople.filter((p) => p.isInternal);
-  const freelancers = sortedPeople.filter((p) => !p.isInternal);
-
-  const personRow = (p: (typeof sortedPeople)[number]) => {
+  const PersonCard = (p: (typeof people)[number], vast: boolean) => {
     const open = Number(p.openVideos);
     const capacity = p.weeklyVideoCapacity;
     const load = capacity > 0 ? (open / capacity) * 100 : 0;
     const overloaded = capacity > 0 && open > capacity;
+    const availability =
+      capacity === 0
+        ? { label: "Geen editcapaciteit", tone: "neutral" as const }
+        : overloaded
+          ? { label: `Overbelast · ${pct(load, 0)}`, tone: "bad" as const }
+          : load > 80
+            ? { label: `Vol · ${pct(load, 0)}`, tone: "warn" as const }
+            : { label: `Ruimte · ${pct(load, 0)}`, tone: "good" as const };
+    const overdue = Number(p.overdueTasks);
     return (
-      <tr key={p.id}>
-        <td className="sc-td">
-          <span className="flex items-center gap-2.5">
-            <Avatar name={p.fullName} color={p.color} size={26} />
-            <span>
-              <span className="flex flex-wrap items-center gap-1.5 font-medium">
-                {p.fullName}
-                <Badge tone={p.isInternal ? "info" : "warn"}>{p.isInternal ? "Vast" : "Freelance"}</Badge>
-                {isCore(p.fullName) ? <Badge tone="good">Kern</Badge> : null}
-                {p.status === "suspended" ? <Badge tone="neutral">Gedeactiveerd</Badge> : null}
-              </span>
-              <span className="block text-xs text-[var(--color-ink-muted)]">{p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}</span>
-            </span>
-          </span>
-        </td>
-        <td className="sc-td text-[var(--color-ink-muted)]">{ROLE_LABELS[p.role] ?? p.role}</td>
-        <td className="sc-td text-right tabular-nums">
-          {Number(p.openTasks)}
-          {Number(p.overdueTasks) > 0 ? <span className="ml-1.5 text-xs font-medium text-[var(--color-bad)]">({Number(p.overdueTasks)} te laat)</span> : null}
-        </td>
-        <td className="sc-td text-right tabular-nums">{open || "—"}</td>
-        <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{capacity || "—"}</td>
-        <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{Number(p.upcomingShoots) || "—"}</td>
-        <td className="sc-td">
-          {capacity === 0 ? (
-            <span className="text-[var(--color-ink-faint)]">n.v.t.</span>
-          ) : overloaded ? (
-            <Badge tone="bad">overbelast ({pct(load, 0)})</Badge>
-          ) : load > 80 ? (
-            <Badge tone="warn">vol ({pct(load, 0)})</Badge>
-          ) : (
-            <Badge tone="good">ruimte ({pct(load, 0)})</Badge>
-          )}
-        </td>
+      <div
+        key={p.id}
+        className="flex flex-col rounded-[var(--radius-lg)] border bg-[var(--color-surface)] p-4"
+        style={
+          vast
+            ? { borderColor: "color-mix(in srgb, var(--color-indigo-ink) 30%, var(--color-line))", boxShadow: "inset 3px 0 0 var(--color-indigo-ink)" }
+            : { borderColor: "var(--color-line)" }
+        }
+      >
+        <div className="flex items-start gap-3">
+          <Avatar name={p.fullName} color={p.color} size={42} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="truncate font-semibold">{p.fullName}</span>
+              {p.status === "suspended" ? <Badge tone="neutral">Gedeactiveerd</Badge> : null}
+            </div>
+            <div className="truncate text-xs text-[var(--color-ink-muted)]">{p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}</div>
+            <div className="mt-1.5">
+              <Badge tone={availability.tone}>{availability.label}</Badge>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
+          <MiniStat label="Open taken" value={Number(p.openTasks)} tone={overdue > 0 ? "var(--color-bad)" : undefined} hint={overdue > 0 ? `${overdue} te laat` : undefined} />
+          <MiniStat label="In bewerking" value={open} />
+          <MiniStat label="Opnames" value={Number(p.upcomingShoots)} />
+        </div>
+
         {canWrite ? (
-          <td className="sc-td text-right">
-            <Link href={`/team/${p.id}/edit`} className="text-sm text-[var(--color-brand-600)] hover:underline">Bewerken</Link>
-          </td>
+          <div className="mt-3 flex justify-end border-t border-[var(--color-line)] pt-2">
+            <Link href={`/team/${p.id}/edit`} className="text-xs font-medium text-[var(--color-brand-600)] hover:underline">Bewerken</Link>
+          </div>
         ) : null}
-      </tr>
+      </div>
     );
   };
-
-  const head = (
-    <>
-      <th className="sc-th">Naam</th>
-      <th className="sc-th">Rol</th>
-      <th className="sc-th text-right">Open taken</th>
-      <th className="sc-th text-right">Video&apos;s in bewerking</th>
-      <th className="sc-th text-right">Capaciteit/week</th>
-      <th className="sc-th text-right">Opnames gepland</th>
-      <th className="sc-th">Belasting</th>
-      {canWrite ? <th className="sc-th" /> : null}
-    </>
-  );
 
   return (
     <div className="mx-auto max-w-[1300px]">
       <PageHeader
         title="Team"
-        description="Intern team en freelancers, met openstaand werk."
+        description="Vaste medewerkers en freelancers, met beschikbaarheid en openstaand werk in één oogopslag."
         actions={canWrite ? <LinkButton href="/team/new">Nieuw teamlid</LinkButton> : undefined}
       />
 
-      <details open className="mb-4 group">
-        <summary className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-semibold text-white">
-          Vaste medewerkers
-          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">{internal.length}</span>
-          <span className="ml-auto text-xs font-normal text-white/70">in-/uitklappen</span>
-        </summary>
-        <Card padded={false} className="mt-2">
-          <Table head={head}>{internal.map(personRow)}</Table>
-        </Card>
-      </details>
+      <div className="mb-2 flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-indigo-ink)]" />
+        <h2 className="text-sm font-semibold tracking-tight">Vaste medewerkers</h2>
+        <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-xs text-[var(--color-ink-muted)]">{core.length}</span>
+      </div>
+      {core.length === 0 ? (
+        <Card className="mb-6"><EmptyState title="Geen vaste medewerkers gevonden" /></Card>
+      ) : (
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {core.map((p) => PersonCard(p, true))}
+        </div>
+      )}
 
-      <details open className="mb-5 group">
-        <summary className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-surface-2)] px-4 py-2.5 text-sm font-semibold text-[var(--color-ink)]">
-          Freelancers
-          <span className="rounded-full bg-[var(--color-ink)]/10 px-2 py-0.5 text-xs text-[var(--color-ink-muted)]">{freelancers.length}</span>
-          <span className="ml-auto text-xs font-normal text-[var(--color-ink-muted)]">in-/uitklappen</span>
-        </summary>
-        {freelancers.length === 0 ? (
-          <Card className="mt-2"><EmptyState title="Geen freelancers" /></Card>
-        ) : (
-          <Card padded={false} className="mt-2">
-            <Table head={head}>{freelancers.map(personRow)}</Table>
-          </Card>
-        )}
-      </details>
+      <div className="mb-2 flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-warn)]" />
+        <h2 className="text-sm font-semibold tracking-tight">Freelancers &amp; overig team</h2>
+        <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-xs text-[var(--color-ink-muted)]">{freelancers.length}</span>
+      </div>
+      {freelancers.length === 0 ? (
+        <Card className="mb-6"><EmptyState title="Geen freelancers" /></Card>
+      ) : (
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {freelancers.map((p) => PersonCard(p, false))}
+        </div>
+      )}
 
       {stats.length > 0 ? (
         <Card padded={false}>
