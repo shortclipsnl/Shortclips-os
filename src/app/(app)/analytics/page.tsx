@@ -223,21 +223,23 @@ export default async function AnalyticsPage({
               </>
             }
           >
-            {clientRows.map((c) => (
-              <tr key={String(c.id)} className="sc-row-link">
-                <td className="sc-td">
-                  <Link href={`/analytics/${c.slug}`} className="flex items-center gap-2 hover:underline">
-                    <Avatar name={String(c.name)} color={c.color ? String(c.color) : null} size={22} />
-                    {String(c.name)}
-                  </Link>
-                </td>
-                <td className="sc-td text-right tabular-nums">{compact(Number(c.views))}</td>
-                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">
-                  {compact(Number(c.reach))}
-                </td>
-                <td className="sc-td text-right tabular-nums">+{num(Number(c.follower_growth))}</td>
-              </tr>
-            ))}
+            {clientRows.map((c, i) => {
+              const fg = Number(c.follower_growth);
+              return (
+                <tr key={String(c.id)} className="sc-row-link" style={i < 3 ? { boxShadow: "inset 3px 0 0 var(--color-brand-500)" } : undefined}>
+                  <td className="sc-td">
+                    <Link href={`/analytics/${c.slug}`} className="flex items-center gap-2 hover:underline">
+                      {i < 3 ? <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--color-brand-500)] text-2xs font-bold text-white">{i + 1}</span> : <span className="w-5 shrink-0" />}
+                      <Avatar name={String(c.name)} color={c.color ? String(c.color) : null} size={22} />
+                      {String(c.name)}
+                    </Link>
+                  </td>
+                  <td className="sc-td text-right font-semibold tabular-nums">{compact(Number(c.views))}</td>
+                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{compact(Number(c.reach))}</td>
+                  <td className="sc-td text-right tabular-nums font-medium" style={{ color: fg > 0 ? "var(--color-good)" : fg < 0 ? "var(--color-bad)" : "var(--color-ink-muted)" }}>{fg >= 0 ? "+" : ""}{num(fg)}</td>
+                </tr>
+              );
+            })}
           </Table>
         </Card>
 
