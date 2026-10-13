@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, X } from "lucide-react";
-import { confirmLink, rejectLink } from "@/server/actions/link-review";
+import { confirmLink, rejectLink, confirmHighConfidenceLinks } from "@/server/actions/link-review";
 import type { LinkSuggestion } from "@/server/link-review";
 
 function fmt(d: string | null) {
@@ -26,8 +26,11 @@ export function LinkReview({ rows }: { rows: LinkSuggestion[] }) {
       </div>
     );
   }
+  const highCount = rows.filter((r) => r.confidence === "high").length;
   return (
-    <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
+    <div>
+      {highCount > 0 ? <BulkConfirm highCount={highCount} /> : null}
+      <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
       <table className="w-full min-w-[820px] text-sm">
         <thead>
           <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] text-left text-xs text-[var(--color-ink-faint)]">
@@ -42,6 +45,37 @@ export function LinkReview({ rows }: { rows: LinkSuggestion[] }) {
           {rows.map((r) => <Row key={r.id} r={r} />)}
         </tbody>
       </table>
+      </div>
+    </div>
+  );
+}
+
+function BulkConfirm({ highCount }: { highCount: number }) {
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+  const router = useRouter();
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-good)]/30 bg-[var(--color-good-soft)]/50 px-4 py-3">
+      <div className="text-sm">
+        <span className="font-semibold">{highCount} suggestie{highCount === 1 ? "" : "s"} met hoge zekerheid.</span>{" "}
+        <span className="text-[var(--color-ink-muted)]">In één keer bevestigen zet elke video op de voorgestelde opname + automatische deadline. Lagere zekerheid blijft hieronder staan.</span>
+        {msg ? <span className="ml-1 font-medium text-[#14633a]">{msg}</span> : null}
+      </div>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            const res = await confirmHighConfidenceLinks();
+            if (res.ok) { setMsg(`✓ ${res.count ?? 0} gekoppeld`); router.refresh(); }
+            else setMsg(res.message ?? "Mislukt");
+          })
+        }
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-good)] px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+      >
+        {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+        Bevestig alle {highCount} met hoge zekerheid
+      </button>
     </div>
   );
 }

@@ -1,13 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { deliverables, productionDays } from "@/db/schema";
 import { requireOwner, ForbiddenError } from "@/server/auth/context";
 import { addWorkingDays } from "@/lib/workdays";
 
-export type ActionResult = { ok: boolean; message?: string };
+export type ActionResult = { ok: boolean; message?: string; count?: number };
 
 function wrap<T>(fn: () => Promise<T>) {
   return fn().catch((e) => {
@@ -84,5 +84,36 @@ export async function setManualLink(deliverableId: string, productionDayId: stri
     await applyLink(deliverableId, productionDayId);
     revalidatePath("/koppelingen");
     return { ok: true };
+  });
+}
+
+/**
+ * Alle openstaande suggesties met hoge zekerheid in één keer bevestigen.
+ * Elk krijgt dezelfde automatische deadline als bij losse bevestiging.
+ * Lage/gemiddelde suggesties blijven staan voor handmatige controle.
+ */
+export async function confirmHighConfidenceLinks(): Promise<ActionResult> {
+  return wrap(async () => {
+    await requireOwner();
+    const rows = await db
+      .select({ id: deliverables.id, suggested: deliverables.suggestedProductionDayId })
+      .from(deliverables)
+      .where(
+        and(
+          isNull(deliverables.deletedAt),
+          isNull(deliverables.productionDayId),
+          isNotNull(deliverables.suggestedProductionDayId),
+          eq(deliverables.linkReviewed, false),
+          eq(deliverables.linkConfidence, "high"),
+        ),
+      );
+    let count = 0;
+    for (const r of rows) {
+      if (!r.suggested) continue;
+      await applyLink(r.id, r.suggested);
+      count++;
+    }
+    revalidatePath("/koppelingen");
+    return { ok: true, count };
   });
 }
