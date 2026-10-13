@@ -1,0 +1,1 @@
+ALTER TABLE "production_days" ADD COLUMN "scripting_status" varchar(24) DEFAULT 'afstemmen' NOT NULL;

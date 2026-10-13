@@ -94,6 +94,10 @@ export const productionDays = pgTable(
     phase: varchar("phase", { length: 24 }).notNull().default("nieuw"),
     /** Datum waarop de huidige fase inging. */
     phaseEnteredOn: date("phase_entered_on"),
+    /** Scriptingstatus voor het Scripting-dashboard: afstemmen → concepting →
+     *  klaar_shortclips → scriptmeeting → final. Blijft bij deze opname bewaard,
+     *  ook als de opnamedatum verandert. "final" = klaar voor opname. */
+    scriptingStatus: varchar("scripting_status", { length: 24 }).notNull().default("afstemmen"),
     videographerId: uuid("videographer_id").references(() => users.id, {
       onDelete: "set null",
     }),
