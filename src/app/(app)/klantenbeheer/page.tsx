@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { requireInternal } from "@/server/auth/context";
+import { requireManageClients } from "@/server/auth/context";
 import { listClientsAdmin } from "@/server/clients";
 import { Avatar, Badge, Card, EmptyState, InfoNote, LinkButton, PageHeader, Table } from "@/components/ui";
 import { CLIENT_STATUS } from "@/lib/statuses";
@@ -28,8 +27,7 @@ export default async function KlantenbeheerPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  const viewer = await requireInternal();
-  if (!viewer.permissions.has("clients:write")) redirect("/clients");
+  const viewer = await requireManageClients();
 
   const all = await listClientsAdmin(viewer);
   const filterKey = (await searchParams).status ?? "actief";

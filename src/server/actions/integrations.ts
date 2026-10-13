@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { importCandidates } from "@/db/schema";
-import { ForbiddenError, requirePermission } from "@/server/auth/context";
+import { ForbiddenError, requireOwner } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { recordTest, specFor } from "@/server/integrations/registry";
 import type { Provider } from "@/server/integrations/types";
@@ -23,7 +23,7 @@ export type ActionResult<T = unknown> = { ok: boolean; message?: string; data?: 
 
 export async function testIntegration(provider: string): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("integrations:read");
+    const viewer = await requireOwner();
     const spec = specFor(provider as Provider);
     if (!spec) return { ok: false, message: "Onbekende koppeling." };
 
@@ -56,7 +56,7 @@ const JOBS: Record<string, () => Promise<{ ok: boolean; error?: string }>> = {
 
 export async function runSyncJob(job: string): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("integrations:write");
+    const viewer = await requireOwner();
     const runner = JOBS[job];
     if (!runner) return { ok: false, message: "Onbekende taak." };
 
@@ -84,7 +84,7 @@ export async function syncDriveForClient(
   folderId: string,
 ): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("integrations:write");
+    const viewer = await requireOwner();
     const result = await syncClientDriveFolder(clientId, folderId, viewer.id);
     revalidatePath("/settings/integrations");
     return { ok: result.ok, message: result.ok ? "Map gesynchroniseerd." : result.error };
@@ -96,7 +96,7 @@ export async function syncDriveForClient(
 
 export async function startDryRun(providers: string[]): Promise<ActionResult<{ runId: string }>> {
   try {
-    const viewer = await requirePermission("import:run");
+    const viewer = await requireOwner();
     const result = await dryRunImport(
       providers as Array<"monday" | "frameio" | "google_drive">,
       viewer.id,
@@ -115,7 +115,7 @@ export async function decideCandidate(
   entityId?: string,
 ): Promise<ActionResult> {
   try {
-    await requirePermission("import:run");
+    await requireOwner();
     await db
       .update(importCandidates)
       .set({ decision, decidedEntityId: entityId ?? null, updatedAt: new Date() })
@@ -130,7 +130,7 @@ export async function decideCandidate(
 
 export async function confirmImport(runId: string): Promise<ActionResult> {
   try {
-    await requirePermission("import:run");
+    await requireOwner();
     const result = await commitImport(runId);
     revalidatePath("/settings/import");
     revalidatePath("/clients");

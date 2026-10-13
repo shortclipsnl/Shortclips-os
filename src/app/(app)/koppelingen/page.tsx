@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireOwner } from "@/server/auth/context";
 import { listLinkSuggestions } from "@/server/link-review";
 import { PageHeader, Stat } from "@/components/ui";
 import { LinkReview } from "./koppelingen-ui";
@@ -7,6 +8,7 @@ export const metadata: Metadata = { title: "Koppelingen" };
 export const dynamic = "force-dynamic";
 
 export default async function KoppelingenPage() {
+  await requireOwner();
   const { rows, summary } = await listLinkSuggestions();
 
   return (

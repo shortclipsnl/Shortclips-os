@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { requireOwner } from "@/server/auth/context";
 import { getMigrationStatus } from "@/server/migration-status";
 import { Badge, Card, CardHeader, PageHeader, Stat } from "@/components/ui";
 
@@ -13,6 +14,7 @@ function when(d: string | null) {
 }
 
 export default async function MigrationPage() {
+  await requireOwner();
   const s = await getMigrationStatus();
   const a = s.attention;
   const issues =

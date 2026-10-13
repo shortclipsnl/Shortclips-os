@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { db } from "@/db/client";
 import { syncJobs, integrationEvents } from "@/db/schema";
-import { requirePermission } from "@/server/auth/context";
+import { requireOwner } from "@/server/auth/context";
 import { integrationHealth } from "@/server/integrations/registry";
 import { appointmentReviewStats, unmatchedAppointments } from "@/server/appointments";
 import { env } from "@/lib/env";
@@ -28,7 +28,7 @@ const STATUS_META: Record<string, { label: string; tone: "good" | "warn" | "bad"
 };
 
 export default async function IntegrationsPage() {
-  const viewer = await requirePermission("integrations:read");
+  const viewer = await requireOwner();
   const health = await integrationHealth();
   const canWrite = viewer.permissions.has("integrations:write");
 

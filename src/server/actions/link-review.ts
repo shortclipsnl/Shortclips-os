@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { deliverables, productionDays } from "@/db/schema";
-import { requirePermission, ForbiddenError } from "@/server/auth/context";
+import { requireOwner, ForbiddenError } from "@/server/auth/context";
 import { addWorkingDays } from "@/lib/workdays";
 
 export type ActionResult = { ok: boolean; message?: string };
@@ -47,7 +47,7 @@ async function applyLink(deliverableId: string, productionDayId: string): Promis
 /** Voorgestelde koppeling bevestigen. */
 export async function confirmLink(deliverableId: string): Promise<ActionResult> {
   return wrap(async () => {
-    await requirePermission("videos:write");
+    await requireOwner();
     const [v] = await db
       .select({ suggested: deliverables.suggestedProductionDayId })
       .from(deliverables)
@@ -63,7 +63,7 @@ export async function confirmLink(deliverableId: string): Promise<ActionResult> 
 /** Voorstel afwijzen — video blijft ongekoppeld, komt niet terug als suggestie. */
 export async function rejectLink(deliverableId: string): Promise<ActionResult> {
   return wrap(async () => {
-    await requirePermission("videos:write");
+    await requireOwner();
     await db
       .update(deliverables)
       .set({ suggestedProductionDayId: null, linkConfidence: null, linkReviewed: true, updatedAt: new Date() })
@@ -76,7 +76,7 @@ export async function rejectLink(deliverableId: string): Promise<ActionResult> {
 /** Handmatig koppelen aan een gekozen opnamedag (alleen binnen dezelfde klant). */
 export async function setManualLink(deliverableId: string, productionDayId: string): Promise<ActionResult> {
   return wrap(async () => {
-    await requirePermission("videos:write");
+    await requireOwner();
     const [v] = await db.select({ clientId: deliverables.clientId }).from(deliverables).where(eq(deliverables.id, deliverableId)).limit(1);
     const [d] = await db.select({ clientId: productionDays.clientId }).from(productionDays).where(eq(productionDays.id, productionDayId)).limit(1);
     if (!v || !d) return { ok: false, message: "Video of opname niet gevonden." };

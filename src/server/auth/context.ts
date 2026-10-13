@@ -137,6 +137,19 @@ export function can(viewer: Viewer | null, permission: PermissionKey): boolean {
   return Boolean(viewer?.permissions.has(permission));
 }
 
+/** Is deze gebruiker de eigenaar (Janno)? Enige bron van waarheid hiervoor. */
+export function isOwner(viewer: Viewer | null): boolean {
+  return viewer?.primaryRole === "owner";
+}
+
+/** E-mailadressen die — náást de eigenaar — klanten mogen beheren (#10). */
+const MANAGE_CLIENTS_EMAILS = ["milou@shortclips.nl"];
+
+export function canManageClients(viewer: Viewer | null): boolean {
+  if (!viewer) return false;
+  return isOwner(viewer) || MANAGE_CLIENTS_EMAILS.includes(viewer.email.toLowerCase());
+}
+
 export function canAny(viewer: Viewer | null, list: PermissionKey[]): boolean {
   return list.some((p) => can(viewer, p));
 }
@@ -156,6 +169,24 @@ export async function requirePermission(
     throw new ForbiddenError(
       `Hiervoor is het recht "${permission}" nodig. Vraag een beheerder om toegang.`,
     );
+  }
+  return viewer;
+}
+
+/** Alleen de eigenaar (Janno) — financiën, leads, koppelingen, migratie. */
+export async function requireOwner(): Promise<Viewer> {
+  const viewer = await requireInternal();
+  if (!isOwner(viewer)) {
+    throw new ForbiddenError("Dit onderdeel is alleen toegankelijk voor de eigenaar.");
+  }
+  return viewer;
+}
+
+/** Eigenaar of een expliciet aangewezen klantbeheerder (Milou). */
+export async function requireManageClients(): Promise<Viewer> {
+  const viewer = await requireInternal();
+  if (!canManageClients(viewer)) {
+    throw new ForbiddenError("Klantenbeheer is alleen voor de eigenaar en Milou.");
   }
   return viewer;
 }

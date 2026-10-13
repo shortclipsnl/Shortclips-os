@@ -1,5 +1,4 @@
 import { getClientReport } from "@/server/client-report";
-import { getLatestInsights } from "@/server/insights";
 import { compact } from "@/lib/format";
 import { PrintButton } from "./print-button";
 
@@ -35,7 +34,6 @@ export default async function RapportPage({ params, searchParams }: { params: Pr
   const { slug } = await params;
   const days = Number((await searchParams).dagen) || 90;
   const r = await getClientReport(slug, days);
-  const ai = (await getLatestInsights(r.client.id))?.insights ?? null;
   const t = r.totals;
   const maxMonth = Math.max(1, ...r.months.map((m) => m.views));
 
@@ -117,42 +115,6 @@ export default async function RapportPage({ params, searchParams }: { params: Pr
                 </div>
               ))}
             </div>
-
-            {/* AI-secties: worden gevuld zodra de Anthropic-sleutel is ingesteld */}
-            <SectionTitle>Analyse &amp; verbeterpunten</SectionTitle>
-            {ai ? (
-              <div style={{ fontSize: 14, lineHeight: 1.6 }}>
-                {ai.analysis?.watWerkt?.length ? (
-                  <>
-                    <div style={{ fontWeight: 700, color: "#2e9a6e", marginBottom: 4 }}>Wat werkt</div>
-                    <ul style={{ margin: "0 0 12px", paddingLeft: 20 }}>{ai.analysis.watWerkt.map((f, i) => <li key={i}>{f.punt} <em style={{ color: "#8a90a2" }}>({f.zekerheid})</em></li>)}</ul>
-                  </>
-                ) : null}
-                {ai.analysis?.watMinder?.length ? (
-                  <>
-                    <div style={{ fontWeight: 700, color: "#d9483b", marginBottom: 4 }}>Wat minder werkt</div>
-                    <ul style={{ margin: "0 0 12px", paddingLeft: 20 }}>{ai.analysis.watMinder.map((f, i) => <li key={i}>{f.punt} <em style={{ color: "#8a90a2" }}>({f.zekerheid})</em></li>)}</ul>
-                  </>
-                ) : null}
-                {ai.verbeterpunten?.length ? (
-                  <>
-                    <div style={{ fontWeight: 700, color: NAVY, marginBottom: 6 }}>Concrete verbeterpunten</div>
-                    {ai.verbeterpunten.map((rec, i) => (
-                      <div key={i} style={{ border: "1px solid #e6e8ee", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
-                        <div style={{ fontWeight: 700 }}>{rec.titel}</div>
-                        <div style={{ color: "#4b5160", marginTop: 2 }}><strong>Waarom:</strong> {rec.waarom}</div>
-                        <div style={{ color: "#4b5160" }}><strong>Wat:</strong> {rec.wat}</div>
-                        <div style={{ color: "#8a90a2" }}><strong>Hoe meten:</strong> {rec.hoeMeten}</div>
-                      </div>
-                    ))}
-                  </>
-                ) : null}
-              </div>
-            ) : (
-              <div style={{ border: "1px dashed #c9cedb", borderRadius: 12, padding: "16px 18px", color: "#6b7280", fontSize: 14, lineHeight: 1.6 }}>
-                De inhoudelijke AI-analyse (wat werkte goed, wat minder, en concrete verbeterpunten voor de volgende opnames) wordt hier automatisch toegevoegd zodra de AI-koppeling is geactiveerd. Tot die tijd baseert dit rapport zich op de feitelijke cijfers hierboven.
-              </div>
-            )}
 
             <SectionTitle>Conclusie</SectionTitle>
             <p style={{ fontSize: 14.5, lineHeight: 1.7 }}>

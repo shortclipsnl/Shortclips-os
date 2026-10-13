@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { clients, salesLeads } from "@/db/schema";
-import { requireInternal, requirePermission, ForbiddenError } from "@/server/auth/context";
+import { requireOwner, ForbiddenError } from "@/server/auth/context";
 import { dispatch } from "@/server/automation";
 import { createClient } from "@/server/actions/clients";
 
@@ -26,7 +26,7 @@ const statusSchema = z.object({
 /** Leadstatus wijzigen — zoals de statuskolom in Monday. */
 export async function setLeadStatus(input: z.infer<typeof statusSchema>): Promise<ActionResult> {
   return wrap(async () => {
-    await requireInternal();
+    await requireOwner();
     const p = statusSchema.safeParse(input);
     if (!p.success) return { ok: false, message: "Ongeldige status." };
     await db.update(salesLeads).set({ status: p.data.status, updatedAt: new Date() }).where(eq(salesLeads.id, p.data.id));
@@ -58,7 +58,7 @@ const createLeadSchema = z.object({
 /** Handmatig een nieuwe lead toevoegen vanuit het leadsoverzicht. */
 export async function createLead(input: z.infer<typeof createLeadSchema>): Promise<ActionResult> {
   return wrap(async () => {
-    await requireInternal();
+    await requireOwner();
     const p = createLeadSchema.safeParse(input);
     if (!p.success) return { ok: false, message: p.error.issues[0]?.message };
     const v = p.data;
@@ -81,7 +81,7 @@ export async function createLead(input: z.infer<typeof createLeadSchema>): Promi
 /** Opvolgdatum zetten of wissen. */
 export async function setLeadFollowUp(input: z.infer<typeof followUpSchema>): Promise<ActionResult> {
   return wrap(async () => {
-    await requireInternal();
+    await requireOwner();
     const p = followUpSchema.safeParse(input);
     if (!p.success) return { ok: false, message: "Ongeldige datum." };
     await db.update(salesLeads).set({ followUpOn: p.data.followUpOn, updatedAt: new Date() }).where(eq(salesLeads.id, p.data.id));
@@ -99,7 +99,7 @@ export async function setLeadFollowUp(input: z.infer<typeof followUpSchema>): Pr
  */
 export async function convertLeadToClient(leadId: string): Promise<ActionResult> {
   return wrap(async () => {
-    await requirePermission("clients:write");
+    await requireOwner();
 
     const [lead] = await db.select().from(salesLeads).where(eq(salesLeads.id, leadId)).limit(1);
     if (!lead) return { ok: false, message: "Lead niet gevonden." };

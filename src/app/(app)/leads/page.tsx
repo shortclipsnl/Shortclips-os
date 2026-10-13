@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireOwner } from "@/server/auth/context";
 import { listLeads } from "@/server/leads";
 import { PageHeader, Stat } from "@/components/ui";
 import { LeadsBoard, QuickAddLead } from "./leads-ui";
@@ -7,6 +8,7 @@ export const metadata: Metadata = { title: "Leads" };
 export const dynamic = "force-dynamic";
 
 export default async function LeadsPage() {
+  await requireOwner();
   const { rows, summary, segments, sources } = await listLeads();
 
   return (

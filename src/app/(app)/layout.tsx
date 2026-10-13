@@ -1,4 +1,4 @@
-import { requireInternal } from "@/server/auth/context";
+import { requireInternal, isOwner } from "@/server/auth/context";
 import { NAVIGATION } from "@/components/layout/nav-config";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
@@ -12,13 +12,22 @@ export default async function AppLayout({
 
   // Navigatie tonen op basis van rechten: geen menu-items die tot een
   // foutmelding leiden.
+  const owner = isOwner(viewer);
+  const email = viewer.email.toLowerCase();
   const groups = NAVIGATION.map((group) => ({
     ...group,
-    items: group.items.filter(
-      (item) =>
+    items: group.items.filter((item) => {
+      // Eigenaar-only items: alleen voor Janno, of een expliciete allowlist.
+      if (item.ownerOnly && !owner) return false;
+      if (item.allowEmails && !owner && !item.allowEmails.includes(email)) {
+        return false;
+      }
+      // Rechten-gebaseerde items.
+      return (
         !item.permissions ||
-        item.permissions.some((p) => viewer.permissions.has(p)),
-    ),
+        item.permissions.some((p) => viewer.permissions.has(p))
+      );
+    }),
   })).filter((group) => group.items.length > 0);
 
   return (
