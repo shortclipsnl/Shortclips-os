@@ -72,6 +72,12 @@ export const clients = pgTable(
     lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
     notes: text("notes"),
+    /** Werklast/complexiteit van de klant: laag | gemiddeld | hoog. Overgenomen
+     *  uit Monday "KLANT VERDELING" (werklastanalyse). */
+    complexity: varchar("complexity", { length: 12 }),
+    /** Aandachtspunten bij deze klant — wat je moet weten (overdrachtsnotities
+     *  uit Monday "KLANT VERDELING"). */
+    attentionNotes: text("attention_notes"),
     /**
      * Velden die handmatig (via Klantenbeheer) zijn gezet en dus NIET door de
      * Monday-import overschreven mogen worden. Zo blijft een handmatige wijziging

@@ -137,6 +137,11 @@ export default async function ClientPage({
                     {CLIENT_STATUS[c.status]?.label}
                   </Badge>
                 )}
+                {c.complexity ? (
+                  <Badge tone={c.complexity === "hoog" ? "bad" : c.complexity === "gemiddeld" ? "warn" : "good"}>
+                    Complexiteit: {c.complexity}
+                  </Badge>
+                ) : null}
                 {c.website ? (
                   <a
                     href={c.website}
@@ -168,6 +173,13 @@ export default async function ClientPage({
       {c.riskLevel !== "none" && c.riskReason ? (
         <div className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-bad)]/20 bg-[var(--color-bad-soft)] px-4 py-3 text-sm text-[#a3271c]">
           <strong className="font-semibold">Aandachtspunt:</strong> {c.riskReason}
+        </div>
+      ) : null}
+
+      {c.attentionNotes ? (
+        <div className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3 text-sm">
+          <strong className="font-semibold">Aandachtspunten bij deze klant:</strong>{" "}
+          <span className="text-[var(--color-ink-muted)]">{c.attentionNotes}</span>
         </div>
       ) : null}
 

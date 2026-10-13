@@ -6,6 +6,7 @@ import { runMondayPlanningImport } from "./monday-planning";
 import { runMondayLeaveImport } from "./monday-leave";
 import { runMondayLeadsImport } from "./monday-leads";
 import { runMondayTasksImport } from "./monday-tasks";
+import { runMondayClientDistributionImport } from "./monday-client-distribution";
 import { runProductionPhaseAdvance } from "./production-phases";
 import { runLinkSuggestions } from "./link-suggestions";
 import { runContentSync } from "./content-sync";
@@ -71,6 +72,7 @@ export async function runNightlySync() {
   results.push(await step("monday.import_leave", () => runMondayLeaveImport()));
   results.push(await step("monday.import_leads", () => runMondayLeadsImport()));
   results.push(await step("monday.import_tasks", () => runMondayTasksImport()));
+  results.push(await step("monday.import_client_distribution", () => runMondayClientDistributionImport()));
   results.push(await step("production.advance_phases", () => runProductionPhaseAdvance()));
   results.push(await step("editing.suggest_opname_links", () => runLinkSuggestions()));
   results.push(await step("content.sync_from_videos", () => runContentSync()));

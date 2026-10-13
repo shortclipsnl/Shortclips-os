@@ -112,6 +112,8 @@ export async function getClientHub(viewer: Viewer, slug: string) {
       lastContactAt: clients.lastContactAt,
       lastActivityAt: clients.lastActivityAt,
       notes: clients.notes,
+      complexity: clients.complexity,
+      attentionNotes: clients.attentionNotes,
       coordinatorId: clients.coordinatorId,
       coordinatorName: users.fullName,
       videographerId: clients.videographerId,

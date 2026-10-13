@@ -190,6 +190,13 @@
       "when": 1791891705669,
       "tag": "0026_loving_goliath",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791906094980,
+      "tag": "0027_lush_bushwacker",
+      "breakpoints": true
     }
   ]
 }
