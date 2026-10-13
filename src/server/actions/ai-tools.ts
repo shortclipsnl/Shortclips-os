@@ -465,7 +465,10 @@ export type SimpleResult = { ok: boolean; message?: string; id?: string };
 
 export async function saveKnowledgeItem(input: { id?: string; category: string; title: string; body: string }): Promise<SimpleResult> {
   try {
-    const viewer = await requirePermission("ai:read");
+    // Lezen van de kennisbank mag met ai:read; aanpassen/verwijderen vraagt het
+    // sterkere ai:run (owner, admin, projectcoördinator) — een leesrecht mag
+    // geen gedeelde kennis muteren.
+    const viewer = await requirePermission("ai:run");
     const category = (input.category || "algemeen").trim().slice(0, 48);
     const title = input.title.trim();
     const body = input.body.trim();
@@ -487,7 +490,7 @@ export async function saveKnowledgeItem(input: { id?: string; category: string; 
 
 export async function deleteKnowledgeItem(id: string): Promise<SimpleResult> {
   try {
-    const viewer = await requirePermission("ai:read");
+    const viewer = await requirePermission("ai:run");
     await db.update(aiKnowledge).set({ deletedAt: new Date() }).where(eq(aiKnowledge.id, id));
     await auditLog({ viewer, action: "ai.knowledge_deleted", entityType: "ai_knowledge", entityId: id });
     revalidatePath("/ai/kennisbank");

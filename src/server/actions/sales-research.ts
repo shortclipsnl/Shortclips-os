@@ -74,7 +74,7 @@ function clean(v?: string | null): string | null {
 
 export async function createResearch(input: ResearchInput): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("ai:read");
+    const viewer = await requirePermission("ai:run");
     const name = clean(input.companyName);
     if (!name) return { ok: false, message: "Geef een bedrijfsnaam op." };
 
@@ -113,7 +113,7 @@ async function loadResearch(viewer: Viewer, id: string) {
 
 export async function runResearch(id: string): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("ai:read");
+    const viewer = await requirePermission("ai:run");
     const row = await loadResearch(viewer, id);
     if (!row) return { ok: false, message: "Onderzoek niet gevonden." };
 
@@ -184,7 +184,7 @@ Geef UITSLUITEND geldige JSON terug in exact dit formaat (laat velden leeg/[] al
 
 export async function updateResearchResult(id: string, result: ResearchResult): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("ai:read");
+    const viewer = await requirePermission("ai:run");
     const row = await loadResearch(viewer, id);
     if (!row) return { ok: false, message: "Onderzoek niet gevonden." };
 
@@ -201,7 +201,7 @@ export async function updateResearchResult(id: string, result: ResearchResult): 
 
 export async function deleteResearch(id: string): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("ai:read");
+    const viewer = await requirePermission("ai:run");
     await db.update(salesResearch).set({ deletedAt: new Date() }).where(eq(salesResearch.id, id));
     await auditLog({ viewer, action: "sales.research_deleted", entityType: "sales_research", entityId: id });
     revalidatePath("/ai/bedrijfsonderzoek");
