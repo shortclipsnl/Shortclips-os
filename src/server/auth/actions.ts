@@ -9,6 +9,7 @@ import { users } from "@/db/schema";
 import { auditLog } from "@/server/audit";
 import { dummyVerify, verifyPassword } from "./password";
 import { createSession, destroySession, revokeAllSessions } from "./session";
+import { requireOwner, ForbiddenError } from "@/server/auth/context";
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Vul een geldig e-mailadres in."),
@@ -19,10 +20,18 @@ const loginSchema = z.object({
 
 export type LoginState = { error?: string };
 
-/** Eenvoudige rem op brute force, per proces. */
+/** Eenvoudige rem op brute force, per proces (IP-gebaseerd). */
 const attempts = new Map<string, { count: number; resetAt: number }>();
 const MAX_ATTEMPTS = 8;
 const WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * Account-lockout in de database (werkt óók over meerdere instances/serverless
+ * en is niet te omzeilen via X-Forwarded-For): na te veel mislukte pogingen
+ * wordt het account tijdelijk geblokkeerd.
+ */
+const LOCK_THRESHOLD = 10;
+const LOCK_MINUTES = 15;
 
 function rateLimited(key: string): boolean {
   const entry = attempts.get(key);
@@ -91,11 +100,16 @@ export async function loginAction(
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
     recordFailure(ip);
+    const nextCount = user.failedLoginCount + 1;
+    const lock = nextCount >= LOCK_THRESHOLD;
     await db
       .update(users)
-      .set({ failedLoginCount: user.failedLoginCount + 1 })
+      .set({
+        failedLoginCount: nextCount,
+        ...(lock ? { lockedUntil: new Date(Date.now() + LOCK_MINUTES * 60_000) } : {}),
+      })
       .where(eq(users.id, user.id));
-    await auditLog({ action: "auth.login_failed", entityType: "user", entityId: user.id, outcome: "deny" });
+    await auditLog({ action: lock ? "auth.account_locked" : "auth.login_failed", entityType: "user", entityId: user.id, outcome: "deny" });
     return { error: "E-mailadres of wachtwoord klopt niet." };
   }
 
@@ -106,7 +120,7 @@ export async function loginAction(
   attempts.delete(ip);
   await db
     .update(users)
-    .set({ lastLoginAt: new Date(), failedLoginCount: 0 })
+    .set({ lastLoginAt: new Date(), failedLoginCount: 0, lockedUntil: null })
     .where(eq(users.id, user.id));
 
   await createSession(user.id, { ip, userAgent: h.get("user-agent") });
@@ -132,6 +146,17 @@ export async function logoutAction() {
   redirect("/login");
 }
 
-export async function revokeSessionsAction(userId: string) {
+/**
+ * Alle sessies van een gebruiker intrekken (geforceerd uitloggen). Alleen de
+ * eigenaar mag dit — anders zou iedereen elke gebruiker kunnen uitloggen.
+ */
+export async function revokeSessionsAction(userId: string): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await requireOwner();
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
   await revokeAllSessions(userId);
+  return { ok: true };
 }

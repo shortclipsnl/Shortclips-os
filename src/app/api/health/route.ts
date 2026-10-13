@@ -16,12 +16,11 @@ export async function GET() {
       time: new Date().toISOString(),
     });
   } catch (error) {
+    // Details alleen in de serverlog; de publieke healthcheck lekt geen
+    // database-/verbindingsinformatie naar anonieme bellers.
+    console.error("[health] database niet bereikbaar:", error);
     return NextResponse.json(
-      {
-        status: "error",
-        database: { driver: activeDriver() },
-        message: error instanceof Error ? error.message : "onbekende fout",
-      },
+      { status: "error", database: { driver: activeDriver() } },
       { status: 503 },
     );
   }

@@ -32,9 +32,12 @@ export async function POST(request: Request) {
     request.headers.get("x-signature") ??
     null;
 
+  // Fail-closed: zonder geldige handtekening niet verwerken. Ontbreekt het
+  // secret (verifyHmac → null), dan weigeren we i.p.v. te vertrouwen.
   const signatureValid = verifyHmac(raw, signature, env.FRAMEIO_WEBHOOK_SECRET);
-  if (signatureValid === false) {
-    return NextResponse.json({ error: "ongeldige handtekening" }, { status: 401 });
+  if (signatureValid !== true) {
+    const reason = signatureValid === null ? "webhook-secret niet ingesteld" : "ongeldige handtekening";
+    return NextResponse.json({ error: reason }, { status: 401 });
   }
 
   let payload: FramePayload;
