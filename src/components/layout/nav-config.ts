@@ -58,6 +58,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/klantenbeheer", label: "Klantenbeheer", icon: "UserCog", allowEmails: ["milou@shortclips.nl"], match: "/klantenbeheer" },
       { href: "/editkosten", label: "Winst & editkosten", icon: "Euro", ownerOnly: true, match: "/editkosten" },
       { href: "/koppelingen", label: "Koppeling controleren", icon: "Link2", ownerOnly: true, match: "/koppelingen" },
+      { href: "/settings/agendas", label: "Agenda's", icon: "CalendarRange", ownerOnly: true, match: "/settings/agendas" },
       { href: "/settings/integrations", label: "Koppelingen", icon: "Plug", ownerOnly: true, match: "/settings/integrations" },
       { href: "/migratie", label: "Monday-migratie", icon: "Database", ownerOnly: true, match: "/migratie" },
       { href: "/settings", label: "Instellingen", icon: "Settings", permissions: ["settings:read", "users:read"], match: "/settings" },

@@ -183,6 +183,13 @@
       "when": 1791880358241,
       "tag": "0025_wooden_ben_parker",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791891705669,
+      "tag": "0026_loving_goliath",
+      "breakpoints": true
     }
   ]
 }

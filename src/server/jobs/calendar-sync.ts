@@ -22,6 +22,7 @@ import {
 } from "@/server/integrations/calendar-matching";
 import { MissingCredentialsError } from "@/server/integrations/types";
 import { aliasesForSlug } from "@/server/integrations/client-aliases";
+import { listEnabledCouplings } from "@/server/calendar-couplings";
 import { runJob } from "./runner";
 
 /**
@@ -149,9 +150,15 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
       const matchers = await buildClientMatchers();
       ctx.log(`${matchers.length} klanten geladen als matcher`);
 
-      const calendars = source.configuredCalendarIds.length
-        ? source.configuredCalendarIds.map((id) => ({ id, summary: id }))
-        : await source.listCalendars();
+      // Gekoppelde agenda's uit de database (Beheer → Agenda's) hebben voorrang.
+      // Staat er niets, dan vallen we terug op de env-lijst of alle agenda's.
+      const coupled = await listEnabledCouplings();
+      const calendars = coupled.length
+        ? coupled.map((c) => ({ id: c.calendarId, summary: c.label ?? c.calendarId }))
+        : source.configuredCalendarIds.length
+          ? source.configuredCalendarIds.map((id) => ({ id, summary: id }))
+          : await source.listCalendars();
+      if (coupled.length) ctx.log(`${coupled.length} gekoppelde agenda's uit beheer`);
 
       const timeMin = new Date(Date.now() - back * 86_400_000).toISOString();
       const timeMax = new Date(Date.now() + forward * 86_400_000).toISOString();
@@ -255,13 +262,18 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
           ),
         );
 
+      // Ontdubbelen: dezelfde opname kan in meerdere gekoppelde agenda's staan
+      // (bijv. een gedeelde afspraak). We leiden er dan één opnamedag van af,
+      // op basis van klant + datum + titel + starttijd.
       let shoots = 0;
+      const seenShoot = new Map<string, string>(); // dedup-sleutel → productionDayId
       for (const ev of shootEvents) {
         if (!ev.clientId || !ev.startsAt) continue;
         const scheduledOn = ev.startsAt.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
         const startTime = ev.allDay
           ? null
           : `${ev.startsAt.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" })}:00`;
+        const dedupKey = `${ev.clientId}|${scheduledOn}|${(ev.title ?? "opnamedag").trim().toLowerCase()}|${startTime ?? "allday"}`;
         const base = {
           clientId: ev.clientId,
           title: ev.title ?? "Opnamedag",
@@ -271,24 +283,42 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
           status: "planned" as const,
           updatedAt: new Date(),
         };
+
         const [map] = await db
           .select({ id: mondayMappings.id, entityId: mondayMappings.entityId })
           .from(mondayMappings)
           .where(and(eq(mondayMappings.entityType, "calendar_shoot"), eq(mondayMappings.itemId, ev.id)))
           .limit(1);
-        if (map?.entityId) {
-          await db.update(productionDays).set(base).where(eq(productionDays.id, map.entityId));
+
+        // Doel-opnamedag bepalen: eerst een al in deze run gezien exemplaar
+        // (andere agenda, zelfde opname), dan de bestaande koppeling, anders nieuw.
+        let targetPdId = seenShoot.get(dedupKey) ?? map?.entityId ?? null;
+        const alreadyCounted = seenShoot.has(dedupKey);
+
+        if (targetPdId) {
+          await db.update(productionDays).set(base).where(eq(productionDays.id, targetPdId));
         } else {
           const [created] = await db.insert(productionDays).values(base).returning({ id: productionDays.id });
+          targetPdId = created!.id;
+        }
+        seenShoot.set(dedupKey, targetPdId);
+
+        // Koppeling voor déze agenda-afspraak naar de (gedeelde) opnamedag wijzen.
+        if (map) {
+          if (map.entityId !== targetPdId) {
+            await db.update(mondayMappings).set({ entityId: targetPdId, lastSyncedAt: new Date() }).where(eq(mondayMappings.id, map.id));
+          }
+        } else {
           await db.insert(mondayMappings).values({
             entityType: "calendar_shoot",
-            entityId: created!.id,
+            entityId: targetPdId,
             boardId: "google_calendar",
             itemId: ev.id,
             lastSyncedAt: new Date(),
           });
         }
-        shoots++;
+
+        if (!alreadyCounted) shoots++;
       }
 
       ctx.log(

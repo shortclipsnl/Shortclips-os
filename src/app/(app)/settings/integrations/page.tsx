@@ -10,6 +10,7 @@ import { syncJobs, integrationEvents } from "@/db/schema";
 import { requireOwner } from "@/server/auth/context";
 import { integrationHealth } from "@/server/integrations/registry";
 import { appointmentReviewStats, unmatchedAppointments } from "@/server/appointments";
+import { calendarColorMap } from "@/server/calendar-couplings";
 import { env } from "@/lib/env";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, Table } from "@/components/ui";
 import { formatDateTime, relativeDays } from "@/lib/format";
@@ -49,9 +50,10 @@ export default async function IntegrationsPage() {
     }).from(integrationEvents).orderBy(desc(integrationEvents.receivedAt)).limit(15),
   ]);
 
-  const [agendaReview, agendaStats] = await Promise.all([
+  const [agendaReview, agendaStats, agendaColors] = await Promise.all([
     unmatchedAppointments(50),
     appointmentReviewStats(),
+    calendarColorMap(),
   ]);
 
   return (
@@ -296,7 +298,12 @@ export default async function IntegrationsPage() {
               <tr key={a.id}>
                 <td className="sc-td font-medium">{a.title ?? "(zonder titel)"}</td>
                 <td className="sc-td text-[var(--color-ink-muted)]">{formatDateTime(a.startsAt)}</td>
-                <td className="sc-td text-[var(--color-ink-muted)]">{a.calendarName ?? "–"}</td>
+                <td className="sc-td text-[var(--color-ink-muted)]">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="size-2.5 shrink-0 rounded-full" style={{ background: agendaColors.get(a.calendarId) ?? "var(--color-ink-faint)" }} />
+                    {a.calendarName ?? "–"}
+                  </span>
+                </td>
                 <td className="sc-td">
                   <Badge tone={a.matchConfidence === "ambiguous" ? "warn" : "neutral"}>
                     {a.matchConfidence === "ambiguous" ? "meerdere mogelijk" : "geen klant herkend"}

@@ -394,3 +394,22 @@ export const calendarEvents = pgTable(
 export const calendarEventsRelations = relations(calendarEvents, ({ one }) => ({
   client: one(clients, { fields: [calendarEvents.clientId], references: [clients.id] }),
 }));
+
+/* ------------------------------------------------------------------ *
+ * Gekoppelde agenda's — welke Google-agenda's we synchroniseren.
+ * Owner-beheerd (Beheer → Agenda's). Vervangt de env-lijst zodra er
+ * rijen staan; elke agenda krijgt een eigen kleur voor de weergave.
+ * ------------------------------------------------------------------ */
+
+export const calendarCouplings = pgTable(
+  "calendar_couplings",
+  {
+    id: pk(),
+    calendarId: varchar("calendar_id", { length: 320 }).notNull(),
+    label: varchar("label", { length: 200 }),
+    color: varchar("color", { length: 16 }).notNull().default("#2E90FA"),
+    enabled: boolean("enabled").notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [unique("calendar_couplings_calendar_id_unique").on(t.calendarId)],
+);

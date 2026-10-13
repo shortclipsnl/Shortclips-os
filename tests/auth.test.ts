@@ -51,10 +51,14 @@ describe("rollen en rechten", () => {
     for (const p of perms) expect(p.startsWith("portal:")).toBe(true);
   });
 
-  it("laat geen enkele niet-eigenaarrol interne comments én finance combineren zonder reden", () => {
-    const finance = permissionsForRole("finance");
-    expect(finance).toContain("finance:read");
-    expect(finance).not.toContain("comments:read_internal");
+  it("geeft finance-rechten uitsluitend aan de eigenaar", () => {
+    // Finance (omzet, kosten, marges) is bewust owner-only. Geen enkele andere
+    // rol — ook de Finance-rapportagerol niet — mag finance:read/write krijgen.
+    for (const role of ROLE_DEFINITIONS) {
+      if (role.key === "owner") continue;
+      const perms = permissionsForRole(role.key);
+      expect(perms.some((p) => p.startsWith("finance:"))).toBe(false);
+    }
   });
 
   it("verwijst alleen naar bestaande rechten", () => {
