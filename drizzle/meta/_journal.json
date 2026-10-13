@@ -169,6 +169,13 @@
       "when": 1791827407339,
       "tag": "0023_flawless_gambit",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791871684731,
+      "tag": "0024_absurd_misty_knight",
+      "breakpoints": true
     }
   ]
 }

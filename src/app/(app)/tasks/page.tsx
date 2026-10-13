@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, tasks, users } from "@/db/schema";
 import { requireInternal, scopeToClients } from "@/server/auth/context";
@@ -67,9 +67,12 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   let buckets: { label: string; tone?: "bad" | "warn"; items: TaskItemData[] }[] = [];
   if (persoon) {
     const assigneeCond = persoon === "algemeen" ? isNull(tasks.assigneeId) : eq(tasks.assigneeId, persoon);
-    const [open, done] = await Promise.all([
+    const [open, done, archived] = await Promise.all([
       fetchTasks(and(isNull(tasks.deletedAt), inArray(tasks.status, [...OPEN]), assigneeCond, scopeToClients(viewer, tasks.clientId))),
-      fetchTasks(and(isNull(tasks.deletedAt), eq(tasks.status, "done"), assigneeCond, scopeToClients(viewer, tasks.clientId))),
+      // Afgerond maar nog niet gearchiveerd (recent): blijft in beeld.
+      fetchTasks(and(isNull(tasks.deletedAt), eq(tasks.status, "done"), isNull(tasks.archivedAt), assigneeCond, scopeToClients(viewer, tasks.clientId))),
+      // Gearchiveerd (automatisch na 7 dagen klaar) — blijft terugvindbaar.
+      fetchTasks(and(isNull(tasks.deletedAt), isNotNull(tasks.archivedAt), assigneeCond, scopeToClients(viewer, tasks.clientId))),
     ]);
     const today = addDays(0);
     const weekEnd = addDays(7);
@@ -80,6 +83,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       { label: "Deze week", items: o.filter((t) => t.dueOn && t.dueOn > today && t.dueOn <= weekEnd) },
       { label: "Later / zonder datum", items: o.filter((t) => !t.dueOn || t.dueOn > weekEnd) },
       { label: "Afgerond", items: (done as TaskItemData[]).slice(0, 20) },
+      { label: `Gearchiveerd (${archived.length})`, items: (archived as TaskItemData[]).slice(0, 30) },
     ];
   }
 

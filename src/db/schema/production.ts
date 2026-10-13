@@ -230,6 +230,10 @@ export const tasks = pgTable(
     }),
     dueOn: date("due_on"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    /** Gezet wanneer een afgeronde taak naar het archief is verplaatst; de taak
+     *  blijft bestaan en terugvindbaar, maar verdwijnt uit het dagelijkse
+     *  overzicht. */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     /** Waar deze taak over gaat: `video`, `script`, `production_day`, ... */
     entityType: varchar("entity_type", { length: 40 }),
     entityId: uuid("entity_id"),
