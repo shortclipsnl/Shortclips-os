@@ -18,6 +18,7 @@ import { runMondayContractImport } from "@/server/jobs/monday-contracts";
 import { runMondayPlanningImport } from "@/server/jobs/monday-planning";
 import { runMondayLeaveImport } from "@/server/jobs/monday-leave";
 import { runMondayLeadsImport } from "@/server/jobs/monday-leads";
+import { runMondayTasksImport } from "@/server/jobs/monday-tasks";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, runMetricoolSync } from "@/server/jobs/metricool-sync";
 import { setTeamContact } from "@/server/jobs/team";
@@ -60,6 +61,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "monday.import_planning": runMondayPlanningImport,
   "monday.import_leave": runMondayLeaveImport,
   "monday.import_leads": runMondayLeadsImport,
+  "monday.import_tasks": runMondayTasksImport,
   "metricool.link_brands": linkMetricoolBrands,
   "metricool.pull_metrics": pullMetricoolMetrics,
   "metricool.sync": runMetricoolSync,
