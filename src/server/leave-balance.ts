@@ -1,9 +1,10 @@
 import "server-only";
-import { and, eq, gte, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { leaveRequests, teamMembers, users } from "@/db/schema";
+import { leaveRequests, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { workingDaysBetween } from "@/lib/workdays";
+import { CORE_STAFF_EMAILS, coreStaffRank } from "@/server/core-staff";
 
 export type LeaveBalance = {
   userId: string;
@@ -18,10 +19,10 @@ export type LeaveBalance = {
 const HOURS_PER_DAY = 8;
 
 /**
- * Vakantiesaldo per teamlid, op uren (overgenomen uit Monday): beschikbaar
- * (contract), opgenomen (goedgekeurd verlof dit jaar × 8u per werkdag) en wat er
- * nog over is. Het hele team is zichtbaar, dus Milou, Jiska en Rutger staan er
- * standaard bij.
+ * Vakantiesaldo van de vaste medewerkers (kernteam: Janno, Milou, Jiska,
+ * Rutger). Per persoon: beschikbaar (contract), opgenomen (goedgekeurd verlof
+ * dit jaar × 8u per werkdag) en wat er nog over is. Freelancers en losse
+ * content creators blijven hier bewust buiten.
  */
 export async function getLeaveBalances(): Promise<LeaveBalance[]> {
   await requireInternal();
@@ -29,11 +30,15 @@ export async function getLeaveBalances(): Promise<LeaveBalance[]> {
 
   const [team, approved] = await Promise.all([
     db
-      .select({ id: users.id, name: users.fullName, isStaff: sql<boolean>`coalesce(${teamMembers.isInternal}, true)`, total: users.leaveHoursTotal })
+      .select({ id: users.id, name: users.fullName, email: users.email, total: users.leaveHoursTotal })
       .from(users)
-      .leftJoin(teamMembers, and(eq(teamMembers.userId, users.id), isNull(teamMembers.deletedAt)))
-      .where(and(isNull(users.deletedAt), eq(users.status, "active"), ne(users.primaryRole, "client")))
-      .orderBy(users.fullName),
+      .where(
+        and(
+          isNull(users.deletedAt),
+          eq(users.status, "active"),
+          sql`lower(${users.email}) in (${sql.join(CORE_STAFF_EMAILS.map((e) => sql`${e}`), sql`, `)})`,
+        ),
+      ),
     db
       .select({ userId: leaveRequests.userId, startOn: leaveRequests.startOn, endOn: leaveRequests.endOn })
       .from(leaveRequests)
@@ -49,16 +54,20 @@ export async function getLeaveBalances(): Promise<LeaveBalance[]> {
     takenByUser.set(r.userId, cur);
   }
 
-  return team.map((u) => {
-    const t = takenByUser.get(u.id) ?? { hours: 0, count: 0 };
-    return {
-      userId: u.id,
-      name: u.name,
-      isStaff: u.isStaff,
-      totalHours: u.total,
-      takenHours: t.hours,
-      remainingHours: u.total - t.hours,
-      requests: t.count,
-    };
-  });
+  return team
+    .map((u) => {
+      const t = takenByUser.get(u.id) ?? { hours: 0, count: 0 };
+      return {
+        userId: u.id,
+        name: u.name,
+        email: u.email,
+        isStaff: true,
+        totalHours: u.total,
+        takenHours: t.hours,
+        remainingHours: u.total - t.hours,
+        requests: t.count,
+      };
+    })
+    .sort((a, b) => coreStaffRank(a.email) - coreStaffRank(b.email))
+    .map(({ email: _email, ...rest }) => rest);
 }

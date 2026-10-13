@@ -66,7 +66,7 @@ export default async function LeavePage() {
       </div>
 
       <div className="mb-6">
-        <h2 className="mb-2 text-sm font-semibold text-[var(--color-ink)]">Vakantiesaldo per teamlid <span className="font-normal text-[var(--color-ink-faint)]">· op uren (8 u per werkdag)</span></h2>
+        <h2 className="mb-2 text-sm font-semibold text-[var(--color-ink)]">Vakantiesaldo vaste medewerkers <span className="font-normal text-[var(--color-ink-faint)]">· op uren (8 u per werkdag)</span></h2>
         <LeaveBalances balances={balances} canEdit={canApprove} />
       </div>
 
