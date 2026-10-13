@@ -129,9 +129,10 @@ export default async function TeamPage() {
           <span className="flex items-center gap-2.5">
             <Avatar name={p.fullName} color={p.color} size={26} />
             <span>
-              <span className="flex items-center gap-2 font-medium">
+              <span className="flex flex-wrap items-center gap-1.5 font-medium">
                 {p.fullName}
-                {isCore(p.fullName) ? <Badge tone="info">Kern</Badge> : null}
+                <Badge tone={p.isInternal ? "info" : "warn"}>{p.isInternal ? "Vast" : "Freelance"}</Badge>
+                {isCore(p.fullName) ? <Badge tone="good">Kern</Badge> : null}
                 {p.status === "suspended" ? <Badge tone="neutral">Gedeactiveerd</Badge> : null}
               </span>
               <span className="block text-xs text-[var(--color-ink-muted)]">{p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}</span>
@@ -189,7 +190,7 @@ export default async function TeamPage() {
 
       <details open className="mb-4 group">
         <summary className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-semibold text-white">
-          Team Shortclips
+          Vaste medewerkers
           <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">{internal.length}</span>
           <span className="ml-auto text-xs font-normal text-white/70">in-/uitklappen</span>
         </summary>

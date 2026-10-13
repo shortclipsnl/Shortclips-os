@@ -1,7 +1,7 @@
 import "server-only";
-import { and, eq, gte, isNull, ne } from "drizzle-orm";
+import { and, eq, gte, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { leaveRequests, users } from "@/db/schema";
+import { leaveRequests, teamMembers, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { workingDaysBetween } from "@/lib/workdays";
 
@@ -29,8 +29,9 @@ export async function getLeaveBalances(): Promise<LeaveBalance[]> {
 
   const [team, approved] = await Promise.all([
     db
-      .select({ id: users.id, name: users.fullName, isStaff: users.isStaff, total: users.leaveHoursTotal })
+      .select({ id: users.id, name: users.fullName, isStaff: sql<boolean>`coalesce(${teamMembers.isInternal}, true)`, total: users.leaveHoursTotal })
       .from(users)
+      .leftJoin(teamMembers, and(eq(teamMembers.userId, users.id), isNull(teamMembers.deletedAt)))
       .where(and(isNull(users.deletedAt), eq(users.status, "active"), ne(users.primaryRole, "client")))
       .orderBy(users.fullName),
     db
