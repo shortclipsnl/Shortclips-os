@@ -16,9 +16,11 @@ import {
   relativeDays,
 } from "@/lib/format";
 import { RISK_LEVEL, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
+import { getMyDay } from "@/server/my-day";
 import { PipelineStrip } from "./pipeline-strip";
 import { EditorDashboard } from "./editor-view";
 import { DayScheduleStrip } from "./day-schedule";
+import { MyDayCard } from "./my-day-card";
 import { AttentionPopups, type Signal } from "./attention-popups";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -30,7 +32,7 @@ export default async function DashboardPage() {
   // Editors krijgen een eigen, smaller dashboard met uitsluitend hun werk.
   if (viewer.isEditorOnly) return <EditorDashboard viewer={viewer} />;
 
-  const [data, top] = await Promise.all([getDashboard(viewer), getDashboardTopStats(viewer)]);
+  const [data, top, myDay] = await Promise.all([getDashboard(viewer), getDashboardTopStats(viewer), getMyDay(viewer)]);
 
   // Dagchecklist: bevestigingen van vandaag (NL-kalenderdag), gedeeld met het team.
   const todayNL = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -99,6 +101,9 @@ export default async function DashboardPage() {
           </LinkButton>
         </div>
       </div>
+
+      {/* Mijn dag — eigen opnames, taken en editwerk van de ingelogde persoon. */}
+      {myDay.hasAny ? <MyDayCard day={myDay} firstName={firstName} /> : null}
 
       {/* Wat vraagt nú aandacht — prominent, met reden, verantwoordelijke, dagen en directe link. */}
       {(() => {
