@@ -47,6 +47,8 @@
   --color-bad-soft: #fdeceb;
   --color-info: #00affa;
   --color-info-soft: #e6f7ff;
+  --color-violet: #7c5cff; /* opvallend, afwijkend — bijv. "om te checken" */
+  --color-violet-soft: #efeaff;
   --color-neutral-soft: #f0efec;
 
   /* ---- Platform-accenten ---- */

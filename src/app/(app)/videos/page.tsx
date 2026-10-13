@@ -285,8 +285,8 @@ function ReviewQueue({ queue }: { queue: { teControleren: ReviewQueueItem[]; fee
   const total = queue.teControleren.length + queue.feedbackOntvangen.length + queue.goedgekeurd.length;
 
   return (
-    <Card padded={false} className="mb-5 overflow-hidden ring-1 ring-[var(--color-indigo-ink)]/15">
-      <div className="flex items-center justify-between gap-2 bg-[var(--color-indigo-ink)] px-5 py-3 text-white">
+    <Card padded={false} className="mb-5 overflow-hidden ring-1 ring-[var(--color-violet)]/25">
+      <div className="flex items-center justify-between gap-2 bg-[var(--color-violet)] px-5 py-3 text-white">
         <div>
           <h2 className="text-base font-bold tracking-tight">Video&apos;s om te checken</h2>
           <p className="text-xs text-white/70">Automatisch gevuld zodra een video klaarstaat voor controle. Klik door naar Frame.io.</p>
@@ -369,11 +369,23 @@ function DrillCard({
   items: { id: string; primary: string; secondary: string; meta?: string }[];
   empty: string;
 }) {
+  const active = count > 0;
   return (
-    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)]">
-      <Link href={href} className="flex items-center justify-between gap-2 bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white hover:bg-[var(--color-indigo-soft)]">
-        <span className="text-sm font-semibold">{title}</span>
-        <span className="text-2xl font-bold tabular-nums" style={{ color: count > 0 ? accent : "rgba(255,255,255,.6)" }}>{count}</span>
+    <div
+      className="overflow-hidden rounded-[var(--radius-lg)] border bg-[var(--color-surface)]"
+      style={{ borderColor: active ? `color-mix(in srgb, ${accent} 35%, var(--color-line))` : "var(--color-line)" }}
+    >
+      <Link
+        href={href}
+        className="flex items-center justify-between gap-2 px-4 py-2.5 transition-[filter] hover:brightness-[0.98]"
+        style={{
+          background: active ? `color-mix(in srgb, ${accent} 13%, var(--color-surface))` : "var(--color-surface-sunken)",
+          color: active ? accent : "var(--color-ink-muted)",
+          borderBottom: `2px solid ${active ? accent : "var(--color-line)"}`,
+        }}
+      >
+        <span className="text-sm font-bold">{title}</span>
+        <span className="text-2xl font-bold tabular-nums">{count}</span>
       </Link>
       {items.length === 0 ? (
         <p className="px-4 py-3 text-xs text-[var(--color-ink-faint)]">{empty}</p>
