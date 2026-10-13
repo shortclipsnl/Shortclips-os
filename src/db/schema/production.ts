@@ -5,6 +5,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
   text,
   time,
@@ -412,4 +413,52 @@ export const calendarCouplings = pgTable(
     ...timestamps,
   },
   (t) => [unique("calendar_couplings_calendar_id_unique").on(t.calendarId)],
+);
+
+/* ------------------------------------------------------------------ *
+ * Teamcapaciteit — eigen vervanger van het Monday-capaciteitsdashboard.
+ * Per persoon een capaciteit in de juiste eenheid (opnames/4wk, shorts/4wk
+ * of CC-uren/maand) met grenzen; de belasting wordt native berekend uit
+ * opnamedagen, editwerk en verlof. capacity_params houdt de globale aannames
+ * (groeisimulator, personeelsadvies, economie).
+ * ------------------------------------------------------------------ */
+
+export const capacityPeople = pgTable(
+  "capacity_people",
+  {
+    id: pk(),
+    /** Gekoppelde gebruiker, als die bestaat (anders alleen op naam/alias). */
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    name: varchar("name", { length: 120 }).notNull(),
+    /** Komma-gescheiden namen zoals ze in labels/agenda voorkomen (voor matching). */
+    aliases: varchar("aliases", { length: 300 }),
+    employment: varchar("employment", { length: 16 }), // vast | freelance
+    role: varchar("role", { length: 24 }), // Content Creative | Videograaf | Editor | Founder
+    /** Capaciteitseenheid: opnames_4w | shorts_4w | cc_uren_maand | niet_gemeten. */
+    unit: varchar("unit", { length: 20 }).notNull().default("niet_gemeten"),
+    workdaysPerWeek: numeric("workdays_per_week", { precision: 4, scale: 1 }),
+    contractHoursPerWeek: numeric("contract_hours_per_week", { precision: 5, scale: 1 }),
+    productiveHoursPerMonth: numeric("productive_hours_per_month", { precision: 6, scale: 1 }),
+    limitGreen: numeric("limit_green", { precision: 8, scale: 2 }),
+    limitOrange: numeric("limit_orange", { precision: 8, scale: 2 }),
+    limitMax: numeric("limit_max", { precision: 8, scale: 2 }),
+    costPerMonth: numeric("cost_per_month", { precision: 10, scale: 2 }),
+    note: text("note"),
+    ...timestamps,
+  },
+  (t) => [unique("capacity_people_name_unique").on(t.name)],
+);
+
+export const capacityParams = pgTable(
+  "capacity_params",
+  {
+    id: pk(),
+    key: varchar("key", { length: 48 }).notNull(),
+    label: varchar("label", { length: 200 }),
+    value: numeric("value", { precision: 14, scale: 4 }),
+    unit: varchar("unit", { length: 80 }),
+    confidence: varchar("confidence", { length: 16 }), // Bevestigd | Indicatief | Onbevestigd
+    ...timestamps,
+  },
+  (t) => [unique("capacity_params_key_unique").on(t.key)],
 );
