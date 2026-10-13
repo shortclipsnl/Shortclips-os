@@ -20,8 +20,10 @@ import {
   relativeDays,
 } from "@/lib/format";
 import { VIDEO_STATUS, stageOverdue, type VideoStage } from "@/lib/statuses";
+import { getQcChecklist } from "@/server/qc";
 import { StatusControl, EditorPicker } from "./status-control";
 import { CommentForm, ResolveButton } from "./comment-form";
+import { QcPanel } from "./qc-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +53,8 @@ export default async function VideoPage({
   const { id } = await params;
   const detail = await getVideo(viewer, id);
   const v = detail.video;
+  const qc = await getQcChecklist(viewer, id);
+  const canWriteVideo = viewer.permissions.has("videos:write");
 
   const days = daysSince(v.statusChangedAt);
   const late = stageOverdue(v.status, days);
@@ -107,6 +111,9 @@ export default async function VideoPage({
               aangevraagd {relativeDays(pendingApproval.requestedAt)}.
             </div>
           ) : null}
+
+          {/* Kwaliteitscontrole */}
+          {detail.canSeeInternal ? <QcPanel items={qc.items} canWrite={canWriteVideo} /> : null}
 
           {/* Feedback */}
           {detail.canSeeInternal ? (

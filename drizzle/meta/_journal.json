@@ -204,6 +204,13 @@
       "when": 1791910140866,
       "tag": "0028_stale_darkstar",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791919299204,
+      "tag": "0029_rare_callisto",
+      "breakpoints": true
     }
   ]
 }

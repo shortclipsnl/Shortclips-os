@@ -312,6 +312,30 @@ export const editorCosts = pgTable(
 );
 
 /* ------------------------------------------------------------------ *
+ * QC-checklist — kwaliteitscontrole per video vóór oplevering aan de klant.
+ * Eén rij per controlepunt per video; template wordt lui aangemaakt.
+ * ------------------------------------------------------------------ */
+export const qcChecks = pgTable(
+  "qc_checks",
+  {
+    id: pk(),
+    deliverableId: uuid("deliverable_id")
+      .notNull()
+      .references(() => deliverables.id, { onDelete: "cascade" }),
+    label: varchar("label", { length: 160 }).notNull(),
+    done: boolean("done").notNull().default(false),
+    doneById: uuid("done_by_id").references(() => users.id, { onDelete: "set null" }),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [
+    unique("qc_checks_unique").on(t.deliverableId, t.label),
+    index("qc_checks_deliverable_idx").on(t.deliverableId),
+  ],
+);
+
+/* ------------------------------------------------------------------ *
  * Relaties
  * ------------------------------------------------------------------ */
 
