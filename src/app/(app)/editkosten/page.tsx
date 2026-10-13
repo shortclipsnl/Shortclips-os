@@ -136,8 +136,8 @@ export default async function EditCostsPage() {
                     <td className="sc-td text-right tabular-nums">{euro(m.income)}</td>
                     <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">−{euro(m.edit)}</td>
                     <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{m.hasManual ? `−${euro(m.manualCosts)}` : <span className="text-[var(--color-ink-faint)]">nog niet ingevuld</span>}</td>
-                    <td className="sc-td text-right font-bold tabular-nums">{euro(m.net)}</td>
-                    <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{m.marginPct}%</td>
+                    <td className="sc-td text-right font-bold tabular-nums" style={{ color: m.net > 0 ? "var(--color-good)" : m.net < 0 ? "var(--color-bad)" : undefined }}>{euro(m.net)}</td>
+                    <td className="sc-td text-right font-semibold tabular-nums" style={{ color: m.marginPct >= 50 ? "var(--color-good)" : m.marginPct >= 20 ? "var(--color-warn)" : "var(--color-bad)" }}>{m.marginPct}%</td>
                     <td className="sc-td text-right tabular-nums">{delta == null ? "—" : <span style={{ color: delta >= 0 ? "var(--color-good)" : "var(--color-bad)" }}>{delta >= 0 ? "+" : ""}{delta}%</span>}</td>
                   </tr>
                 );
@@ -153,16 +153,19 @@ export default async function EditCostsPage() {
         <Card padded={false} className="mb-5">
           <CardHeader title={`Netto per klant · ${monthLabel(latestPeriod!)}`} subtitle="Wie is het meest en minst winstgevend deze maand (na editkosten en ingevulde directe kosten)." className="p-5 pb-2" />
           <Table head={<><th className="sc-th">Klant</th><th className="sc-th text-right">Omzet</th><th className="sc-th text-right">Editkosten</th><th className="sc-th text-right">Directe kosten</th><th className="sc-th text-right">Netto</th><th className="sc-th text-right">Marge</th></>}>
-            {perClient.map((r) => (
-              <tr key={r.slug} className="sc-row-link">
-                <td className="sc-td"><Link href={`/clients/${r.slug}?tab=financieel`} className="font-medium hover:underline">{r.name}</Link></td>
-                <td className="sc-td text-right tabular-nums">{euro(r.income)}</td>
-                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">−{euro(r.edit)}</td>
-                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{r.manual > 0 ? `−${euro(r.manual)}` : "—"}</td>
-                <td className="sc-td text-right font-semibold tabular-nums">{euro(r.net)}</td>
-                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{r.margin}%</td>
-              </tr>
-            ))}
+            {perClient.map((r) => {
+              const attention = r.net < 0 || r.margin < 20;
+              return (
+                <tr key={r.slug} className="sc-row-link" style={attention ? { boxShadow: `inset 3px 0 0 ${r.net < 0 ? "var(--color-bad)" : "var(--color-warn)"}` } : undefined}>
+                  <td className="sc-td"><Link href={`/clients/${r.slug}?tab=financieel`} className="font-medium hover:underline">{r.name}</Link></td>
+                  <td className="sc-td text-right tabular-nums">{euro(r.income)}</td>
+                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">−{euro(r.edit)}</td>
+                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{r.manual > 0 ? `−${euro(r.manual)}` : "—"}</td>
+                  <td className="sc-td text-right font-semibold tabular-nums" style={{ color: r.net > 0 ? "var(--color-good)" : r.net < 0 ? "var(--color-bad)" : undefined }}>{euro(r.net)}</td>
+                  <td className="sc-td text-right font-semibold tabular-nums" style={{ color: r.margin >= 50 ? "var(--color-good)" : r.margin >= 20 ? "var(--color-warn)" : "var(--color-bad)" }}>{r.margin}%</td>
+                </tr>
+              );
+            })}
           </Table>
         </Card>
       ) : null}
