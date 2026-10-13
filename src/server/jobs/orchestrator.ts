@@ -13,6 +13,7 @@ import { runLinkSuggestions } from "./link-suggestions";
 import { runContentSync } from "./content-sync";
 import { runTaskArchive } from "./task-archive";
 import { runCalendarSync } from "./calendar-sync";
+import { isMondaySyncEnabled } from "@/server/app-settings";
 import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
 import {
@@ -63,18 +64,29 @@ export async function runFrequentSync() {
  */
 export async function runNightlySync() {
   const results: StepResult[] = [];
-  results.push(await step("monday.import_clients", () => runMondayClientImport()));
-  // Direct na de klant-import: portaaltoegang gelijktrekken met de nieuwe
-  // samenwerkingsstatussen (gestopte klanten dicht, actieve weer open).
-  results.push(await step("portal.enforce_access", () => enforcePortalAccess()));
-  results.push(await step("monday.import_editing", () => runMondayEditingImport()));
-  results.push(await step("monday.import_contracts", () => runMondayContractImport()));
-  results.push(await step("monday.import_planning", () => runMondayPlanningImport()));
-  results.push(await step("monday.import_leave", () => runMondayLeaveImport()));
-  results.push(await step("monday.import_leads", () => runMondayLeadsImport()));
-  results.push(await step("monday.import_tasks", () => runMondayTasksImport()));
-  results.push(await step("monday.import_client_distribution", () => runMondayClientDistributionImport()));
-  results.push(await step("monday.import_capacity", () => runMondayCapacityImport()));
+
+  // Monday-synchronisatie kan door de eigenaar worden uitgezet zodra de app de
+  // bron is (Beheer → Monday-migratie). Dan slaan we álle Monday-imports over;
+  // de rest van de nachtelijke sync draait gewoon door — de app is immers
+  // onafhankelijk van Monday.
+  const mondayOn = await isMondaySyncEnabled();
+  if (mondayOn) {
+    results.push(await step("monday.import_clients", () => runMondayClientImport()));
+    // Direct na de klant-import: portaaltoegang gelijktrekken met de nieuwe
+    // samenwerkingsstatussen (gestopte klanten dicht, actieve weer open).
+    results.push(await step("portal.enforce_access", () => enforcePortalAccess()));
+    results.push(await step("monday.import_editing", () => runMondayEditingImport()));
+    results.push(await step("monday.import_contracts", () => runMondayContractImport()));
+    results.push(await step("monday.import_planning", () => runMondayPlanningImport()));
+    results.push(await step("monday.import_leave", () => runMondayLeaveImport()));
+    results.push(await step("monday.import_leads", () => runMondayLeadsImport()));
+    results.push(await step("monday.import_tasks", () => runMondayTasksImport()));
+    results.push(await step("monday.import_client_distribution", () => runMondayClientDistributionImport()));
+    results.push(await step("monday.import_capacity", () => runMondayCapacityImport()));
+  } else {
+    // Portaaltoegang blijft ook zonder Monday belangrijk.
+    results.push(await step("portal.enforce_access", () => enforcePortalAccess()));
+  }
   results.push(await step("production.advance_phases", () => runProductionPhaseAdvance()));
   results.push(await step("editing.suggest_opname_links", () => runLinkSuggestions()));
   results.push(await step("content.sync_from_videos", () => runContentSync()));

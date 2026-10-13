@@ -3,7 +3,9 @@ import Link from "next/link";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { requireOwner } from "@/server/auth/context";
 import { getMigrationStatus } from "@/server/migration-status";
+import { isMondaySyncEnabled } from "@/server/app-settings";
 import { Badge, Card, CardHeader, PageHeader, Stat } from "@/components/ui";
+import { MondaySyncToggle } from "./migratie-toggle";
 
 export const metadata: Metadata = { title: "Monday-migratie" };
 export const dynamic = "force-dynamic";
@@ -15,7 +17,7 @@ function when(d: string | null) {
 
 export default async function MigrationPage() {
   await requireOwner();
-  const s = await getMigrationStatus();
+  const [s, mondayOn] = await Promise.all([getMigrationStatus(), isMondaySyncEnabled()]);
   const a = s.attention;
   const issues =
     a.videosWithoutShoot + a.duplicateClients.length + a.duplicateLeads.length + a.wonLeadsUnconverted;
@@ -26,6 +28,8 @@ export default async function MigrationPage() {
         title="Monday-migratie"
         description="Controleoverzicht: hoeveel is uit Monday overgenomen, hoeveel is gekoppeld, en wat vraagt nog aandacht voordat Monday kan worden opgezegd."
       />
+
+      <MondaySyncToggle enabled={mondayOn} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Stat label="Records overgenomen uit Monday" value={String(s.totalMapped)} />

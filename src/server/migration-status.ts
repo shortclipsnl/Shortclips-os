@@ -26,7 +26,9 @@ export async function getMigrationStatus() {
         (select count(*)::int from contracts where deleted_at is null) contracts,
         (select count(*)::int from leave_requests) leave_requests,
         (select count(*)::int from sales_leads where deleted_at is null) sales_leads,
-        (select count(*)::int from client_contacts where deleted_at is null) client_contacts`),
+        (select count(*)::int from client_contacts where deleted_at is null) client_contacts,
+        (select count(*)::int from clients where deleted_at is null and complexity is not null) clients_enriched,
+        (select count(*)::int from capacity_people) capacity_people`),
     db.execute(sql`select count(*)::int n from deliverables where deleted_at is null and production_day_id is null`),
     db.execute(sql`select count(*)::int n from deliverables where deleted_at is null and production_day_id is null and suggested_production_day_id is not null and link_reviewed = false`),
     db.execute(sql`select lower(name) nm, count(*)::int n from clients where deleted_at is null group by lower(name) having count(*) > 1 order by n desc`),
@@ -51,6 +53,9 @@ export async function getMigrationStatus() {
     { board: "CONTRACT DUUR → Contracten", mapped: m("contract"), last: mapByEntity.get("contract")?.last ?? null, target: "contracts" },
     { board: "PROJECT PLANNING → Opnames", mapped: m("production_day"), last: mapByEntity.get("production_day")?.last ?? null, target: "production_days" },
     { board: "VAKANTIES PLANNEN → Verlof", mapped: m("leave_request"), last: mapByEntity.get("leave_request")?.last ?? null, target: "leave_requests" },
+    { board: "TO DO-borden → Taken", mapped: m("task"), last: mapByEntity.get("task")?.last ?? null, target: "tasks" },
+    { board: "KLANT VERDELING → Complexiteit/aandachtspunten", mapped: Number(ent.clients_enriched ?? 0), last: null as string | null, target: "clients", note: "verrijkt klanten" },
+    { board: "TEAMCAPACITEIT → Teamcapaciteit", mapped: Number(ent.capacity_people ?? 0), last: null as string | null, target: "capacity_people", note: "eigen dashboard" },
   ];
 
   // Dekking per app-entiteit.
