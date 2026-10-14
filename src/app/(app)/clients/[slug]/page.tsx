@@ -48,6 +48,7 @@ import {
 } from "@/lib/statuses";
 import { ClientTabs, type TabDef } from "./tabs";
 import { FinanceMonths } from "./finance-months";
+import { GenerateReportButton, ReportPublishToggle } from "./report-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -195,7 +196,7 @@ export default async function ClientPage({
       {active === "opnames" ? <ShootsTab hub={hub} /> : null}
       {active === "planning" ? <PlanningTab hub={hub} /> : null}
       {active === "resultaten" ? <ResultsTab hub={hub} /> : null}
-      {active === "rapportages" ? <ReportsTab hub={hub} /> : null}
+      {active === "rapportages" ? <ReportsTab hub={hub} slug={slug} canWrite={viewer.permissions.has("reports:write")} /> : null}
       {active === "kennis" ? <KnowledgeTab hub={hub} /> : null}
       {active === "documenten" ? <FilesTab hub={hub} /> : null}
       {active === "taken" ? <TasksTab hub={hub} /> : null}
@@ -577,17 +578,31 @@ function ResultsTab({ hub }: { hub: ClientHub }) {
 
 /* ---------------------------- Rapportages -------------------------- */
 
-function ReportsTab({ hub }: { hub: ClientHub }) {
-  if (hub.reports.length === 0)
-    return <Card><EmptyState title="Nog geen rapportages" description="Rapportages verschijnen hier zodra de eerste maand is afgerond." /></Card>;
+function ReportsTab({ hub, slug, canWrite }: { hub: ClientHub; slug: string; canWrite: boolean }) {
   return (
     <div className="space-y-4">
+      {canWrite ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3">
+          <p className="text-sm text-[var(--color-ink-muted)]">Rapport wordt automatisch uit de cijfers samengesteld; jij keurt goed en publiceert naar het portaal.</p>
+          <GenerateReportButton slug={slug} />
+        </div>
+      ) : null}
+
+      {hub.reports.length === 0 ? (
+        <Card><EmptyState title="Nog geen rapportages" description="Genereer het eerste maandrapport met de knop hierboven, of wacht op de nachtelijke concept-generatie." /></Card>
+      ) : null}
+
       {hub.reports.map((r) => (
         <Card key={r.id}>
           <CardHeader
             title={r.title}
             subtitle={`${periodLabel(r.period)} · ${r.isPublished ? "gepubliceerd naar het portaal" : "concept"}`}
-            action={<Badge tone={r.isPublished ? "good" : "neutral"}>{r.isPublished ? "live" : "concept"}</Badge>}
+            action={
+              <span className="flex items-center gap-2">
+                <Badge tone={r.isPublished ? "good" : "neutral"}>{r.isPublished ? "live" : "concept"}</Badge>
+                {canWrite ? <ReportPublishToggle reportId={r.id} published={r.isPublished} /> : null}
+              </span>
+            }
           />
           {r.summary ? (
             <p className="mt-3 text-sm text-[var(--color-ink-muted)]">{r.summary}</p>

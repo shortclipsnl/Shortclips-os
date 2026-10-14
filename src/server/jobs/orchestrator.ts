@@ -14,6 +14,7 @@ import { runContentSync } from "./content-sync";
 import { runTaskArchive } from "./task-archive";
 import { runCalendarSync } from "./calendar-sync";
 import { isMondaySyncEnabled } from "@/server/app-settings";
+import { runMonthlyReportDrafts } from "./report-drafts";
 import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
 import {
@@ -91,6 +92,7 @@ export async function runNightlySync() {
   results.push(await step("editing.suggest_opname_links", () => runLinkSuggestions()));
   results.push(await step("content.sync_from_videos", () => runContentSync()));
   results.push(await step("tasks.archive_done", () => runTaskArchive()));
+  results.push(await step("reports.generate_drafts", () => runMonthlyReportDrafts()));
   results.push(await step("frameio.pull_projects", () => pullFrameProjects()));
   results.push(await step("frameio.pull_deliverables", () => pullFrameDeliverables()));
   results.push(await step("calendar.sync", () => runCalendarSync()));

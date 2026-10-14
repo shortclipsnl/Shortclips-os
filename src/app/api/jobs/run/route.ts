@@ -21,6 +21,7 @@ import { runMondayLeadsImport } from "@/server/jobs/monday-leads";
 import { runMondayTasksImport } from "@/server/jobs/monday-tasks";
 import { runMondayClientDistributionImport } from "@/server/jobs/monday-client-distribution";
 import { runMondayCapacityImport } from "@/server/jobs/monday-capacity";
+import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, runMetricoolSync } from "@/server/jobs/metricool-sync";
 import { setTeamContact } from "@/server/jobs/team";
@@ -81,6 +82,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "editing.suggest_opname_links": runLinkSuggestions,
   "content.sync_from_videos": runContentSync,
   "tasks.archive_done": runTaskArchive,
+  "reports.generate_drafts": runMonthlyReportDrafts,
   "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,
   "team.setup_logins": setupTeamLogins,
