@@ -11,6 +11,7 @@ import {
   time,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -244,6 +245,11 @@ export const tasks = pgTable(
     entityId: uuid("entity_id"),
     /** Automatisch aangemaakt door de automation engine. */
     createdByRuleId: uuid("created_by_rule_id"),
+    /** `manual` of `automation` — onderscheidt handwerk van automatische taken. */
+    source: varchar("source", { length: 16 }).notNull().default("manual"),
+    /** Unieke sleutel regel:entiteit:periode, zodat eenzelfde automatische taak
+     *  nooit dubbel wordt aangemaakt (alleen uniek zolang de taak open is). */
+    dedupeKey: varchar("dedupe_key", { length: 200 }),
     createdById: uuid("created_by_id").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -255,6 +261,10 @@ export const tasks = pgTable(
     index("tasks_client_idx").on(t.clientId, t.status),
     index("tasks_due_idx").on(t.dueOn),
     index("tasks_entity_idx").on(t.entityType, t.entityId),
+    // Partiële unieke index: één open automatische taak per dedupe-sleutel.
+    uniqueIndex("tasks_dedupe_open_unique")
+      .on(t.dedupeKey)
+      .where(sql`${t.dedupeKey} is not null and ${t.status} <> 'done' and ${t.deletedAt} is null`),
   ],
 );
 

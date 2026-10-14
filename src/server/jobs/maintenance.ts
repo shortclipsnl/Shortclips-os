@@ -59,6 +59,9 @@ export async function runDailySignals() {
         entityId: contract.id,
         data: {
           contractEndsInDays: 60,
+          // Periode = de einddatum zelf: verlengt het contract (nieuwe einddatum),
+          // dan hoort daar een nieuwe sleutel (en taak) bij.
+          periodKey: contract.endsOn,
           title: `Contract ${contract.clientName} loopt af op ${contract.endsOn}`,
           coordinatorId: contract.coordinatorId,
           href: `/clients/${contract.slug}?tab=contract`,

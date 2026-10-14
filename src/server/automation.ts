@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   approvals,
@@ -88,7 +88,7 @@ export async function dispatch(event: AutomationEvent): Promise<void> {
     const results: unknown[] = [];
     try {
       for (const action of rule.actions as Action[]) {
-        results.push(await runAction(action, event));
+        results.push(await runAction(action, event, rule.key, rule.id));
       }
       await db
         .update(automationRuns)
@@ -113,7 +113,7 @@ export async function dispatch(event: AutomationEvent): Promise<void> {
   }
 }
 
-async function runAction(action: Action, event: AutomationEvent): Promise<unknown> {
+async function runAction(action: Action, event: AutomationEvent, ruleKey?: string, ruleId?: string): Promise<unknown> {
   switch (action.type) {
     case "set_video_status": {
       if (!event.entityId) return { skipped: "geen video" };
@@ -125,6 +125,25 @@ async function runAction(action: Action, event: AutomationEvent): Promise<unknow
     }
 
     case "create_task": {
+      // Dedupe-sleutel: regel + entiteit + periode. Bestaat er al een OPEN
+      // automatische taak met deze sleutel, dan niets aanmaken (geen dubbels,
+      // ook niet bij meerdere runs op dezelfde dag of gelijktijdig).
+      const periodKey = (event.data?.periodKey as string) ?? (event.data?.dedupe as string) ?? (event.data?.periodKey as string) ?? "";
+      const dedupeKey = `${ruleKey ?? "rule"}:${event.entityId ?? event.clientId ?? "-"}:${periodKey}`;
+
+      const existing = await db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.dedupeKey, dedupeKey),
+            isNull(tasks.deletedAt),
+            sql`${tasks.status} <> 'done'`,
+          ),
+        )
+        .limit(1);
+      if (existing[0]) return { taskId: existing[0].id, deduped: true };
+
       const [row] = await db
         .insert(tasks)
         .values({
@@ -136,9 +155,13 @@ async function runAction(action: Action, event: AutomationEvent): Promise<unknow
           entityId: event.entityId ?? null,
           assigneeId: (event.data?.coordinatorId as string) ?? null,
           dueOn: (action.dueOn as string) ?? null,
+          source: "automation",
+          dedupeKey,
+          createdByRuleId: ruleId ?? null,
         })
+        .onConflictDoNothing()
         .returning({ id: tasks.id });
-      return { taskId: row?.id };
+      return { taskId: row?.id, deduped: !row };
     }
 
     case "create_approval": {
@@ -173,7 +196,7 @@ async function runAction(action: Action, event: AutomationEvent): Promise<unknow
         href: "/portal",
         entityType: event.entityType,
         entityId: event.entityId,
-        dedupeKey: `${action.type}:${event.entityId}:${(event.data?.to as string) ?? (event.data?.dedupe as string) ?? ""}`,
+        dedupeKey: `${action.type}:${event.entityId}:${(event.data?.to as string) ?? (event.data?.dedupe as string) ?? (event.data?.periodKey as string) ?? ""}`,
       });
       return { notified: count };
     }
@@ -191,7 +214,7 @@ async function runAction(action: Action, event: AutomationEvent): Promise<unknow
         href: (event.data?.href as string) ?? undefined,
         entityType: event.entityType,
         entityId: event.entityId,
-        dedupeKey: `${event.trigger}:${event.entityId}:${(event.data?.to as string) ?? (event.data?.dedupe as string) ?? ""}`,
+        dedupeKey: `${event.trigger}:${event.entityId}:${(event.data?.to as string) ?? (event.data?.dedupe as string) ?? (event.data?.periodKey as string) ?? ""}`,
       });
       return { notified: count };
     }
@@ -207,7 +230,7 @@ async function runAction(action: Action, event: AutomationEvent): Promise<unknow
         href: (event.data?.href as string) ?? undefined,
         entityType: event.entityType,
         entityId: event.entityId,
-        dedupeKey: `${event.trigger}:${event.entityId}:${(event.data?.to as string) ?? (event.data?.dedupe as string) ?? ""}`,
+        dedupeKey: `${event.trigger}:${event.entityId}:${(event.data?.to as string) ?? (event.data?.dedupe as string) ?? (event.data?.periodKey as string) ?? ""}`,
       });
       return { notified: count };
     }
@@ -222,7 +245,7 @@ async function runAction(action: Action, event: AutomationEvent): Promise<unknow
         href: "/finance",
         entityType: event.entityType,
         entityId: event.entityId,
-        dedupeKey: `${event.trigger}:${event.entityId}:${(event.data?.to as string) ?? (event.data?.dedupe as string) ?? ""}`,
+        dedupeKey: `${event.trigger}:${event.entityId}:${(event.data?.to as string) ?? (event.data?.dedupe as string) ?? (event.data?.periodKey as string) ?? ""}`,
       });
       return { notified: count };
     }

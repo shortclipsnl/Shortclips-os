@@ -211,6 +211,13 @@
       "when": 1791919299204,
       "tag": "0029_rare_callisto",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791958668219,
+      "tag": "0030_fuzzy_crusher_hogan",
+      "breakpoints": true
     }
   ]
 }
