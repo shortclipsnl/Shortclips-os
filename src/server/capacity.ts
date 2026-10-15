@@ -40,13 +40,15 @@ function n(v: string | number | null | undefined): number | null {
   return Number.isFinite(x) ? x : null;
 }
 
-function statusFor(load: number | null, green: number | null, orange: number | null, max: number | null): CapacityStatus {
-  if (load === null || (green === null && orange === null && max === null)) return "geen_data";
-  const hi = orange ?? max ?? green ?? 0;
-  const lo = green ?? orange ?? 0;
-  if (max !== null && load > max) return "kritiek";
-  if (load > hi) return "kritiek";
-  if (load > lo) return "hoog";
+/**
+ * Eén drempel, gelijk aan Editors en dashboard (#5): bezetting t.o.v. de
+ * gezonde grens — <80% gezond, 80-100% hoog, >100% kritiek.
+ */
+function statusFor(load: number | null, green: number | null): CapacityStatus {
+  if (load === null || green === null || green <= 0) return "geen_data";
+  const pct = (load / green) * 100;
+  if (pct > 100) return "kritiek";
+  if (pct >= 80) return "hoog";
   return "gezond";
 }
 
@@ -133,7 +135,7 @@ export async function getCapacityOverview(): Promise<{
     const green = n(row.limitGreen);
     const orange = n(row.limitOrange);
     const max = n(row.limitMax);
-    const status = statusFor(load, green, orange, max);
+    const status = statusFor(load, green);
     const occupancy = load !== null && green ? Math.round((load / green) * 100) : null;
 
     people.push({

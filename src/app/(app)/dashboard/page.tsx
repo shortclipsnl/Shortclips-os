@@ -17,6 +17,8 @@ import {
 } from "@/lib/format";
 import { RISK_LEVEL, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 import { getMyDay } from "@/server/my-day";
+import { editorCapacityMap } from "@/server/metrics";
+import { editorLoad, LOAD_LABEL } from "@/lib/metrics";
 import { PipelineStrip } from "./pipeline-strip";
 import { EditorDashboard } from "./editor-view";
 import { DayScheduleStrip } from "./day-schedule";
@@ -32,7 +34,7 @@ export default async function DashboardPage() {
   // Editors krijgen een eigen, smaller dashboard met uitsluitend hun werk.
   if (viewer.isEditorOnly) return <EditorDashboard viewer={viewer} />;
 
-  const [data, top, myDay] = await Promise.all([getDashboard(viewer), getDashboardTopStats(viewer), getMyDay(viewer)]);
+  const [data, top, myDay, capMap] = await Promise.all([getDashboard(viewer), getDashboardTopStats(viewer), getMyDay(viewer), editorCapacityMap()]);
 
   // Dagchecklist: bevestigingen van vandaag (NL-kalenderdag), gedeeld met het team.
   const todayNL = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -314,7 +316,9 @@ export default async function DashboardPage() {
               const open = Number(e.open);
               const overdue = Number(e.overdue);
               const soon = Number(e.dueSoon);
-              const level = editorLevel(open, overdue);
+              const cap = capMap.get(e.editorId) ?? 0;
+              const { pct, level: lvl } = editorLoad(open, cap);
+              const level = { label: LOAD_LABEL[lvl], color: LEVEL_COLOR[lvl]! };
               const maxOpen = Math.max(6, ...data.editors.map((x) => Number(x.open)));
               return (
                 <div key={e.editorId} className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3.5">
@@ -330,7 +334,7 @@ export default async function DashboardPage() {
                     </div>
                   </div>
                   <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
-                    <span className="block h-full rounded-full" style={{ width: `${Math.min(100, (open / maxOpen) * 100)}%`, background: level.color }} />
+                    <span className="block h-full rounded-full" style={{ width: `${Math.min(100, pct ?? (open / maxOpen) * 100)}%`, background: level.color }} />
                   </div>
                   <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                     {overdue > 0 ? <Badge tone="bad">{overdue} te laat</Badge> : null}
@@ -444,12 +448,12 @@ export default async function DashboardPage() {
   );
 }
 
-/** Belastingniveau van een editor op basis van openstaande en te late video's. */
-function editorLevel(open: number, overdue: number): { label: string; color: string } {
-  if (overdue > 0 || open >= 7) return { label: "Mogelijk overbelast", color: "var(--color-bad)" };
-  if (open >= 4) return { label: "Hoge belasting", color: "var(--color-warn)" };
-  return { label: "Normale belasting", color: "var(--color-good)" };
-}
+const LEVEL_COLOR: Record<string, string> = {
+  normaal: "var(--color-good)",
+  hoog: "var(--color-warn)",
+  overbelast: "var(--color-bad)",
+  geen_data: "var(--color-ink-faint)",
+};
 
 function NavyStat({
   label,

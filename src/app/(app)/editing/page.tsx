@@ -2,25 +2,32 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireInternal } from "@/server/auth/context";
 import { getEditingDashboard, listEditorsWithRates } from "@/server/editing";
+import { editorCapacityMap } from "@/server/metrics";
+import { editorLoad, LOAD_LABEL } from "@/lib/metrics";
 import { Avatar, Badge, Card, CardHeader, EmptyState, PageHeader, Table } from "@/components/ui";
 import { euro, formatDate, num } from "@/lib/format";
 import { RateRow } from "./editing-ui";
 
-export const metadata: Metadata = { title: "Editing Dashboard" };
+export const metadata: Metadata = { title: "Editors" };
 export const dynamic = "force-dynamic";
 
-function loadLevel(open: number, capacity: number, late: number): { label: string; color: string } {
-  if (late > 0 || (capacity > 0 && open > capacity)) return { label: "Overbelast", color: "var(--color-bad)" };
-  if (capacity > 0 && open >= capacity * 0.75) return { label: "Hoge belasting", color: "var(--color-warn)" };
-  return { label: "Normale belasting", color: "var(--color-good)" };
-}
+const LEVEL_COLOR: Record<string, string> = {
+  normaal: "var(--color-good)",
+  hoog: "var(--color-warn)",
+  overbelast: "var(--color-bad)",
+  geen_data: "var(--color-ink-faint)",
+};
 
 export default async function EditingPage() {
   const viewer = await requireInternal();
   const canSeeCosts = viewer.permissions.has("finance:read_costs");
   const canManage = viewer.permissions.has("team:write");
 
-  const [data, editors] = await Promise.all([getEditingDashboard(viewer), canManage ? listEditorsWithRates() : Promise.resolve([])]);
+  const [data, editors, capMap] = await Promise.all([
+    getEditingDashboard(viewer),
+    canManage ? listEditorsWithRates() : Promise.resolve([]),
+    editorCapacityMap(),
+  ]);
 
   return (
     <div className="mx-auto max-w-[1300px]">
@@ -34,8 +41,9 @@ export default async function EditingPage() {
         <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {data.editors.map((e) => {
             const open = Number(e.in_production);
-            const level = loadLevel(open, Number(e.capacity), Number(e.late));
-            const capacity = Number(e.capacity);
+            const capacity = capMap.get(e.editor_id) ?? 0;
+            const { pct, level: lvl } = editorLoad(open, capacity);
+            const level = { label: LOAD_LABEL[lvl], color: LEVEL_COLOR[lvl]! };
             return (
               <div key={e.editor_id} className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3.5">
                 <div className="flex items-center gap-3">
@@ -55,9 +63,9 @@ export default async function EditingPage() {
                 {capacity > 0 ? (
                   <div className="mt-3">
                     <div className="h-2 overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
-                      <span className="block h-full rounded-full" style={{ width: `${Math.min(100, (open / capacity) * 100)}%`, background: level.color }} />
+                      <span className="block h-full rounded-full" style={{ width: `${Math.min(100, pct ?? 0)}%`, background: level.color }} />
                     </div>
-                    <div className="mt-1 text-2xs text-[var(--color-ink-faint)]">{open} van {capacity} per week</div>
+                    <div className="mt-1 text-2xs text-[var(--color-ink-faint)]">{open} van {capacity} shorts per 4 weken{pct !== null ? ` · ${pct}%` : ""}</div>
                   </div>
                 ) : null}
                 <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
