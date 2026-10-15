@@ -19,7 +19,7 @@ import {
   formatDateTime,
   relativeDays,
 } from "@/lib/format";
-import { VIDEO_STATUS, stageOverdue, type VideoStage } from "@/lib/statuses";
+import { videoPhase, stageOverdue } from "@/lib/statuses";
 import { getQcChecklist } from "@/server/qc";
 import { StatusControl, EditorPicker } from "./status-control";
 import { CommentForm, ResolveButton } from "./comment-form";
@@ -58,7 +58,7 @@ export default async function VideoPage({
 
   const days = daysSince(v.statusChangedAt);
   const late = stageOverdue(v.status, days);
-  const meta = VIDEO_STATUS[v.status as VideoStage];
+  const meta = videoPhase(v.status);
 
   const internalThreads = detail.threads.filter((t) => t.visibility === "internal");
   const clientThreads = detail.threads.filter((t) => t.visibility === "client");

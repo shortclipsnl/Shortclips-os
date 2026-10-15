@@ -10,7 +10,7 @@ import {
   daysSince,
   formatDate,
 } from "@/lib/format";
-import { VIDEO_STATUS, VIDEO_WAITING_ON, stageOverdue, type VideoStage } from "@/lib/statuses";
+import { VIDEO_STATUS, VIDEO_WAITING_ON, videoPhase, stageOverdue, type VideoStage } from "@/lib/statuses";
 
 const WAITING_ON: Record<string, { label: string; color: string }> = {
   client: { label: "Klant", color: "var(--color-warn)" },
@@ -202,7 +202,7 @@ export default async function VideosPage({
               const inPhase = daysSince(v.statusChangedAt);
               const stuck = stageOverdue(v.status, inPhase);
               const waitOn = WAITING_ON[VIDEO_WAITING_ON[v.status as VideoStage] ?? "none"];
-              const fase = VIDEO_STATUS[v.status as VideoStage];
+              const fase = videoPhase(v.status);
               const health = overdue
                 ? { label: "Te laat", tone: "bad" as const }
                 : waiting
@@ -227,7 +227,7 @@ export default async function VideosPage({
                   </td>
                   <td className="sc-td">
                     {/* Lijst is alleen-lezen; status wijzig je op de detailpagina via "Volgende stap". */}
-                    <Badge tone={fase?.tone ?? "neutral"}>{fase?.short ?? v.status}</Badge>
+                    <Badge tone={fase.tone}>{fase.label}</Badge>
                   </td>
                   <td className="sc-td">
                     {waitOn.label === "—" ? (

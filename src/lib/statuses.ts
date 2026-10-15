@@ -40,6 +40,61 @@ export const VIDEO_STATUS: Record<VideoStage, { label: string; tone: Tone; short
   analysis_available: { label: "Analyse beschikbaar", tone: "ink", short: "Analyse" },
 };
 
+/**
+ * De zeven productiefases — één naam en één kleur, overal gelijk (#4). De 13
+ * interne statussen vouwen samen tot deze fases voor elke fase-weergave; de
+ * statussen zelf blijven bestaan voor de "Volgende stap"-besturing op de
+ * detailpagina. "Live" is terminaal (ná de productie, de gepubliceerde video's).
+ */
+export type VideoPhase =
+  | "gepland"
+  | "beelden_binnen"
+  | "in_edit"
+  | "interne_controle"
+  | "bij_klant"
+  | "feedback_verwerken"
+  | "klaar"
+  | "live";
+
+export const VIDEO_PHASE_META: Record<VideoPhase, { label: string; tone: Tone }> = {
+  gepland: { label: "Gepland", tone: "neutral" },
+  beelden_binnen: { label: "Beelden binnen", tone: "info" },
+  in_edit: { label: "In edit", tone: "info" },
+  interne_controle: { label: "Interne controle", tone: "info" },
+  bij_klant: { label: "Bij klant", tone: "warn" },
+  feedback_verwerken: { label: "Feedback verwerken", tone: "info" },
+  klaar: { label: "Klaar", tone: "good" },
+  live: { label: "Live", tone: "ink" },
+};
+
+/** Volgorde van de productiefases (zonder de terminale "live"). */
+export const VIDEO_PHASE_ORDER: VideoPhase[] = [
+  "gepland", "beelden_binnen", "in_edit", "interne_controle", "bij_klant", "feedback_verwerken", "klaar",
+];
+
+const STATUS_TO_PHASE: Record<VideoStage, VideoPhase> = {
+  recorded: "beelden_binnen",
+  footage_upload: "beelden_binnen",
+  awaiting_editor: "beelden_binnen",
+  editing: "in_edit",
+  editor_revision: "in_edit",
+  internal_review: "interne_controle",
+  client_review: "bij_klant",
+  client_revision: "feedback_verwerken",
+  approved: "klaar",
+  ready_to_publish: "klaar",
+  scheduled: "klaar",
+  published: "live",
+  analysis_available: "live",
+};
+
+/** De fase (naam + kleur) van een videostatus — de enige bron voor fase-weergave. */
+export function videoPhase(status: string): { phase: VideoPhase; label: string; tone: Tone } {
+  const phase = STATUS_TO_PHASE[status as VideoStage] ?? "beelden_binnen";
+  const meta = VIDEO_PHASE_META[phase];
+  return { phase, label: meta.label, tone: meta.tone };
+}
+
 /** Bij wie ligt de bal? Bepaalt de "wacht op"-kolom en de dashboardsignalen. */
 export const VIDEO_WAITING_ON: Record<VideoStage, "shortclips" | "editor" | "client" | "none"> = {
   recorded: "shortclips",

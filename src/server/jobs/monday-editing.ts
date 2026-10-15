@@ -21,10 +21,13 @@ const C = {
 /** Fase op het Monday-bord → videostatus in ShortClips OS. */
 const FASE_TO_STATUS: Record<
   string,
-  "awaiting_editor" | "editing" | "internal_review" | "client_review" | "client_revision"
+  "recorded" | "awaiting_editor" | "editing" | "internal_review" | "client_review" | "client_revision"
 > = {
-  "binnenkort beschikbaar": "awaiting_editor",
-  nieuw: "awaiting_editor",
+  // "Binnenkort beschikbaar"/"nieuw" = nog op te nemen of beelden onderweg —
+  // nog NIET bij de editor. Daarom "recorded" (telt niet als editorbelasting en
+  // staat niet op "wacht op editor").
+  "binnenkort beschikbaar": "recorded",
+  nieuw: "recorded",
   "in edit": "editing",
   "interne review": "internal_review",
   "feedback klant": "client_review",
@@ -126,13 +129,13 @@ export async function runMondayEditingImport() {
       }
 
       const dueOn = timelineEnd(item, C.deadline);
+      // Titel is app-eigen (onderwerp/hook): alleen bij aanmaken vullen, nooit
+      // overschrijven met de Monday-itemnaam (die is vaak de klantnaam).
       const base = {
         clientId,
-        title: item.name.trim() || "Editing-project",
         status,
         ...(editorId ? { editorId } : {}),
         ...(dueOn ? { dueOn } : {}),
-        statusChangedAt: new Date(),
         updatedAt: new Date(),
       };
 
@@ -144,7 +147,18 @@ export async function runMondayEditingImport() {
         .limit(1);
 
       if (map?.entityId) {
-        await db.update(deliverables).set(base).where(eq(deliverables.id, map.entityId));
+        // "Dagen in fase" vanaf de echte statuswijziging: statusChangedAt alleen
+        // bijwerken als de status echt verandert (niet elke sync).
+        const [cur] = await db
+          .select({ status: deliverables.status })
+          .from(deliverables)
+          .where(eq(deliverables.id, map.entityId))
+          .limit(1);
+        const statusChanged = cur && cur.status !== status;
+        await db
+          .update(deliverables)
+          .set({ ...base, ...(statusChanged ? { statusChangedAt: new Date() } : {}) })
+          .where(eq(deliverables.id, map.entityId));
         await db
           .update(mondayMappings)
           .set({ lastSyncedAt: new Date() })
@@ -153,7 +167,7 @@ export async function runMondayEditingImport() {
       } else {
         const [created] = await db
           .insert(deliverables)
-          .values(base)
+          .values({ ...base, title: item.name.trim() || "Editing-project", statusChangedAt: new Date() })
           .returning({ id: deliverables.id });
         await db.insert(mondayMappings).values({
           entityType: "editing_item",
