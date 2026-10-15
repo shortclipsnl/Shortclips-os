@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import { AlertTriangle, ExternalLink, MessageSquare } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getReviewQueue, getVideoHighlights, listEditorOptions, listVideos, type ReviewQueueItem } from "@/server/videos";
-import { DeadlineCell, EditorCell, StatusCell } from "./editable-cells";
 import { EditorFilter } from "./editor-filter";
 import { Avatar, Badge, Card, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import {
@@ -59,7 +58,6 @@ export default async function VideosPage({
     listEditorOptions(),
   ]);
   const canEdit = viewer.permissions.has("videos:write");
-  const canAssign = viewer.permissions.has("videos:assign");
 
   const view = params.weergave === "kanban" ? "kanban" : "lijst";
 
@@ -228,11 +226,8 @@ export default async function VideosPage({
                     </Link>
                   </td>
                   <td className="sc-td">
-                    {canEdit ? (
-                      <StatusCell id={v.id} status={v.status} />
-                    ) : (
-                      <Badge tone={fase?.tone ?? "neutral"}>{fase?.short ?? v.status}</Badge>
-                    )}
+                    {/* Lijst is alleen-lezen; status wijzig je op de detailpagina via "Volgende stap". */}
+                    <Badge tone={fase?.tone ?? "neutral"}>{fase?.short ?? v.status}</Badge>
                   </td>
                   <td className="sc-td">
                     {waitOn.label === "—" ? (
@@ -248,20 +243,10 @@ export default async function VideosPage({
                     {inPhase} d
                   </td>
                   <td className="sc-td text-[var(--color-ink-muted)]">
-                    {canAssign ? (
-                      <EditorCell id={v.id} editorId={v.editorId} editors={editors} />
-                    ) : (
-                      v.editorName ?? "—"
-                    )}
+                    {v.editorName ?? "—"}
                   </td>
                   <td className={`sc-td ${overdue ? "font-medium text-[var(--color-bad)]" : "text-[var(--color-ink-muted)]"}`}>
-                    {canEdit ? (
-                      <DeadlineCell id={v.id} dueOn={v.dueOn} overdue={Boolean(overdue)} />
-                    ) : v.dueOn ? (
-                      formatDate(v.dueOn)
-                    ) : (
-                      "—"
-                    )}
+                    {v.dueOn ? formatDate(v.dueOn) : "—"}
                   </td>
                   <td className="sc-td">
                     <Badge tone={health.tone}>{health.label}</Badge>

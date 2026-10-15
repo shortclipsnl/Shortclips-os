@@ -40,7 +40,7 @@ export default async function ClientsPage() {
         description={`${activeCount} actief · ${inactiveCount} niet-actief`}
         actions={canWrite ? <LinkButton href="/clients/new">Nieuwe klant</LinkButton> : undefined}
       />
-      <ClientsBoard clients={clients} canWrite={canWrite} />
+      <ClientsBoard clients={clients} />
     </div>
   );
 }

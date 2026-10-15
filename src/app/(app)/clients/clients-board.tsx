@@ -1,10 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Loader2, Search } from "lucide-react";
-import { setClientStatus } from "@/server/actions/clients";
+import { Search } from "lucide-react";
 import { Avatar, Badge } from "@/components/ui";
 import { CLIENT_STATUS } from "@/lib/statuses";
 import { euro, formatDate } from "@/lib/format";
@@ -37,7 +35,7 @@ function Chip({ children, tone }: { children: React.ReactNode; tone: "blue" | "i
 
 const STOPPED = new Set(["paused", "churned"]);
 
-export function ClientsBoard({ clients, canWrite }: { clients: BoardClient[]; canWrite: boolean }) {
+export function ClientsBoard({ clients }: { clients: BoardClient[] }) {
   const [q, setQ] = useState("");
   // Standaard alleen de actieve klanten; niet-actieve nemen pas ruimte in als je
   // daar bewust naar wisselt.
@@ -97,7 +95,7 @@ export function ClientsBoard({ clients, canWrite }: { clients: BoardClient[]; ca
         <Empty />
       ) : (
         <div className="grid gap-2.5 md:grid-cols-2">
-          {shown.map((c) => <ClientCard key={c.id} c={c} canWrite={canWrite} />)}
+          {shown.map((c) => <ClientCard key={c.id} c={c} />)}
         </div>
       )}
     </div>
@@ -108,9 +106,7 @@ function Empty() {
   return <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-line)] px-4 py-10 text-center text-sm text-[var(--color-ink-faint)]">Geen klanten in deze weergave</p>;
 }
 
-function ClientCard({ c, canWrite }: { c: BoardClient; canWrite: boolean }) {
-  const [pending, start] = useTransition();
-  const router = useRouter();
+function ClientCard({ c }: { c: BoardClient }) {
   const stopped = STOPPED.has(c.status);
 
   return (
@@ -144,21 +140,6 @@ function ClientCard({ c, canWrite }: { c: BoardClient; canWrite: boolean }) {
           </span>
         </span>
       </Link>
-      {canWrite ? (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() =>
-            start(async () => {
-              await setClientStatus(c.slug, stopped ? "active" : "churned");
-              router.refresh();
-            })
-          }
-          className="shrink-0 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
-        >
-          {pending ? <Loader2 className="size-3.5 animate-spin" /> : stopped ? "Activeren" : "Op inactief"}
-        </button>
-      ) : null}
     </div>
   );
 }
