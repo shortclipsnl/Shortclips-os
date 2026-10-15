@@ -43,8 +43,7 @@ import {
   RISK_LEVEL,
   SCRIPT_STATUS,
   TASK_PRIORITY,
-  VIDEO_STATUS,
-  type VideoStage,
+  videoPhase,
 } from "@/lib/statuses";
 import { ClientTabs, type TabDef } from "./tabs";
 import { FinanceMonths } from "./finance-months";
@@ -333,8 +332,8 @@ function OverviewTab({
                           {v.editorName ?? "geen editor"} · {daysSince(v.statusChangedAt)} dagen in deze stap
                         </span>
                       </span>
-                      <Badge tone={VIDEO_STATUS[v.status as VideoStage]?.tone ?? "neutral"}>
-                        {VIDEO_STATUS[v.status as VideoStage]?.short ?? v.status}
+                      <Badge tone={videoPhase(v.status).tone}>
+                        {videoPhase(v.status).label}
                       </Badge>
                     </Link>
                   </li>
@@ -383,8 +382,8 @@ function VideosTab({ hub }: { hub: ClientHub }) {
               </Link>
             </td>
             <td className="sc-td">
-              <Badge tone={VIDEO_STATUS[v.status as VideoStage]?.tone ?? "neutral"}>
-                {VIDEO_STATUS[v.status as VideoStage]?.label ?? v.status}
+              <Badge tone={videoPhase(v.status).tone}>
+                {videoPhase(v.status).label}
               </Badge>
             </td>
             <td className="sc-td text-[var(--color-ink-muted)]">{v.editorName ?? "—"}</td>
