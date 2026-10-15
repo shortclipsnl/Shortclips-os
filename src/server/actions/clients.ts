@@ -230,6 +230,10 @@ export async function updateClient(slug: string, input: ClientInput): Promise<Ac
     const name = clean(input.name);
     if (!name) return { ok: false, message: "Geef een klantnaam op." };
     const status: ClientStatus = input.status ?? (existing.status as ClientStatus);
+    // Verantwoordelijke (Content Creative) is verplicht bij een actieve klant.
+    if (status === "active" && !(input.coordinatorId || existing.coordinatorId)) {
+      return { ok: false, message: "Kies een verantwoordelijke (Content Creative) voor een actieve klant." };
+    }
     const newRevenue = clean(input.monthlyRevenue);
     const newStarted = clean(input.startedOn);
 

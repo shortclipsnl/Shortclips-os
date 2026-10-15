@@ -17,6 +17,8 @@ import {
 } from "@/lib/format";
 import { RISK_LEVEL, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 import { getMyDay } from "@/server/my-day";
+import { activeClientsMissingCoordinator } from "@/server/clients";
+import { isOwner } from "@/server/auth/context";
 import { editorCapacityMap } from "@/server/metrics";
 import { editorLoad, LOAD_LABEL } from "@/lib/metrics";
 import { PipelineStrip } from "./pipeline-strip";
@@ -35,6 +37,7 @@ export default async function DashboardPage() {
   if (viewer.isEditorOnly) return <EditorDashboard viewer={viewer} />;
 
   const [data, top, myDay, capMap] = await Promise.all([getDashboard(viewer), getDashboardTopStats(viewer), getMyDay(viewer), editorCapacityMap()]);
+  const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
 
   // Dagchecklist: bevestigingen van vandaag (NL-kalenderdag), gedeeld met het team.
   const todayNL = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -103,6 +106,14 @@ export default async function DashboardPage() {
           </LinkButton>
         </div>
       </div>
+
+      {/* Blokkerend: actieve klanten zonder verantwoordelijke (alleen eigenaar). */}
+      {missingCoord.count > 0 ? (
+        <Link href="/clients" className="block rounded-[var(--radius-lg)] border border-[var(--color-bad)]/30 bg-[var(--color-bad-soft)] px-4 py-3 text-sm hover:brightness-[0.99]">
+          <strong className="font-semibold text-[#a3271c]">{missingCoord.count} actieve klant{missingCoord.count === 1 ? "" : "en"} zonder verantwoordelijke.</strong>{" "}
+          <span className="text-[var(--color-ink-muted)]">Wijs een Content Creative toe — {missingCoord.names.slice(0, 6).join(", ")}{missingCoord.names.length > 6 ? "…" : ""}.</span>
+        </Link>
+      ) : null}
 
       {/* Mijn dag — eigen opnames, taken en editwerk van de ingelogde persoon. */}
       {myDay.hasAny ? <MyDayCard day={myDay} firstName={firstName} /> : null}

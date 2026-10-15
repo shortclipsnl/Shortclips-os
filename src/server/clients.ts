@@ -410,3 +410,16 @@ export async function getClientForEdit(viewer: Viewer, slug: string) {
 
   return { client, contact: contact ?? null, integrations };
 }
+
+/**
+ * Actieve klanten zonder verantwoordelijke (Content Creative). Verplicht veld:
+ * de eigenaar krijgt hiervan een blokkerend signaal op het dashboard (#6).
+ */
+export async function activeClientsMissingCoordinator(): Promise<{ count: number; names: string[] }> {
+  const rows = await db
+    .select({ name: clients.name })
+    .from(clients)
+    .where(and(eq(clients.status, "active"), isNull(clients.deletedAt), isNull(clients.coordinatorId)))
+    .orderBy(asc(clients.name));
+  return { count: rows.length, names: rows.map((r) => r.name) };
+}
