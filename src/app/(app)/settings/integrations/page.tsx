@@ -22,11 +22,19 @@ export const dynamic = "force-dynamic";
 
 const STATUS_META: Record<string, { label: string; tone: "good" | "warn" | "bad" | "neutral" }> = {
   connected: { label: "Verbonden", tone: "good" },
+  stale: { label: "Verouderd", tone: "warn" },
+  never_synced: { label: "Nog niet gesynct", tone: "warn" },
   degraded: { label: "Instabiel", tone: "warn" },
   disconnected: { label: "Verbroken", tone: "bad" },
   error: { label: "Fout", tone: "bad" },
   not_configured: { label: "Nog niet ingesteld", tone: "neutral" },
 };
+
+function staleHours(ms: number | null): string {
+  if (ms === null) return "";
+  const h = Math.round(ms / 3_600_000);
+  return h >= 48 ? `${Math.round(h / 24)} dagen` : `${h} uur`;
+}
 
 export default async function IntegrationsPage() {
   const viewer = await requireOwner();
@@ -73,8 +81,10 @@ export default async function IntegrationsPage() {
                   <div className="flex items-center gap-2.5">
                     {item.status === "connected" ? (
                       <CheckCircle2 className="size-5 text-[var(--color-good)]" strokeWidth={1.75} />
-                    ) : item.configured ? (
+                    ) : item.status === "error" ? (
                       <AlertCircle className="size-5 text-[var(--color-bad)]" strokeWidth={1.75} />
+                    ) : item.configured ? (
+                      <AlertCircle className="size-5 text-[var(--color-warn)]" strokeWidth={1.75} />
                     ) : (
                       <CircleDashed className="size-5 text-[var(--color-ink-faint)]" strokeWidth={1.75} />
                     )}
@@ -97,13 +107,25 @@ export default async function IntegrationsPage() {
                 <div className="w-full shrink-0 space-y-2 sm:w-56">
                   <TestButton provider={item.spec.provider} canTest={viewer.permissions.has("integrations:read")} />
                   <dl className="space-y-1 text-xs text-[var(--color-ink-muted)]">
-                    <Row label="Laatste sync" value={item.lastSyncAt ? relativeDays(item.lastSyncAt) : "nooit"} />
+                    <Row label="Laatste succesvolle sync" value={item.lastSuccessAt ? relativeDays(item.lastSuccessAt) : "nooit"} />
                     <Row label="Laatste webhook" value={item.lastWebhookAt ? relativeDays(item.lastWebhookAt) : "nooit"} />
                     <Row label="Items gesynchroniseerd" value={String(item.itemsSynced)} />
                     <Row label="Fouten" value={String(item.errorCount)} />
                   </dl>
                 </div>
               </div>
+
+              {item.configured && item.status === "stale" ? (
+                <div className="border-t border-[var(--color-warn)]/30 bg-[var(--color-warn-soft)] px-5 py-3 text-sm">
+                  <strong className="font-semibold text-[#8a5300]">Verouderde gegevens:</strong>{" "}
+                  <span className="text-[var(--color-ink-muted)]">laatste succesvolle synchronisatie {staleHours(item.ageMs)} geleden (ouder dan 24 uur). De verbinding kan nog bestaan, maar er komt geen verse data binnen — controleer de synchronisatie.</span>
+                </div>
+              ) : item.configured && item.status === "never_synced" ? (
+                <div className="border-t border-[var(--color-warn)]/30 bg-[var(--color-warn-soft)] px-5 py-3 text-sm">
+                  <strong className="font-semibold text-[#8a5300]">Nog nooit gesynchroniseerd:</strong>{" "}
+                  <span className="text-[var(--color-ink-muted)]">de secrets staan ingevuld, maar er is nog geen succesvolle synchronisatie geweest. Draai een handmatige sync of wacht op de nachtelijke run.</span>
+                </div>
+              ) : null}
 
               {item.missing.length > 0 ? (
                 <div className="border-t border-[var(--color-line)] bg-[var(--color-warn-soft)]/50 p-5">

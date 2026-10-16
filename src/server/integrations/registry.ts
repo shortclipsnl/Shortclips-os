@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { integrationConnections } from "@/db/schema";
 import { integrationConfig } from "@/lib/env";
@@ -183,27 +183,31 @@ export const INTEGRATION_SPECS: IntegrationSpec[] = [
     test: () => googleCalendar.testConnection(),
   },
   {
-    provider: "ayrshare",
-    name: "Ayrshare",
+    provider: "metricool",
+    name: "Metricool",
     description:
-      "Levert social statistieken van Instagram, TikTok, YouTube, Facebook en LinkedIn via één koppeling.",
+      "Levert socialmediastatistieken (weergaven, bereik, interacties, volgers) per klant en platform. Voorlopig de bron voor klantresultaten; de datalaag (daily_metrics) is brononafhankelijk, zodat later rechtstreekse platformkoppelingen kunnen worden toegevoegd.",
     purpose: [
-      "Dagelijkse cijfers per publicatie ophalen",
-      "Volgersgroei en bereik bijhouden",
+      "Dagelijkse cijfers per klant en platform ophalen (Instagram, TikTok, Facebook)",
+      "Volgersgroei, bereik en interacties bijhouden voor rapportages",
     ],
     required: [
       {
-        key: "AYRSHARE_API_KEY",
-        label: "API-sleutel",
-        where: "app.ayrshare.com → Dashboard → API Key",
+        key: "METRICOOL_USER_TOKEN",
+        label: "User token",
+        where: "Metricool → Instellingen → API/Integraties",
       },
     ],
-    test: async () => ({
-      ok: Boolean(integrationConfig().ayrshare.configured),
-      message: integrationConfig().ayrshare.configured
-        ? "Sleutel aanwezig. De eerste synchronisatie bevestigt of hij werkt."
-        : "Nog niet ingesteld: AYRSHARE_API_KEY ontbreekt.",
-    }),
+    test: async () => {
+      const { metricool } = await import("./metricool");
+      if (!metricool.isConfigured) return { ok: false, message: "Nog niet ingesteld: METRICOOL_USER_TOKEN ontbreekt." };
+      try {
+        const brands = await metricool.listBrands();
+        return { ok: true, message: `Verbonden. ${brands.length} merken beschikbaar.` };
+      } catch (e) {
+        return { ok: false, message: e instanceof Error ? e.message : "Verbinding met Metricool mislukt." };
+      }
+    },
   },
 ];
 
@@ -212,26 +216,64 @@ export function specFor(provider: Provider): IntegrationSpec | undefined {
 }
 
 /** Status van alle koppelingen, voor de health-pagina. */
+/** Data ouder dan dit geldt als verouderd (een groen icoon is dan onvoldoende). */
+const STALE_MS = 24 * 60 * 60 * 1000;
+
+export type IntegrationHealthStatus = "not_configured" | "never_synced" | "stale" | "error" | "connected";
+
 export async function integrationHealth() {
-  const rows = await db.select().from(integrationConnections);
+  const [rows, errorRows] = await Promise.all([
+    db.select().from(integrationConnections),
+    // Echte foutentelling uit de laatste 7 dagen (de runner vult errorCount niet).
+    db.execute(sql`
+      select provider, count(*) filter (where status = 'error')::int errors,
+             max(finished_at) filter (where status = 'success') last_success
+      from sync_jobs
+      where finished_at >= now() - interval '7 days'
+      group by provider`),
+  ]);
+  const errByProvider = new Map(
+    (((errorRows as { rows?: unknown[] }).rows ?? (errorRows as unknown as unknown[])) as Array<{ provider: string; errors: number; last_success: string | null }>)
+      .map((r) => [r.provider, r]),
+  );
   const config = integrationConfig();
+  const now = Date.now();
 
   return INTEGRATION_SPECS.map((spec) => {
     const row = rows.find((r) => r.provider === spec.provider);
     const configured =
       (config as Record<string, { configured: boolean }>)[spec.provider]?.configured ?? false;
+    const err = errByProvider.get(spec.provider);
+    const lastSuccessAt = err?.last_success ? new Date(err.last_success) : (row?.lastSyncAt ?? null);
+    const ageMs = lastSuccessAt ? now - new Date(lastSuccessAt).getTime() : null;
+    const stale = configured && ageMs !== null && ageMs > STALE_MS;
+
+    // Afgeleide, eerlijke status: niet "connected" zolang de data verouderd is.
+    const health: IntegrationHealthStatus = !configured
+      ? "not_configured"
+      : !lastSuccessAt
+        ? "never_synced"
+        : (row?.status === "error" || (err?.errors ?? 0) > 0) && stale
+          ? "error"
+          : stale
+            ? "stale"
+            : "connected";
 
     return {
       spec,
       configured,
-      status: !configured ? "not_configured" : (row?.status ?? "not_configured"),
+      status: health,
+      rawStatus: row?.status ?? "not_configured",
+      stale,
+      ageMs,
       lastSyncAt: row?.lastSyncAt ?? null,
+      lastSuccessAt,
       lastWebhookAt: row?.lastWebhookAt ?? null,
       lastCheckedAt: row?.lastCheckedAt ?? null,
       lastErrorAt: row?.lastErrorAt ?? null,
       lastErrorMessage: row?.lastErrorMessage ?? null,
       itemsSynced: row?.itemsSynced ?? 0,
-      errorCount: row?.errorCount ?? 0,
+      errorCount: err?.errors ?? row?.errorCount ?? 0,
       missing: spec.required
         .filter((r) => !process.env[r.key])
         .map((r) => r.key),

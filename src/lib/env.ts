@@ -160,7 +160,11 @@ export function integrationConfig() {
       required: ["AYRSHARE_API_KEY"],
       optional: [],
     },
-    metricool: { configured: false, required: [], optional: [] },
+    metricool: {
+      configured: Boolean(env.METRICOOL_USER_TOKEN),
+      required: ["METRICOOL_USER_TOKEN"],
+      optional: [],
+    },
     email: {
       configured: Boolean(env.RESEND_API_KEY && env.MAIL_FROM),
       required: ["RESEND_API_KEY", "MAIL_FROM"],
