@@ -63,13 +63,14 @@ export default async function AnalyticsPage({
       select c.id, c.name, c.slug, c.color, c.status,
         coalesce(sum(dm.views), 0)::int as views,
         coalesce(sum(dm.reach), 0)::int as reach,
-        coalesce(sum(dm.follower_delta), 0)::int as follower_growth
+        coalesce(sum(dm.follower_delta), 0)::int as follower_growth,
+        (exists (select 1 from daily_metrics d2 where d2.client_id = c.id))::int as linked
       from clients c
       left join daily_metrics dm
         on dm.client_id = c.id and dm.measured_on >= current_date - ${sql.raw(`interval '${days} days'`)}
       where c.deleted_at is null ${statusCond}
       group by c.id, c.name, c.slug, c.color, c.status
-      order by views desc
+      order by (exists (select 1 from daily_metrics d2 where d2.client_id = c.id)) desc, views desc
     `),
 
     db.execute(sql`
@@ -225,18 +226,25 @@ export default async function AnalyticsPage({
           >
             {clientRows.map((c, i) => {
               const fg = Number(c.follower_growth);
+              const linked = Number(c.linked) === 1;
               return (
-                <tr key={String(c.id)} className="sc-row-link" style={i < 3 ? { boxShadow: "inset 3px 0 0 var(--color-brand-500)" } : undefined}>
+                <tr key={String(c.id)} className="sc-row-link" style={i < 3 && linked ? { boxShadow: "inset 3px 0 0 var(--color-brand-500)" } : undefined}>
                   <td className="sc-td">
                     <Link href={`/analytics/${c.slug}`} className="flex items-center gap-2 hover:underline">
-                      {i < 3 ? <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--color-brand-500)] text-2xs font-bold text-white">{i + 1}</span> : <span className="w-5 shrink-0" />}
+                      {i < 3 && linked ? <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--color-brand-500)] text-2xs font-bold text-white">{i + 1}</span> : <span className="w-5 shrink-0" />}
                       <Avatar name={String(c.name)} color={c.color ? String(c.color) : null} size={22} />
                       {String(c.name)}
                     </Link>
                   </td>
-                  <td className="sc-td text-right font-semibold tabular-nums">{compact(Number(c.views))}</td>
-                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{compact(Number(c.reach))}</td>
-                  <td className="sc-td text-right tabular-nums font-medium" style={{ color: fg > 0 ? "var(--color-good)" : fg < 0 ? "var(--color-bad)" : "var(--color-ink-muted)" }}>{fg >= 0 ? "+" : ""}{num(fg)}</td>
+                  {linked ? (
+                    <>
+                      <td className="sc-td text-right font-semibold tabular-nums">{compact(Number(c.views))}</td>
+                      <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{compact(Number(c.reach))}</td>
+                      <td className="sc-td text-right tabular-nums font-medium" style={{ color: fg > 0 ? "var(--color-good)" : fg < 0 ? "var(--color-bad)" : "var(--color-ink-muted)" }}>{fg >= 0 ? "+" : ""}{num(fg)}</td>
+                    </>
+                  ) : (
+                    <td className="sc-td text-right text-xs text-[var(--color-ink-faint)]" colSpan={3}>niet gekoppeld</td>
+                  )}
                 </tr>
               );
             })}
