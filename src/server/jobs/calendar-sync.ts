@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gte, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   calendarEvents,
@@ -165,10 +165,14 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
 
       let matched = 0;
       let needsReview = 0;
+      // Per agenda bijhouden welke afspraken we nu zagen, zodat we daarna
+      // afspraken die in Google verdwenen/geannuleerd zijn kunnen opruimen.
+      const seenByCalendar = new Map<string, Set<string>>();
 
       for (const cal of calendars) {
         const events = await source.listEvents(cal.id, { timeMin, timeMax });
         ctx.log(`Agenda "${cal.summary}": ${events.length} afspraken`);
+        if (!seenByCalendar.has(cal.id)) seenByCalendar.set(cal.id, new Set());
 
         for (const ev of events) {
           ctx.counters.processed++;
@@ -177,6 +181,7 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
             ctx.counters.failed++;
             continue;
           }
+          seenByCalendar.get(cal.id)!.add(ev.id);
 
           const match = matchEvent(ev, matchers, cal.summary);
           const clientId =
@@ -241,6 +246,43 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         }
       }
 
+      // Annuleringen opruimen: afspraken die eerder in het venster gesynct zijn
+      // maar nu niet meer uit Google terugkomen (geannuleerd of verwijderd),
+      // markeren we als geannuleerd en we annuleren de afgeleide opnamedag.
+      let cancelled = 0;
+      const timeMinDate = new Date(timeMin);
+      const timeMaxDate = new Date(timeMax);
+      for (const [calId, seen] of seenByCalendar) {
+        const known = await db
+          .select({ id: calendarEvents.id, externalId: calendarEvents.externalId })
+          .from(calendarEvents)
+          .where(
+            and(
+              eq(calendarEvents.source, "google_calendar"),
+              eq(calendarEvents.calendarId, calId),
+              sql`${calendarEvents.status} is distinct from 'cancelled'`,
+              gte(calendarEvents.startsAt, timeMinDate),
+              lte(calendarEvents.startsAt, timeMaxDate),
+            ),
+          );
+        for (const row of known) {
+          if (seen.has(row.externalId)) continue;
+          await db.update(calendarEvents).set({ status: "cancelled", syncedAt: new Date(), updatedAt: new Date() }).where(eq(calendarEvents.id, row.id));
+          // Afgeleide opnamedag annuleren (de calendar_shoot-mapping gebruikt
+          // het calendar_events-id als itemId).
+          const [map] = await db
+            .select({ entityId: mondayMappings.entityId })
+            .from(mondayMappings)
+            .where(and(eq(mondayMappings.entityType, "calendar_shoot"), eq(mondayMappings.itemId, row.id)))
+            .limit(1);
+          if (map?.entityId) {
+            await db.update(productionDays).set({ status: "cancelled", updatedAt: new Date() }).where(eq(productionDays.id, map.entityId));
+          }
+          cancelled++;
+        }
+      }
+      if (cancelled > 0) ctx.log(`${cancelled} geannuleerde/verwijderde afspraken opgeruimd`);
+
       // Toekomstige opname-afspraken → opnamedagen (productionDays), zodat
       // "aankomende opnames" en het klantportaal "volgende opname" de echte
       // geplande opnames tonen. Google Agenda is hiervoor de centrale bron (§5).
@@ -259,6 +301,7 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
             eq(calendarEvents.kind, "opname"),
             isNotNull(calendarEvents.clientId),
             gte(calendarEvents.startsAt, new Date()),
+            sql`${calendarEvents.status} is distinct from 'cancelled'`,
           ),
         );
 
