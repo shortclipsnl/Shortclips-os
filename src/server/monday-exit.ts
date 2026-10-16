@@ -98,9 +98,9 @@ export async function getMondayExitCriteria(): Promise<{ criteria: ExitCriterion
     {
       n: 8,
       title: "Overdraagbaar systeem (documentatie)",
-      status: "nog_niet",
-      getest: "Technische kennis staat in code + projectgeheugen.",
-      open: "README met deploy-, backup-/herstel- en sync-controle-procedures, zodat een tweede ontwikkelaar zelfstandig kan beheren.",
+      status: "deels",
+      getest: "docs/ dekt deploy, backup, restore, sync-controle en storingen (DEPLOYMENT/ARCHITECTUUR/CREDENTIALS/MIGRATIE/ONTWIKKELEN).",
+      open: "Restore in een gescheiden omgeving één keer aantoonbaar uitvoeren; docs bijhouden bij wijzigingen.",
     },
   ];
 

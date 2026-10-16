@@ -99,3 +99,62 @@ luistert standaard op poort 3000.
 Bij Supabase staan automatische back-ups aan. Draai je zelf Postgres, richt dan
 `pg_dump` in. De belangrijkste onvervangbare data zijn `social_metrics` en
 `daily_metrics`: platforms bewaren die historie zelf niet.
+
+Dagelijkse dump zelf draaien (naast Supabase, aan te raden):
+
+```bash
+pg_dump "$DATABASE_URL" --no-owner --format=custom \
+  --file "shortclips-$(date +%F).dump"
+# bewaar minstens 14 dagen aan dumps buiten de server
+```
+
+## Herstel (restore) — test dit vóór je Monday opzegt
+
+Zet een back-up altijd eerst terug in een **gescheiden** database, nooit over
+productie heen:
+
+```bash
+# 1) maak een lege hersteldatabase (Supabase: nieuw project of een branch)
+# 2) zet de dump terug
+pg_restore --no-owner --clean --if-exists \
+  --dbname "$RESTORE_DATABASE_URL" shortclips-YYYY-MM-DD.dump
+# 3) draai de app tegen RESTORE_DATABASE_URL en controleer:
+#    - inloggen werkt
+#    - klanten/video's/opnames tellen kloppen met productie
+#    - Beheer → Systeemstatus toont de database als bereikbaar
+```
+
+Criterium 1 (exitcriteria) is pas behaald als een restore in een aparte omgeving
+aantoonbaar is uitgevoerd.
+
+## Synchronisatie controleren (dagelijks/na deploy)
+
+- **Beheer → Koppelingen**: per koppeling status, **laatste succesvolle sync** en
+  een **"Verouderd"-waarschuwing** als data > 24 u oud is. Een groen icoon alleen
+  is onvoldoende — let op de versheid.
+- **Beheer → Monday-migratie**: de 8 exitcriteria met status + bewijs, en de
+  Monday-sync-schakelaar.
+- **Beheer → Audit log / Systeemstatus**: recente `sync_jobs` (nieuw/bij/mislukt)
+  en databaselatentie.
+- Handmatig een sync forceren: `POST /api/jobs/run?job=<naam>` met
+  `Authorization: Bearer $CRON_SECRET` (bv. `sync.nightly`, `calendar.sync`,
+  `frameio.pull_comments`, `metricool.sync`, `drive.sync_all`).
+
+## Veelvoorkomende storingen
+
+| Symptoom | Oorzaak | Oplossing |
+|---|---|---|
+| Koppeling "Verouderd" terwijl verbonden | cron draait niet of token verlopen | controleer `CRON_SECRET`, draai de job handmatig, vernieuw de OAuth-refresh-token |
+| "Nog niet ingesteld" | secret ontbreekt | vul de genoemde env-var in en herstart; klik "Verbinding testen" |
+| Webhook komt niet binnen | webhook-secret leeg (fail-closed → 401) of URL niet geregistreerd | zet het secret, registreer de webhook-URL bij de externe dienst |
+| Geen enkele sync draait | `CRON_SECRET` leeg → `/api/jobs/run` dicht | zet `CRON_SECRET` in de omgeving |
+| Agenda/Drive dood | `GOOGLE_CLIENT_SECRET`/`GOOGLE_REFRESH_TOKEN` leeg | OAuth-consent (offline, prompt=consent) opnieuw doorlopen |
+| App start niet in productie | `SESSION_SECRET` leeg | genereer en zet `SESSION_SECRET` |
+
+## Overdraagbaarheid (criterium 8)
+
+Een tweede ontwikkelaar kan met deze map (`docs/`) zelfstandig: deployen
+(dit bestand), de database en architectuur begrijpen (`ARCHITECTUUR.md`),
+secrets vinden en zetten (`CREDENTIALS.md`), de Monday-migratie volgen
+(`MIGRATIE.md`) en lokaal ontwikkelen (`ONTWIKKELEN.md`). Houd deze bestanden
+bij elke structurele wijziging actueel.
