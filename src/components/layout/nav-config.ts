@@ -20,25 +20,40 @@ export const NAVIGATION: NavGroup[] = [
   {
     title: "Werk",
     items: [
-      { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
+      { href: "/dashboard", label: "Vandaag", icon: "LayoutDashboard" },
       { href: "/clients", label: "Onze klanten", icon: "Building2", permissions: ["clients:read"], match: "/clients" },
-      { href: "/leads", label: "Leads", icon: "Target", ownerOnly: true, match: "/leads" },
-      { href: "/videos", label: "Editing Dashboard", icon: "Clapperboard", permissions: ["videos:read"], match: "/videos" },
+      { href: "/tasks", label: "Taken", icon: "CircleCheck", permissions: ["tasks:read"], match: "/tasks" },
+      { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },
+    ],
+  },
+  {
+    title: "Productie",
+    items: [
+      { href: "/videos", label: "Video's", icon: "Clapperboard", permissions: ["videos:read"], match: "/videos" },
       { href: "/editing", label: "Editors", icon: "Scissors", permissions: ["videos:read"], match: "/editing" },
+    ],
+  },
+  {
+    title: "Opnames",
+    items: [
       { href: "/productions", label: "Opnameplanning", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
       { href: "/scripting", label: "Scripting", icon: "ScrollText", permissions: ["scripts:read"], match: "/scripting" },
-      { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },
-      { href: "/tasks", label: "Taken", icon: "CircleCheck", permissions: ["tasks:read"], match: "/tasks" },
+    ],
+  },
+  {
+    title: "Team",
+    items: [
+      { href: "/team", label: "Team", icon: "Users", permissions: ["team:read", "editors:read"], match: "/team" },
+      { href: "/capaciteit", label: "Teamcapaciteit", icon: "Gauge", permissions: ["team:read", "editors:read"], match: "/capaciteit" },
+      { href: "/verlof", label: "Vakantie", icon: "Palmtree", match: "/verlof" },
+      { href: "/meetings", label: "Teammeetings", icon: "Presentation", match: "/meetings" },
     ],
   },
   {
     title: "Inzicht",
     items: [
       { href: "/analytics", label: "Resultaten", icon: "TrendingUp", permissions: ["analytics:read"], match: "/analytics" },
-      { href: "/team", label: "Team", icon: "Users", permissions: ["team:read", "editors:read"], match: "/team" },
-      { href: "/capaciteit", label: "Teamcapaciteit", icon: "Gauge", permissions: ["team:read", "editors:read"], match: "/capaciteit" },
-      { href: "/verlof", label: "Vakantie", icon: "Palmtree", match: "/verlof" },
-      { href: "/meetings", label: "Teammeetings", icon: "Presentation", match: "/meetings" },
+      { href: "/leads", label: "Leads", icon: "Target", ownerOnly: true, match: "/leads" },
     ],
   },
   {

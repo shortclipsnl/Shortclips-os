@@ -21,7 +21,7 @@ const WAITING_ON: Record<string, { label: string; color: string }> = {
 import { ViewSwitch } from "./view-switch";
 import { Kanban } from "./kanban";
 
-export const metadata: Metadata = { title: "Editing Dashboard" };
+export const metadata: Metadata = { title: "Video's" };
 export const dynamic = "force-dynamic";
 
 const PRESETS = [
@@ -64,7 +64,7 @@ export default async function VideosPage({
   return (
     <div className="mx-auto max-w-[1500px]">
       <PageHeader
-        title="Editing Dashboard"
+        title="Video's"
         description={`${rows.length} video's${params.status ? ` in de stap ${VIDEO_STATUS[params.status as VideoStage]?.label ?? params.status}` : ""}`}
         actions={
           <Suspense fallback={null}>
