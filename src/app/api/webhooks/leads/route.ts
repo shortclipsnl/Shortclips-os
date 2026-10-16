@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { salesLeads } from "@/db/schema";
+import { salesLeads, users } from "@/db/schema";
 import { env } from "@/lib/env";
 import { dispatch } from "@/server/automation";
 
@@ -90,6 +90,14 @@ export async function POST(request: Request) {
     if (dup) return NextResponse.json({ ok: true, deduped: true, id: dup.id });
   }
 
+  // Verantwoordelijke voor nieuwe leads = de eigenaar.
+  const [owner] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.primaryRole, "owner"), eq(users.status, "active"), isNull(users.deletedAt)))
+    .limit(1);
+  const ownerId = owner?.id ?? null;
+
   const [created] = await db
     .insert(salesLeads)
     .values({
@@ -102,6 +110,9 @@ export async function POST(request: Request) {
       segment: String(new Date().getFullYear()),
       note: note?.slice(0, 2000) ?? "Automatisch binnengekomen via het aanmeldformulier.",
       firstContactOn: new Date().toISOString().slice(0, 10),
+      // Leads zijn eigenaar-werk: een nieuwe lead krijgt direct een
+      // verantwoordelijke (de eigenaar) i.p.v. ongekoppeld binnen te komen.
+      ownerId: ownerId ?? null,
     })
     .returning({ id: salesLeads.id });
 
