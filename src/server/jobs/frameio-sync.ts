@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clientIntegrations,
@@ -356,7 +356,19 @@ export async function pullFrameComments(
           frameAssetId: deliverables.frameAssetId,
         })
         .from(deliverables)
-        .where(and(isNull(deliverables.deletedAt), isNull(deliverables.publishedAt)));
+        // Comments ophalen voor video's die nog feedback kunnen krijgen: niet
+        // alleen "nog niet gepubliceerd", maar ook video's die expliciet in een
+        // review-fase staan (vangt een onterecht op "published" gezette video).
+        .where(
+          and(
+            isNull(deliverables.deletedAt),
+            isNotNull(deliverables.frameAssetId),
+            or(
+              isNull(deliverables.publishedAt),
+              inArray(deliverables.status, ["internal_review", "client_review", "editor_revision", "client_revision", "awaiting_editor", "editing"]),
+            ),
+          ),
+        );
 
       const linked = videos.filter((v) => v.frameAssetId);
       ctx.log(`${linked.length} video's gekoppeld aan Frame.io`);
