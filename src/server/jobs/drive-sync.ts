@@ -2,6 +2,7 @@ import "server-only";
 import {
   and,
   eq,
+  isNotNull,
 } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -195,4 +196,29 @@ export async function syncDriveChanges(mappingId: string) {
       }
     },
   );
+}
+
+/**
+ * Nachtelijke Drive-synchronisatie: werk alle gekoppelde klantmappen
+ * incrementeel bij (via de opgeslagen pageToken). Zo blijft Drive automatisch
+ * actueel i.p.v. alleen bij een handmatige actie. Draait alleen echt zodra de
+ * Google-secrets zijn ingevuld.
+ */
+export async function runDriveSync() {
+  const mappings = await db
+    .select({ id: driveMappings.id })
+    .from(driveMappings)
+    .where(and(eq(driveMappings.entityType, "client"), isNotNull(driveMappings.pageToken)));
+  let ok = 0;
+  let failed = 0;
+  for (const m of mappings) {
+    try {
+      const res = await syncDriveChanges(m.id);
+      if (res.ok) ok++;
+      else failed++;
+    } catch {
+      failed++;
+    }
+  }
+  return { ok: true, mappings: mappings.length, synced: ok, failed };
 }
