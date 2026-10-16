@@ -5,6 +5,7 @@ import { requireOwner } from "@/server/auth/context";
 import { getMigrationStatus } from "@/server/migration-status";
 import { isMondaySyncEnabled } from "@/server/app-settings";
 import { findDuplicateTaskGroups } from "@/server/task-dedup";
+import { getMondayExitCriteria } from "@/server/monday-exit";
 import { Badge, Card, CardHeader, PageHeader, Stat } from "@/components/ui";
 import { MondaySyncToggle } from "./migratie-toggle";
 import { TaskDedupCard } from "./task-dedup-card";
@@ -19,7 +20,7 @@ function when(d: string | null) {
 
 export default async function MigrationPage() {
   await requireOwner();
-  const [s, mondayOn, dupGroups] = await Promise.all([getMigrationStatus(), isMondaySyncEnabled(), findDuplicateTaskGroups()]);
+  const [s, mondayOn, dupGroups, exit] = await Promise.all([getMigrationStatus(), isMondaySyncEnabled(), findDuplicateTaskGroups(), getMondayExitCriteria()]);
   const a = s.attention;
   const issues =
     a.videosWithoutShoot + a.duplicateClients.length + a.duplicateLeads.length + a.wonLeadsUnconverted;
@@ -30,6 +31,25 @@ export default async function MigrationPage() {
         title="Monday-migratie"
         description="Controleoverzicht: hoeveel is uit Monday overgenomen, hoeveel is gekoppeld, en wat vraagt nog aandacht voordat Monday kan worden opgezegd."
       />
+
+      {/* De 8 exitcriteria: wanneer kan Monday eruit? */}
+      <Card padded={false} className="mb-6">
+        <CardHeader title={`Monday-exitcriteria — ${exit.behaald}/8 behaald`} subtitle="Monday mag pas worden opgezegd als alle acht aantoonbaar groen zijn." className="p-5 pb-2" />
+        <ul className="divide-y divide-[var(--color-line)]">
+          {exit.criteria.map((c) => (
+            <li key={c.n} className="flex items-start gap-3 px-5 py-3">
+              <Badge tone={c.status === "behaald" ? "good" : c.status === "deels" ? "warn" : "bad"}>
+                {c.status === "behaald" ? "behaald" : c.status === "deels" ? "deels" : "nog niet"}
+              </Badge>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium">{c.n}. {c.title}</div>
+                <div className="text-2xs text-[var(--color-ink-muted)]">{c.getest}</div>
+                {c.status !== "behaald" ? <div className="text-2xs text-[var(--color-ink-faint)]">Nog nodig: {c.open}</div> : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Card>
 
       <MondaySyncToggle enabled={mondayOn} />
 
