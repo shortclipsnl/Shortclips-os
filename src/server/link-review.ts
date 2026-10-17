@@ -57,3 +57,23 @@ export async function listLinkSuggestions() {
 
   return { rows: rows as LinkSuggestion[], summary: sum };
 }
+
+/**
+ * Goedkope telling van open video→opnamedag-suggesties die nog bevestigd moeten
+ * worden — voor de centrale kwaliteitsbewaking. Geen autorisatie hier: de
+ * aanroeper bepaalt de zichtbaarheid (het koppeloverzicht zelf is owner-only).
+ */
+export async function countOpenLinkSuggestions(): Promise<number> {
+  const res = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(deliverables)
+    .where(
+      and(
+        isNull(deliverables.deletedAt),
+        isNull(deliverables.productionDayId),
+        isNotNull(deliverables.suggestedProductionDayId),
+        eq(deliverables.linkReviewed, false),
+      ),
+    );
+  return res[0]?.n ?? 0;
+}

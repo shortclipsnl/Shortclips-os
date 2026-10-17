@@ -2,6 +2,7 @@ import "server-only";
 import { daysSince, daysUntil } from "@/lib/format";
 import { getDashboard } from "@/server/dashboard";
 import { listEditingProjects } from "@/server/editing";
+import { countOpenLinkSuggestions } from "@/server/link-review";
 import { isOwner, type Viewer } from "@/server/auth/context";
 
 /**
@@ -28,8 +29,25 @@ const EDIT = ["project_coordinator", "editor"];
 const SHOOT = ["project_coordinator", "videographer"];
 
 export async function getQualityOverview(viewer: Viewer): Promise<{ items: QualityItem[]; counts: Record<QualitySeverity, number> }> {
-  const [data, projects] = await Promise.all([getDashboard(viewer), listEditingProjects(viewer)]);
+  const owner = isOwner(viewer);
+  const [data, projects, openLinks] = await Promise.all([
+    getDashboard(viewer),
+    listEditingProjects(viewer),
+    // Het koppeloverzicht is owner-only; tel alleen als de viewer er bij kan.
+    owner ? countOpenLinkSuggestions() : Promise.resolve(0),
+  ]);
   const items: QualityItem[] = [];
+
+  // Video's met een voorgestelde opnamekoppeling die nog bevestigd moet worden
+  // (Deel 7 — centrale koppeling). Hergebruikt het bestaande koppeloverzicht.
+  if (owner && openLinks > 0) {
+    items.push({
+      id: "links-open", severity: "blauw", category: "Koppeling te bevestigen",
+      title: `${openLinks} video${openLinks === 1 ? "" : "'s"} wachten op koppeling`,
+      detail: "Voorgestelde opnamedag bevestigen of afwijzen → deadline wordt daarna automatisch gezet",
+      href: "/koppelingen", roles: ["project_coordinator"],
+    });
+  }
 
   // Voorspellend: projecten die nog NIET te laat zijn maar risico lopen (Deel 3.2).
   for (const p of projects) {
