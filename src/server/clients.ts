@@ -180,13 +180,18 @@ export async function getClientHub(viewer: Viewer, slug: string) {
 
     db.select({
       id: scripts.id, title: scripts.title, status: scripts.status,
-      pillar: scripts.pillar, updatedAt: scripts.updatedAt,
+      pillar: scripts.pillar, format: scripts.format, hook: scripts.hook,
+      updatedAt: scripts.updatedAt, approvedAt: scripts.approvedAt,
+      currentVersion: scripts.currentVersion,
+      productionDayId: scripts.productionDayId,
       shootOn: productionDays.scheduledOn,
+      shootTitle: productionDays.title,
+      clientNotes: scripts.clientNotes,
     })
       .from(scripts)
       .leftJoin(productionDays, eq(productionDays.id, scripts.productionDayId))
       .where(and(eq(scripts.clientId, client.id), isNull(scripts.deletedAt)))
-      .orderBy(desc(scripts.updatedAt)).limit(40),
+      .orderBy(desc(scripts.updatedAt)).limit(200),
 
     db.select({
       id: productionDays.id, title: productionDays.title,

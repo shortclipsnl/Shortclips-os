@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getClientHub, type ClientHub } from "@/server/clients";
+import { ScriptHistory } from "./script-history";
 import {
   Avatar,
   Badge,
@@ -196,7 +197,7 @@ export default async function ClientPage({
         <OverviewTab hub={hub} publishedThisMonth={publishedThisMonth} nextShoot={nextShoot} activeVideos={activeVideos.length} />
       ) : null}
       {active === "videos" ? <VideosTab hub={hub} /> : null}
-      {active === "scripts" ? <ScriptsTab hub={hub} /> : null}
+      {active === "scripts" ? <ScriptsTab hub={hub} canVI={viewer.permissions.has("video_intelligence:read")} /> : null}
       {active === "opnames" ? <ShootsTab hub={hub} /> : null}
       {active === "planning" ? <PlanningTab hub={hub} /> : null}
       {active === "resultaten" ? <ResultsTab hub={hub} /> : null}
@@ -408,43 +409,16 @@ function VideosTab({ hub }: { hub: ClientHub }) {
 
 /* ------------------------------ Scripts ---------------------------- */
 
-function ScriptsTab({ hub }: { hub: ClientHub }) {
-  if (hub.scripts.length === 0)
+function ScriptsTab({ hub, canVI }: { hub: ClientHub; canVI: boolean }) {
+  if (hub.scripts.length === 0 && !hub.files.some((f) => f.category === "Scripts" && !f.isFolder))
     return <Card><EmptyState title="Nog geen scripts" /></Card>;
+  const driveScripts = hub.files.filter((f) => f.category === "Scripts" && !f.isFolder);
   return (
-    <Card padded={false}>
-      <Table
-        head={
-          <>
-            <th className="sc-th">Script</th>
-            <th className="sc-th">Pijler</th>
-            <th className="sc-th">Status</th>
-            <th className="sc-th">Opname</th>
-            <th className="sc-th">Bijgewerkt</th>
-          </>
-        }
-      >
-        {hub.scripts.map((s) => (
-          <tr key={s.id} className="sc-row-link">
-            <td className="sc-td">
-              <Link href={`/scripts/${s.id}`} className="font-medium hover:underline">
-                {s.title}
-              </Link>
-            </td>
-            <td className="sc-td text-[var(--color-ink-muted)]">{s.pillar ?? "—"}</td>
-            <td className="sc-td">
-              <Badge tone={SCRIPT_STATUS[s.status]?.tone ?? "neutral"}>
-                {SCRIPT_STATUS[s.status]?.label ?? s.status}
-              </Badge>
-            </td>
-            <td className="sc-td text-[var(--color-ink-muted)]">
-              {s.shootOn ? formatDate(s.shootOn) : "—"}
-            </td>
-            <td className="sc-td text-[var(--color-ink-muted)]">{relativeDays(s.updatedAt)}</td>
-          </tr>
-        ))}
-      </Table>
-    </Card>
+    <ScriptHistory
+      scripts={hub.scripts}
+      driveScripts={driveScripts}
+      intelligenceHref={canVI ? "/video-intelligence" : null}
+    />
   );
 }
 
