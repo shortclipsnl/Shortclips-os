@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { setScriptingStatus } from "@/server/actions/scripting";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS } from "@/lib/statuses";
-import { Avatar } from "@/components/ui";
+import { ClientLogo } from "@/components/ui";
 import type { ScriptingRow } from "@/server/scripting";
 
 const FILTERS = [
@@ -109,7 +109,7 @@ export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }:
                 style={{ boxShadow: `inset 3px 0 0 ${FLAG_COLOR[r.flag]}` }}>
                 <td className="px-3 py-2">
                   <Link href={`/productions/${r.id}`} className="flex items-center gap-2 font-medium hover:underline">
-                    <Avatar name={r.clientName} color={r.clientColor} size={22} />
+                    <ClientLogo name={r.clientName} logoUrl={r.clientLogo} color={r.clientColor} size={22} />
                     {r.clientName}
                   </Link>
                 </td>

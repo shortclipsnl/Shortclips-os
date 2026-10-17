@@ -24,6 +24,7 @@ export type ScriptingRow = {
   clientName: string;
   clientSlug: string;
   clientColor: string | null;
+  clientLogo: string | null;
   scheduledOn: string;
   deadline: string;
   daysToShoot: number;
@@ -53,6 +54,7 @@ export async function listScripting(viewer: Viewer) {
       clientName: clients.name,
       clientSlug: clients.slug,
       clientColor: clients.color,
+      clientLogo: clients.logoUrl,
     })
     .from(productionDays)
     .innerJoin(clients, eq(clients.id, productionDays.clientId))
@@ -82,6 +84,7 @@ export async function listScripting(viewer: Viewer) {
       clientName: r.clientName,
       clientSlug: r.clientSlug,
       clientColor: r.clientColor,
+      clientLogo: r.clientLogo,
       scheduledOn: r.scheduledOn,
       deadline,
       daysToShoot: daysDiff(r.scheduledOn, today),
