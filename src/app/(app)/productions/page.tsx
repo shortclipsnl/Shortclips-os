@@ -4,7 +4,7 @@ import { AlertTriangle, CalendarCheck, CheckCircle2 } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getMonthShootStats, getShootOverview, listProductionDays, listVideographerOptions, nextShootPerClient } from "@/server/productions";
 import { ProdStatusCell, VideographerCell } from "./prod-cells";
-import { Avatar, Badge, Card, EmptyState, PageHeader, Stat } from "@/components/ui";
+import { Badge, Card, ClientLogo, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { daysUntil, formatDate, formatDateFull, plural, relativeDays } from "@/lib/format";
 import { PRODUCTION_STATUS } from "@/lib/statuses";
 
@@ -122,7 +122,7 @@ export default async function ProductionsPage({
                   className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-2)]"
                 >
                   <span className="flex items-center gap-2.5">
-                    <Avatar name={n.clientName} color={n.clientColor} size={24} />
+                    <ClientLogo name={n.clientName} logoUrl={n.clientLogo} color={n.clientColor} size={24} />
                     <span className="font-medium">{n.clientName}</span>
                   </span>
                   <span className="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]">
@@ -179,7 +179,7 @@ export default async function ProductionsPage({
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <Avatar name={d.clientName} color={d.clientColor} size={22} />
+                          <ClientLogo name={d.clientName} logoUrl={d.clientLogo} color={d.clientColor} size={22} />
                           <span className="font-medium">{d.clientName}</span>
                         </div>
                         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">

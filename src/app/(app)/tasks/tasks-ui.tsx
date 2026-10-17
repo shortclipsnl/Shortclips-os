@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { createTask, createTasksBulk, deleteTask, setTaskStatus, updateTask } from "@/server/actions/tasks";
-import { Avatar, Button, ErrorNote } from "@/components/ui";
+import { Button, ClientLogo, ErrorNote, TeamAvatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
 
 export type UserOption = { id: string; fullName: string };
@@ -18,9 +18,12 @@ export type TaskItemData = {
   priority: string;
   dueOn: string | null;
   assigneeId: string | null;
+  assigneeName: string | null;
+  assigneeAvatar: string | null;
   clientName: string | null;
   clientSlug: string | null;
   clientColor: string | null;
+  clientLogo: string | null;
 };
 
 const PRIORITIES = [
@@ -202,13 +205,19 @@ export function TaskItem({
         </span>
         {task.clientSlug ? (
           <Link href={`/clients/${task.clientSlug}`} className="mt-0.5 inline-flex items-center gap-1 text-xs text-[var(--color-ink-muted)] hover:underline">
-            <Avatar name={task.clientName ?? "?"} color={task.clientColor} size={14} />
+            <ClientLogo name={task.clientName ?? "?"} logoUrl={task.clientLogo} color={task.clientColor} size={14} />
             {task.clientName}
           </Link>
         ) : (
           <span className="mt-0.5 block text-xs text-[var(--color-ink-faint)]">intern</span>
         )}
       </span>
+
+      {task.assigneeName ? (
+        <span className="hidden shrink-0 items-center gap-1.5 text-xs text-[var(--color-ink-muted)] sm:inline-flex" title={`Toegewezen aan ${task.assigneeName}`}>
+          <TeamAvatar name={task.assigneeName} avatarUrl={task.assigneeAvatar} size={20} />
+        </span>
+      ) : null}
 
       {canWrite ? (
         <>

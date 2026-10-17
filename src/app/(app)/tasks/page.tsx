@@ -68,12 +68,16 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         priority: tasks.priority,
         dueOn: tasks.dueOn,
         assigneeId: tasks.assigneeId,
+        assigneeName: users.fullName,
+        assigneeAvatar: users.avatarUrl,
         clientName: clients.name,
         clientSlug: clients.slug,
         clientColor: clients.color,
+        clientLogo: clients.logoUrl,
       })
       .from(tasks)
       .leftJoin(clients, eq(clients.id, tasks.clientId))
+      .leftJoin(users, eq(users.id, tasks.assigneeId))
       .where(where)
       .orderBy(asc(tasks.dueOn), desc(tasks.priority))
       .limit(400);
