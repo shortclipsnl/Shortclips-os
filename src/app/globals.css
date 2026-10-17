@@ -30,6 +30,9 @@
   --color-canvas: #efeeea; /* app-achtergrond, crème */
   --color-surface: #ffffff;
   --color-surface-sunken: #f7f6f3;
+  /* Subtiel grijs vlak voor pills/badges/hover. Was alleen in .portal-studio
+   * gedefinieerd, waardoor die achtergronden in het interne portaal wegvielen. */
+  --color-surface-2: #eceae4;
   --color-line: #e3e1db;
   --color-line-strong: #cfccc4;
   --color-ink: #00003b;
