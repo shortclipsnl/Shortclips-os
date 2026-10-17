@@ -146,7 +146,8 @@ export default async function EditingPage() {
         <Card padded={false}>
           <CardHeader title="Editor-tarieven & capaciteit" subtitle="Tarief per video en weekcapaciteit per editor. De editingkosten worden hiermee automatisch berekend; een afwijkend tarief per video stel je op de videopagina in." className="p-5 pb-2" />
           {editors.length === 0 ? <EmptyState title="Geen editors gevonden" /> : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--color-line)] text-left text-xs text-[var(--color-ink-faint)]">
                   <th className="px-5 py-2 font-medium">Editor</th>
@@ -159,6 +160,7 @@ export default async function EditingPage() {
                 {editors.map((e) => <RateRow key={e.id} editor={e} />)}
               </tbody>
             </table>
+            </div>
           )}
         </Card>
       ) : null}

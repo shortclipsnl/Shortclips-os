@@ -110,7 +110,7 @@ function ClientCard({ c }: { c: BoardClient }) {
   const stopped = STOPPED.has(c.status);
 
   return (
-    <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5 hover:shadow-[var(--shadow-raised)]">
+    <div className="flex min-w-0 items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5 hover:shadow-[var(--shadow-raised)]">
       {/* Statusindicator: groen = actief, rood = niet-actief. */}
       <span
         className="size-2.5 shrink-0 rounded-full"
@@ -120,8 +120,8 @@ function ClientCard({ c }: { c: BoardClient }) {
       <Link href={`/clients/${c.slug}`} className="flex min-w-0 flex-1 items-center gap-3">
         <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={36} />
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="truncate font-medium">{c.name}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="min-w-0 flex-1 truncate font-medium">{c.name}</span>
             <Badge tone={CLIENT_STATUS[c.status]?.tone ?? "neutral"}>{CLIENT_STATUS[c.status]?.label ?? c.status}</Badge>
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-1">
