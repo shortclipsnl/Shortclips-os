@@ -37,7 +37,7 @@ export default async function FinancienPage() {
 
       {/* Boekhouding (Digiboox) — officiële cijfers */}
       <Card padded={false} className="mb-6 overflow-hidden ring-1 ring-[var(--color-brand-600)]/15">
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--color-brand-700,#0B2447)] px-5 py-3 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--color-brand-700,#00003b)] px-5 py-3 text-white">
           <div>
             <h2 className="text-base font-bold tracking-tight">Boekhouding · Digiboox</h2>
             <p className="text-xs text-white/70">

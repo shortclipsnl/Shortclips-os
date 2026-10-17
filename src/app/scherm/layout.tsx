@@ -9,7 +9,7 @@ export default function ScreenLayout({ children }: { children: React.ReactNode }
     <div
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(160deg,#0B2447 0%,#0a1f3d 60%,#071630 100%)",
+        background: "linear-gradient(160deg,#00003b 0%,#0a1f3d 60%,#071630 100%)",
         color: "#fff",
       }}
     >

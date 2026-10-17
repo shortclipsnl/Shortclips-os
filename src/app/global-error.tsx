@@ -27,7 +27,7 @@ export default function GlobalError({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0B2447",
+          background: "#00003b",
           color: "#ffffff",
           fontFamily: "Inter, Segoe UI, Arial, sans-serif",
           padding: "24px",

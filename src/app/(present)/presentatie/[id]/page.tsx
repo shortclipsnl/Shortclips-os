@@ -10,7 +10,7 @@ import { PrintBar } from "./print-bar";
 export const metadata: Metadata = { title: "Presentatie" };
 export const dynamic = "force-dynamic";
 
-const NAVY = "#0B2447";
+const NAVY = "#00003b";
 const BLUE = "#2E90FA";
 const ORANGE = "#FF6A00";
 

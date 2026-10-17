@@ -8,7 +8,7 @@ export function PrintBar({ backHref }: { backHref: string }) {
     <div className="no-print fixed top-4 right-4 z-50 flex items-center gap-2">
       <Link
         href={backHref}
-        className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-[#0B2447] shadow hover:bg-white"
+        className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-[#00003b] shadow hover:bg-white"
       >
         <ArrowLeft className="size-3.5" /> Terug
       </Link>

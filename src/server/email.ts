@@ -75,7 +75,7 @@ export function portalEmailHtml(opts: {
   ctaLabel: string;
   ctaUrl: string;
 }): string {
-  const navy = "#0B2447";
+  const navy = "#00003b";
   const orange = "#FF6A00";
   return `<!doctype html><html lang="nl"><body style="margin:0;background:#f4f5f7;font-family:Inter,Segoe UI,Arial,sans-serif;color:${navy};">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 0;">
