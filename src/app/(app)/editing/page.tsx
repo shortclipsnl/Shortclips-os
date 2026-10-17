@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireInternal } from "@/server/auth/context";
 import { getEditingDashboard, listEditorsWithRates, listEditingProjects } from "@/server/editing";
+import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { editorCapacityMap } from "@/server/metrics";
 import { editorLoad, LOAD_LABEL } from "@/lib/metrics";
 import { Avatar, Badge, Card, CardHeader, ClientLogo, EmptyState, PageHeader, Table } from "@/components/ui";
 import { euro, formatDate, num } from "@/lib/format";
 import { RateRow } from "./editing-ui";
 import { EditingBoard } from "./editing-board";
+import { ShootTimers } from "./shoot-timers";
 
 export const metadata: Metadata = { title: "Editing" };
 export const dynamic = "force-dynamic";
@@ -24,12 +26,14 @@ export default async function EditingPage() {
   const canSeeCosts = viewer.permissions.has("finance:read_costs");
   const canManage = viewer.permissions.has("team:write");
 
-  const [data, editors, capMap, projects] = await Promise.all([
+  const [data, editors, capMap, projects, shoots] = await Promise.all([
     getEditingDashboard(viewer),
     canManage ? listEditorsWithRates() : Promise.resolve([]),
     editorCapacityMap(),
     listEditingProjects(viewer),
+    getShootDeadlines(viewer),
   ]);
+  const shootsAtRisk = shoots.filter((s) => s.atRisk).length;
 
   const editorOptions = [...new Set(projects.map((p) => p.editorName ?? "—"))].sort((a, b) => a.localeCompare(b, "nl"));
   const clientOptions = [...new Set(projects.map((p) => p.clientName))].sort((a, b) => a.localeCompare(b, "nl"));
@@ -37,6 +41,20 @@ export default async function EditingPage() {
   return (
     <div className="mx-auto max-w-[1300px]">
       <PageHeader title="Editing" description="Alle video's in de editingproductie, gegroepeerd op status — wat vraagt aandacht, wat ligt bij de editor, wat wacht op de klant en wat is afgerond." />
+
+      {/* Deadlinebewaking per klantopname (§7): 14 werkdagen tot klantoplevering,
+          editor levert 2 werkdagen eerder. Live uit de datum van vandaag. */}
+      {shoots.length > 0 ? (
+        <div className="mb-6">
+          <div className="mb-3 flex items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+            <h2 className="text-sm font-bold tracking-tight">Opnames & deadlines</h2>
+            <span className="text-xs text-white/80">
+              {shootsAtRisk > 0 ? `${shootsAtRisk} vragen aandacht · ` : ""}14 werkdagen tot oplevering, editor −2
+            </span>
+          </div>
+          <ShootTimers shoots={shoots} />
+        </div>
+      ) : null}
 
       {/* Projecten, status-gegroepeerd: urgentie bovenaan, compact en filterbaar. */}
       {projects.length === 0 ? (
