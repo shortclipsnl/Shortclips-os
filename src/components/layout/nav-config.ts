@@ -24,6 +24,7 @@ export const NAVIGATION: NavGroup[] = [
     title: "Overzicht",
     items: [
       { href: "/dashboard", label: "Vandaag", icon: "LayoutDashboard" },
+      { href: "/kwaliteit", label: "Kwaliteit & Aandachtspunten", icon: "ShieldCheck", match: "/kwaliteit" },
     ],
   },
   {
@@ -31,6 +32,7 @@ export const NAVIGATION: NavGroup[] = [
     title: "Werk",
     items: [
       { href: "/clients", label: "Onze klanten", icon: "Building2", permissions: ["clients:read"], match: "/clients" },
+      { href: "/planning", label: "Productieplanning", icon: "CalendarRange", permissions: ["productions:read", "videos:read"], match: "/planning" },
       { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },
       { href: "/scripting", label: "Scripting", icon: "ScrollText", permissions: ["scripts:read"], match: "/scripting" },
       { href: "/productions", label: "Opnameplanning", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
