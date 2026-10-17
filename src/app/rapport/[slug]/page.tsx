@@ -4,7 +4,7 @@ import { PrintButton } from "./print-button";
 
 export const dynamic = "force-dynamic";
 
-const NAVY = "#0B2447";
+const NAVY = "#00003b";
 const BLUE = "#2E90FA";
 const ORANGE = "#FF6A00";
 
@@ -44,7 +44,7 @@ export default async function RapportPage({ params, searchParams }: { params: Pr
         @media print { .no-print { display: none !important; } .page-break { break-before: page; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
         * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       `}</style>
-      <PrintButton />
+      <PrintButton slug={slug} days={days} />
 
       <div style={{ maxWidth: 840, margin: "0 auto", padding: "0 28px 60px", fontFamily: "Inter, system-ui, sans-serif" }}>
         {/* Titelblok */}

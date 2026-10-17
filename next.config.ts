@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   // Deze pakketten mogen niet gebundeld worden: pg opent native sockets en
   // PGlite laadt een WASM-bestand vanaf schijf.
-  serverExternalPackages: ["pg", "@electric-sql/pglite", "mammoth", "ffmpeg-static", "ffprobe-static"],
+  serverExternalPackages: ["pg", "@electric-sql/pglite", "mammoth", "ffmpeg-static", "ffprobe-static", "puppeteer-core", "@sparticuz/chromium"],
   experimental: {
     // Server actions krijgen soms grotere payloads (import-wizard, scripts).
     serverActions: { bodySizeLimit: "4mb" },
