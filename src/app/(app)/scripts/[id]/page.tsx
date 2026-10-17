@@ -9,7 +9,10 @@ import {
   formatDateTime,
 } from "@/lib/format";
 import { SCRIPT_STATUS, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
+import { getLatestScriptControl } from "@/server/script-control";
+import type { ScriptControlResult } from "@/server/actions/script-control";
 import { ScriptEditor, ScriptStatusControl } from "./editor";
+import { ScriptControlPanel } from "./script-control-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +36,10 @@ export default async function ScriptPage({
   const { id } = await params;
   const { script, versions, videos } = await getScript(viewer, id);
   const canWrite = viewer.permissions.has("scripts:write");
+  const canControl = viewer.permissions.has("ai:read");
+  const latestControl = canControl
+    ? ((await getLatestScriptControl(script.id, script.clientId)) as ScriptControlResult | null)
+    : null;
 
   return (
     <div className="mx-auto max-w-[1200px]">
@@ -88,6 +95,15 @@ export default async function ScriptPage({
               />
             </div>
           </Card>
+
+          {canControl ? (
+            <ScriptControlPanel
+              scriptId={script.id}
+              orig={{ hook: script.hook ?? "", body: script.body ?? "", cta: script.cta ?? "" }}
+              canApply={canWrite}
+              initial={latestControl}
+            />
+          ) : null}
         </div>
 
         <div className="space-y-5">
