@@ -1,7 +1,8 @@
 import "server-only";
-import { sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import type { Viewer } from "@/server/auth/context";
+import { clients, deliverables, users } from "@/db/schema";
+import { scopeToClients, type Viewer } from "@/server/auth/context";
 
 const rows = <T,>(r: unknown): T[] => ((r as { rows?: T[] }).rows ?? (r as T[])) as T[];
 
@@ -75,6 +76,78 @@ export async function getEditingDashboard(_viewer: Viewer) {
     editors: rows<EditorRow>(editorRes).map((e) => ({ ...e, leave: leaveByUser.get(e.editor_id) ?? null })),
     clients: rows<EditingClientRow>(clientRes),
   };
+}
+
+/* ---- Project-gerichte lijst voor het editing-dashboard (§4) ---- */
+
+export type EditingBucket = "aandacht" | "editor" | "klant" | "afgerond";
+export type EditingProject = {
+  id: string;
+  title: string;
+  status: string;
+  clientName: string;
+  clientColor: string | null;
+  clientSlug: string;
+  editorName: string | null;
+  dueOn: string | null;
+  bucket: EditingBucket;
+  isLate: boolean;
+  daysToDeadline: number | null;
+};
+
+const CLIENT_STATUSES = ["client_review", "client_revision"];
+const DONE_STATUSES = ["approved", "ready_to_publish", "scheduled", "published", "analysis_available"];
+
+/** Alle video's die relevant zijn voor de editingproductie, per status gebucket.
+ *  Gescoped: editors zien uitsluitend eigen werk; coördinatoren hun klanten. */
+export async function listEditingProjects(viewer: Viewer): Promise<EditingProject[]> {
+  const conds = [
+    isNull(deliverables.deletedAt),
+    scopeToClients(viewer, deliverables.clientId),
+    // Actief, óf recent afgerond (laatste 30 dagen) zodat de "Afgerond"-kolom gevuld is.
+    or(
+      notInArray(deliverables.status, ["published", "analysis_available"] as const),
+      gte(deliverables.publishedAt, sql`now() - interval '30 days'`),
+    ),
+  ];
+  if (viewer.isEditorOnly) conds.push(eq(deliverables.editorId, viewer.id));
+
+  const rawRows = await db
+    .select({
+      id: deliverables.id,
+      title: deliverables.title,
+      status: deliverables.status,
+      dueOn: deliverables.dueOn,
+      statusChangedAt: deliverables.statusChangedAt,
+      clientName: clients.name,
+      clientColor: clients.color,
+      clientSlug: clients.slug,
+      editorName: users.fullName,
+    })
+    .from(deliverables)
+    .innerJoin(clients, eq(clients.id, deliverables.clientId))
+    .leftJoin(users, eq(users.id, deliverables.editorId))
+    .where(and(...conds))
+    .orderBy(sql`${deliverables.dueOn} asc nulls last`, desc(deliverables.statusChangedAt))
+    .limit(500);
+
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  return rawRows.map((r) => {
+    // Te laat = deadline verstreken en het editwerk is nog niet afgerond.
+    const isLate = Boolean(r.dueOn && r.dueOn < today && !DONE_STATUSES.includes(r.status));
+    let bucket: EditingBucket;
+    if (isLate) bucket = "aandacht";
+    else if (DONE_STATUSES.includes(r.status)) bucket = "afgerond";
+    else if (CLIENT_STATUSES.includes(r.status)) bucket = "klant";
+    else bucket = "editor";
+    const daysToDeadline = r.dueOn ? Math.round((new Date(r.dueOn).getTime() - new Date(today).getTime()) / 86400000) : null;
+    return {
+      id: r.id, title: r.title, status: r.status,
+      clientName: r.clientName, clientColor: r.clientColor, clientSlug: r.clientSlug,
+      editorName: r.editorName, dueOn: r.dueOn,
+      bucket, isLate, daysToDeadline,
+    };
+  });
 }
 
 /** Lijst van editors (users die video's monteren of editor-rol hebben) + hun tarief. */

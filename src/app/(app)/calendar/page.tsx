@@ -204,6 +204,16 @@ export default async function CalendarPage({
           )}
         </Card>
       ) : (
+        <>
+        {items.length === 0 ? (
+          <div className="mb-3 rounded-[var(--radius-md)] border border-dashed border-[var(--color-line-strong)] bg-[var(--color-surface-sunken)]/50 px-4 py-3 text-sm text-[var(--color-ink-muted)]">
+            Niets gepland in deze maand. Plan content in via{" "}
+            <Link href="/calendar/plannen" className="font-medium text-[var(--color-brand-600)] hover:underline">
+              Contentplanning plannen
+            </Link>
+            .
+          </div>
+        ) : null}
         <Card padded={false} className="overflow-hidden">
           <div className="grid grid-cols-7 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)]">
             {WEEKDAYS.map((d) => (
@@ -272,6 +282,7 @@ export default async function CalendarPage({
             })}
           </div>
         </Card>
+        </>
       )}
 
       <div className="mt-4 flex flex-wrap gap-3 text-xs text-[var(--color-ink-muted)]">

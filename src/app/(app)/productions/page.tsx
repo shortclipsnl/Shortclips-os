@@ -73,12 +73,13 @@ export default async function ProductionsPage({
       {/* Overzicht: deze week / deze maand / eerstvolgende + per videograaf. */}
       <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Deze week" value={overview.thisWeek} hint="komende 7 dagen" href="/productions?periode=deze-week" />
-        <Stat label={`Gepland in ${monthLabel}`} value={monthStats.planned} />
-        <Stat label="Afgerond deze maand" value={monthStats.completed} tone={monthStats.completed > 0 ? "good" : undefined} />
+        <Stat label={`Gepland in ${monthLabel}`} value={monthStats.planned} href="/productions?periode=komend" />
+        <Stat label="Afgerond deze maand" value={monthStats.completed} tone={monthStats.completed > 0 ? "good" : undefined} href="/productions?periode=verleden" />
         <Stat
           label="Eerstvolgende opname"
           value={next ? new Date(next.scheduledOn).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }) : "—"}
           hint={next ? next.clientName : "niets gepland"}
+          href={next ? "/productions?periode=deze-week" : undefined}
         />
       </div>
 

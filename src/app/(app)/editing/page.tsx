@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireInternal } from "@/server/auth/context";
-import { getEditingDashboard, listEditorsWithRates } from "@/server/editing";
+import { getEditingDashboard, listEditorsWithRates, listEditingProjects } from "@/server/editing";
 import { editorCapacityMap } from "@/server/metrics";
 import { editorLoad, LOAD_LABEL } from "@/lib/metrics";
 import { Avatar, Badge, Card, CardHeader, EmptyState, PageHeader, Table } from "@/components/ui";
 import { euro, formatDate, num } from "@/lib/format";
 import { RateRow } from "./editing-ui";
+import { EditingBoard } from "./editing-board";
 
-export const metadata: Metadata = { title: "Editors" };
+export const metadata: Metadata = { title: "Editing" };
 export const dynamic = "force-dynamic";
 
 const LEVEL_COLOR: Record<string, string> = {
@@ -23,18 +24,31 @@ export default async function EditingPage() {
   const canSeeCosts = viewer.permissions.has("finance:read_costs");
   const canManage = viewer.permissions.has("team:write");
 
-  const [data, editors, capMap] = await Promise.all([
+  const [data, editors, capMap, projects] = await Promise.all([
     getEditingDashboard(viewer),
     canManage ? listEditorsWithRates() : Promise.resolve([]),
     editorCapacityMap(),
+    listEditingProjects(viewer),
   ]);
+
+  const editorOptions = [...new Set(projects.map((p) => p.editorName ?? "—"))].sort((a, b) => a.localeCompare(b, "nl"));
+  const clientOptions = [...new Set(projects.map((p) => p.clientName))].sort((a, b) => a.localeCompare(b, "nl"));
 
   return (
     <div className="mx-auto max-w-[1300px]">
-      <PageHeader title="Editing Dashboard" description="De volledige editingproductie per editor en per klant, met automatisch berekende editingkosten." />
+      <PageHeader title="Editing" description="Alle video's in de editingproductie, gegroepeerd op status — wat vraagt aandacht, wat ligt bij de editor, wat wacht op de klant en wat is afgerond." />
 
-      {/* Per editor */}
-      <div className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">Per editor</div>
+      {/* Projecten, status-gegroepeerd: urgentie bovenaan, compact en filterbaar. */}
+      {projects.length === 0 ? (
+        <Card className="mb-6"><EmptyState title="Geen video's in de editingproductie" /></Card>
+      ) : (
+        <div className="mb-6">
+          <EditingBoard projects={projects} editorOptions={editorOptions} clientOptions={clientOptions} />
+        </div>
+      )}
+
+      {/* Werkvoorraad per editor */}
+      <div className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">Werkvoorraad per editor</div>
       {data.editors.length === 0 ? (
         <Card className="mb-6"><EmptyState title="Nog geen editwerk toegewezen" /></Card>
       ) : (

@@ -48,3 +48,6 @@ next-env.d.ts
 # Lokale pilot-logins (nooit committen)
 *.local.md
 PILOT-LOGINS*
+
+# Video Intelligence transcriptie-venv
+.venv-vi/

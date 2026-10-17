@@ -11,6 +11,7 @@ import type { ScriptingRow } from "@/server/scripting";
 
 const FILTERS = [
   { key: "alle", label: "Alle aankomend" },
+  { key: "niet-afgerond", label: "Nog niet afgerond" },
   { key: "deze-week", label: "Deze week" },
   { key: "volgende-week", label: "Volgende week" },
   { key: "nadert", label: "Deadline nadert" },
@@ -47,13 +48,14 @@ const FLAG_COLOR: Record<string, string> = {
   done: "var(--color-good)",
 };
 
-export function ScriptingBoard({ rows, clientOptions, canWrite }: { rows: ScriptingRow[]; clientOptions: string[]; canWrite: boolean }) {
-  const [filter, setFilter] = useState<string>("alle");
+export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }: { rows: ScriptingRow[]; clientOptions: string[]; canWrite: boolean; defaultFilter?: string }) {
+  const [filter, setFilter] = useState<string>(FILTERS.some((f) => f.key === defaultFilter) ? defaultFilter! : "alle");
   const [status, setStatus] = useState<string>("alle");
   const [client, setClient] = useState<string>("alle");
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
+      if (filter === "niet-afgerond" && r.done) return false;
       if (filter === "deze-week" && !(r.daysToShoot >= 0 && r.daysToShoot <= 7)) return false;
       if (filter === "volgende-week" && !(r.daysToShoot > 7 && r.daysToShoot <= 14)) return false;
       if (filter === "nadert" && !(r.flag === "amber")) return false;

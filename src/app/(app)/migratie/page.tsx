@@ -115,6 +115,68 @@ export default async function MigrationPage() {
         </ul>
       </Card>
 
+      {/* #10 — opschonen mensen & namen (alleen lezen, voor goedkeuring) */}
+      {(() => {
+        const p = s.people;
+        const total = p.duplicateNames.length + p.placeholders.length + p.firstNameOnly.length;
+        return (
+          <Card padded={false} className="mb-6">
+            <CardHeader
+              title={`Opschonen: mensen & namen — ${total} aandachtspunt${total === 1 ? "" : "en"}`}
+              subtitle="Kandidaten om op te schonen. Niets wordt automatisch verwijderd — bekijk de lijst en geef aan wat weg of samengevoegd mag worden."
+              className="p-5 pb-2"
+            />
+            {total === 0 ? (
+              <div className="flex items-center gap-3 px-5 py-4 text-sm text-[var(--color-ink-muted)]">
+                <CheckCircle2 className="size-4 text-[var(--color-good)]" /> Geen dubbele of onvolledige teamleden gevonden.
+              </div>
+            ) : (
+              <div className="divide-y divide-[var(--color-line)]">
+                {p.duplicateNames.length > 0 ? (
+                  <div className="px-5 py-3">
+                    <div className="text-sm font-medium">Mogelijk dubbele teamleden (zelfde naam)</div>
+                    <ul className="mt-1.5 space-y-1">
+                      {p.duplicateNames.map((d) => (
+                        <li key={d.nm} className="text-xs text-[var(--color-ink-muted)]">
+                          <span className="font-medium text-[var(--color-ink)]">{d.nm}</span> — {d.n}× · {d.emails}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {p.placeholders.length > 0 ? (
+                  <div className="px-5 py-3">
+                    <div className="text-sm font-medium">Niet-geactiveerde of placeholder-accounts</div>
+                    <ul className="mt-1.5 space-y-1">
+                      {p.placeholders.map((u) => (
+                        <li key={u.email} className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-ink-muted)]">
+                          <span className="font-medium text-[var(--color-ink)]">{u.full_name}</span>
+                          <span>{u.email}</span>
+                          <Badge tone={u.status === "invited" ? "warn" : "neutral"}>{u.status === "invited" ? "nooit ingelogd" : u.status}</Badge>
+                          <span className="text-[var(--color-ink-faint)]">{u.primary_role}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {p.firstNameOnly.length > 0 ? (
+                  <div className="px-5 py-3">
+                    <div className="text-sm font-medium">Teamleden met alleen een voornaam (naam aanvullen)</div>
+                    <ul className="mt-1.5 space-y-1">
+                      {p.firstNameOnly.map((u) => (
+                        <li key={u.email} className="text-xs text-[var(--color-ink-muted)]">
+                          <span className="font-medium text-[var(--color-ink)]">{u.full_name}</span> — {u.email} · {u.primary_role}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </Card>
+        );
+      })()}
+
       {/* Recente sync-jobs */}
       <Card padded={false}>
         <CardHeader title="Recente synchronisaties" subtitle="De laatste Monday-importruns." className="p-5 pb-2" />

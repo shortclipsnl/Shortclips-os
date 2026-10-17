@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireOwner } from "@/server/auth/context";
 import { getManagementFinance } from "@/server/management-finance";
 import { Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { compact, euro, formatDate } from "@/lib/format";
@@ -13,7 +14,9 @@ export const metadata: Metadata = { title: "Financiën" };
 export const dynamic = "force-dynamic";
 
 export default async function FinancienPage() {
-  // getManagementFinance checkt finance:read — feitelijk alleen de eigenaar.
+  // Financiën is uitsluitend voor de eigenaar — hard afgedwongen op paginaniveau
+  // (defense-in-depth), náást de finance:read-check in getManagementFinance.
+  await requireOwner();
   const d = await getManagementFinance();
   const companyByPeriod = new Map(d.companyRows.map((c) => [c.period, c as unknown as CompanyMonth]));
   const monthsDesc = [...d.months].reverse();

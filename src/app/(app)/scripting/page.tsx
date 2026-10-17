@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { listScripting } from "@/server/scripting";
 import { PageHeader, Stat } from "@/components/ui";
@@ -7,10 +9,11 @@ import { ScriptingBoard } from "./scripting-ui";
 export const metadata: Metadata = { title: "Scripting" };
 export const dynamic = "force-dynamic";
 
-export default async function ScriptingPage() {
+export default async function ScriptingPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const viewer = await requireInternal();
   const canWrite = viewer.permissions.has("scripts:write");
   const { rows, stats, clientOptions } = await listScripting(viewer);
+  const filter = (await searchParams).filter;
 
   return (
     <div className="mx-auto max-w-[1200px]">
@@ -19,14 +22,21 @@ export default async function ScriptingPage() {
         description="Alle aankomende opnames en hun scripting in één overzicht — automatisch gekoppeld aan de opnameplanning. Scripts moeten uiterlijk 7 dagen vóór de opname klaar zijn."
       />
 
+      {/* Klikbare statusblokken: openen direct de bijbehorende filter hieronder. */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Aankomende opnames" value={String(stats.upcoming)} />
-        <Stat label="Nog niet afgerond" value={String(stats.notDone)} tone={stats.notDone > 0 ? "info" : "good"} />
-        <Stat label="Deadline nadert" value={String(stats.deadlineSoon)} tone={stats.deadlineSoon > 0 ? "warn" : "good"} hint="binnen 7 dagen" />
-        <Stat label="Te laat" value={String(stats.late)} tone={stats.late > 0 ? "bad" : "good"} />
+        <Stat label="Aankomende opnames" value={String(stats.upcoming)} href="/scripting?filter=alle" />
+        <Stat label="Nog niet afgerond" value={String(stats.notDone)} tone={stats.notDone > 0 ? "warn" : "good"} href="/scripting?filter=niet-afgerond" />
+        <Stat label="Deadline nadert" value={String(stats.deadlineSoon)} tone={stats.deadlineSoon > 0 ? "warn" : "good"} hint="binnen 7 dagen" href="/scripting?filter=nadert" />
+        <Stat label="Te laat" value={String(stats.late)} tone={stats.late > 0 ? "bad" : "good"} href="/scripting?filter=te-laat" />
       </div>
 
-      <ScriptingBoard rows={rows} clientOptions={clientOptions} canWrite={canWrite} />
+      {viewer.permissions.has("video_intelligence:read") ? (
+        <Link href="/video-intelligence" className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-brand-600)] hover:underline">
+          <Sparkles className="size-4" /> Video-patronen per klant bekijken (input voor je script)
+        </Link>
+      ) : null}
+
+      <ScriptingBoard rows={rows} clientOptions={clientOptions} canWrite={canWrite} defaultFilter={filter} />
     </div>
   );
 }

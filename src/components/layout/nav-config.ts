@@ -1,5 +1,8 @@
 import type { PermissionKey } from "@/server/auth/permissions";
 
+/** Rollen zoals in de user_role-enum (zie src/db/schema/enums.ts). */
+type UserRole = "owner" | "admin" | "project_coordinator" | "content_creator" | "videographer" | "editor" | "finance" | "client";
+
 export type NavItem = {
   href: string;
   label: string;
@@ -10,50 +13,46 @@ export type NavItem = {
   match?: string;
   /** Alleen zichtbaar voor de eigenaar (Janno). */
   ownerOnly?: boolean;
-  /** Náást de eigenaar ook zichtbaar voor deze e-mailadressen (lowercase). */
-  allowEmails?: string[];
+  /** Náást de eigenaar ook zichtbaar voor deze rollen (rolgebaseerd, geen e-mailuitzonderingen). */
+  roles?: UserRole[];
 };
 
 export type NavGroup = { title: string; items: NavItem[] };
 
 export const NAVIGATION: NavGroup[] = [
   {
-    title: "Werk",
+    title: "Overzicht",
     items: [
       { href: "/dashboard", label: "Vandaag", icon: "LayoutDashboard" },
+    ],
+  },
+  {
+    // Alles rondom de productie: klant, planning, script, opname, edit, video's.
+    title: "Werk",
+    items: [
       { href: "/clients", label: "Onze klanten", icon: "Building2", permissions: ["clients:read"], match: "/clients" },
-      { href: "/tasks", label: "Taken", icon: "CircleCheck", permissions: ["tasks:read"], match: "/tasks" },
       { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },
-    ],
-  },
-  {
-    title: "Productie",
-    items: [
-      { href: "/videos", label: "Video's", icon: "Clapperboard", permissions: ["videos:read"], match: "/videos" },
-      { href: "/editing", label: "Editors", icon: "Scissors", permissions: ["videos:read"], match: "/editing" },
-    ],
-  },
-  {
-    title: "Opnames",
-    items: [
-      { href: "/productions", label: "Opnameplanning", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
       { href: "/scripting", label: "Scripting", icon: "ScrollText", permissions: ["scripts:read"], match: "/scripting" },
+      { href: "/productions", label: "Opnameplanning", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
+      { href: "/editing", label: "Editing", icon: "Scissors", permissions: ["videos:read"], match: "/editing" },
+      { href: "/videos", label: "Video's", icon: "Clapperboard", permissions: ["videos:read"], match: "/videos" },
+    ],
+  },
+  {
+    title: "Resultaten",
+    items: [
+      { href: "/analytics", label: "Resultatenoverzicht", icon: "TrendingUp", permissions: ["analytics:read"], match: "/analytics" },
+      { href: "/video-intelligence", label: "Video Intelligence", icon: "Sparkles", permissions: ["video_intelligence:read"], match: "/video-intelligence" },
     ],
   },
   {
     title: "Team",
     items: [
+      { href: "/tasks", label: "Taken", icon: "CircleCheck", permissions: ["tasks:read"], match: "/tasks" },
       { href: "/team", label: "Team", icon: "Users", permissions: ["team:read", "editors:read"], match: "/team" },
       { href: "/capaciteit", label: "Teamcapaciteit", icon: "Gauge", permissions: ["team:read", "editors:read"], match: "/capaciteit" },
       { href: "/verlof", label: "Vakantie", icon: "Palmtree", match: "/verlof" },
       { href: "/meetings", label: "Teammeetings", icon: "Presentation", match: "/meetings" },
-    ],
-  },
-  {
-    title: "Inzicht",
-    items: [
-      { href: "/analytics", label: "Resultaten", icon: "TrendingUp", permissions: ["analytics:read"], match: "/analytics" },
-      { href: "/leads", label: "Leads", icon: "Target", ownerOnly: true, match: "/leads" },
     ],
   },
   {
@@ -68,11 +67,13 @@ export const NAVIGATION: NavGroup[] = [
     ],
   },
   {
+    // Beheer, inclusief de uitsluitend voor de eigenaar zichtbare onderdelen.
     title: "Beheer",
     items: [
+      { href: "/leads", label: "Leads", icon: "Target", ownerOnly: true, match: "/leads" },
       { href: "/financien", label: "Financiën", icon: "Landmark", ownerOnly: true, match: "/financien" },
-      { href: "/klantenbeheer", label: "Klantenbeheer", icon: "UserCog", allowEmails: ["milou@shortclips.nl"], match: "/klantenbeheer" },
       { href: "/editkosten", label: "Winst & editkosten", icon: "Euro", ownerOnly: true, match: "/editkosten" },
+      { href: "/klantenbeheer", label: "Klantenbeheer", icon: "UserCog", roles: ["project_coordinator"], match: "/klantenbeheer" },
       { href: "/koppelingen", label: "Koppeling controleren", icon: "Link2", ownerOnly: true, match: "/koppelingen" },
       { href: "/settings/agendas", label: "Agenda's", icon: "CalendarRange", ownerOnly: true, match: "/settings/agendas" },
       { href: "/settings/integrations", label: "Koppelingen", icon: "Plug", ownerOnly: true, match: "/settings/integrations" },

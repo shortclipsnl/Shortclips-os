@@ -65,6 +65,10 @@ export const PERMISSIONS = {
   "ai:read": "AI-inzichten bekijken",
   "ai:run": "AI-analyses starten",
 
+  // Video Intelligence
+  "video_intelligence:read": "Video Intelligence-analyses bekijken",
+  "video_intelligence:run": "Video's toevoegen en laten analyseren",
+
   // Beheer
   "integrations:read": "Koppelingen en hun status bekijken",
   "integrations:write": "Koppelingen instellen en synchronisatie starten",
@@ -154,6 +158,8 @@ export const ROLE_DEFINITIONS: Array<{
       "editors:read",
       "ai:read",
       "ai:run",
+      "video_intelligence:read",
+      "video_intelligence:run",
       "integrations:read",
       "automations:read",
     ],
@@ -171,6 +177,7 @@ export const ROLE_DEFINITIONS: Array<{
       "calendar:write",
       "analytics:read",
       "ai:read",
+      "video_intelligence:read",
     ],
   },
   {
@@ -208,6 +215,7 @@ export const ROLE_DEFINITIONS: Array<{
       "editors:read",
       "reports:read",
       "analytics:read",
+      "video_intelligence:read",
     ],
   },
   {

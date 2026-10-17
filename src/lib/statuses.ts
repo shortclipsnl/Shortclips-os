@@ -72,7 +72,7 @@ export const VIDEO_PHASE_ORDER: VideoPhase[] = [
   "gepland", "beelden_binnen", "in_edit", "interne_controle", "bij_klant", "feedback_verwerken", "klaar",
 ];
 
-const STATUS_TO_PHASE: Record<VideoStage, VideoPhase> = {
+export const STATUS_TO_PHASE: Record<VideoStage, VideoPhase> = {
   recorded: "beelden_binnen",
   footage_upload: "beelden_binnen",
   awaiting_editor: "beelden_binnen",

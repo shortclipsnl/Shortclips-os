@@ -9,3 +9,4 @@ export * from "./platform";
 export * from "./ops";
 export * from "./ai-tools";
 export * from "./team-planning";
+export * from "./video-intelligence";

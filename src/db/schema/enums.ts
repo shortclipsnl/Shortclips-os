@@ -228,6 +228,45 @@ export const fileSourceEnum = pgEnum("file_source", [
   "upload",
 ]);
 
+/* ---- Video Intelligence ---- */
+
+export const videoAnalysisStatusEnum = pgEnum("video_analysis_status", [
+  "queued", // aangemaakt, wacht op verwerking
+  "downloading", // bron ophalen (yt-dlp)
+  "processing", // ffmpeg/AI bezig
+  "needs_ai", // meetbare stappen klaar; transcriptie/visuele AI nog niet beschikbaar (geen tool/sleutel)
+  "partial", // deels gelukt (sommige stappen overgeslagen)
+  "complete", // alle stappen klaar
+  "failed", // kernstap mislukt
+]);
+
+export const videoAnalysisSourceEnum = pgEnum("video_analysis_source", [
+  "platform_url", // publieke TikTok/Reel/Short-link, opgehaald via yt-dlp
+  "upload", // handmatig geüpload MP4
+  "frameio", // later: origineel uit Frame.io
+]);
+
+export const videoAnalysisStepEnum = pgEnum("video_analysis_step", [
+  "download",
+  "probe",
+  "shots",
+  "editing",
+  "transcribe",
+  "ocr",
+  "vision",
+  "hook",
+  "structure",
+  "insights",
+]);
+
+export const videoAnalysisStepStatusEnum = pgEnum("video_analysis_step_status", [
+  "pending",
+  "running",
+  "done",
+  "skipped", // bewust overgeslagen (tool/sleutel ontbreekt) — géén nepdata
+  "failed",
+]);
+
 export const importRunStatusEnum = pgEnum("import_run_status", [
   "dry_run",
   "reviewed",

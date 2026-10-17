@@ -152,6 +152,11 @@ export default async function ClientPage({
                     Website <ExternalLink className="size-3.5" />
                   </a>
                 ) : null}
+                {viewer.permissions.has("video_intelligence:read") ? (
+                  <LinkButton href={`/video-intelligence?klant=${slug}`} variant="secondary" size="sm">
+                    Video-analyses
+                  </LinkButton>
+                ) : null}
                 {viewer.permissions.has("clients:write") ? (
                   <LinkButton href={`/clients/${slug}/edit`} variant="secondary" size="sm">
                     Bewerken
@@ -531,14 +536,28 @@ function PlanningTab({ hub }: { hub: ClientHub }) {
 /* ----------------------------- Resultaten -------------------------- */
 
 function ResultsTab({ hub }: { hub: ClientHub }) {
+  // Vullen-of-verbergen (#12): zonder cijfers én zonder kanalen is dit tabblad
+  // leeg — toon dan één eerlijke uitleg i.p.v. een rij nullen.
+  const hasMetrics =
+    hub.metrics.views + hub.metrics.reach + hub.metrics.engagements + Math.abs(hub.metrics.followerGrowth) > 0;
+  if (!hasMetrics && hub.socials.length === 0) {
+    return (
+      <EmptyState
+        title="Nog geen resultaten gekoppeld"
+        description="Zodra de kanalen van deze klant aan Metricool gekoppeld zijn en er cijfers binnenkomen, verschijnen hier de weergaven, het bereik en de volgersgroei."
+      />
+    );
+  }
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Weergaven (30d)" value={compact(hub.metrics.views)} />
-        <Stat label="Bereik (30d)" value={compact(hub.metrics.reach)} />
-        <Stat label="Interacties (30d)" value={compact(hub.metrics.engagements)} />
-        <Stat label="Volgersgroei (30d)" value={`+${num(hub.metrics.followerGrowth)}`} />
-      </div>
+      {hasMetrics ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat label="Weergaven (30d)" value={compact(hub.metrics.views)} />
+          <Stat label="Bereik (30d)" value={compact(hub.metrics.reach)} />
+          <Stat label="Interacties (30d)" value={compact(hub.metrics.engagements)} />
+          <Stat label="Volgersgroei (30d)" value={`+${num(hub.metrics.followerGrowth)}`} />
+        </div>
+      ) : null}
 
       <Card padded={false}>
         <div className="p-5 pb-3">
@@ -567,10 +586,12 @@ function ResultsTab({ hub }: { hub: ClientHub }) {
         )}
       </Card>
 
-      <p className="text-xs text-[var(--color-ink-muted)]">
-        Weergaven en interacties zijn vrijwel actueel. Bereik, kijktijd en retentie
-        lopen bij de meeste platforms één tot drie dagen achter.
-      </p>
+      {hasMetrics ? (
+        <p className="text-xs text-[var(--color-ink-muted)]">
+          Weergaven en interacties zijn vrijwel actueel. Bereik, kijktijd en retentie
+          lopen bij de meeste platforms één tot drie dagen achter.
+        </p>
+      ) : null}
     </div>
   );
 }

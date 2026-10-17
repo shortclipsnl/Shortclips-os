@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, ilike, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, tasks, users } from "@/db/schema";
 import { requireInternal, requirePermission, ForbiddenError } from "@/server/auth/context";
@@ -29,21 +29,33 @@ export async function generateInsights(slug: string, days = 90): Promise<ActionR
   });
 }
 
-/** Een verbeterpunt doorzetten als taak naar een Content Creative (Milou/Jiska). */
+/** Een verbeterpunt doorzetten als taak naar de verantwoordelijke van de klant. */
 export async function recommendationToTask(
   slug: string,
   rec: { titel: string; waarom: string; wat: string; hoeMeten: string },
 ): Promise<ActionResult> {
   return wrap(async () => {
     await requirePermission("tasks:write");
-    const [client] = await db.select({ id: clients.id }).from(clients).where(and(eq(clients.slug, slug), isNull(clients.deletedAt))).limit(1);
+    const [client] = await db
+      .select({ id: clients.id, coordinatorId: clients.coordinatorId })
+      .from(clients)
+      .where(and(eq(clients.slug, slug), isNull(clients.deletedAt)))
+      .limit(1);
     if (!client) return { ok: false, message: "Klant niet gevonden." };
 
-    // Content Creative zoeken (Milou bij voorkeur, anders Jiska).
-    const [creative] =
-      (await db.select({ id: users.id }).from(users).where(and(ilike(users.fullName, "%milou%"), eq(users.status, "active"), isNull(users.deletedAt))).limit(1)).length
-        ? await db.select({ id: users.id }).from(users).where(and(ilike(users.fullName, "%milou%"), eq(users.status, "active"), isNull(users.deletedAt))).limit(1)
-        : await db.select({ id: users.id }).from(users).where(and(ilike(users.fullName, "%jiska%"), eq(users.status, "active"), isNull(users.deletedAt))).limit(1);
+    // Verantwoordelijke van de klant (#6); zonder vaste coördinator valt het
+    // terug op een willekeurige actieve projectcoördinator — rolgebaseerd, geen
+    // vaste namen.
+    let assigneeId: string | null = client.coordinatorId ?? null;
+    if (!assigneeId) {
+      const [coord] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.primaryRole, "project_coordinator"), eq(users.status, "active"), isNull(users.deletedAt)))
+        .orderBy(asc(users.fullName))
+        .limit(1);
+      assigneeId = coord?.id ?? null;
+    }
 
     await db.insert(tasks).values({
       clientId: client.id,
@@ -51,7 +63,7 @@ export async function recommendationToTask(
       description: `Waarom: ${rec.waarom}\n\nWat aanpassen: ${rec.wat}\n\nHoe meten: ${rec.hoeMeten}`,
       priority: "normal",
       status: "todo",
-      assigneeId: creative?.id ?? null,
+      assigneeId,
       entityType: "ai_insight",
     });
 

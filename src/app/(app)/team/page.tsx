@@ -46,6 +46,22 @@ const ROLE_LABELS: Record<string, string> = {
   finance: "Finance",
 };
 
+/**
+ * Echte portretfoto's uit public/team/ (bron: shortclips.nl), gekoppeld op
+ * voornaam. Let op: het bestand voor Jiska heet historisch "jeska.png".
+ * Zonder match toont de Avatar initialen op de persoonskleur.
+ */
+const TEAM_PHOTO_FILE: Record<string, string> = {
+  fabian: "fabian", jarno: "jarno", jiska: "jeska", jeska: "jeska",
+  max: "max", milou: "milou", nynke: "nynke", quinn: "quinn",
+  rutger: "rutger", sem: "sem",
+};
+function teamPhoto(fullName: string): string | undefined {
+  const first = fullName.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+  const file = TEAM_PHOTO_FILE[first];
+  return file ? `/team/${file}.png` : undefined;
+}
+
 export default async function TeamPage() {
   const viewer = await requirePermission("team:read");
   const canSeeCosts = viewer.permissions.has("finance:read_costs");
@@ -145,7 +161,7 @@ export default async function TeamPage() {
         }
       >
         <div className="flex items-start gap-3">
-          <Avatar name={p.fullName} color={p.color} size={42} />
+          <Avatar name={p.fullName} color={p.color} size={42} src={teamPhoto(p.fullName)} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="truncate font-semibold">{p.fullName}</span>

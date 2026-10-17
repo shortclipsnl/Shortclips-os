@@ -218,6 +218,20 @@
       "when": 1791958668219,
       "tag": "0030_fuzzy_crusher_hogan",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792220223275,
+      "tag": "0031_windy_brood",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792244182447,
+      "tag": "0032_lethal_diamondback",
+      "breakpoints": true
     }
   ]
 }

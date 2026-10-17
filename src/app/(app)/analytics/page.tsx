@@ -137,7 +137,11 @@ export default async function AnalyticsPage({
     return d >= 0 ? "good" : "bad";
   };
   const selectedName = params.klant ? String(clientRows.find((c) => String(c.slug) === params.klant)?.name ?? params.klant) : null;
-  const keep = `dagen=${days}${klanten !== "actief" ? `&klanten=${klanten}` : ""}`;
+  // Vullen-of-verbergen (#12): zijn er überhaupt cijfers in deze periode? Zo
+  // niet, dan tonen we één eerlijke lege staat i.p.v. een raster met nullen.
+  const hasAnyData =
+    Number(t.views ?? 0) + Number(t.reach ?? 0) + Number(t.engagements ?? 0) +
+      Math.abs(Number(t.follower_growth ?? 0)) + Number(t.posts ?? 0) > 0;
 
   return (
     <div className="mx-auto max-w-[1300px]">
@@ -201,6 +205,15 @@ export default async function AnalyticsPage({
         Belangrijkste resultaten · {selectedName ?? (klanten === "gestopt" ? "gestopte klanten" : klanten === "alle" ? "alle klanten" : "actieve klanten")}
       </div>
 
+      {!hasAnyData ? (
+        <Card padded={false}>
+          <EmptyState
+            title="Nog geen resultaten in deze periode"
+            description="Zodra klanten aan Metricool gekoppeld zijn en er cijfers binnenkomen, verschijnen de weergaven, het bereik en de best presterende video's hier. Kies eventueel een langere periode."
+          />
+        </Card>
+      ) : (
+        <>
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Stat label="Weergaven" value={compact(Number(t.views ?? 0))} hint={deltaHint(Number(t.views ?? 0), Number(prev.views ?? 0))} tone={deltaTone(Number(t.views ?? 0), Number(prev.views ?? 0))} />
         <Stat label="Bereik" value={compact(Number(t.reach ?? 0))} hint={deltaHint(Number(t.reach ?? 0), Number(prev.reach ?? 0))} tone={deltaTone(Number(t.reach ?? 0), Number(prev.reach ?? 0))} />
@@ -340,6 +353,8 @@ export default async function AnalyticsPage({
         de meeste platforms één tot drie dagen achter. Retentie en opslagacties
         zijn niet op elk platform via de API beschikbaar.
       </p>
+        </>
+      )}
     </div>
   );
 }

@@ -15,7 +15,7 @@ const num = (v: unknown) => Number((v as { n?: number })?.n ?? 0);
 export async function getMigrationStatus() {
   await requireInternal();
 
-  const [mapRes, clientInt, entityRes, unlinked, suggests, dupClients, dupLeads, wonUnconverted, jobsRes] = await Promise.all([
+  const [mapRes, clientInt, entityRes, unlinked, suggests, dupClients, dupLeads, wonUnconverted, jobsRes, dupUsers, placeholderUsers, firstNameOnly] = await Promise.all([
     db.execute(sql`select entity_type, count(*)::int n, max(last_synced_at) last from monday_mappings group by entity_type`),
     db.execute(sql`select count(*)::int n, max(last_synced_at) last from client_integrations where provider = 'monday'`),
     db.execute(sql`
@@ -37,6 +37,29 @@ export async function getMigrationStatus() {
     db.execute(sql`
       select job_type, status, items_created, items_updated, items_failed, finished_at, error
       from sync_jobs where provider = 'monday' order by finished_at desc nulls last limit 10`),
+
+    // #10 — opschonen mensen/namen (alleen lezen, voor goedkeuring):
+    // exacte naamduplicaten onder teamleden.
+    db.execute(sql`
+      select lower(full_name) nm, count(*)::int n, string_agg(email, ', ' order by email) emails
+      from users
+      where deleted_at is null and primary_role <> 'client'
+      group by lower(full_name) having count(*) > 1 order by n desc`),
+
+    // Nog niet geactiveerde of placeholder-teamaccounts.
+    db.execute(sql`
+      select full_name, email, primary_role, status
+      from users
+      where deleted_at is null and primary_role <> 'client'
+        and (status = 'invited' or email ilike '%@pilot.shortclips.nl')
+      order by full_name`),
+
+    // Teamleden met alleen een voornaam (naam-inconsistentie om op te schonen).
+    db.execute(sql`
+      select full_name, email, primary_role
+      from users
+      where deleted_at is null and primary_role <> 'client' and full_name not like '% %'
+      order by full_name`),
   ]);
 
   const mapByEntity = new Map(rows<{ entity_type: string; n: number; last: string | null }>(mapRes).map((r) => [r.entity_type, r]));
@@ -76,6 +99,13 @@ export async function getMigrationStatus() {
     wonLeadsUnconverted: num(one(wonUnconverted)),
   };
 
+  // #10 — opschoonkandidaten mensen/namen (alleen lezen).
+  const people = {
+    duplicateNames: rows<{ nm: string; n: number; emails: string }>(dupUsers),
+    placeholders: rows<{ full_name: string; email: string; primary_role: string; status: string }>(placeholderUsers),
+    firstNameOnly: rows<{ full_name: string; email: string; primary_role: string }>(firstNameOnly),
+  };
+
   const jobs = rows<Record<string, unknown>>(jobsRes).map((j) => ({
     jobType: String(j.job_type),
     status: String(j.status),
@@ -87,5 +117,5 @@ export async function getMigrationStatus() {
   }));
 
   const totalMapped = boards.reduce((a, b) => a + b.mapped, 0);
-  return { boards, coverage, attention, jobs, totalMapped };
+  return { boards, coverage, attention, people, jobs, totalMapped };
 }

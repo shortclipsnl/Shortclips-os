@@ -142,12 +142,14 @@ export function isOwner(viewer: Viewer | null): boolean {
   return viewer?.primaryRole === "owner";
 }
 
-/** E-mailadressen die — náást de eigenaar — klanten mogen beheren (#10). */
-const MANAGE_CLIENTS_EMAILS = ["milou@shortclips.nl"];
-
+/**
+ * Klantbeheer is rolgebaseerd, niet per e-mailadres (#4.1/#6): de eigenaar en
+ * elke projectcoördinator mogen klanten beheren. Zo hoeft er geen uitzondering
+ * per persoon bijgehouden te worden als het team wisselt.
+ */
 export function canManageClients(viewer: Viewer | null): boolean {
   if (!viewer) return false;
-  return isOwner(viewer) || MANAGE_CLIENTS_EMAILS.includes(viewer.email.toLowerCase());
+  return isOwner(viewer) || viewer.primaryRole === "project_coordinator";
 }
 
 export function canAny(viewer: Viewer | null, list: PermissionKey[]): boolean {
@@ -182,11 +184,11 @@ export async function requireOwner(): Promise<Viewer> {
   return viewer;
 }
 
-/** Eigenaar of een expliciet aangewezen klantbeheerder (Milou). */
+/** Eigenaar of een projectcoördinator mag klanten beheren (rolgebaseerd). */
 export async function requireManageClients(): Promise<Viewer> {
   const viewer = await requireInternal();
   if (!canManageClients(viewer)) {
-    throw new ForbiddenError("Klantenbeheer is alleen voor de eigenaar en Milou.");
+    throw new ForbiddenError("Klantenbeheer is alleen voor de eigenaar en projectcoördinatoren.");
   }
   return viewer;
 }

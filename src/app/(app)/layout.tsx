@@ -13,13 +13,14 @@ export default async function AppLayout({
   // Navigatie tonen op basis van rechten: geen menu-items die tot een
   // foutmelding leiden.
   const owner = isOwner(viewer);
-  const email = viewer.email.toLowerCase();
   const groups = NAVIGATION.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
-      // Eigenaar-only items: alleen voor Janno, of een expliciete allowlist.
+      // Eigenaar-only items: alleen voor Janno.
       if (item.ownerOnly && !owner) return false;
-      if (item.allowEmails && !owner && !item.allowEmails.includes(email)) {
+      // Rolgebaseerde zichtbaarheid (geen e-mailuitzonderingen): eigenaar ziet
+      // alles, verder alleen de aangewezen rollen.
+      if (item.roles && !owner && !(item.roles as string[]).includes(viewer.primaryRole)) {
         return false;
       }
       // Rechten-gebaseerde items.

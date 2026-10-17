@@ -11,8 +11,14 @@ import { QuickTaskLines, TaskItem, type TaskItemData } from "./tasks-ui";
 export const metadata: Metadata = { title: "Taken" };
 export const dynamic = "force-dynamic";
 
-const CORE = ["milou", "jiska", "rutger", "jarno"];
-const firstName = (n: string) => n.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+// De vaste coördinatiekern — rolgebaseerd, geen vaste namen, zodat de rij
+// meegroeit met het team. Deze personen staan er altijd; daarnaast verschijnt
+// iedereen die op dit moment open taken heeft. Volgorde = deze rolprioriteit.
+const OFFICE_ROLE_ORDER: Record<string, number> = {
+  owner: 0,
+  project_coordinator: 1,
+  admin: 2,
+};
 const OPEN = ["todo", "in_progress", "blocked"] as const;
 
 function addDays(n: number) {
@@ -26,19 +32,31 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const canWrite = viewer.permissions.has("tasks:write");
   const persoon = (await searchParams).persoon;
 
-  const [assignable, allOpen] = await Promise.all([
-    canWrite ? listAssignableUsers() : Promise.resolve([]),
+  const [team, allOpen] = await Promise.all([
+    listAssignableUsers(),
     db
       .select({ id: tasks.id, assigneeId: tasks.assigneeId, dueOn: tasks.dueOn })
       .from(tasks)
       .where(and(isNull(tasks.deletedAt), inArray(tasks.status, [...OPEN]), scopeToClients(viewer, tasks.clientId))),
   ]);
-  const userOptions = assignable.map((u) => ({ id: u.id, fullName: u.fullName }));
+  const userOptions = team.map((u) => ({ id: u.id, fullName: u.fullName }));
 
-  // De vier kernmedewerkers in vaste volgorde.
-  const core = CORE.map((fn) => assignable.find((u) => firstName(u.fullName) === fn)).filter((u): u is NonNullable<typeof u> => Boolean(u));
   const openCountFor = (uid: string) => allOpen.filter((t) => t.assigneeId === uid).length;
   const algemeenCount = allOpen.filter((t) => !t.assigneeId).length;
+
+  // Personenrij: de coördinatiekern (op rol) staat er altijd; daarnaast ieder
+  // teamlid dat nú open taken heeft. Kern eerst (op rolprioriteit, dan naam),
+  // daarna de overigen op werkdruk (meeste open taken eerst).
+  const isOffice = (role: string) => role in OFFICE_ROLE_ORDER;
+  const core = team
+    .filter((u) => isOffice(u.primaryRole) || openCountFor(u.id) > 0)
+    .sort((a, b) => {
+      const ao = isOffice(a.primaryRole);
+      const bo = isOffice(b.primaryRole);
+      if (ao !== bo) return ao ? -1 : 1;
+      if (ao && bo) return (OFFICE_ROLE_ORDER[a.primaryRole]! - OFFICE_ROLE_ORDER[b.primaryRole]!) || a.fullName.localeCompare(b.fullName, "nl");
+      return openCountFor(b.id) - openCountFor(a.id) || a.fullName.localeCompare(b.fullName, "nl");
+    });
 
   // Taken voor de geselecteerde weergave ophalen.
   async function fetchTasks(where: ReturnType<typeof and>) {
@@ -61,7 +79,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       .limit(400);
   }
 
-  const selected = persoon && persoon !== "algemeen" ? core.find((u) => u.id === persoon) : null;
+  const selected = persoon && persoon !== "algemeen" ? team.find((u) => u.id === persoon) : null;
   const selectedLabel = selected ? selected.fullName : persoon === "algemeen" ? "Algemene taken" : null;
 
   let buckets: { label: string; tone?: "bad" | "warn"; items: TaskItemData[] }[] = [];
@@ -114,7 +132,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
       {!persoon ? (
         <Card>
-          <EmptyState title="Kies een persoon" description="Klik hierboven op Milou, Jiska, Rutger, Jarno of Algemeen om de taken te zien." />
+          <EmptyState title="Kies een persoon" description="Klik hierboven op een teamlid of op Algemeen om de taken te zien." />
         </Card>
       ) : (
         <div className="space-y-5">
