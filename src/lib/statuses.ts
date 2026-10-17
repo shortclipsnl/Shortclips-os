@@ -200,6 +200,20 @@ export const RISK_LEVEL: Record<string, { label: string; tone: Tone }> = {
   high: { label: "Risico", tone: "bad" },
 };
 
+/**
+ * Leads — nu centraal (stond los in leads-ui.tsx). De 5 databasestatussen; de
+ * "opvolging nodig"-urgentie komt los uit de follow-up-datum (zie urgency.ts),
+ * niet uit de status zelf.
+ */
+export const LEAD_STATUS: Record<string, { label: string; tone: Tone; dot: string }> = {
+  lead: { label: "Nieuwe lead", tone: "info", dot: "var(--color-info)" },
+  offerte: { label: "Voorstel verstuurd", tone: "lime", dot: "var(--color-lime)" },
+  onderhandeling: { label: "In onderhandeling", tone: "warn", dot: "var(--color-warn)" },
+  gewonnen: { label: "Gewonnen", tone: "good", dot: "var(--color-good)" },
+  verloren: { label: "Verloren", tone: "bad", dot: "var(--color-bad)" },
+};
+export const LEAD_OPEN_STATUSES = ["lead", "offerte", "onderhandeling"] as const;
+
 export const PLATFORM: Record<string, { label: string; color: string }> = {
   instagram: { label: "Instagram", color: "#E1306C" },
   tiktok: { label: "TikTok", color: "#111111" },

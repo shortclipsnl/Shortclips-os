@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { teamPhotoSrc } from "@/lib/team-photos";
 
 /* ------------------------------ Kaart ------------------------------ */
 
@@ -157,56 +158,93 @@ export function LinkButton({
 
 /* --------------------------- Kerncijfer ---------------------------- */
 
+/**
+ * Toon → kleuraccent voor KPI-blokken. Subtiele getinte achtergrond + gekleurde
+ * linkerrand + gekleurd cijfer, zodat functie (goed/aandacht/urgent) in één
+ * oogopslag leesbaar is zonder felle vlakken. `neutral` blijft rustig wit.
+ */
+const STAT_ACCENT: Record<Tone, { bar: string; bg: string; value: string; chip: string }> = {
+  neutral: { bar: "", bg: "", value: "text-[var(--color-ink)]", chip: "bg-[var(--color-neutral-soft)] text-[var(--color-ink-muted)]" },
+  info: { bar: "var(--color-info)", bg: "bg-[var(--color-info-soft)]", value: "text-[#0060a8]", chip: "bg-[var(--color-info-soft)] text-[#0060a8]" },
+  good: { bar: "var(--color-good)", bg: "bg-[var(--color-good-soft)]", value: "text-[#1d6b4c]", chip: "bg-[var(--color-good-soft)] text-[#1d6b4c]" },
+  warn: { bar: "var(--color-warn)", bg: "bg-[var(--color-warn-soft)]", value: "text-[#8a5300]", chip: "bg-[var(--color-warn-soft)] text-[#8a5300]" },
+  bad: { bar: "var(--color-bad)", bg: "bg-[var(--color-bad-soft)]", value: "text-[#a3271c]", chip: "bg-[var(--color-bad-soft)] text-[#a3271c]" },
+  lime: { bar: "var(--color-lime)", bg: "bg-[var(--color-lime-soft)]", value: "text-[#54700a]", chip: "bg-[var(--color-lime-soft)] text-[#54700a]" },
+  ink: { bar: "var(--color-indigo-ink)", bg: "bg-[var(--color-neutral-soft)]", value: "text-[var(--color-ink)]", chip: "bg-[var(--color-indigo-ink)] text-white" },
+};
+
 export function Stat({
   label,
   value,
   hint,
   tone = "neutral",
   href,
+  icon,
+  delta,
+  emphasis = false,
 }: {
   label: string;
   value: ReactNode;
   hint?: ReactNode;
   tone?: Tone;
   href?: string;
+  /** Optioneel icoon rechtsboven in een getinte chip. */
+  icon?: ReactNode;
+  /** Optionele trend; goodWhenUp bepaalt of stijgen groen of rood is. */
+  delta?: { value: number; suffix?: string; goodWhenUp?: boolean } | null;
+  /** Grotere nadruk voor het belangrijkste/urgente blok. */
+  emphasis?: boolean;
 }) {
+  const a = STAT_ACCENT[tone];
+  const toned = tone !== "neutral";
+
+  let deltaEl: ReactNode = null;
+  if (delta && delta.value !== 0) {
+    const up = delta.value > 0;
+    const goodWhenUp = delta.goodWhenUp ?? true;
+    const positive = up === goodWhenUp;
+    deltaEl = (
+      <span className={cn("inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums", positive ? "text-[var(--color-good)]" : "text-[var(--color-bad)]")}>
+        {up ? "▲" : "▼"} {Math.abs(delta.value)}{delta.suffix ?? "%"}
+      </span>
+    );
+  }
+
   const body = (
     <>
-      <p className="text-2xs font-semibold tracking-[0.06em] text-[var(--color-ink-faint)] uppercase">
-        {label}
-      </p>
-      <p className="mt-1.5 text-2xl font-semibold tabular-nums text-[var(--color-ink)]">
-        {value}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-2xs font-semibold tracking-[0.06em] text-[var(--color-ink-faint)] uppercase">
+          {label}
+        </p>
+        {icon ? (
+          <span className={cn("inline-flex size-6 shrink-0 items-center justify-center rounded-full [&_svg]:size-3.5", a.chip)}>
+            {icon}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-1.5 flex items-baseline gap-2">
+        <p className={cn("font-semibold tabular-nums", emphasis ? "text-3xl" : "text-2xl", toned ? a.value : "text-[var(--color-ink)]")}>
+          {value}
+        </p>
+        {deltaEl}
+      </div>
       {hint ? (
         <p className="mt-1 text-xs text-[var(--color-ink-muted)]">{hint}</p>
       ) : null}
     </>
   );
 
-  const accent =
-    tone === "bad"
-      ? "border-l-[3px] border-l-[var(--color-bad)]"
-      : tone === "warn"
-        ? "border-l-[3px] border-l-[var(--color-warn)]"
-        : tone === "good"
-          ? "border-l-[3px] border-l-[var(--color-good)]"
-          : "";
+  const style = toned ? { borderLeft: `3px solid ${a.bar}` } : undefined;
+  const cls = cn("sc-card p-4", toned && a.bg);
 
   if (href) {
     return (
-      <Link
-        href={href}
-        className={cn(
-          "sc-card block p-4 transition-shadow hover:shadow-[var(--shadow-raised)]",
-          accent,
-        )}
-      >
+      <Link href={href} className={cn(cls, "block transition-shadow hover:shadow-[var(--shadow-raised)]")} style={style}>
         {body}
       </Link>
     );
   }
-  return <div className={cn("sc-card p-4", accent)}>{body}</div>;
+  return <div className={cls} style={style}>{body}</div>;
 }
 
 /* ------------------------- Lege toestand --------------------------- */
@@ -299,6 +337,90 @@ export function Avatar({
       {letters}
     </span>
   );
+}
+
+/* ---------------------------- Klantlogo ---------------------------- */
+
+/**
+ * Centrale weergave van een klant: het bedrijfslogo op een nette witte chip met
+ * dunne rand (zodat ook transparante logo's leesbaar blijven op lichte én
+ * donkere achtergronden), of een nette initialen-fallback op de klantkleur.
+ * Nooit een willekeurige afbeelding. Rechthoekig-afgerond, want logo's zijn
+ * zelden rond.
+ */
+export function ClientLogo({
+  name,
+  logoUrl,
+  color,
+  size = 28,
+}: {
+  name: string;
+  logoUrl?: string | null;
+  color?: string | null;
+  size?: number;
+}) {
+  const radius = Math.max(6, Math.round(size * 0.28));
+  if (logoUrl) {
+    return (
+      <span
+        className="inline-flex shrink-0 items-center justify-center overflow-hidden border border-[var(--color-line)] bg-white"
+        style={{ width: size, height: size, borderRadius: radius }}
+        title={name}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoUrl}
+          alt={name}
+          width={size}
+          height={size}
+          className="size-full object-contain p-[12%]"
+          loading="lazy"
+        />
+      </span>
+    );
+  }
+  const letters = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join("");
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center font-semibold text-white"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: radius,
+        background: color ?? "var(--color-indigo-soft)",
+        fontSize: Math.round(size * 0.36),
+      }}
+      title={name}
+    >
+      {letters}
+    </span>
+  );
+}
+
+/* --------------------------- Teamavatar ---------------------------- */
+
+/**
+ * Teamlid-avatar met de juiste foto: opgeslagen `avatarUrl` → bekende
+ * portretfoto in public/team/ → initialen op de persoonskleur. Eén plek i.p.v.
+ * losse foto-mappings per pagina.
+ */
+export function TeamAvatar({
+  name,
+  avatarUrl,
+  color,
+  size = 28,
+}: {
+  name: string;
+  avatarUrl?: string | null;
+  color?: string | null;
+  size?: number;
+}) {
+  return <Avatar name={name} color={color} size={size} src={teamPhotoSrc(name, avatarUrl)} />;
 }
 
 /* --------------------------- Paginakop ----------------------------- */
