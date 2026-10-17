@@ -20,6 +20,7 @@ import {
   reviewThreads,
   scripts,
   tasks,
+  videoAnalyses,
 } from "@/db/schema";
 import { scopeToClients, type Viewer } from "@/server/auth/context";
 
@@ -63,6 +64,7 @@ export async function universalSearch(
     knowledgeHits,
     calendarHits,
     invoiceHits,
+    viHits,
   ] = await Promise.all([
     db
       .select({ id: clients.id, slug: clients.slug, name: clients.name, sector: clients.sector })
@@ -146,6 +148,16 @@ export async function universalSearch(
           .where(and(isNull(invoices.deletedAt), ilike(invoices.number, like), scope(invoices.clientId)))
           .limit(LIMIT_PER_KIND)
       : Promise.resolve([]),
+
+    // Video Intelligence-analyses, alleen voor wie die module mag zien.
+    viewer.permissions.has("video_intelligence:read")
+      ? db
+          .select({ id: videoAnalyses.id, title: videoAnalyses.title, caption: videoAnalyses.caption, platform: videoAnalyses.platform, clientName: clients.name })
+          .from(videoAnalyses)
+          .innerJoin(clients, eq(clients.id, videoAnalyses.clientId))
+          .where(and(isNull(videoAnalyses.deletedAt), or(ilike(videoAnalyses.title, like), ilike(videoAnalyses.caption, like)), scope(videoAnalyses.clientId)))
+          .limit(LIMIT_PER_KIND)
+      : Promise.resolve([]),
   ]);
 
   const hits: SearchHit[] = [
@@ -160,6 +172,7 @@ export async function universalSearch(
     ...knowledgeHits.map((r) => ({ kind: "knowledge", kindLabel: "Klantkennis", title: r.title, subtitle: r.body.slice(0, 90), href: `/clients/${r.slug}?tab=kennis`, clientName: r.clientName })),
     ...calendarHits.map((r) => ({ kind: "calendar", kindLabel: "Planning", title: r.title, subtitle: r.scheduledOn, href: `/calendar?datum=${r.scheduledOn}`, clientName: r.clientName })),
     ...invoiceHits.map((r) => ({ kind: "invoice", kindLabel: "Factuur", title: r.number, subtitle: r.status, href: `/finance?factuur=${r.id}`, clientName: r.clientName })),
+    ...viHits.map((r) => ({ kind: "video_intelligence", kindLabel: "Video Intelligence", title: r.title ?? "Video-analyse", subtitle: r.platform ?? (r.caption ? r.caption.slice(0, 60) : null), href: `/video-intelligence/${r.id}`, clientName: r.clientName })),
   ];
 
   return hits;
