@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
-import { Avatar, Badge } from "@/components/ui";
+import { Badge, ClientLogo } from "@/components/ui";
 import { VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 import type { EditingProject } from "@/server/editing";
 
@@ -110,7 +110,7 @@ export function EditingBoard({ projects, editorOptions, clientOptions }: { proje
                         <li key={p.id}>
                           <Link href={`/videos/${p.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-sunken)]/50">
                             <span className="size-2 shrink-0 rounded-full" style={{ background: b.color }} />
-                            <Avatar name={p.clientName} color={p.clientColor} size={24} />
+                            <ClientLogo name={p.clientName} logoUrl={p.clientLogo} color={p.clientColor} size={24} />
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-medium">{p.title || "Naamloze video"}</span>
                               <span className="block truncate text-2xs text-[var(--color-ink-faint)]">{p.clientName} · {p.editorName ?? "geen editor"}</span>

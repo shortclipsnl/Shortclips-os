@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { AlertTriangle, ExternalLink, FileText, Folder } from "lucide-react";
+import { AlertTriangle, ExternalLink, FileText, Folder, Film, CheckCircle2, Clock } from "lucide-react";
 import { getEditorDashboard } from "@/server/editor-dashboard";
 import type { Viewer } from "@/server/auth/context";
-import { Avatar, Badge, Card, CardHeader, EmptyState, Stat } from "@/components/ui";
+import { Badge, Card, CardHeader, ClientLogo, EmptyState, Stat } from "@/components/ui";
 import { daysSince, pct, plural, relativeDays } from "@/lib/format";
 import { TASK_PRIORITY, VIDEO_STATUS, stageOverdue, type VideoStage } from "@/lib/statuses";
 
@@ -44,9 +44,9 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Nu op je bord" value={data.queue.length} />
-        <Stat label="Over deadline" value={data.overdue} tone={data.overdue > 0 ? "bad" : "good"} />
-        <Stat label="Totaal opgeleverd" value={data.stats.delivered} />
+        <Stat label="Nu op je bord" value={data.queue.length} tone="info" icon={<Film />} />
+        <Stat label="Over deadline" value={data.overdue} tone={data.overdue > 0 ? "bad" : "good"} icon={<AlertTriangle />} emphasis={data.overdue > 0} />
+        <Stat label="Totaal opgeleverd" value={data.stats.delivered} tone="good" icon={<CheckCircle2 />} />
         <Stat
           label="Op tijd geleverd"
           value={data.stats.onTimeRate !== null ? pct(data.stats.onTimeRate, 0) : "–"}
@@ -56,6 +56,7 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
               : "nog geen video's met deadline"
           }
           tone={data.stats.onTimeRate !== null && data.stats.onTimeRate >= 80 ? "good" : "neutral"}
+          icon={<Clock />}
         />
       </div>
 
@@ -86,7 +87,7 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
                       </Link>
                       <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-ink-muted)]">
                         <span className="inline-flex items-center gap-1.5">
-                          <Avatar name={v.clientName} color={v.clientColor} size={16} />
+                          <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={16} />
                           {v.clientName}
                         </span>
                         <span>· versie {v.currentVersion}</span>

@@ -11,7 +11,7 @@ import { scopeToClients, type Viewer } from "@/server/auth/context";
  * gescoopt; puur lezen uit bestaande tabellen.
  */
 
-export type PlanItem = { id: string; kind: "opname" | "oplevering" | "publicatie"; date: string; clientName: string; clientColor: string | null; title: string; person: string | null; href: string };
+export type PlanItem = { id: string; kind: "opname" | "oplevering" | "publicatie"; date: string; clientName: string; clientColor: string | null; clientLogo: string | null; title: string; person: string | null; href: string };
 export type PlanWeek = {
   key: string; label: string; startOn: string; endOn: string;
   opnames: PlanItem[]; opleveringen: PlanItem[]; publicaties: PlanItem[];
@@ -37,19 +37,19 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
   const endIso = iso(end);
 
   const [shootRows, deliverableRows, pubRows, leaveRows] = await Promise.all([
-    db.select({ id: productionDays.id, date: productionDays.scheduledOn, clientName: clients.name, clientColor: clients.color, person: users.fullName })
+    db.select({ id: productionDays.id, date: productionDays.scheduledOn, clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl, person: users.fullName })
       .from(productionDays)
       .innerJoin(clients, eq(clients.id, productionDays.clientId))
       .leftJoin(users, eq(users.id, productionDays.videographerId))
       .where(and(isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled"), gte(productionDays.scheduledOn, startIso), lte(productionDays.scheduledOn, endIso), scopeToClients(viewer, productionDays.clientId))),
 
-    db.select({ id: deliverables.id, date: deliverables.dueOn, title: deliverables.title, clientName: clients.name, clientColor: clients.color, person: users.fullName })
+    db.select({ id: deliverables.id, date: deliverables.dueOn, title: deliverables.title, clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl, person: users.fullName })
       .from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
       .leftJoin(users, eq(users.id, deliverables.editorId))
       .where(and(isNull(deliverables.deletedAt), sql`${deliverables.dueOn} is not null`, gte(deliverables.dueOn, startIso), lte(deliverables.dueOn, endIso), sql`${deliverables.status} not in ('published','analysis_available')`, scopeToClients(viewer, deliverables.clientId))),
 
-    db.select({ id: contentCalendar.id, date: contentCalendar.scheduledOn, title: contentCalendar.title, clientName: clients.name, clientColor: clients.color })
+    db.select({ id: contentCalendar.id, date: contentCalendar.scheduledOn, title: contentCalendar.title, clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl })
       .from(contentCalendar)
       .innerJoin(clients, eq(clients.id, contentCalendar.clientId))
       .where(and(isNull(contentCalendar.deletedAt), gte(contentCalendar.scheduledOn, startIso), lte(contentCalendar.scheduledOn, endIso), scopeToClients(viewer, contentCalendar.clientId))),
@@ -67,9 +67,9 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
     const s = iso(wStart), e = iso(wEnd);
     const inWeek = (d: string | null) => Boolean(d && d >= s && d <= e);
 
-    const opnames: PlanItem[] = shootRows.filter((r) => inWeek(r.date)).map((r) => ({ id: r.id, kind: "opname", date: r.date, clientName: r.clientName, clientColor: r.clientColor, title: "Opname", person: r.person, href: `/productions/${r.id}` }));
-    const opleveringen: PlanItem[] = deliverableRows.filter((r) => inWeek(r.date)).map((r) => ({ id: r.id, kind: "oplevering", date: r.date!, clientName: r.clientName, clientColor: r.clientColor, title: r.title, person: r.person, href: `/videos/${r.id}` }));
-    const publicaties: PlanItem[] = pubRows.filter((r) => inWeek(r.date)).map((r) => ({ id: r.id, kind: "publicatie", date: r.date, clientName: r.clientName, clientColor: r.clientColor, title: r.title, person: null, href: `/calendar` }));
+    const opnames: PlanItem[] = shootRows.filter((r) => inWeek(r.date)).map((r) => ({ id: r.id, kind: "opname", date: r.date, clientName: r.clientName, clientColor: r.clientColor, clientLogo: r.clientLogo, title: "Opname", person: r.person, href: `/productions/${r.id}` }));
+    const opleveringen: PlanItem[] = deliverableRows.filter((r) => inWeek(r.date)).map((r) => ({ id: r.id, kind: "oplevering", date: r.date!, clientName: r.clientName, clientColor: r.clientColor, clientLogo: r.clientLogo, title: r.title, person: r.person, href: `/videos/${r.id}` }));
+    const publicaties: PlanItem[] = pubRows.filter((r) => inWeek(r.date)).map((r) => ({ id: r.id, kind: "publicatie", date: r.date, clientName: r.clientName, clientColor: r.clientColor, clientLogo: r.clientLogo, title: r.title, person: null, href: `/calendar` }));
 
     // Conflict: editor met te veel opleveringen in deze week.
     const byEditor = new Map<string, number>();

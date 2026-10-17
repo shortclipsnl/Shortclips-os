@@ -3,8 +3,9 @@ import Link from "next/link";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients } from "@/db/schema";
+import { Scissors, Film, Coins, Users } from "lucide-react";
 import { requirePermission } from "@/server/auth/context";
-import { Card, CardHeader, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
+import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import { euro, num } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Editkosten & winst" };
@@ -42,7 +43,7 @@ export default async function EditCostsPage() {
   // Netto per klant voor de laatste maand (wie is het meest/minst winstgevend).
   const perClientRes = latestPeriod
     ? await db.execute(sql`
-        select c.name, c.slug,
+        select c.name, c.slug, c.color, c.logo_url,
           (m.revenue + m.extra_revenue)::float income,
           m.edit_cost::float edit,
           (m.shoot_cost + m.strategy_cost + m.other_cost)::float manual
@@ -51,7 +52,7 @@ export default async function EditCostsPage() {
         where m.period = ${latestPeriod}
       `)
     : null;
-  type PRow = { name: string; slug: string; income: number; edit: number; manual: number };
+  type PRow = { name: string; slug: string; color: string | null; logo_url: string | null; income: number; edit: number; manual: number };
   const perClient = (perClientRes ? rows2<PRow>(perClientRes) : [])
     .map((r) => ({ ...r, net: r.income - r.edit - r.manual, margin: r.income > 0 ? Math.round(((r.income - r.edit - r.manual) / r.income) * 100) : 0 }))
     .sort((a, b) => b.net - a.net);
@@ -61,6 +62,7 @@ export default async function EditCostsPage() {
       slug: clients.slug,
       name: clients.name,
       color: clients.color,
+      logoUrl: clients.logoUrl,
       shorts: clients.monthlyVideoQuota,
       editPer: clients.editCostPerVideo,
       editor: clients.editorName,
@@ -157,7 +159,7 @@ export default async function EditCostsPage() {
               const attention = r.net < 0 || r.margin < 20;
               return (
                 <tr key={r.slug} className="sc-row-link" style={attention ? { boxShadow: `inset 3px 0 0 ${r.net < 0 ? "var(--color-bad)" : "var(--color-warn)"}` } : undefined}>
-                  <td className="sc-td"><Link href={`/clients/${r.slug}?tab=financieel`} className="font-medium hover:underline">{r.name}</Link></td>
+                  <td className="sc-td"><Link href={`/clients/${r.slug}?tab=financieel`} className="flex items-center gap-2 font-medium hover:underline"><ClientLogo name={r.name} logoUrl={r.logo_url} color={r.color} size={20} />{r.name}</Link></td>
                   <td className="sc-td text-right tabular-nums">{euro(r.income)}</td>
                   <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">−{euro(r.edit)}</td>
                   <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{r.manual > 0 ? `−${euro(r.manual)}` : "—"}</td>
@@ -172,10 +174,10 @@ export default async function EditCostsPage() {
 
       <div className="mb-3 text-sm font-semibold text-[var(--color-ink-muted)]">Editkosten (verwacht, uit de contracten)</div>
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Totale editkosten / maand" value={euro(totalMonth)} hint="actieve klanten" />
-        <Stat label="Shorts per maand" value={num(totalShorts)} hint="afgerekende edits/maand" />
-        <Stat label="Gem. per short" value={euro(avgPerShort)} />
-        <Stat label="Editors actief" value={num(byEditor.filter((e) => e.name !== "Niet toegewezen").length)} />
+        <Stat label="Totale editkosten / maand" value={euro(totalMonth)} hint="actieve klanten" tone="warn" icon={<Scissors />} />
+        <Stat label="Shorts per maand" value={num(totalShorts)} hint="afgerekende edits/maand" tone="info" icon={<Film />} />
+        <Stat label="Gem. per short" value={euro(avgPerShort)} icon={<Coins />} />
+        <Stat label="Editors actief" value={num(byEditor.filter((e) => e.name !== "Niet toegewezen").length)} icon={<Users />} />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
@@ -207,7 +209,7 @@ export default async function EditCostsPage() {
             <Table head={<><th className="sc-th">Klant</th><th className="sc-th">Editor</th><th className="sc-th text-right">Shorts</th><th className="sc-th text-right">Per short</th><th className="sc-th text-right">Per maand</th></>}>
               {topClients.map((r) => (
                 <tr key={r.slug} className="sc-row-link">
-                  <td className="sc-td"><Link href={`/clients/${r.slug}?tab=financieel`} className="font-medium hover:underline">{r.name}</Link></td>
+                  <td className="sc-td"><Link href={`/clients/${r.slug}?tab=financieel`} className="flex items-center gap-2 font-medium hover:underline"><ClientLogo name={r.name} logoUrl={r.logoUrl} color={r.color} size={20} />{r.name}</Link></td>
                   <td className="sc-td text-[var(--color-ink-muted)]">{r.editor ?? "—"}</td>
                   <td className="sc-td text-right tabular-nums">{r.shorts}</td>
                   <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{euro(Number(r.editPer))}</td>
@@ -224,7 +226,7 @@ export default async function EditCostsPage() {
           <CardHeader title={`Nog geen editkosten bekend (${missing.length})`} subtitle="Deze klanten missen editkosten per short of shorts per maand in Monday — niet meegeteld." className="p-5 pb-2" />
           <div className="flex flex-wrap gap-1.5 p-5 pt-1">
             {missing.map((r) => (
-              <Link key={r.slug} href={`/clients/${r.slug}?tab=financieel`} className="rounded-full bg-[var(--color-surface-2)] px-3 py-1 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{r.name}</Link>
+              <Link key={r.slug} href={`/clients/${r.slug}?tab=financieel`} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-neutral-soft)] px-3 py-1 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"><ClientLogo name={r.name} logoUrl={r.logoUrl} color={r.color} size={16} />{r.name}</Link>
             ))}
           </div>
         </Card>

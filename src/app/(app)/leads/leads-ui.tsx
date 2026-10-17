@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRightCircle, Check, Loader2, Plus, Search } from "lucide-react";
 import { convertLeadToClient, createLead, setLeadFollowUp, setLeadStatus } from "@/server/actions/leads";
 import type { LeadRow } from "@/server/leads";
+import { LEAD_STATUS } from "@/lib/statuses";
 
 /** Snel een nieuwe lead toevoegen (handmatig, naast de webhook-intake). */
 export function QuickAddLead() {
@@ -54,13 +55,17 @@ export function QuickAddLead() {
 const STATUSES = ["lead", "offerte", "onderhandeling", "gewonnen", "verloren"] as const;
 type Status = (typeof STATUSES)[number];
 
-const STATUS_STYLE: Record<Status, string> = {
-  lead: "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]",
-  offerte: "bg-[#e7f0ff] text-[#1b5fe0]",
-  onderhandeling: "bg-[#f3e9ff] text-[#8338d9]",
-  gewonnen: "bg-[var(--color-good-soft)] text-[#14633a]",
-  verloren: "bg-[#fde8ea] text-[#c02a3a]",
+// Centrale lead-statuskleuren (zie lib/statuses.ts). Toon → pill-stijl + accentdot.
+const TONE_PILL: Record<string, string> = {
+  neutral: "bg-[var(--color-neutral-soft)] text-[var(--color-ink-muted)]",
+  info: "bg-[var(--color-info-soft)] text-[#0060a8]",
+  good: "bg-[var(--color-good-soft)] text-[#1d6b4c]",
+  warn: "bg-[var(--color-warn-soft)] text-[#8a5300]",
+  bad: "bg-[var(--color-bad-soft)] text-[#a3271c]",
+  lime: "bg-[var(--color-lime-soft)] text-[#54700a]",
+  ink: "bg-[var(--color-indigo-ink)] text-white",
 };
+const statusPill = (s: string) => TONE_PILL[LEAD_STATUS[s]?.tone ?? "neutral"]!;
 
 function fmtDate(d: string | null) {
   if (!d) return "";
@@ -95,15 +100,13 @@ export function LeadsBoard({ rows, segments, sources }: { rows: LeadRow[]; segme
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-1">
           {(["open", "lead", "offerte", "onderhandeling", "gewonnen", "verloren", "alle"] as const).map((s) => {
-            const dot: Record<string, string> = {
-              lead: "var(--color-ink-faint)", offerte: "#1b5fe0", onderhandeling: "#8338d9",
-              gewonnen: "var(--color-good)", verloren: "var(--color-bad)",
-            };
+            const meta = LEAD_STATUS[s];
+            const label = s === "open" ? "Open" : s === "alle" ? "Alle" : meta?.label ?? s;
             return (
               <button key={s} type="button" onClick={() => setStatus(s)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium capitalize ${status === s ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
-                {dot[s] ? <span className="size-2 rounded-full" style={{ background: dot[s] }} /> : null}
-                {s}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${status === s ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-neutral-soft)] text-[var(--color-ink-muted)]"}`}>
+                {meta ? <span className="size-2 rounded-full" style={{ background: meta.dot }} /> : null}
+                {label}
               </button>
             );
           })}
@@ -171,7 +174,7 @@ function LeadRowView({ r, today }: { r: LeadRow; today: string }) {
 
   return (
     <tr className="border-b border-[var(--color-line)] last:border-0 hover:bg-[var(--color-surface-sunken)]/40"
-      style={{ boxShadow: `inset 3px 0 0 ${({ gewonnen: "var(--color-good)", verloren: "var(--color-bad)", offerte: "#1b5fe0", onderhandeling: "#8338d9" } as Record<string, string>)[status] ?? "transparent"}` }}>
+      style={{ boxShadow: `inset 3px 0 0 ${overdue ? "var(--color-bad)" : LEAD_STATUS[status]?.dot ?? "transparent"}` }}>
       <td className="px-3 py-2">
         <div className="font-medium text-[var(--color-ink)]">{r.company}</div>
         <div className="text-2xs text-[var(--color-ink-faint)]">
@@ -182,8 +185,8 @@ function LeadRowView({ r, today }: { r: LeadRow; today: string }) {
       <td className="px-2 py-2">
         <div className="relative inline-flex items-center">
           <select value={status} onChange={(e) => changeStatus(e.target.value as Status)} disabled={pending}
-            className={`appearance-none rounded-full px-2.5 py-1 pr-6 text-xs font-medium capitalize ${STATUS_STYLE[status]} cursor-pointer`}>
-            {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            className={`appearance-none rounded-full px-2.5 py-1 pr-6 text-xs font-medium ${statusPill(status)} cursor-pointer`}>
+            {STATUSES.map((s) => <option key={s} value={s}>{LEAD_STATUS[s]?.label ?? s}</option>)}
           </select>
           {pending ? <Loader2 className="pointer-events-none absolute right-1.5 size-3 animate-spin opacity-60" /> : null}
         </div>

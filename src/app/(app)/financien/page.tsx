@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Repeat, CalendarClock, Wallet, Receipt } from "lucide-react";
 import { requireOwner } from "@/server/auth/context";
 import { getManagementFinance } from "@/server/management-finance";
 import { Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
@@ -29,10 +30,10 @@ export default async function FinancienPage() {
 
       {/* Kerncijfers */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Terugkerende omzet (MRR)" value={euro(d.mrr)} hint="actieve contracten/maand" />
-        <Stat label="Verwacht volgende maand" value={euro(d.expectedNextMonth)} hint={`incl. ${euro(d.pipeline.monthly)} pipeline`} />
-        <Stat label={`Gerealiseerd ${new Date().getFullYear()}`} value={euro(d.yearRealized)} />
-        <Stat label="Vaste lasten / maand" value={euro(d.fixedTotal)} />
+        <Stat label="Terugkerende omzet (MRR)" value={euro(d.mrr)} hint="actieve contracten/maand" tone="good" icon={<Repeat />} />
+        <Stat label="Verwacht volgende maand" value={euro(d.expectedNextMonth)} hint={`incl. ${euro(d.pipeline.monthly)} pipeline`} tone="info" icon={<CalendarClock />} />
+        <Stat label={`Gerealiseerd ${new Date().getFullYear()}`} value={euro(d.yearRealized)} tone="good" icon={<Wallet />} />
+        <Stat label="Vaste lasten / maand" value={euro(d.fixedTotal)} tone="warn" icon={<Receipt />} />
       </div>
 
       {/* Boekhouding (Digiboox) — officiële cijfers */}
@@ -130,7 +131,7 @@ export default async function FinancienPage() {
           {fixedByCat.size > 0 ? (
             <div className="flex flex-wrap gap-1.5 px-5 pb-2">
               {[...fixedByCat.entries()].map(([c, v]) => (
-                <span key={c} className="rounded-full bg-[var(--color-surface-2)] px-2.5 py-1 text-2xs text-[var(--color-ink-muted)]">{c}: <strong className="text-[var(--color-ink)]">{euro(v)}</strong></span>
+                <span key={c} className="rounded-full bg-[var(--color-neutral-soft)] px-2.5 py-1 text-2xs text-[var(--color-ink-muted)]">{c}: <strong className="text-[var(--color-ink)]">{euro(v)}</strong></span>
               ))}
             </div>
           ) : null}

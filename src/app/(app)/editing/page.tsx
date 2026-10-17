@@ -4,7 +4,7 @@ import { requireInternal } from "@/server/auth/context";
 import { getEditingDashboard, listEditorsWithRates, listEditingProjects } from "@/server/editing";
 import { editorCapacityMap } from "@/server/metrics";
 import { editorLoad, LOAD_LABEL } from "@/lib/metrics";
-import { Avatar, Badge, Card, CardHeader, EmptyState, PageHeader, Table } from "@/components/ui";
+import { Avatar, Badge, Card, CardHeader, ClientLogo, EmptyState, PageHeader, Table } from "@/components/ui";
 import { euro, formatDate, num } from "@/lib/format";
 import { RateRow } from "./editing-ui";
 import { EditingBoard } from "./editing-board";
@@ -105,7 +105,7 @@ export default async function EditingPage() {
         <Table head={<><th className="sc-th">Klant</th><th className="sc-th">Editor(s)</th><th className="sc-th text-right">In productie</th><th className="sc-th text-right">Afgerond (mnd)</th><th className="sc-th text-right">Wacht op feedback</th><th className="sc-th text-right">Te laat</th><th className="sc-th">Deadline</th>{canSeeCosts ? <><th className="sc-th text-right">Editkosten/mnd</th><th className="sc-th text-right">Gem./video</th></> : null}</>}>
           {data.clients.map((c) => (
             <tr key={c.id} className="sc-row-link">
-              <td className="sc-td"><Link href={`/clients/${c.slug}?tab=videos`} className="flex items-center gap-2 font-medium hover:underline"><Avatar name={c.name} color={c.color} size={20} />{c.name}</Link></td>
+              <td className="sc-td"><Link href={`/clients/${c.slug}?tab=videos`} className="flex items-center gap-2 font-medium hover:underline"><ClientLogo name={c.name} logoUrl={c.logo_url} color={c.color} size={20} />{c.name}</Link></td>
               <td className="sc-td text-[var(--color-ink-muted)]">{c.editors ?? "—"}</td>
               <td className="sc-td text-right tabular-nums">{num(Number(c.in_production))}</td>
               <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{num(Number(c.done_month))}</td>

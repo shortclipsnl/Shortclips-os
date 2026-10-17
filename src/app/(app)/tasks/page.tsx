@@ -5,7 +5,7 @@ import { db } from "@/db/client";
 import { clients, tasks, users } from "@/db/schema";
 import { requireInternal, scopeToClients } from "@/server/auth/context";
 import { listAssignableUsers } from "@/server/clients";
-import { Avatar, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Card, EmptyState, PageHeader, TeamAvatar } from "@/components/ui";
 import { QuickTaskLines, TaskItem, type TaskItemData } from "./tasks-ui";
 
 export const metadata: Metadata = { title: "Taken" };
@@ -169,7 +169,7 @@ function PersonCard({ id, name, count, active, generic }: { id: string; name: st
       {generic ? (
         <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--color-surface-sunken)] text-xs font-semibold text-[var(--color-ink-muted)]">AL</span>
       ) : (
-        <Avatar name={name} size={32} />
+        <TeamAvatar name={name} size={32} />
       )}
       <span className="min-w-0">
         <span className="block truncate text-sm font-medium">{name.split(" ")[0]}</span>

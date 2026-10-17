@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Palmtree } from "lucide-react";
+import { ClientLogo } from "@/components/ui";
 
-type PlanItem = { id: string; kind: "opname" | "oplevering" | "publicatie"; date: string; clientName: string; clientColor: string | null; title: string; person: string | null; href: string };
+type PlanItem = { id: string; kind: "opname" | "oplevering" | "publicatie"; date: string; clientName: string; clientColor: string | null; clientLogo: string | null; title: string; person: string | null; href: string };
 type PlanWeek = { key: string; label: string; opnames: PlanItem[]; opleveringen: PlanItem[]; publicaties: PlanItem[]; conflicts: Array<{ editor: string; count: number }>; leave: Array<{ name: string; startOn: string; endOn: string }> };
 
 const KINDS = [
@@ -82,10 +83,13 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
                           <ul className="space-y-1">
                             {list.map((i) => (
                               <li key={i.id}>
-                                <Link href={i.href} className="block rounded px-1 py-0.5 text-xs hover:bg-[var(--color-surface-sunken)]">
-                                  <span className="font-medium tabular-nums text-[var(--color-ink-muted)]">{fmtDay(i.date)}</span>{" "}
-                                  <span className="font-medium">{i.clientName}</span>
-                                  {i.person ? <span className="text-[var(--color-ink-faint)]"> · {i.person.split(" ")[0]}</span> : null}
+                                <Link href={i.href} className="flex items-center gap-1.5 rounded px-1 py-0.5 text-xs hover:bg-[var(--color-surface-sunken)]">
+                                  <ClientLogo name={i.clientName} logoUrl={i.clientLogo} color={i.clientColor} size={22} />
+                                  <span className="min-w-0">
+                                    <span className="font-medium tabular-nums text-[var(--color-ink-muted)]">{fmtDay(i.date)}</span>{" "}
+                                    <span className="font-medium">{i.clientName}</span>
+                                    {i.person ? <span className="text-[var(--color-ink-faint)]"> · {i.person.split(" ")[0]}</span> : null}
+                                  </span>
                                 </Link>
                               </li>
                             ))}

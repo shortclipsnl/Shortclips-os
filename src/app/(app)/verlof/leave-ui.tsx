@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Plus, X } from "lucide-react";
 import { cancelLeave, requestLeave, reviewLeave, setLeaveHours } from "@/server/actions/leave";
-import { Avatar, Button, ErrorNote } from "@/components/ui";
+import { Button, ErrorNote, TeamAvatar } from "@/components/ui";
 
 const KINDS = ["vakantie", "vrije dag", "ziek", "bijzonder verlof"] as const;
 
@@ -45,7 +45,7 @@ function BalanceCard({ b, canEdit }: { b: Balance; canEdit: boolean }) {
   return (
     <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
       <div className="flex items-center gap-2">
-        <Avatar name={b.name} size={26} />
+        <TeamAvatar name={b.name} size={26} />
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{b.name.split(" ")[0]}</span>
         <span className="rounded-full bg-[var(--color-info-soft)] px-2 py-0.5 text-2xs font-medium text-[#0060a8]">Vast</span>
       </div>

@@ -20,7 +20,7 @@ export type EditorRow = {
   clients_active: number; next_due: string | null; cost_active: number;
 };
 export type EditingClientRow = {
-  id: string; slug: string; name: string; color: string | null; quota: number; client_rate: number;
+  id: string; slug: string; name: string; color: string | null; logo_url: string | null; quota: number; client_rate: number;
   editors: string | null; in_production: number; awaiting_feedback: number; done_month: number;
   late: number; next_due: string | null;
 };
@@ -48,7 +48,7 @@ export async function getEditingDashboard(_viewer: Viewer) {
       order by in_production desc, editor_name
     `),
     db.execute(sql`
-      select c.id, c.slug, c.name, c.color,
+      select c.id, c.slug, c.name, c.color, c.logo_url,
         coalesce(c.monthly_video_quota,0)::int quota, coalesce(c.edit_cost_per_video,0)::float client_rate,
         string_agg(distinct u.full_name, ', ') filter (where ${ACTIVE}) editors,
         count(*) filter (where ${ACTIVE}) in_production,
@@ -60,7 +60,7 @@ export async function getEditingDashboard(_viewer: Viewer) {
       left join deliverables d on d.client_id = c.id and d.deleted_at is null
       left join users u on u.id = d.editor_id
       where c.deleted_at is null and c.status = 'active'
-      group by c.id, c.slug, c.name, c.color, c.monthly_video_quota, c.edit_cost_per_video
+      group by c.id, c.slug, c.name, c.color, c.logo_url, c.monthly_video_quota, c.edit_cost_per_video
       order by in_production desc, name
     `),
     // Goedgekeurd verlof dat nu of binnen 14 dagen speelt — zodat je bij het
@@ -91,6 +91,7 @@ export type EditingProject = {
   status: string;
   clientName: string;
   clientColor: string | null;
+  clientLogo: string | null;
   clientSlug: string;
   editorName: string | null;
   dueOn: string | null;
@@ -127,6 +128,7 @@ export async function listEditingProjects(viewer: Viewer): Promise<EditingProjec
         statusChangedAt: deliverables.statusChangedAt,
         clientName: clients.name,
         clientColor: clients.color,
+        clientLogo: clients.logoUrl,
         clientSlug: clients.slug,
         editorId: deliverables.editorId,
         editorName: users.fullName,
@@ -170,7 +172,7 @@ export async function listEditingProjects(viewer: Viewer): Promise<EditingProjec
     });
     return {
       id: r.id, title: r.title, status: r.status,
-      clientName: r.clientName, clientColor: r.clientColor, clientSlug: r.clientSlug,
+      clientName: r.clientName, clientColor: r.clientColor, clientLogo: r.clientLogo, clientSlug: r.clientSlug,
       editorName: r.editorName, dueOn: r.dueOn,
       bucket, isLate, daysToDeadline, risk,
     };

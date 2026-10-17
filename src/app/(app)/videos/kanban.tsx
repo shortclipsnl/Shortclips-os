@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { Avatar, Badge } from "@/components/ui";
+import { Badge, ClientLogo } from "@/components/ui";
 import { changeVideoStatus } from "@/server/actions/videos";
 import { daysSince, relativeDays } from "@/lib/format";
 import { VIDEO_STAGES, VIDEO_STATUS, stageOverdue } from "@/lib/statuses";
@@ -91,7 +91,7 @@ export function Kanban({ rows, canEdit = false }: { rows: VideoRow[]; canEdit?: 
                           {v.title}
                         </Link>
                         <div className="mt-2 flex items-center gap-1.5">
-                          <Avatar name={v.clientName} color={v.clientColor} size={18} />
+                          <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={18} />
                           <span className="min-w-0 flex-1 truncate text-xs text-[var(--color-ink-muted)]">{v.clientName}</span>
                         </div>
                         <div className="mt-2 flex items-center justify-between text-2xs text-[var(--color-ink-faint)]">

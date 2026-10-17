@@ -21,7 +21,24 @@ type Tone = "bad" | "warn" | "good" | "neutral";
  */
 
 type Line = { key: string; href: string; what: string; action: string; meta: string; tone: Tone };
-type Block = { key: string; title: string; subtitle?: string; icon: React.ReactNode; accent?: "bad"; lines: Line[]; empty: string };
+type Accent = "bad" | "warn" | "info" | "good" | "ink";
+type Block = { key: string; title: string; subtitle?: string; icon: React.ReactNode; accent?: Accent; lines: Line[]; empty: string };
+
+/** Functionele koptekst-kleur per blok, zodat blokken niet allemaal gelijk ogen. */
+const BLOCK_HEADER: Record<Accent, string> = {
+  bad: "bg-[var(--color-bad)]",
+  warn: "bg-[var(--color-warn)]",
+  info: "bg-[var(--color-brand-600)]",
+  good: "bg-[var(--color-good)]",
+  ink: "bg-[var(--color-indigo-ink)]",
+};
+const BLOCK_RING: Record<Accent, string> = {
+  bad: "ring-1 ring-[var(--color-bad)]/25 border-[var(--color-bad)]/40",
+  warn: "ring-1 ring-[var(--color-warn)]/25",
+  info: "ring-1 ring-[var(--color-brand-600)]/20",
+  good: "ring-1 ring-[var(--color-good)]/20",
+  ink: "ring-1 ring-[var(--color-indigo-ink)]/10",
+};
 
 /** "Klant — Titel", maar niet "Klant — Klant" als de titel gelijk is. */
 function label(clientName: string, title: string): string {
@@ -170,8 +187,8 @@ function ownerBlocks(data: DashboardData, capMap: Map<string, number>): Block[] 
 
   return [
     { key: "attention", title: "Vraagt nu aandacht", subtitle: "Over de deadline, stil bij de klant of opname niet rond.", icon: <AlertTriangle className="size-5" strokeWidth={2.25} />, accent: "bad", lines: attention, empty: "Niets urgents — alles loopt op schema." },
-    { key: "clients", title: "Klanten die actie nodig hebben", subtitle: "Risico, achterstand op de afspraak of geen opname.", icon: <Users className="size-5" />, lines: clientLines.slice(0, 8), empty: "Alle klanten lopen op schema." },
-    { key: "team", title: "Team & contracten", subtitle: "Capaciteit van editors en aflopende contracten.", icon: <FileSignature className="size-5" />, lines: teamLines.slice(0, 8), empty: "Capaciteit in orde, geen contracten binnen 90 dagen." },
+    { key: "clients", title: "Klanten die actie nodig hebben", subtitle: "Risico, achterstand op de afspraak of geen opname.", icon: <Users className="size-5" />, accent: "warn", lines: clientLines.slice(0, 8), empty: "Alle klanten lopen op schema." },
+    { key: "team", title: "Team & contracten", subtitle: "Capaciteit van editors en aflopende contracten.", icon: <FileSignature className="size-5" />, accent: "ink", lines: teamLines.slice(0, 8), empty: "Capaciteit in orde, geen contracten binnen 90 dagen." },
   ];
 }
 
@@ -229,9 +246,9 @@ function creativeBlocks(data: DashboardData, myDay: MyDay): Block[] {
   ];
 
   return [
-    { key: "mine", title: "Mijn acties vandaag", subtitle: "Jouw taken en video's die op jou wachten.", icon: <ListChecks className="size-5" />, lines: mine.slice(0, 8), empty: "Geen openstaande acties op jouw naam." },
-    { key: "waiting", title: "Mijn klanten wachten", subtitle: "Video's die te lang bij de klant liggen.", icon: <Users className="size-5" />, lines: waiting.slice(0, 8), empty: "Geen klanten die op feedback laten wachten." },
-    { key: "soon", title: "Komende dagen", subtitle: "Opnames en scripts die eraan komen.", icon: <CalendarClock className="size-5" />, lines: soon.slice(0, 8), empty: "Niets op de planning de komende dagen." },
+    { key: "mine", title: "Mijn acties vandaag", subtitle: "Jouw taken en video's die op jou wachten.", icon: <ListChecks className="size-5" />, accent: "info", lines: mine.slice(0, 8), empty: "Geen openstaande acties op jouw naam." },
+    { key: "waiting", title: "Mijn klanten wachten", subtitle: "Video's die te lang bij de klant liggen.", icon: <Users className="size-5" />, accent: "warn", lines: waiting.slice(0, 8), empty: "Geen klanten die op feedback laten wachten." },
+    { key: "soon", title: "Komende dagen", subtitle: "Opnames en scripts die eraan komen.", icon: <CalendarClock className="size-5" />, accent: "ink", lines: soon.slice(0, 8), empty: "Niets op de planning de komende dagen." },
   ];
 }
 
@@ -259,17 +276,17 @@ function videographerBlocks(myDay: MyDay): Block[] {
   }));
 
   return [
-    { key: "shoots", title: "Mijn opnames", subtitle: "Jouw opnamedagen, eerstvolgende bovenaan.", icon: <Camera className="size-5" />, lines: shoots.slice(0, 8), empty: "Geen opnames op jouw naam de komende twee weken." },
-    { key: "tasks", title: "Mijn taken", subtitle: "Beelden uploaden en andere acties op jouw naam.", icon: <ListChecks className="size-5" />, lines: tasks.slice(0, 8), empty: "Geen openstaande taken." },
+    { key: "shoots", title: "Mijn opnames", subtitle: "Jouw opnamedagen, eerstvolgende bovenaan.", icon: <Camera className="size-5" />, accent: "info", lines: shoots.slice(0, 8), empty: "Geen opnames op jouw naam de komende twee weken." },
+    { key: "tasks", title: "Mijn taken", subtitle: "Beelden uploaden en andere acties op jouw naam.", icon: <ListChecks className="size-5" />, accent: "ink", lines: tasks.slice(0, 8), empty: "Geen openstaande taken." },
   ];
 }
 
 /* ---------------- Weergave ---------------- */
 function BlockCard({ block }: { block: Block }) {
-  const bad = block.accent === "bad";
+  const accent: Accent = block.accent ?? "ink";
   return (
-    <Card padded={false} className={`overflow-hidden ${bad ? "border-[var(--color-bad)]/40 ring-1 ring-[var(--color-bad)]/20" : "ring-1 ring-[var(--color-indigo-ink)]/10"}`}>
-      <div className={`flex items-center gap-2.5 px-5 py-3 ${bad ? "bg-[var(--color-bad)] text-white" : "bg-[var(--color-indigo-ink)] text-white"}`}>
+    <Card padded={false} className={`overflow-hidden ${BLOCK_RING[accent]}`}>
+      <div className={`flex items-center gap-2.5 px-5 py-3 text-white ${BLOCK_HEADER[accent]}`}>
         <span className="shrink-0 opacity-90">{block.icon}</span>
         <div className="min-w-0">
           <h2 className="truncate text-base font-bold tracking-tight">{block.title}</h2>

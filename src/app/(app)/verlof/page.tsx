@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/db/client";
 import { leaveRequests, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
-import { Avatar, Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
+import { Badge, Card, CardHeader, EmptyState, PageHeader, TeamAvatar } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { getLeaveBalances } from "@/server/leave-balance";
 import { RequestLeaveForm, ReviewButtons, CancelButton, LeaveBalances } from "./leave-ui";
@@ -76,7 +76,7 @@ export default async function LeavePage() {
           <ul className="divide-y divide-[var(--color-line)]">
             {pending.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                <Avatar name={r.name} size={26} />
+                <TeamAvatar name={r.name} size={26} />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-medium">{r.name} · {r.kind}</span>
                   <span className="block text-xs text-[var(--color-ink-muted)]">{formatDate(r.startOn)} t/m {formatDate(r.endOn)}{r.note ? ` · ${r.note}` : ""}</span>
@@ -125,7 +125,7 @@ export default async function LeavePage() {
             <ul className="divide-y divide-[var(--color-line)]">
               {approved.map((r) => (
                 <li key={r.id} className="flex items-center gap-3 px-5 py-3">
-                  <Avatar name={r.name} size={26} />
+                  <TeamAvatar name={r.name} size={26} />
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium">{r.name}</span>
                     <span className="block text-xs text-[var(--color-ink-muted)]">{r.kind}</span>

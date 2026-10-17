@@ -26,6 +26,7 @@ export async function getEditorDashboard(viewer: Viewer) {
         clientName: clients.name,
         clientSlug: clients.slug,
         clientColor: clients.color,
+        clientLogo: clients.logoUrl,
         scriptId: deliverables.scriptId,
         driveFolderId: deliverables.driveFolderId,
         frameUrl: deliverables.frameUrl,

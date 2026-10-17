@@ -80,6 +80,7 @@ export async function listVideos(viewer: Viewer, filter: VideoFilter = {}) {
       clientName: clients.name,
       clientSlug: clients.slug,
       clientColor: clients.color,
+      clientLogo: clients.logoUrl,
       editorId: deliverables.editorId,
       editorName: users.fullName,
       openComments: sql<number>`(
@@ -201,6 +202,7 @@ export async function getReviewQueue(viewer: Viewer) {
     clientName: clients.name,
     clientSlug: clients.slug,
     clientColor: clients.color,
+    clientLogo: clients.logoUrl,
     editorName: users.fullName,
     openComments: sql<number>`(
       select count(*) from review_threads rt

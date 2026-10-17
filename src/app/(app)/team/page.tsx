@@ -9,7 +9,6 @@ import {
 import { requirePermission } from "@/server/auth/context";
 import { isCoreStaff, coreStaffRank } from "@/server/core-staff";
 import {
-  Avatar,
   Badge,
   Card,
   CardHeader,
@@ -17,6 +16,7 @@ import {
   LinkButton,
   PageHeader,
   Table,
+  TeamAvatar,
 } from "@/components/ui";
 import {
   euro,
@@ -46,22 +46,6 @@ const ROLE_LABELS: Record<string, string> = {
   finance: "Finance",
 };
 
-/**
- * Echte portretfoto's uit public/team/ (bron: shortclips.nl), gekoppeld op
- * voornaam. Let op: het bestand voor Jiska heet historisch "jeska.png".
- * Zonder match toont de Avatar initialen op de persoonskleur.
- */
-const TEAM_PHOTO_FILE: Record<string, string> = {
-  fabian: "fabian", jarno: "jarno", jiska: "jeska", jeska: "jeska",
-  max: "max", milou: "milou", nynke: "nynke", quinn: "quinn",
-  rutger: "rutger", sem: "sem",
-};
-function teamPhoto(fullName: string): string | undefined {
-  const first = fullName.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
-  const file = TEAM_PHOTO_FILE[first];
-  return file ? `/team/${file}.png` : undefined;
-}
-
 export default async function TeamPage() {
   const viewer = await requirePermission("team:read");
   const canSeeCosts = viewer.permissions.has("finance:read_costs");
@@ -72,6 +56,7 @@ export default async function TeamPage() {
       id: users.id,
       fullName: users.fullName,
       email: users.email,
+      avatarUrl: users.avatarUrl,
       role: users.primaryRole,
       status: users.status,
       jobTitle: teamMembers.jobTitle,
@@ -161,7 +146,7 @@ export default async function TeamPage() {
         }
       >
         <div className="flex items-start gap-3">
-          <Avatar name={p.fullName} color={p.color} size={42} src={teamPhoto(p.fullName)} />
+          <TeamAvatar name={p.fullName} avatarUrl={p.avatarUrl ?? null} color={p.color} size={42} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="truncate font-semibold">{p.fullName}</span>
@@ -248,7 +233,7 @@ export default async function TeamPage() {
               <tr key={String(e.id)}>
                 <td className="sc-td">
                   <span className="flex items-center gap-2.5">
-                    <Avatar name={String(e.display_name)} size={24} />
+                    <TeamAvatar name={String(e.display_name)} size={24} />
                     <span>
                       <span className="block font-medium">{String(e.display_name)}</span>
                       {e.is_freelance ? (

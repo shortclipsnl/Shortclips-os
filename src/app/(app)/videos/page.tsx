@@ -5,7 +5,7 @@ import { AlertTriangle, ExternalLink, MessageSquare } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getReviewQueue, getVideoHighlights, listEditorOptions, listVideos, type ReviewQueueItem } from "@/server/videos";
 import { EditorFilter } from "./editor-filter";
-import { Avatar, Badge, Card, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
+import { Badge, Card, ClientLogo, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import {
   daysSince,
   formatDate,
@@ -221,7 +221,7 @@ export default async function VideosPage({
                   </td>
                   <td className="sc-td">
                     <Link href={`/clients/${v.clientSlug}`} className="flex items-center gap-2 text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
-                      <Avatar name={v.clientName} color={v.clientColor} size={20} />
+                      <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={20} />
                       {v.clientName}
                     </Link>
                   </td>
@@ -309,7 +309,7 @@ function ReviewRow({ v, accent }: { v: ReviewQueueItem; accent: string }) {
   return (
     <li className="flex items-center gap-2 px-4 py-2.5">
       <Link href={`/videos/${v.id}`} className="flex min-w-0 flex-1 items-center gap-2.5">
-        <Avatar name={v.clientName} color={v.clientColor} size={24} />
+        <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={24} />
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium">{v.title}</span>
           <span className="block truncate text-xs text-[var(--color-ink-muted)]">

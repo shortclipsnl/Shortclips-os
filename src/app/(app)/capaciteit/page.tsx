@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireInternal } from "@/server/auth/context";
 import { getCapacityOverview } from "@/server/capacity";
-import { PageHeader, Card, Stat, Badge } from "@/components/ui";
+import { PageHeader, Card, Stat, Badge, TeamAvatar } from "@/components/ui";
 import { euro } from "@/lib/format";
 import { GrowthSimulator } from "./simulator";
 
@@ -40,10 +40,13 @@ export default async function CapacityPage() {
               <div key={p.id} className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4"
                 style={{ boxShadow: `inset 3px 0 0 ${st.bar}` }}>
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate font-semibold">{p.name}</div>
-                    <div className="text-2xs text-[var(--color-ink-muted)]">
-                      {p.role ?? "—"}{p.employment ? ` · ${p.employment}` : ""}
+                  <div className="flex min-w-0 items-center gap-2">
+                    <TeamAvatar name={p.name} size={20} />
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold">{p.name}</div>
+                      <div className="text-2xs text-[var(--color-ink-muted)]">
+                        {p.role ?? "—"}{p.employment ? ` · ${p.employment}` : ""}
+                      </div>
                     </div>
                   </div>
                   <Badge tone={st.tone}>{st.label}</Badge>

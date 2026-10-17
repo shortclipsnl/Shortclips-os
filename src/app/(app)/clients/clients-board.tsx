@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { Avatar, Badge } from "@/components/ui";
+import { Badge, ClientLogo } from "@/components/ui";
 import { CLIENT_STATUS } from "@/lib/statuses";
 import { euro, formatDate } from "@/lib/format";
 
@@ -118,14 +118,7 @@ function ClientCard({ c }: { c: BoardClient }) {
         title={stopped ? "Niet-actief" : "Actief"}
       />
       <Link href={`/clients/${c.slug}`} className="flex min-w-0 flex-1 items-center gap-3">
-        {c.logoUrl ? (
-          <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] p-0.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={c.logoUrl} alt="" className="max-h-full max-w-full object-contain" />
-          </span>
-        ) : (
-          <Avatar name={c.name} color={c.color} size={34} />
-        )}
+        <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={36} />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className="truncate font-medium">{c.name}</span>
