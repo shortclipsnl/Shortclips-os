@@ -36,8 +36,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },
       { href: "/scripting", label: "Scripting", icon: "ScrollText", permissions: ["scripts:read"], match: "/scripting" },
       { href: "/productions", label: "Opnameplanning", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
-      { href: "/editing", label: "Editing", icon: "Scissors", permissions: ["videos:read"], match: "/editing" },
-      { href: "/videos", label: "Video's", icon: "Clapperboard", permissions: ["videos:read"], match: "/videos" },
+      { href: "/videos", label: "Editing", icon: "Scissors", permissions: ["videos:read"], match: "/videos" },
     ],
   },
   {

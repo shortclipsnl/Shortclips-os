@@ -4,7 +4,10 @@ import { Suspense } from "react";
 import { AlertTriangle, ExternalLink, MessageSquare } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getReviewQueue, getVideoHighlights, listEditorOptions, listVideos, type ReviewQueueItem } from "@/server/videos";
+import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { EditorFilter } from "./editor-filter";
+import { ShootTimers } from "../editing/shoot-timers";
+import { WorkloadSection } from "../editing/workload-section";
 import { Badge, Card, ClientLogo, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import {
   daysSince,
@@ -21,7 +24,7 @@ const WAITING_ON: Record<string, { label: string; color: string }> = {
 import { ViewSwitch } from "./view-switch";
 import { Kanban } from "./kanban";
 
-export const metadata: Metadata = { title: "Video's" };
+export const metadata: Metadata = { title: "Editing" };
 export const dynamic = "force-dynamic";
 
 const PRESETS = [
@@ -46,7 +49,7 @@ export default async function VideosPage({
       ? undefined
       : "actief";
 
-  const [rows, highlights, reviewQueue, editors] = await Promise.all([
+  const [rows, highlights, reviewQueue, editors, shoots] = await Promise.all([
     listVideos(viewer, {
       preset,
       status: params.status,
@@ -56,15 +59,17 @@ export default async function VideosPage({
     getVideoHighlights(viewer),
     getReviewQueue(viewer),
     listEditorOptions(),
+    getShootDeadlines(viewer),
   ]);
   const canEdit = viewer.permissions.has("videos:write");
+  const shootsAtRisk = shoots.filter((s) => s.atRisk).length;
 
   const view = params.weergave === "kanban" ? "kanban" : "lijst";
 
   return (
     <div className="mx-auto max-w-[1500px]">
       <PageHeader
-        title="Video's"
+        title="Editing"
         description={`${rows.length} video's${params.status ? ` in de stap ${VIDEO_STATUS[params.status as VideoStage]?.label ?? params.status}` : ""}`}
         actions={
           <Suspense fallback={null}>
@@ -79,6 +84,20 @@ export default async function VideosPage({
           </Suspense>
         }
       />
+
+      {/* Deadlinebewaking per klantopname (§7): 14 werkdagen tot klantoplevering,
+          editor levert 2 werkdagen eerder. Live uit de datum van vandaag. */}
+      {shoots.length > 0 ? (
+        <div className="mb-6">
+          <div className="mb-3 flex items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+            <h2 className="text-sm font-bold tracking-tight">Opnames & deadlines</h2>
+            <span className="text-xs text-white/80">
+              {shootsAtRisk > 0 ? `${shootsAtRisk} vragen aandacht · ` : ""}14 werkdagen tot oplevering, editor −2
+            </span>
+          </div>
+          <ShootTimers shoots={shoots} />
+        </div>
+      ) : null}
 
       {/* Aandachtsblokken: automatisch uit Monday (fase + deadline). */}
       {highlights.late > 0 || highlights.atClient > 0 ? (
@@ -257,6 +276,9 @@ export default async function VideosPage({
           </Table>
         </Card>
       )}
+
+      {/* Editorbelasting & tarieven — samengevoegd vanuit de oude /editing-pagina. */}
+      <WorkloadSection viewer={viewer} />
     </div>
   );
 }
