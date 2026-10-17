@@ -446,3 +446,57 @@ export async function runTaskDeadlineReminders() {
     ctx.log(`${ctx.counters.updated} teamleden een taak-herinnering gestuurd`);
   });
 }
+
+/** Maandag van de huidige week (voor wekelijkse dedupe). */
+function mondayIso(): string {
+  const d = new Date();
+  const back = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - back);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Signaleert actieve klanten zonder geplande volgende opname (Deel 2.1). Slaat
+ * bewust gepauzeerde klanten en klanten met voldoende contentvoorraad over, en
+ * stuurt de verantwoordelijke coördinator één melding per week (dedupe).
+ */
+export async function runClientsWithoutShootSignal() {
+  return runJob("monday", "signals.clients_without_shoot", {}, async (ctx) => {
+    const week = mondayIso();
+    const res = await db.execute(sql`
+      select c.id, c.name, c.slug, c.coordinator_id,
+        coalesce(c.monthly_video_quota, 0)::int quota,
+        (select max(pd.scheduled_on) from production_days pd where pd.client_id = c.id and pd.deleted_at is null) last_shoot,
+        (select count(*) from deliverables d where d.client_id = c.id and d.deleted_at is null
+           and d.status in ('approved','ready_to_publish','scheduled'))::int voorraad
+      from clients c
+      where c.deleted_at is null and c.status = 'active'
+        and not exists (
+          select 1 from production_days pd
+          where pd.client_id = c.id and pd.deleted_at is null
+            and pd.status <> 'cancelled' and pd.scheduled_on >= current_date
+        )`);
+    const rows = ((res as { rows?: unknown[] }).rows ?? (res as unknown as unknown[])) as Array<{
+      id: string; name: string; slug: string; coordinator_id: string | null; quota: number; last_shoot: string | null; voorraad: number;
+    }>;
+
+    for (const c of rows) {
+      ctx.counters.processed++;
+      // Voldoende voorraad (minstens één maand publicaties klaar) → geen waarschuwing.
+      if (c.voorraad >= Math.max(c.quota, 1)) continue;
+      if (!c.coordinator_id) continue; // zonder verantwoordelijke geen gerichte melding
+      await notify({
+        userIds: [c.coordinator_id],
+        clientId: c.id,
+        type: "client_without_shoot",
+        level: "warning",
+        title: `${c.name} heeft geen volgende opname gepland`,
+        body: `${c.last_shoot ? `Laatste opname ${c.last_shoot}. ` : ""}Voorraad: ${c.voorraad} video('s). Plan een opnamedag in.`,
+        href: `/clients/${c.slug}`,
+        dedupeKey: `client_without_shoot:${c.id}:${week}`,
+      });
+      ctx.counters.updated++;
+    }
+    ctx.log(`${ctx.counters.updated} coördinator-meldingen voor klanten zonder opname`);
+  });
+}

@@ -1,6 +1,7 @@
 import "server-only";
 import { daysSince, daysUntil } from "@/lib/format";
 import { getDashboard } from "@/server/dashboard";
+import { listEditingProjects } from "@/server/editing";
 import { isOwner, type Viewer } from "@/server/auth/context";
 
 /**
@@ -27,8 +28,19 @@ const EDIT = ["project_coordinator", "editor"];
 const SHOOT = ["project_coordinator", "videographer"];
 
 export async function getQualityOverview(viewer: Viewer): Promise<{ items: QualityItem[]; counts: Record<QualitySeverity, number> }> {
-  const data = await getDashboard(viewer);
+  const [data, projects] = await Promise.all([getDashboard(viewer), listEditingProjects(viewer)]);
   const items: QualityItem[] = [];
+
+  // Voorspellend: projecten die nog NIET te laat zijn maar risico lopen (Deel 3.2).
+  for (const p of projects) {
+    if (p.bucket === "aandacht" || p.risk.level !== "oranje") continue; // al-te-laat komt hieronder apart
+    items.push({
+      id: `risk-${p.id}`, severity: "oranje", category: "Risico op vertraging",
+      title: `${p.clientName} — ${p.title === p.clientName ? "video" : p.title}`,
+      detail: `${p.risk.factors.join(" · ")} → vooruit plannen`,
+      href: `/videos/${p.id}`, roles: EDIT,
+    });
+  }
 
   // Video's over de deadline — directe actie (rood).
   for (const v of data.videos.late) {

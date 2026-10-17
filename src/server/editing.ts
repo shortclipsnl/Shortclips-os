@@ -3,6 +3,10 @@ import { and, desc, eq, gte, isNull, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, deliverables, users } from "@/db/schema";
 import { scopeToClients, type Viewer } from "@/server/auth/context";
+import { editorCapacityMap } from "@/server/metrics";
+import { editorLoad } from "@/lib/metrics";
+import { workingDaysBetween } from "@/lib/workdays";
+import { projectRisk, type RiskLevel } from "@/server/risk";
 
 const rows = <T,>(r: unknown): T[] => ((r as { rows?: T[] }).rows ?? (r as T[])) as T[];
 
@@ -93,6 +97,7 @@ export type EditingProject = {
   bucket: EditingBucket;
   isLate: boolean;
   daysToDeadline: number | null;
+  risk: { level: RiskLevel; factors: string[] };
 };
 
 const CLIENT_STATUSES = ["client_review", "client_revision"];
@@ -112,24 +117,38 @@ export async function listEditingProjects(viewer: Viewer): Promise<EditingProjec
   ];
   if (viewer.isEditorOnly) conds.push(eq(deliverables.editorId, viewer.id));
 
-  const rawRows = await db
-    .select({
-      id: deliverables.id,
-      title: deliverables.title,
-      status: deliverables.status,
-      dueOn: deliverables.dueOn,
-      statusChangedAt: deliverables.statusChangedAt,
-      clientName: clients.name,
-      clientColor: clients.color,
-      clientSlug: clients.slug,
-      editorName: users.fullName,
-    })
-    .from(deliverables)
-    .innerJoin(clients, eq(clients.id, deliverables.clientId))
-    .leftJoin(users, eq(users.id, deliverables.editorId))
-    .where(and(...conds))
-    .orderBy(sql`${deliverables.dueOn} asc nulls last`, desc(deliverables.statusChangedAt))
-    .limit(500);
+  const [rawRows, capMap] = await Promise.all([
+    db
+      .select({
+        id: deliverables.id,
+        title: deliverables.title,
+        status: deliverables.status,
+        dueOn: deliverables.dueOn,
+        statusChangedAt: deliverables.statusChangedAt,
+        clientName: clients.name,
+        clientColor: clients.color,
+        clientSlug: clients.slug,
+        editorId: deliverables.editorId,
+        editorName: users.fullName,
+      })
+      .from(deliverables)
+      .innerJoin(clients, eq(clients.id, deliverables.clientId))
+      .leftJoin(users, eq(users.id, deliverables.editorId))
+      .where(and(...conds))
+      .orderBy(sql`${deliverables.dueOn} asc nulls last`, desc(deliverables.statusChangedAt))
+      .limit(500),
+    editorCapacityMap(),
+  ]);
+
+  // Actieve werkvoorraad per editor → overbelasting (voor de risicofactor).
+  const openByEditor = new Map<string, number>();
+  for (const r of rawRows) {
+    if (r.editorId && !DONE_STATUSES.includes(r.status)) openByEditor.set(r.editorId, (openByEditor.get(r.editorId) ?? 0) + 1);
+  }
+  const overloaded = new Set<string>();
+  for (const [eid, open] of openByEditor) {
+    if (editorLoad(open, capMap.get(eid) ?? 0).level === "overbelast") overloaded.add(eid);
+  }
 
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
   return rawRows.map((r) => {
@@ -141,11 +160,19 @@ export async function listEditingProjects(viewer: Viewer): Promise<EditingProjec
     else if (CLIENT_STATUSES.includes(r.status)) bucket = "klant";
     else bucket = "editor";
     const daysToDeadline = r.dueOn ? Math.round((new Date(r.dueOn).getTime() - new Date(today).getTime()) / 86400000) : null;
+    const daysAtClient = CLIENT_STATUSES.includes(r.status) && r.statusChangedAt
+      ? workingDaysBetween(new Date(r.statusChangedAt).toLocaleDateString("en-CA"), today)
+      : null;
+    const risk = projectRisk({
+      isLate, daysToDeadline, status: r.status,
+      editorOverloaded: r.editorId ? overloaded.has(r.editorId) : false,
+      daysAtClient,
+    });
     return {
       id: r.id, title: r.title, status: r.status,
       clientName: r.clientName, clientColor: r.clientColor, clientSlug: r.clientSlug,
       editorName: r.editorName, dueOn: r.dueOn,
-      bucket, isLate, daysToDeadline,
+      bucket, isLate, daysToDeadline, risk,
     };
   });
 }
