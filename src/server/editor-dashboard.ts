@@ -1,7 +1,7 @@
 import "server-only";
-import { and, asc, count, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, deliverables, tasks } from "@/db/schema";
+import { clientKnowledge, clients, deliverables, files, tasks } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -23,6 +23,7 @@ export async function getEditorDashboard(viewer: Viewer) {
         currentVersion: deliverables.currentVersion,
         clientRevisionRounds: deliverables.clientRevisionRounds,
         internalRevisionRounds: deliverables.internalRevisionRounds,
+        clientId: deliverables.clientId,
         clientName: clients.name,
         clientSlug: clients.slug,
         clientColor: clients.color,
@@ -93,6 +94,40 @@ export async function getEditorDashboard(viewer: Viewer) {
       .limit(10),
   ]);
 
+  // Huisstijl & referenties per klant waar de editor werk voor heeft (§5):
+  // Drive-map "Branding" + klantkennis over stijl/tone-of-voice. Alleen bestaande
+  // data; leeg blok wordt niet getoond.
+  const clientIds = [...new Set(queue.map((q) => q.clientId))];
+  const [brandFiles, styleNotes] = clientIds.length
+    ? await Promise.all([
+        db
+          .select({ clientId: files.clientId, name: files.name, url: files.externalUrl })
+          .from(files)
+          .where(and(isNull(files.deletedAt), eq(files.isFolder, false), eq(files.category, "Branding"), inArray(files.clientId, clientIds)))
+          .limit(40),
+        db
+          .select({ clientId: clientKnowledge.clientId, title: clientKnowledge.title, body: clientKnowledge.body, category: clientKnowledge.category })
+          .from(clientKnowledge)
+          .where(and(isNull(clientKnowledge.deletedAt), inArray(clientKnowledge.category, ["editing_style", "tone_of_voice", "hook_style", "branding"]), inArray(clientKnowledge.clientId, clientIds)))
+          .limit(40),
+      ])
+    : [[], []];
+
+  const brandingByClient = new Map<string, { clientId: string; clientName: string; clientSlug: string; files: { name: string; url: string | null }[]; notes: { title: string; body: string }[] }>();
+  const clientMeta = new Map(queue.map((q) => [q.clientId, { name: q.clientName, slug: q.clientSlug }]));
+  const ensure = (cid: string) => {
+    let b = brandingByClient.get(cid);
+    if (!b) {
+      const m = clientMeta.get(cid);
+      b = { clientId: cid, clientName: m?.name ?? "Klant", clientSlug: m?.slug ?? "", files: [], notes: [] };
+      brandingByClient.set(cid, b);
+    }
+    return b;
+  };
+  for (const f of brandFiles) if (f.clientId) ensure(f.clientId).files.push({ name: f.name, url: f.url });
+  for (const n of styleNotes) if (n.clientId) ensure(n.clientId).notes.push({ title: n.title, body: n.body });
+  const branding = [...brandingByClient.values()].filter((b) => b.files.length > 0 || b.notes.length > 0);
+
   const row =
     ((stats as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
       (stats as unknown as Array<Record<string, unknown>>))[0] ?? {};
@@ -104,6 +139,7 @@ export async function getEditorDashboard(viewer: Viewer) {
     queue,
     overdue: Number(overdue[0]?.total ?? 0),
     tasks: openTasks,
+    branding,
     stats: {
       delivered: Number(row.opgeleverd ?? 0),
       inProgress: Number(row.lopend ?? 0),

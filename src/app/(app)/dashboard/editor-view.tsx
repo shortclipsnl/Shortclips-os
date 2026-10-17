@@ -190,6 +190,38 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
         )}
       </Card>
 
+      {data.branding.length > 0 ? (
+        <Card padded={false}>
+          <div className="p-5 pb-3">
+            <CardHeader title="Huisstijl & referenties" subtitle="Richtlijnen en merkmateriaal per klant — uit Drive en de klantkennis." />
+          </div>
+          <ul className="divide-y divide-[var(--color-line)]">
+            {data.branding.map((b) => (
+              <li key={b.clientId} className="px-5 py-3">
+                <Link href={`/clients/${b.clientSlug}?tab=kennis`} className="text-sm font-medium hover:underline">{b.clientName}</Link>
+                {b.notes.length > 0 ? (
+                  <ul className="mt-1.5 space-y-1">
+                    {b.notes.slice(0, 4).map((n, i) => (
+                      <li key={i} className="text-xs text-[var(--color-ink-muted)]"><span className="font-medium text-[var(--color-ink)]">{n.title}:</span> {n.body.slice(0, 140)}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {b.files.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {b.files.slice(0, 8).map((f, i) => (
+                      <a key={i} href={f.url ?? "#"} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface-2)] px-2.5 py-1 text-2xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+                        <FileText className="size-3" /> {f.name}
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       <div className="grid gap-5 md:grid-cols-2">
         <Card padded={false}>
           <div className="p-5 pb-3">
