@@ -1,17 +1,20 @@
 import Link from "next/link";
 import { AlertTriangle, ExternalLink, FileText, Folder, Film, CheckCircle2, Clock } from "lucide-react";
 import { getEditorDashboard } from "@/server/editor-dashboard";
+import { getShootDeadlines } from "@/server/shoot-deadlines";
 import type { Viewer } from "@/server/auth/context";
 import { Badge, Card, CardHeader, ClientLogo, EmptyState, Stat } from "@/components/ui";
 import { daysSince, pct, plural, relativeDays } from "@/lib/format";
 import { TASK_PRIORITY, VIDEO_STATUS, stageOverdue, type VideoStage } from "@/lib/statuses";
+import { ShootTimers } from "../editing/shoot-timers";
+import { EditorStatusControl } from "./editor-status";
 
 /**
  * Dashboard voor editors: alleen eigen werk, met alles wat nodig is om te
  * beginnen — script, materiaal, briefing en openstaande feedback.
  */
 export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
-  const data = await getEditorDashboard(viewer);
+  const [data, shoots] = await Promise.all([getEditorDashboard(viewer), getShootDeadlines(viewer)]);
   const firstName = viewer.fullName.split(" ")[0];
 
   const todayList = data.queue.filter(
@@ -60,11 +63,21 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
         />
       </div>
 
+      {shoots.length > 0 ? (
+        <div>
+          <div className="mb-3 flex items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+            <h2 className="text-sm font-bold tracking-tight">Jouw opdrachten per opname</h2>
+            <span className="text-xs text-white/80">14 werkdagen tot oplevering, jij levert 2 eerder</span>
+          </div>
+          <ShootTimers shoots={shoots} />
+        </div>
+      ) : null}
+
       <Card padded={false}>
         <div className="p-5 pb-3">
           <CardHeader
             title="Jouw werk"
-            subtitle="Op volgorde van deadline. Klik door voor script, materiaal en feedback."
+            subtitle="Op volgorde van deadline. Werk je status bij, en klik door voor script, materiaal en feedback."
           />
         </div>
         {data.queue.length === 0 ? (
@@ -138,12 +151,25 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
                           </span>
                         ) : null}
                       </div>
+                      {(() => {
+                        const missing: string[] = [];
+                        if (!v.scriptId) missing.push("script");
+                        if (!v.driveFolderId) missing.push("materiaal");
+                        if (!v.frameUrl) missing.push("Frame.io");
+                        return missing.length > 0 ? (
+                          <p className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-[var(--color-warn)]">
+                            <AlertTriangle className="size-3" /> Nog koppelen vóór start: {missing.join(" · ")}
+                          </p>
+                        ) : (
+                          <p className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-[var(--color-good)]">
+                            <CheckCircle2 className="size-3" /> Script, materiaal en Frame.io beschikbaar
+                          </p>
+                        );
+                      })()}
                     </div>
 
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
-                      <Badge tone={VIDEO_STATUS[v.status as VideoStage]?.tone ?? "neutral"}>
-                        {VIDEO_STATUS[v.status as VideoStage]?.label ?? v.status}
-                      </Badge>
+                      <EditorStatusControl videoId={v.id} status={v.status} />
                       {v.dueOn ? (
                         <span
                           className={
