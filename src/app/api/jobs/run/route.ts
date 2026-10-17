@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
-import { runClientsWithoutShootSignal, runDailySignals, runEditorDeadlineReminders, runHourlySignals, runTaskDeadlineReminders } from "@/server/jobs/maintenance";
+import { runClientsWithoutShootSignal, runDailySignals, runEditorDeadlineReminders, runHourlySignals, runPostShootTodoReminders, runScriptTodoReminders, runTaskDeadlineReminders } from "@/server/jobs/maintenance";
 import {
   inspectFrameProject,
   listFrameProjects,
@@ -53,6 +53,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "reminders.editor_deadlines": runEditorDeadlineReminders,
   "reminders.task_deadlines": runTaskDeadlineReminders,
   "signals.clients_without_shoot": runClientsWithoutShootSignal,
+  "reminders.script_todo": runScriptTodoReminders,
+  "reminders.post_shoot_todo": runPostShootTodoReminders,
   "signals.hourly": runHourlySignals,
   "frameio.pull_projects": pullFrameProjects,
   "frameio.pull_comments": pullFrameComments,

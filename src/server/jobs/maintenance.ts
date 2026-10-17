@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clients,
@@ -498,5 +498,139 @@ export async function runClientsWithoutShootSignal() {
       ctx.counters.updated++;
     }
     ctx.log(`${ctx.counters.updated} coördinator-meldingen voor klanten zonder opname`);
+  });
+}
+
+/**
+ * Zorgt voor precies één open automatische to-do per dedupe-sleutel (zelfde
+ * patroon als de automation engine). Geeft true terug als er een nieuwe taak is
+ * aangemaakt. Gebruikt voor de opname-herinneringen hieronder.
+ */
+async function ensureTask(input: {
+  clientId: string | null;
+  title: string;
+  assigneeId: string | null;
+  dueOn: string | null;
+  priority?: "normal" | "high" | "urgent";
+  entityType: string;
+  entityId: string;
+  dedupeKey: string;
+}): Promise<boolean> {
+  const existing = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(and(eq(tasks.dedupeKey, input.dedupeKey), isNull(tasks.deletedAt), sql`${tasks.status} <> 'done'`))
+    .limit(1);
+  if (existing[0]) return false;
+  const [row] = await db
+    .insert(tasks)
+    .values({
+      clientId: input.clientId,
+      title: input.title,
+      assigneeId: input.assigneeId,
+      dueOn: input.dueOn,
+      priority: input.priority ?? "normal",
+      status: "todo",
+      entityType: input.entityType,
+      entityId: input.entityId,
+      source: "automation",
+      dedupeKey: input.dedupeKey,
+    })
+    .onConflictDoNothing()
+    .returning({ id: tasks.id });
+  return Boolean(row);
+}
+
+/**
+ * Script-herinnering als to-do: zodra een opname binnen 7 dagen valt en de
+ * scripting nog niet 'final' is, krijgt de verantwoordelijke coördinator een
+ * to-do "script afronden/afstemmen". Eén open taak per opname (dedupe); verdwijnt
+ * vanzelf zodra hij afgevinkt wordt.
+ */
+export async function runScriptTodoReminders() {
+  return runJob("monday", "reminders.script_todo", {}, async (ctx) => {
+    const today = day(0);
+    const in7 = day(7);
+    const rows = await db
+      .select({
+        id: productionDays.id,
+        scheduledOn: productionDays.scheduledOn,
+        clientId: productionDays.clientId,
+        clientName: clients.name,
+        coordA: productionDays.coordinatorId,
+        coordB: clients.coordinatorId,
+      })
+      .from(productionDays)
+      .innerJoin(clients, eq(clients.id, productionDays.clientId))
+      .where(
+        and(
+          isNull(productionDays.deletedAt),
+          ne(productionDays.status, "cancelled"),
+          gte(productionDays.scheduledOn, today),
+          lte(productionDays.scheduledOn, in7),
+          ne(productionDays.scriptingStatus, "final"),
+        ),
+      );
+    for (const r of rows) {
+      ctx.counters.processed++;
+      const created = await ensureTask({
+        clientId: r.clientId,
+        title: `Script afronden/afstemmen — ${r.clientName} (opname ${r.scheduledOn})`,
+        assigneeId: r.coordA ?? r.coordB ?? null,
+        dueOn: today,
+        priority: "high",
+        entityType: "production_day",
+        entityId: r.id,
+        dedupeKey: `script_todo:${r.id}`,
+      });
+      if (created) ctx.counters.updated++;
+    }
+    ctx.log(`${ctx.counters.updated} script-to-do's aangemaakt`);
+  });
+}
+
+/**
+ * Na-opname-herinnering als to-do: voor opnames van de afgelopen 2 dagen krijgt
+ * de verantwoordelijke coördinator een to-do "stuur de klant een berichtje over
+ * de editing". Eén open taak per opname (dedupe).
+ */
+export async function runPostShootTodoReminders() {
+  return runJob("monday", "reminders.post_shoot_todo", {}, async (ctx) => {
+    const today = day(0);
+    const from = day(-2);
+    const rows = await db
+      .select({
+        id: productionDays.id,
+        scheduledOn: productionDays.scheduledOn,
+        clientId: productionDays.clientId,
+        clientName: clients.name,
+        coordA: productionDays.coordinatorId,
+        coordB: clients.coordinatorId,
+      })
+      .from(productionDays)
+      .innerJoin(clients, eq(clients.id, productionDays.clientId))
+      .where(
+        and(
+          isNull(productionDays.deletedAt),
+          ne(productionDays.status, "cancelled"),
+          gte(productionDays.scheduledOn, from),
+          lte(productionDays.scheduledOn, today),
+        ),
+      );
+    for (const r of rows) {
+      ctx.counters.processed++;
+      const created = await ensureTask({
+        clientId: r.clientId,
+        title: `Stuur ${r.clientName} een berichtje over de editing (opname ${r.scheduledOn})`,
+        assigneeId: r.coordA ?? r.coordB ?? null,
+        dueOn: today,
+        priority: "normal",
+        entityType: "production_day",
+        entityId: r.id,
+        dedupeKey: `postshoot_msg:${r.id}`,
+      });
+      if (created) ctx.counters.updated++;
+    }
+    ctx.log(`${ctx.counters.updated} na-opname-to-do's aangemaakt`);
   });
 }

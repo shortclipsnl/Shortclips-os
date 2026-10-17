@@ -23,7 +23,7 @@ import {
   pullFrameDeliverables,
   pullFrameProjects,
 } from "./frameio-sync";
-import { runClientsWithoutShootSignal, runDailySignals, runEditorDeadlineReminders, runHourlySignals, runTaskDeadlineReminders } from "./maintenance";
+import { runClientsWithoutShootSignal, runDailySignals, runEditorDeadlineReminders, runHourlySignals, runPostShootTodoReminders, runScriptTodoReminders, runTaskDeadlineReminders } from "./maintenance";
 import { enforcePortalAccess } from "./portal-access";
 import { runClientNotifications } from "./notifications";
 
@@ -104,5 +104,7 @@ export async function runNightlySync() {
   results.push(await step("reminders.editor_deadlines", () => runEditorDeadlineReminders()));
   results.push(await step("reminders.task_deadlines", () => runTaskDeadlineReminders()));
   results.push(await step("signals.clients_without_shoot", () => runClientsWithoutShootSignal()));
+  results.push(await step("reminders.script_todo", () => runScriptTodoReminders()));
+  results.push(await step("reminders.post_shoot_todo", () => runPostShootTodoReminders()));
   return { ok: results.every((r) => r.ok), results };
 }
