@@ -11,6 +11,7 @@ import {
 import { SCRIPT_STATUS, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 import { getLatestScriptControl } from "@/server/script-control";
 import type { ScriptControlResult } from "@/server/actions/script-control";
+import { getScriptVideoInsights } from "@/server/video-intelligence/script-insights";
 import { ScriptEditor, ScriptStatusControl } from "./editor";
 import { ScriptControlPanel } from "./script-control-panel";
 
@@ -40,6 +41,7 @@ export default async function ScriptPage({
   const latestControl = canControl
     ? ((await getLatestScriptControl(script.id, script.clientId)) as ScriptControlResult | null)
     : null;
+  const videoInsights = await getScriptVideoInsights(viewer, script.clientId, script.clientSlug);
 
   return (
     <div className="mx-auto max-w-[1200px]">
@@ -107,6 +109,51 @@ export default async function ScriptPage({
         </div>
 
         <div className="space-y-5">
+          {videoInsights.total > 0 ? (
+            <Card>
+              <CardHeader
+                title="Inzichten uit eerdere video's"
+                subtitle={`${videoInsights.total} geanalyseerde video${videoInsights.total === 1 ? "" : "'s"} van deze klant. Meetbare signalen als input — geen garantie.`}
+              />
+              {videoInsights.dominantHooks.length > 0 ? (
+                <div className="mt-3">
+                  <div className="mb-1 text-xs font-semibold text-[var(--color-ink-muted)]">Meest gebruikte hooktypes</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {videoInsights.dominantHooks.map((h) => (
+                      <Badge key={h.key} tone="info">{h.key} · {h.n}</Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {videoInsights.speechSample > 0 && (videoInsights.avgWpm || videoInsights.avgWords3s) ? (
+                <p className="mt-3 text-xs text-[var(--color-ink-muted)]">
+                  Tempo: {videoInsights.avgWpm ? `${videoInsights.avgWpm} wpm` : "—"}
+                  {videoInsights.avgWords3s ? ` · ${videoInsights.avgWords3s} woorden in de eerste 3s` : ""}
+                  <span className="text-[var(--color-ink-faint)]"> (n={videoInsights.speechSample})</span>
+                </p>
+              ) : null}
+              {videoInsights.videos.length > 0 ? (
+                <ul className="mt-3 space-y-2 border-t border-[var(--color-line)] pt-3">
+                  {videoInsights.videos.map((v) => (
+                    <li key={v.analysisId} className="text-sm">
+                      <Link href={`/video-intelligence/${v.analysisId}`} className="font-medium text-[var(--color-brand-600)] hover:underline">
+                        {v.title ?? "Video-analyse"}
+                      </Link>
+                      {v.platform ? <span className="text-2xs text-[var(--color-ink-faint)]"> · {v.platform}</span> : null}
+                      {v.hookText ? <p className="mt-0.5 text-xs text-[var(--color-ink-muted)] line-clamp-2">“{v.hookText}”</p> : null}
+                      {v.hookTypes.length > 0 || v.timeToFirstWordMs != null ? (
+                        <p className="text-2xs text-[var(--color-ink-faint)]">
+                          {v.hookTypes.join(" · ")}
+                          {v.timeToFirstWordMs != null ? `${v.hookTypes.length ? " · " : ""}eerste woord na ${(v.timeToFirstWordMs / 1000).toFixed(1)}s` : ""}
+                        </p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader title="Details" />
             <dl className="mt-4 space-y-3 text-sm">
