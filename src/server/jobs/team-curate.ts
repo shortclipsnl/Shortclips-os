@@ -29,6 +29,8 @@ const TEAM: Record<string, { title: string; internal: boolean }> = {
   nynke: { title: "Presentatrice", internal: false },
   quinn: { title: "Short Video Creative", internal: false },
   sem: { title: "Short Video Creative", internal: false },
+  noah: { title: "Short Video Creative", internal: false },
+  senna: { title: "Short Video Creative", internal: false },
 };
 
 const firstName = (full: string) => full.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
