@@ -22,7 +22,7 @@ function tempPassword(): string {
   return `${out.slice(0, 5)}-${out.slice(5, 10)}-${out.slice(10, 14)}`;
 }
 
-export async function setupTeamLogins(): Promise<{ ok: boolean; count: number; file: string }> {
+export async function setupTeamLogins(): Promise<{ ok: boolean; count: number; file: string | null; credentials: Array<{ fullName: string; role: string; email: string; password: string }> }> {
   // Zichtbare teamleden (team_members niet verwijderd), geen klantaccounts.
   const members = await db
     .select({ id: users.id, fullName: users.fullName, email: users.email, role: users.primaryRole })
@@ -42,6 +42,7 @@ export async function setupTeamLogins(): Promise<{ ok: boolean; count: number; f
   ];
 
   let count = 0;
+  const credentials: Array<{ fullName: string; role: string; email: string; password: string }> = [];
   for (const m of members) {
     const pw = tempPassword();
     await db.update(users).set({ passwordHash: await hashPassword(pw), status: "active", updatedAt: new Date() }).where(eq(users.id, m.id));
@@ -51,10 +52,17 @@ export async function setupTeamLogins(): Promise<{ ok: boolean; count: number; f
     if (role) await db.insert(userRoles).values({ userId: m.id, roleId: role.id }).onConflictDoNothing();
 
     lines.push(`| ${m.fullName} | ${m.role} | ${m.email} | ${pw} |`);
+    credentials.push({ fullName: m.fullName, role: m.role, email: m.email, password: pw });
     count++;
   }
 
-  const file = path.resolve(process.cwd(), "team-logins.local.md");
-  writeFileSync(file, lines.join("\n") + "\n", "utf8");
-  return { ok: true, count, file };
+  // Lokaal naar een bestand; op serverless (alleen-lezen schijf) mislukt dat
+  // stilletjes — de credentials staan dan in het antwoord.
+  let file: string | null = path.resolve(process.cwd(), "team-logins.local.md");
+  try {
+    writeFileSync(file, lines.join("\n") + "\n", "utf8");
+  } catch {
+    file = null;
+  }
+  return { ok: true, count, file, credentials };
 }
