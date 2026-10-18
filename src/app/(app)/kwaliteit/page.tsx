@@ -2,21 +2,28 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireInternal } from "@/server/auth/context";
 import { getQualityOverview, type QualityItem, type QualitySeverity } from "@/server/quality";
-import { Badge, Card, CardHeader, PageHeader, Stat, type Tone } from "@/components/ui";
+import { Badge, PageHeader, Stat, type Tone } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Kwaliteit & Aandachtspunten" };
 export const dynamic = "force-dynamic";
 
 /**
  * Secties per ernst, in vaste volgorde: eerst directe actie, dan extra
- * aandacht, en vooruitkijken als laatste. Elke sectie krijgt een eigen
- * kleuraccent (gekleurde linkerrand + getinte count-badge) zodat de pagina in
- * één oogopslag te scannen is.
+ * aandacht, en vooruitkijken als laatste. Elke sectie krijgt een volledig
+ * gekleurde kop (rood/oranje/blauw), een gekleurde linkerrand per regel, een
+ * getinte categorie-badge en een in kleur uitgelichte detail-/deadlinetekst,
+ * zodat de pagina in één oogopslag te scannen is i.p.v. één wit vlak.
  */
-const SECTIONS: { severity: QualitySeverity; label: string; tone: Tone; bar: string }[] = [
-  { severity: "rood", label: "Directe actie", tone: "bad", bar: "border-l-[var(--color-bad)]" },
-  { severity: "oranje", label: "Extra aandachtspunten", tone: "warn", bar: "border-l-[var(--color-warn)]" },
-  { severity: "blauw", label: "Vooruitkijken", tone: "info", bar: "border-l-[var(--color-info)]" },
+const SECTIONS: {
+  severity: QualitySeverity;
+  label: string;
+  tone: Tone;
+  color: string;
+  detailClass: string;
+}[] = [
+  { severity: "rood", label: "Directe actie", tone: "bad", color: "var(--color-bad)", detailClass: "text-[#a3271c] font-medium" },
+  { severity: "oranje", label: "Extra aandachtspunten", tone: "warn", color: "var(--color-warn)", detailClass: "text-[#8a5300]" },
+  { severity: "blauw", label: "Vooruitkijken", tone: "info", color: "var(--color-info)", detailClass: "text-[var(--color-ink-muted)]" },
 ];
 
 export default async function QualityPage() {
@@ -42,24 +49,22 @@ export default async function QualityPage() {
         {SECTIONS.map((s) => {
           const bucket = items.filter((i) => i.severity === s.severity);
           return (
-            <Card key={s.severity} padded={false} className={`overflow-hidden border-l-[3px] ${s.bar}`}>
-              <CardHeader
-                title={s.label}
-                action={<Badge tone={bucket.length > 0 ? s.tone : "good"}>{bucket.length}</Badge>}
-                className="px-5 py-3.5"
-              />
+            <div key={s.severity} className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)]">
+              {/* Volledig gekleurde kop per ernst. */}
+              <div className="flex items-center justify-between gap-2 px-5 py-3 text-white" style={{ background: s.color }}>
+                <h2 className="text-sm font-bold tracking-tight">{s.label}</h2>
+                <span className="shrink-0 rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold tabular-nums">{bucket.length}</span>
+              </div>
               {bucket.length === 0 ? (
-                <p className="border-t border-[var(--color-line)] px-5 py-6 text-center text-sm text-[var(--color-ink-muted)]">
-                  Niets — mooi!
-                </p>
+                <p className="px-5 py-5 text-center text-sm text-[var(--color-ink-muted)]">Niets — mooi!</p>
               ) : (
-                <ul className="divide-y divide-[var(--color-line)] border-t border-[var(--color-line)]">
+                <ul className="divide-y divide-[var(--color-line)]">
                   {bucket.map((i) => (
-                    <QualityRow key={i.id} item={i} />
+                    <QualityRow key={i.id} item={i} tone={s.tone} color={s.color} detailClass={s.detailClass} />
                   ))}
                 </ul>
               )}
-            </Card>
+            </div>
           );
         })}
       </div>
@@ -67,16 +72,22 @@ export default async function QualityPage() {
   );
 }
 
-/** Eén aandachtspunt-rij: titel, detail en categorietag, als link naar `href`. */
-function QualityRow({ item }: { item: QualityItem }) {
+/** Eén aandachtspunt-rij: titel, in kleur uitgelichte detail-/deadlinetekst en
+ *  een getinte categorie-badge, als link naar `href`. Een gekleurde linkerrand
+ *  maakt de ernst per regel zichtbaar. */
+function QualityRow({ item, tone, color, detailClass }: { item: QualityItem; tone: Tone; color: string; detailClass: string }) {
   return (
     <li>
-      <Link href={item.href} className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--color-surface-sunken)]/50">
+      <Link
+        href={item.href}
+        className="flex items-center gap-3 border-l-[3px] px-5 py-3 hover:bg-[var(--color-surface-sunken)]/50"
+        style={{ borderLeftColor: color }}
+      >
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">{item.title}</span>
-          <span className="block truncate text-xs text-[var(--color-ink-muted)]">{item.detail}</span>
+          <span className="block truncate text-sm font-semibold">{item.title}</span>
+          <span className={`block truncate text-xs ${detailClass}`}>{item.detail}</span>
         </span>
-        <span className="shrink-0 text-2xs uppercase tracking-wide text-[var(--color-ink-faint)]">{item.category}</span>
+        <Badge tone={tone} className="shrink-0">{item.category}</Badge>
       </Link>
     </li>
   );
