@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Camera, Presentation } from "lucide-react";
 import { Card, CardHeader, ClientLogo } from "@/components/ui";
-import { formatDate } from "@/lib/format";
 import type { UpcomingMeeting } from "@/server/meetings";
 
 /** Opname-rij zoals die uit het dashboard komt (subset). */
@@ -17,84 +16,96 @@ export type WeekShoot = {
   videographerName: string | null;
 };
 
-/** Korte dag-aanduiding, bijv. "wo 22 okt". */
-function dayLabel(input: string | Date): string {
-  const d = typeof input === "string" ? new Date(input) : input;
-  return d.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" });
-}
-
-function timeLabel(input: Date): string {
-  return input.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
-}
+const WEEKDAYS = ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag"];
+const iso = (d: Date) => d.toLocaleDateString("en-CA");
+const dayOf = (input: string | Date) => (typeof input === "string" ? input.slice(0, 10) : iso(new Date(input)));
 
 /**
- * Weekplanning op het dashboard: wat staat er deze week aan — opnames (uit de
- * agenda/opnameplanning) en teammeetings. Puur informatief en scanbaar.
+ * Weekplanning op het dashboard als échte werkweek (ma–vr): elke opname en
+ * teammeeting staat op de dag waarop hij valt, zodat het team in één oogopslag
+ * ziet wat er die dag gebeurt. De dag van vandaag is gemarkeerd.
  */
 export function WeekPlanning({ shoots, meetings }: { shoots: WeekShoot[]; meetings: UpcomingMeeting[] }) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dow = (today.getDay() + 6) % 7; // 0 = maandag … 6 = zondag
+  const monday = new Date(today);
+  // Op een werkdag: deze week. In het weekend (za/zo): de kómende werkweek,
+  // zodat je niet naar een afgelopen week kijkt.
+  monday.setDate(today.getDate() + (dow >= 5 ? 7 - dow : -dow));
+  const todayIso = iso(today);
+
+  const days = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+
   return (
     <Card padded={false} className="overflow-hidden">
-      <CardHeader title="Deze week" subtitle="Opnames en meetings die eraan komen." className="px-5 py-3.5" />
-      <div className="grid gap-px bg-[var(--color-line)] sm:grid-cols-2">
-        {/* Opnames */}
-        <div className="bg-[var(--color-surface)]">
-          <div className="flex items-center gap-2 px-5 pt-4 pb-2 text-2xs font-bold uppercase tracking-[0.1em] text-[var(--color-brand-600)]">
-            <Camera className="size-3.5" strokeWidth={2} />
-            Opnames
-          </div>
-          {shoots.length === 0 ? (
-            <p className="px-5 pb-4 text-sm text-[var(--color-ink-muted)]">Geen opnames deze week.</p>
-          ) : (
-            <ul className="divide-y divide-[var(--color-line)]">
-              {shoots.map((s) => (
-                <li key={s.id}>
-                  <Link href={`/clients/${s.clientSlug}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-[var(--color-surface-sunken)]/60">
-                    <ClientLogo name={s.clientName} logoUrl={s.clientLogo} color={s.clientColor} size={24} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{s.clientName}</span>
-                      <span className="block truncate text-xs text-[var(--color-ink-muted)]">
-                        {s.locationName ?? "Locatie n.t.b."}
-                        {s.videographerName ? ` · ${s.videographerName}` : ""}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-right text-xs">
-                      <span className="block font-semibold">{dayLabel(s.scheduledOn)}</span>
-                      {s.startTime ? <span className="block text-[var(--color-ink-faint)]">{s.startTime.slice(0, 5)}</span> : null}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Meetings */}
-        <div className="bg-[var(--color-surface)]">
-          <div className="flex items-center gap-2 px-5 pt-4 pb-2 text-2xs font-bold uppercase tracking-[0.1em] text-[var(--color-warn)]">
-            <Presentation className="size-3.5" strokeWidth={2} />
-            Meetings
-          </div>
-          {meetings.length === 0 ? (
-            <p className="px-5 pb-4 text-sm text-[var(--color-ink-muted)]">Geen meetings deze week.</p>
-          ) : (
-            <ul className="divide-y divide-[var(--color-line)]">
-              {meetings.map((m) => (
-                <li key={m.id}>
-                  <Link href="/meetings" className="flex items-center gap-3 px-5 py-2.5 hover:bg-[var(--color-surface-sunken)]/60">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{m.title}</span>
-                      {m.location ? <span className="block truncate text-xs text-[var(--color-ink-muted)]">{m.location}</span> : null}
-                    </span>
-                    <span className="shrink-0 text-right text-xs">
-                      <span className="block font-semibold">{dayLabel(m.scheduledAt)}</span>
-                      <span className="block text-[var(--color-ink-faint)]">{timeLabel(m.scheduledAt)}</span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <CardHeader title="Deze week" subtitle="Opnames en meetings per dag (ma–vr)." className="px-5 py-3.5" />
+      <div className="grid gap-px bg-[var(--color-line)] sm:grid-cols-5">
+        {days.map((d, i) => {
+          const key = iso(d);
+          const isToday = key === todayIso;
+          const dayShoots = shoots.filter((s) => dayOf(s.scheduledOn) === key);
+          const dayMeetings = meetings.filter((m) => dayOf(m.scheduledAt) === key);
+          const empty = dayShoots.length === 0 && dayMeetings.length === 0;
+          return (
+            <div key={key} className="min-w-0 bg-[var(--color-surface)]">
+              {/* Dagkop */}
+              <div className={`px-3 pt-3 pb-2 ${isToday ? "bg-[var(--color-brand-600)] text-white" : ""}`}>
+                <div className="text-sm font-bold capitalize">{WEEKDAYS[i]}</div>
+                <div className={`text-2xs ${isToday ? "text-white/80" : "text-[var(--color-ink-faint)]"}`}>
+                  {d.toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
+                  {isToday ? " · vandaag" : ""}
+                </div>
+              </div>
+              {/* Items */}
+              <div className="space-y-1.5 px-2 pb-3">
+                {empty ? (
+                  <p className="px-1 py-2 text-2xs text-[var(--color-ink-faint)]">—</p>
+                ) : (
+                  <>
+                    {dayShoots.map((s) => (
+                      <Link
+                        key={s.id}
+                        href={`/clients/${s.clientSlug}`}
+                        className="flex items-start gap-1.5 rounded-[var(--radius-sm)] border-l-[3px] border-l-[var(--color-brand-600)] bg-[var(--color-brand-50)] p-1.5 hover:brightness-[0.99]"
+                      >
+                        <Camera className="mt-0.5 size-3.5 shrink-0 text-[var(--color-brand-600)]" strokeWidth={2} />
+                        <span className="min-w-0">
+                          <span className="flex items-center gap-1">
+                            <ClientLogo name={s.clientName} logoUrl={s.clientLogo} color={s.clientColor} size={14} />
+                            <span className="truncate text-2xs font-semibold">{s.clientName}</span>
+                          </span>
+                          <span className="block text-[10px] text-[var(--color-ink-muted)]">
+                            opname{s.startTime ? ` · ${s.startTime.slice(0, 5)}` : ""}
+                          </span>
+                        </span>
+                      </Link>
+                    ))}
+                    {dayMeetings.map((m) => (
+                      <Link
+                        key={m.id}
+                        href="/meetings"
+                        className="flex items-start gap-1.5 rounded-[var(--radius-sm)] border-l-[3px] border-l-[var(--color-warn)] bg-[var(--color-warn-soft)] p-1.5 hover:brightness-[0.99]"
+                      >
+                        <Presentation className="mt-0.5 size-3.5 shrink-0 text-[var(--color-warn)]" strokeWidth={2} />
+                        <span className="min-w-0">
+                          <span className="block truncate text-2xs font-semibold">{m.title}</span>
+                          <span className="block text-[10px] text-[var(--color-ink-muted)]">
+                            meeting · {new Date(m.scheduledAt).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </span>
+                      </Link>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );

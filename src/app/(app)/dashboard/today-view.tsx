@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, Camera, FileSignature, ListChecks, Users } from "lucide-react";
 import { Card, EmptyState } from "@/components/ui";
-import { daysSince, daysUntil, formatDate, plural, relativeDays } from "@/lib/format";
+import { daysSince, daysUntil, formatDate, plural } from "@/lib/format";
 import { editorLoad } from "@/lib/metrics";
 import { isOwner, type Viewer } from "@/server/auth/context";
 import type { DashboardData } from "@/server/dashboard";
@@ -9,6 +9,13 @@ import type { getMyDay } from "@/server/my-day";
 
 type MyDay = Awaited<ReturnType<typeof getMyDay>>;
 type Tone = "bad" | "warn" | "good" | "neutral";
+
+/** "wo 22 okt" — dagnaam + datum, zodat het team in één oogopslag ziet op welke
+ *  dag een opname/taak/script valt. */
+function dayName(input: string | Date): string {
+  const d = new Date(typeof input === "string" ? `${input.slice(0, 10)}T00:00:00` : input);
+  return d.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" });
+}
 
 /**
  * Het "Vandaag"-dashboard toont per rol maximaal drie blokken. Elke regel zegt
@@ -112,7 +119,7 @@ function ownerBlocks(data: DashboardData, capMap: Map<string, number>): Block[] 
     ...urgentShoots.map((s) => ({
       key: `ushoot-${s.id}`,
       href: `/productions/${s.id}`,
-      what: `${s.clientName} — opname ${relativeDays(s.scheduledOn)}`,
+      what: `${s.clientName} — opname ${dayName(s.scheduledOn)}`,
       action: `Nog niet rond · ${s.videographerName ?? "geen videograaf"} → voorbereiden`,
       meta: `${Number(s.openBlockers) + Number(s.unapprovedScripts)} open`,
       tone: "warn" as const,
@@ -200,7 +207,7 @@ function creativeBlocks(data: DashboardData, myDay: MyDay): Block[] {
       href: "/tasks",
       what: t.title,
       action: t.clientName ? `${t.clientName} → oppakken` : "Eigen taak → oppakken",
-      meta: t.overdue ? "te laat" : t.dueOn ? relativeDays(t.dueOn) : "geen datum",
+      meta: t.dueOn ? `${dayName(t.dueOn)}${t.overdue ? " · te laat" : ""}` : "geen datum",
       tone: (t.overdue ? "bad" : t.priority === "urgent" || t.priority === "high" ? "warn" : "neutral") as Tone,
     })),
     ...myDay.videos.map((v) => ({
@@ -208,7 +215,7 @@ function creativeBlocks(data: DashboardData, myDay: MyDay): Block[] {
       href: `/videos/${v.id}`,
       what: label(v.clientName, v.title),
       action: "Jouw video → volgende stap zetten",
-      meta: v.dueOn ? relativeDays(v.dueOn) : "",
+      meta: v.dueOn ? dayName(v.dueOn) : "",
       tone: "neutral" as Tone,
     })),
   ];
@@ -231,7 +238,7 @@ function creativeBlocks(data: DashboardData, myDay: MyDay): Block[] {
         href: `/productions/${s.id}`,
         what: `${s.clientName} — opname`,
         action: open > 0 ? `${open} punt(en) open → voorbereiden` : "Rond → klaar voor opname",
-        meta: relativeDays(s.scheduledOn),
+        meta: dayName(s.scheduledOn),
         tone: (open > 0 && daysUntil(s.scheduledOn) <= 2 ? "warn" : "neutral") as Tone,
       };
     }),
@@ -240,7 +247,7 @@ function creativeBlocks(data: DashboardData, myDay: MyDay): Block[] {
       href: `/scripting`,
       what: label(s.clientName, s.title),
       action: "Script ter goedkeuring → nakijken",
-      meta: s.shootOn ? relativeDays(s.shootOn) : "",
+      meta: s.shootOn ? dayName(s.shootOn) : "",
       tone: "neutral" as Tone,
     })),
   ];
@@ -259,7 +266,7 @@ function videographerBlocks(myDay: MyDay): Block[] {
     href: `/productions/${s.id}`,
     what: `${s.clientName}`,
     action: `${s.locationName ?? "locatie onbekend"}${s.startTime ? ` · ${s.startTime.slice(0, 5)}` : ""} → opnemen`,
-    meta: relativeDays(s.scheduledOn),
+    meta: dayName(s.scheduledOn),
     tone: (daysUntil(s.scheduledOn) <= 1 ? "warn" : "neutral") as Tone,
   }));
 
@@ -271,7 +278,7 @@ function videographerBlocks(myDay: MyDay): Block[] {
     href: "/tasks",
     what: t.title,
     action: t.clientName ? `${t.clientName} → oppakken` : "Eigen taak → oppakken",
-    meta: t.overdue ? "te laat" : t.dueOn ? relativeDays(t.dueOn) : "geen datum",
+    meta: t.dueOn ? `${dayName(t.dueOn)}${t.overdue ? " · te laat" : ""}` : "geen datum",
     tone: (t.overdue ? "bad" : t.priority === "urgent" || t.priority === "high" ? "warn" : "neutral") as Tone,
   }));
 
