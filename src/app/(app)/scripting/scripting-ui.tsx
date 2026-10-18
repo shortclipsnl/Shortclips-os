@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { setScriptingStatus } from "@/server/actions/scripting";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS } from "@/lib/statuses";
 import { ClientLogo } from "@/components/ui";
@@ -26,6 +26,32 @@ const STATUS_PILL: Record<string, string> = {
   scriptmeeting: "bg-[var(--color-warn-soft)] text-[#8a5300]",
   final: "bg-[var(--color-good-soft)] text-[#1d6b4c]",
 };
+
+/** Volle accentkleur per status, voor de rand van de actieve knop. */
+const STATUS_ACCENT: Record<string, string> = {
+  afstemmen: "var(--color-ink-faint)",
+  concepting: "var(--color-info)",
+  klaar_shortclips: "var(--color-lime)",
+  scriptmeeting: "var(--color-warn)",
+  final: "var(--color-good)",
+};
+
+/** Korte labels voor de knoppen (de volledige labels zijn soms lang). */
+const STATUS_SHORT: Record<string, string> = {
+  afstemmen: "Afstemmen",
+  concepting: "Concepting",
+  klaar_shortclips: "Klaar",
+  scriptmeeting: "Scriptmeeting",
+  final: "Final",
+};
+
+/** Opname-week t.o.v. nu, voor de groepering. */
+function weekBucket(days: number): { order: number; label: string } {
+  if (days <= 7) return { order: 1, label: "Deze week" };
+  if (days <= 14) return { order: 2, label: "Volgende week" };
+  if (days <= 21) return { order: 3, label: "Over twee weken" };
+  return { order: 4, label: "Later" };
+}
 
 function fmt(d: string) {
   const [y, m, day] = d.split("-").map(Number);
@@ -67,6 +93,20 @@ export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }:
     });
   }, [rows, filter, status, client]);
 
+  // Per week groeperen (deze week / volgende week / ...), gesorteerd op opnamedag.
+  const groups = useMemo(() => {
+    const m = new Map<number, { order: number; label: string; rows: ScriptingRow[] }>();
+    for (const r of filtered) {
+      const b = weekBucket(r.daysToShoot);
+      const g = m.get(b.order) ?? { ...b, rows: [] };
+      g.rows.push(r);
+      m.set(b.order, g);
+    }
+    return [...m.values()]
+      .sort((a, b) => a.order - b.order)
+      .map((g) => ({ ...g, rows: [...g.rows].sort((x, y) => x.daysToShoot - y.daysToShoot) }));
+  }, [filtered]);
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -104,29 +144,43 @@ export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }:
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r) => (
-              <tr key={r.id} className="border-b border-[var(--color-line)] last:border-0 hover:bg-[var(--color-surface-sunken)]/40"
-                style={{ boxShadow: `inset 3px 0 0 ${FLAG_COLOR[r.flag]}` }}>
-                <td className="px-3 py-2">
-                  <Link href={`/productions/${r.id}`} className="flex items-center gap-2 font-medium hover:underline">
-                    <ClientLogo name={r.clientName} logoUrl={r.clientLogo} color={r.clientColor} size={22} />
-                    {r.clientName}
-                  </Link>
-                </td>
-                <td className="px-2 py-2 tabular-nums">{fmt(r.scheduledOn)}</td>
-                <td className="px-2 py-2 tabular-nums text-[var(--color-ink-muted)]">{fmt(r.deadline)}</td>
-                <td className="px-2 py-2">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: FLAG_COLOR[r.flag] }}>
-                    <span className="size-2 rounded-full" style={{ background: FLAG_COLOR[r.flag] }} />
-                    {countdown(r)}
-                  </span>
-                </td>
-                <td className="px-2 py-2">
-                  <StatusCell id={r.id} status={r.status} canWrite={canWrite} />
-                </td>
-              </tr>
+            {groups.map((g) => (
+              <Fragment key={g.label}>
+                {/* Week-kop */}
+                <tr>
+                  <td colSpan={5} className="border-y border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-3 py-2">
+                    <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--color-ink)]">
+                      <span className="size-2 rounded-full bg-[var(--color-brand-600)]" />
+                      {g.label}
+                      <span className="font-medium normal-case text-[var(--color-ink-muted)]">· {g.rows.length}</span>
+                    </span>
+                  </td>
+                </tr>
+                {g.rows.map((r) => (
+                  <tr key={r.id} className="border-b border-[var(--color-line)] hover:bg-[var(--color-surface-sunken)]/40"
+                    style={{ boxShadow: `inset 3px 0 0 ${FLAG_COLOR[r.flag]}` }}>
+                    <td className="px-3 py-2">
+                      <Link href={`/productions/${r.id}`} className="flex items-center gap-2 font-medium hover:underline">
+                        <ClientLogo name={r.clientName} logoUrl={r.clientLogo} color={r.clientColor} size={22} />
+                        {r.clientName}
+                      </Link>
+                    </td>
+                    <td className="px-2 py-2 tabular-nums">{fmt(r.scheduledOn)}</td>
+                    <td className="px-2 py-2 tabular-nums text-[var(--color-ink-muted)]">{fmt(r.deadline)}</td>
+                    <td className="px-2 py-2">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: FLAG_COLOR[r.flag] }}>
+                        <span className="size-2 rounded-full" style={{ background: FLAG_COLOR[r.flag] }} />
+                        {countdown(r)}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 align-top">
+                      <StatusPicker id={r.id} status={r.status} canWrite={canWrite} />
+                    </td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
-            {filtered.length === 0 ? (
+            {groups.length === 0 ? (
               <tr><td colSpan={5} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
             ) : null}
           </tbody>
@@ -136,26 +190,55 @@ export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }:
   );
 }
 
-function StatusCell({ id, status, canWrite }: { id: string; status: string; canWrite: boolean }) {
+/**
+ * Gekleurde statuskiezer: de huidige status staat als grote gekleurde pil; bij
+ * klikken klappen de opties (ook gekleurd, groter) eronder uit — zo ziet het
+ * team in één oogopslag de status en kan het met één klik wisselen.
+ */
+function StatusPicker({ id, status, canWrite }: { id: string; status: string; canWrite: boolean }) {
   const [pending, start] = useTransition();
   const [val, setVal] = useState(status);
+  const [open, setOpen] = useState(false);
   const router = useRouter();
   const meta = SCRIPTING_STATUS[val] ?? SCRIPTING_STATUS.afstemmen!;
 
+  const choose = (v: string) => {
+    setVal(v);
+    setOpen(false);
+    start(async () => { await setScriptingStatus(id, v); router.refresh(); });
+  };
+
   if (!canWrite) {
-    return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_PILL[val]}`}>{meta.label}</span>;
+    return (
+      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val]}`}>
+        <span className="size-2 rounded-full" style={{ background: STATUS_ACCENT[val] }} />
+        {STATUS_SHORT[val] ?? meta.label}
+      </span>
+    );
   }
+
   return (
-    <span className="inline-flex items-center gap-1">
-      <select
-        value={val}
-        disabled={pending}
-        onChange={(e) => { const v = e.target.value; setVal(v); start(async () => { await setScriptingStatus(id, v); router.refresh(); }); }}
-        className={`appearance-none rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_PILL[val]} cursor-pointer`}
-      >
-        {SCRIPTING_ORDER.map((s) => <option key={s} value={s}>{SCRIPTING_STATUS[s]!.label}</option>)}
-      </select>
-      {pending ? <Loader2 className="size-3 animate-spin text-[var(--color-ink-faint)]" /> : null}
-    </span>
+    <div className="min-w-[150px]">
+      <button type="button" onClick={() => setOpen((o) => !o)} disabled={pending}
+        title={meta.label}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val]}`}
+        style={open ? { boxShadow: `0 0 0 2px ${STATUS_ACCENT[val]}` } : undefined}>
+        <span className="size-2 rounded-full" style={{ background: STATUS_ACCENT[val] }} />
+        {STATUS_SHORT[val] ?? meta.label}
+        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <ChevronDown className="size-3.5 opacity-60" />}
+      </button>
+      {open ? (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {SCRIPTING_ORDER.map((s) => (
+            <button key={s} type="button" onClick={() => choose(s)} title={SCRIPTING_STATUS[s]!.label}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[s]} ${s === val ? "" : "opacity-75 hover:opacity-100"}`}
+              style={s === val ? { boxShadow: `0 0 0 2px ${STATUS_ACCENT[s]}` } : undefined}>
+              <span className="size-2 rounded-full" style={{ background: STATUS_ACCENT[s] }} />
+              {STATUS_SHORT[s]}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
