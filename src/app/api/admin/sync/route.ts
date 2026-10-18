@@ -6,6 +6,7 @@ import { runMetricoolSync } from "@/server/jobs/metricool-sync";
 import { pullFrameProjects, pullFrameDeliverables, pullFrameComments } from "@/server/jobs/frameio-sync";
 import { frameio } from "@/server/integrations/frameio";
 import { runDriveSync, linkDriveFolders } from "@/server/jobs/drive-sync";
+import { fetchMissingClientLogos } from "@/server/jobs/client-logos-fetch";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,11 +27,16 @@ async function handle(request: Request) {
 
   const url = new URL(request.url);
   const which = url.searchParams.get("which");
-  if (!which || !["metricool", "frameio", "calendar", "drive", "drive_link"].includes(which)) {
-    return NextResponse.json({ error: "Geef ?which=metricool|frameio|calendar|drive|drive_link mee." }, { status: 400 });
+  if (!which || !["metricool", "frameio", "calendar", "drive", "drive_link", "fetch_logos"].includes(which)) {
+    return NextResponse.json({ error: "Geef ?which=metricool|frameio|calendar|drive|drive_link|fetch_logos mee." }, { status: 400 });
   }
 
   const cfg = integrationConfig();
+
+  if (which === "fetch_logos") {
+    const limit = Math.max(1, Math.min(30, Number(url.searchParams.get("limit") ?? 15)));
+    return NextResponse.json({ ok: true, which, result: await fetchMissingClientLogos(limit) });
+  }
 
   if (which === "drive_link") {
     if (!cfg.google_drive.configured) return NextResponse.json({ ok: false, reason: "Google Drive niet geconfigureerd." }, { status: 200 });

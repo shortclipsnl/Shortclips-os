@@ -40,6 +40,15 @@ export default async function ClientsPage() {
         description={`${activeCount} actief · ${inactiveCount} niet-actief`}
         actions={canWrite ? <LinkButton href="/clients/new">Nieuwe klant</LinkButton> : undefined}
       />
+      {canWrite ? (
+        <p className="-mt-2 mb-4 max-w-3xl text-sm text-[var(--color-ink-muted)]">
+          Nieuwe klant? Klik rechtsboven op{" "}
+          <span className="font-semibold text-[var(--color-ink)]">Nieuwe klant</span> en vul meteen{" "}
+          <span className="font-semibold text-[var(--color-ink)]">alle gegevens volledig</span> in
+          (naam, website, logo, verantwoordelijke, aantal shorts per maand, contactpersoon…). Dan klopt
+          alles vanaf het begin en hoeft er later niets te worden aangevuld.
+        </p>
+      ) : null}
       <ClientsBoard clients={clients} />
     </div>
   );
