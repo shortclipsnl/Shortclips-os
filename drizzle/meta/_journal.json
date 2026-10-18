@@ -232,6 +232,13 @@
       "when": 1792244182447,
       "tag": "0032_lethal_diamondback",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792337224630,
+      "tag": "0033_tranquil_hawkeye",
+      "breakpoints": true
     }
   ]
 }

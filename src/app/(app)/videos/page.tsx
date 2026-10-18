@@ -5,6 +5,7 @@ import { AlertTriangle, ExternalLink, MessageSquare } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getReviewQueue, getVideoHighlights, listEditorOptions, listVideos, type ReviewQueueItem } from "@/server/videos";
 import { getShootDeadlines } from "@/server/shoot-deadlines";
+import { listEditingProjects } from "@/server/editing-board";
 import { EditorFilter } from "./editor-filter";
 import { ShootTimers } from "../editing/shoot-timers";
 import { WorkloadSection } from "../editing/workload-section";
@@ -33,6 +34,7 @@ const TONE_COLOR: Record<string, string> = {
 import { ViewSwitch } from "./view-switch";
 import { Kanban } from "./kanban";
 import { PhasePicker, PHASE_COLOR } from "./phase-picker";
+import { EditingProjects } from "./editing-projects";
 
 export const metadata: Metadata = { title: "Editing" };
 export const dynamic = "force-dynamic";
@@ -59,7 +61,7 @@ export default async function VideosPage({
       ? undefined
       : "actief";
 
-  const [rows, highlights, reviewQueue, editors, shoots] = await Promise.all([
+  const [rows, highlights, reviewQueue, editors, shoots, editingProjects] = await Promise.all([
     listVideos(viewer, {
       preset,
       status: params.status,
@@ -70,8 +72,10 @@ export default async function VideosPage({
     getReviewQueue(viewer),
     listEditorOptions(),
     getShootDeadlines(viewer),
+    listEditingProjects(viewer),
   ]);
   const canEdit = viewer.permissions.has("videos:write");
+  const canAssign = viewer.permissions.has("videos:assign");
   const shootsAtRisk = shoots.filter((s) => s.atRisk).length;
 
   const view = params.weergave === "kanban" ? "kanban" : "lijst";
@@ -94,6 +98,17 @@ export default async function VideosPage({
           </Suspense>
         }
       />
+
+      {/* Editing per editor: elke opname is een edit-project met editor, fase,
+          batterij (14 werkdagen) en download-/scriptlink. Komt automatisch uit
+          de opnames (Google Agenda). */}
+      <section className="mb-6">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+          <h2 className="text-sm font-bold tracking-tight">Editing per editor</h2>
+          <span className="text-xs text-white/80">14 werkdagen opname → oplevering · automatisch uit de opnames</span>
+        </div>
+        <EditingProjects projects={editingProjects} editors={editors} canEdit={canEdit} canAssign={canAssign} />
+      </section>
 
       {/* Deadlinebewaking per klantopname (§7): 14 werkdagen tot klantoplevering,
           editor levert 2 werkdagen eerder. Live uit de datum van vandaag. */}

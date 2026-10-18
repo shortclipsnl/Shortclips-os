@@ -113,6 +113,18 @@ export const productionDays = pgTable(
     /** Externe koppelingen zodat de map/het project direct te openen is. */
     driveFolderId: varchar("drive_folder_id", { length: 200 }),
     frameProjectId: varchar("frame_project_id", { length: 200 }),
+    /* --- Editing: deze opname is tegelijk het edit-project voor één editor. --- */
+    /** Editor die de beelden van deze opname monteert. */
+    editorId: uuid("editor_id").references(() => users.id, { onDelete: "set null" }),
+    /** Editingfase van het project, handmatig of afgeleid: te_plannen → in_edit →
+     *  interne_controle → bij_klant → feedback_verwerken → afgerond. */
+    editStatus: varchar("edit_status", { length: 24 }).notNull().default("te_plannen"),
+    /** Aantal shorts dat uit deze opname moet komen (planning). */
+    plannedShorts: integer("planned_shorts"),
+    /** Download-link met het ruwe beeldmateriaal voor de editor. */
+    footageUrl: text("footage_url"),
+    /** Link naar het script (bijv. een PDF in Drive) voor de editor. */
+    scriptUrl: text("script_url"),
     ...timestamps,
     ...softDelete,
   },
@@ -120,6 +132,7 @@ export const productionDays = pgTable(
     index("production_days_client_idx").on(t.clientId, t.scheduledOn),
     index("production_days_date_idx").on(t.scheduledOn),
     index("production_days_videographer_idx").on(t.videographerId),
+    index("production_days_editor_idx").on(t.editorId),
   ],
 );
 

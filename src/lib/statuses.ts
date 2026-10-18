@@ -123,6 +123,37 @@ export const VIDEO_SLA_DAYS: Partial<Record<VideoStage, number>> = {
   client_revision: 2,
 };
 
+/* ------------------------------------------------------------------ *
+ * Editing-projecten per opname (editor-board). Eén opname = één edit-
+ * project met een eigen fase, los van de per-short videostatus.
+ * ------------------------------------------------------------------ */
+export type EditPhase =
+  | "te_plannen"
+  | "in_edit"
+  | "interne_controle"
+  | "bij_klant"
+  | "feedback_verwerken"
+  | "afgerond";
+
+export const EDIT_PHASE_ORDER: EditPhase[] = [
+  "te_plannen",
+  "in_edit",
+  "interne_controle",
+  "bij_klant",
+  "feedback_verwerken",
+  "afgerond",
+];
+
+/** Label, volle kleur en "wacht op" per editingfase. */
+export const EDIT_PHASE_META: Record<EditPhase, { label: string; color: string; waitOn: string }> = {
+  te_plannen: { label: "Te plannen", color: "var(--color-ink-muted)", waitOn: "Eigen team" },
+  in_edit: { label: "In edit", color: "var(--color-brand-600)", waitOn: "Editor" },
+  interne_controle: { label: "Interne controle", color: "var(--color-violet)", waitOn: "Eigen team" },
+  bij_klant: { label: "Bij klant", color: "var(--color-warn)", waitOn: "Klant" },
+  feedback_verwerken: { label: "Feedback verwerken", color: "var(--color-bad)", waitOn: "Editor" },
+  afgerond: { label: "Afgerond", color: "var(--color-good)", waitOn: "—" },
+};
+
 export const SCRIPT_STATUS: Record<string, { label: string; tone: Tone }> = {
   idea: { label: "Idee", tone: "neutral" },
   concept: { label: "Concept", tone: "neutral" },
