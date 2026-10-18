@@ -9,7 +9,7 @@ import { listAssignableUsers } from "@/server/clients";
 import { ensureWeeklyMeeting } from "@/server/meetings";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/format";
-import { NewMeetingForm } from "./meetings-ui";
+import { AddItemForm, NewMeetingForm } from "./meetings-ui";
 
 export const metadata: Metadata = { title: "Teammeetings" };
 export const dynamic = "force-dynamic";
@@ -33,44 +33,42 @@ export default async function MeetingsPage() {
   const agendaCount = Number(weeklyCount[0]?.n ?? 0);
   // De wekelijkse meeting niet dubbel in de "komende" lijst.
   const upcoming = meetings.filter((m) => m.id !== weeklyId && new Date(m.scheduledAt).getTime() >= now - 2 * 60 * 60 * 1000).reverse();
-  const past = meetings.filter((m) => new Date(m.scheduledAt).getTime() < now - 2 * 60 * 60 * 1000);
 
   return (
     <div className="mx-auto max-w-[1000px]">
       <PageHeader title="Teammeetings" description="Verzamel de hele week bespreekpunten voor de vaste teammeeting; leg besluiten en actiepunten vast en koppel actiepunten direct aan Taken." />
 
-      {/* Vaste wekelijkse teammeeting */}
-      <Link href={`/meetings/${weeklyId}`} className="mb-5 block overflow-hidden rounded-[var(--radius-lg)] bg-[var(--color-indigo-ink)] text-white transition-shadow hover:shadow-[var(--shadow-raised)]">
-        <div className="flex flex-wrap items-center gap-3 p-5">
+      {/* Vaste wekelijkse teammeeting — met directe invoer voor bespreekpunten. */}
+      <Card padded={false} className="mb-5 overflow-hidden">
+        <Link href={`/meetings/${weeklyId}`} className="flex flex-wrap items-center gap-3 bg-[var(--color-indigo-ink)] p-5 text-white transition-opacity hover:opacity-95">
           <CalendarClock className="size-6 shrink-0 text-[var(--color-brand-400)]" />
           <div className="min-w-0 flex-1">
             <div className="text-base font-bold tracking-tight">Vaste teammeeting · {dateTime(new Date(w.scheduledAt))}</div>
-            <div className="text-xs text-white/70">Iedereen voegt de hele week bespreekpunten toe. {agendaCount} bespreekpunt{agendaCount === 1 ? "" : "en"} klaar · niet-behandelde punten gaan automatisch mee naar volgende week.</div>
+            <div className="text-xs text-white/70">{agendaCount} bespreekpunt{agendaCount === 1 ? "" : "en"} klaar · niet-behandelde punten gaan automatisch mee naar volgende week.</div>
           </div>
-          <span className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium">Bespreekpunten toevoegen →</span>
+          <span className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium">Open de meeting →</span>
+        </Link>
+
+        {/* Duidelijke oproep: zet hier je bespreekpunten neer voor de meeting. */}
+        <div className="px-4 pt-3">
+          <p className="text-sm font-semibold">Zet hier je bespreekpunten neer</p>
+          <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
+            Heb je iets te bespreken? Voeg het de hele week door toe — dan behandelen we het samen tijdens de vaste teammeeting.
+          </p>
         </div>
-      </Link>
+        <AddItemForm meetingId={weeklyId} kind="agenda" members={members} />
+      </Card>
 
       <div className="mb-5"><NewMeetingForm members={members} /></div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card padded={false}>
-          <CardHeader title="Komende meetings" className="p-5 pb-2" />
-          {upcoming.length === 0 ? <EmptyState title="Geen meetings gepland" /> : (
-            <ul className="divide-y divide-[var(--color-line)]">
-              {upcoming.map((m) => <MeetingRow key={m.id} m={m} />)}
-            </ul>
-          )}
-        </Card>
-        <Card padded={false}>
-          <CardHeader title="Eerdere meetings" className="p-5 pb-2" />
-          {past.length === 0 ? <EmptyState title="Nog geen eerdere meetings" /> : (
-            <ul className="divide-y divide-[var(--color-line)]">
-              {past.map((m) => <MeetingRow key={m.id} m={m} />)}
-            </ul>
-          )}
-        </Card>
-      </div>
+      <Card padded={false}>
+        <CardHeader title="Komende meetings" className="p-5 pb-2" />
+        {upcoming.length === 0 ? <EmptyState title="Geen extra meetings gepland" description="Naast de vaste teammeeting staat er niets ingepland." /> : (
+          <ul className="divide-y divide-[var(--color-line)]">
+            {upcoming.map((m) => <MeetingRow key={m.id} m={m} />)}
+          </ul>
+        )}
+      </Card>
     </div>
   );
 }
