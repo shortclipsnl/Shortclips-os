@@ -36,6 +36,7 @@ import { runTaskArchive } from "@/server/jobs/task-archive";
 import { snapshotFinanceMonth } from "@/server/jobs/finance-snapshot";
 import { curateTeam } from "@/server/jobs/team-curate";
 import { setupTeamLogins } from "@/server/jobs/team-login-setup";
+import { applyClientLogos } from "@/server/jobs/client-logos-apply";
 import { bootstrapProduction } from "@/server/jobs/bootstrap";
 import { runClientNotifications } from "@/server/jobs/notifications";
 import { pruneSessions } from "@/server/auth/session";
@@ -92,6 +93,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,
   "team.setup_logins": setupTeamLogins,
+  "clients.apply_logos": applyClientLogos,
   "bootstrap.production": bootstrapProduction,
   "maintenance.prune_sessions": async () => ({ removed: await pruneSessions() }),
 };
