@@ -8,7 +8,7 @@ import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { EditorFilter } from "./editor-filter";
 import { ShootTimers } from "../editing/shoot-timers";
 import { WorkloadSection } from "../editing/workload-section";
-import { Badge, Card, ClientLogo, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
+import { Card, ClientLogo, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import {
   daysSince,
   formatDate,
@@ -22,20 +22,17 @@ const WAITING_ON: Record<string, { label: string; color: string }> = {
   none: { label: "—", color: "var(--color-ink-faint)" },
 };
 
-/** Volle, onderscheidende kleur per productiefase (Monday-stijl) — alleen voor
- *  de fasesborden hieronder, zodat elke fase in één oogopslag herkenbaar is. */
-const PHASE_COLOR: Record<VideoPhase, string> = {
-  gepland: "var(--color-ink-muted)",
-  beelden_binnen: "var(--color-info)",
-  in_edit: "var(--color-brand-600)",
-  interne_controle: "var(--color-violet)",
-  bij_klant: "var(--color-warn)",
-  feedback_verwerken: "var(--color-bad)",
-  klaar: "var(--color-good)",
-  live: "var(--color-indigo-ink)",
+/** Statuskleur voor de volledig gekleurde "Status"-chip in de lijst. */
+const TONE_COLOR: Record<string, string> = {
+  bad: "var(--color-bad)",
+  warn: "var(--color-warn)",
+  good: "var(--color-good)",
+  neutral: "var(--color-ink-muted)",
 };
+
 import { ViewSwitch } from "./view-switch";
 import { Kanban } from "./kanban";
+import { PhasePicker, PHASE_COLOR } from "./phase-picker";
 
 export const metadata: Metadata = { title: "Editing" };
 export const dynamic = "force-dynamic";
@@ -234,7 +231,6 @@ export default async function VideosPage({
               const inPhase = daysSince(v.statusChangedAt);
               const stuck = stageOverdue(v.status, inPhase);
               const waitOn = WAITING_ON[VIDEO_WAITING_ON[v.status as VideoStage] ?? "none"];
-              const fase = videoPhase(v.status);
               const health = overdue
                 ? { label: "Te laat", tone: "bad" as const }
                 : waiting
@@ -258,15 +254,14 @@ export default async function VideosPage({
                     </Link>
                   </td>
                   <td className="sc-td">
-                    {/* Lijst is alleen-lezen; status wijzig je op de detailpagina via "Volgende stap". */}
-                    <Badge tone={fase.tone}>{fase.label}</Badge>
+                    {/* Klikbare fase: kies een fase en de video verspringt automatisch van bord. */}
+                    <PhasePicker videoId={v.id} status={v.status} canEdit={canEdit} />
                   </td>
                   <td className="sc-td">
                     {waitOn.label === "—" ? (
                       <span className="text-[var(--color-ink-faint)]">—</span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: waitOn.color }}>
-                        <span className="size-2 rounded-full" style={{ background: waitOn.color }} />
+                      <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold text-white" style={{ background: waitOn.color }}>
                         {waitOn.label}
                       </span>
                     )}
@@ -281,7 +276,9 @@ export default async function VideosPage({
                     {v.dueOn ? formatDate(v.dueOn) : "—"}
                   </td>
                   <td className="sc-td">
-                    <Badge tone={health.tone}>{health.label}</Badge>
+                    <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold text-white" style={{ background: TONE_COLOR[health.tone] ?? "var(--color-ink-muted)" }}>
+                      {health.label}
+                    </span>
                   </td>
                 </tr>
               );
@@ -291,7 +288,7 @@ export default async function VideosPage({
       )}
 
       {/* Fases in volle kleur (Monday-stijl): de pipeline per productiefase. */}
-      {rows.length > 0 ? <PhaseBoard rows={rows} /> : null}
+      {rows.length > 0 ? <PhaseBoard rows={rows} canEdit={canEdit} /> : null}
 
       {/* Editorbelasting & tarieven — samengevoegd vanuit de oude /editing-pagina. */}
       <WorkloadSection viewer={viewer} />
@@ -306,7 +303,7 @@ type PhaseRow = { id: string; title: string; clientName: string; clientSlug: str
  * gekleurde kop (geen klein stipje meer), zodat je in één oogopslag ziet waar
  * het werk zit. Horizontaal scrollbaar zoals een Monday-bord.
  */
-function PhaseBoard({ rows }: { rows: PhaseRow[] }) {
+function PhaseBoard({ rows, canEdit }: { rows: PhaseRow[]; canEdit: boolean }) {
   const today = new Date().toISOString().slice(0, 10);
   const byPhase = new Map<VideoPhase, PhaseRow[]>();
   for (const phase of VIDEO_PHASE_ORDER) byPhase.set(phase, []);
@@ -341,13 +338,14 @@ function PhaseBoard({ rows }: { rows: PhaseRow[] }) {
                   list.map((v) => {
                     const overdue = v.dueOn && v.dueOn < today;
                     return (
-                      <Link
+                      <div
                         key={v.id}
-                        href={`/videos/${v.id}`}
-                        className="block rounded-[var(--radius-sm)] border-l-[3px] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-card)] hover:brightness-[0.99]"
+                        className="rounded-[var(--radius-sm)] border-l-[3px] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-card)]"
                         style={{ borderLeftColor: color }}
                       >
-                        <span className="block truncate text-xs font-semibold">{v.title}</span>
+                        <Link href={`/videos/${v.id}`} className="block truncate text-xs font-semibold hover:underline">
+                          {v.title}
+                        </Link>
                         <span className="mt-1 flex items-center gap-1.5 text-2xs text-[var(--color-ink-muted)]">
                           <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={16} />
                           <span className="truncate">{v.clientName}</span>
@@ -360,7 +358,13 @@ function PhaseBoard({ rows }: { rows: PhaseRow[] }) {
                             </span>
                           ) : null}
                         </span>
-                      </Link>
+                        {/* Klik om de video naar een andere fase/bord te verplaatsen. */}
+                        {canEdit ? (
+                          <div className="mt-1.5">
+                            <PhasePicker videoId={v.id} status={v.status} canEdit size="sm" />
+                          </div>
+                        ) : null}
+                      </div>
                     );
                   })
                 )}
