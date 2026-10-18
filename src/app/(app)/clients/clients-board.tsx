@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { Badge, ClientLogo } from "@/components/ui";
 import { CLIENT_STATUS } from "@/lib/statuses";
-import { euro, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 export type BoardClient = {
   id: string;
@@ -126,7 +126,6 @@ function ClientCard({ c }: { c: BoardClient }) {
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-1">
             <Chip tone="blue">{c.shortsPerMonth > 0 ? `${c.shortsPerMonth} shorts/mnd` : "shorts ?"}</Chip>
-            {c.monthlyRevenue !== null ? <Chip tone="indigo">{euro(c.monthlyRevenue)}/mnd</Chip> : null}
             {c.inProduction > 0 ? <Chip tone="amber">{c.inProduction} lopend</Chip> : null}
             {c.nextShoot ? <Chip tone="green">opname {formatDate(c.nextShoot)}</Chip> : null}
             <Chip tone="grey">{c.coordinatorName ?? "geen verantwoordelijke"}</Chip>
