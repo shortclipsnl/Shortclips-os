@@ -39,23 +39,22 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       .from(tasks)
       .where(and(isNull(tasks.deletedAt), inArray(tasks.status, [...OPEN]), scopeToClients(viewer, tasks.clientId))),
   ]);
-  const userOptions = team.map((u) => ({ id: u.id, fullName: u.fullName }));
+  // Taken zijn alleen voor de kantoorkern (eigenaar + coördinatoren/admin) —
+  // Jarno, Milou, Jiska en Rutger. Editors, videografen en freelancers hebben
+  // dit niet nodig, dus die vallen uit de personenrij én de toewijslijst.
+  const isOffice = (role: string) => role in OFFICE_ROLE_ORDER;
+  const office = team.filter((u) => isOffice(u.primaryRole));
+  const userOptions = office.map((u) => ({ id: u.id, fullName: u.fullName }));
 
   const openCountFor = (uid: string) => allOpen.filter((t) => t.assigneeId === uid).length;
   const algemeenCount = allOpen.filter((t) => !t.assigneeId).length;
 
-  // Personenrij: álle interne teamleden staan er altijd (ook zonder open taken),
-  // zodat iedereen direct selecteerbaar is. Kern eerst (op rolprioriteit, dan
-  // naam), daarna de overigen op werkdruk (meeste open taken eerst, dan naam).
-  const isOffice = (role: string) => role in OFFICE_ROLE_ORDER;
-  const core = [...team]
-    .sort((a, b) => {
-      const ao = isOffice(a.primaryRole);
-      const bo = isOffice(b.primaryRole);
-      if (ao !== bo) return ao ? -1 : 1;
-      if (ao && bo) return (OFFICE_ROLE_ORDER[a.primaryRole]! - OFFICE_ROLE_ORDER[b.primaryRole]!) || a.fullName.localeCompare(b.fullName, "nl");
-      return openCountFor(b.id) - openCountFor(a.id) || a.fullName.localeCompare(b.fullName, "nl");
-    });
+  // Personenrij: de kantoorkern, gesorteerd op rolprioriteit en daarna naam.
+  const core = [...office].sort(
+    (a, b) =>
+      (OFFICE_ROLE_ORDER[a.primaryRole]! - OFFICE_ROLE_ORDER[b.primaryRole]!) ||
+      a.fullName.localeCompare(b.fullName, "nl"),
+  );
 
   // Taken voor de geselecteerde weergave ophalen.
   async function fetchTasks(where: ReturnType<typeof and>) {

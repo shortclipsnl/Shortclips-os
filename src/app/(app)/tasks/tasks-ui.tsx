@@ -3,10 +3,42 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { createTask, createTasksBulk, deleteTask, setTaskStatus, updateTask } from "@/server/actions/tasks";
 import { Button, ClientLogo, ErrorNote, TeamAvatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
+
+/**
+ * Kort, vrolijk "belletje" wanneer een taak wordt afgevinkt — puur via de Web
+ * Audio API, dus geen geluidsbestand nodig. Twee oplopende tonen = positief.
+ * Alles in try/catch: als audio geblokkeerd is, gebeurt er simpelweg niets.
+ */
+let _audioCtx: AudioContext | null = null;
+function playDing() {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    _audioCtx = _audioCtx ?? new Ctx();
+    const ctx = _audioCtx;
+    if (ctx.state === "suspended") void ctx.resume();
+    const now = ctx.currentTime;
+    [880, 1318.5].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const t = now + i * 0.1;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.16, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.3);
+    });
+  } catch {
+    /* audio niet beschikbaar — stil doorgaan */
+  }
+}
 
 export type UserOption = { id: string; fullName: string };
 export type ClientOption = { id: string; name: string };
@@ -178,6 +210,7 @@ export function TaskItem({
   canWrite: boolean;
 }) {
   const [pending, start] = useTransition();
+  const [justDone, setJustDone] = useState(false);
   const router = useRouter();
   const done = task.status === "done";
   const overdue = task.dueOn && !done && task.dueOn < new Date().toISOString().slice(0, 10);
@@ -189,16 +222,35 @@ export function TaskItem({
     });
   }
 
+  function toggleDone() {
+    const next = done ? "todo" : "done";
+    if (next === "done") {
+      playDing();
+      setJustDone(true);
+      setTimeout(() => setJustDone(false), 600);
+    }
+    run(() => setTaskStatus(task.id, next));
+  }
+
   return (
     <li className="flex flex-wrap items-center gap-3 px-4 py-2.5">
-      <input
-        type="checkbox"
-        checked={done}
+      {/* Afvinkknop met positief belletje bij afronden. */}
+      <button
+        type="button"
         disabled={!canWrite || pending}
-        onChange={() => run(() => setTaskStatus(task.id, done ? "todo" : "done"))}
-        className="size-4 shrink-0 accent-[var(--color-good)]"
-        aria-label={`Taak afronden: ${task.title}`}
-      />
+        onClick={toggleDone}
+        aria-pressed={done}
+        aria-label={done ? `Taak heropenen: ${task.title}` : `Taak afronden: ${task.title}`}
+        className={cn(
+          "grid size-6 shrink-0 place-items-center rounded-full border-2 transition-all duration-150 disabled:opacity-50",
+          done
+            ? "border-[var(--color-good)] bg-[var(--color-good)] text-white"
+            : "border-[var(--color-line-strong)] text-transparent hover:border-[var(--color-good)] hover:text-[var(--color-good)]/40",
+          justDone && "scale-125",
+        )}
+      >
+        {pending ? <Loader2 className="size-3.5 animate-spin text-[var(--color-ink-faint)]" /> : <Check className="size-3.5" strokeWidth={3} />}
+      </button>
       <span className="min-w-40 flex-1">
         <span className={cn("block text-sm font-medium", done && "text-[var(--color-ink-faint)] line-through")}>
           {task.title}
