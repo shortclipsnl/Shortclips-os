@@ -26,16 +26,6 @@ import {
 export const metadata: Metadata = { title: "Team" };
 export const dynamic = "force-dynamic";
 
-function MiniStat({ label, value, tone, hint }: { label: string; value: number; tone?: string; hint?: string }) {
-  return (
-    <div className="rounded-[var(--radius-sm)] bg-[var(--color-surface-sunken)] py-1.5">
-      <div className="text-base font-bold leading-none tabular-nums" style={tone ? { color: tone } : undefined}>{value || "—"}</div>
-      <div className="mt-0.5 text-2xs text-[var(--color-ink-faint)]">{label}</div>
-      {hint ? <div className="text-2xs font-medium text-[var(--color-bad)]">{hint}</div> : null}
-    </div>
-  );
-}
-
 const ROLE_LABELS: Record<string, string> = {
   owner: "Eigenaar",
   admin: "Beheerder",
@@ -63,25 +53,11 @@ export default async function TeamPage() {
       color: teamMembers.color,
       weeklyVideoCapacity: teamMembers.weeklyVideoCapacity,
       isInternal: teamMembers.isInternal,
-      openTasks: sql<number>`(
-        select count(*) from tasks t
-        where t.assignee_id = users.id and t.deleted_at is null
-          and t.status in ('todo','in_progress','blocked')
-      )`,
-      overdueTasks: sql<number>`(
-        select count(*) from tasks t
-        where t.assignee_id = users.id and t.deleted_at is null
-          and t.status in ('todo','in_progress','blocked') and t.due_on < current_date
-      )`,
+      // Alleen nog nodig voor de beschikbaarheid van editors (ruimte/vol).
       openVideos: sql<number>`(
         select count(*) from deliverables d
         where d.editor_id = users.id and d.deleted_at is null
           and d.status in ('editing','editor_revision','awaiting_editor')
-      )`,
-      upcomingShoots: sql<number>`(
-        select count(*) from production_days pd
-        where pd.videographer_id = users.id and pd.deleted_at is null
-          and pd.scheduled_on >= current_date and pd.status <> 'cancelled'
       )`,
     })
       .from(users)
@@ -126,49 +102,47 @@ export default async function TeamPage() {
     const capacity = p.weeklyVideoCapacity;
     const load = capacity > 0 ? (open / capacity) * 100 : 0;
     const overloaded = capacity > 0 && open > capacity;
+    // Beschikbaarheid tonen we alleen waar het betekenis heeft (editcapaciteit).
     const availability =
-      capacity === 0
-        ? { label: "Geen editcapaciteit", tone: "neutral" as const }
+      capacity <= 0
+        ? null
         : overloaded
           ? { label: `Overbelast · ${pct(load, 0)}`, tone: "bad" as const }
           : load > 80
             ? { label: `Vol · ${pct(load, 0)}`, tone: "warn" as const }
             : { label: `Ruimte · ${pct(load, 0)}`, tone: "good" as const };
-    const overdue = Number(p.overdueTasks);
+    const accent = vast ? "var(--color-indigo-ink)" : "var(--color-warn)";
     return (
       <div
         key={p.id}
-        className="flex flex-col rounded-[var(--radius-lg)] border bg-[var(--color-surface)] p-4"
-        style={
-          vast
-            ? { borderColor: "color-mix(in srgb, var(--color-indigo-ink) 30%, var(--color-line))", boxShadow: "inset 3px 0 0 var(--color-indigo-ink)" }
-            : { borderColor: "var(--color-line)" }
-        }
+        className="relative flex flex-col items-center overflow-hidden rounded-[var(--radius-lg)] border bg-[var(--color-surface)] px-4 pb-4 pt-6 text-center"
+        style={{
+          borderColor: vast
+            ? "color-mix(in srgb, var(--color-indigo-ink) 30%, var(--color-line))"
+            : "var(--color-line)",
+        }}
       >
-        <div className="flex items-start gap-3">
-          <TeamAvatar name={p.fullName} avatarUrl={p.avatarUrl ?? null} color={p.color} size={42} />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="truncate font-semibold">{p.fullName}</span>
-              {p.status === "suspended" ? <Badge tone="neutral">Gedeactiveerd</Badge> : null}
-            </div>
-            <div className="truncate text-xs text-[var(--color-ink-muted)]">{p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}</div>
-            <div className="mt-1.5">
-              <Badge tone={availability.tone}>{availability.label}</Badge>
-            </div>
-          </div>
-        </div>
+        {/* Kleurstrip bovenaan: navy = vaste medewerker, oranje = freelancer. */}
+        <span className="absolute inset-x-0 top-0 h-1.5" style={{ background: accent }} />
 
-        <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
-          <MiniStat label="Open taken" value={Number(p.openTasks)} tone={overdue > 0 ? "var(--color-bad)" : undefined} hint={overdue > 0 ? `${overdue} te laat` : undefined} />
-          <MiniStat label="In bewerking" value={open} />
-          <MiniStat label="Opnames" value={Number(p.upcomingShoots)} />
+        <TeamAvatar name={p.fullName} avatarUrl={p.avatarUrl ?? null} color={p.color} size={vast ? 96 : 76} />
+
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+          <span className="font-semibold leading-tight">{p.fullName}</span>
+          {p.status === "suspended" ? <Badge tone="neutral">Gedeactiveerd</Badge> : null}
         </div>
+        <div className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}</div>
+
+        {availability ? (
+          <div className="mt-2">
+            <Badge tone={availability.tone}>{availability.label}</Badge>
+          </div>
+        ) : null}
 
         {canWrite ? (
-          <div className="mt-3 flex justify-end border-t border-[var(--color-line)] pt-2">
-            <Link href={`/team/${p.id}/edit`} className="text-xs font-medium text-[var(--color-brand-600)] hover:underline">Bewerken</Link>
-          </div>
+          <Link href={`/team/${p.id}/edit`} className="mt-3 text-xs font-medium text-[var(--color-brand-600)] hover:underline">
+            Bewerken
+          </Link>
         ) : null}
       </div>
     );
@@ -182,10 +156,12 @@ export default async function TeamPage() {
         actions={canWrite ? <LinkButton href="/team/new">Nieuw teamlid</LinkButton> : undefined}
       />
 
-      <div className="mb-2 flex items-center gap-2">
-        <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-indigo-ink)]" />
-        <h2 className="text-sm font-semibold tracking-tight">Vaste medewerkers</h2>
-        <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-xs text-[var(--color-ink-muted)]">{core.length}</span>
+      <div className="mb-3 flex items-center gap-3 border-l-4 border-[var(--color-indigo-ink)] pl-3">
+        <div>
+          <h2 className="text-base font-bold tracking-tight">Vaste medewerkers</h2>
+          <p className="text-xs text-[var(--color-ink-muted)]">Het vaste kernteam</p>
+        </div>
+        <span className="ml-auto rounded-full bg-[var(--color-indigo-ink)] px-2.5 py-0.5 text-xs font-semibold text-white">{core.length}</span>
       </div>
       {core.length === 0 ? (
         <Card className="mb-6"><EmptyState title="Geen vaste medewerkers gevonden" /></Card>
@@ -195,10 +171,12 @@ export default async function TeamPage() {
         </div>
       )}
 
-      <div className="mb-2 flex items-center gap-2">
-        <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-warn)]" />
-        <h2 className="text-sm font-semibold tracking-tight">Freelancers &amp; overig team</h2>
-        <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-xs text-[var(--color-ink-muted)]">{freelancers.length}</span>
+      <div className="mb-3 mt-8 flex items-center gap-3 border-l-4 border-[var(--color-warn)] pl-3">
+        <div>
+          <h2 className="text-base font-bold tracking-tight">Freelancers &amp; overig team</h2>
+          <p className="text-xs text-[var(--color-ink-muted)]">Flexibele inzet</p>
+        </div>
+        <span className="ml-auto rounded-full bg-[var(--color-warn)] px-2.5 py-0.5 text-xs font-semibold text-white">{freelancers.length}</span>
       </div>
       {freelancers.length === 0 ? (
         <Card className="mb-6"><EmptyState title="Geen freelancers" /></Card>
