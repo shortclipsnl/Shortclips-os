@@ -30,7 +30,7 @@ export function QuickAddLead() {
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)}
-        className="mb-4 inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-ink)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">
+        className="mb-4 inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">
         <Plus className="size-4" /> Nieuwe lead
       </button>
     );
@@ -43,7 +43,7 @@ export function QuickAddLead() {
       <input className="sc-input h-8 w-44 py-0 text-sm" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
       <input className="sc-input h-8 w-36 py-0 text-sm" placeholder="Telefoon" value={phone} onChange={(e) => setPhone(e.target.value)} />
       <button type="button" onClick={add} disabled={pending || !company.trim()}
-        className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-ink)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+        className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
         {pending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Toevoegen
       </button>
       <button type="button" onClick={() => setOpen(false)} className="px-2 py-1.5 text-xs text-[var(--color-ink-muted)]">Annuleren</button>
@@ -104,7 +104,7 @@ export function LeadsBoard({ rows, segments, sources }: { rows: LeadRow[]; segme
             const label = s === "open" ? "Open" : s === "alle" ? "Alle" : meta?.label ?? s;
             return (
               <button key={s} type="button" onClick={() => setStatus(s)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${status === s ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-neutral-soft)] text-[var(--color-ink-muted)]"}`}>
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${status === s ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-neutral-soft)] text-[var(--color-ink-muted)]"}`}>
                 {meta ? <span className="size-2 rounded-full" style={{ background: meta.dot }} /> : null}
                 {label}
               </button>

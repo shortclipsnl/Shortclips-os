@@ -64,7 +64,7 @@ export function EditingBoard({ projects, editorOptions, clientOptions }: { proje
           <div className="flex gap-1">
             {DEADLINE_FILTERS.map((f) => (
               <button key={f.key} onClick={() => setDeadline(f.key)}
-                className={`rounded-full px-2.5 py-1 text-xs font-medium ${deadline === f.key ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${deadline === f.key ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
                 {f.label}
               </button>
             ))}

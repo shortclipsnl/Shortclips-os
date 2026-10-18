@@ -99,7 +99,7 @@ export function ShootAgenda({ shoots, initialDate }: { shoots: AgendaShoot[]; in
         <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] p-0.5">
           {(["week", "maand"] as const).map((v) => (
             <button key={v} onClick={() => setView(v)}
-              className={`rounded-[calc(var(--radius-sm)-2px)] px-3 py-1 text-xs font-semibold capitalize ${view === v ? "bg-[var(--color-ink)] text-white" : "text-[var(--color-ink-muted)]"}`}>
+              className={`rounded-[calc(var(--radius-sm)-2px)] px-3 py-1 text-xs font-semibold capitalize ${view === v ? "bg-[var(--color-indigo-ink)] text-white" : "text-[var(--color-ink-muted)]"}`}>
               {v}
             </button>
           ))}

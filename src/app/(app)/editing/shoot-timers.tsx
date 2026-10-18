@@ -54,7 +54,7 @@ export function ShootTimers({ shoots }: { shoots: ShootDeadline[] }) {
                 <div className="mt-3">
                   <div className="relative h-2.5 rounded-full bg-[var(--color-neutral-soft)]">
                     <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: c.bar }} />
-                    <span className="absolute top-[-2px] h-[14px] w-0.5 bg-[var(--color-ink)]/50" style={{ left: `${editorMarkPct}%` }} title="Editordeadline" aria-hidden />
+                    <span className="absolute top-[-2px] h-[14px] w-0.5 bg-[var(--color-indigo-ink)]/50" style={{ left: `${editorMarkPct}%` }} title="Editordeadline" aria-hidden />
                   </div>
                   <div className="mt-1 flex justify-between text-2xs text-[var(--color-ink-faint)]">
                     <span>{s.elapsedWorkdays} werkdagen verstreken</span>

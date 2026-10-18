@@ -61,7 +61,7 @@ export default async function KennisbankPage({
                   href={`/ai/kennisbank?klant=${c.id}`}
                   className={`rounded-full px-3 py-1 text-xs font-medium ${
                     selectedId === c.id
-                      ? "bg-[var(--color-ink)] text-white"
+                      ? "bg-[var(--color-indigo-ink)] text-white"
                       : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
                   }`}
                 >

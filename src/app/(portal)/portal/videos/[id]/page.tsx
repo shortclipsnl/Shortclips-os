@@ -135,7 +135,7 @@ export default async function PortalVideoDetailPage({
       {video.frameUrl ? (
         <a href={video.frameUrl} target="_blank" rel="noreferrer" className="group block">
           <Card padded={false} className="overflow-hidden">
-            <div className="flex aspect-video items-center justify-center bg-[var(--color-ink)]/[0.06]">
+            <div className="flex aspect-video items-center justify-center bg-[var(--color-indigo-ink)]/[0.06]">
               <span className="flex size-14 items-center justify-center rounded-full bg-[var(--color-brand-600)] text-white transition-transform group-hover:scale-105">
                 <Play className="size-6 translate-x-0.5" fill="currentColor" />
               </span>

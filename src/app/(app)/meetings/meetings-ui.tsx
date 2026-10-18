@@ -54,7 +54,7 @@ export function NewMeetingForm({ members }: { members: Member[] }) {
         <div className="flex flex-wrap gap-1.5">
           {members.map((m) => (
             <button key={m.id} type="button" onClick={() => toggle(m.id)}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${participants.includes(m.id) ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
+              className={`rounded-full px-3 py-1 text-xs font-medium ${participants.includes(m.id) ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
               {m.fullName.split(" ")[0]}
             </button>
           ))}

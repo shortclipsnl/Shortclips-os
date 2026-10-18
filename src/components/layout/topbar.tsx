@@ -10,6 +10,7 @@ import { notifications } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 import { Avatar } from "@/components/ui";
 import { GlobalSearch } from "./global-search";
+import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
 
 export async function Topbar({ viewer }: { viewer: Viewer }) {
@@ -24,6 +25,8 @@ export async function Topbar({ viewer }: { viewer: Viewer }) {
       <div className="flex-1">
         <GlobalSearch />
       </div>
+
+      <ThemeToggle />
 
       <Link
         href="/notifications"

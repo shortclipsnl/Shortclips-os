@@ -326,3 +326,54 @@ body {
   display: grid;
   place-items: center;
 }
+
+/* =========================================================================
+   Donkere modus — alleen de kleur-tokens worden omgezet; componenten gebruiken
+   die tokens, dus de hele app schakelt mee. Geactiveerd via data-theme="dark"
+   op <html> (schakelaar rechtsboven; keuze bewaard in localStorage).
+   ========================================================================= */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Neutraal → donker */
+  --color-canvas: #0a0b16;
+  --color-surface: #15162a;
+  --color-surface-sunken: #101121;
+  --color-surface-2: #20223c;
+  --color-neutral-soft: #181a2e;
+  --color-line: #292b45;
+  --color-line-strong: #3b3d5c;
+
+  /* Tekst → licht */
+  --color-ink: #ecebf6;
+  --color-ink-muted: #a8aac6;
+  --color-ink-faint: #82849f;
+
+  /* Indigo-vlakken (navy balken/koppen) iets lichter, zodat ze op donker
+     zichtbaar blijven met witte tekst. */
+  --color-indigo-ink: #262a55;
+  --color-indigo-deep: #1a1d40;
+  --color-indigo-soft: #333873;
+  --color-indigo-mist: #3d4380;
+
+  /* Merk-licht-vlakken (bv. brand-50 als zacht blok) → donker getint. */
+  --color-brand-50: #0f2a44;
+  --color-brand-100: #123553;
+
+  /* Zachte semantische vlakken → donker getint (de hoofdkleuren blijven). */
+  --color-good-soft: #102c21;
+  --color-lime-soft: #202808;
+  --color-warn-soft: #30240a;
+  --color-bad-soft: #311713;
+  --color-info-soft: #0c2b45;
+  --color-violet-soft: #211a3a;
+
+  /* Schaduw op donker iets dieper zodat kaarten loskomen. */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.45);
+  --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-pop: 0 8px 16px rgba(0, 0, 0, 0.5), 0 24px 48px rgba(0, 0, 0, 0.65);
+}

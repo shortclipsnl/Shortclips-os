@@ -121,7 +121,7 @@ export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }:
         <div className="flex flex-wrap gap-1">
           {FILTERS.map((f) => (
             <button key={f.key} type="button" onClick={() => setFilter(f.key)}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${filter === f.key ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
+              className={`rounded-full px-3 py-1 text-xs font-medium ${filter === f.key ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
               {f.label}
             </button>
           ))}

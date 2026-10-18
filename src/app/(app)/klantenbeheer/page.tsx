@@ -73,7 +73,7 @@ export default async function KlantenbeheerPage({
               href={f.key === "actief" ? "/klantenbeheer" : `/klantenbeheer?status=${f.key}`}
               className={`rounded-full px-3 py-1 text-xs font-medium ${
                 active
-                  ? "bg-[var(--color-ink)] text-white"
+                  ? "bg-[var(--color-indigo-ink)] text-white"
                   : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
               }`}
             >

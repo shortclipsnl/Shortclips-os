@@ -201,7 +201,7 @@ export function AutoPlanner({ clients, aiReady }: { clients: ClientOption[]; aiR
               <div className="flex flex-wrap gap-1.5">
                 {PLATFORMS.map((p) => (
                   <button key={p.value} type="button" onClick={() => togglePlatform(p.value)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${platforms.includes(p.value) ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${platforms.includes(p.value) ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
                     {p.label}
                   </button>
                 ))}

@@ -125,7 +125,7 @@ function NewProject({ clients, editors }: { clients: ClientOption[]; editors: Ed
           {editors.map((e) => <option key={e.id} value={e.id}>{e.fullName}</option>)}
         </select>
       </label>
-      <button type="button" onClick={create} disabled={pending || !clientId || !scheduledOn || !title.trim()} className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-ink)] px-3 text-xs font-semibold text-white disabled:opacity-50">
+      <button type="button" onClick={create} disabled={pending || !clientId || !scheduledOn || !title.trim()} className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 text-xs font-semibold text-white disabled:opacity-50">
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />} Aanmaken
       </button>
       <button type="button" onClick={() => setOpen(false)} className="h-8 rounded-[var(--radius-sm)] px-2 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleren</button>
@@ -139,7 +139,7 @@ function SwitchBtn({ active, onClick, children }: { active: boolean; onClick: ()
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-3 py-1 text-xs font-semibold ${active ? "bg-[var(--color-ink)] text-white" : "border border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${active ? "bg-[var(--color-indigo-ink)] text-white" : "border border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
     >
       {children}
     </button>
@@ -346,7 +346,7 @@ function ScriptField({ p, canEdit, pending, run }: { p: EditingProject; canEdit:
           <input autoFocus value={link} placeholder="Plak een link naar het script…" onChange={(e) => setLink(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { run(() => setProjectLinks(p.id, { scriptUrl: link })); setLinking(false); } if (e.key === "Escape") setLinking(false); }}
             className="sc-input h-7 flex-1 py-0 text-xs" />
-          <button type="button" onClick={() => { run(() => setProjectLinks(p.id, { scriptUrl: link })); setLinking(false); }} className="shrink-0 rounded bg-[var(--color-ink)] px-2 py-1 text-2xs font-semibold text-white">Opslaan</button>
+          <button type="button" onClick={() => { run(() => setProjectLinks(p.id, { scriptUrl: link })); setLinking(false); }} className="shrink-0 rounded bg-[var(--color-indigo-ink)] px-2 py-1 text-2xs font-semibold text-white">Opslaan</button>
         </div>
       ) : null}
       {err ? <span className="mt-1 block text-[var(--color-bad)]">{err}</span> : null}
@@ -370,7 +370,7 @@ function LinkRow({ icon, label, url, canEdit, onSave }: { icon: React.ReactNode;
           onKeyDown={(e) => { if (e.key === "Enter") { onSave(val); setEditing(false); } if (e.key === "Escape") setEditing(false); }}
           className="sc-input h-7 flex-1 py-0 text-xs"
         />
-        <button type="button" onClick={() => { onSave(val); setEditing(false); }} className="shrink-0 rounded bg-[var(--color-ink)] px-2 py-1 text-2xs font-semibold text-white">Opslaan</button>
+        <button type="button" onClick={() => { onSave(val); setEditing(false); }} className="shrink-0 rounded bg-[var(--color-indigo-ink)] px-2 py-1 text-2xs font-semibold text-white">Opslaan</button>
       </div>
     );
   }

@@ -207,7 +207,7 @@ export function ResearchEditor({ id, initial, sources }: { id: string; initial: 
               key={s.key}
               type="button"
               onClick={() => toggleSlide(s.key)}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${slidesUit.has(s.key) ? "bg-[var(--color-surface-2)] text-[var(--color-ink-faint)] line-through" : "bg-[var(--color-ink)] text-white"}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${slidesUit.has(s.key) ? "bg-[var(--color-surface-2)] text-[var(--color-ink-faint)] line-through" : "bg-[var(--color-indigo-ink)] text-white"}`}
             >
               {s.label}
             </button>

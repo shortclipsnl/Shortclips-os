@@ -115,7 +115,7 @@ export function AnalysisView({ data, canRun }: { data: ViewData; canRun: boolean
                     style={{ left: `${((data.hook.startMs ?? 0) / dur) * 100}%`, width: `${(((data.hook.endMs ?? 0) - (data.hook.startMs ?? 0)) / dur) * 100}%` }}
                     title="Hook" />
                 ) : null}
-                <div className="absolute top-0 h-full w-0.5 bg-[var(--color-ink)]" style={{ left: `${(curMs / dur) * 100}%` }} />
+                <div className="absolute top-0 h-full w-0.5 bg-[var(--color-indigo-ink)]" style={{ left: `${(curMs / dur) * 100}%` }} />
               </div>
               <div className="mt-1 flex justify-between text-2xs text-[var(--color-ink-faint)]">
                 <span>{msToClock(curMs)}</span>

@@ -26,11 +26,18 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+// Zet het opgeslagen (of systeem-)thema al vóór het renderen, zodat er geen
+// flits van het verkeerde thema is.
+const THEME_INIT = `(function(){try{var t=localStorage.getItem('sc-theme');if(t!=='light'&&t!=='dark'){t='light';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="nl" className={poppins.variable}>
+    <html lang="nl" className={poppins.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+      </head>
       <body className="min-h-screen antialiased">{children}</body>
     </html>
   );

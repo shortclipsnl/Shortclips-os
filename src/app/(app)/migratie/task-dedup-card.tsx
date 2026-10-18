@@ -41,7 +41,7 @@ export function TaskDedupCard({ groups }: { groups: Group[] }) {
               if (res.ok) router.refresh();
             })
           }
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-ink)] px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
         >
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Merge className="size-4" />}
           Samenvoegen ({totalExtra})

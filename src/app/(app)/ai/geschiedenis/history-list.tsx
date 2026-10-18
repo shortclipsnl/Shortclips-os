@@ -49,7 +49,7 @@ export function HistoryList({ rows }: { rows: HistoryRow[] }) {
               key={t.key}
               type="button"
               onClick={() => setTool(t.key)}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${tool === t.key ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${tool === t.key ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
             >
               {t.label}
             </button>
