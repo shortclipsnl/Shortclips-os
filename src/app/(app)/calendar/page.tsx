@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireInternal } from "@/server/auth/context";
+import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { listCalendar, monthGrid, type CalendarItem } from "@/server/calendar";
 import { listClients } from "@/server/clients";
 import { Avatar, Badge, Card, EmptyState, PageHeader } from "@/components/ui";
@@ -27,6 +28,8 @@ export default async function CalendarPage({
   }>;
 }) {
   const viewer = await requireInternal();
+  // Google Agenda op de achtergrond verversen als de laatste sync >1u geleden is.
+  await syncCalendarIfStale();
   const canWriteCal = viewer.permissions.has("calendar:write");
   const params = await searchParams;
 

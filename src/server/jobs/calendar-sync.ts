@@ -1,12 +1,15 @@
 import "server-only";
-import { and, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { after } from "next/server";
+import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { env } from "@/lib/env";
 import {
   calendarEvents,
   clientContacts,
   clientIntegrations,
   clients,
   contentCalendar,
+  integrationConnections,
   mondayMappings,
   productionDays,
 } from "@/db/schema";
@@ -481,4 +484,40 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
     },
     { triggeredById: options.triggeredById },
   );
+}
+
+/**
+ * Sync-bij-gebruik: ververst de Google Agenda op de achtergrond (ná de respons,
+ * via after()) wanneer iemand een plannings-/contentpagina opent én de laatste
+ * sync langer dan `maxAgeMinutes` geleden was. Zo zijn wijzigingen in Google
+ * binnen ~een uur zichtbaar, zonder dat het de pagina vertraagt. Een atomische
+ * "claim" op lastSyncAt voorkomt dat gelijktijdige bezoeken dubbel syncen.
+ * Draait alleen als Google is geconfigureerd; faalt nooit richting de pagina.
+ */
+export async function syncCalendarIfStale(maxAgeMinutes = 60): Promise<void> {
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_REFRESH_TOKEN) return;
+  const cutoff = new Date(Date.now() - maxAgeMinutes * 60_000);
+  try {
+    const claimed = await db
+      .update(integrationConnections)
+      .set({ lastSyncAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(integrationConnections.provider, "google_calendar"),
+          or(isNull(integrationConnections.lastSyncAt), lt(integrationConnections.lastSyncAt, cutoff)),
+        ),
+      )
+      .returning({ id: integrationConnections.id });
+    if (claimed.length > 0) {
+      after(async () => {
+        try {
+          await runCalendarSync();
+        } catch {
+          /* fout wordt al in de job-log vastgelegd */
+        }
+      });
+    }
+  } catch {
+    /* nooit de pagina breken door een sync-check */
+  }
 }

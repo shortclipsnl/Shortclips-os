@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireInternal } from "@/server/auth/context";
 import { getPlanningOverview, planningFilterOptions } from "@/server/planning-overview";
+import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { PageHeader } from "@/components/ui";
 import { PlanningBoard } from "./planning-board";
 
@@ -9,6 +10,8 @@ export const dynamic = "force-dynamic";
 
 export default async function PlanningPage() {
   const viewer = await requireInternal();
+  // Google Agenda op de achtergrond verversen als de laatste sync >1u geleden is.
+  await syncCalendarIfStale();
   const [weeks, options] = await Promise.all([getPlanningOverview(viewer, 8), planningFilterOptions(viewer)]);
 
   return (
