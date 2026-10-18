@@ -2,14 +2,19 @@ import "server-only";
 import {
   and,
   eq,
+  inArray,
   isNotNull,
+  isNull,
 } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
+  clients,
   driveMappings,
   files,
 } from "@/db/schema";
 import { drive, DriveService } from "@/server/integrations/drive";
+import { matchScore, normalizeName } from "@/server/import";
+import { aliasesForSlug } from "@/server/integrations/client-aliases";
 import { runJob } from "./runner";
 
 /** Uit welke logische map komt dit bestand? Bepaalt de categorie in de UI. */
@@ -40,16 +45,21 @@ export async function syncClientDriveFolder(
       const entries = await drive.walkFolder(folderId, 3);
       ctx.log(`${entries.length} objecten gevonden`);
 
+      // Bestaande bestanden één keer ophalen, zodat we nieuwe bestanden in bulk
+      // kunnen invoegen i.p.v. per stuk een select + insert (snelheid/limiet).
+      const entryIds = entries.map((e) => e.id);
+      const existingSet = new Set<string>();
+      for (let i = 0; i < entryIds.length; i += 200) {
+        const rows = await db
+          .select({ externalId: files.externalId })
+          .from(files)
+          .where(and(eq(files.source, "google_drive"), inArray(files.externalId, entryIds.slice(i, i + 200))));
+        for (const r of rows) if (r.externalId) existingSet.add(r.externalId);
+      }
+
+      const toInsert: (typeof files.$inferInsert)[] = [];
       for (const entry of entries) {
         ctx.counters.processed++;
-        const isFolder = DriveService.isFolder(entry);
-
-        const existing = await db
-          .select({ id: files.id })
-          .from(files)
-          .where(and(eq(files.source, "google_drive"), eq(files.externalId, entry.id)))
-          .limit(1);
-
         const values = {
           clientId,
           name: entry.name,
@@ -61,18 +71,21 @@ export async function syncClientDriveFolder(
           category: categoryFromPath(entry.path),
           path: entry.path,
           parentExternalId: entry.parents?.[0] ?? null,
-          isFolder,
+          isFolder: DriveService.isFolder(entry),
           modifiedAt: entry.modifiedTime ? new Date(entry.modifiedTime) : null,
           lastSyncedAt: new Date(),
         };
 
-        if (existing[0]) {
-          await db.update(files).set(values).where(eq(files.id, existing[0].id));
+        if (existingSet.has(entry.id)) {
+          await db.update(files).set(values).where(and(eq(files.source, "google_drive"), eq(files.externalId, entry.id)));
           ctx.counters.updated++;
         } else {
-          await db.insert(files).values(values);
-          ctx.counters.created++;
+          toInsert.push(values);
         }
+      }
+      for (let i = 0; i < toInsert.length; i += 200) {
+        await db.insert(files).values(toInsert.slice(i, i + 200));
+        ctx.counters.created += Math.min(200, toInsert.length - i);
       }
 
       // Startpunt bewaren voor incrementele synchronisatie hierna.
@@ -221,4 +234,70 @@ export async function runDriveSync() {
     }
   }
   return { ok: true, mappings: mappings.length, synced: ok, failed };
+}
+
+/**
+ * Koppelt de klantmappen onder GOOGLE_DRIVE_ROOT_FOLDER_ID aan klanten (op naam,
+ * met aliassen en een fuzzy score) en leest hun bestanden in. Per aanroep worden
+ * maximaal `limit` nog-niet-gekoppelde mappen verwerkt, zodat ook grote mappen
+ * binnen de tijdslimiet passen; herhaal tot `remaining` 0 is. Nooit gokken:
+ * mappen zonder één duidelijke klant worden overgeslagen en gerapporteerd.
+ */
+export async function linkDriveFolders(limit = 5): Promise<{
+  ok: boolean;
+  linked: number;
+  linkedList: string[];
+  skipped: number;
+  skippedList: string[];
+  remaining: number;
+}> {
+  const root = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
+  if (!root) throw new Error("GOOGLE_DRIVE_ROOT_FOLDER_ID ontbreekt");
+
+  const folders = (await drive.listFolder(root)).filter((f) => DriveService.isFolder(f));
+  const clientRows = await db
+    .select({ id: clients.id, name: clients.name, slug: clients.slug })
+    .from(clients)
+    .where(isNull(clients.deletedAt));
+  const mapped = new Set(
+    (await db.select({ folderId: driveMappings.folderId }).from(driveMappings).where(eq(driveMappings.entityType, "client"))).map((m) => m.folderId),
+  );
+
+  function matchClient(name: string): { id: string; name: string } | null {
+    const n = normalizeName(name);
+    if (!n) return null;
+    const hits = clientRows.filter(
+      (c) =>
+        normalizeName(c.name) === n ||
+        normalizeName(c.slug) === n ||
+        aliasesForSlug(c.slug).some((a) => normalizeName(a) === n) ||
+        matchScore(name, c.name) >= 85,
+    );
+    return hits.length === 1 ? { id: hits[0]!.id, name: hits[0]!.name } : null;
+  }
+
+  const skipped: string[] = [];
+  const candidates: { folderId: string; folderName: string; client: { id: string; name: string } }[] = [];
+  for (const folder of folders) {
+    if (mapped.has(folder.id)) continue;
+    const client = matchClient(folder.name);
+    if (client) candidates.push({ folderId: folder.id, folderName: folder.name, client });
+    else skipped.push(folder.name);
+  }
+
+  const batch = candidates.slice(0, limit);
+  const linkedList: string[] = [];
+  for (const c of batch) {
+    await syncClientDriveFolder(c.client.id, c.folderId);
+    linkedList.push(`${c.folderName} → ${c.client.name}`);
+  }
+
+  return {
+    ok: true,
+    linked: linkedList.length,
+    linkedList,
+    skipped: skipped.length,
+    skippedList: skipped,
+    remaining: candidates.length - batch.length,
+  };
 }

@@ -5,7 +5,7 @@ import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { runMetricoolSync } from "@/server/jobs/metricool-sync";
 import { pullFrameProjects, pullFrameDeliverables, pullFrameComments } from "@/server/jobs/frameio-sync";
 import { frameio } from "@/server/integrations/frameio";
-import { runDriveSync } from "@/server/jobs/drive-sync";
+import { runDriveSync, linkDriveFolders } from "@/server/jobs/drive-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,12 +24,19 @@ async function handle(request: Request) {
     return NextResponse.json({ error: "Alleen de eigenaar kan een sync starten." }, { status: 403 });
   }
 
-  const which = new URL(request.url).searchParams.get("which");
-  if (!which || !["metricool", "frameio", "calendar", "drive"].includes(which)) {
-    return NextResponse.json({ error: "Geef ?which=metricool|frameio|calendar|drive mee." }, { status: 400 });
+  const url = new URL(request.url);
+  const which = url.searchParams.get("which");
+  if (!which || !["metricool", "frameio", "calendar", "drive", "drive_link"].includes(which)) {
+    return NextResponse.json({ error: "Geef ?which=metricool|frameio|calendar|drive|drive_link mee." }, { status: 400 });
   }
 
   const cfg = integrationConfig();
+
+  if (which === "drive_link") {
+    if (!cfg.google_drive.configured) return NextResponse.json({ ok: false, reason: "Google Drive niet geconfigureerd." }, { status: 200 });
+    const limit = Math.max(1, Math.min(10, Number(url.searchParams.get("limit") ?? 5)));
+    return NextResponse.json({ ok: true, which, result: await linkDriveFolders(limit) });
+  }
 
   if (which === "metricool") {
     if (!cfg.metricool.configured) return NextResponse.json({ ok: false, reason: "Metricool niet geconfigureerd (METRICOOL_USER_TOKEN ontbreekt)." }, { status: 200 });
