@@ -6,7 +6,7 @@ import "server-only";
  * editor-portal. Bewust een vaste lijst (op voornaam), zodat oud-editors of
  * mensen die ooit één keer monteerden hier niet tussen staan.
  */
-export const EDIT_BOARD_EDITOR_FIRST_NAMES = ["sem", "noah", "fabian", "quinn", "senna"] as const;
+export const EDIT_BOARD_EDITOR_FIRST_NAMES = ["sem", "sam", "noah", "fabian", "quinn", "senna"] as const;
 
 export function isBoardEditor(fullName: string | null | undefined): boolean {
   if (!fullName) return false;

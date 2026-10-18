@@ -144,13 +144,13 @@ export const EDIT_PHASE_ORDER: EditPhase[] = [
   "afgerond",
 ];
 
-/** Label, volle kleur en "wacht op" per editingfase. */
+/** Label, volle kleur en "wacht op" per editingfase (Monday-indeling). */
 export const EDIT_PHASE_META: Record<EditPhase, { label: string; color: string; waitOn: string }> = {
-  te_plannen: { label: "Te plannen", color: "var(--color-ink-muted)", waitOn: "Eigen team" },
-  in_edit: { label: "In edit", color: "var(--color-brand-600)", waitOn: "Editor" },
-  interne_controle: { label: "Interne controle", color: "var(--color-violet)", waitOn: "Eigen team" },
-  bij_klant: { label: "Bij klant", color: "var(--color-warn)", waitOn: "Klant" },
-  feedback_verwerken: { label: "Feedback verwerken", color: "var(--color-bad)", waitOn: "Editor" },
+  te_plannen: { label: "Binnenkort beschikbaar", color: "#22b573", waitOn: "Eigen team" },
+  in_edit: { label: "In edit", color: "var(--color-info)", waitOn: "Editor" },
+  interne_controle: { label: "Interne review", color: "var(--color-warn)", waitOn: "Eigen team" },
+  bij_klant: { label: "Feedback klant", color: "var(--color-violet)", waitOn: "Klant" },
+  feedback_verwerken: { label: "Feedback klant verwerken", color: "#e0a500", waitOn: "Editor" },
   afgerond: { label: "Afgerond", color: "var(--color-good)", waitOn: "—" },
 };
 
