@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
 import { AlertTriangle, ExternalLink, MessageSquare } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getReviewQueue, getVideoHighlights, listEditorOptions, listVideos, type ReviewQueueItem } from "@/server/videos";
@@ -8,46 +7,13 @@ import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { listEditingProjects } from "@/server/editing-board";
 import { isBoardEditor } from "@/server/edit-board-editors";
 import { listClients } from "@/server/clients";
-import { EditorFilter } from "./editor-filter";
 import { ShootTimers } from "../editing/shoot-timers";
 import { WorkloadSection } from "../editing/workload-section";
-import { Card, ClientLogo, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
-import {
-  daysSince,
-  formatDate,
-} from "@/lib/format";
-import { VIDEO_PHASE_META, VIDEO_PHASE_ORDER, VIDEO_STATUS, VIDEO_WAITING_ON, videoPhase, stageOverdue, type VideoPhase, type VideoStage } from "@/lib/statuses";
-
-const WAITING_ON: Record<string, { label: string; color: string }> = {
-  client: { label: "Klant", color: "var(--color-warn)" },
-  editor: { label: "Editor", color: "var(--color-brand-600)" },
-  shortclips: { label: "Eigen team", color: "var(--color-indigo-ink)" },
-  none: { label: "—", color: "var(--color-ink-faint)" },
-};
-
-/** Statuskleur voor de volledig gekleurde "Status"-chip in de lijst. */
-const TONE_COLOR: Record<string, string> = {
-  bad: "var(--color-bad)",
-  warn: "var(--color-warn)",
-  good: "var(--color-good)",
-  neutral: "var(--color-ink-muted)",
-};
-
-import { ViewSwitch } from "./view-switch";
-import { Kanban } from "./kanban";
-import { PhasePicker, PHASE_COLOR } from "./phase-picker";
+import { Card, ClientLogo, PageHeader } from "@/components/ui";
 import { EditingProjects } from "./editing-projects";
 
 export const metadata: Metadata = { title: "Editing" };
 export const dynamic = "force-dynamic";
-
-const PRESETS = [
-  { value: "actief", label: "In productie" },
-  { value: "bij-klant", label: "Bij de klant" },
-  { value: "te-laat", label: "Te laat" },
-  { value: "mijn-werk", label: "Mijn werk" },
-  { value: "alles", label: "Alles" },
-];
 
 export default async function VideosPage({
   searchParams,
@@ -84,25 +50,11 @@ export default async function VideosPage({
   const boardEditors = editors.filter((e) => isBoardEditor(e.fullName));
   const shootsAtRisk = shoots.filter((s) => s.atRisk).length;
 
-  const view = params.weergave === "kanban" ? "kanban" : "lijst";
-
   return (
     <div className="mx-auto max-w-[1500px]">
       <PageHeader
         title="Editing"
-        description={`${rows.length} video's${params.status ? ` in de stap ${VIDEO_STATUS[params.status as VideoStage]?.label ?? params.status}` : ""}`}
-        actions={
-          <Suspense fallback={null}>
-            <ViewSwitch
-              param="weergave"
-              fallback="lijst"
-              options={[
-                { value: "lijst", label: "Lijst" },
-                { value: "kanban", label: "Kanban" },
-              ]}
-            />
-          </Suspense>
-        }
+        description={`${editingProjects.length} projecten · ${rows.length} video's in productie`}
       />
 
       {/* Editing per editor: elke opname is een edit-project met editor, fase,
@@ -172,229 +124,9 @@ export default async function VideosPage({
       {/* Video's om te checken — interne controle, automatisch gevuld uit de pipeline. */}
       <ReviewQueue queue={reviewQueue} />
 
-      <div className="mb-4 flex flex-wrap items-center gap-4">
-        <div className="min-w-48">
-          <Stat label="In productie" value={highlights.inProduction} hint={`${highlights.awaitingEditor} wacht op editor`} href="/videos?filter=actief" />
-        </div>
-        {/* Vaste statuskleuren — consequent door het hele Editing Dashboard. */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[var(--color-ink-muted)]">
-          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[var(--color-bad)]" />Te laat</span>
-          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[var(--color-warn)]" />Wacht op klant</span>
-          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[var(--color-brand-600)]" />Wacht op editor</span>
-          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[var(--color-good)]" />Afgerond</span>
-        </div>
-      </div>
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        {PRESETS.map((p) => {
-          const active = (params.filter ?? "actief") === p.value;
-          const qs = new URLSearchParams();
-          if (p.value !== "actief") qs.set("filter", p.value);
-          if (params.weergave) qs.set("weergave", params.weergave);
-          return (
-            <Link
-              key={p.value}
-              href={qs.toString() ? `/videos?${qs}` : "/videos"}
-              className={
-                active
-                  ? "rounded-full bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white"
-                  : "rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-              }
-            >
-              {p.label}
-            </Link>
-          );
-        })}
-        {params.status ? (
-          <Link
-            href="/videos"
-            className="rounded-full bg-[var(--color-info-soft)] px-3 py-1.5 text-xs font-medium text-[#0060a8]"
-          >
-            {VIDEO_STATUS[params.status as VideoStage]?.label} ✕
-          </Link>
-        ) : null}
-        <span className="ml-auto"><EditorFilter editors={editors} current={params.editor} /></span>
-      </div>
-
-      {rows.length === 0 ? (
-        <Card>
-          <EmptyState
-            title="Geen video's in deze selectie"
-            description="Pas het filter aan of bekijk alle video's."
-          />
-        </Card>
-      ) : view === "kanban" ? (
-        <Kanban rows={rows} canEdit={canEdit} />
-      ) : (
-        <Card padded={false}>
-          <Table
-            head={
-              <>
-                <th className="sc-th">Video</th>
-                <th className="sc-th">Klant</th>
-                <th className="sc-th">Fase</th>
-                <th className="sc-th">Wacht op</th>
-                <th className="sc-th">In fase</th>
-                <th className="sc-th">Editor</th>
-                <th className="sc-th">Deadline</th>
-                <th className="sc-th">Status</th>
-              </>
-            }
-          >
-            {rows.map((v) => {
-              const today = new Date().toISOString().slice(0, 10);
-              const soon = new Date();
-              soon.setDate(soon.getDate() + 3);
-              const soonStr = soon.toISOString().slice(0, 10);
-              const overdue = v.dueOn && v.dueOn < today;
-              const nearing = v.dueOn && v.dueOn >= today && v.dueOn <= soonStr;
-              const waiting = v.status === "client_review" || v.status === "client_revision";
-              const inPhase = daysSince(v.statusChangedAt);
-              const stuck = stageOverdue(v.status, inPhase);
-              const waitOn = WAITING_ON[VIDEO_WAITING_ON[v.status as VideoStage] ?? "none"];
-              const health = overdue
-                ? { label: "Te laat", tone: "bad" as const }
-                : waiting
-                  ? { label: "Wacht op klant", tone: "warn" as const }
-                  : stuck
-                    ? { label: "Loopt vast", tone: "bad" as const }
-                    : nearing
-                      ? { label: "Deadline nadert", tone: "warn" as const }
-                      : { label: "Op schema", tone: "neutral" as const };
-              return (
-                <tr key={v.id} className="sc-row-link">
-                  <td className="sc-td">
-                    <Link href={`/videos/${v.id}`} className="font-medium hover:underline">
-                      {v.title}
-                    </Link>
-                  </td>
-                  <td className="sc-td">
-                    <Link href={`/clients/${v.clientSlug}`} className="flex items-center gap-2 text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
-                      <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={20} />
-                      {v.clientName}
-                    </Link>
-                  </td>
-                  <td className="sc-td">
-                    {/* Klikbare fase: kies een fase en de video verspringt automatisch van bord. */}
-                    <PhasePicker videoId={v.id} status={v.status} canEdit={canEdit} />
-                  </td>
-                  <td className="sc-td">
-                    {waitOn.label === "—" ? (
-                      <span className="text-[var(--color-ink-faint)]">—</span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold text-white" style={{ background: waitOn.color }}>
-                        {waitOn.label}
-                      </span>
-                    )}
-                  </td>
-                  <td className={`sc-td tabular-nums ${stuck ? "font-semibold text-[var(--color-bad)]" : "text-[var(--color-ink-muted)]"}`}>
-                    {inPhase} d
-                  </td>
-                  <td className="sc-td text-[var(--color-ink-muted)]">
-                    {v.editorName ?? "—"}
-                  </td>
-                  <td className={`sc-td ${overdue ? "font-medium text-[var(--color-bad)]" : "text-[var(--color-ink-muted)]"}`}>
-                    {v.dueOn ? formatDate(v.dueOn) : "—"}
-                  </td>
-                  <td className="sc-td">
-                    <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold text-white" style={{ background: TONE_COLOR[health.tone] ?? "var(--color-ink-muted)" }}>
-                      {health.label}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </Table>
-        </Card>
-      )}
-
-      {/* Fases in volle kleur (Monday-stijl): de pipeline per productiefase. */}
-      {rows.length > 0 ? <PhaseBoard rows={rows} canEdit={canEdit} /> : null}
-
       {/* Editorbelasting & tarieven — samengevoegd vanuit de oude /editing-pagina. */}
       <WorkloadSection viewer={viewer} />
     </div>
-  );
-}
-
-type PhaseRow = { id: string; title: string; clientName: string; clientSlug: string; clientColor: string | null; clientLogo: string | null; status: string; editorName: string | null; dueOn: string | null };
-
-/**
- * Fasesbord in volle kleur — elke productiefase is een kolom met een volledig
- * gekleurde kop (geen klein stipje meer), zodat je in één oogopslag ziet waar
- * het werk zit. Horizontaal scrollbaar zoals een Monday-bord.
- */
-function PhaseBoard({ rows, canEdit }: { rows: PhaseRow[]; canEdit: boolean }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const byPhase = new Map<VideoPhase, PhaseRow[]>();
-  for (const phase of VIDEO_PHASE_ORDER) byPhase.set(phase, []);
-  for (const v of rows) {
-    const { phase } = videoPhase(v.status);
-    if (phase === "live") continue; // terminaal, hoort niet in de productie-pipeline
-    byPhase.get(phase)!.push(v);
-  }
-
-  return (
-    <section className="mt-6">
-      <div className="mb-3 flex items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
-        <h2 className="text-sm font-bold tracking-tight">Fases</h2>
-        <span className="text-xs text-white/80">De pipeline per productiefase</span>
-      </div>
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {VIDEO_PHASE_ORDER.map((phase) => {
-          const list = byPhase.get(phase)!;
-          const color = PHASE_COLOR[phase];
-          return (
-            <div key={phase} className="flex w-64 shrink-0 flex-col overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)]">
-              {/* Volle kleur-kop. */}
-              <div className="flex items-center justify-between gap-2 px-3 py-2 text-white" style={{ background: color }}>
-                <span className="truncate text-sm font-bold">{VIDEO_PHASE_META[phase].label}</span>
-                <span className="shrink-0 rounded-full bg-white/25 px-2 py-0.5 text-2xs font-bold tabular-nums">{list.length}</span>
-              </div>
-              {/* Lichte tint-achtergrond in dezelfde kleur. */}
-              <div className="flex-1 space-y-2 p-2" style={{ background: `color-mix(in srgb, ${color} 8%, var(--color-surface))` }}>
-                {list.length === 0 ? (
-                  <p className="px-1 py-3 text-center text-2xs text-[var(--color-ink-faint)]">Leeg</p>
-                ) : (
-                  list.map((v) => {
-                    const overdue = v.dueOn && v.dueOn < today;
-                    return (
-                      <div
-                        key={v.id}
-                        className="rounded-[var(--radius-sm)] border-l-[3px] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-card)]"
-                        style={{ borderLeftColor: color }}
-                      >
-                        <Link href={`/videos/${v.id}`} className="block truncate text-xs font-semibold hover:underline">
-                          {v.title}
-                        </Link>
-                        <span className="mt-1 flex items-center gap-1.5 text-2xs text-[var(--color-ink-muted)]">
-                          <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={16} />
-                          <span className="truncate">{v.clientName}</span>
-                        </span>
-                        <span className="mt-1 flex items-center justify-between gap-2 text-2xs">
-                          <span className="truncate text-[var(--color-ink-faint)]">{v.editorName ?? "—"}</span>
-                          {v.dueOn ? (
-                            <span className={`shrink-0 tabular-nums ${overdue ? "font-semibold text-[var(--color-bad)]" : "text-[var(--color-ink-faint)]"}`}>
-                              {formatDate(v.dueOn)}
-                            </span>
-                          ) : null}
-                        </span>
-                        {/* Klik om de video naar een andere fase/bord te verplaatsen. */}
-                        {canEdit ? (
-                          <div className="mt-1.5">
-                            <PhasePicker videoId={v.id} status={v.status} canEdit size="sm" />
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 

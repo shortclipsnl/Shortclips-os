@@ -122,9 +122,10 @@ export function EditingProjects({
             <span className="px-1 text-center">Bestanden</span>
           </div>
 
+          {/* Alle fases altijd onder elkaar — ook de lege, zodat de hele
+              pipeline zichtbaar is en je items ertussen kunt verplaatsen. */}
           {EDIT_PHASE_ORDER.map((ph) => {
             const list = byPhase.get(ph)!;
-            if (list.length === 0) return null;
             const meta = EDIT_PHASE_META[ph];
             const open = !collapsed.has(ph);
             return (
@@ -135,18 +136,18 @@ export function EditingProjects({
                   <span className="text-sm font-bold">{meta.label}</span>
                   <span className="rounded-full bg-white/25 px-2 py-0.5 text-2xs font-bold tabular-nums">{list.length}</span>
                 </button>
-                {open
-                  ? list.map((p) => (
+                {open ? (
+                  list.length > 0 ? (
+                    list.map((p) => (
                       <ProjectRow key={p.id} p={p} editors={editors} canEdit={canEdit} canAssign={canAssign} phaseColor={meta.color} />
                     ))
-                  : null}
+                  ) : (
+                    <p className="border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2.5 text-2xs text-[var(--color-ink-faint)]">Nog geen projecten in deze fase.</p>
+                  )
+                ) : null}
               </div>
             );
           })}
-
-          {shown.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen editing-projecten in deze weergave.</p>
-          ) : null}
         </div>
       </div>
     </div>
