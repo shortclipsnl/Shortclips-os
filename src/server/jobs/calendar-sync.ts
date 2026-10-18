@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gte, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   calendarEvents,
@@ -169,6 +169,22 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
       // afspraken die in Google verdwenen/geannuleerd zijn kunnen opruimen.
       const seenByCalendar = new Map<string, Set<string>>();
 
+      // Welke afspraken staan al in de database? Eén keer ophalen voor de
+      // betrokken agenda's, zodat we in bulk kunnen wegschrijven i.p.v. per
+      // afspraak een select + insert/update (dat haalt bij honderden afspraken
+      // de tijdslimiet niet).
+      const calendarIds = calendars.map((c) => c.id);
+      const existingKeys = new Set<string>();
+      if (calendarIds.length) {
+        const known = await db
+          .select({ calendarId: calendarEvents.calendarId, externalId: calendarEvents.externalId })
+          .from(calendarEvents)
+          .where(and(eq(calendarEvents.source, "google_calendar"), inArray(calendarEvents.calendarId, calendarIds)));
+        for (const r of known) existingKeys.add(`${r.calendarId}|${r.externalId}`);
+      }
+
+      const toUpsert: (typeof calendarEvents.$inferInsert)[] = [];
+
       for (const cal of calendars) {
         const events = await source.listEvents(cal.id, { timeMin, timeMax });
         ctx.log(`Agenda "${cal.summary}": ${events.length} afspraken`);
@@ -197,7 +213,7 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
           if (clientId) matched++;
           else if (kind !== "intern") needsReview++;
 
-          const values = {
+          toUpsert.push({
             source: "google_calendar",
             calendarId: cal.id,
             calendarName: cal.summary ?? null,
@@ -222,28 +238,44 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
             candidates: match.candidates,
             syncedAt: new Date(),
             updatedAt: new Date(),
-          };
-
-          const existing = await db
-            .select({ id: calendarEvents.id })
-            .from(calendarEvents)
-            .where(
-              and(
-                eq(calendarEvents.source, "google_calendar"),
-                eq(calendarEvents.calendarId, cal.id),
-                eq(calendarEvents.externalId, ev.id),
-              ),
-            )
-            .limit(1);
-
-          if (existing[0]) {
-            await db.update(calendarEvents).set(values).where(eq(calendarEvents.id, existing[0].id));
-            ctx.counters.updated++;
-          } else {
-            await db.insert(calendarEvents).values(values);
-            ctx.counters.created++;
-          }
+          });
         }
+      }
+
+      // In bulk wegschrijven: upsert op (source, agenda, externalId), in blokken
+      // zodat ook honderden afspraken ruim binnen de tijdslimiet passen.
+      const CHUNK = 200;
+      for (let i = 0; i < toUpsert.length; i += CHUNK) {
+        await db
+          .insert(calendarEvents)
+          .values(toUpsert.slice(i, i + CHUNK))
+          .onConflictDoUpdate({
+            target: [calendarEvents.source, calendarEvents.calendarId, calendarEvents.externalId],
+            set: {
+              calendarName: sql`excluded.calendar_name`,
+              clientId: sql`excluded.client_id`,
+              kind: sql`excluded.kind`,
+              title: sql`excluded.title`,
+              description: sql`excluded.description`,
+              location: sql`excluded.location`,
+              startsAt: sql`excluded.starts_at`,
+              endsAt: sql`excluded.ends_at`,
+              allDay: sql`excluded.all_day`,
+              attendees: sql`excluded.attendees`,
+              htmlLink: sql`excluded.html_link`,
+              status: sql`excluded.status`,
+              matchConfidence: sql`excluded.match_confidence`,
+              matchReason: sql`excluded.match_reason`,
+              matchedBy: sql`excluded.matched_by`,
+              candidates: sql`excluded.candidates`,
+              syncedAt: sql`excluded.synced_at`,
+              updatedAt: sql`excluded.updated_at`,
+            },
+          });
+      }
+      for (const v of toUpsert) {
+        if (existingKeys.has(`${v.calendarId}|${v.externalId}`)) ctx.counters.updated++;
+        else ctx.counters.created++;
       }
 
       // Annuleringen opruimen: afspraken die eerder in het venster gesynct zijn
