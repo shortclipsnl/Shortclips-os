@@ -73,6 +73,40 @@ export async function listProductionDays(
     .limit(200);
 }
 
+/** Opnamedagen binnen een datumbereik [startIso, endIso) — voor de agenda-
+ *  weergave (per week/maand doorbladeren). Zelfde velden als listProductionDays. */
+export async function shootsInRange(viewer: Viewer, startIso: string, endIso: string) {
+  return db
+    .select({
+      id: productionDays.id,
+      title: productionDays.title,
+      scheduledOn: productionDays.scheduledOn,
+      startTime: productionDays.startTime,
+      endTime: productionDays.endTime,
+      locationName: productionDays.locationName,
+      status: productionDays.status,
+      phase: productionDays.phase,
+      clientName: clients.name,
+      clientSlug: clients.slug,
+      clientColor: clients.color,
+      clientLogo: clients.logoUrl,
+      videographerName: users.fullName,
+    })
+    .from(productionDays)
+    .innerJoin(clients, eq(clients.id, productionDays.clientId))
+    .leftJoin(users, eq(users.id, productionDays.videographerId))
+    .where(
+      and(
+        isNull(productionDays.deletedAt),
+        gte(productionDays.scheduledOn, startIso),
+        lt(productionDays.scheduledOn, endIso),
+        scopeToClients(viewer, productionDays.clientId),
+      ),
+    )
+    .orderBy(asc(productionDays.scheduledOn), asc(productionDays.startTime))
+    .limit(500);
+}
+
 /** Opnamestatistieken voor één maand (YYYY-MM): hoeveel gepland, afgerond, nog
  *  te doen, en of alle opnames die al hadden moeten plaatsvinden ook echt zijn
  *  uitgevoerd. Data komt uit production_days (gevoed door Google Agenda/Monday). */
