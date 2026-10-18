@@ -7,7 +7,7 @@ import { db } from "@/db/client";
 import {
   requirePermission,
 } from "@/server/auth/context";
-import { Monitor } from "lucide-react";
+import { Monitor, MousePointerClick } from "lucide-react";
 import { Avatar, Card, CardHeader, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import { compact, formatDate, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
@@ -16,24 +16,25 @@ import { ClientSelector, type SelectorClient } from "./client-selector";
 export const metadata: Metadata = { title: "Resultaten" };
 export const dynamic = "force-dynamic";
 
+// De tabellen (per klant, per platform, beste video's) tonen we over een vaste,
+// representatieve periode van 30 dagen. De kerncijfers bovenin tonen we juist
+// voor 7 én 30 dagen tegelijk, zodat je niet hoeft te wisselen.
+const TABLE_DAYS = 30;
+
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ dagen?: string; klanten?: string; klant?: string }>;
+  searchParams: Promise<{ klant?: string }>;
 }) {
   await requirePermission("analytics:read");
   const params = await searchParams;
-  const days = Number(params.dagen) || 30;
-  const klanten = params.klanten === "gestopt" ? "gestopt" : params.klanten === "alle" ? "alle" : "actief";
-  const statusCond =
-    klanten === "actief"
-      ? sql`and c.status = 'active'`
-      : klanten === "gestopt"
-        ? sql`and c.status in ('paused','churned')`
-        : sql``;
+
+  // Alleen actieve klanten — gestopte klanten tonen we hier bewust niet.
+  const statusCond = sql`and c.status = 'active'`;
   const klantCond = params.klant ? sql`and c.slug = ${params.klant}` : sql``;
 
-  const [totals, prevTotals, perClient, perPlatform, topVideos] = await Promise.all([
+  // Kerncijfers voor een venster [fromDays terug .. toDays terug). toDays=null = tot nu.
+  const totalsQuery = (fromDays: number, toDays: number | null) =>
     db.execute(sql`
       select
         coalesce(sum(dm.views), 0)::int as views,
@@ -43,21 +44,16 @@ export default async function AnalyticsPage({
         coalesce(sum(dm.posts_published), 0)::int as posts
       from daily_metrics dm
       join clients c on c.id = dm.client_id and c.deleted_at is null
-      where dm.measured_on >= current_date - ${sql.raw(`interval '${days} days'`)} ${statusCond} ${klantCond}
-    `),
+      where dm.measured_on >= current_date - ${sql.raw(`interval '${fromDays} days'`)}
+        ${toDays !== null ? sql`and dm.measured_on < current_date - ${sql.raw(`interval '${toDays} days'`)}` : sql``}
+        ${statusCond} ${klantCond}
+    `);
 
-    db.execute(sql`
-      select
-        coalesce(sum(dm.views), 0)::int as views,
-        coalesce(sum(dm.reach), 0)::int as reach,
-        coalesce(sum(dm.engagements), 0)::int as engagements,
-        coalesce(sum(dm.follower_delta), 0)::int as follower_growth,
-        coalesce(sum(dm.posts_published), 0)::int as posts
-      from daily_metrics dm
-      join clients c on c.id = dm.client_id and c.deleted_at is null
-      where dm.measured_on >= current_date - ${sql.raw(`interval '${2 * days} days'`)}
-        and dm.measured_on < current_date - ${sql.raw(`interval '${days} days'`)} ${statusCond} ${klantCond}
-    `),
+  const [cur7, prev7, cur30, prev30, perClient, perPlatform, topVideos] = await Promise.all([
+    totalsQuery(7, null),
+    totalsQuery(14, 7),
+    totalsQuery(30, null),
+    totalsQuery(60, 30),
 
     db.execute(sql`
       select c.id, c.name, c.slug, c.color, c.status,
@@ -67,7 +63,7 @@ export default async function AnalyticsPage({
         (exists (select 1 from daily_metrics d2 where d2.client_id = c.id))::int as linked
       from clients c
       left join daily_metrics dm
-        on dm.client_id = c.id and dm.measured_on >= current_date - ${sql.raw(`interval '${days} days'`)}
+        on dm.client_id = c.id and dm.measured_on >= current_date - ${sql.raw(`interval '${TABLE_DAYS} days'`)}
       where c.deleted_at is null ${statusCond}
       group by c.id, c.name, c.slug, c.color, c.status
       order by (exists (select 1 from daily_metrics d2 where d2.client_id = c.id)) desc, views desc
@@ -80,7 +76,7 @@ export default async function AnalyticsPage({
         coalesce(sum(dm.follower_delta), 0)::int as follower_growth
       from daily_metrics dm
       join clients c on c.id = dm.client_id and c.deleted_at is null
-      where dm.measured_on >= current_date - ${sql.raw(`interval '${days} days'`)}
+      where dm.measured_on >= current_date - ${sql.raw(`interval '${TABLE_DAYS} days'`)}
         and dm.platform is not null ${statusCond} ${klantCond}
       group by dm.platform
       order by views desc
@@ -97,7 +93,7 @@ export default async function AnalyticsPage({
       join publications p on p.deliverable_id = d.id
       join social_metrics sm on sm.publication_id = p.id
       where d.deleted_at is null and d.status = 'published'
-        and d.published_at >= current_date - ${sql.raw(`interval '${days} days'`)} ${klantCond}
+        and d.published_at >= current_date - ${sql.raw(`interval '${TABLE_DAYS} days'`)} ${klantCond}
       group by d.id, d.title, c.name, c.slug, c.color, d.published_at
       order by views desc
       limit 15
@@ -109,12 +105,14 @@ export default async function AnalyticsPage({
 
   const allClientsRaw = await db.execute(sql`
     select slug, name, color, status from clients
-    where deleted_at is null
-    order by (status = 'active') desc, name
+    where deleted_at is null and status = 'active'
+    order by name
   `);
 
-  const t = rows<Record<string, number>>(totals)[0] ?? {};
-  const prev = rows<Record<string, number>>(prevTotals)[0] ?? {};
+  const t7 = rows<Record<string, number>>(cur7)[0] ?? {};
+  const p7 = rows<Record<string, number>>(prev7)[0] ?? {};
+  const t30 = rows<Record<string, number>>(cur30)[0] ?? {};
+  const p30 = rows<Record<string, number>>(prev30)[0] ?? {};
   const clientRows = rows<Record<string, string | number>>(perClient);
   const platformRows = rows<Record<string, string | number>>(perPlatform);
   const videoRows = rows<Record<string, string | number>>(topVideos);
@@ -137,225 +135,206 @@ export default async function AnalyticsPage({
     return d >= 0 ? "good" : "bad";
   };
   const selectedName = params.klant ? String(clientRows.find((c) => String(c.slug) === params.klant)?.name ?? params.klant) : null;
-  // Vullen-of-verbergen (#12): zijn er überhaupt cijfers in deze periode? Zo
-  // niet, dan tonen we één eerlijke lege staat i.p.v. een raster met nullen.
-  const hasAnyData =
-    Number(t.views ?? 0) + Number(t.reach ?? 0) + Number(t.engagements ?? 0) +
-      Math.abs(Number(t.follower_growth ?? 0)) + Number(t.posts ?? 0) > 0;
+
+  // Eén rij met de vijf kerncijfers voor een gegeven venster.
+  const kpiRow = (t: Record<string, number>, p: Record<string, number>) => (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <Stat label="Weergaven" value={compact(Number(t.views ?? 0))} hint={deltaHint(Number(t.views ?? 0), Number(p.views ?? 0))} tone={deltaTone(Number(t.views ?? 0), Number(p.views ?? 0))} />
+      <Stat label="Bereik" value={compact(Number(t.reach ?? 0))} hint={deltaHint(Number(t.reach ?? 0), Number(p.reach ?? 0))} tone={deltaTone(Number(t.reach ?? 0), Number(p.reach ?? 0))} />
+      <Stat label="Interacties" value={compact(Number(t.engagements ?? 0))} hint={deltaHint(Number(t.engagements ?? 0), Number(p.engagements ?? 0))} tone={deltaTone(Number(t.engagements ?? 0), Number(p.engagements ?? 0))} />
+      <Stat label="Volgersgroei" value={`${Number(t.follower_growth ?? 0) >= 0 ? "+" : ""}${num(Number(t.follower_growth ?? 0))}`} hint={deltaHint(Number(t.follower_growth ?? 0), Number(p.follower_growth ?? 0))} tone={deltaTone(Number(t.follower_growth ?? 0), Number(p.follower_growth ?? 0))} />
+      <Stat label="Publicaties" value={num(Number(t.posts ?? 0))} hint={deltaHint(Number(t.posts ?? 0), Number(p.posts ?? 0))} />
+    </div>
+  );
+
+  const sum = (t: Record<string, number>) =>
+    Number(t.views ?? 0) + Number(t.reach ?? 0) + Number(t.engagements ?? 0) + Math.abs(Number(t.follower_growth ?? 0)) + Number(t.posts ?? 0);
+  const hasAnyData = sum(t7) + sum(t30) > 0;
 
   return (
     <div className="mx-auto max-w-[1300px]">
       <PageHeader
         title="Resultaten"
-        description={`${selectedName ?? (klanten === "gestopt" ? "Gestopte klanten" : klanten === "alle" ? "Alle klanten" : "Actieve klanten")}, afgelopen ${days} dagen · uit je eigen database (dagelijkse snapshots)`}
+        description={`${selectedName ?? "Actieve klanten"} · uit je eigen database (dagelijkse snapshots)`}
         actions={
-          <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
-              {[7, 30, 90].map((d) => (
-                <Link
-                  key={d}
-                  href={`/analytics?dagen=${d}${klanten !== "actief" ? `&klanten=${klanten}` : ""}`}
-                  className={
-                    days === d
-                      ? "rounded-[4px] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white"
-                      : "px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)]"
-                  }
-                >
-                  {d} dagen
-                </Link>
-              ))}
-            </div>
-            <a
-              href="/scherm"
-              target="_blank"
-              rel="noopener"
-              className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
-              title="Open het resultatenscherm voor het grote scherm op kantoor"
-            >
-              <Monitor className="size-4" /> Kantoorscherm
-            </a>
-          </div>
+          <a
+            href="/scherm"
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+            title="Open het resultatenscherm voor het grote scherm op kantoor"
+          >
+            <Monitor className="size-4" /> Kantoorscherm
+          </a>
         }
       />
-
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {([
-          { key: "actief", label: "Actieve klanten" },
-          { key: "gestopt", label: "Gestopte klanten" },
-          { key: "alle", label: "Alle klanten" },
-        ] as const).map((f) => (
-          <Link
-            key={f.key}
-            href={`/analytics?dagen=${days}${f.key !== "actief" ? `&klanten=${f.key}` : ""}`}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              klanten === f.key
-                ? "bg-[var(--color-ink)] text-white"
-                : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-            }`}
-          >
-            {f.label}
-          </Link>
-        ))}
-      </div>
 
       {/* Prominente klantselector: open een volledige, aparte resultatenpagina per klant. */}
       <ClientSelector clients={selectorClients} />
 
-      <div className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">
-        Belangrijkste resultaten · {selectedName ?? (klanten === "gestopt" ? "gestopte klanten" : klanten === "alle" ? "alle klanten" : "actieve klanten")}
+      {/* Uitleg: klik op een klant(naam) voor alle resultaten van die klant. */}
+      <div className="mb-5 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-info)]/30 bg-[var(--color-info-soft)]/60 px-4 py-2.5 text-sm text-[var(--color-ink)]">
+        <MousePointerClick className="mt-0.5 size-4 shrink-0 text-[var(--color-info)]" strokeWidth={1.75} />
+        <p>
+          Klik op een <strong>klant hierboven</strong> of op een <strong>klantnaam in de tabel</strong> om álle resultaten van die klant te zien — per video, per platform en per periode.
+        </p>
       </div>
 
       {!hasAnyData ? (
         <Card padded={false}>
           <EmptyState
-            title="Nog geen resultaten in deze periode"
-            description="Zodra klanten aan Metricool gekoppeld zijn en er cijfers binnenkomen, verschijnen de weergaven, het bereik en de best presterende video's hier. Kies eventueel een langere periode."
+            title="Nog geen resultaten"
+            description="Zodra klanten aan Metricool gekoppeld zijn en er cijfers binnenkomen, verschijnen de weergaven, het bereik en de best presterende video's hier."
           />
         </Card>
       ) : (
         <>
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Stat label="Weergaven" value={compact(Number(t.views ?? 0))} hint={deltaHint(Number(t.views ?? 0), Number(prev.views ?? 0))} tone={deltaTone(Number(t.views ?? 0), Number(prev.views ?? 0))} />
-        <Stat label="Bereik" value={compact(Number(t.reach ?? 0))} hint={deltaHint(Number(t.reach ?? 0), Number(prev.reach ?? 0))} tone={deltaTone(Number(t.reach ?? 0), Number(prev.reach ?? 0))} />
-        <Stat label="Interacties" value={compact(Number(t.engagements ?? 0))} hint={deltaHint(Number(t.engagements ?? 0), Number(prev.engagements ?? 0))} tone={deltaTone(Number(t.engagements ?? 0), Number(prev.engagements ?? 0))} />
-        <Stat label="Volgersgroei" value={`${Number(t.follower_growth ?? 0) >= 0 ? "+" : ""}${num(Number(t.follower_growth ?? 0))}`} hint={deltaHint(Number(t.follower_growth ?? 0), Number(prev.follower_growth ?? 0))} tone={deltaTone(Number(t.follower_growth ?? 0), Number(prev.follower_growth ?? 0))} />
-        <Stat label="Publicaties" value={num(Number(t.posts ?? 0))} hint={deltaHint(Number(t.posts ?? 0), Number(prev.posts ?? 0))} />
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-2">
-        <Card padded={false}>
-          <div className="p-5 pb-3">
-            <CardHeader title="Per klant" />
+          {/* Kerncijfers: 7 én 30 dagen tegelijk, zonder te hoeven wisselen. */}
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+            <span className="text-sm font-bold tracking-tight">Afgelopen 7 dagen</span>
+            <span className="text-xs text-white/70">{selectedName ?? "actieve klanten"}</span>
           </div>
-          <Table
-            head={
-              <>
-                <th className="sc-th">Klant</th>
-                <th className="sc-th text-right">Weergaven</th>
-                <th className="sc-th text-right">Bereik</th>
-                <th className="sc-th text-right">Volgers</th>
-              </>
-            }
-          >
-            {clientRows.map((c, i) => {
-              const fg = Number(c.follower_growth);
-              const linked = Number(c.linked) === 1;
-              return (
-                <tr key={String(c.id)} className="sc-row-link" style={i < 3 && linked ? { boxShadow: "inset 3px 0 0 var(--color-brand-500)" } : undefined}>
-                  <td className="sc-td">
-                    <Link href={`/analytics/${c.slug}`} className="flex items-center gap-2 hover:underline">
-                      {i < 3 && linked ? <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--color-brand-500)] text-2xs font-bold text-white">{i + 1}</span> : <span className="w-5 shrink-0" />}
-                      <Avatar name={String(c.name)} color={c.color ? String(c.color) : null} size={22} />
-                      {String(c.name)}
-                    </Link>
-                  </td>
-                  {linked ? (
+          <div className="mb-5">{kpiRow(t7, p7)}</div>
+
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+            <span className="text-sm font-bold tracking-tight">Afgelopen 30 dagen</span>
+            <span className="text-xs text-white/70">{selectedName ?? "actieve klanten"}</span>
+          </div>
+          <div className="mb-6">{kpiRow(t30, p30)}</div>
+
+          <div className="grid gap-5 xl:grid-cols-2">
+            <Card padded={false}>
+              <div className="p-5 pb-3">
+                <CardHeader title="Per klant" subtitle="Afgelopen 30 dagen · klik op een klantnaam voor alle resultaten van die klant" />
+              </div>
+              <Table
+                head={
+                  <>
+                    <th className="sc-th">Klant</th>
+                    <th className="sc-th text-right">Weergaven</th>
+                    <th className="sc-th text-right">Bereik</th>
+                    <th className="sc-th text-right">Volgers</th>
+                  </>
+                }
+              >
+                {clientRows.map((c, i) => {
+                  const fg = Number(c.follower_growth);
+                  const linked = Number(c.linked) === 1;
+                  return (
+                    <tr key={String(c.id)} className="sc-row-link" style={i < 3 && linked ? { boxShadow: "inset 3px 0 0 var(--color-brand-500)" } : undefined}>
+                      <td className="sc-td">
+                        <Link href={`/analytics/${c.slug}`} className="flex items-center gap-2 hover:underline">
+                          {i < 3 && linked ? <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--color-brand-500)] text-2xs font-bold text-white">{i + 1}</span> : <span className="w-5 shrink-0" />}
+                          <Avatar name={String(c.name)} color={c.color ? String(c.color) : null} size={22} />
+                          {String(c.name)}
+                        </Link>
+                      </td>
+                      {linked ? (
+                        <>
+                          <td className="sc-td text-right font-semibold tabular-nums">{compact(Number(c.views))}</td>
+                          <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{compact(Number(c.reach))}</td>
+                          <td className="sc-td text-right tabular-nums font-medium" style={{ color: fg > 0 ? "var(--color-good)" : fg < 0 ? "var(--color-bad)" : "var(--color-ink-muted)" }}>{fg >= 0 ? "+" : ""}{num(fg)}</td>
+                        </>
+                      ) : (
+                        <td className="sc-td text-right text-xs text-[var(--color-ink-faint)]" colSpan={3}>niet gekoppeld</td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </Table>
+            </Card>
+
+            <Card padded={false}>
+              <div className="p-5 pb-3">
+                <CardHeader title="Per platform" subtitle={`Afgelopen ${TABLE_DAYS} dagen`} />
+              </div>
+              {platformRows.length === 0 ? (
+                <EmptyState title="Nog geen cijfers" />
+              ) : (
+                <Table
+                  head={
                     <>
-                      <td className="sc-td text-right font-semibold tabular-nums">{compact(Number(c.views))}</td>
-                      <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{compact(Number(c.reach))}</td>
-                      <td className="sc-td text-right tabular-nums font-medium" style={{ color: fg > 0 ? "var(--color-good)" : fg < 0 ? "var(--color-bad)" : "var(--color-ink-muted)" }}>{fg >= 0 ? "+" : ""}{num(fg)}</td>
+                      <th className="sc-th">Platform</th>
+                      <th className="sc-th text-right">Weergaven</th>
+                      <th className="sc-th text-right">Bereik</th>
+                      <th className="sc-th text-right">Volgers</th>
                     </>
-                  ) : (
-                    <td className="sc-td text-right text-xs text-[var(--color-ink-faint)]" colSpan={3}>niet gekoppeld</td>
-                  )}
-                </tr>
-              );
-            })}
-          </Table>
-        </Card>
-
-        <Card padded={false}>
-          <div className="p-5 pb-3">
-            <CardHeader title="Per platform" />
+                  }
+                >
+                  {platformRows.map((p) => (
+                    <tr key={String(p.platform)}>
+                      <td className="sc-td">
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="size-2.5 rounded-full"
+                            style={{ background: PLATFORM[String(p.platform)]?.color ?? "#999" }}
+                          />
+                          {PLATFORM[String(p.platform)]?.label ?? String(p.platform)}
+                        </span>
+                      </td>
+                      <td className="sc-td text-right tabular-nums">{compact(Number(p.views))}</td>
+                      <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">
+                        {compact(Number(p.reach))}
+                      </td>
+                      <td className="sc-td text-right tabular-nums">+{num(Number(p.follower_growth))}</td>
+                    </tr>
+                  ))}
+                </Table>
+              )}
+            </Card>
           </div>
-          {platformRows.length === 0 ? (
-            <EmptyState title="Nog geen cijfers" />
-          ) : (
-            <Table
-              head={
-                <>
-                  <th className="sc-th">Platform</th>
-                  <th className="sc-th text-right">Weergaven</th>
-                  <th className="sc-th text-right">Bereik</th>
-                  <th className="sc-th text-right">Volgers</th>
-                </>
-              }
-            >
-              {platformRows.map((p) => (
-                <tr key={String(p.platform)}>
-                  <td className="sc-td">
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="size-2.5 rounded-full"
-                        style={{ background: PLATFORM[String(p.platform)]?.color ?? "#999" }}
-                      />
-                      {PLATFORM[String(p.platform)]?.label ?? String(p.platform)}
-                    </span>
-                  </td>
-                  <td className="sc-td text-right tabular-nums">{compact(Number(p.views))}</td>
-                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">
-                    {compact(Number(p.reach))}
-                  </td>
-                  <td className="sc-td text-right tabular-nums">+{num(Number(p.follower_growth))}</td>
-                </tr>
-              ))}
-            </Table>
-          )}
-        </Card>
-      </div>
 
-      <Card className="mt-5" padded={false}>
-        <div className="p-5 pb-3">
-          <CardHeader title="Best presterende video's" subtitle={`Gepubliceerd in de afgelopen ${days} dagen`} />
-        </div>
-        {videoRows.length === 0 ? (
-          <EmptyState title="Nog geen gepubliceerde video's in deze periode" />
-        ) : (
-          <Table
-            head={
-              <>
-                <th className="sc-th">Video</th>
-                <th className="sc-th">Klant</th>
-                <th className="sc-th">Gepubliceerd</th>
-                <th className="sc-th text-right">Weergaven</th>
-                <th className="sc-th text-right">Likes</th>
-                <th className="sc-th text-right">Gem. kijktijd</th>
-              </>
-            }
-          >
-            {videoRows.map((v) => (
-              <tr key={String(v.id)} className="sc-row-link">
-                <td className="sc-td">
-                  <Link href={`/videos/${v.id}`} className="font-medium hover:underline">
-                    {String(v.title)}
-                  </Link>
-                </td>
-                <td className="sc-td text-[var(--color-ink-muted)]">{String(v.client_name)}</td>
-                <td className="sc-td text-[var(--color-ink-muted)]">
-                  {formatDate(String(v.published_at))}
-                </td>
-                <td className="sc-td text-right tabular-nums">{compact(Number(v.views))}</td>
-                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">
-                  {compact(Number(v.likes))}
-                </td>
-                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">
-                  {v.avg_watch ? `${Number(v.avg_watch).toFixed(1)}s` : "—"}
-                </td>
-              </tr>
-            ))}
-          </Table>
-        )}
-      </Card>
+          <Card className="mt-5" padded={false}>
+            <div className="p-5 pb-3">
+              <CardHeader title="Best presterende video's" subtitle={`Gepubliceerd in de afgelopen ${TABLE_DAYS} dagen`} />
+            </div>
+            {videoRows.length === 0 ? (
+              <EmptyState title="Nog geen gepubliceerde video's in deze periode" />
+            ) : (
+              <Table
+                head={
+                  <>
+                    <th className="sc-th">Video</th>
+                    <th className="sc-th">Klant</th>
+                    <th className="sc-th">Gepubliceerd</th>
+                    <th className="sc-th text-right">Weergaven</th>
+                    <th className="sc-th text-right">Likes</th>
+                    <th className="sc-th text-right">Gem. kijktijd</th>
+                  </>
+                }
+              >
+                {videoRows.map((v) => (
+                  <tr key={String(v.id)} className="sc-row-link">
+                    <td className="sc-td">
+                      <Link href={`/videos/${v.id}`} className="font-medium hover:underline">
+                        {String(v.title)}
+                      </Link>
+                    </td>
+                    <td className="sc-td text-[var(--color-ink-muted)]">{String(v.client_name)}</td>
+                    <td className="sc-td text-[var(--color-ink-muted)]">
+                      {formatDate(String(v.published_at))}
+                    </td>
+                    <td className="sc-td text-right tabular-nums">{compact(Number(v.views))}</td>
+                    <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">
+                      {compact(Number(v.likes))}
+                    </td>
+                    <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">
+                      {v.avg_watch ? `${Number(v.avg_watch).toFixed(1)}s` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </Table>
+            )}
+          </Card>
 
-      <p className="mt-4 text-xs text-[var(--color-ink-muted)]">
-        Cijfers komen uit dagelijkse snapshots in de eigen database. Weergaven en
-        interacties zijn vrijwel actueel; bereik, kijktijd en retentie lopen bij
-        de meeste platforms één tot drie dagen achter. Retentie en opslagacties
-        zijn niet op elk platform via de API beschikbaar.
-      </p>
+          <p className="mt-4 text-xs text-[var(--color-ink-muted)]">
+            Cijfers komen uit dagelijkse snapshots in de eigen database. Weergaven en
+            interacties zijn vrijwel actueel; bereik, kijktijd en retentie lopen bij
+            de meeste platforms één tot drie dagen achter. Retentie en opslagacties
+            zijn niet op elk platform via de API beschikbaar.
+          </p>
         </>
       )}
     </div>
   );
 }
-
