@@ -4,13 +4,14 @@ import { requireInternal, isOwner } from "@/server/auth/context";
 import { getDashboard } from "@/server/dashboard";
 import { getMyDay } from "@/server/my-day";
 import { listUpcomingMeetings } from "@/server/meetings";
+import { listCalendar } from "@/server/calendar";
 import { activeClientsMissingCoordinator } from "@/server/clients";
 import { editorCapacityMap } from "@/server/metrics";
 import { periodLabel } from "@/lib/format";
 import { LinkButton } from "@/components/ui";
 import { EditorDashboard } from "./editor-view";
 import { TodayView } from "./today-view";
-import { WeekPlanning } from "./week-planning";
+import { WeekPlanning, type WeekUpload } from "./week-planning";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
@@ -21,11 +22,18 @@ export default async function DashboardPage() {
   // Editors krijgen een eigen, smaller dashboard met uitsluitend hun werk.
   if (viewer.isEditorOnly) return <EditorDashboard viewer={viewer} />;
 
-  const [data, myDay, capMap, meetings] = await Promise.all([
+  // Venster voor de weekplanning (dekt ook het weekend → kómende werkweek).
+  const contentFrom = new Date().toISOString().slice(0, 10);
+  const contentToD = new Date();
+  contentToD.setDate(contentToD.getDate() + 14);
+  const contentTo = contentToD.toISOString().slice(0, 10);
+
+  const [data, myDay, capMap, meetings, contentItems] = await Promise.all([
     getDashboard(viewer),
     getMyDay(viewer),
     editorCapacityMap(),
     listUpcomingMeetings(7),
+    listCalendar(viewer, { from: contentFrom, to: contentTo }),
   ]);
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
 
@@ -33,6 +41,18 @@ export default async function DashboardPage() {
   const weekEnd = new Date();
   weekEnd.setDate(weekEnd.getDate() + 7);
   const weekShoots = data.shoots.filter((s) => new Date(s.scheduledOn) <= weekEnd);
+
+  // Content die deze/komende week gepost wordt — als "uploads" per dag.
+  const uploads: WeekUpload[] = contentItems.map((c) => ({
+    id: c.id,
+    scheduledOn: c.scheduledOn,
+    scheduledAt: c.scheduledAt,
+    title: c.title,
+    clientName: c.clientName,
+    clientSlug: c.clientSlug,
+    clientColor: c.clientColor,
+    clientLogo: null,
+  }));
 
   const firstName = viewer.fullName.split(" ")[0];
   const hour = new Date().getHours();
@@ -77,7 +97,7 @@ export default async function DashboardPage() {
       <TodayView viewer={viewer} data={data} myDay={myDay} capMap={capMap} />
 
       {/* Weekplanning: opnames en meetings die eraan komen. */}
-      <WeekPlanning shoots={weekShoots} meetings={meetings} />
+      <WeekPlanning shoots={weekShoots} meetings={meetings} uploads={uploads} />
     </div>
   );
 }

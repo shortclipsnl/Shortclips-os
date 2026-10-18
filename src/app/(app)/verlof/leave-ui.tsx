@@ -44,10 +44,10 @@ function BalanceCard({ b, canEdit }: { b: Balance; canEdit: boolean }) {
 
   return (
     <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-      <div className="flex items-center gap-2">
-        <TeamAvatar name={b.name} size={26} />
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{b.name.split(" ")[0]}</span>
-        <span className="rounded-full bg-[var(--color-info-soft)] px-2 py-0.5 text-2xs font-medium text-[#0060a8]">Vast</span>
+      <div className="flex items-center gap-3">
+        <TeamAvatar name={b.name} size={48} />
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{b.name}</span>
+        <span className="shrink-0 rounded-full bg-[var(--color-info-soft)] px-2 py-0.5 text-2xs font-medium text-[#0060a8]">Vast</span>
       </div>
       <div className="mt-3 flex items-end justify-between">
         <div>

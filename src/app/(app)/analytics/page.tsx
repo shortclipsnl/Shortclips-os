@@ -155,7 +155,7 @@ export default async function AnalyticsPage({
     <div className="mx-auto max-w-[1300px]">
       <PageHeader
         title="Resultaten"
-        description={`${selectedName ?? "Actieve klanten"} · uit je eigen database (dagelijkse snapshots)`}
+        description={`${selectedName ?? "Alle actieve klanten samen"} · uit je eigen database (dagelijkse snapshots)`}
         actions={
           <a
             href="/scherm"
@@ -192,13 +192,13 @@ export default async function AnalyticsPage({
           {/* Kerncijfers: 7 én 30 dagen tegelijk, zonder te hoeven wisselen. */}
           <div className="mb-2 flex items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
             <span className="text-sm font-bold tracking-tight">Afgelopen 7 dagen</span>
-            <span className="text-xs text-white/70">{selectedName ?? "actieve klanten"}</span>
+            <span className="text-xs text-white/70">{selectedName ?? "alle actieve klanten samen"}</span>
           </div>
           <div className="mb-5">{kpiRow(t7, p7)}</div>
 
           <div className="mb-2 flex items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
             <span className="text-sm font-bold tracking-tight">Afgelopen 30 dagen</span>
-            <span className="text-xs text-white/70">{selectedName ?? "actieve klanten"}</span>
+            <span className="text-xs text-white/70">{selectedName ?? "alle actieve klanten samen"}</span>
           </div>
           <div className="mb-6">{kpiRow(t30, p30)}</div>
 

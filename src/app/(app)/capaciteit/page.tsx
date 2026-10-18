@@ -18,7 +18,15 @@ const STATUS_STYLE: Record<string, { label: string; tone: "good" | "warn" | "bad
 export default async function CapacityPage() {
   const viewer = await requireInternal();
   const canSeeFinance = viewer.permissions.has("finance:read");
-  const { people, params, summary } = await getCapacityOverview();
+  const overview = await getCapacityOverview();
+  const { params, summary } = overview;
+
+  // De eigenaar (Jarno/Janno) hoort niet in de capaciteitsverdeling.
+  const people = overview.people.filter((p) => {
+    const n = (p.name ?? "").toLowerCase();
+    const r = (p.role ?? "").toLowerCase();
+    return !(n.includes("jarno") || n.includes("janno") || r.includes("eigenaar") || r.includes("owner"));
+  });
 
   const paramMap = new Map(params.map((p) => [p.key, p.value ?? 0]));
 
@@ -40,11 +48,11 @@ export default async function CapacityPage() {
               <div key={p.id} className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4"
                 style={{ boxShadow: `inset 3px 0 0 ${st.bar}` }}>
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <TeamAvatar name={p.name} size={20} />
+                  <div className="flex min-w-0 items-center gap-3">
+                    <TeamAvatar name={p.name} size={48} />
                     <div className="min-w-0">
                       <div className="truncate font-semibold">{p.name}</div>
-                      <div className="text-2xs text-[var(--color-ink-muted)]">
+                      <div className="text-xs text-[var(--color-ink-muted)]">
                         {p.role ?? "—"}{p.employment ? ` · ${p.employment}` : ""}
                       </div>
                     </div>
@@ -80,14 +88,14 @@ export default async function CapacityPage() {
         </div>
       )}
 
-      {/* Teamsamenvatting */}
+      {/* Teamsamenvatting — in kleur, zodat je in één oogopslag kunt scannen. */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Actieve klanten" value={String(summary.activeClients)} />
-        <Stat label="Shorts per maand" value={String(summary.monthlyShorts)} hint="afname actieve klanten" />
+        <Stat label="Actieve klanten" value={String(summary.activeClients)} tone="info" />
+        <Stat label="Shorts per maand" value={String(summary.monthlyShorts)} hint="afname actieve klanten" tone="lime" />
         <Stat label="Editketen" value={summary.editChainUsedPct !== null ? `${summary.editChainUsedPct}%` : "—"}
           tone={summary.editChainUsedPct !== null && summary.editChainUsedPct > 90 ? "bad" : summary.editChainUsedPct !== null && summary.editChainUsedPct > 75 ? "warn" : "good"}
           hint={summary.editChainCapacity ? `max ~${summary.editChainCapacity}/mnd` : undefined} />
-        <Stat label="Actieve editors" value={String(summary.activeEditors)} />
+        <Stat label="Actieve editors" value={String(summary.activeEditors)} tone="violet" />
       </div>
 
       {canSeeFinance && summary.monthlyRevenue !== null ? (

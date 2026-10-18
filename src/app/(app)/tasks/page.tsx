@@ -5,20 +5,13 @@ import { db } from "@/db/client";
 import { clients, tasks, users } from "@/db/schema";
 import { requireInternal, scopeToClients } from "@/server/auth/context";
 import { listAssignableUsers } from "@/server/clients";
+import { isCoreStaff, coreStaffRank } from "@/server/core-staff";
 import { Card, EmptyState, PageHeader, TeamAvatar } from "@/components/ui";
 import { QuickTaskLines, TaskItem, type TaskItemData } from "./tasks-ui";
 
 export const metadata: Metadata = { title: "Taken" };
 export const dynamic = "force-dynamic";
 
-// De vaste coördinatiekern — rolgebaseerd, geen vaste namen, zodat de rij
-// meegroeit met het team. Deze personen staan er altijd; daarnaast verschijnt
-// iedereen die op dit moment open taken heeft. Volgorde = deze rolprioriteit.
-const OFFICE_ROLE_ORDER: Record<string, number> = {
-  owner: 0,
-  project_coordinator: 1,
-  admin: 2,
-};
 const OPEN = ["todo", "in_progress", "blocked"] as const;
 
 function addDays(n: number) {
@@ -39,22 +32,17 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       .from(tasks)
       .where(and(isNull(tasks.deletedAt), inArray(tasks.status, [...OPEN]), scopeToClients(viewer, tasks.clientId))),
   ]);
-  // Taken zijn alleen voor de kantoorkern (eigenaar + coördinatoren/admin) —
-  // Jarno, Milou, Jiska en Rutger. Editors, videografen en freelancers hebben
-  // dit niet nodig, dus die vallen uit de personenrij én de toewijslijst.
-  const isOffice = (role: string) => role in OFFICE_ROLE_ORDER;
-  const office = team.filter((u) => isOffice(u.primaryRole));
+  // Taken zijn alleen voor het interne kernteam — Jarno, Milou, Jiska en Rutger
+  // (vaste lijst op e-mail, los van rol). Editors, videografen en freelancers
+  // hebben dit niet nodig, dus die vallen uit de personenrij én de toewijslijst.
+  const office = team.filter((u) => isCoreStaff(u.email));
   const userOptions = office.map((u) => ({ id: u.id, fullName: u.fullName }));
 
   const openCountFor = (uid: string) => allOpen.filter((t) => t.assigneeId === uid).length;
   const algemeenCount = allOpen.filter((t) => !t.assigneeId).length;
 
-  // Personenrij: de kantoorkern, gesorteerd op rolprioriteit en daarna naam.
-  const core = [...office].sort(
-    (a, b) =>
-      (OFFICE_ROLE_ORDER[a.primaryRole]! - OFFICE_ROLE_ORDER[b.primaryRole]!) ||
-      a.fullName.localeCompare(b.fullName, "nl"),
-  );
+  // Personenrij: het kernteam in de vaste volgorde (Jarno, Milou, Jiska, Rutger).
+  const core = [...office].sort((a, b) => coreStaffRank(a.email) - coreStaffRank(b.email));
 
   // Taken voor de geselecteerde weergave ophalen.
   async function fetchTasks(where: ReturnType<typeof and>) {

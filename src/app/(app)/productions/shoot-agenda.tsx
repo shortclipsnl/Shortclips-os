@@ -135,7 +135,7 @@ export function ShootAgenda({ shoots, initialDate }: { shoots: AgendaShoot[]; in
                     {d.toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}{isToday ? " · vandaag" : ""}
                   </div>
                 </div>
-                <div className="space-y-1.5 p-1.5">
+                <div className="min-h-[190px] space-y-2 p-2">
                   {items.length === 0 ? (
                     <p className="px-1 py-2 text-2xs text-[var(--color-ink-faint)]">—</p>
                   ) : (
@@ -165,13 +165,13 @@ function ShootCard({ s }: { s: AgendaShoot }) {
   const color = STATUS_COLOR[s.status] ?? "var(--color-ink-faint)";
   return (
     <Link href={`/productions/${s.id}`}
-      className="block rounded-[var(--radius-sm)] border-l-[3px] bg-[var(--color-surface)] p-1.5 shadow-[var(--shadow-card)] hover:brightness-[0.99]"
+      className="block rounded-[var(--radius-sm)] border-l-[3px] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-card)] hover:brightness-[0.99]"
       style={{ borderLeftColor: color }}>
       <span className="flex items-center gap-1.5">
-        <ClientLogo name={s.clientName} logoUrl={s.clientLogo} color={s.clientColor} size={16} />
+        <ClientLogo name={s.clientName} logoUrl={s.clientLogo} color={s.clientColor} size={18} />
         <span className="min-w-0 flex-1 truncate text-xs font-semibold">{s.clientName}</span>
       </span>
-      <span className="mt-0.5 flex items-center justify-between gap-1 text-[10px] text-[var(--color-ink-muted)]">
+      <span className="mt-1 flex items-center justify-between gap-1 text-[11px] text-[var(--color-ink-muted)]">
         <span className="truncate">{s.startTime ? s.startTime.slice(0, 5) : "hele dag"}{s.videographerName ? ` · ${s.videographerName.split(" ")[0]}` : ""}</span>
         <span className="shrink-0 font-semibold" style={{ color }}>{STATUS_LABEL[s.status] ?? s.status}</span>
       </span>
@@ -201,7 +201,7 @@ function MonthGrid({ anchor, byDate, todayIso }: { anchor: Date; byDate: Map<str
           const isToday = key === todayIso;
           const items = byDate.get(key) ?? [];
           return (
-            <div key={key} className={`min-h-[76px] min-w-0 p-1 ${inMonth ? "bg-[var(--color-surface)]" : "bg-[var(--color-surface-2)]"}`}>
+            <div key={key} className={`min-h-[96px] min-w-0 p-1 ${inMonth ? "bg-[var(--color-surface)]" : "bg-[var(--color-surface-2)]"}`}>
               <div className={`mb-0.5 text-2xs font-semibold ${isToday ? "inline-grid size-5 place-items-center rounded-full bg-[var(--color-brand-600)] text-white" : inMonth ? "text-[var(--color-ink)]" : "text-[var(--color-ink-faint)]"}`}>
                 {d.getDate()}
               </div>

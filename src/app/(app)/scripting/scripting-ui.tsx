@@ -53,6 +53,14 @@ function weekBucket(days: number): { order: number; label: string } {
   return { order: 4, label: "Later" };
 }
 
+/** Volle kleur per week-kop, zodat je van week naar week kunt scannen. */
+const WEEK_COLOR: Record<number, string> = {
+  1: "var(--color-brand-600)",
+  2: "var(--color-info)",
+  3: "var(--color-violet)",
+  4: "var(--color-ink-muted)",
+};
+
 function fmt(d: string) {
   const [y, m, day] = d.split("-").map(Number);
   return new Date(y!, (m ?? 1) - 1, day).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
@@ -146,14 +154,16 @@ export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }:
           <tbody>
             {groups.map((g) => (
               <Fragment key={g.label}>
-                {/* Week-kop */}
+                {/* Week-kop in volle kleur, zodat je van week naar week kunt scannen. */}
                 <tr>
-                  <td colSpan={5} className="border-y border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-3 py-2">
-                    <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--color-ink)]">
-                      <span className="size-2 rounded-full bg-[var(--color-brand-600)]" />
+                  <td colSpan={5} className="p-0">
+                    <div
+                      className="flex items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wide text-white"
+                      style={{ background: WEEK_COLOR[g.order] ?? "var(--color-ink-muted)" }}
+                    >
                       {g.label}
-                      <span className="font-medium normal-case text-[var(--color-ink-muted)]">· {g.rows.length}</span>
-                    </span>
+                      <span className="rounded-full bg-white/25 px-2 py-0.5 text-2xs font-bold normal-case tabular-nums">{g.rows.length}</span>
+                    </div>
                   </td>
                 </tr>
                 {g.rows.map((r) => (

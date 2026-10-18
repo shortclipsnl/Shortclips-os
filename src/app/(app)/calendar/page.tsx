@@ -16,6 +16,13 @@ export const dynamic = "force-dynamic";
 
 const WEEKDAYS = ["ma", "di", "wo", "do", "vr", "za", "zo"];
 
+// Klanten waarvoor we niet op social posten — die horen niet in de
+// contentplanning. Vergelijking op genormaliseerde naam (hoofdletters/spaties
+// maken niet uit).
+const NO_POST = new Set(["365werk", "autofotostudio", "bedrijfskledingonline", "bmtek"]);
+const normName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+const postsContent = (name?: string | null) => !name || !NO_POST.has(normName(name));
+
 export default async function CalendarPage({
   searchParams,
 }: {
@@ -41,7 +48,7 @@ export default async function CalendarPage({
   const from = weeks[0]![0]!;
   const to = weeks[weeks.length - 1]![6]!;
 
-  const [items, clientList] = await Promise.all([
+  const [rawItems, rawClientList] = await Promise.all([
     listCalendar(viewer, {
       from,
       to,
@@ -51,18 +58,22 @@ export default async function CalendarPage({
     }),
     listClients(viewer),
   ]);
+  // Klanten waar we niet voor posten eruit filteren.
+  const items = rawItems.filter((i) => postsContent(i.clientName));
+  const clientList = rawClientList.filter((c) => postsContent(c.name));
 
   const canWrite = viewer.permissions.has("calendar:write");
   const asPlanner = params.weergave === "planner";
   const plannerTo = new Date();
   plannerTo.setDate(plannerTo.getDate() + 120);
-  const plannerItems = asPlanner
+  const plannerItems = (asPlanner
     ? await listCalendar(viewer, {
         from: new Date().toISOString().slice(0, 10),
         to: plannerTo.toISOString().slice(0, 10),
         clientSlug: params.klant,
       })
-    : [];
+    : []
+  ).filter((i) => postsContent(i.clientName));
 
   const byDay = new Map<string, CalendarItem[]>();
   for (const item of items) {
@@ -148,6 +159,12 @@ export default async function CalendarPage({
             {p.label}
           </Link>
         ))}
+      </div>
+
+      {/* Vaste postmomenten. */}
+      <div className="mb-4 inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-info-soft)]/60 px-3 py-1.5 text-xs text-[var(--color-ink)]">
+        <span className="size-2 rounded-full bg-[var(--color-info)]" />
+        We posten dagelijks tussen <strong>14:30 en 17:00 uur</strong>.
       </div>
 
       {asPlanner ? (

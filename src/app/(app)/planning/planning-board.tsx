@@ -81,13 +81,24 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap gap-1">
-          {KINDS.map((k) => (
-            <button key={k.key} onClick={() => setKinds((s) => ({ ...s, [k.key]: !s[k.key] }))}
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${kinds[k.key] ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
-              <span className="size-2 rounded-full" style={{ background: k.color }} />{k.label}
-            </button>
-          ))}
+        <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Klik om te tonen of verbergen:</span>
+        <div className="flex flex-wrap gap-1.5">
+          {KINDS.map((k) => {
+            const on = kinds[k.key];
+            return (
+              <button
+                key={k.key}
+                onClick={() => setKinds((s) => ({ ...s, [k.key]: !s[k.key] }))}
+                aria-pressed={on}
+                title={on ? `${k.label} verbergen` : `${k.label} tonen`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition ${on ? "text-white" : "border text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+                style={on ? { background: k.color } : { borderColor: "var(--color-line-strong)" }}
+              >
+                <k.Icon className="size-3.5" strokeWidth={2} style={on ? undefined : { color: k.color }} />
+                {k.label}
+              </button>
+            );
+          })}
         </div>
         <select className="sc-input ml-auto h-8 w-auto py-0 text-xs" value={client} onChange={(e) => setClient(e.target.value)} aria-label="Klant">
           <option value="alle">Alle klanten</option>
@@ -96,9 +107,9 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
       </div>
 
       <div className="space-y-4">
-        {view.map((w) => (
+        {view.map((w, wi) => (
           <div key={w.key} className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)]">
-            <WeekHeader w={w} count={w.total}>
+            <WeekHeader w={w} count={w.total} color={WEEK_BAR[wi % WEEK_BAR.length]!}>
               {w.conflicts.map((c) => (
                 <span key={c.editor} className="inline-flex items-center gap-1 rounded-full bg-[var(--color-bad-soft)] px-2 py-0.5 text-2xs font-medium text-[#a3271c]">
                   <AlertTriangle className="size-3" /> {c.editor}: {c.count} opleveringen
@@ -158,13 +169,31 @@ function KindIcon({ kind }: { kind: Kind }) {
   return <Icon className="size-3.5 shrink-0" style={{ color: k.color }} strokeWidth={2} />;
 }
 
-/** Weekkop met weeknummer + datumbereik + telling. */
-function WeekHeader({ w, count, children }: { w: PlanWeek; count: number; children?: React.ReactNode }) {
+/** Volle kleur per week-balk, zodat je van week naar week kunt scannen. */
+const WEEK_BAR = [
+  "var(--color-brand-600)",
+  "var(--color-indigo-ink)",
+  "var(--color-violet)",
+  "var(--color-info)",
+];
+
+/** "20 – 26 okt" uit twee YYYY-MM-DD datums. */
+function rangeLabel(startOn: string, endOn: string) {
+  const f = (d: string) => {
+    const [y, m, day] = d.split("-").map(Number);
+    return new Date(y!, (m ?? 1) - 1, day).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+  };
+  return `${f(startOn)} – ${f(endOn)}`;
+}
+
+/** Weekkop in volle kleur met weeknummer, naam en datumbereik. */
+function WeekHeader({ w, count, color, children }: { w: PlanWeek; count: number; color: string; children?: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-2">
-      <span className="rounded bg-[var(--color-brand-600)] px-1.5 py-0.5 text-2xs font-bold tabular-nums text-white">W{w.weekNumber}</span>
-      <span className="text-sm font-semibold">{w.label}</span>
-      <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-2xs font-medium text-[var(--color-ink-muted)]">{count}</span>
+    <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-white" style={{ background: color }}>
+      <span className="rounded bg-white/25 px-1.5 py-0.5 text-2xs font-bold tabular-nums">W{w.weekNumber}</span>
+      <span className="text-sm font-bold capitalize">{w.label}</span>
+      <span className="text-xs font-medium text-white/80">{rangeLabel(w.startOn, w.endOn)}</span>
+      <span className="rounded-full bg-white/20 px-2 py-0.5 text-2xs font-semibold tabular-nums">{count}</span>
       {children}
     </div>
   );

@@ -356,7 +356,7 @@ export async function listClientsAdmin(viewer: Viewer) {
 /** Interne teamleden die als coördinator of videograaf toewijsbaar zijn. */
 export async function listAssignableUsers() {
   return db
-    .select({ id: users.id, fullName: users.fullName, primaryRole: users.primaryRole })
+    .select({ id: users.id, fullName: users.fullName, email: users.email, primaryRole: users.primaryRole })
     .from(users)
     .where(and(ne(users.primaryRole, "client"), eq(users.status, "active"), isNull(users.deletedAt)))
     .orderBy(asc(users.fullName));
