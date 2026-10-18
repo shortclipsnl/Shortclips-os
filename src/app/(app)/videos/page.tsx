@@ -6,6 +6,7 @@ import { requireInternal } from "@/server/auth/context";
 import { getReviewQueue, getVideoHighlights, listEditorOptions, listVideos, type ReviewQueueItem } from "@/server/videos";
 import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { listEditingProjects } from "@/server/editing-board";
+import { isBoardEditor } from "@/server/edit-board-editors";
 import { listClients } from "@/server/clients";
 import { EditorFilter } from "./editor-filter";
 import { ShootTimers } from "../editing/shoot-timers";
@@ -79,6 +80,8 @@ export default async function VideosPage({
   const canEdit = viewer.permissions.has("videos:write");
   const canAssign = viewer.permissions.has("videos:assign");
   const clientOptions = clientList.filter((c) => c.status === "active").map((c) => ({ id: c.id, name: c.name }));
+  // Edit-boards zijn alleen voor de vaste editors: Sem, Noah, Fabian, Quinn, Senna.
+  const boardEditors = editors.filter((e) => isBoardEditor(e.fullName));
   const shootsAtRisk = shoots.filter((s) => s.atRisk).length;
 
   const view = params.weergave === "kanban" ? "kanban" : "lijst";
@@ -110,7 +113,7 @@ export default async function VideosPage({
           <h2 className="text-sm font-bold tracking-tight">Editing per editor</h2>
           <span className="text-xs text-white/80">14 werkdagen opname → oplevering · automatisch uit de opnames</span>
         </div>
-        <EditingProjects projects={editingProjects} editors={editors} clients={clientOptions} canEdit={canEdit} canAssign={canAssign} />
+        <EditingProjects projects={editingProjects} editors={boardEditors} clients={clientOptions} canEdit={canEdit} canAssign={canAssign} />
       </section>
 
       {/* Deadlinebewaking per klantopname (§7): 14 werkdagen tot klantoplevering,
