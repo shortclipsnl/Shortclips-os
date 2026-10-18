@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Battery, ChevronDown, Download, FileText, Loader2, Pencil } from "lucide-react";
+import { Battery, ChevronDown, Download, FileText, Loader2, Pencil, Plus, Upload, X } from "lucide-react";
 import { ClientLogo } from "@/components/ui";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase } from "@/lib/statuses";
 import { formatDate } from "@/lib/format";
-import { setProjectEditStatus, setProjectEditor, setProjectLinks, setProjectPlannedShorts } from "@/server/actions/editing-board";
+import { createEditingProject, deleteProjectScript, setProjectEditStatus, setProjectEditor, setProjectLinks, setProjectPlannedShorts, uploadProjectScript } from "@/server/actions/editing-board";
+import { fileToBase64 } from "../ai/_shared";
 import type { EditingProject, BatteryColor } from "@/server/editing-board";
 
 const BATTERY_COLOR: Record<BatteryColor, string> = {
@@ -18,16 +19,19 @@ const BATTERY_COLOR: Record<BatteryColor, string> = {
 };
 
 type Editor = { id: string; fullName: string };
+type ClientOption = { id: string; name: string };
 
 export function EditingProjects({
   projects,
   editors,
+  clients = [],
   canEdit,
   canAssign,
   lockedEditor = false,
 }: {
   projects: EditingProject[];
   editors: Editor[];
+  clients?: ClientOption[];
   canEdit: boolean;
   canAssign: boolean;
   /** true voor editors zelf: geen switcher, ze zien alleen hun eigen board. */
@@ -56,6 +60,7 @@ export function EditingProjects({
             </SwitchBtn>
           ))}
           {geenCount > 0 ? <SwitchBtn active={editor === "geen"} onClick={() => setEditor("geen")}>Geen editor · {geenCount}</SwitchBtn> : null}
+          {canAssign && clients.length > 0 ? <span className="ml-auto"><NewProject clients={clients} editors={editors} /></span> : null}
         </div>
       ) : null}
 
@@ -70,6 +75,61 @@ export function EditingProjects({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function NewProject({ clients, editors }: { clients: ClientOption[]; editors: Editor[] }) {
+  const [open, setOpen] = useState(false);
+  const [clientId, setClientId] = useState("");
+  const [scheduledOn, setScheduledOn] = useState("");
+  const [title, setTitle] = useState("");
+  const [editorId, setEditorId] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+
+  function create() {
+    setErr(null);
+    start(async () => {
+      const res = await createEditingProject({ clientId, scheduledOn, title, editorId: editorId || null });
+      if (res.ok) { setOpen(false); setClientId(""); setScheduledOn(""); setTitle(""); setEditorId(""); router.refresh(); }
+      else setErr(res.message ?? "Mislukt");
+    });
+  }
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1 rounded-full bg-[var(--color-indigo-ink)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-indigo-soft)]">
+        <Plus className="size-3.5" /> Nieuw project
+      </button>
+    );
+  }
+  return (
+    <div className="mt-2 flex w-full flex-wrap items-end gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2.5">
+      <label className="text-2xs text-[var(--color-ink-muted)]">Klant
+        <select className="sc-input mt-0.5 h-8 w-40 py-0 text-xs" value={clientId} onChange={(e) => setClientId(e.target.value)}>
+          <option value="">Kies…</option>
+          {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </label>
+      <label className="text-2xs text-[var(--color-ink-muted)]">Opnamedatum
+        <input type="date" className="sc-input mt-0.5 h-8 w-36 py-0 text-xs" value={scheduledOn} onChange={(e) => setScheduledOn(e.target.value)} />
+      </label>
+      <label className="text-2xs text-[var(--color-ink-muted)]">Titel
+        <input className="sc-input mt-0.5 h-8 w-48 py-0 text-xs" placeholder="bv. Opname + onderwerp" value={title} onChange={(e) => setTitle(e.target.value)} />
+      </label>
+      <label className="text-2xs text-[var(--color-ink-muted)]">Editor
+        <select className="sc-input mt-0.5 h-8 w-32 py-0 text-xs" value={editorId} onChange={(e) => setEditorId(e.target.value)}>
+          <option value="">Later</option>
+          {editors.map((e) => <option key={e.id} value={e.id}>{e.fullName}</option>)}
+        </select>
+      </label>
+      <button type="button" onClick={create} disabled={pending || !clientId || !scheduledOn || !title.trim()} className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-ink)] px-3 text-xs font-semibold text-white disabled:opacity-50">
+        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />} Aanmaken
+      </button>
+      <button type="button" onClick={() => setOpen(false)} className="h-8 rounded-[var(--radius-sm)] px-2 text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleren</button>
+      {err ? <span className="w-full text-2xs text-[var(--color-bad)]">{err}</span> : null}
     </div>
   );
 }
@@ -161,13 +221,7 @@ function ProjectCard({ p, editors, canEdit, canAssign }: { p: EditingProject; ed
           canEdit={canEdit}
           onSave={(u) => run(() => setProjectLinks(p.id, { footageUrl: u }))}
         />
-        <LinkRow
-          icon={<FileText className="size-3.5" />}
-          label="Script (pdf-link)"
-          url={p.scriptUrl}
-          canEdit={canEdit}
-          onSave={(u) => run(() => setProjectLinks(p.id, { scriptUrl: u }))}
-        />
+        <ScriptField p={p} canEdit={canEdit} pending={pending} run={run} />
       </div>
     </div>
   );
@@ -222,6 +276,81 @@ function ShortsField({ p, canEdit, onSave }: { p: EditingProject; canEdit: boole
       />
       shorts {label}
     </span>
+  );
+}
+
+function ScriptField({ p, canEdit, pending, run }: { p: EditingProject; canEdit: boolean; pending: boolean; run: (fn: () => Promise<unknown>) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [linking, setLinking] = useState(false);
+  const [link, setLink] = useState(p.scriptUrl ?? "");
+
+  async function onFile(file: File) {
+    setErr(null);
+    if (!(file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))) { setErr("Alleen een pdf-bestand."); return; }
+    if (file.size > 10 * 1024 * 1024) { setErr("Max 10 MB."); return; }
+    setBusy(true);
+    try {
+      const base64 = await fileToBase64(file);
+      run(() => uploadProjectScript(p.id, { fileName: file.name, contentType: file.type || "application/pdf", base64 }));
+    } catch {
+      setErr("Uploaden mislukt.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Geüpload script aanwezig → openen/downloaden (+ verwijderen).
+  if (p.scriptFileId) {
+    return (
+      <div className="flex items-center gap-1.5 py-1 text-xs">
+        <FileText className="size-3.5 shrink-0 text-[var(--color-ink-faint)]" />
+        <a href={`/api/edit-files/${p.scriptFileId}`} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate font-medium text-[var(--color-brand-600)] hover:underline">
+          {p.scriptFileName ?? "Script.pdf"} — openen
+        </a>
+        {canEdit ? (
+          <button type="button" onClick={() => run(() => deleteProjectScript(p.id))} className="shrink-0 rounded p-1 text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-bad)]" aria-label="Script verwijderen">
+            <X className="size-3.5" />
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="py-1 text-xs">
+      <div className="flex items-center gap-1.5">
+        <FileText className="size-3.5 shrink-0 text-[var(--color-ink-faint)]" />
+        {canEdit ? (
+          <>
+            <input ref={inputRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
+            <button type="button" onClick={() => inputRef.current?.click()} disabled={busy || pending}
+              className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-1 font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]">
+              {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />} Script-pdf uploaden
+            </button>
+            {p.scriptUrl ? (
+              <a href={p.scriptUrl} target="_blank" rel="noopener noreferrer" className="truncate text-[var(--color-brand-600)] hover:underline">of open de link</a>
+            ) : (
+              <button type="button" onClick={() => { setLink(p.scriptUrl ?? ""); setLinking(true); }} className="text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]">of plak een link</button>
+            )}
+          </>
+        ) : p.scriptUrl ? (
+          <a href={p.scriptUrl} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate font-medium text-[var(--color-brand-600)] hover:underline">Script openen</a>
+        ) : (
+          <span className="min-w-0 flex-1 truncate text-[var(--color-ink-faint)]">Script: nog geen</span>
+        )}
+      </div>
+      {linking ? (
+        <div className="mt-1 flex items-center gap-1.5">
+          <input autoFocus value={link} placeholder="Plak een link naar het script…" onChange={(e) => setLink(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { run(() => setProjectLinks(p.id, { scriptUrl: link })); setLinking(false); } if (e.key === "Escape") setLinking(false); }}
+            className="sc-input h-7 flex-1 py-0 text-xs" />
+          <button type="button" onClick={() => { run(() => setProjectLinks(p.id, { scriptUrl: link })); setLinking(false); }} className="shrink-0 rounded bg-[var(--color-ink)] px-2 py-1 text-2xs font-semibold text-white">Opslaan</button>
+        </div>
+      ) : null}
+      {err ? <span className="mt-1 block text-[var(--color-bad)]">{err}</span> : null}
+    </div>
   );
 }
 

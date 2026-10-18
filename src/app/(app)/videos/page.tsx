@@ -6,6 +6,7 @@ import { requireInternal } from "@/server/auth/context";
 import { getReviewQueue, getVideoHighlights, listEditorOptions, listVideos, type ReviewQueueItem } from "@/server/videos";
 import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { listEditingProjects } from "@/server/editing-board";
+import { listClients } from "@/server/clients";
 import { EditorFilter } from "./editor-filter";
 import { ShootTimers } from "../editing/shoot-timers";
 import { WorkloadSection } from "../editing/workload-section";
@@ -61,7 +62,7 @@ export default async function VideosPage({
       ? undefined
       : "actief";
 
-  const [rows, highlights, reviewQueue, editors, shoots, editingProjects] = await Promise.all([
+  const [rows, highlights, reviewQueue, editors, shoots, editingProjects, clientList] = await Promise.all([
     listVideos(viewer, {
       preset,
       status: params.status,
@@ -73,9 +74,11 @@ export default async function VideosPage({
     listEditorOptions(),
     getShootDeadlines(viewer),
     listEditingProjects(viewer),
+    listClients(viewer),
   ]);
   const canEdit = viewer.permissions.has("videos:write");
   const canAssign = viewer.permissions.has("videos:assign");
+  const clientOptions = clientList.filter((c) => c.status === "active").map((c) => ({ id: c.id, name: c.name }));
   const shootsAtRisk = shoots.filter((s) => s.atRisk).length;
 
   const view = params.weergave === "kanban" ? "kanban" : "lijst";
@@ -107,7 +110,7 @@ export default async function VideosPage({
           <h2 className="text-sm font-bold tracking-tight">Editing per editor</h2>
           <span className="text-xs text-white/80">14 werkdagen opname → oplevering · automatisch uit de opnames</span>
         </div>
-        <EditingProjects projects={editingProjects} editors={editors} canEdit={canEdit} canAssign={canAssign} />
+        <EditingProjects projects={editingProjects} editors={editors} clients={clientOptions} canEdit={canEdit} canAssign={canAssign} />
       </section>
 
       {/* Deadlinebewaking per klantopname (§7): 14 werkdagen tot klantoplevering,

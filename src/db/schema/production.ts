@@ -155,6 +155,29 @@ export const productionChecklistItems = pgTable(
   (t) => [index("production_checklist_day_idx").on(t.productionDayId)],
 );
 
+/** Geüploade bestanden bij een edit-project (nu: het script als PDF). Klein
+ *  genoeg om als base64 in de database te bewaren — werkt lokaal én in productie
+ *  zonder externe opslag. */
+export const editProjectFiles = pgTable(
+  "edit_project_files",
+  {
+    id: pk(),
+    productionDayId: uuid("production_day_id")
+      .notNull()
+      .references(() => productionDays.id, { onDelete: "cascade" }),
+    kind: varchar("kind", { length: 16 }).notNull().default("script"),
+    fileName: varchar("file_name", { length: 255 }).notNull(),
+    contentType: varchar("content_type", { length: 100 }).notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    dataBase64: text("data_base64").notNull(),
+    uploadedById: uuid("uploaded_by_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps,
+  },
+  (t) => [index("edit_project_files_day_idx").on(t.productionDayId, t.kind)],
+);
+
 /* ------------------------------------------------------------------ *
  * Scripts
  * ------------------------------------------------------------------ */

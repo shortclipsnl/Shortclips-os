@@ -27,6 +27,8 @@ export type EditingProject = {
   shortsCount: number;
   footageUrl: string | null;
   scriptUrl: string | null;
+  scriptFileId: string | null;
+  scriptFileName: string | null;
   editorDeadline: string;
   clientDeadline: string;
   elapsedWorkdays: number;
@@ -79,6 +81,8 @@ export async function listEditingProjects(
       footageUrl: productionDays.footageUrl,
       scriptUrl: productionDays.scriptUrl,
       shortsCount: sql<number>`(select count(*) from deliverables d where d.production_day_id = production_days.id and d.deleted_at is null)`,
+      scriptFileId: sql<string | null>`(select f.id from edit_project_files f where f.production_day_id = production_days.id and f.kind = 'script' order by f.created_at desc limit 1)`,
+      scriptFileName: sql<string | null>`(select f.file_name from edit_project_files f where f.production_day_id = production_days.id and f.kind = 'script' order by f.created_at desc limit 1)`,
     })
     .from(productionDays)
     .innerJoin(clients, eq(clients.id, productionDays.clientId))
@@ -118,6 +122,8 @@ export async function listEditingProjects(
       shortsCount: Number(r.shortsCount ?? 0),
       footageUrl: r.footageUrl,
       scriptUrl: r.scriptUrl,
+      scriptFileId: r.scriptFileId,
+      scriptFileName: r.scriptFileName,
       editorDeadline,
       clientDeadline,
       elapsedWorkdays: elapsed,

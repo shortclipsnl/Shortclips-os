@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { AlertTriangle, ExternalLink, FileText, Folder, Film, CheckCircle2, Clock } from "lucide-react";
 import { getEditorDashboard } from "@/server/editor-dashboard";
-import { getShootDeadlines } from "@/server/shoot-deadlines";
+import { listEditingProjects } from "@/server/editing-board";
 import type { Viewer } from "@/server/auth/context";
 import { Badge, Card, CardHeader, ClientLogo, EmptyState, Stat } from "@/components/ui";
 import { daysSince, pct, plural, relativeDays } from "@/lib/format";
 import { TASK_PRIORITY, VIDEO_STATUS, stageOverdue, type VideoStage } from "@/lib/statuses";
-import { ShootTimers } from "../editing/shoot-timers";
+import { EditingProjects } from "../videos/editing-projects";
 import { EditorStatusControl } from "./editor-status";
 
 /**
@@ -14,8 +14,9 @@ import { EditorStatusControl } from "./editor-status";
  * beginnen — script, materiaal, briefing en openstaande feedback.
  */
 export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
-  const [data, shoots] = await Promise.all([getEditorDashboard(viewer), getShootDeadlines(viewer)]);
+  const [data, editingProjects] = await Promise.all([getEditorDashboard(viewer), listEditingProjects(viewer)]);
   const firstName = viewer.fullName.split(" ")[0];
+  const canEdit = viewer.permissions.has("videos:write");
 
   const todayList = data.queue.filter(
     (v) => v.dueOn && v.dueOn <= new Date().toISOString().slice(0, 10),
@@ -63,13 +64,13 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
         />
       </div>
 
-      {shoots.length > 0 ? (
+      {editingProjects.length > 0 ? (
         <div>
-          <div className="mb-3 flex items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
-            <h2 className="text-sm font-bold tracking-tight">Jouw opdrachten per opname</h2>
-            <span className="text-xs text-white/80">14 werkdagen tot oplevering, jij levert 2 eerder</span>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+            <h2 className="text-sm font-bold tracking-tight">Jouw editing-projecten</h2>
+            <span className="text-xs text-white/80">14 werkdagen tot oplevering · download &amp; script per project</span>
           </div>
-          <ShootTimers shoots={shoots} />
+          <EditingProjects projects={editingProjects} editors={[]} canEdit={canEdit} canAssign={false} lockedEditor />
         </div>
       ) : null}
 

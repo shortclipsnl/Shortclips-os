@@ -3,12 +3,47 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { deliverables, productionDays } from "@/db/schema";
+import { deliverables, editProjectFiles, productionDays } from "@/db/schema";
 import { assertClientAccess, ForbiddenError, requirePermission } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { EDIT_PHASE_ORDER } from "@/lib/statuses";
 
 export type ActionResult = { ok: boolean; message?: string };
+
+const MAX_SCRIPT_BYTES = 10 * 1024 * 1024; // 10 MB — ruim voor een script-pdf
+
+/** Handmatig een nieuw edit-project (opname) aanmaken, los van de Google-sync. */
+export async function createEditingProject(input: {
+  clientId: string;
+  scheduledOn: string;
+  title: string;
+  editorId?: string | null;
+  plannedShorts?: number | null;
+}): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const title = input.title.trim();
+    if (!title) return { ok: false, message: "Geef het project een titel." };
+    if (!input.clientId) return { ok: false, message: "Kies een klant." };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.scheduledOn)) return { ok: false, message: "Kies een opnamedatum." };
+    assertClientAccess(viewer, input.clientId);
+
+    await db.insert(productionDays).values({
+      clientId: input.clientId,
+      title: title.slice(0, 200),
+      scheduledOn: input.scheduledOn,
+      editorId: input.editorId ?? null,
+      plannedShorts: input.plannedShorts ?? null,
+      status: "planned",
+    });
+
+    revalidatePath("/videos");
+    return { ok: true, message: "Project aangemaakt." };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
 
 async function loadProject(id: string) {
   const [row] = await db
@@ -129,6 +164,61 @@ export async function setProjectLinks(
     if (links.scriptUrl !== undefined) patch.scriptUrl = clean(links.scriptUrl);
 
     await db.update(productionDays).set(patch).where(eq(productionDays.id, id));
+    revalidatePath("/videos");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/** Script-pdf uploaden bij een edit-project. Vervangt een eventueel bestaand
+ *  script. Wordt als base64 in de database bewaard (klein bestand). */
+export async function uploadProjectScript(
+  id: string,
+  file: { fileName: string; contentType: string; base64: string },
+): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const project = await loadProject(id);
+    if (!project) return { ok: false, message: "Project niet gevonden." };
+    assertClientAccess(viewer, project.clientId);
+
+    const isPdf = file.contentType === "application/pdf" || file.fileName.toLowerCase().endsWith(".pdf");
+    if (!isPdf) return { ok: false, message: "Alleen een pdf-bestand kan worden geüpload." };
+    const sizeBytes = Math.floor((file.base64.length * 3) / 4);
+    if (sizeBytes > MAX_SCRIPT_BYTES) return { ok: false, message: "Het bestand is te groot (max 10 MB)." };
+    if (sizeBytes === 0) return { ok: false, message: "Leeg bestand." };
+
+    // Oud script vervangen.
+    await db.delete(editProjectFiles).where(and(eq(editProjectFiles.productionDayId, id), eq(editProjectFiles.kind, "script")));
+    await db.insert(editProjectFiles).values({
+      productionDayId: id,
+      kind: "script",
+      fileName: file.fileName.slice(0, 255),
+      contentType: "application/pdf",
+      sizeBytes,
+      dataBase64: file.base64,
+      uploadedById: viewer.id,
+    });
+
+    revalidatePath("/videos");
+    return { ok: true, message: "Script geüpload." };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/** Het geüploade script-pdf verwijderen. */
+export async function deleteProjectScript(id: string): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const project = await loadProject(id);
+    if (!project) return { ok: false, message: "Project niet gevonden." };
+    assertClientAccess(viewer, project.clientId);
+
+    await db.delete(editProjectFiles).where(and(eq(editProjectFiles.productionDayId, id), eq(editProjectFiles.kind, "script")));
     revalidatePath("/videos");
     return { ok: true };
   } catch (error) {
