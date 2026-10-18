@@ -3,6 +3,7 @@ import { daysSince, daysUntil } from "@/lib/format";
 import { getDashboard } from "@/server/dashboard";
 import { listEditingProjects } from "@/server/editing";
 import { countOpenLinkSuggestions } from "@/server/link-review";
+import { VIDEO_WAITING_ON, type VideoStage } from "@/lib/statuses";
 import { isOwner, type Viewer } from "@/server/auth/context";
 
 /**
@@ -60,14 +61,21 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
     });
   }
 
-  // Video's over de deadline — directe actie (rood).
+  // Video's over de deadline — directe actie (rood). Wie moet handelen hangt af
+  // van bij wie de bal ligt (status), niet automatisch de editor: een video die
+  // al bij de klant ligt is "wacht op klant → herinneren" (coördinator), niet
+  // "editor → afmaken".
   for (const v of data.videos.late) {
     const d = Math.max(1, -daysUntil(v.dueOn));
+    const atClient = VIDEO_WAITING_ON[v.status as VideoStage] === "client";
     items.push({
-      id: `late-${v.id}`, severity: "rood", category: "Video over deadline",
+      id: `late-${v.id}`, severity: "rood",
+      category: atClient ? "Te laat bij klant" : "Video over deadline",
       title: `${v.clientName} — ${v.title === v.clientName ? "video" : v.title}`,
-      detail: `${d} dag(en) te laat · ${v.editorName ?? "geen editor"} → afmaken`,
-      href: `/videos/${v.id}`, roles: EDIT,
+      detail: atClient
+        ? `${d} dag(en) te laat · wacht op klant → herinneren`
+        : `${d} dag(en) te laat · ${v.editorName ?? "geen editor"} → afmaken`,
+      href: `/videos/${v.id}`, roles: atClient ? CC : EDIT,
     });
   }
 

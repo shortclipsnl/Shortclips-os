@@ -23,6 +23,12 @@ import {
   videoAnalyses,
 } from "@/db/schema";
 import { scopeToClients, type Viewer } from "@/server/auth/context";
+import {
+  INVOICE_STATUS,
+  SCRIPT_STATUS,
+  TASK_STATUS,
+  VIDEO_STATUS,
+} from "@/lib/statuses";
 
 export type SearchHit = {
   kind: string;
@@ -163,15 +169,15 @@ export async function universalSearch(
   const hits: SearchHit[] = [
     ...clientHits.map((r) => ({ kind: "client", kindLabel: "Klant", title: r.name, subtitle: r.sector, href: `/clients/${r.slug}` })),
     ...contactHits.map((r) => ({ kind: "contact", kindLabel: "Contactpersoon", title: r.name, subtitle: r.role, href: `/clients/${r.slug}?tab=contacten`, clientName: r.clientName })),
-    ...scriptHits.map((r) => ({ kind: "script", kindLabel: "Script", title: r.title, subtitle: r.status, href: `/scripts/${r.id}`, clientName: r.clientName })),
-    ...videoHits.map((r) => ({ kind: "video", kindLabel: "Video", title: r.title, subtitle: r.status, href: `/videos/${r.id}`, clientName: r.clientName })),
+    ...scriptHits.map((r) => ({ kind: "script", kindLabel: "Script", title: r.title, subtitle: SCRIPT_STATUS[r.status]?.label ?? r.status, href: `/scripts/${r.id}`, clientName: r.clientName })),
+    ...videoHits.map((r) => ({ kind: "video", kindLabel: "Video", title: r.title, subtitle: VIDEO_STATUS[r.status]?.label ?? r.status, href: `/videos/${r.id}`, clientName: r.clientName })),
     ...dayHits.map((r) => ({ kind: "production", kindLabel: "Opnamedag", title: r.title, subtitle: r.scheduledOn, href: `/productions/${r.id}`, clientName: r.clientName })),
     ...fileHits.map((r) => ({ kind: "file", kindLabel: "Bestand", title: r.name, subtitle: r.category, href: r.url ?? "#", clientName: r.clientName })),
-    ...taskHits.map((r) => ({ kind: "task", kindLabel: "Taak", title: r.title, subtitle: r.status, href: `/tasks?focus=${r.id}`, clientName: r.clientName })),
+    ...taskHits.map((r) => ({ kind: "task", kindLabel: "Taak", title: r.title, subtitle: TASK_STATUS[r.status]?.label ?? r.status, href: `/tasks?focus=${r.id}`, clientName: r.clientName })),
     ...commentHits.map((r) => ({ kind: "comment", kindLabel: "Opmerking", title: r.body.slice(0, 90), href: `/videos/${r.deliverableId}`, clientName: r.clientName })),
     ...knowledgeHits.map((r) => ({ kind: "knowledge", kindLabel: "Klantkennis", title: r.title, subtitle: r.body.slice(0, 90), href: `/clients/${r.slug}?tab=kennis`, clientName: r.clientName })),
     ...calendarHits.map((r) => ({ kind: "calendar", kindLabel: "Planning", title: r.title, subtitle: r.scheduledOn, href: `/calendar?datum=${r.scheduledOn}`, clientName: r.clientName })),
-    ...invoiceHits.map((r) => ({ kind: "invoice", kindLabel: "Factuur", title: r.number, subtitle: r.status, href: `/finance?factuur=${r.id}`, clientName: r.clientName })),
+    ...invoiceHits.map((r) => ({ kind: "invoice", kindLabel: "Factuur", title: r.number, subtitle: INVOICE_STATUS[r.status]?.label ?? r.status, href: `/finance?factuur=${r.id}`, clientName: r.clientName })),
     ...viHits.map((r) => ({ kind: "video_intelligence", kindLabel: "Video Intelligence", title: r.title ?? "Video-analyse", subtitle: r.platform ?? (r.caption ? r.caption.slice(0, 60) : null), href: `/video-intelligence/${r.id}`, clientName: r.clientName })),
   ];
 

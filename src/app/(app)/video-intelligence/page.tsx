@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
-import { requirePermission } from "@/server/auth/context";
+import { requirePermission, isOwner } from "@/server/auth/context";
 import { listAnalyses, assignableClients } from "@/server/video-intelligence/queries";
 import { getIntelligenceOverview, getToolStatus } from "@/server/video-intelligence/intelligence";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
@@ -43,7 +43,7 @@ export default async function VideoIntelligencePage({
         description="Analyseer organische short video's: shots, hooks, spraak, montage en AI-conclusies. Begrijp wáárom een video werkt."
       />
 
-      <ToolStatusPanel status={toolStatus} />
+      <ToolStatusPanel status={toolStatus} isOwner={isOwner(viewer)} />
 
       {canRun ? <AddVideo clients={clients} /> : null}
 
@@ -101,7 +101,7 @@ export default async function VideoIntelligencePage({
 
 type ToolStatus = { ffmpeg: boolean; ffprobe: boolean; ytdlp: boolean; whisper: boolean; ocr: boolean; anthropic: boolean };
 
-function ToolStatusPanel({ status }: { status: ToolStatus }) {
+function ToolStatusPanel({ status, isOwner }: { status: ToolStatus; isOwner: boolean }) {
   const items = [
     { ok: status.ffmpeg && status.ffprobe, label: "ffmpeg / ffprobe", need: "Duur, shotdetectie, thumbnails, montagetempo", fix: "meegeleverd (ffmpeg-static)" },
     { ok: status.ytdlp, label: "yt-dlp", need: "Video's ophalen via platform-URL", fix: "uv tool install yt-dlp" },
@@ -123,7 +123,14 @@ function ToolStatusPanel({ status }: { status: ToolStatus }) {
               <span className="block text-sm font-medium">{i.label}</span>
               <span className="block text-2xs text-[var(--color-ink-faint)]">{i.need}</span>
             </span>
-            {!i.ok ? <code className="rounded bg-[var(--color-surface-sunken)] px-2 py-1 text-2xs">{i.fix}</code> : null}
+            {!i.ok ? (
+              // Alleen de eigenaar ziet de technische install-commando's; teamleden zien een neutrale melding.
+              isOwner ? (
+                <code className="rounded bg-[var(--color-surface-sunken)] px-2 py-1 text-2xs">{i.fix}</code>
+              ) : (
+                <span className="text-2xs text-[var(--color-ink-faint)]">Wordt door het team ingericht.</span>
+              )
+            ) : null}
           </li>
         ))}
       </ul>

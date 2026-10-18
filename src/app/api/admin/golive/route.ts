@@ -3,6 +3,7 @@ import { getViewer, isOwner } from "@/server/auth/context";
 import { curateTeam } from "@/server/jobs/team-curate";
 import { setupMissingTeamLogins } from "@/server/jobs/team-login-setup";
 import { applyClientLogos } from "@/server/jobs/client-logos-apply";
+import { cleanupDeliverables } from "@/server/jobs/deliverables-cleanup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,8 +29,9 @@ async function handle() {
   const team = await curateTeam();
   const logins = await setupMissingTeamLogins();
   const logos = await applyClientLogos();
+  const deliverables = await cleanupDeliverables();
 
-  return NextResponse.json({ ok: true, team, logins, logos });
+  return NextResponse.json({ ok: true, team, logins, logos, deliverables });
 }
 
 // Bewust alleen POST: muteert data, dus niet per ongeluk via een GET/prefetch.

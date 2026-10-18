@@ -41,6 +41,17 @@ export function subWorkingDays(dateStr: string, n: number, holidays?: Holidays):
   return fmt(d);
 }
 
+/**
+ * Schuift een datum terug naar de dichtstbijzijnde vóórliggende werkdag als hij
+ * op een weekend (of meegegeven feestdag) valt; anders ongewijzigd. Voor
+ * deadlines: een opleverdatum hoort nooit op een niet-werkdag te staan.
+ */
+export function snapToWorkingDay(dateStr: string, holidays?: Holidays): string {
+  const d = parse(dateStr);
+  while (isNonWorking(d, holidays)) d.setUTCDate(d.getUTCDate() - 1);
+  return fmt(d);
+}
+
 /** Aantal kalenderdagen tussen twee YYYY-MM-DD datums (absoluut). */
 export function daysBetween(a: string, b: string): number {
   return Math.abs(Math.round((parse(a).getTime() - parse(b).getTime()) / 86_400_000));

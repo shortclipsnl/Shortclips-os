@@ -86,22 +86,33 @@ export default async function ClientPage({
     (s) => s.scheduledOn >= new Date().toISOString().slice(0, 10) && s.status !== "cancelled",
   );
 
+  // Resultaten is pas zinvol als er cijfers binnenkomen óf er kanalen gekoppeld
+  // zijn — zelfde voorwaarde als ResultsTab gebruikt om leeg-of-vullen te kiezen.
+  const hasResults =
+    hub.metrics.views + hub.metrics.reach + hub.metrics.engagements + Math.abs(hub.metrics.followerGrowth) > 0 ||
+    hub.socials.length > 0;
+
+  // Vaak-lege tabbladen tonen we alleen als er echt data achter zit (#12), zodat
+  // de pagina niet volloopt met lege tabs. Kern-tabs (overzicht, video's, scripts,
+  // taken, contacten) blijven altijd staan — die worden verwacht, ook als ze leeg
+  // zijn. Een tab die hier wegvalt, kan ook niet geselecteerd worden, dus zijn
+  // paneel hieronder rendert dan evenmin.
   const tabs: TabDef[] = [
     { key: "overzicht", label: "Overzicht" },
     { key: "videos", label: "Video's", count: activeVideos.length },
     { key: "scripts", label: "Scripts", count: hub.scripts.filter((s) => s.status !== "shot").length },
-    { key: "opnames", label: "Opnames" },
-    { key: "planning", label: "Planning" },
-    { key: "resultaten", label: "Resultaten" },
-    { key: "rapportages", label: "Rapportages", count: hub.reports.length },
-    { key: "kennis", label: "Klantkennis", count: hub.knowledge.length },
-    { key: "documenten", label: "Documenten" },
+    ...(hub.shoots.length > 0 ? [{ key: "opnames", label: "Opnames" }] : []),
+    ...(hub.calendar.length > 0 ? [{ key: "planning", label: "Planning" }] : []),
+    ...(hasResults ? [{ key: "resultaten", label: "Resultaten" }] : []),
+    ...(hub.reports.length > 0 ? [{ key: "rapportages", label: "Rapportages", count: hub.reports.length }] : []),
+    ...(hub.knowledge.length > 0 ? [{ key: "kennis", label: "Klantkennis", count: hub.knowledge.length }] : []),
+    ...(hub.files.length > 0 ? [{ key: "documenten", label: "Documenten" }] : []),
     { key: "taken", label: "Taken", count: hub.tasks.length },
     { key: "contacten", label: "Contacten", count: hub.contacts.length },
     ...(hub.canSeeFinance ? [{ key: "financieel", label: "Financieel" }, { key: "contract", label: "Contract & facturatie" }] : []),
-    { key: "inzichten", label: "AI-inzichten", count: hub.insights.length },
-    { key: "koppelingen", label: "Koppelingen" },
-    { key: "activiteit", label: "Activiteit" },
+    ...(hub.insights.length > 0 ? [{ key: "inzichten", label: "AI-inzichten", count: hub.insights.length }] : []),
+    ...(hub.integrations.length > 0 ? [{ key: "koppelingen", label: "Koppelingen" }] : []),
+    ...(hub.timeline.length > 0 ? [{ key: "activiteit", label: "Activiteit" }] : []),
   ];
   const active = tabs.some((t) => t.key === tab) ? tab! : "overzicht";
 

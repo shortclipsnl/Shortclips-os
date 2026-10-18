@@ -1,11 +1,22 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, deliverables, mondayMappings, users } from "@/db/schema";
+import { clients, deliverables, mondayMappings, qcChecks, users } from "@/db/schema";
 import { monday, type MondayItem } from "@/server/integrations/monday";
 import { normalizeName, matchScore } from "@/server/import";
 import { aliasesForSlug } from "@/server/integrations/client-aliases";
+import { QC_TEMPLATE } from "@/server/qc";
+import { snapToWorkingDay } from "@/lib/workdays";
 import { runJob } from "./runner";
+
+/** Statussen waarbij de interne controle voorbij is → QC geldt als gehaald. */
+const QC_DONE_STATUSES = new Set(["client_review", "client_revision"]);
+
+/** Datum uit Monday's updated_at (ISO) → Date, of nu als het niet lukt. */
+function mondayUpdatedAt(item: MondayItem): Date {
+  const d = new Date(item.updated_at);
+  return Number.isNaN(d.getTime()) ? new Date() : d;
+}
 
 /* EDITING DASHBOARD KLANTEN — editing-pijplijn per klant. */
 const EDITING_BOARD = "5060995925";
@@ -101,6 +112,21 @@ export async function runMondayEditingImport() {
     }
 
     const editorCache = new Map<string, string>();
+    // Lopend volgnummer per klant voor onderscheidbare titels ("<klant> #n").
+    const seqByClient = new Map<string, number>();
+    async function nextSeq(clientId: string): Promise<number> {
+      let n = seqByClient.get(clientId);
+      if (n === undefined) {
+        const [row] = await db
+          .select({ c: count() })
+          .from(deliverables)
+          .where(and(eq(deliverables.clientId, clientId), isNull(deliverables.deletedAt)));
+        n = Number(row?.c ?? 0);
+      }
+      n += 1;
+      seqByClient.set(clientId, n);
+      return n;
+    }
 
     const items = await monday.listItems(EDITING_BOARD, 300);
     ctx.log(`${items.length} editing-items op het bord`);
@@ -128,9 +154,10 @@ export async function runMondayEditingImport() {
         editorId = editorCache.get(editorName)!;
       }
 
-      const dueOn = timelineEnd(item, C.deadline);
-      // Titel is app-eigen (onderwerp/hook): alleen bij aanmaken vullen, nooit
-      // overschrijven met de Monday-itemnaam (die is vaak de klantnaam).
+      // Opleverdatum op een werkdag zetten (nooit op een weekend).
+      const dueRaw = timelineEnd(item, C.deadline);
+      const dueOn = dueRaw ? snapToWorkingDay(dueRaw) : null;
+      const clientName = clientRows.find((c) => c.id === clientId)?.name ?? "Klant";
       const base = {
         clientId,
         status,
@@ -165,9 +192,14 @@ export async function runMondayEditingImport() {
           .where(eq(mondayMappings.id, map.id));
         ctx.counters.updated++;
       } else {
+        // Onderscheidbare titel ("<klant> #n"); de Monday-itemnaam is vaak de
+        // klantnaam en maakt video's niet uit elkaar te houden.
+        const title = `${clientName} #${await nextSeq(clientId)}`;
         const [created] = await db
           .insert(deliverables)
-          .values({ ...base, title: item.name.trim() || "Editing-project", statusChangedAt: new Date() })
+          // "Dagen in fase" vanaf de echte laatste wijziging in Monday, niet de
+          // importdatum (anders staat alles op 0).
+          .values({ ...base, title, statusChangedAt: mondayUpdatedAt(item) })
           .returning({ id: deliverables.id });
         await db.insert(mondayMappings).values({
           entityType: "editing_item",
@@ -176,6 +208,13 @@ export async function runMondayEditingImport() {
           itemId: item.id,
           lastSyncedAt: new Date(),
         });
+        // QC geldt als gehaald zodra de video de interne controle voorbij is.
+        if (QC_DONE_STATUSES.has(status)) {
+          await db
+            .insert(qcChecks)
+            .values(QC_TEMPLATE.map((label, i) => ({ deliverableId: created!.id, label, sortOrder: i, done: true, doneAt: new Date() })))
+            .onConflictDoNothing();
+        }
         ctx.counters.created++;
       }
     }

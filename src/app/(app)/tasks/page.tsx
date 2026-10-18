@@ -120,10 +120,11 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         <PersonCard id="algemeen" name="Algemeen" count={algemeenCount} active={persoon === "algemeen"} generic />
         <Link
           href="/tasks?persoon="
-          className={`flex flex-col justify-center rounded-[var(--radius-md)] border px-3 py-2.5 text-sm ${!persoon ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-mist)]" : "border-[var(--color-line)] hover:bg-[var(--color-surface-2)]"}`}
+          // Actieve staat heeft een donkere achtergrond, dus tekst wit maken voor leesbaarheid
+          className={`flex flex-col justify-center rounded-[var(--radius-md)] border px-3 py-2.5 text-sm ${!persoon ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-mist)] text-white" : "border-[var(--color-line)] hover:bg-[var(--color-surface-2)]"}`}
         >
           <span className="font-medium">Iedereen</span>
-          <span className="text-xs text-[var(--color-ink-muted)]">overzicht</span>
+          <span className={`text-xs ${!persoon ? "text-white/70" : "text-[var(--color-ink-muted)]"}`}>overzicht</span>
         </Link>
       </div>
 
@@ -167,16 +168,18 @@ function PersonCard({ id, name, count, active, generic }: { id: string; name: st
   return (
     <Link
       href={`/tasks?persoon=${id}`}
-      className={`flex items-center gap-2.5 rounded-[var(--radius-md)] border px-3 py-2.5 ${active ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-mist)]" : "border-[var(--color-line)] hover:bg-[var(--color-surface-2)]"}`}
+      // Actieve staat heeft een donkere achtergrond, dus tekst wit maken voor leesbaarheid
+      className={`flex items-center gap-2.5 rounded-[var(--radius-md)] border px-3 py-2.5 ${active ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-mist)] text-white" : "border-[var(--color-line)] hover:bg-[var(--color-surface-2)]"}`}
     >
       {generic ? (
-        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--color-surface-sunken)] text-xs font-semibold text-[var(--color-ink-muted)]">AL</span>
+        // Op de donkere actieve kaart een doorschijnend-witte chip gebruiken zodat 'AL' leesbaar blijft
+        <span className={`grid size-8 shrink-0 place-items-center rounded-full text-xs font-semibold ${active ? "bg-white/15 text-white" : "bg-[var(--color-surface-sunken)] text-[var(--color-ink-muted)]"}`}>AL</span>
       ) : (
         <TeamAvatar name={name} size={32} />
       )}
       <span className="min-w-0">
         <span className="block truncate text-sm font-medium">{name.split(" ")[0]}</span>
-        <span className="text-xs text-[var(--color-ink-muted)]">{count} open</span>
+        <span className={`text-xs ${active ? "text-white/70" : "text-[var(--color-ink-muted)]"}`}>{count} open</span>
       </span>
     </Link>
   );

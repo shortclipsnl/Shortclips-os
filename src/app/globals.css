@@ -37,7 +37,9 @@
   --color-line-strong: #cfccc4;
   --color-ink: #00003b;
   --color-ink-muted: #5b5b74;
-  --color-ink-faint: #8a8a9c;
+  /* Donkerder gemaakt voor beter contrast (was #8a8a9c, zakte onder AA op de
+     crèmekleurige achtergrond). Nu leesbaar voor subregels/tijden/labels. */
+  --color-ink-faint: #6f6f82;
 
   /* ---- Semantisch ---- */
   --color-good: #2e9a6e;

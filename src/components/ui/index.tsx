@@ -52,6 +52,8 @@ const TONES = {
   warn: "bg-[var(--color-warn-soft)] text-[#8a5300]",
   bad: "bg-[var(--color-bad-soft)] text-[#a3271c]",
   lime: "bg-[var(--color-lime-soft)] text-[#54700a]",
+  // Paars = uitsluitend "interne controle / te checken" — overal dezelfde betekenis.
+  violet: "bg-[var(--color-violet-soft)] text-[#5636c4]",
   ink: "bg-[var(--color-indigo-ink)] text-white",
 } as const;
 
@@ -170,6 +172,7 @@ const STAT_ACCENT: Record<Tone, { bar: string; bg: string; value: string; chip: 
   warn: { bar: "var(--color-warn)", bg: "bg-[var(--color-warn-soft)]", value: "text-[#8a5300]", chip: "bg-[var(--color-warn-soft)] text-[#8a5300]" },
   bad: { bar: "var(--color-bad)", bg: "bg-[var(--color-bad-soft)]", value: "text-[#a3271c]", chip: "bg-[var(--color-bad-soft)] text-[#a3271c]" },
   lime: { bar: "var(--color-lime)", bg: "bg-[var(--color-lime-soft)]", value: "text-[#54700a]", chip: "bg-[var(--color-lime-soft)] text-[#54700a]" },
+  violet: { bar: "var(--color-violet)", bg: "bg-[var(--color-violet-soft)]", value: "text-[#5636c4]", chip: "bg-[var(--color-violet-soft)] text-[#5636c4]" },
   ink: { bar: "var(--color-indigo-ink)", bg: "bg-[var(--color-neutral-soft)]", value: "text-[var(--color-ink)]", chip: "bg-[var(--color-indigo-ink)] text-white" },
 };
 

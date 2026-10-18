@@ -60,7 +60,7 @@ export const VIDEO_PHASE_META: Record<VideoPhase, { label: string; tone: Tone }>
   gepland: { label: "Gepland", tone: "neutral" },
   beelden_binnen: { label: "Beelden binnen", tone: "info" },
   in_edit: { label: "In edit", tone: "info" },
-  interne_controle: { label: "Interne controle", tone: "info" },
+  interne_controle: { label: "Interne controle", tone: "violet" },
   bij_klant: { label: "Bij klant", tone: "warn" },
   feedback_verwerken: { label: "Feedback verwerken", tone: "info" },
   klaar: { label: "Klaar", tone: "good" },
