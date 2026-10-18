@@ -66,3 +66,45 @@ export async function setupTeamLogins(): Promise<{ ok: boolean; count: number; f
   }
   return { ok: true, count, file, credentials };
 }
+
+/**
+ * Niet-destructieve variant: geeft alleen teamleden die nog GÉÉN wachtwoord
+ * hebben een persoonlijk wachtwoord. Wie al kan inloggen (bijv. de eigenaar)
+ * houdt zijn bestaande wachtwoord — zo is herhaald uitvoeren veilig. De
+ * rol-koppeling (rechten) wordt voor iedereen gezekerd. Geeft alleen de nieuw
+ * aangemaakte inloggegevens terug.
+ */
+export async function setupMissingTeamLogins(): Promise<{
+  ok: boolean;
+  created: number;
+  alreadyHadLogin: number;
+  credentials: Array<{ fullName: string; role: string; email: string; password: string }>;
+}> {
+  const members = await db
+    .select({ id: users.id, fullName: users.fullName, email: users.email, role: users.primaryRole, passwordHash: users.passwordHash })
+    .from(users)
+    .innerJoin(teamMembers, eq(teamMembers.userId, users.id))
+    .where(and(isNull(teamMembers.deletedAt), isNull(users.deletedAt), ne(users.primaryRole, "client")))
+    .orderBy(users.fullName);
+
+  let created = 0;
+  let alreadyHadLogin = 0;
+  const credentials: Array<{ fullName: string; role: string; email: string; password: string }> = [];
+
+  for (const m of members) {
+    // Rol-koppeling (rechten) altijd zekeren.
+    const [role] = await db.select({ id: roles.id }).from(roles).where(eq(roles.key, m.role)).limit(1);
+    if (role) await db.insert(userRoles).values({ userId: m.id, roleId: role.id }).onConflictDoNothing();
+
+    if (m.passwordHash) {
+      alreadyHadLogin++;
+      continue;
+    }
+    const pw = tempPassword();
+    await db.update(users).set({ passwordHash: await hashPassword(pw), status: "active", updatedAt: new Date() }).where(eq(users.id, m.id));
+    credentials.push({ fullName: m.fullName, role: m.role, email: m.email, password: pw });
+    created++;
+  }
+
+  return { ok: true, created, alreadyHadLogin, credentials };
+}
