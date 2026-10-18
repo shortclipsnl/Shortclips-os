@@ -92,9 +92,10 @@ export default async function ProductionsPage() {
         </div>
       </Card>
 
-      {/* De agenda zelf: per week (ma–zo dag-indeling) of per maand, doorbladerbaar. */}
+      {/* De agenda zelf: per week (ma–zo dag-indeling) of per maand, doorbladerbaar.
+          Start op de week van de eerstvolgende opname, niet op een lege "deze week". */}
       <div className="mb-6">
-        <ShootAgenda shoots={agendaShoots} />
+        <ShootAgenda shoots={agendaShoots} initialDate={next?.scheduledOn} />
       </div>
 
       {nextPerClient.length > 0 ? (

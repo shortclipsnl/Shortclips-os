@@ -55,10 +55,15 @@ function isoWeek(d: Date): number {
   return 1 + Math.round((t.getTime() - first.getTime()) / 6048e5);
 }
 
-export function ShootAgenda({ shoots }: { shoots: AgendaShoot[] }) {
+export function ShootAgenda({ shoots, initialDate }: { shoots: AgendaShoot[]; initialDate?: string }) {
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
   const [view, setView] = useState<"week" | "maand">("week");
-  const [anchor, setAnchor] = useState<Date>(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; });
+  // Start op de week van de eerstvolgende opname (initialDate) als die er is —
+  // zodat je niet op een lege "deze week" landt. Anders gewoon vandaag.
+  const [anchor, setAnchor] = useState<Date>(() => {
+    if (initialDate) { const [y, m, d] = initialDate.slice(0, 10).split("-").map(Number); if (y) return new Date(y, (m ?? 1) - 1, d); }
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d;
+  });
 
   const byDate = useMemo(() => {
     const m = new Map<string, AgendaShoot[]>();
