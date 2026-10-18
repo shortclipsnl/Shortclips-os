@@ -6,6 +6,7 @@ import {
   clientContacts,
   clientIntegrations,
   clients,
+  contentCalendar,
   mondayMappings,
   productionDays,
 } from "@/db/schema";
@@ -153,12 +154,19 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
       // Gekoppelde agenda's uit de database (Beheer → Agenda's) hebben voorrang.
       // Staat er niets, dan vallen we terug op de env-lijst of alle agenda's.
       const coupled = await listEnabledCouplings();
-      const calendars = coupled.length
-        ? coupled.map((c) => ({ id: c.calendarId, summary: c.label ?? c.calendarId }))
-        : source.configuredCalendarIds.length
-          ? source.configuredCalendarIds.map((id) => ({ id, summary: id }))
-          : await source.listCalendars();
-      if (coupled.length) ctx.log(`${coupled.length} gekoppelde agenda's uit beheer`);
+      let calendars: { id: string; summary: string }[];
+      if (coupled.length) {
+        calendars = coupled.map((c) => ({ id: c.calendarId, summary: c.label ?? c.calendarId }));
+        ctx.log(`${coupled.length} gekoppelde agenda's uit beheer`);
+      } else if (source.configuredCalendarIds.length) {
+        // Echte agenda-namen ophalen (niet het kale ID), zodat de classificatie
+        // o.a. "Klant Content uploaden" als publicatie-agenda herkent.
+        const all = await source.listCalendars().catch(() => [] as { id: string; summary: string }[]);
+        const byId = new Map(all.map((c) => [c.id, c.summary]));
+        calendars = source.configuredCalendarIds.map((id) => ({ id, summary: byId.get(id) ?? id }));
+      } else {
+        calendars = await source.listCalendars();
+      }
 
       const timeMin = new Date(Date.now() - back * 86_400_000).toISOString();
       const timeMax = new Date(Date.now() + forward * 86_400_000).toISOString();
@@ -396,8 +404,79 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         if (!alreadyCounted) shoots++;
       }
 
+      // Publicatie-afspraken (agenda "Klant Content uploaden") → contentplanning.
+      // De titel is de post, de omschrijving bevat de caption. Alleen met een
+      // herkende klant (nooit gokken). Ontdubbeld via een calendar_content-koppeling.
+      const pubEvents = await db
+        .select({
+          id: calendarEvents.id,
+          clientId: calendarEvents.clientId,
+          title: calendarEvents.title,
+          description: calendarEvents.description,
+          startsAt: calendarEvents.startsAt,
+          allDay: calendarEvents.allDay,
+        })
+        .from(calendarEvents)
+        .where(
+          and(
+            eq(calendarEvents.kind, "publicatie"),
+            isNotNull(calendarEvents.clientId),
+            sql`${calendarEvents.status} is distinct from 'cancelled'`,
+          ),
+        );
+
+      let publications = 0;
+      const seenPub = new Map<string, string>();
+      for (const ev of pubEvents) {
+        if (!ev.clientId || !ev.startsAt) continue;
+        const scheduledOn = ev.startsAt.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+        const scheduledAt = ev.allDay
+          ? null
+          : `${ev.startsAt.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" })}:00`;
+        const dedupKey = `${ev.clientId}|${scheduledOn}|${(ev.title ?? "publicatie").trim().toLowerCase()}`;
+        const base = {
+          clientId: ev.clientId,
+          title: (ev.title ?? "Publicatie").slice(0, 240),
+          scheduledOn,
+          ...(scheduledAt ? { scheduledAt } : {}),
+          caption: ev.description ?? null,
+          updatedAt: new Date(),
+        };
+
+        const [map] = await db
+          .select({ id: mondayMappings.id, entityId: mondayMappings.entityId })
+          .from(mondayMappings)
+          .where(and(eq(mondayMappings.entityType, "calendar_content"), eq(mondayMappings.itemId, ev.id)))
+          .limit(1);
+
+        let targetId = seenPub.get(dedupKey) ?? map?.entityId ?? null;
+        const alreadyCounted = seenPub.has(dedupKey);
+        if (targetId) {
+          await db.update(contentCalendar).set(base).where(eq(contentCalendar.id, targetId));
+        } else {
+          const [created] = await db.insert(contentCalendar).values(base).returning({ id: contentCalendar.id });
+          targetId = created!.id;
+        }
+        seenPub.set(dedupKey, targetId);
+
+        if (map) {
+          if (map.entityId !== targetId) {
+            await db.update(mondayMappings).set({ entityId: targetId, lastSyncedAt: new Date() }).where(eq(mondayMappings.id, map.id));
+          }
+        } else {
+          await db.insert(mondayMappings).values({
+            entityType: "calendar_content",
+            entityId: targetId,
+            boardId: "google_calendar",
+            itemId: ev.id,
+            lastSyncedAt: new Date(),
+          });
+        }
+        if (!alreadyCounted) publications++;
+      }
+
       ctx.log(
-        `Klaar: ${ctx.counters.processed} afspraken, ${matched} gekoppeld, ${needsReview} voor review, ${shoots} opnamedagen afgeleid.`,
+        `Klaar: ${ctx.counters.processed} afspraken, ${matched} gekoppeld, ${needsReview} voor review, ${shoots} opnamedagen, ${publications} publicaties afgeleid.`,
       );
     },
     { triggeredById: options.triggeredById },

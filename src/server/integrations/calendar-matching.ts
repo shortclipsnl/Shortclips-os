@@ -118,7 +118,11 @@ function emailDomain(email?: string | null): string | null {
 /* ------------------------------ soort afspraak ------------------------------ */
 
 const TYPE_RULES: Array<{ kind: AppointmentKind; pattern: RegExp }> = [
-  { kind: "opname", pattern: /\b(opname(dag)?|draaidag|shoot ?day|shoot|filmdag|filmen)\b/i },
+  // Opnames worden door het team verschillend genoemd: "opname", "opnamedag",
+  // "opnamesessie", "opnamessie", "sessie", maar ook shoot/draaidag/filmen.
+  // opname\w* vangt alle opname-varianten (de oude \bopname\b miste juist
+  // "opnamesessie"). "sessie" los wordt ook als opname gelezen.
+  { kind: "opname", pattern: /\b(opname\w*|draaidag|shoot ?day|shoot|filmdag|filmen|sessie)\b/i },
   { kind: "scriptbespreking", pattern: /\b(script(bespreking|overleg)?|conceptbespreking)\b/i },
   { kind: "evaluatie", pattern: /\b(evaluatie(gesprek)?|voortgangsgesprek|kwartaalgesprek|review ?gesprek)\b/i },
   { kind: "publicatie", pattern: /\b(publicatie|online zetten|uploaden|plaatsen|posten)\b/i },
@@ -134,7 +138,7 @@ export function classifyAppointment(title?: string | null, calendarSummary?: str
 /* ------------------------------ titel-alias ------------------------------ */
 
 const TYPE_WORDS =
-  /\b(monthly|shoot ?day|shoot|opname(dag)?|draaidag|script(bespreking)?|evaluatie|publicatie|upload(en)?|meeting|overleg|call|bespreking|strategie)\b/i;
+  /\b(monthly|shoot ?day|shoot|opname\w*|draaidag|sessie|script(bespreking)?|evaluatie|publicatie|upload(en)?|meeting|overleg|call|bespreking|strategie)\b/i;
 
 /** Haalt de klant-aanduiding uit "Shortclips x <KLANT> ...". */
 export function extractTitleHint(title?: string | null): string | null {
