@@ -17,11 +17,17 @@ export type NavItem = {
   roles?: UserRole[];
 };
 
-export type NavGroup = { title: string; items: NavItem[] };
+export type NavGroup = {
+  title: string;
+  /** Accentkleur (CSS-variabele) voor de sectietitel, zodat het menu scanbaar is. */
+  accent?: string;
+  items: NavItem[];
+};
 
 export const NAVIGATION: NavGroup[] = [
   {
     title: "Overzicht",
+    accent: "var(--color-brand-600)",
     items: [
       { href: "/dashboard", label: "Vandaag", icon: "LayoutDashboard" },
       { href: "/kwaliteit", label: "Kwaliteit & Aandachtspunten", icon: "ShieldCheck", match: "/kwaliteit" },
@@ -30,6 +36,7 @@ export const NAVIGATION: NavGroup[] = [
   {
     // Alles rondom de productie: klant, planning, script, opname, edit, video's.
     title: "Werk",
+    accent: "var(--color-violet)",
     items: [
       { href: "/clients", label: "Onze klanten", icon: "Building2", permissions: ["clients:read"], match: "/clients" },
       { href: "/planning", label: "Productieplanning", icon: "CalendarRange", permissions: ["productions:read", "videos:read"], match: "/planning" },
@@ -41,6 +48,7 @@ export const NAVIGATION: NavGroup[] = [
   },
   {
     title: "Resultaten",
+    accent: "var(--color-good)",
     items: [
       { href: "/analytics", label: "Resultatenoverzicht", icon: "TrendingUp", permissions: ["analytics:read"], match: "/analytics" },
       { href: "/video-intelligence", label: "Video Intelligence", icon: "Sparkles", permissions: ["video_intelligence:read"], match: "/video-intelligence" },
@@ -48,6 +56,7 @@ export const NAVIGATION: NavGroup[] = [
   },
   {
     title: "Team",
+    accent: "var(--color-warn)",
     items: [
       { href: "/tasks", label: "Taken", icon: "CircleCheck", permissions: ["tasks:read"], match: "/tasks" },
       { href: "/team", label: "Team", icon: "Users", permissions: ["team:read", "editors:read"], match: "/team" },
@@ -58,6 +67,7 @@ export const NAVIGATION: NavGroup[] = [
   },
   {
     title: "AI Tools",
+    accent: "var(--color-info)",
     items: [
       { href: "/ai/caption", label: "Caption Maker", icon: "Sparkles", permissions: ["ai:read"], match: "/ai/caption" },
       { href: "/ai/briefing", label: "Editor Briefing", icon: "ClipboardList", permissions: ["ai:read"], match: "/ai/briefing" },
@@ -70,6 +80,7 @@ export const NAVIGATION: NavGroup[] = [
   {
     // Beheer, inclusief de uitsluitend voor de eigenaar zichtbare onderdelen.
     title: "Beheer",
+    accent: "var(--color-ink-muted)",
     items: [
       { href: "/leads", label: "Leads", icon: "Target", ownerOnly: true, match: "/leads" },
       { href: "/financien", label: "Financiën", icon: "Landmark", ownerOnly: true, match: "/financien" },

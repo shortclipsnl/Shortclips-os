@@ -25,7 +25,15 @@ export function Sidebar({ groups }: { groups: NavGroup[] }) {
       <div className="flex flex-1 flex-col gap-5">
         {groups.map((group) => (
           <div key={group.title}>
-            <p className="px-3 pb-1.5 text-2xs font-semibold tracking-[0.1em] text-[var(--color-ink-faint)] uppercase">
+            <p
+              className="flex items-center gap-1.5 px-3 pb-1.5 text-2xs font-bold tracking-[0.1em] uppercase"
+              style={{ color: group.accent ?? "var(--color-ink-faint)" }}
+            >
+              <span
+                aria-hidden
+                className="size-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: group.accent ?? "var(--color-ink-faint)" }}
+              />
               {group.title}
             </p>
             <ul className="space-y-0.5">

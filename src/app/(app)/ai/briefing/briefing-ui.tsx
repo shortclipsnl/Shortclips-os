@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Loader2, Sparkles, Upload } from "lucide-react";
 import { generateBriefing, type EditorBriefing } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote } from "@/components/ui";
-import { CopyButton, HistoryPanel, NoProviderNote, fileToBase64, type HistoryEntry } from "../_shared";
+import { CopyButton, HistoryPanel, NoProviderNote, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
 
 type ClientOption = { id: string; name: string };
 
@@ -57,6 +57,9 @@ export function BriefingMaker({
 
   return (
     <div className="space-y-5">
+      <ToolHowTo>
+        Kies de klant en het script of de video. Je krijgt een complete editor-briefing met structuur, hooks en aandachtspunten. Controleer hem en deel hem met je editor.
+      </ToolHowTo>
       {!aiReady ? <NoProviderNote /> : null}
       <HistoryPanel items={recent} onLoad={(o) => setResult(o)} />
 

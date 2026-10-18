@@ -1,7 +1,35 @@
 import "server-only";
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 import { db } from "@/db/client";
 import { meetingItems, teamMeetings } from "@/db/schema";
+
+export type UpcomingMeeting = {
+  id: string;
+  title: string;
+  scheduledAt: Date;
+  location: string | null;
+};
+
+/**
+ * De eerstvolgende teammeetings binnen een venster (standaard de komende 14
+ * dagen), oplopend op datum. Voor de weekplanning op het dashboard.
+ */
+export async function listUpcomingMeetings(days = 14, limit = 8): Promise<UpcomingMeeting[]> {
+  const now = new Date();
+  const until = new Date(now);
+  until.setDate(now.getDate() + days);
+  // Kleine marge zodat een meeting die nu bezig is nog meetelt.
+  const from = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+
+  const rows = await db
+    .select({ id: teamMeetings.id, title: teamMeetings.title, scheduledAt: teamMeetings.scheduledAt, location: teamMeetings.location })
+    .from(teamMeetings)
+    .where(and(gte(teamMeetings.scheduledAt, from), lt(teamMeetings.scheduledAt, until)))
+    .orderBy(asc(teamMeetings.scheduledAt))
+    .limit(limit);
+
+  return rows.map((r) => ({ ...r, scheduledAt: new Date(r.scheduledAt) }));
+}
 
 /** De eerstvolgende woensdag om 16:00 (vandaag als het woensdag is en vóór de avond). */
 function nextWednesday16(): Date {

@@ -147,7 +147,7 @@ export default async function AnalyticsPage({
     <div className="mx-auto max-w-[1300px]">
       <PageHeader
         title="Resultaten"
-        description={`${selectedName ?? (klanten === "gestopt" ? "Gestopte klanten" : klanten === "alle" ? "Alle klanten" : "Actieve klanten")}, afgelopen ${days} dagen · live uit Metricool`}
+        description={`${selectedName ?? (klanten === "gestopt" ? "Gestopte klanten" : klanten === "alle" ? "Alle klanten" : "Actieve klanten")}, afgelopen ${days} dagen · uit je eigen database (dagelijkse snapshots)`}
         actions={
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">

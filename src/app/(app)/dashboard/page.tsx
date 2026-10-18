@@ -3,12 +3,14 @@ import Link from "next/link";
 import { requireInternal, isOwner } from "@/server/auth/context";
 import { getDashboard } from "@/server/dashboard";
 import { getMyDay } from "@/server/my-day";
+import { listUpcomingMeetings } from "@/server/meetings";
 import { activeClientsMissingCoordinator } from "@/server/clients";
 import { editorCapacityMap } from "@/server/metrics";
 import { periodLabel } from "@/lib/format";
 import { LinkButton } from "@/components/ui";
 import { EditorDashboard } from "./editor-view";
 import { TodayView } from "./today-view";
+import { WeekPlanning } from "./week-planning";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
@@ -19,8 +21,18 @@ export default async function DashboardPage() {
   // Editors krijgen een eigen, smaller dashboard met uitsluitend hun werk.
   if (viewer.isEditorOnly) return <EditorDashboard viewer={viewer} />;
 
-  const [data, myDay, capMap] = await Promise.all([getDashboard(viewer), getMyDay(viewer), editorCapacityMap()]);
+  const [data, myDay, capMap, meetings] = await Promise.all([
+    getDashboard(viewer),
+    getMyDay(viewer),
+    editorCapacityMap(),
+    listUpcomingMeetings(7),
+  ]);
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
+
+  // Opnames binnen de komende 7 dagen voor de weekplanning.
+  const weekEnd = new Date();
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const weekShoots = data.shoots.filter((s) => new Date(s.scheduledOn) <= weekEnd);
 
   const firstName = viewer.fullName.split(" ")[0];
   const hour = new Date().getHours();
@@ -63,6 +75,9 @@ export default async function DashboardPage() {
 
       {/* Rol-gericht: maximaal drie blokken met concrete acties. */}
       <TodayView viewer={viewer} data={data} myDay={myDay} capMap={capMap} />
+
+      {/* Weekplanning: opnames en meetings die eraan komen. */}
+      <WeekPlanning shoots={weekShoots} meetings={meetings} />
     </div>
   );
 }

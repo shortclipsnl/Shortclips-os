@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, contentCalendar, deliverables, leaveRequests, productionDays, users } from "@/db/schema";
+import { clients, contentCalendar, deliverables, leaveRequests, productionDays, teamMeetings, users } from "@/db/schema";
 import { scopeToClients, type Viewer } from "@/server/auth/context";
 
 /**
@@ -12,9 +12,10 @@ import { scopeToClients, type Viewer } from "@/server/auth/context";
  */
 
 export type PlanItem = { id: string; kind: "opname" | "oplevering" | "publicatie"; date: string; clientName: string; clientColor: string | null; clientLogo: string | null; title: string; person: string | null; href: string };
+export type PlanMeeting = { id: string; title: string; date: string; time: string; location: string | null };
 export type PlanWeek = {
-  key: string; label: string; startOn: string; endOn: string;
-  opnames: PlanItem[]; opleveringen: PlanItem[]; publicaties: PlanItem[];
+  key: string; label: string; weekNumber: number; startOn: string; endOn: string;
+  opnames: PlanItem[]; opleveringen: PlanItem[]; publicaties: PlanItem[]; meetings: PlanMeeting[];
   conflicts: Array<{ editor: string; count: number }>;
   leave: Array<{ name: string; startOn: string; endOn: string }>;
 };
@@ -27,6 +28,17 @@ function mondayOf(d: Date): Date {
   return x;
 }
 const iso = (d: Date) => d.toLocaleDateString("en-CA");
+
+/** ISO 8601-weeknummer (maandag als eerste dag, week 1 bevat de eerste donderdag). */
+function isoWeekNumber(d: Date): number {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = (t.getUTCDay() + 6) % 7; // 0 = maandag
+  t.setUTCDate(t.getUTCDate() - day + 3); // donderdag van deze week
+  const firstThursday = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
+  const fDay = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - fDay + 3);
+  return 1 + Math.round((t.getTime() - firstThursday.getTime()) / (7 * 24 * 3600 * 1000));
+}
 const CONFLICT_THRESHOLD = 4; // opleveringen door dezelfde editor in één week
 
 export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<PlanWeek[]> {
@@ -36,7 +48,7 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
   const startIso = iso(start);
   const endIso = iso(end);
 
-  const [shootRows, deliverableRows, pubRows, leaveRows] = await Promise.all([
+  const [shootRows, deliverableRows, pubRows, leaveRows, meetingRows] = await Promise.all([
     db.select({ id: productionDays.id, date: productionDays.scheduledOn, clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl, person: users.fullName })
       .from(productionDays)
       .innerJoin(clients, eq(clients.id, productionDays.clientId))
@@ -58,7 +70,17 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
       .from(leaveRequests)
       .innerJoin(users, eq(users.id, leaveRequests.userId))
       .where(and(eq(leaveRequests.status, "approved"), gte(leaveRequests.endOn, startIso), lte(leaveRequests.startOn, endIso))),
+
+    db.select({ id: teamMeetings.id, title: teamMeetings.title, scheduledAt: teamMeetings.scheduledAt, location: teamMeetings.location })
+      .from(teamMeetings)
+      .where(and(gte(teamMeetings.scheduledAt, start), lte(teamMeetings.scheduledAt, end))),
   ]);
+
+  // Meetings voorbewerken: datum (voor week-bucketing) + tijd.
+  const meetings = meetingRows.map((m) => {
+    const when = new Date(m.scheduledAt);
+    return { id: m.id, title: m.title, date: iso(when), time: when.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }), location: m.location };
+  });
 
   const result: PlanWeek[] = [];
   for (let w = 0; w < weeks; w++) {
@@ -77,9 +99,10 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
     const conflicts = [...byEditor.entries()].filter(([, n]) => n >= CONFLICT_THRESHOLD).map(([editor, count]) => ({ editor, count }));
 
     const leave = leaveRows.filter((l) => l.startOn <= e && l.endOn >= s).map((l) => ({ name: l.name, startOn: l.startOn, endOn: l.endOn }));
+    const weekMeetings = meetings.filter((m) => inWeek(m.date));
 
     const label = wStart.toLocaleDateString("nl-NL", { day: "numeric", month: "short" }) + " – " + wEnd.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
-    result.push({ key: s, label: w === 0 ? `Deze week · ${label}` : label, startOn: s, endOn: e, opnames, opleveringen, publicaties, conflicts, leave });
+    result.push({ key: s, label: w === 0 ? `Deze week · ${label}` : label, weekNumber: isoWeekNumber(wStart), startOn: s, endOn: e, opnames, opleveringen, publicaties, meetings: weekMeetings, conflicts, leave });
   }
   return result;
 }

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { AlertTriangle, Loader2, Sparkles, Upload, X } from "lucide-react";
 import { generateReply, type ReplyDraft } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote, InfoNote } from "@/components/ui";
-import { CopyButton, HistoryPanel, NoProviderNote, fileToBase64, type HistoryEntry } from "../_shared";
+import { CopyButton, HistoryPanel, NoProviderNote, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
 
 type ClientOption = { id: string; name: string };
 type Img = { name: string; base64: string; mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif" };
@@ -74,6 +74,9 @@ export function BerichtAssistent({
 
   return (
     <div className="space-y-5">
+      <ToolHowTo>
+        Plak het bericht van de klant, of upload een screenshot van WhatsApp/e-mail. Je krijgt een concept-antwoord in de juiste toon. Lees het na, pas aan waar nodig en verstuur het zelf.
+      </ToolHowTo>
       {!aiReady ? <NoProviderNote /> : null}
       <HistoryPanel items={recent} onLoad={(o) => { setResult(o); setDraft(o.reply); }} />
 

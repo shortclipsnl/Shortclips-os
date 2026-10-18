@@ -122,7 +122,7 @@ export default async function ClientResultsPage({
       <Link href="/analytics" className="text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">← Resultaten</Link>
       <PageHeader
         title={client.name}
-        description={`Volledige resultaten · afgelopen ${days} dagen · live uit Metricool`}
+        description={`Volledige resultaten · afgelopen ${days} dagen · uit je eigen database (dagelijkse snapshots)`}
         actions={
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">

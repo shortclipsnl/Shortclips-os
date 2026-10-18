@@ -44,12 +44,11 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const openCountFor = (uid: string) => allOpen.filter((t) => t.assigneeId === uid).length;
   const algemeenCount = allOpen.filter((t) => !t.assigneeId).length;
 
-  // Personenrij: de coördinatiekern (op rol) staat er altijd; daarnaast ieder
-  // teamlid dat nú open taken heeft. Kern eerst (op rolprioriteit, dan naam),
-  // daarna de overigen op werkdruk (meeste open taken eerst).
+  // Personenrij: álle interne teamleden staan er altijd (ook zonder open taken),
+  // zodat iedereen direct selecteerbaar is. Kern eerst (op rolprioriteit, dan
+  // naam), daarna de overigen op werkdruk (meeste open taken eerst, dan naam).
   const isOffice = (role: string) => role in OFFICE_ROLE_ORDER;
-  const core = team
-    .filter((u) => isOffice(u.primaryRole) || openCountFor(u.id) > 0)
+  const core = [...team]
     .sort((a, b) => {
       const ao = isOffice(a.primaryRole);
       const bo = isOffice(b.primaryRole);

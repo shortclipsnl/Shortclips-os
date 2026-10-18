@@ -13,13 +13,26 @@ import {
   daysSince,
   formatDate,
 } from "@/lib/format";
-import { VIDEO_STATUS, VIDEO_WAITING_ON, videoPhase, stageOverdue, type VideoStage } from "@/lib/statuses";
+import { VIDEO_PHASE_META, VIDEO_PHASE_ORDER, VIDEO_STATUS, VIDEO_WAITING_ON, videoPhase, stageOverdue, type VideoPhase, type VideoStage } from "@/lib/statuses";
 
 const WAITING_ON: Record<string, { label: string; color: string }> = {
   client: { label: "Klant", color: "var(--color-warn)" },
   editor: { label: "Editor", color: "var(--color-brand-600)" },
   shortclips: { label: "Eigen team", color: "var(--color-indigo-ink)" },
   none: { label: "—", color: "var(--color-ink-faint)" },
+};
+
+/** Volle, onderscheidende kleur per productiefase (Monday-stijl) — alleen voor
+ *  de fasesborden hieronder, zodat elke fase in één oogopslag herkenbaar is. */
+const PHASE_COLOR: Record<VideoPhase, string> = {
+  gepland: "var(--color-ink-muted)",
+  beelden_binnen: "var(--color-info)",
+  in_edit: "var(--color-brand-600)",
+  interne_controle: "var(--color-violet)",
+  bij_klant: "var(--color-warn)",
+  feedback_verwerken: "var(--color-bad)",
+  klaar: "var(--color-good)",
+  live: "var(--color-indigo-ink)",
 };
 import { ViewSwitch } from "./view-switch";
 import { Kanban } from "./kanban";
@@ -277,9 +290,86 @@ export default async function VideosPage({
         </Card>
       )}
 
+      {/* Fases in volle kleur (Monday-stijl): de pipeline per productiefase. */}
+      {rows.length > 0 ? <PhaseBoard rows={rows} /> : null}
+
       {/* Editorbelasting & tarieven — samengevoegd vanuit de oude /editing-pagina. */}
       <WorkloadSection viewer={viewer} />
     </div>
+  );
+}
+
+type PhaseRow = { id: string; title: string; clientName: string; clientSlug: string; clientColor: string | null; clientLogo: string | null; status: string; editorName: string | null; dueOn: string | null };
+
+/**
+ * Fasesbord in volle kleur — elke productiefase is een kolom met een volledig
+ * gekleurde kop (geen klein stipje meer), zodat je in één oogopslag ziet waar
+ * het werk zit. Horizontaal scrollbaar zoals een Monday-bord.
+ */
+function PhaseBoard({ rows }: { rows: PhaseRow[] }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const byPhase = new Map<VideoPhase, PhaseRow[]>();
+  for (const phase of VIDEO_PHASE_ORDER) byPhase.set(phase, []);
+  for (const v of rows) {
+    const { phase } = videoPhase(v.status);
+    if (phase === "live") continue; // terminaal, hoort niet in de productie-pipeline
+    byPhase.get(phase)!.push(v);
+  }
+
+  return (
+    <section className="mt-6">
+      <div className="mb-3 flex items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+        <h2 className="text-sm font-bold tracking-tight">Fases</h2>
+        <span className="text-xs text-white/80">De pipeline per productiefase</span>
+      </div>
+      <div className="flex gap-3 overflow-x-auto pb-2">
+        {VIDEO_PHASE_ORDER.map((phase) => {
+          const list = byPhase.get(phase)!;
+          const color = PHASE_COLOR[phase];
+          return (
+            <div key={phase} className="flex w-64 shrink-0 flex-col overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)]">
+              {/* Volle kleur-kop. */}
+              <div className="flex items-center justify-between gap-2 px-3 py-2 text-white" style={{ background: color }}>
+                <span className="truncate text-sm font-bold">{VIDEO_PHASE_META[phase].label}</span>
+                <span className="shrink-0 rounded-full bg-white/25 px-2 py-0.5 text-2xs font-bold tabular-nums">{list.length}</span>
+              </div>
+              {/* Lichte tint-achtergrond in dezelfde kleur. */}
+              <div className="flex-1 space-y-2 p-2" style={{ background: `color-mix(in srgb, ${color} 8%, var(--color-surface))` }}>
+                {list.length === 0 ? (
+                  <p className="px-1 py-3 text-center text-2xs text-[var(--color-ink-faint)]">Leeg</p>
+                ) : (
+                  list.map((v) => {
+                    const overdue = v.dueOn && v.dueOn < today;
+                    return (
+                      <Link
+                        key={v.id}
+                        href={`/videos/${v.id}`}
+                        className="block rounded-[var(--radius-sm)] border-l-[3px] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-card)] hover:brightness-[0.99]"
+                        style={{ borderLeftColor: color }}
+                      >
+                        <span className="block truncate text-xs font-semibold">{v.title}</span>
+                        <span className="mt-1 flex items-center gap-1.5 text-2xs text-[var(--color-ink-muted)]">
+                          <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={16} />
+                          <span className="truncate">{v.clientName}</span>
+                        </span>
+                        <span className="mt-1 flex items-center justify-between gap-2 text-2xs">
+                          <span className="truncate text-[var(--color-ink-faint)]">{v.editorName ?? "—"}</span>
+                          {v.dueOn ? (
+                            <span className={`shrink-0 tabular-nums ${overdue ? "font-semibold text-[var(--color-bad)]" : "text-[var(--color-ink-faint)]"}`}>
+                              {formatDate(v.dueOn)}
+                            </span>
+                          ) : null}
+                        </span>
+                      </Link>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

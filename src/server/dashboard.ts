@@ -207,6 +207,7 @@ export async function getDashboard(viewer: Viewer) {
         clientName: clients.name,
         clientSlug: clients.slug,
         clientColor: clients.color,
+        clientLogo: clients.logoUrl,
         videographerName: users.fullName,
         openBlockers: sql<number>`(
           select count(*) from production_checklist_items ci

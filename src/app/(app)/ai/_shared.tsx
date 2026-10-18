@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, History } from "lucide-react";
+import { Check, Copy, History, Lightbulb } from "lucide-react";
 
 /** Leest een bestand als base64 (zonder de data:-prefix). */
 export function fileToBase64(file: File): Promise<string> {
@@ -82,6 +82,19 @@ export function HistoryPanel<T>({ items, onLoad }: { items: HistoryEntry<T>[]; o
           ))}
         </ul>
       ) : null}
+    </div>
+  );
+}
+
+/** Korte uitleg boven een AI-tool: wat je invult en wat je terugkrijgt. */
+export function ToolHowTo({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-[var(--radius-sm)] bg-[var(--color-info-soft)] px-3 py-2.5 text-sm text-[var(--color-ink)]">
+      <Lightbulb className="mt-0.5 size-4 shrink-0 text-[var(--color-info)]" />
+      <div>
+        <p className="font-semibold">Zo werkt het</p>
+        <p className="mt-0.5 text-[var(--color-ink-muted)]">{children}</p>
+      </div>
     </div>
   );
 }

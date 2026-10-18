@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Search } from "lucide-react";
 import { createResearch, runResearch } from "@/server/actions/sales-research";
 import { Button, Card, ErrorNote } from "@/components/ui";
-import { NoProviderNote } from "../_shared";
+import { NoProviderNote, ToolHowTo } from "../_shared";
 
 const AREAS = [
   "Bedrijf & positionering",
@@ -56,6 +56,11 @@ export function ResearchForm({ aiReady }: { aiReady: boolean }) {
 
   return (
     <Card>
+      <div className="mb-4">
+        <ToolHowTo>
+          Vul de bedrijfsnaam en/of website in. De AI zoekt online en levert een bondig bedrijfsonderzoek met inzichten voor je salesgesprek. Controleer altijd de genoemde bronnen.
+        </ToolHowTo>
+      </div>
       {!aiReady ? <div className="mb-4"><NoProviderNote /></div> : null}
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Bedrijfsnaam" required>

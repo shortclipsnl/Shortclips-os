@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { CalendarPlus, Check, Loader2, RefreshCw, Sparkles, Upload } from "lucide-react";
 import { addCaptionToPlanning, generateCaptions, regenerateOneCaption, type ShortCaption } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote } from "@/components/ui";
-import { CopyButton, HistoryPanel, NoProviderNote, fileToBase64, type HistoryEntry } from "../_shared";
+import { CopyButton, HistoryPanel, NoProviderNote, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
 
 type ClientOption = { id: string; name: string };
 
@@ -54,6 +54,9 @@ export function CaptionMaker({
 
   return (
     <div className="space-y-5">
+      <ToolHowTo>
+        Kies een klant en plak het script, of upload het script als PDF of Word-bestand. Klik op genereren — je krijgt meerdere caption-opties met passende hashtags die je direct kunt kopiëren. De toon per klant stel je in via de AI-kennisbank.
+      </ToolHowTo>
       {!aiReady ? <NoProviderNote /> : null}
       <HistoryPanel items={recent} onLoad={(o) => setResults(o)} />
 

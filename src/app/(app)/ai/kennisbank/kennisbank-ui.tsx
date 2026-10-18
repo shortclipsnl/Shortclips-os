@@ -14,6 +14,7 @@ import type {
   EditingProfile,
 } from "@/server/ai/knowledge";
 import { Button, Card, CardHeader, ErrorNote, InfoNote } from "@/components/ui";
+import { ToolHowTo } from "../_shared";
 
 const CATEGORIES = ["branding", "schrijfstijl", "productie", "editing", "communicatie", "kwaliteit", "escalatie", "algemeen"];
 
@@ -22,7 +23,11 @@ export type KnowledgeItem = { id: string; category: string; title: string; body:
 export function KnowledgeManager({ items }: { items: KnowledgeItem[] }) {
   const [adding, setAdding] = useState(false);
   return (
-    <Card padded={false}>
+    <div className="space-y-5">
+      <ToolHowTo>
+        Leg hier per klant de vaste afspraken, de gewenste toon en terugkerende correcties vast. De andere AI-tools gebruiken deze kennis automatisch, zodat hun output beter bij de klant past.
+      </ToolHowTo>
+      <Card padded={false}>
       <div className="flex items-center justify-between p-5 pb-3">
         <CardHeader title="Centrale Shortclips-kennis" subtitle="Branding, werkwijze, editingrichtlijnen, communicatie. Gebruikt door alle AI Tools." />
         <Button size="sm" variant="secondary" onClick={() => setAdding((v) => !v)}>
@@ -38,7 +43,8 @@ export function KnowledgeManager({ items }: { items: KnowledgeItem[] }) {
           <KnowledgeRow key={it.id} item={it} />
         ))}
       </div>
-    </Card>
+      </Card>
+    </div>
   );
 }
 
