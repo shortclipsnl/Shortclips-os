@@ -98,14 +98,6 @@ export default async function CapacityPage() {
         <Stat label="Actieve editors" value={String(summary.activeEditors)} tone="violet" />
       </div>
 
-      {canSeeFinance && summary.monthlyRevenue !== null ? (
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <Stat label="Omzet (indicatief)" value={euro(summary.monthlyRevenue)} hint="per maand" />
-          <Stat label="Personeels- + directe kosten" value={summary.staffCost ? euro(summary.staffCost) : "—"} hint="per maand" />
-          <Stat label="Indicatief resultaat" value={summary.estimatedProfit !== null ? euro(summary.estimatedProfit) : "—"} tone={summary.estimatedProfit !== null && summary.estimatedProfit < 0 ? "bad" : "good"} hint="per maand" />
-        </div>
-      ) : null}
-
       {/* Groeisimulator */}
       <GrowthSimulator
         currentClients={summary.activeClients}
