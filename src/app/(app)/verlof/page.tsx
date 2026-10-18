@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { and, asc, desc, eq, gte } from "drizzle-orm";
+import { CalendarClock } from "lucide-react";
 import { db } from "@/db/client";
 import { leaveRequests, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
@@ -60,6 +61,16 @@ export default async function LeavePage() {
   return (
     <div className="mx-auto max-w-[1100px]">
       <PageHeader title="Vakantieplanning" description="Vraag verlof aan, bekijk goedgekeurde afwezigheid en voorkom dat te veel collega's tegelijk weg zijn." />
+
+      {/* Duidelijke oproep om vakantie tijdig door te geven. */}
+      <div className="mb-5 flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-info)]/30 bg-[var(--color-info-soft)]/60 px-4 py-3">
+        <CalendarClock className="mt-0.5 size-5 shrink-0 text-[var(--color-info)]" strokeWidth={1.75} />
+        <p className="text-sm text-[var(--color-ink)]">
+          <strong className="font-semibold">Geef je vakantie op tijd door.</strong> Vraag verlof het liefst{" "}
+          <strong>minimaal 4 weken van tevoren</strong> aan, zodat we opnames, opleveringen en de klantplanning er goed
+          omheen kunnen regelen. Hoe eerder bekend, hoe makkelijker we het rond krijgen.
+        </p>
+      </div>
 
       <div className="mb-5">
         <RequestLeaveForm />

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { leaveRequests, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
@@ -19,10 +19,10 @@ export type LeaveBalance = {
 const HOURS_PER_DAY = 8;
 
 /**
- * Vakantiesaldo van de vaste medewerkers (kernteam: Janno, Milou, Jiska,
- * Rutger). Per persoon: beschikbaar (contract), opgenomen (goedgekeurd verlof
- * dit jaar × 8u per werkdag) en wat er nog over is. Freelancers en losse
- * content creators blijven hier bewust buiten.
+ * Vakantiesaldo van de vaste medewerkers (Milou, Jiska, Rutger). Per persoon:
+ * beschikbaar (contract), opgenomen (goedgekeurd verlof dit jaar × 8u per
+ * werkdag) en wat er nog over is. De eigenaar (Jarno) houdt hier geen saldo bij,
+ * en freelancers/losse content creators blijven bewust buiten beeld.
  */
 export async function getLeaveBalances(): Promise<LeaveBalance[]> {
   await requireInternal();
@@ -36,6 +36,8 @@ export async function getLeaveBalances(): Promise<LeaveBalance[]> {
         and(
           isNull(users.deletedAt),
           eq(users.status, "active"),
+          // De eigenaar (Jarno) houdt hier geen vakantiesaldo bij.
+          ne(users.primaryRole, "owner"),
           sql`lower(${users.email}) in (${sql.join(CORE_STAFF_EMAILS.map((e) => sql`${e}`), sql`, `)})`,
         ),
       ),
