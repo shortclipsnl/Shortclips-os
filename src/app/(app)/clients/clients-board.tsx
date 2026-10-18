@@ -118,7 +118,7 @@ function ClientCard({ c }: { c: BoardClient }) {
         title={stopped ? "Niet-actief" : "Actief"}
       />
       <Link href={`/clients/${c.slug}`} className="flex min-w-0 flex-1 items-center gap-3">
-        <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={36} />
+        <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={52} />
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2">
             <span className="min-w-0 flex-1 truncate font-medium">{c.name}</span>

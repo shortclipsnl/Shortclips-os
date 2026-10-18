@@ -63,6 +63,12 @@ export default async function CalendarPage({
   const items = rawItems.filter((i) => postsContent(i.clientName));
   const clientList = rawClientList.filter((c) => postsContent(c.name));
 
+  // Vaste set klant-filters bovenaan, in deze volgorde.
+  const CHIP_KEYS = ["autochristiaan", "benzcollector", "cbautomobielen", "campernet", "koopschalets", "marcovanbeek", "luxewagen", "nahv"];
+  const chipClients = CHIP_KEYS
+    .map((k) => clientList.find((c) => normName(c.name).includes(k)))
+    .filter((c): c is (typeof clientList)[number] => !!c);
+
   const canWrite = viewer.permissions.has("calendar:write");
   const asPlanner = params.weergave === "planner";
   const plannerTo = new Date();
@@ -148,7 +154,7 @@ export default async function CalendarPage({
         <Link href={withParam("klant", undefined)} className={chip(!params.klant)}>
           Alle klanten
         </Link>
-        {clientList.slice(0, 8).map((c) => (
+        {chipClients.map((c) => (
           <Link key={c.id} href={withParam("klant", c.slug)} className={chip(params.klant === c.slug)}>
             {c.name}
           </Link>

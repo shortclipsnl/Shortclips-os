@@ -8,7 +8,7 @@ import {
   requirePermission,
 } from "@/server/auth/context";
 import { Monitor, MousePointerClick } from "lucide-react";
-import { Avatar, Card, CardHeader, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
+import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import { compact, formatDate, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
 import { ClientSelector, type SelectorClient } from "./client-selector";
@@ -56,7 +56,7 @@ export default async function AnalyticsPage({
     totalsQuery(60, 30),
 
     db.execute(sql`
-      select c.id, c.name, c.slug, c.color, c.status,
+      select c.id, c.name, c.slug, c.color, c.status, c.logo_url as "logoUrl",
         coalesce(sum(dm.views), 0)::int as views,
         coalesce(sum(dm.reach), 0)::int as reach,
         coalesce(sum(dm.follower_delta), 0)::int as follower_growth,
@@ -65,7 +65,7 @@ export default async function AnalyticsPage({
       left join daily_metrics dm
         on dm.client_id = c.id and dm.measured_on >= current_date - ${sql.raw(`interval '${TABLE_DAYS} days'`)}
       where c.deleted_at is null ${statusCond}
-      group by c.id, c.name, c.slug, c.color, c.status
+      group by c.id, c.name, c.slug, c.color, c.status, c.logo_url
       order by (exists (select 1 from daily_metrics d2 where d2.client_id = c.id)) desc, views desc
     `),
 
@@ -104,7 +104,7 @@ export default async function AnalyticsPage({
     ((r as { rows?: T[] }).rows ?? (r as T[])) as T[];
 
   const allClientsRaw = await db.execute(sql`
-    select slug, name, color, status from clients
+    select slug, name, color, status, logo_url as "logoUrl" from clients
     where deleted_at is null and status = 'active'
     order by name
   `);
@@ -121,6 +121,7 @@ export default async function AnalyticsPage({
     name: String(c.name),
     color: c.color ? String(c.color) : null,
     status: String(c.status),
+    logoUrl: c.logoUrl ? String(c.logoUrl) : null,
   })) as SelectorClient[];
 
   const deltaPct = (cur: number, p: number): number | null => (p > 0 ? Math.round(((cur - p) / p) * 100) : null);
@@ -225,7 +226,7 @@ export default async function AnalyticsPage({
                       <td className="sc-td">
                         <Link href={`/analytics/${c.slug}`} className="flex items-center gap-2 hover:underline">
                           {i < 3 && linked ? <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[var(--color-brand-500)] text-2xs font-bold text-white">{i + 1}</span> : <span className="w-5 shrink-0" />}
-                          <Avatar name={String(c.name)} color={c.color ? String(c.color) : null} size={22} />
+                          <ClientLogo name={String(c.name)} logoUrl={c.logoUrl ? String(c.logoUrl) : null} color={c.color ? String(c.color) : null} size={22} />
                           {String(c.name)}
                         </Link>
                       </td>

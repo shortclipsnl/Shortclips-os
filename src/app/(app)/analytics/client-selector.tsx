@@ -3,9 +3,9 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Search } from "lucide-react";
-import { Avatar } from "@/components/ui";
+import { ClientLogo } from "@/components/ui";
 
-export type SelectorClient = { slug: string; name: string; color: string | null; status: string };
+export type SelectorClient = { slug: string; name: string; color: string | null; status: string; logoUrl: string | null };
 
 /**
  * Prominente klantselector voor de resultatenpagina. Donkerblauwe balk met de
@@ -48,7 +48,7 @@ export function ClientSelector({
         className="inline-flex max-w-full items-center gap-2.5 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-3.5 py-2.5 text-left text-white transition-colors hover:bg-[var(--color-indigo-soft)]"
       >
         <span className="text-2xs font-semibold uppercase tracking-wide text-white/50">Klant</span>
-        {current ? <Avatar name={current.name} color={current.color} size={26} /> : null}
+        {current ? <ClientLogo name={current.name} logoUrl={current.logoUrl} color={current.color} size={26} /> : null}
         <span className="min-w-0 truncate text-base font-bold tracking-tight">
           {current ? current.name : "Kies een klant"}
         </span>
@@ -81,7 +81,7 @@ export function ClientSelector({
                       onClick={() => go(c.slug)}
                       className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-2)]"
                     >
-                      <Avatar name={c.name} color={c.color} size={22} />
+                      <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={22} />
                       <span className="min-w-0 flex-1 truncate font-medium">{c.name}</span>
                       {c.status !== "active" ? <span className="shrink-0 text-2xs text-[var(--color-ink-faint)]">gestopt</span> : null}
                       {c.slug === currentSlug ? <Check className="size-4 shrink-0 text-[var(--color-good)]" /> : null}

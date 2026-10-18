@@ -152,13 +152,19 @@ export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }:
             </tr>
           </thead>
           <tbody>
-            {groups.map((g) => (
+            {groups.map((g, gi) => (
               <Fragment key={g.label}>
+                {/* Ruimte tussen de weekgroepen, zodat het beter scanbaar is. */}
+                {gi > 0 ? (
+                  <tr aria-hidden>
+                    <td colSpan={5} className="h-6 bg-[var(--color-surface)]" />
+                  </tr>
+                ) : null}
                 {/* Week-kop in volle kleur, zodat je van week naar week kunt scannen. */}
                 <tr>
                   <td colSpan={5} className="p-0">
                     <div
-                      className="flex items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wide text-white"
+                      className="flex items-center gap-2 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white"
                       style={{ background: WEEK_COLOR[g.order] ?? "var(--color-ink-muted)" }}
                     >
                       {g.label}
