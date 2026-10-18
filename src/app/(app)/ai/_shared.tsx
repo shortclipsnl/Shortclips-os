@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, History, Lightbulb } from "lucide-react";
+import { Check, Copy, History, Lightbulb, Save } from "lucide-react";
 
 /** Leest een bestand als base64 (zonder de data:-prefix). */
 export function fileToBase64(file: File): Promise<string> {
@@ -86,15 +86,39 @@ export function HistoryPanel<T>({ items, onLoad }: { items: HistoryEntry<T>[]; o
   );
 }
 
-/** Korte uitleg boven een AI-tool: wat je invult en wat je terugkrijgt. */
-export function ToolHowTo({ children }: { children: React.ReactNode }) {
+/**
+ * Korte uitleg boven een AI-tool, in opsommingsvorm (stap voor stap onder
+ * elkaar) i.p.v. één tekstblok. Met `output` erbij (standaard aan) komt er een
+ * vast blokje onder dat uitlegt waar het resultaat wordt opgeslagen en hoe je
+ * het kopieert of als pdf bewaart.
+ */
+export function ToolHowTo({ steps, output = true }: { steps: string[]; output?: boolean }) {
   return (
-    <div className="flex items-start gap-2.5 rounded-[var(--radius-sm)] bg-[var(--color-info-soft)] px-3 py-2.5 text-sm text-[var(--color-ink)]">
-      <Lightbulb className="mt-0.5 size-4 shrink-0 text-[var(--color-info)]" />
-      <div>
-        <p className="font-semibold">Zo werkt het</p>
-        <p className="mt-0.5 text-[var(--color-ink-muted)]">{children}</p>
-      </div>
+    <div className="rounded-[var(--radius-md)] border border-[var(--color-info)]/25 bg-[var(--color-info-soft)]/60 px-4 py-3 text-sm text-[var(--color-ink)]">
+      <p className="flex items-center gap-2 font-semibold">
+        <Lightbulb className="size-4 shrink-0 text-[var(--color-info)]" /> Zo werkt het
+      </p>
+      <ol className="mt-2 space-y-1.5">
+        {steps.map((s, i) => (
+          <li key={i} className="flex gap-2.5">
+            <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-[var(--color-info)] text-2xs font-bold text-white">{i + 1}</span>
+            <span className="text-[var(--color-ink-muted)]">{s}</span>
+          </li>
+        ))}
+      </ol>
+
+      {output ? (
+        <div className="mt-3 border-t border-[var(--color-info)]/20 pt-2.5">
+          <p className="flex items-center gap-2 text-xs font-semibold">
+            <Save className="size-3.5 shrink-0 text-[var(--color-info)]" /> Opslaan, kopiëren &amp; pdf
+          </p>
+          <ul className="mt-1.5 space-y-1 text-xs text-[var(--color-ink-muted)]">
+            <li className="flex gap-2"><span className="text-[var(--color-info)]">•</span><span>Elk resultaat wordt <strong>automatisch opgeslagen</strong> onder AI-geschiedenis (in de database, per klant) — niets gaat verloren.</span></li>
+            <li className="flex gap-2"><span className="text-[var(--color-info)]">•</span><span>Klaar? Kopieer de tekst met de <strong>Kopiëren</strong>-knop bij het resultaat.</span></li>
+            <li className="flex gap-2"><span className="text-[var(--color-info)]">•</span><span>Als <strong>pdf</strong> bewaren kan via je browser: Afdrukken (⌘/Ctrl + P) → <em>Opslaan als pdf</em>.</span></li>
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

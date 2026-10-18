@@ -57,9 +57,13 @@ export function BriefingMaker({
 
   return (
     <div className="space-y-5">
-      <ToolHowTo>
-        Kies de klant en het script of de video. Je krijgt een complete editor-briefing met structuur, hooks en aandachtspunten. Controleer hem en deel hem met je editor.
-      </ToolHowTo>
+      <ToolHowTo
+        steps={[
+          "Kies de klant en het script of de video.",
+          "Je krijgt een complete editor-briefing met structuur, hooks en aandachtspunten.",
+          "Controleer hem en deel hem met je editor.",
+        ]}
+      />
       {!aiReady ? <NoProviderNote /> : null}
       <HistoryPanel items={recent} onLoad={(o) => setResult(o)} />
 

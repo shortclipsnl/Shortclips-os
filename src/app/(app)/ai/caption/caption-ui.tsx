@@ -54,9 +54,13 @@ export function CaptionMaker({
 
   return (
     <div className="space-y-5">
-      <ToolHowTo>
-        Kies een klant en plak het script, of upload het script als PDF of Word-bestand. Klik op genereren — je krijgt meerdere caption-opties met passende hashtags die je direct kunt kopiëren. De toon per klant stel je in via de AI-kennisbank.
-      </ToolHowTo>
+      <ToolHowTo
+        steps={[
+          "Kies een klant en plak het script — of upload het script als PDF of Word-bestand.",
+          "Klik op Genereren. Je krijgt meerdere caption-opties met passende hashtags.",
+          "Kies de beste optie; de toon per klant stel je in via de AI-kennisbank.",
+        ]}
+      />
       {!aiReady ? <NoProviderNote /> : null}
       <HistoryPanel items={recent} onLoad={(o) => setResults(o)} />
 

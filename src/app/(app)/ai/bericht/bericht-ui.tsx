@@ -74,9 +74,13 @@ export function BerichtAssistent({
 
   return (
     <div className="space-y-5">
-      <ToolHowTo>
-        Plak het bericht van de klant, of upload een screenshot van WhatsApp/e-mail. Je krijgt een concept-antwoord in de juiste toon. Lees het na, pas aan waar nodig en verstuur het zelf.
-      </ToolHowTo>
+      <ToolHowTo
+        steps={[
+          "Plak het bericht van de klant — of upload een screenshot van WhatsApp/e-mail.",
+          "Je krijgt een concept-antwoord in de juiste toon.",
+          "Lees het na, pas aan waar nodig en verstuur het zelf.",
+        ]}
+      />
       {!aiReady ? <NoProviderNote /> : null}
       <HistoryPanel items={recent} onLoad={(o) => { setResult(o); setDraft(o.reply); }} />
 

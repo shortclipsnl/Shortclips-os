@@ -24,9 +24,14 @@ export function KnowledgeManager({ items }: { items: KnowledgeItem[] }) {
   const [adding, setAdding] = useState(false);
   return (
     <div className="space-y-5">
-      <ToolHowTo>
-        Leg hier per klant de vaste afspraken, de gewenste toon en terugkerende correcties vast. De andere AI-tools gebruiken deze kennis automatisch, zodat hun output beter bij de klant past.
-      </ToolHowTo>
+      <ToolHowTo
+        output={false}
+        steps={[
+          "Leg per klant de vaste afspraken, de gewenste toon en terugkerende correcties vast.",
+          "Wat je hier opslaat, blijft bewaard in de kennisbank van die klant.",
+          "De andere AI-tools gebruiken deze kennis automatisch, zodat hun output beter bij de klant past.",
+        ]}
+      />
       <Card padded={false}>
       <div className="flex items-center justify-between p-5 pb-3">
         <CardHeader title="Centrale Shortclips-kennis" subtitle="Branding, werkwijze, editingrichtlijnen, communicatie. Gebruikt door alle AI Tools." />
