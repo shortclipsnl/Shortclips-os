@@ -10,6 +10,7 @@ import { PLATFORM, PUBLICATION_STATUS } from "@/lib/statuses";
 import { cn } from "@/lib/cn";
 import { Planner } from "./planner";
 import { CalDateCell, CalStatusCell } from "./calendar-cells";
+import { ContentChip, CaptionToggle } from "./content-items";
 
 export const metadata: Metadata = { title: "Contentplanning" };
 export const dynamic = "force-dynamic";
@@ -211,6 +212,20 @@ export default async function CalendarPage({
                       <span key={p} title={PLATFORM[p]?.label} className="size-2 rounded-full" style={{ background: PLATFORM[p]?.color ?? "#999" }} />
                     ))}
                   </span>
+                  <CaptionToggle
+                    item={{
+                      id: i.id,
+                      title: i.title,
+                      caption: i.caption,
+                      clientName: i.clientName,
+                      clientSlug: i.clientSlug,
+                      scheduledOn: i.scheduledOn,
+                      scheduledAt: i.scheduledAt,
+                      contentType: i.contentType,
+                      platforms: (i.platforms as string[]) ?? [],
+                      deliverableId: i.deliverableId,
+                    }}
+                  />
                   {canWriteCal ? (
                     <CalStatusCell id={i.id} status={i.status} />
                   ) : (
@@ -276,25 +291,22 @@ export default async function CalendarPage({
                   </div>
                   <div className="space-y-1">
                     {dayItems.slice(0, 3).map((i) => (
-                      <Link
+                      <ContentChip
                         key={i.id}
-                        href={i.deliverableId ? `/videos/${i.deliverableId}` : `/clients/${i.clientSlug}?tab=planning`}
-                        className="block rounded-[4px] border-l-2 bg-[var(--color-surface-sunken)] px-1.5 py-1 hover:bg-[var(--color-neutral-soft)]"
-                        style={{ borderLeftColor: i.clientColor ?? "var(--color-brand-500)" }}
-                        title={`${i.clientName} — ${i.title}`}
-                      >
-                        <span className="block truncate text-2xs leading-tight font-medium">
-                          {i.title}
-                        </span>
-                        <span className="mt-0.5 flex items-center gap-1">
-                          {(i.platforms as string[]).slice(0, 3).map((p) => (
-                            <span key={p} className="size-1.5 rounded-full" style={{ background: PLATFORM[p]?.color ?? "#999" }} />
-                          ))}
-                          <span className="truncate text-2xs text-[var(--color-ink-faint)]">
-                            {i.clientName}
-                          </span>
-                        </span>
-                      </Link>
+                        color={i.clientColor ?? "var(--color-brand-500)"}
+                        item={{
+                          id: i.id,
+                          title: i.title,
+                          caption: i.caption,
+                          clientName: i.clientName,
+                          clientSlug: i.clientSlug,
+                          scheduledOn: i.scheduledOn,
+                          scheduledAt: i.scheduledAt,
+                          contentType: i.contentType,
+                          platforms: (i.platforms as string[]) ?? [],
+                          deliverableId: i.deliverableId,
+                        }}
+                      />
                     ))}
                   </div>
                 </div>
