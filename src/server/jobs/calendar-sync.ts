@@ -494,7 +494,7 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
  * "claim" op lastSyncAt voorkomt dat gelijktijdige bezoeken dubbel syncen.
  * Draait alleen als Google is geconfigureerd; faalt nooit richting de pagina.
  */
-export async function syncCalendarIfStale(maxAgeMinutes = 60): Promise<void> {
+export async function syncCalendarIfStale(maxAgeMinutes = 20): Promise<void> {
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_REFRESH_TOKEN) return;
   const cutoff = new Date(Date.now() - maxAgeMinutes * 60_000);
   try {
