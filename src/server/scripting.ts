@@ -7,6 +7,10 @@ import { requireInternal, scopeToClients, type Viewer } from "@/server/auth/cont
 /** Aantal scriptingdagen vóór de opname dat de scripts klaar moeten zijn. */
 export const SCRIPT_LEAD_DAYS = 7;
 
+/** Vanaf "Klaar Shortclips" is de scriptdeadline gehaald → telt als afgerond
+ *  (niet meer "te laat"). Alles daarna (scriptmeeting, final) ook. */
+const SCRIPT_DONE_STATUSES = ["klaar_shortclips", "scriptmeeting", "final"];
+
 function parseUTC(d: string): number {
   return new Date(d.slice(0, 10) + "T00:00:00Z").getTime();
 }
@@ -79,7 +83,7 @@ export async function listScripting(viewer: Viewer) {
   const list: ScriptingRow[] = rows.map((r) => {
     const deadline = addCalendarDays(r.scheduledOn, -SCRIPT_LEAD_DAYS);
     const daysToDeadline = daysDiff(deadline, today);
-    const done = r.status === "final";
+    const done = SCRIPT_DONE_STATUSES.includes(r.status);
     const flag: ScriptingRow["flag"] = done
       ? "done"
       : daysToDeadline < 0

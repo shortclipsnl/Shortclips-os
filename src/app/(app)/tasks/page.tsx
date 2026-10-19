@@ -23,7 +23,7 @@ function addDays(n: number) {
 export default async function TasksPage({ searchParams }: { searchParams: Promise<{ persoon?: string }> }) {
   const viewer = await requireInternal();
   const canWrite = viewer.permissions.has("tasks:write");
-  const persoon = (await searchParams).persoon;
+  const spPersoon = (await searchParams).persoon;
 
   const [team, allOpen] = await Promise.all([
     listAssignableUsers(),
@@ -37,6 +37,10 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   // hebben dit niet nodig, dus die vallen uit de personenrij én de toewijslijst.
   const office = team.filter((u) => isCoreStaff(u.email));
   const userOptions = office.map((u) => ({ id: u.id, fullName: u.fullName }));
+
+  // Eerste bezoek (geen ?persoon): meteen je eigen taken tonen i.p.v. "Kies een
+  // persoon". De knop "Iedereen" stuurt een lege ?persoon= en houdt het overzicht.
+  const persoon = spPersoon === undefined && office.some((u) => u.id === viewer.id) ? viewer.id : spPersoon;
 
   const openCountFor = (uid: string) => allOpen.filter((t) => t.assigneeId === uid).length;
   const algemeenCount = allOpen.filter((t) => !t.assigneeId).length;
@@ -117,7 +121,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
       {canWrite ? (
         <div className="mb-4">
-          <QuickTaskLines users={userOptions} defaultAssignee={selected?.id} />
+          <QuickTaskLines users={userOptions} defaultAssignee={selected?.id ?? (office.some((u) => u.id === viewer.id) ? viewer.id : undefined)} />
         </div>
       ) : null}
 

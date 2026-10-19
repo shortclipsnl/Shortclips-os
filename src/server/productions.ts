@@ -98,6 +98,8 @@ export async function shootsInRange(viewer: Viewer, startIso: string, endIso: st
     .where(
       and(
         isNull(productionDays.deletedAt),
+        // Geannuleerde opnames tellen nergens mee (agenda, "eerstvolgende opname").
+        ne(productionDays.status, "cancelled"),
         gte(productionDays.scheduledOn, startIso),
         lt(productionDays.scheduledOn, endIso),
         scopeToClients(viewer, productionDays.clientId),
