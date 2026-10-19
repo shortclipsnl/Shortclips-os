@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { contentCalendar } from "@/db/schema";
@@ -185,6 +185,30 @@ ${text.trim() ? `Document:\n\n${text.trim()}` : "Het document is bijgevoegd."}`;
 
 /** Plant meerdere publicaties in één keer; slaat exacte duplicaten (zelfde klant,
  *  titel én datum) over om dubbele publicaties te voorkomen. */
+/**
+ * De al geplande/gepubliceerde uploads van een klant vanaf vandaag — zodat de
+ * automatische planner weet wat er al staat en daar omheen (of daarná) verder
+ * plant, en we een overzicht kunnen tonen van wat er nu ingepland is.
+ */
+export async function getClientSchedule(clientId: string): Promise<
+  { ok: true; items: Array<{ scheduledOn: string; title: string; platforms: string[] }> } | { ok: false; message: string }
+> {
+  try {
+    const viewer = await requirePermission("calendar:read");
+    assertClientAccess(viewer, clientId);
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = await db
+      .select({ scheduledOn: contentCalendar.scheduledOn, title: contentCalendar.title, platforms: contentCalendar.platforms })
+      .from(contentCalendar)
+      .where(and(eq(contentCalendar.clientId, clientId), isNull(contentCalendar.deletedAt), gte(contentCalendar.scheduledOn, today)))
+      .orderBy(asc(contentCalendar.scheduledOn));
+    return { ok: true, items: rows.map((r) => ({ scheduledOn: r.scheduledOn, title: r.title, platforms: (r.platforms as string[]) ?? [] })) };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 export async function bulkCreateCalendarItems(input: {
   clientId: string;
   items: Array<{ title: string; scheduledOn: string; platforms: string[]; status?: string }>;

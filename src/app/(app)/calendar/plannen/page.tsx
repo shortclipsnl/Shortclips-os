@@ -30,7 +30,7 @@ export default async function AutoPlanPage() {
       <Link href="/calendar" className="text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">← Contentplanning</Link>
       <PageHeader
         title="Automatisch plannen vanuit scripts"
-        description="Upload een scriptdocument, laat de AI de videotitels herkennen en plan ze automatisch op werkdagen."
+        description="Kies de klant, sleep het scriptbestand (PDF of Word) erin en laat de AI de video's herkennen. De planner houdt rekening met wat er al in de agenda staat en toont vooraf een volledig overzicht."
       />
       <AutoPlanner clients={activeClients} aiReady={aiConfigured()} />
     </div>
