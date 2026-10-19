@@ -49,7 +49,18 @@ export default async function CalendarPage({
   const from = weeks[0]![0]!;
   const to = weeks[weeks.length - 1]![6]!;
 
-  const [rawItems, rawClientList] = await Promise.all([
+  // De huidige week (ma–zo) — altijd de échte week van vandaag, los van welke
+  // maand je bekijkt. In UTC, net als de rest van de datums op deze pagina.
+  const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const dow = (base.getUTCDay() + 6) % 7; // 0 = maandag
+  const weekDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(base);
+    d.setUTCDate(base.getUTCDate() - dow + i);
+    return d.toISOString().slice(0, 10);
+  });
+  const weekSet = new Set(weekDates);
+
+  const [rawItems, rawClientList, rawWeekItems] = await Promise.all([
     listCalendar(viewer, {
       from,
       to,
@@ -58,10 +69,24 @@ export default async function CalendarPage({
       platform: params.platform,
     }),
     listClients(viewer),
+    listCalendar(viewer, {
+      from: weekDates[0]!,
+      to: weekDates[6]!,
+      clientSlug: params.klant,
+      status: params.status,
+      platform: params.platform,
+    }),
   ]);
   // Klanten waar we niet voor posten eruit filteren.
   const items = rawItems.filter((i) => postsContent(i.clientName));
   const clientList = rawClientList.filter((c) => postsContent(c.name));
+  const weekItems = rawWeekItems.filter((i) => postsContent(i.clientName));
+  const weekByDay = new Map<string, CalendarItem[]>();
+  for (const item of weekItems) {
+    const list = weekByDay.get(item.scheduledOn) ?? [];
+    list.push(item);
+    weekByDay.set(item.scheduledOn, list);
+  }
 
   // Vaste set klant-filters bovenaan, in deze volgorde.
   const CHIP_KEYS = ["autochristiaan", "benzcollector", "cbautomobielen", "campernet", "koopschalets", "marcovanbeek", "luxewagen", "nahv"];
@@ -107,6 +132,28 @@ export default async function CalendarPage({
 
   const today = new Date().toISOString().slice(0, 10);
   const asList = params.weergave === "lijst";
+
+  // CalendarItem → het lichte item dat ContentChip verwacht.
+  const toChipItem = (i: CalendarItem) => ({
+    id: i.id,
+    title: i.title,
+    caption: i.caption,
+    clientName: i.clientName,
+    clientSlug: i.clientSlug,
+    clientLogo: i.clientLogo,
+    clientColor: i.clientColor,
+    scheduledOn: i.scheduledOn,
+    scheduledAt: i.scheduledAt,
+    contentType: i.contentType,
+    platforms: (i.platforms as string[]) ?? [],
+    deliverableId: i.deliverableId,
+  });
+
+  const dLabel = (d: string) => {
+    const [y, m, day] = d.split("-").map(Number);
+    return new Date(y!, (m ?? 1) - 1, day).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+  };
+  const weekRange = `${dLabel(weekDates[0]!)} – ${dLabel(weekDates[6]!)}`;
 
   return (
     <div className="mx-auto max-w-[1500px]">
@@ -174,6 +221,47 @@ export default async function CalendarPage({
         <span className="size-2 rounded-full bg-[var(--color-info)]" />
         We posten dagelijks tussen <strong>14:30 en 17:00 uur</strong>.
       </div>
+
+      {/* Deze week — altijd bovenaan en groen gemarkeerd, zodat je in één
+          oogopslag ziet wat er deze week de deur uit moet. */}
+      {!asPlanner ? (
+        <section className="mb-6">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-good)] px-4 py-2.5 text-white">
+            <span className="text-sm font-bold tracking-tight">Deze week</span>
+            <span className="text-xs text-white/85">{weekRange} · {weekItems.length} {weekItems.length === 1 ? "item" : "items"}</span>
+          </div>
+          <Card padded={false} className="overflow-hidden ring-1 ring-[var(--color-good)]/30">
+            <div className="grid grid-cols-7">
+              {weekDates.map((date, i) => {
+                const dayItems = weekByDay.get(date) ?? [];
+                const isToday = date === today;
+                return (
+                  <div
+                    key={date}
+                    className={cn(
+                      "min-h-24 border-r border-b border-[var(--color-line)] p-1.5 last:border-r-0",
+                      isToday ? "bg-[var(--color-good-soft)]/50" : "bg-[var(--color-good-soft)]/15",
+                    )}
+                  >
+                    <div className="mb-1 flex items-center justify-between px-1">
+                      <span className={cn("text-2xs font-semibold uppercase tracking-wide", isToday ? "text-[var(--color-good)]" : "text-[var(--color-ink-faint)]")}>
+                        {WEEKDAYS[i]} {Number(date.slice(8, 10))}
+                        {isToday ? <span className="ml-1 rounded bg-[var(--color-good)] px-1 py-px text-[9px] font-bold text-white">vandaag</span> : null}
+                      </span>
+                      {dayItems.length > 3 ? <span className="text-2xs text-[var(--color-ink-faint)]">+{dayItems.length - 3}</span> : null}
+                    </div>
+                    <div className="space-y-1">
+                      {dayItems.slice(0, 3).map((it) => (
+                        <ContentChip key={it.id} color={it.clientColor ?? "var(--color-brand-500)"} item={toChipItem(it)} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </section>
+      ) : null}
 
       {asPlanner ? (
         <Planner
@@ -269,14 +357,23 @@ export default async function CalendarPage({
           <div className="grid grid-cols-7">
             {weeks.flat().map((date) => {
               const inMonth = Number(date.slice(5, 7)) === month;
+              const inThisWeek = weekSet.has(date);
               const dayItems = byDay.get(date) ?? [];
+              // Achtergrond met duidelijke voorrang: vandaag > deze week > buiten maand.
+              const bg = date === today
+                ? "bg-[var(--color-good-soft)]/55"
+                : inThisWeek
+                  ? "bg-[var(--color-good-soft)]/20"
+                  : !inMonth
+                    ? "bg-[var(--color-surface-sunken)]/60"
+                    : "";
               return (
                 <div
                   key={date}
                   className={cn(
                     "min-h-28 border-r border-b border-[var(--color-line)] p-1.5 last:border-r-0",
-                    !inMonth && "bg-[var(--color-surface-sunken)]/60",
-                    date === today && "bg-[var(--color-info-soft)]/40",
+                    bg,
+                    inThisWeek && "ring-1 ring-inset ring-[var(--color-good)]/30",
                   )}
                 >
                   <div className="mb-1 flex items-center justify-between px-1">
