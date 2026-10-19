@@ -33,12 +33,15 @@ export type HandlerKey =
   | "taken"
   | "scripts"
   | "opnames"
+  | "opnames_week"
+  | "publicaties_week"
   | "videos"
+  | "videos_deadline"
   | "klanten"
   | "veranderd"
   | "resultaten";
 
-export const HANDLER_KEYS: HandlerKey[] = ["vandaag", "taken", "scripts", "opnames", "videos", "klanten", "veranderd", "resultaten"];
+export const HANDLER_KEYS: HandlerKey[] = ["vandaag", "taken", "scripts", "opnames", "opnames_week", "publicaties_week", "videos", "videos_deadline", "klanten", "veranderd", "resultaten"];
 
 export type ExampleQuestion = { text: string; handler: HandlerKey };
 export type QuestionCategory = { key: string; label: string; questions: ExampleQuestion[] };
@@ -56,26 +59,36 @@ export const QUESTION_CATEGORIES: QuestionCategory[] = [
     ],
   },
   {
-    key: "scripting",
-    label: "Scripting",
-    questions: [
-      { text: "Welke scripts moeten deze week nog af?", handler: "scripts" },
-      { text: "Welke scripts wachten op goedkeuring?", handler: "scripts" },
-    ],
-  },
-  {
     key: "opnames",
     label: "Opnames",
     questions: [
+      { text: "Welke opnames hebben we deze week?", handler: "opnames_week" },
       { text: "Welke opnames hebben voorbereiding nodig?", handler: "opnames" },
+    ],
+  },
+  {
+    key: "scripting",
+    label: "Scripting",
+    questions: [
+      { text: "Welke scripts moeten nog af?", handler: "scripts" },
+      { text: "Welke scripts wachten op goedkeuring?", handler: "scripts" },
     ],
   },
   {
     key: "editing",
     label: "Editing",
     questions: [
-      { text: "Welke video's dreigen hun deadline te missen?", handler: "videos" },
       { text: "Welke video's vragen aandacht?", handler: "videos" },
+      { text: "Welke video's dreigen hun deadline te missen?", handler: "videos_deadline" },
+      { text: "Welke video's wachten op de klant?", handler: "videos" },
+    ],
+  },
+  {
+    key: "planning",
+    label: "Planning",
+    questions: [
+      { text: "Wat gaat er deze week online?", handler: "publicaties_week" },
+      { text: "Welke opnames staan er deze week?", handler: "opnames_week" },
     ],
   },
   {
@@ -83,6 +96,7 @@ export const QUESTION_CATEGORIES: QuestionCategory[] = [
     label: "Klanten",
     questions: [
       { text: "Welke klanten wachten nog op een update?", handler: "klanten" },
+      { text: "Welke klanten lopen achter op hun maandafspraak?", handler: "klanten" },
     ],
   },
   {

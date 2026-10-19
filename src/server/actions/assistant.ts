@@ -7,6 +7,8 @@ import { ForbiddenError, requirePermission, scopeToClients, type Viewer } from "
 import { getMyDay } from "@/server/my-day";
 import { getDashboard } from "@/server/dashboard";
 import { getVideoHighlights } from "@/server/videos";
+import { listProductionDays } from "@/server/productions";
+import { listCalendar } from "@/server/calendar";
 import { aiConfigured, runPrompt } from "@/server/ai/client";
 import { SCRIPT_STATUS } from "@/lib/statuses";
 import { compact } from "@/lib/format";
@@ -118,6 +120,61 @@ async function hOpnames(viewer: Viewer): Promise<AssistantAnswer> {
     summary: items.length === 0 ? "Alle komende opnames zijn voorbereid — geen openstaande punten of ongoedgekeurde scripts." : `Er ${items.length === 1 ? "is" : "zijn"} ${plural(items.length, "opname", "opnames")} die nog voorbereiding nodig ${items.length === 1 ? "heeft" : "hebben"}.`,
     groups: [{ items }],
     source: "Opnameplanning (blokkades + scriptstatus)",
+  };
+}
+
+async function hOpnamesWeek(viewer: Viewer): Promise<AssistantAnswer> {
+  const shoots = await listProductionDays(viewer, "deze-week");
+  const items: AssistantItem[] = shoots.map((s) => ({
+    title: s.clientName,
+    subtitle: [s.locationName, s.videographerName].filter(Boolean).join(" · ") || null,
+    meta: `${fmtDay(s.scheduledOn)}${s.startTime ? ` · ${s.startTime.slice(0, 5)}` : ""}`,
+    tone: "info",
+    href: `/productions/${s.id}`,
+  }));
+  return {
+    summary: items.length === 0 ? "Er staan deze week geen opnames gepland." : `Er ${items.length === 1 ? "staat" : "staan"} deze week ${plural(items.length, "opname", "opnames")} gepland.`,
+    groups: [{ items }],
+    source: "Opnameplanning (deze week)",
+  };
+}
+
+async function hPublicatiesWeek(viewer: Viewer): Promise<AssistantAnswer> {
+  // Maandag t/m zondag van de huidige week (UTC, net als de rest).
+  const now = new Date();
+  const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const dow = (base.getUTCDay() + 6) % 7;
+  const start = new Date(base); start.setUTCDate(base.getUTCDate() - dow);
+  const end = new Date(start); end.setUTCDate(start.getUTCDate() + 6);
+  const rows = await listCalendar(viewer, { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) });
+  const items: AssistantItem[] = rows.map((r) => ({
+    title: r.title,
+    subtitle: [r.clientName, (r.platforms as string[])?.join(", ")].filter(Boolean).join(" · ") || null,
+    meta: `${fmtDay(r.scheduledOn)}${r.scheduledAt ? ` · ${r.scheduledAt.slice(0, 5)}` : ""}`,
+    tone: "good",
+    href: `/calendar`,
+  }));
+  return {
+    summary: items.length === 0 ? "Er staat deze week nog niets gepland om te publiceren." : `Er ${items.length === 1 ? "gaat" : "gaan"} deze week ${plural(items.length, "publicatie", "publicaties")} online.`,
+    groups: [{ items }],
+    source: "Contentplanning (deze week)",
+  };
+}
+
+async function hVideosDeadline(viewer: Viewer): Promise<AssistantAnswer> {
+  const h = await getVideoHighlights(viewer);
+  const items: AssistantItem[] = h.lateList.map((v) => ({
+    title: v.title,
+    subtitle: [v.clientName, v.editorName].filter(Boolean).join(" · "),
+    meta: `${Number(v.days)} d te laat`,
+    tone: "bad",
+    href: `/videos/${v.id}`,
+  }));
+  return {
+    summary: items.length === 0 ? "Geen video's over de deadline op dit moment." : `Er ${items.length === 1 ? "is" : "zijn"} ${plural(items.length, "video", "video's")} over de deadline.`,
+    groups: [{ items }],
+    note: "Video's die hun oplevering al voorbij zijn. Video's die er bijna overheen zijn, zie je op de Editing-pagina.",
+    source: "Editing (deadlines)",
   };
 }
 
@@ -239,7 +296,10 @@ const HANDLERS: Record<HandlerKey, (v: Viewer) => Promise<AssistantAnswer>> = {
   taken: hTaken,
   scripts: hScripts,
   opnames: hOpnames,
+  opnames_week: hOpnamesWeek,
+  publicaties_week: hPublicatiesWeek,
   videos: hVideos,
+  videos_deadline: hVideosDeadline,
   klanten: hKlanten,
   veranderd: hVeranderd,
   resultaten: hResultaten,
@@ -249,14 +309,19 @@ const HANDLERS: Record<HandlerKey, (v: Viewer) => Promise<AssistantAnswer>> = {
  *  vragen zonder AI meteen uit de echte data beantwoord worden. */
 function routeByKeyword(q: string): HandlerKey | null {
   const s = q.toLowerCase();
+  const week = /(deze week|komende week|dit weekend)/.test(s);
   if (/(resulta|presteer|best presterend|weergav|views|bereik)/.test(s)) return "resultaten";
   if (/(verander|sinds gisteren|nieuw sinds|update sinds|wat is er nieuw)/.test(s)) return "veranderd";
+  // Publiceren/online deze week → contentplanning.
+  if ((/(publica|online|post|plaats|content)/.test(s)) && (week || /online/.test(s))) return "publicaties_week";
+  if (/(opname|shoot|draaidag|film)/.test(s)) return week ? "opnames_week" : (/(voorbereid|klaar|rond)/.test(s) ? "opnames" : "opnames_week");
   if (/\bscript/.test(s)) return "scripts";
-  if (/(opname|shoot|draaidag|voorbereid)/.test(s)) return "opnames";
-  if (/(video|edit|deadline|te laat|oplever)/.test(s)) return "videos";
+  if (/(deadline|te laat|over de deadline|dreigen)/.test(s)) return "videos_deadline";
+  if (/(video|edit|oplever|montage)/.test(s)) return "videos";
   if (/\bklant/.test(s)) return "klanten";
-  if (/(mijn taak|mijn taken|taken|to-?do)/.test(s)) return "taken";
+  if (/(mijn taak|mijn taken|\btaken\b|to-?do)/.test(s)) return "taken";
   if (/(vandaag|prioriteit|wat moet ik)/.test(s)) return "vandaag";
+  if (week) return "opnames_week";
   return null;
 }
 

@@ -18,13 +18,10 @@ const DOT: Record<AssistantTone, string> = {
 type Asked = { question: string; answer: AssistantAnswer } | { question: string; error: string } | null;
 
 export function AssistantConsole({ firstName, aiReady }: { firstName: string; aiReady: boolean }) {
-  const [cat, setCat] = useState(QUESTION_CATEGORIES[0]!.key);
   const [text, setText] = useState("");
   const [asked, setAsked] = useState<Asked>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const activeCat = QUESTION_CATEGORIES.find((c) => c.key === cat) ?? QUESTION_CATEGORIES[0]!;
 
   function run(question: string, handler?: HandlerKey) {
     const q = question.trim();
@@ -74,36 +71,32 @@ export function AssistantConsole({ firstName, aiReady }: { firstName: string; ai
         </form>
       </Card>
 
-      {/* Voorbeeldvragen per categorie. */}
+      {/* Voorbeeldvragen — per categorie, onder elkaar. */}
       <div>
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Voorbeeldvragen</span>
-          <div className="flex flex-wrap gap-1.5">
-            {QUESTION_CATEGORIES.map((c) => (
-              <button
-                key={c.key}
-                type="button"
-                onClick={() => setCat(c.key)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${c.key === cat ? "bg-[var(--color-indigo-ink)] text-white" : "border border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
-              >
+        <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Voorbeeldvragen</span>
+        <div className="mt-2 space-y-4">
+          {QUESTION_CATEGORIES.map((c) => (
+            <div key={c.key}>
+              <h3 className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
+                <span className="inline-block size-1.5 rounded-full bg-[var(--color-brand-500)]" />
                 {c.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {activeCat.questions.map((q) => (
-            <button
-              key={q.text}
-              type="button"
-              onClick={() => onExample(q)}
-              disabled={pending}
-              className="group flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-2.5 text-left text-sm font-medium hover:border-[var(--color-brand-500)] hover:bg-[var(--color-surface-sunken)]"
-            >
-              <Sparkles className="size-4 shrink-0 text-[var(--color-brand-500)]" />
-              <span className="min-w-0 flex-1">{q.text}</span>
-              <ChevronRight className="size-4 shrink-0 text-[var(--color-ink-faint)] group-hover:text-[var(--color-brand-600)]" />
-            </button>
+              </h3>
+              <div className="flex flex-col gap-1.5">
+                {c.questions.map((q) => (
+                  <button
+                    key={q.text}
+                    type="button"
+                    onClick={() => onExample(q)}
+                    disabled={pending}
+                    className="group flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-2.5 text-left text-sm font-medium hover:border-[var(--color-brand-500)] hover:bg-[var(--color-surface-sunken)]"
+                  >
+                    <Sparkles className="size-4 shrink-0 text-[var(--color-brand-500)]" />
+                    <span className="min-w-0 flex-1">{q.text}</span>
+                    <ChevronRight className="size-4 shrink-0 text-[var(--color-ink-faint)] group-hover:text-[var(--color-brand-600)]" />
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>
