@@ -108,6 +108,35 @@ export default async function ClientResultsPage({
 
   const avgViews = publishedTotal > 0 ? Math.round(Number(t.views ?? 0) / publishedTotal) : 0;
   const maxMonth = Math.max(1, ...months.map((m) => Number(m.views)));
+
+  // Inzichten per maand, automatisch afgeleid uit de maandcijfers (geen AI nodig).
+  const monthLabelNL = (ym: string) => {
+    const [y, m] = ym.split("-").map(Number);
+    return new Date(y!, (m ?? 1) - 1, 1).toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
+  };
+  const monthRows = months.map((m) => ({ ym: String(m.maand), views: Number(m.views) }));
+  const monthInsights: string[] = [];
+  if (monthRows.length >= 2) {
+    const best = monthRows.reduce((a, b) => (b.views > a.views ? b : a));
+    if (best.views > 0) monthInsights.push(`Beste maand tot nu toe: ${monthLabelNL(best.ym)} met ${compact(best.views)} weergaven.`);
+    const last = monthRows[monthRows.length - 1]!;
+    const prev = monthRows[monthRows.length - 2]!;
+    if (prev.views > 0) {
+      const d = Math.round(((last.views - prev.views) / prev.views) * 100);
+      monthInsights.push(`${monthLabelNL(last.ym)} ${d >= 0 ? "steeg" : "daalde"} ${Math.abs(d)}% t.o.v. ${monthLabelNL(prev.ym)} (${compact(last.views)} vs ${compact(prev.views)} weergaven).`);
+    }
+    if (monthRows.length >= 6) {
+      const recent = monthRows.slice(-3).reduce((s, m) => s + m.views, 0);
+      const earlier = monthRows.slice(-6, -3).reduce((s, m) => s + m.views, 0);
+      // Bij een hele kleine basis is een percentage misleidend → dan woorden.
+      if (earlier >= 200) {
+        const d = Math.round(((recent - earlier) / earlier) * 100);
+        monthInsights.push(`De laatste 3 maanden liggen ${Math.abs(d)}% ${d >= 0 ? "hoger" : "lager"} dan de 3 maanden daarvoor.`);
+      } else if (recent > earlier * 2 && recent >= 200) {
+        monthInsights.push(`De laatste 3 maanden trekken duidelijk aan (${compact(recent)} weergaven, tegen ${compact(earlier)} in de 3 maanden daarvoor).`);
+      }
+    }
+  }
   // Gemiddelde kijktijd = totale kijktijd / videoweergaven (uit Metricool reels).
   const videoViews = Number(t.video_views ?? 0);
   const avgWatch = videoViews > 0 ? Number(t.watch_seconds ?? 0) / videoViews : null;
@@ -223,11 +252,21 @@ export default async function ClientResultsPage({
                 <div className="space-y-2 p-5 pt-1">
                   {months.map((m) => (
                     <div key={String(m.maand)} className="flex items-center gap-3">
-                      <span className="w-16 shrink-0 text-xs text-[var(--color-ink-muted)]">{String(m.maand)}</span>
+                      <span className="w-16 shrink-0 text-xs text-[var(--color-ink-muted)]">{monthLabelNL(String(m.maand)).replace(/ \d{4}$/, "")}</span>
                       <span className="h-3 rounded-full bg-[var(--color-indigo-ink)]" style={{ width: `${Math.max(3, (Number(m.views) / maxMonth) * 100)}%` }} />
                       <span className="shrink-0 text-xs tabular-nums text-[var(--color-ink-muted)]">{compact(Number(m.views))}</span>
                     </div>
                   ))}
+                  {monthInsights.length > 0 ? (
+                    <div className="mt-3 border-t border-[var(--color-line)] pt-3">
+                      <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Inzichten per maand</span>
+                      <ul className="mt-1.5 space-y-1 text-sm text-[var(--color-ink-muted)]">
+                        {monthInsights.map((t, i) => (
+                          <li key={i} className="flex gap-2"><span className="text-[var(--color-brand-500)]">•</span><span>{t}</span></li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </Card>

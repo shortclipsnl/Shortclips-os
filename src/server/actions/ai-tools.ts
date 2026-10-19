@@ -106,12 +106,12 @@ ${learned ? `\nGELEERDE KLANTVOORKEUREN (bevestigd uit eerder werk — volg deze
 
 ${knowledge ? `ALGEMENE SHORTCLIPS-KENNIS:\n${knowledge}\n` : ""}
 REGELS VOOR DE CAPTIONS:
-- Baseer elke caption op de daadwerkelijke inhoud van het script.
-- Gebruik de hook van het script als belangrijk uitgangspunt voor de opening, maar schrijf het script niet over — maak een aantrekkelijke caption die aansluit op de video.
+- HEEL BELANGRIJK: de caption draait volledig om de hoek/hook van de video. Pak uit het script de hook (de invalshoek waarmee de video opent) en spreek de kijker daar direct op aan. Niet het script navertellen of samenvatten.
+- ZEER KORT en pakkend: 1 à 2 korte zinnen, zoals het team ze écht schrijft. Nooit lange captions.
 - Gebruik de tone of voice en schrijfstijl van deze klant. Laat het natuurlijk klinken, nooit herkenbaar als AI.
 - Gebruik passende emoji's alleen als dat bij deze klant past.
 - Voeg contactgegevens alleen toe als dat onderdeel is van de captionstijl van de klant, en uitsluitend de gegevens die in het profiel staan. Verzin nooit gegevens.
-- Eén caption per short die werkt op Instagram, TikTok, Facebook én YouTube Shorts (niet per platform verschillend). Kort en pakkend.
+- Eén caption per short die werkt op Instagram, TikTok, Facebook én YouTube Shorts (niet per platform verschillend).
 - Zet GEEN hashtags in de caption zelf; die geef je apart als eventueel toepasbare hashtags (relevant voor onderwerp en branche, geen generieke of willekeurige — mag een lege lijst zijn).
 - Zorg dat de captions onderling variëren — niet elke video dezelfde soort opening.`;
 
@@ -164,6 +164,8 @@ export async function regenerateOneCaption(input: {
   hook: string;
   scriptText?: string;
   pdfBase64?: string;
+  /** Variant van de nieuwe versie. Leeg = gewoon een frisse variatie. */
+  variant?: "variatie" | "met_cta" | "zonder_cta" | "korter" | "langer";
 }): Promise<AiActionResult<ShortCaption>> {
   try {
     const viewer = await requirePermission("ai:read");
@@ -178,9 +180,20 @@ export async function regenerateOneCaption(input: {
 Je maakt captions voor klant "${name}". Houd je aan dit captionprofiel:
 ${caption}
 
-Baseer de caption op de inhoud van het script en de hook. Eén caption die werkt op Instagram, TikTok, Facebook en YouTube Shorts. Gebruik passende emoji's; zet geen hashtags in de caption maar geef ze apart. Verzin geen contactgegevens.`;
+De caption draait volledig om de hoek/hook van de video en spreekt de kijker daar direct op aan — niet het script navertellen. Standaard ZEER kort en pakkend (1 à 2 korte zinnen), zoals het team ze écht schrijft. Eén caption die werkt op Instagram, TikTok, Facebook en YouTube Shorts. Gebruik passende emoji's; zet geen hashtags in de caption maar geef ze apart. Verzin geen contactgegevens.`;
 
-    const user = `Genereer UITSLUITEND voor de volgende short één nieuwe, frisse caption (andere invalshoek dan voorheen), bruikbaar voor Instagram, TikTok, Facebook en YouTube Shorts, plus eventueel toepasbare hashtags.
+    const variantInstr: Record<NonNullable<typeof input.variant>, string> = {
+      variatie: "Kies een andere invalshoek dan voorheen, maar blijf kort en gericht op de hoek van de video.",
+      met_cta: "Voeg een duidelijke, natuurlijke call to action toe (bijv. aanzetten tot reageren, kijken of contact opnemen) — passend bij de klant.",
+      zonder_cta: "Zonder call to action: puur de pakkende, hook-gerichte caption.",
+      korter: "Maak het nóg korter: één pakkende zin die direct de hoek van de video raakt.",
+      langer: "Maak het iets uitgebreider (maar nog steeds vlot en gericht op de hoek), met wat meer context of een extra prikkel.",
+    };
+    const instr = variantInstr[input.variant ?? "variatie"];
+
+    const user = `Genereer UITSLUITEND voor de volgende short één nieuwe caption, bruikbaar voor Instagram, TikTok, Facebook en YouTube Shorts, plus eventueel toepasbare hashtags.
+
+${instr}
 
 Short: "${input.shortTitle}"
 Hook: "${input.hook}"

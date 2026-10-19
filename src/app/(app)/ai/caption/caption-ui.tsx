@@ -239,18 +239,27 @@ function ShortBlock({
     : `${short.caption}${short.hashtags?.length ? `\n\n${short.hashtags.join(" ")}` : ""}`
   ).trim();
 
-  function regen() {
+  function regen(variant?: "variatie" | "met_cta" | "zonder_cta" | "korter" | "langer") {
+    setErr(null);
     start(async () => {
       const res = await regenerateOneCaption({
         clientId,
         shortTitle: short.shortTitle,
         hook: short.hook,
         pdfBase64: pdfBase64 ?? undefined,
+        variant,
       });
       if (res.ok) onChange(res.data);
       else setErr(res.message);
     });
   }
+
+  const VARIANTS: { key: "met_cta" | "zonder_cta" | "korter" | "langer"; label: string }[] = [
+    { key: "met_cta", label: "Met CTA" },
+    { key: "zonder_cta", label: "Zonder CTA" },
+    { key: "korter", label: "Korter" },
+    { key: "langer", label: "Langer" },
+  ];
 
   function toPlanning() {
     setErr(null);
@@ -272,7 +281,7 @@ function ShortBlock({
             {saved ? <Check className="size-3.5 text-[var(--color-good)]" /> : planning ? <Loader2 className="size-3.5 animate-spin" /> : <CalendarPlus className="size-3.5" />}
             {saved ? "In planning" : "Naar contentplanning"}
           </Button>
-          <Button size="sm" variant="ghost" onClick={regen} disabled={pending}>
+          <Button size="sm" variant="ghost" onClick={() => regen()} disabled={pending}>
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
             Opnieuw
           </Button>
@@ -306,6 +315,21 @@ function ShortBlock({
             )}
           </div>
         )}
+        {/* Snel een andere versie: met/zonder CTA, korter of langer. */}
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[var(--color-line)] pt-3">
+          <span className="text-2xs text-[var(--color-ink-faint)]">Andere versie:</span>
+          {VARIANTS.map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              disabled={pending}
+              onClick={() => regen(v.key)}
+              className="rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 py-1 text-xs font-medium hover:bg-[var(--color-surface-sunken)] disabled:opacity-50"
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
       </div>
       {err ? <div className="mt-2"><ErrorNote>{err}</ErrorNote></div> : null}
     </Card>

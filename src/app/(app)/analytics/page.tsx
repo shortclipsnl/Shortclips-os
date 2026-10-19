@@ -26,7 +26,10 @@ export default async function AnalyticsPage({
 }) {
   await requirePermission("analytics:read");
   const params = await searchParams;
-  const linkFilter = params.koppeling === "gekoppeld" || params.koppeling === "niet" ? params.koppeling : null;
+  // Standaard tonen we alleen gekoppelde klanten — dan zie je meteen echte
+  // resultaten en niet een lijst vol lege klanten. "Alle" is een bewuste keuze.
+  const linkFilter: "gekoppeld" | "niet" | "alle" =
+    params.koppeling === "niet" ? "niet" : params.koppeling === "alle" ? "alle" : "gekoppeld";
 
   // Alleen actieve klanten — gestopte klanten tonen we hier bewust niet.
   const statusCond = sql`and c.status = 'active'`;
@@ -187,13 +190,13 @@ export default async function AnalyticsPage({
       {/* Klant-tegels: logo's naast elkaar met bedrijfsnaam, groot en klikbaar —
           makkelijk aan te wijzen op een scherm. Klik opent alle resultaten van
           die klant. Gekoppelde klanten eerst. */}
-      {/* Filter op koppeling: standaard alle, of alleen (niet-)gekoppelde klanten. */}
+      {/* Filter op koppeling: standaard alleen gekoppelde klanten (echte resultaten). */}
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Tonen:</span>
-        <Link href="/analytics" className={linkTab(!linkFilter)}>Alle klanten <span className="opacity-70">· {allTiles.length}</span></Link>
         <Link href="/analytics?koppeling=gekoppeld" className={linkTab(linkFilter === "gekoppeld")}>
           <span className="size-1.5 rounded-full bg-[var(--color-good)]" /> Gekoppeld <span className="opacity-70">· {linkedCount}</span>
         </Link>
+        <Link href="/analytics?koppeling=alle" className={linkTab(linkFilter === "alle")}>Alle klanten <span className="opacity-70">· {allTiles.length}</span></Link>
         <Link href="/analytics?koppeling=niet" className={linkTab(linkFilter === "niet")}>
           <span className="size-1.5 rounded-full bg-[var(--color-line-strong)]" /> Niet gekoppeld <span className="opacity-70">· {allTiles.length - linkedCount}</span>
         </Link>
