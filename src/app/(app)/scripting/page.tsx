@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function ScriptingPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const viewer = await requireInternal();
   const canWrite = viewer.permissions.has("scripts:write");
-  const { rows, stats, clientOptions } = await listScripting(viewer);
+  const { rows, stats, clientOptions, writerOptions } = await listScripting(viewer);
   const filter = (await searchParams).filter;
 
   return (
@@ -36,7 +36,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
         </Link>
       ) : null}
 
-      <ScriptingBoard rows={rows} clientOptions={clientOptions} canWrite={canWrite} defaultFilter={filter} />
+      <ScriptingBoard rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} />
     </div>
   );
 }

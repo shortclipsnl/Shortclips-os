@@ -4,10 +4,10 @@ import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, Loader2 } from "lucide-react";
-import { setScriptingStatus } from "@/server/actions/scripting";
+import { setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS } from "@/lib/statuses";
-import { ClientLogo } from "@/components/ui";
-import type { ScriptingRow } from "@/server/scripting";
+import { Avatar, ClientLogo } from "@/components/ui";
+import type { ScriptingRow, WriterOption } from "@/server/scripting";
 
 const FILTERS = [
   { key: "alle", label: "Alle aankomend" },
@@ -82,7 +82,7 @@ const FLAG_COLOR: Record<string, string> = {
   done: "var(--color-good)",
 };
 
-export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }: { rows: ScriptingRow[]; clientOptions: string[]; canWrite: boolean; defaultFilter?: string }) {
+export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, defaultFilter }: { rows: ScriptingRow[]; clientOptions: string[]; writerOptions: WriterOption[]; canWrite: boolean; defaultFilter?: string }) {
   const [filter, setFilter] = useState<string>(FILTERS.some((f) => f.key === defaultFilter) ? defaultFilter! : "alle");
   const [status, setStatus] = useState<string>("alle");
   const [client, setClient] = useState<string>("alle");
@@ -141,13 +141,14 @@ export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }:
       <div className="mb-2 text-xs text-[var(--color-ink-faint)]">{filtered.length} van {rows.length} opnames</div>
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <table className="w-full min-w-[760px] text-sm">
+        <table className="w-full min-w-[900px] text-sm">
           <thead>
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] text-left text-xs text-[var(--color-ink-faint)]">
               <th className="px-3 py-2 font-medium">Klant</th>
               <th className="px-2 py-2 font-medium">Opname</th>
               <th className="px-2 py-2 font-medium">Scriptdeadline</th>
               <th className="px-2 py-2 font-medium">Afteller</th>
+              <th className="px-2 py-2 font-medium">Verantwoordelijke</th>
               <th className="px-2 py-2 font-medium">Scriptingstatus</th>
             </tr>
           </thead>
@@ -157,12 +158,12 @@ export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }:
                 {/* Ruimte tussen de weekgroepen, zodat het beter scanbaar is. */}
                 {gi > 0 ? (
                   <tr aria-hidden>
-                    <td colSpan={5} className="h-6 bg-[var(--color-surface)]" />
+                    <td colSpan={6} className="h-6 bg-[var(--color-surface)]" />
                   </tr>
                 ) : null}
                 {/* Week-kop in volle kleur, zodat je van week naar week kunt scannen. */}
                 <tr>
-                  <td colSpan={5} className="p-0">
+                  <td colSpan={6} className="p-0">
                     <div
                       className="flex items-center gap-2 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white"
                       style={{ background: WEEK_COLOR[g.order] ?? "var(--color-ink-muted)" }}
@@ -190,6 +191,9 @@ export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }:
                       </span>
                     </td>
                     <td className="px-2 py-2 align-top">
+                      <WriterCell id={r.id} writerId={r.scriptWriterId} writerName={r.scriptWriterName} options={writerOptions} canWrite={canWrite} />
+                    </td>
+                    <td className="px-2 py-2 align-top">
                       <StatusPicker id={r.id} status={r.status} canWrite={canWrite} />
                     </td>
                   </tr>
@@ -197,12 +201,56 @@ export function ScriptingBoard({ rows, clientOptions, canWrite, defaultFilter }:
               </Fragment>
             ))}
             {groups.length === 0 ? (
-              <tr><td colSpan={5} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
+              <tr><td colSpan={6} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
             ) : null}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+/**
+ * Verantwoordelijke scriptschrijver kiezen (Milou/Jiska/Jarno). Niet toegewezen
+ * valt op in oranje, zodat meteen duidelijk is wie het script nog moet oppakken.
+ */
+function WriterCell({ id, writerId, writerName, options, canWrite }: { id: string; writerId: string | null; writerName: string | null; options: WriterOption[]; canWrite: boolean }) {
+  const [pending, start] = useTransition();
+  const router = useRouter();
+
+  if (!canWrite) {
+    return writerName ? (
+      <span className="inline-flex items-center gap-1.5 text-sm">
+        <Avatar name={writerName} size={20} />
+        {writerName.split(" ")[0]}
+      </span>
+    ) : (
+      <span className="text-xs text-[var(--color-ink-faint)]">—</span>
+    );
+  }
+
+  const change = (next: string) => {
+    start(async () => { await setScriptWriter(id, next || null); router.refresh(); });
+  };
+  const unassigned = !writerId;
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {writerName ? <Avatar name={writerName} size={20} /> : null}
+      <select
+        value={writerId ?? ""}
+        onChange={(e) => change(e.target.value)}
+        disabled={pending}
+        aria-label="Verantwoordelijke"
+        className={`h-7 min-w-[120px] rounded-full border-0 py-0 pl-2.5 pr-6 text-xs font-semibold ${unassigned ? "bg-[var(--color-warn-soft)]/60 text-[#8a5300]" : "bg-[var(--color-surface-2)] text-[var(--color-ink)]"}`}
+      >
+        <option value="">⚠ Wie schrijft dit?</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>{o.fullName.split(" ")[0]}</option>
+        ))}
+      </select>
+      {pending ? <Loader2 className="size-3 animate-spin text-[var(--color-ink-faint)]" /> : null}
+    </span>
   );
 }
 

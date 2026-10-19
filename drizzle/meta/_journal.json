@@ -260,6 +260,13 @@
       "when": 1792406284821,
       "tag": "0036_kennisbank",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792420924420,
+      "tag": "0037_wise_gamma_corps",
+      "breakpoints": true
     }
   ]
 }

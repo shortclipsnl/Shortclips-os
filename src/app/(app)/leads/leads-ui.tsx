@@ -8,15 +8,28 @@ import type { LeadRow } from "@/server/leads";
 import { LEAD_STATUS } from "@/lib/statuses";
 
 /** Vaste bronnen met een eigen kleur, zodat ze goed herkenbaar zijn. */
+// Elke bron een eigen, duidelijke kleur — inclusief de bronnen die echt in de
+// data voorkomen (Rocket leads, Website, Onbekend). Onbekende/nieuwe bronnen
+// krijgen via een hash alsnog een vaste, eigen kleur.
 const LEAD_SOURCES: { value: string; color: string }[] = [
+  { value: "Rocket leads", color: "#7c5cff" },
   { value: "Meta advertentiecampagne", color: "#1877F2" },
-  { value: "Mail", color: "#0f766e" },
-  { value: "Social media", color: "#d6336c" },
+  { value: "Website", color: "#2f9e44" },
   { value: "Netwerk", color: "#f2843b" },
   { value: "LinkedIn", color: "#5b9bf0" },
+  { value: "Social media", color: "#d6336c" },
+  { value: "Mail", color: "#0f766e" },
+  { value: "Onbekend", color: "#8a94a6" },
 ];
+const SOURCE_FALLBACK = ["#1098ad", "#e8590c", "#9c36b5", "#2b8a3e", "#c2255c", "#1864ab", "#5f3dc4", "#087f5b"];
 function sourceColor(s: string | null | undefined): string {
-  return LEAD_SOURCES.find((x) => x.value.toLowerCase() === (s ?? "").toLowerCase())?.color ?? "var(--color-ink-faint)";
+  const key = (s ?? "").trim().toLowerCase();
+  if (!key) return "var(--color-ink-faint)";
+  const hit = LEAD_SOURCES.find((x) => x.value.toLowerCase() === key);
+  if (hit) return hit.color;
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return SOURCE_FALLBACK[h % SOURCE_FALLBACK.length]!;
 }
 
 /** Snel een nieuwe lead toevoegen (handmatig, naast de webhook-intake). */
@@ -268,8 +281,8 @@ function SourceCell({ id, source }: { id: string; source: string | null }) {
     <span className="relative inline-flex items-center">
       <span className="mr-1.5 size-2 shrink-0 rounded-full" style={{ background: color }} />
       <select value={val} onChange={(e) => change(e.target.value)} disabled={pending}
-        className="max-w-[150px] cursor-pointer appearance-none rounded-full py-1 pl-2 pr-5 text-xs font-medium"
-        style={{ background: `color-mix(in srgb, ${color} 15%, var(--color-surface))`, color: val ? color : "var(--color-ink-muted)" }}>
+        className="max-w-[150px] cursor-pointer appearance-none rounded-full py-1 pl-2 pr-5 text-xs font-semibold"
+        style={{ background: `color-mix(in srgb, ${color} 20%, var(--color-surface))`, color: val ? color : "var(--color-ink-muted)", boxShadow: val ? `inset 0 0 0 1px color-mix(in srgb, ${color} 45%, transparent)` : undefined }}>
         <option value="">Bron kiezen…</option>
         {LEAD_SOURCES.map((s) => <option key={s.value} value={s.value}>{s.value}</option>)}
         {val && !inList ? <option value={val}>{val}</option> : null}

@@ -29,13 +29,13 @@ export default async function KoppelingenPage() {
             <p className="mt-1 text-[var(--color-ink-muted)]">
               Elke video hoort bij een <strong>opnamedag</strong>. Dankzij die koppeling weet de Hub automatisch de
               <strong> deadline</strong> (14 werkdagen na de opname) en komen de video&apos;s op de juiste plek in de planning en bij de klant.
-              Meestal koppelt het systeem dit <strong>vanzelf</strong>. Lukt dat niet zeker — bijvoorbeeld bij meerdere opnames vlak na elkaar —
-              dan vraagt het hier even om bevestiging.
+              Zekere koppelingen legt het systeem nu <strong>volledig automatisch</strong> — je hoeft daar niets voor te doen.
+              Alleen écht twijfelgevallen — bijvoorbeeld meerdere opnames vlak na elkaar — blijven hier staan voor een snelle check.
             </p>
             <p className="mt-2 font-semibold">Wat moet je doen?</p>
             <ul className="mt-1 space-y-0.5 text-[var(--color-ink-muted)]">
-              <li className="flex gap-1.5"><span className="text-[var(--color-info)]">•</span><span>Staat er een suggestie? Controleer de voorgestelde opname en klik <strong>Bevestigen</strong> (of <strong>Afwijzen</strong> als het niet klopt).</span></li>
-              <li className="flex gap-1.5"><span className="text-[var(--color-info)]">•</span><span>Suggesties met zekerheid <strong>Hoog</strong> kun je in één keer bevestigen met de knop bovenaan.</span></li>
+              <li className="flex gap-1.5"><span className="text-[var(--color-info)]">•</span><span>Zekere koppelingen gebeuren <strong>vanzelf</strong>; die zie je hier niet meer terug.</span></li>
+              <li className="flex gap-1.5"><span className="text-[var(--color-info)]">•</span><span>Staat er tóch een suggestie? Dan twijfelde het systeem — controleer de opname en klik <strong>Bevestigen</strong> (of <strong>Afwijzen</strong>).</span></li>
               <li className="flex gap-1.5"><span className="text-[var(--color-info)]">•</span><span>Staat hier niets? Dan is alles gekoppeld en hoef je <strong>niets</strong> te doen.</span></li>
             </ul>
           </div>

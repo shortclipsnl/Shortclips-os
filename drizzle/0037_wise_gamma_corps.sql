@@ -1,0 +1,2 @@
+ALTER TABLE "production_days" ADD COLUMN "script_writer_id" uuid;--> statement-breakpoint
+ALTER TABLE "production_days" ADD CONSTRAINT "production_days_script_writer_id_users_id_fk" FOREIGN KEY ("script_writer_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;

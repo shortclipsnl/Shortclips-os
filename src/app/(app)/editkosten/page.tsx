@@ -30,15 +30,18 @@ function KpiTile({ label, value, hint, tone = "neutral", big = false }: { label:
 }
 
 // Videograafkosten: €16,75 per uur, met maximaal 8 uur filmen per opnamedag.
+// Een klant-maand zonder vastgelegde opnamedag rekenen we als één standaard
+// opnamedag (8 u × €16,75 = €134), zodat er nergens videograafkosten ontbreken.
 const VG_RATE = 16.75;
 const VG_MAX_HOURS = 8;
+const VG_DAY = VG_RATE * VG_MAX_HOURS; // €134 — één standaard opnamedag.
 
 export default async function EditCostsPage({ searchParams }: { searchParams: Promise<{ maand?: string }> }) {
   await requirePermission("finance:read");
   const sp = await searchParams;
 
   // Maandoverzicht: winst per maand over alle klanten (uit de maandstaten).
-  const [monthAgg, vgAgg, editTotalRes] = await Promise.all([
+  const [monthAgg, vgCPAgg, financePairsRes, editTotalRes] = await Promise.all([
     db.execute(sql`
       select period,
         coalesce(sum(revenue),0)::float rev, coalesce(sum(extra_revenue),0)::float extra,
@@ -47,27 +50,45 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
         count(*)::int n
       from client_finance_months group by period order by period
     `),
-    // Videograafkosten per maand uit de opnamedagen: uren (max 8/dag) × €16,75.
+    // Videograafkosten per klant per maand uit de opnamedagen: uren (max 8/dag).
     db.execute(sql`
-      select to_char(scheduled_on,'YYYY-MM') period,
-        count(*)::int shoot_days,
+      select client_id, to_char(scheduled_on,'YYYY-MM') period,
+        count(*)::int days,
         coalesce(sum(least(${VG_MAX_HOURS}::numeric,
           case when start_time is not null and end_time is not null and end_time > start_time
             then extract(epoch from (end_time - start_time))/3600.0
             else ${VG_MAX_HOURS}::numeric end)),0)::float hours
       from production_days
       where deleted_at is null and status <> 'cancelled'
-      group by 1
+      group by 1, 2
     `),
+    // Welke klant-maanden bestaan (hebben een maandstaat) — bron voor de €134-aanname.
+    db.execute(sql`select client_id, period from client_finance_months`),
     // Verwachte editkosten/maand, live gekoppeld aan de klanten: Σ prijs/video × shorts.
     db.execute(sql`
       select coalesce(sum(coalesce(edit_cost_per_video,0) * coalesce(monthly_video_quota,0)),0)::float total
       from clients where deleted_at is null and status = 'active'
     `),
   ]);
-  const vgByPeriod = new Map<string, { days: number; hours: number; cost: number }>();
-  for (const v of rows2<{ period: string; shoot_days: number; hours: number }>(vgAgg)) {
-    vgByPeriod.set(v.period, { days: Number(v.shoot_days), hours: Number(v.hours), cost: Number(v.hours) * VG_RATE });
+  // VG per (klant|maand) uit echte opnamedagen.
+  const vgCP = new Map<string, { days: number; hours: number; cost: number }>();
+  for (const v of rows2<{ client_id: string; period: string; days: number; hours: number }>(vgCPAgg)) {
+    vgCP.set(`${v.client_id}|${v.period}`, { days: Number(v.days), hours: Number(v.hours), cost: Number(v.hours) * VG_RATE });
+  }
+  // Videograafkosten per maand mét €134-aanname voor klant-maanden zonder opnamedag.
+  const vgByPeriod = new Map<string, { days: number; hours: number; cost: number; assumed: number }>();
+  for (const p of rows2<{ client_id: string; period: string }>(financePairsRes)) {
+    const cur = vgByPeriod.get(p.period) ?? { days: 0, hours: 0, cost: 0, assumed: 0 };
+    const cp = vgCP.get(`${p.client_id}|${p.period}`);
+    if (cp) {
+      cur.days += cp.days;
+      cur.hours += cp.hours;
+      cur.cost += cp.cost;
+    } else {
+      cur.cost += VG_DAY;
+      cur.assumed += 1;
+    }
+    vgByPeriod.set(p.period, cur);
   }
   const liveEditTotal = Number(rows2<{ total: number }>(editTotalRes)[0]?.total ?? 0);
 
@@ -93,42 +114,26 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
   const selVgInfo = selPeriod ? vgByPeriod.get(selPeriod) : null;
 
   // Netto per klant voor de gekozen maand: omzet − editkosten − videograafkosten.
-  const [perClientRes, vgClientRes] = await Promise.all([
-    selPeriod
-      ? db.execute(sql`
-          select c.id, c.name, c.slug, c.color, c.logo_url,
-            (m.revenue + m.extra_revenue)::float income,
-            -- Editkosten live gekoppeld aan de klant: prijs/video × shorts per maand.
-            (coalesce(c.edit_cost_per_video,0) * coalesce(c.monthly_video_quota,0))::float edit
-          from client_finance_months m
-          join clients c on c.id = m.client_id and c.deleted_at is null
-          where m.period = ${selPeriod}
-        `)
-      : Promise.resolve(null),
-    selPeriod
-      ? db.execute(sql`
-          select c.id,
-            coalesce(sum(least(${VG_MAX_HOURS}::numeric,
-              case when pd.start_time is not null and pd.end_time is not null and pd.end_time > pd.start_time
-                then extract(epoch from (pd.end_time - pd.start_time))/3600.0
-                else ${VG_MAX_HOURS}::numeric end)),0)::float hours
-          from production_days pd
-          join clients c on c.id = pd.client_id and c.deleted_at is null
-          where to_char(pd.scheduled_on,'YYYY-MM') = ${selPeriod} and pd.deleted_at is null and pd.status <> 'cancelled'
-          group by c.id
-        `)
-      : Promise.resolve(null),
-  ]);
-  const vgByClient = new Map<string, number>();
-  for (const v of (vgClientRes ? rows2<{ id: string; hours: number }>(vgClientRes) : [])) {
-    vgByClient.set(String(v.id), Number(v.hours) * VG_RATE);
-  }
+  const perClientRes = selPeriod
+    ? await db.execute(sql`
+        select c.id, c.name, c.slug, c.color, c.logo_url,
+          (m.revenue + m.extra_revenue)::float income,
+          -- Editkosten live gekoppeld aan de klant: prijs/video × shorts per maand.
+          (coalesce(c.edit_cost_per_video,0) * coalesce(c.monthly_video_quota,0))::float edit
+        from client_finance_months m
+        join clients c on c.id = m.client_id and c.deleted_at is null
+        where m.period = ${selPeriod}
+      `)
+    : null;
   type PRow = { id: string; name: string; slug: string; color: string | null; logo_url: string | null; income: number; edit: number };
   const perClient = (perClientRes ? rows2<PRow>(perClientRes) : [])
     .map((r) => {
-      const vg = vgByClient.get(String(r.id)) ?? 0;
+      // Geen vastgelegde opnamedag deze maand? Dan rekenen we één standaard dag (€134).
+      const cp = selPeriod ? vgCP.get(`${r.id}|${selPeriod}`) : undefined;
+      const vg = cp ? cp.cost : VG_DAY;
+      const assumedVg = !cp;
       const net = r.income - r.edit - vg;
-      return { ...r, vg, net, margin: r.income > 0 ? Math.round((net / r.income) * 100) : 0 };
+      return { ...r, vg, assumedVg, net, margin: r.income > 0 ? Math.round((net / r.income) * 100) : 0 };
     })
     .sort((a, b) => b.net - a.net);
 
@@ -152,7 +157,7 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <KpiTile label="Omzet" value={euro(sel.income)} tone="info" />
             <KpiTile label="Editkosten" value={`−${euro(sel.edit)}`} tone="warn" />
-            <KpiTile label="Videograafkosten" value={`−${euro(sel.vg)}`} tone="warn" hint={selVgInfo ? `${selVgInfo.days} opnamedagen · ${Math.round(selVgInfo.hours)} u × €16,75` : "€16,75/u · max 8u/dag"} />
+            <KpiTile label="Videograafkosten" value={`−${euro(sel.vg)}`} tone="warn" hint={selVgInfo ? `${selVgInfo.days} opnamedagen${selVgInfo.assumed ? ` · ${selVgInfo.assumed}× €134 geschat` : ""}` : "€16,75/u · max 8u/dag"} />
             <KpiTile label="Winst" value={euro(sel.net)} tone={sel.net > 0 ? "good" : sel.net < 0 ? "bad" : "neutral"} hint={`marge ${sel.marginPct}%`} big />
           </div>
           {sel.hasOverige ? <p className="mt-1.5 text-xs text-[var(--color-ink-muted)]">Winst is ná editkosten, videograafkosten en overige directe kosten (−{euro(sel.overige)} strategie/overig deze maand).</p> : <p className="mt-1.5 text-xs text-[var(--color-ink-muted)]">Winst = omzet − editkosten − videograafkosten. Overige directe kosten (strategie/overig) zijn deze maand nog niet ingevuld.</p>}
@@ -202,14 +207,16 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
                   <td className="sc-td"><Link href={`/clients/${r.slug}?tab=financieel`} className="flex items-center gap-2 font-medium hover:underline"><ClientLogo name={r.name} logoUrl={r.logo_url} color={r.color} size={20} />{r.name}</Link></td>
                   <td className="sc-td text-right tabular-nums">{euro(r.income)}</td>
                   <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">−{euro(r.edit)}</td>
-                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{r.vg > 0 ? `−${euro(r.vg)}` : "—"}</td>
+                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]" title={r.assumedVg ? "Geen opnamedag vastgelegd deze maand — gerekend als 1 standaard opnamedag (€134)." : undefined}>
+                    −{euro(r.vg)}{r.assumedVg ? <span className="ml-0.5 text-[var(--color-ink-faint)]">*</span> : null}
+                  </td>
                   <td className="sc-td text-right font-semibold tabular-nums" style={{ color: r.net > 0 ? "var(--color-good)" : r.net < 0 ? "var(--color-bad)" : undefined }}>{euro(r.net)}</td>
                   <td className="sc-td text-right font-semibold tabular-nums" style={{ color: r.margin >= 50 ? "var(--color-good)" : r.margin >= 20 ? "var(--color-warn)" : "var(--color-bad)" }}>{r.margin}%</td>
                 </tr>
               );
             })}
           </Table>
-          <p className="px-5 py-3 text-xs text-[var(--color-ink-muted)]">Editkosten zijn de verwachte editkosten van de maand (afspraak per klant). Videograafkosten zijn berekend uit de opnamedagen van die maand (€16,75/uur, max 8 uur per dag). De editkosten per editor en per klant zijn hierin al verwerkt.</p>
+          <p className="px-5 py-3 text-xs text-[var(--color-ink-muted)]">Editkosten zijn de verwachte editkosten van de maand (afspraak per klant). Videograafkosten zijn berekend uit de opnamedagen van die maand (€16,75/uur, max 8 uur per dag). <span className="text-[var(--color-ink-faint)]">*</span> = geen opnamedag vastgelegd, gerekend als 1 standaard opnamedag (€134).</p>
         </Card>
       ) : null}
     </div>

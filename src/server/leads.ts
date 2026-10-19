@@ -60,7 +60,8 @@ export async function listLeads() {
     .leftJoin(users, eq(users.id, salesLeads.ownerId))
     .leftJoin(convertedClient, eq(convertedClient.id, salesLeads.convertedClientId))
     .where(isNull(salesLeads.deletedAt))
-    .orderBy(sql`${salesLeads.followUpOn} asc nulls last`, desc(salesLeads.updatedAt));
+    // Nieuwste leads bovenaan: daar zijn we nu mee bezig.
+    .orderBy(sql`${salesLeads.firstContactOn} desc nulls last`, desc(salesLeads.createdAt));
 
   const today = new Date().toISOString().slice(0, 10);
   const total = rows.length;

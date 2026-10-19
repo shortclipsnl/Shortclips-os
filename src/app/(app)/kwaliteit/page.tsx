@@ -9,10 +9,11 @@ export const dynamic = "force-dynamic";
 
 /**
  * Secties per ernst, in vaste volgorde: eerst directe actie, dan extra
- * aandacht, en vooruitkijken als laatste. Elke sectie krijgt een volledig
- * gekleurde kop (rood/oranje/blauw), een gekleurde linkerrand per regel, een
- * getinte categorie-badge en een in kleur uitgelichte detail-/deadlinetekst,
- * zodat de pagina in één oogopslag te scannen is i.p.v. één wit vlak.
+ * aandacht, en vooruitkijken als laatste. Elke sectie krijgt alleen een
+ * gekleurd bovenrandje + gekleurde kop-tekst (geen volle kleurbalk), een
+ * subtiele gekleurde linkerrand per regel en een in kleur uitgelichte
+ * detail-/deadlinetekst. Zo valt het urgente op zonder dat alles rood kleurt
+ * en blijft de pagina goed te scannen.
  */
 const SECTIONS: {
   severity: QualitySeverity;
@@ -49,11 +50,20 @@ export default async function QualityPage() {
         {SECTIONS.map((s) => {
           const bucket = items.filter((i) => i.severity === s.severity);
           return (
-            <div key={s.severity} className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)]">
-              {/* Volledig gekleurde kop per ernst. */}
-              <div className="flex items-center justify-between gap-2 px-5 py-3 text-white" style={{ background: s.color }}>
-                <h2 className="text-sm font-bold tracking-tight">{s.label}</h2>
-                <span className="shrink-0 rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-bold tabular-nums">{bucket.length}</span>
+            <div
+              key={s.severity}
+              className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)] border-t-[3px]"
+              style={{ borderTopColor: s.color }}
+            >
+              {/* Alleen een gekleurd bovenrandje + gekleurde kop-tekst — geen volle kleurbalk. */}
+              <div className="flex items-center justify-between gap-2 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-5 py-2.5">
+                <h2 className="text-sm font-bold tracking-tight" style={{ color: s.color }}>{s.label}</h2>
+                <span
+                  className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums"
+                  style={{ background: `color-mix(in srgb, ${s.color} 15%, var(--color-surface))`, color: s.color }}
+                >
+                  {bucket.length}
+                </span>
               </div>
               {bucket.length === 0 ? (
                 <p className="px-5 py-5 text-center text-sm text-[var(--color-ink-muted)]">Niets — mooi!</p>
