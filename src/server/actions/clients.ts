@@ -58,6 +58,34 @@ export async function setClientEditEconomics(
   }
 }
 
+/** De vaste editor die een klant doet (Monday-veld "Editor"). Handmatig gezet =
+ *  vergrendeld, zodat de nachtelijke sync het niet terugzet. */
+export async function setClientEditor(clientId: string, editorName: string | null): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("clients:write");
+    const [existing] = await db
+      .select({ id: clients.id, managedFields: clients.managedFields })
+      .from(clients)
+      .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
+      .limit(1);
+    if (!existing) return { ok: false, message: "Klant niet gevonden." };
+    assertClientAccess(viewer, existing.id);
+
+    const next = editorName?.trim() ? editorName.trim().slice(0, 80) : null;
+    const managed = new Set<string>(existing.managedFields ?? []);
+    managed.add("editorName");
+
+    await db.update(clients).set({ editorName: next, managedFields: [...managed], updatedAt: new Date() }).where(eq(clients.id, existing.id));
+    await auditLog({ viewer, action: "client.set_editor", entityType: "client", entityId: existing.id, clientId: existing.id, changes: { editorName: next } });
+    revalidatePath("/videos");
+    revalidatePath("/clients");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 const CLIENT_STATUSES = ["prospect", "onboarding", "active", "paused", "churned"] as const;
 type ClientStatus = (typeof CLIENT_STATUSES)[number];
 

@@ -1,11 +1,12 @@
-import Link from "next/link";
 import { getEditingDashboard, listEditorsWithRates } from "@/server/editing";
 import { editorCapacityMap } from "@/server/metrics";
 import { editorLoad, LOAD_LABEL } from "@/lib/metrics";
 import type { Viewer } from "@/server/auth/context";
-import { Avatar, Badge, Card, CardHeader, ClientLogo, EmptyState, Table } from "@/components/ui";
+import { Avatar, Card, CardHeader, EmptyState } from "@/components/ui";
 import { euro, formatDate, num } from "@/lib/format";
-import { ClientEconField, RateRow } from "./editing-ui";
+import { editorDisplayName } from "@/lib/editors";
+import { RateRow } from "./editing-ui";
+import { PerClientEditors } from "./per-client-editors";
 
 const LEVEL_COLOR: Record<string, string> = {
   normaal: "var(--color-good)",
@@ -46,7 +47,7 @@ export async function WorkloadSection({ viewer }: { viewer: Viewer }) {
                 <div className="flex items-center gap-3">
                   <Avatar name={e.editor_name} size={46} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-base font-semibold">{e.editor_name}</div>
+                    <div className="truncate text-base font-semibold">{editorDisplayName(e.editor_name)}</div>
                     <div className="flex flex-wrap items-center gap-1.5 text-xs" style={{ color: level.color }}>
                       {level.label}
                       {e.leave ? <span className="rounded-full bg-[var(--color-warn-soft)] px-1.5 py-0.5 text-2xs font-medium text-[#8a5300]">afwezig {formatDate(e.leave.start_on)}–{formatDate(e.leave.end_on)}</span> : null}
@@ -85,30 +86,8 @@ export async function WorkloadSection({ viewer }: { viewer: Viewer }) {
         </div>
       )}
 
-      {/* Per klant */}
-      <Card padded={false} className="mb-6">
-        <CardHeader title="Per klant" subtitle="Welke editor, hoeveel shorts per maand en wat de editkosten per klant zijn. Shorts en prijs per short zijn hier aan te passen." className="p-5 pb-2" />
-        <Table head={<><th className="sc-th">Klant</th><th className="sc-th">Editor(s)</th><th className="sc-th text-right">Shorts/mnd</th><th className="sc-th text-right">In productie</th><th className="sc-th text-right">Afgerond (mnd)</th><th className="sc-th text-right">Wacht op feedback</th><th className="sc-th text-right">Te laat</th><th className="sc-th">Deadline</th>{canSeeCosts ? <><th className="sc-th text-right">Prijs/short</th><th className="sc-th text-right">Editkosten/mnd</th></> : null}</>}>
-          {data.clients.map((c) => (
-            <tr key={c.id} className="sc-row-link">
-              <td className="sc-td"><Link href={`/clients/${c.slug}?tab=videos`} className="flex items-center gap-2.5 font-medium hover:underline"><ClientLogo name={c.name} logoUrl={c.logo_url} color={c.color} size={28} />{c.name}</Link></td>
-              <td className="sc-td text-[var(--color-ink-muted)]">{c.editors ?? "—"}</td>
-              <td className="sc-td text-right tabular-nums">{canManage ? <ClientEconField clientId={c.id} field="quota" value={Number(c.quota)} /> : num(Number(c.quota))}</td>
-              <td className="sc-td text-right tabular-nums">{num(Number(c.in_production))}</td>
-              <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{num(Number(c.done_month))}</td>
-              <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{num(Number(c.awaiting_feedback))}</td>
-              <td className={`sc-td text-right tabular-nums ${Number(c.late) > 0 ? "font-semibold text-[var(--color-bad)]" : "text-[var(--color-ink-muted)]"}`}>{num(Number(c.late))}</td>
-              <td className="sc-td text-[var(--color-ink-muted)]">{c.next_due ? formatDate(c.next_due) : "—"}</td>
-              {canSeeCosts ? (
-                <>
-                  <td className="sc-td text-right tabular-nums">{canManage ? <ClientEconField clientId={c.id} field="costPerVideo" value={Number(c.client_rate)} prefix="€" /> : (Number(c.client_rate) > 0 ? euro(Number(c.client_rate)) : "—")}</td>
-                  <td className="sc-td text-right tabular-nums font-semibold">{Number(c.client_rate) > 0 ? euro(Number(c.client_rate) * Number(c.quota)) : "—"}</td>
-                </>
-              ) : null}
-            </tr>
-          ))}
-        </Table>
-      </Card>
+      {/* Per klant — met editor-filterknoppen en een aanpasbare editor per klant. */}
+      <PerClientEditors clients={data.clients} canManage={canManage} canSeeCosts={canSeeCosts} />
 
       {/* Editor-tarieven beheer */}
       {canManage ? (

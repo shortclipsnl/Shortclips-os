@@ -6,6 +6,7 @@ import { editorLoad } from "@/lib/metrics";
 import { isOwner, type Viewer } from "@/server/auth/context";
 import type { DashboardData } from "@/server/dashboard";
 import type { getMyDay } from "@/server/my-day";
+import { Dagindeling, type ScheduleItem } from "./dagindeling";
 
 type MyDay = Awaited<ReturnType<typeof getMyDay>>;
 type Tone = "bad" | "warn" | "good" | "neutral";
@@ -29,20 +30,15 @@ function dayName(input: string | Date): string {
 
 type Line = { key: string; href: string; what: string; action: string; meta: string; tone: Tone };
 type Accent = "bad" | "warn" | "info" | "good" | "ink";
-type ScheduleItem = { from: string; to?: string; label: string };
 type Block = { key: string; title: string; subtitle?: string; icon: React.ReactNode; accent?: Accent; lines: Line[]; empty: string; schedule?: ScheduleItem[] };
 
-/** Het vaste dagritme van het team. */
+/** Het vaste dagritme van het team, met een korte toelichting per moment. */
 const DAGINDELING: ScheduleItem[] = [
-  { from: "08:30", to: "09:00", label: "Dagstart" },
-  { from: "12:30", to: "13:00", label: "Pauze" },
-  { from: "13:00", to: "13:30", label: "Wat moet er vandaag echt af?" },
-  { from: "16:45", label: "To-do-lijst voor morgen maken" },
+  { from: "08:30", to: "09:00", label: "Dagstart", detail: "Samen de dag doornemen: wat staat er op de planning en wat heeft prioriteit." },
+  { from: "12:30", to: "13:00", label: "Pauze", detail: "Even weg van het scherm — tot 13:00." },
+  { from: "13:00", to: "13:30", label: "Wat moet er vandaag echt af?", detail: "Check de belangrijkste deadlines en stem af waar nodig." },
+  { from: "16:45", label: "To-do-lijst voor morgen maken", detail: "Zet klaar wat morgen als eerste moet, zodat je direct kunt starten." },
 ];
-const toMin = (hhmm: string) => {
-  const [h, m] = hhmm.split(":").map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
-};
 
 /** Functionele koptekst-kleur per blok, zodat blokken niet allemaal gelijk ogen. */
 const BLOCK_HEADER: Record<Accent, string> = {
@@ -295,7 +291,7 @@ function BlockCard({ block }: { block: Block }) {
         ) : null}
       </div>
       {block.schedule ? (
-        <ScheduleList items={block.schedule} />
+        <Dagindeling items={block.schedule} />
       ) : block.lines.length === 0 ? (
         <EmptyState title={block.empty} />
       ) : (
@@ -315,40 +311,5 @@ function BlockCard({ block }: { block: Block }) {
         </ul>
       )}
     </Card>
-  );
-}
-
-/** De vaste dagindeling, met het blok van nú gemarkeerd (tijd in NL). */
-function ScheduleList({ items }: { items: ScheduleItem[] }) {
-  const now = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" });
-  const [nh, nm] = now.split(":").map(Number);
-  const nowMin = (nh ?? 0) * 60 + (nm ?? 0);
-
-  return (
-    <ul className="divide-y divide-[var(--color-line)]">
-      {items.map((it) => {
-        const start = toMin(it.from);
-        const end = it.to ? toMin(it.to) : start + 15;
-        const status: "nu" | "straks" | "geweest" = nowMin >= start && nowMin < end ? "nu" : nowMin < start ? "straks" : "geweest";
-        const done = status === "geweest";
-        return (
-          <li key={it.from + it.label} className={`flex items-center gap-2.5 px-4 py-3 ${status === "nu" ? "bg-[var(--color-good-soft)]/60" : ""}`}>
-            <span className={`w-[68px] shrink-0 text-xs font-semibold tabular-nums leading-tight ${done ? "text-[var(--color-ink-faint)]" : status === "nu" ? "text-[var(--color-good)]" : "text-[var(--color-ink)]"}`}>
-              {it.from}{it.to ? <><br />–{it.to}</> : null}
-            </span>
-            <span className={`min-w-0 flex-1 text-sm leading-snug ${done ? "text-[var(--color-ink-faint)] line-through decoration-[var(--color-line-strong)]" : status === "nu" ? "font-semibold" : "font-medium"}`}>
-              {it.label}
-            </span>
-            {status === "nu" ? (
-              <span className="shrink-0 rounded-full bg-[var(--color-good)] px-2 py-0.5 text-2xs font-bold text-white">Nu</span>
-            ) : status === "straks" ? (
-              <span className="shrink-0 text-2xs font-medium text-[var(--color-ink-faint)]">straks</span>
-            ) : (
-              <span className="shrink-0 text-2xs text-[var(--color-ink-faint)]">gedaan</span>
-            )}
-          </li>
-        );
-      })}
-    </ul>
   );
 }

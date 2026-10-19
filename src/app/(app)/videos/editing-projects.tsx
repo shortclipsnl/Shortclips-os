@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Download, FileText, Loader2, Plus, Upload, X } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
+import { editorColor, editorDisplayName } from "@/lib/editors";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase } from "@/lib/statuses";
 import { createEditingProject, deleteProjectScript, setProjectDeadline, setProjectEditStatus, setProjectEditor, setProjectLinks, setProjectPlannedShorts, uploadProjectScript } from "@/server/actions/editing-board";
 import { fileToBase64 } from "../ai/_shared";
@@ -19,20 +20,6 @@ const BATTERY_COLOR: Record<BatteryColor, string> = {
   oranje: "var(--color-warn)",
   rood: "var(--color-bad)",
 };
-
-/** Vaste kleur per editor (zoals in Monday), op voornaam. */
-const EDITOR_COLOR: Record<string, string> = {
-  fabian: "#0f766e",
-  noah: "#5b9bf0",
-  quinn: "#7c5cff",
-  sem: "#22b573",
-  sam: "#22b573",
-  senna: "#f2843b",
-};
-function editorColor(name: string | null): string {
-  if (!name) return "var(--color-surface-2)";
-  return EDITOR_COLOR[name.trim().split(/\s+/)[0]?.toLowerCase() ?? ""] ?? "var(--color-indigo-mist)";
-}
 
 function fmtShort(d: string): string {
   const [y, m, day] = d.split("-").map(Number);
@@ -115,7 +102,7 @@ export function EditingProjects({
                 <span className="rounded-full p-[2px]" style={{ background: on ? c : "transparent" }}>
                   <TeamAvatar name={e.fullName} avatarUrl={e.avatarUrl ?? null} size={30} />
                 </span>
-                {e.fullName.split(" ")[0]}
+                {editorDisplayName(e.fullName)}
                 <span className="grid min-w-5 place-items-center rounded-full px-1 text-2xs font-bold text-white" style={{ background: c }}>{counts.get(e.id) ?? 0}</span>
               </button>
             );
@@ -218,7 +205,7 @@ function ProjectRow({ p, editors, canEdit, canAssign, phaseColor }: { p: Editing
             style={{ background: p.editorId ? ecolor : "var(--color-surface-2)", color: p.editorId ? "#fff" : "var(--color-ink-muted)" }}
           >
             <option value="">Geen editor</option>
-            {editors.map((ed) => <option key={ed.id} value={ed.id}>{ed.fullName.split(" ")[0]}</option>)}
+            {editors.map((ed) => <option key={ed.id} value={ed.id}>{editorDisplayName(ed.fullName)}</option>)}
           </select>
         ) : (
           <div className="grid h-full place-items-center rounded-[4px] text-sm font-bold text-white" style={{ background: p.editorId ? ecolor : "var(--color-surface-2)" }}>
@@ -455,7 +442,7 @@ function NewProject({ clients, editors }: { clients: ClientOption[]; editors: Ed
       <label className="text-2xs text-[var(--color-ink-muted)]">Editor
         <select className="sc-input mt-0.5 h-8 w-32 py-0 text-xs" value={editorId} onChange={(e) => setEditorId(e.target.value)}>
           <option value="">Later</option>
-          {editors.map((e) => <option key={e.id} value={e.id}>{e.fullName.split(" ")[0]}</option>)}
+          {editors.map((e) => <option key={e.id} value={e.id}>{editorDisplayName(e.fullName)}</option>)}
         </select>
       </label>
       <button type="button" onClick={create} disabled={pending || !clientId || !scheduledOn || !title.trim()} className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-ink)] px-3 text-xs font-semibold text-white disabled:opacity-50">
