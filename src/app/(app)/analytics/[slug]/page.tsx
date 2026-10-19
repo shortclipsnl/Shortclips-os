@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FileText } from "lucide-react";
+import { FileText, Play } from "lucide-react";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients } from "@/db/schema";
 import { requirePermission, assertClientAccess } from "@/server/auth/context";
 import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
+import { PlatformLogo } from "@/components/platform-logo";
 import { compact, formatDate, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
 import { ClientSelector, type SelectorClient } from "../client-selector";
@@ -79,6 +80,7 @@ export default async function ClientResultsPage({
         )
         select d.id, d.title, d.thumbnail_url, d.frame_url, d.duration_seconds, d.published_at,
                string_agg(distinct p.platform::text, ',') platforms,
+               coalesce(jsonb_agg(distinct jsonb_build_object('platform', p.platform::text, 'url', p.external_url)) filter (where p.id is not null and p.external_url is not null), '[]'::jsonb) as post_links,
                coalesce(sum(pm.views),0)::int views, coalesce(sum(pm.likes),0)::int likes,
                coalesce(sum(pm.comments),0)::int comments, coalesce(sum(pm.shares),0)::int shares,
                coalesce(sum(pm.saves),0)::int saves,
@@ -170,13 +172,13 @@ export default async function ClientResultsPage({
 
       <ClientSelector clients={selectorClients} currentSlug={slug} />
 
-      {/* Platformfilter: klik op een platform om alleen die cijfers te zien. */}
-      <div className="mb-5 flex flex-wrap items-center gap-1.5">
+      {/* Platformfilter: klik op een platformlogo om alleen die cijfers te zien. */}
+      <div className="mb-5 flex flex-wrap items-center gap-2">
         <Link href={qpPlat(null)} className={platChip(!platform)}>Alle platforms</Link>
         {PLATFORM_ORDER.filter((p) => PLATFORM[p]).map((p) => (
-          <Link key={p} href={qpPlat(p)} className={platChip(platform === p)}>
-            <span className="size-2 rounded-full" style={{ background: PLATFORM[p]!.color }} />
-            {PLATFORM[p]!.label}
+          <Link key={p} href={qpPlat(p)} className={`${platChip(platform === p)} !pl-1.5`} title={PLATFORM[p]!.label}>
+            <PlatformLogo platform={p} size={22} />
+            <span className="hidden sm:inline">{PLATFORM[p]!.label}</span>
           </Link>
         ))}
       </div>
@@ -237,7 +239,7 @@ export default async function ClientResultsPage({
                 <Table head={<><th className="sc-th">Platform</th><th className="sc-th text-right">Weergaven</th><th className="sc-th text-right">Bereik</th><th className="sc-th text-right">Volgers</th></>}>
                   {platforms.map((p) => (
                     <tr key={String(p.platform)}>
-                      <td className="sc-td"><span className="flex items-center gap-2"><span className="size-2.5 rounded-full" style={{ background: PLATFORM[String(p.platform)]?.color ?? "#999" }} />{PLATFORM[String(p.platform)]?.label ?? String(p.platform)}</span></td>
+                      <td className="sc-td"><span className="flex items-center gap-2"><PlatformLogo platform={String(p.platform)} size={20} />{PLATFORM[String(p.platform)]?.label ?? String(p.platform)}</span></td>
                       <td className="sc-td text-right tabular-nums">{compact(Number(p.views))}</td>
                       <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{compact(Number(p.reach))}</td>
                       <td className="sc-td text-right tabular-nums">+{num(Number(p.volgers))}</td>
@@ -290,6 +292,7 @@ export default async function ClientResultsPage({
 type VideoRow = {
   id: string; title: string; thumbnail_url: string | null; frame_url: string | null;
   duration_seconds: number | null; published_at: string | null; platforms: string | null;
+  post_links: { platform: string; url: string | null }[];
   views: number; likes: number; comments: number; shares: number; saves: number;
   avg_watch: number | null; completion: number | null;
 };
@@ -305,24 +308,42 @@ function platChip(active: boolean): string {
 }
 
 function VideoCard({ v }: { v: VideoRow }) {
+  const links = (v.post_links ?? []).filter((l) => l.url);
+  const primary = links[0]?.url ?? null;
+  const urlFor = (platform: string) => links.find((l) => l.platform === platform)?.url ?? primary;
+  // De thumbnail opent de echte post (zodat je 'm kunt bekijken); anders het detail.
+  const thumbHref = primary ?? `/analytics/video/${v.id}`;
+  const external = !!primary;
   return (
-    <Link href={`/analytics/video/${v.id}`} className="group overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] transition-shadow hover:shadow-[var(--shadow-raised)]">
-      <VideoThumb src={v.thumbnail_url} title={v.title} ratio="aspect-[4/3]" />
+    <div className="group overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] transition-shadow hover:shadow-[var(--shadow-raised)]">
+      <a href={thumbHref} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="relative block" title={external ? "Bekijk de post" : "Bekijk details"}>
+        <VideoThumb src={v.thumbnail_url} title={v.title} ratio="aspect-[4/3]" />
+        <span className="pointer-events-none absolute inset-0 grid place-items-center">
+          <span className="grid size-11 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm transition group-hover:bg-black/60">
+            <Play className="size-5" fill="currentColor" />
+          </span>
+        </span>
+      </a>
       <div className="p-3">
         <div className="flex items-center gap-1.5">
-          {platformList(v.platforms).map((p) => (
-            <span key={p} className="size-2.5 rounded-full" style={{ background: PLATFORM[p]?.color ?? "#999" }} title={PLATFORM[p]?.label ?? p} />
-          ))}
+          {platformList(v.platforms).map((p) => {
+            const u = urlFor(p);
+            return u ? (
+              <a key={p} href={u} target="_blank" rel="noopener noreferrer" title={`Open op ${p}`} className="transition hover:opacity-80">
+                <PlatformLogo platform={p} size={20} />
+              </a>
+            ) : <PlatformLogo key={p} platform={p} size={20} />;
+          })}
           {v.published_at ? <span className="ml-auto text-2xs text-[var(--color-ink-faint)]">{formatDate(String(v.published_at).slice(0, 10))}</span> : null}
         </div>
-        <p className="mt-1 line-clamp-2 min-h-[2.4em] text-sm font-medium group-hover:text-[var(--color-brand-600)]">{v.title}</p>
+        <Link href={`/analytics/video/${v.id}`} className="mt-1 block line-clamp-2 min-h-[2.4em] text-sm font-medium hover:text-[var(--color-brand-600)]">{v.title}</Link>
         <div className="mt-2 grid grid-cols-3 gap-1 text-center">
           <Metric label="Weergaven" value={compact(Number(v.views))} />
           <Metric label="Likes" value={compact(Number(v.likes))} />
-          <Metric label="Uitkijk" value={v.completion != null ? `${Math.round(Number(v.completion) * 100)}%` : "—"} />
+          <Metric label="Reacties" value={compact(Number(v.comments))} />
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
 

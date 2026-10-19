@@ -22,10 +22,11 @@ const TABLE_DAYS = 30;
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ klant?: string }>;
+  searchParams: Promise<{ klant?: string; koppeling?: string }>;
 }) {
   await requirePermission("analytics:read");
   const params = await searchParams;
+  const linkFilter = params.koppeling === "gekoppeld" || params.koppeling === "niet" ? params.koppeling : null;
 
   // Alleen actieve klanten — gestopte klanten tonen we hier bewust niet.
   const statusCond = sql`and c.status = 'active'`;
@@ -96,13 +97,19 @@ export default async function AnalyticsPage({
   const videoRows = rows<Record<string, string | number>>(topVideos);
   // Klant-tegels (logo's naast elkaar) komen uit dezelfde lijst: gekoppelde
   // klanten eerst, dan op weergaven.
-  const tileClients = clientRows.map((c) => ({
+  const allTiles = clientRows.map((c) => ({
     slug: String(c.slug),
     name: String(c.name),
     color: c.color ? String(c.color) : null,
     logoUrl: c.logoUrl ? String(c.logoUrl) : null,
     linked: Number(c.linked) === 1,
   }));
+  const linkedCount = allTiles.filter((c) => c.linked).length;
+  const tileClients = linkFilter === "gekoppeld"
+    ? allTiles.filter((c) => c.linked)
+    : linkFilter === "niet"
+      ? allTiles.filter((c) => !c.linked)
+      : allTiles;
 
   const deltaPct = (cur: number, p: number): number | null => (p > 0 ? Math.round(((cur - p) / p) * 100) : null);
   const deltaTone = (cur: number, p: number): "good" | "bad" | undefined => {
@@ -180,7 +187,22 @@ export default async function AnalyticsPage({
       {/* Klant-tegels: logo's naast elkaar met bedrijfsnaam, groot en klikbaar —
           makkelijk aan te wijzen op een scherm. Klik opent alle resultaten van
           die klant. Gekoppelde klanten eerst. */}
+      {/* Filter op koppeling: standaard alle, of alleen (niet-)gekoppelde klanten. */}
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Tonen:</span>
+        <Link href="/analytics" className={linkTab(!linkFilter)}>Alle klanten <span className="opacity-70">· {allTiles.length}</span></Link>
+        <Link href="/analytics?koppeling=gekoppeld" className={linkTab(linkFilter === "gekoppeld")}>
+          <span className="size-1.5 rounded-full bg-[var(--color-good)]" /> Gekoppeld <span className="opacity-70">· {linkedCount}</span>
+        </Link>
+        <Link href="/analytics?koppeling=niet" className={linkTab(linkFilter === "niet")}>
+          <span className="size-1.5 rounded-full bg-[var(--color-line-strong)]" /> Niet gekoppeld <span className="opacity-70">· {allTiles.length - linkedCount}</span>
+        </Link>
+      </div>
+
       <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {tileClients.length === 0 ? (
+          <p className="col-span-full rounded-[var(--radius-md)] border border-dashed border-[var(--color-line-strong)] px-4 py-6 text-center text-sm text-[var(--color-ink-faint)]">Geen klanten in deze selectie.</p>
+        ) : null}
         {tileClients.map((c) => (
           <Link
             key={c.slug}
@@ -319,4 +341,10 @@ export default async function AnalyticsPage({
       )}
     </div>
   );
+}
+
+function linkTab(active: boolean): string {
+  return `inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+    active ? "bg-[var(--color-indigo-ink)] text-white" : "border border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+  }`;
 }
