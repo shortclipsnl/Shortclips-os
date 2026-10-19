@@ -82,9 +82,13 @@ export default async function ClientPage({
   const publishedThisMonth = hub.videos.filter(
     (v) => v.publishedAt && new Date(v.publishedAt).getMonth() === new Date().getMonth(),
   ).length;
-  const nextShoot = hub.shoots.find(
-    (s) => s.scheduledOn >= new Date().toISOString().slice(0, 10) && s.status !== "cancelled",
-  );
+  // Eerstvolgende opname = de vroegste toekomstige opnamedag uit Google Agenda
+  // (niet geannuleerd). shoots staat aflopend op datum, dus expliciet sorteren,
+  // zodat dit altijd dezelfde datum toont als het klantenoverzicht.
+  const today = new Date().toISOString().slice(0, 10);
+  const nextShoot = hub.shoots
+    .filter((s) => s.scheduledOn >= today && s.status !== "cancelled")
+    .sort((a, b) => a.scheduledOn.localeCompare(b.scheduledOn))[0];
 
   // Resultaten is pas zinvol als er cijfers binnenkomen óf er kanalen gekoppeld
   // zijn — zelfde voorwaarde als ResultsTab gebruikt om leeg-of-vullen te kiezen.

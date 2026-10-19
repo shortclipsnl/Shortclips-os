@@ -200,7 +200,7 @@ export async function getClientHub(viewer: Viewer, slug: string) {
       scriptCount: sql<number>`(select count(*) from scripts sc where sc.production_day_id = production_days.id and sc.deleted_at is null)`,
     })
       .from(productionDays)
-      .where(and(eq(productionDays.clientId, client.id), isNull(productionDays.deletedAt)))
+      .where(and(eq(productionDays.clientId, client.id), isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled")))
       .orderBy(desc(productionDays.scheduledOn)).limit(20),
 
     db.select({

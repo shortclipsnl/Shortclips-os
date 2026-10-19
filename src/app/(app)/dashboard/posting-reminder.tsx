@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { BellRing, X } from "lucide-react";
+import { BellRing, Check, Loader2, X } from "lucide-react";
+import { updateCalendarItem } from "@/server/actions/calendar";
 
 export type TodayPost = { id: string; title: string; clientName: string; at: string | null };
 
@@ -47,7 +48,20 @@ function playPing() {
 
 export function PostingReminder({ posts }: { posts: TodayPost[] }) {
   const [open, setOpen] = useState(false);
+  const [list, setList] = useState(posts);
+  const [postedId, setPostedId] = useState<string | null>(null);
+  const [, startPosted] = useTransition();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // "Gepost" → publicatie direct op Gepubliceerd zetten en uit de melding halen.
+  function markPosted(id: string) {
+    setPostedId(id);
+    startPosted(async () => {
+      await updateCalendarItem(id, { status: "published" });
+      setList((cur) => cur.filter((p) => p.id !== id));
+      setPostedId(null);
+    });
+  }
 
   useEffect(() => {
     if (posts.length === 0) return;
@@ -74,7 +88,7 @@ export function PostingReminder({ posts }: { posts: TodayPost[] }) {
     try { localStorage.setItem(`posting-reminder-dismissed-${todayKey()}`, "1"); } catch { /* no storage */ }
   }
 
-  if (!open || posts.length === 0) return null;
+  if (!open || list.length === 0) return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-50 w-[340px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-warn)]/40 bg-[var(--color-surface)] shadow-[var(--shadow-raised)]">
@@ -87,18 +101,26 @@ export function PostingReminder({ posts }: { posts: TodayPost[] }) {
       </div>
       <div className="p-3">
         <p className="mb-2 text-xs text-[var(--color-ink-muted)]">
-          Let op — deze {posts.length === 1 ? "post moet" : "posts moeten"} vandaag online bij de klant. Niet vergeten te posten.
+          Let op — deze {list.length === 1 ? "post moet" : "posts moeten"} vandaag online bij de klant. Klik op <strong>Gepost</strong> zodra het online staat.
         </p>
         <ul className="max-h-56 space-y-1 overflow-y-auto">
-          {posts.map((p) => (
-            <li key={p.id}>
-              <Link href="/calendar" className="flex items-center gap-2 rounded-[var(--radius-sm)] border-l-[3px] border-[var(--color-warn)] bg-[var(--color-surface-sunken)] px-2.5 py-1.5 text-sm hover:bg-[var(--color-surface-2)]">
+          {list.map((p) => (
+            <li key={p.id} className="flex items-center gap-2 rounded-[var(--radius-sm)] border-l-[3px] border-[var(--color-warn)] bg-[var(--color-surface-sunken)] px-2.5 py-1.5 text-sm">
+              <Link href="/calendar" className="flex min-w-0 flex-1 items-center gap-2 hover:underline">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{p.clientName}</span>
                   <span className="block truncate text-xs text-[var(--color-ink-muted)]">{p.title}</span>
                 </span>
                 {p.at ? <span className="shrink-0 text-2xs font-medium tabular-nums text-[var(--color-ink-faint)]">{p.at.slice(0, 5)}</span> : null}
               </Link>
+              <button
+                type="button"
+                onClick={() => markPosted(p.id)}
+                disabled={postedId === p.id}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-good)] px-2 py-1 text-2xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {postedId === p.id ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />} Gepost
+              </button>
             </li>
           ))}
         </ul>
