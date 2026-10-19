@@ -165,11 +165,14 @@ export function EditingProjects({
             const open = !collapsed.has(ph);
             return (
               <div key={ph}>
-                {/* Fase-groepkop in volle kleur. */}
-                <button type="button" onClick={() => toggle(ph)} className="flex w-full items-center gap-2 px-2 py-2 text-left text-white" style={{ background: meta.color }}>
-                  {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                  <span className="text-sm font-bold">{meta.label}</span>
-                  <span className="rounded-full bg-white/25 px-2 py-0.5 text-2xs font-bold tabular-nums">{list.length}</span>
+                {/* Fase-groepkop: rustige achtergrond, alleen de tekst in de
+                    fasekleur + een gekleurde linkerrand. Scanbaar, niet bont. */}
+                <button type="button" onClick={() => toggle(ph)}
+                  className="flex w-full items-center gap-2 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2.5 py-2 text-left"
+                  style={{ boxShadow: `inset 4px 0 0 ${meta.color}` }}>
+                  <span style={{ color: meta.color }}>{open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</span>
+                  <span className="text-sm font-bold" style={{ color: meta.color }}>{meta.label}</span>
+                  <span className="rounded-full px-2 py-0.5 text-2xs font-bold tabular-nums" style={{ background: `color-mix(in srgb, ${meta.color} 15%, var(--color-surface))`, color: meta.color }}>{list.length}</span>
                 </button>
                 {open ? (
                   list.length > 0 ? (
@@ -213,8 +216,8 @@ function ProjectRow({ p, editors, canEdit, canAssign, phaseColor }: { p: Editing
 
   return (
     <div className="grid items-stretch gap-px border-b border-[var(--color-line)] bg-[var(--color-surface)] text-sm hover:bg-[var(--color-surface-sunken)]/40" style={{ gridTemplateColumns: GRID }}>
-      {/* Item (klant) */}
-      <div className="flex items-center gap-2.5 px-2.5 py-2" style={{ boxShadow: `inset 3px 0 0 ${battery}` }}>
+      {/* Item (klant) — linkerrand kleurt mee met de fase. */}
+      <div className="flex items-center gap-2.5 px-2.5 py-2" style={{ boxShadow: `inset 4px 0 0 ${phaseColor}` }}>
         <Link href={`/clients/${p.clientSlug}?tab=opnames`} className="flex min-w-0 items-center gap-2.5 font-medium hover:underline">
           <ClientLogo name={p.clientName} logoUrl={p.clientLogo} color={p.clientColor} size={32} />
           <span className="truncate">{p.clientName}</span>
@@ -246,7 +249,7 @@ function ProjectRow({ p, editors, canEdit, canAssign, phaseColor }: { p: Editing
       <DeadlineCell p={p} pct={pct} battery={battery} canEdit={canEdit} onSave={(d) => run(() => setProjectDeadline(p.id, d))} />
 
 
-      {/* Fase — gekleurde keuzecel */}
+      {/* Fase — lichte tint + tekst in fasekleur (niet vol gekleurd). */}
       <div className="p-0.5">
         {canEdit ? (
           <select
@@ -254,13 +257,13 @@ function ProjectRow({ p, editors, canEdit, canAssign, phaseColor }: { p: Editing
             disabled={pending}
             onChange={(e) => run(() => setProjectEditStatus(p.id, e.target.value))}
             aria-label="Fase"
-            className="h-full w-full cursor-pointer rounded-[4px] border-0 px-2 text-center text-xs font-semibold text-white outline-none"
-            style={{ background: phaseColor }}
+            className="h-full w-full cursor-pointer rounded-[4px] border-0 px-2 text-center text-xs font-semibold outline-none"
+            style={{ background: `color-mix(in srgb, ${phaseColor} 13%, var(--color-surface))`, color: phaseColor }}
           >
             {EDIT_PHASE_ORDER.map((s) => <option key={s} value={s}>{EDIT_PHASE_META[s].label}</option>)}
           </select>
         ) : (
-          <div className="grid h-full place-items-center rounded-[4px] px-1 text-center text-xs font-semibold text-white" style={{ background: phaseColor }}>
+          <div className="grid h-full place-items-center rounded-[4px] px-1 text-center text-xs font-semibold" style={{ background: `color-mix(in srgb, ${phaseColor} 13%, var(--color-surface))`, color: phaseColor }}>
             {EDIT_PHASE_META[(p.editStatus as EditPhase)]?.label ?? p.editStatus}
           </div>
         )}
