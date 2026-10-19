@@ -179,6 +179,7 @@ export async function getShootOverview(viewer: Viewer) {
 export async function nextShootPerClient(viewer: Viewer) {
   const rows = await db
     .select({
+      id: productionDays.id,
       clientId: productionDays.clientId,
       clientName: clients.name,
       clientSlug: clients.slug,
@@ -186,6 +187,7 @@ export async function nextShootPerClient(viewer: Viewer) {
       clientLogo: clients.logoUrl,
       scheduledOn: productionDays.scheduledOn,
       status: productionDays.status,
+      videographerId: productionDays.videographerId,
       videographerName: users.fullName,
     })
     .from(productionDays)

@@ -120,10 +120,16 @@ export function AssistantConsole({ firstName, aiReady }: { firstName: string; ai
 
 function AnswerView({ question, answer, aiReady }: { question: string; answer: AssistantAnswer; aiReady: boolean }) {
   return (
-    <Card padded={false}>
-      <div className="border-b border-[var(--color-line)] px-5 py-3">
-        <p className="text-xs text-[var(--color-ink-faint)]">Je vroeg</p>
-        <p className="text-sm font-semibold">{question}</p>
+    <Card
+      padded={false}
+      className="overflow-hidden border-l-[3px] border-l-[var(--color-brand-500)] ring-1 ring-[var(--color-brand-500)]/25 bg-[color-mix(in_srgb,var(--color-brand-500)_5%,var(--color-surface))]"
+    >
+      <div className="flex items-center gap-2 border-b border-[var(--color-brand-500)]/20 bg-[color-mix(in_srgb,var(--color-brand-500)_9%,var(--color-surface))] px-5 py-3">
+        <Sparkles className="size-4 shrink-0 text-[var(--color-brand-600)]" />
+        <div className="min-w-0">
+          <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-brand-600)]">Antwoord op je vraag</p>
+          <p className="truncate text-sm font-semibold">{question}</p>
+        </div>
       </div>
       <div className="px-5 py-4">
         <p className="text-sm font-medium">{answer.summary}</p>

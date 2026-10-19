@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check, Copy, ExternalLink, MessageSquare, X } from "lucide-react";
 import { PLATFORM } from "@/lib/statuses";
 import { ClientLogo } from "@/components/ui";
+import { cn } from "@/lib/cn";
 
 export type ContentItemLite = {
   id: string;
@@ -47,7 +48,7 @@ function fmtDate(d: string) {
 
 /** Kalender-chip: klik toont de caption. Een stip rechts geeft aan of er een
  *  caption bij staat (groen) of niet (grijs). */
-export function ContentChip({ item, color }: { item: ContentItemLite; color: string }) {
+export function ContentChip({ item, color, today = false }: { item: ContentItemLite; color: string; today?: boolean }) {
   const [open, setOpen] = useState(false);
   const has = hasCaption(item.caption);
   return (
@@ -56,13 +57,23 @@ export function ContentChip({ item, color }: { item: ContentItemLite; color: str
         type="button"
         onClick={() => setOpen(true)}
         title={has ? cleanCaption(item.caption!) : "Nog geen caption"}
-        className="flex w-full items-start gap-1.5 rounded-[4px] border-l-2 bg-[var(--color-surface-sunken)] px-1.5 py-1 text-left hover:bg-[var(--color-neutral-soft)]"
+        className={cn(
+          "flex w-full items-start gap-1.5 rounded-[4px] border-l-2 px-1.5 py-1 text-left",
+          today
+            ? "bg-[var(--color-surface)] ring-2 ring-[var(--color-good)] shadow-sm hover:bg-[var(--color-good-soft)]/40"
+            : "bg-[var(--color-surface-sunken)] hover:bg-[var(--color-neutral-soft)]",
+        )}
         style={{ borderLeftColor: color }}
       >
         {/* Klantlogo altijd links op dezelfde plek — maakt de maand scanbaar. */}
         <ClientLogo name={item.clientName} logoUrl={item.clientLogo} color={item.clientColor} size={18} />
         <span className="min-w-0 flex-1">
           <span className="flex items-start gap-1">
+            {today ? (
+              <span className="shrink-0 rounded bg-[var(--color-good)] px-1 py-px text-[8px] font-bold uppercase leading-none tracking-wide text-white">
+                vandaag
+              </span>
+            ) : null}
             <span className="block min-w-0 flex-1 truncate text-2xs leading-tight font-medium">{item.title}</span>
             <span className="mt-0.5 size-1.5 shrink-0 rounded-full" style={{ background: has ? "var(--color-good)" : "var(--color-line-strong)" }} />
           </span>

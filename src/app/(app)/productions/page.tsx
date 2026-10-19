@@ -3,10 +3,12 @@ import Link from "next/link";
 import { CalendarCheck } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getMonthShootStats, getShootOverview, nextShootPerClient, shootsInRange } from "@/server/productions";
+import { listAssignableUsers } from "@/server/clients";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { Avatar, Card, ClientLogo, PageHeader, Stat } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { ShootAgenda, type AgendaShoot } from "./shoot-agenda";
+import { VideographerCell, type PersonOption } from "./prod-cells";
 
 export const metadata: Metadata = { title: "Opnameplanning" };
 export const dynamic = "force-dynamic";
@@ -25,12 +27,20 @@ export default async function ProductionsPage() {
   const endIso = e.toLocaleDateString("en-CA");
   const todayIso = new Date().toLocaleDateString("en-CA");
 
-  const [shoots, monthStats, nextPerClient, overview] = await Promise.all([
+  const canAssign = viewer.permissions.has("productions:write");
+  const [shoots, monthStats, nextPerClient, overview, assignable] = await Promise.all([
     shootsInRange(viewer, startIso, endIso),
     getMonthShootStats(viewer),
     nextShootPerClient(viewer),
     getShootOverview(viewer),
+    canAssign ? listAssignableUsers() : Promise.resolve([]),
   ]);
+
+  // Wie kan een opname draaien: videografen (en wie óók shoots doet binnen het
+  // kleine team). Zo kun je de videograaf direct hier koppelen i.p.v. losse boards.
+  const videographerOptions: PersonOption[] = assignable
+    .filter((u) => ["videographer", "content_creator", "owner", "admin"].includes(u.primaryRole))
+    .map((u) => ({ id: u.id, fullName: u.fullName }));
 
   const agendaShoots: AgendaShoot[] = shoots.map((x) => ({
     id: x.id,
@@ -102,13 +112,20 @@ export default async function ProductionsPage() {
                     <span className="truncate font-medium">{n.clientName}</span>
                   </span>
                   <span className="order-last col-span-2 flex items-center gap-2 sm:order-none sm:col-span-1">
-                    {n.videographerName ? (
+                    {canAssign && videographerOptions.length > 0 ? (
+                      <>
+                        {n.videographerName ? <Avatar name={n.videographerName} size={22} /> : null}
+                        <VideographerCell id={n.id} videographerId={n.videographerId} options={videographerOptions} />
+                      </>
+                    ) : n.videographerName ? (
                       <>
                         <Avatar name={n.videographerName} size={22} />
                         <span className="truncate text-sm text-[var(--color-ink)]">{n.videographerName}</span>
                       </>
                     ) : (
-                      <span className="text-sm text-[var(--color-ink-faint)]">Nog geen videograaf</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-warn-soft)]/60 px-2 py-0.5 text-xs font-medium text-[#8a5300]">
+                        ⚠ Nog geen videograaf
+                      </span>
                     )}
                   </span>
                   <span className="flex items-center justify-end gap-2 text-sm text-[var(--color-ink-muted)]">

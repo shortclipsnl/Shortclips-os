@@ -155,6 +155,17 @@ export default async function CalendarPage({
   };
   const weekRange = `${dLabel(weekDates[0]!)} – ${dLabel(weekDates[6]!)}`;
 
+  // Scheidingsbalk onder "Deze week": maakt duidelijk dat de rest van de
+  // planning over de weken die nog komen gaat. Extra ruimte boven de balk.
+  const aankomendeBar = (
+    <div className="mt-8 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+      <span className="text-sm font-bold tracking-tight">Aankomende weken</span>
+      <span className="text-xs text-white/80">
+        {periodLabel(period)} · {items.length} {items.length === 1 ? "item" : "items"}
+      </span>
+    </div>
+  );
+
   return (
     <div className="mx-auto max-w-[1500px]">
       <PageHeader
@@ -252,7 +263,7 @@ export default async function CalendarPage({
                     </div>
                     <div className="space-y-1">
                       {dayItems.slice(0, 3).map((it) => (
-                        <ContentChip key={it.id} color={it.clientColor ?? "var(--color-brand-500)"} item={toChipItem(it)} />
+                        <ContentChip key={it.id} color={it.clientColor ?? "var(--color-brand-500)"} item={toChipItem(it)} today={isToday} />
                       ))}
                     </div>
                   </div>
@@ -279,6 +290,8 @@ export default async function CalendarPage({
             .map((c) => ({ id: c.id, name: c.name }))}
         />
       ) : asList ? (
+        <>
+        {aankomendeBar}
         <Card padded={false}>
           {items.length === 0 ? (
             <EmptyState title="Niets gepland in deze periode" />
@@ -335,8 +348,10 @@ export default async function CalendarPage({
             </ul>
           )}
         </Card>
+        </>
       ) : (
         <>
+        {aankomendeBar}
         {items.length === 0 ? (
           <div className="mb-3 rounded-[var(--radius-md)] border border-dashed border-[var(--color-line-strong)] bg-[var(--color-surface-sunken)]/50 px-4 py-3 text-sm text-[var(--color-ink-muted)]">
             Niets gepland in deze maand. Plan content in via{" "}
@@ -400,6 +415,7 @@ export default async function CalendarPage({
                       <ContentChip
                         key={i.id}
                         color={i.clientColor ?? "var(--color-brand-500)"}
+                        today={date === today}
                         item={{
                           id: i.id,
                           title: i.title,

@@ -49,15 +49,18 @@ export function ProdStatusCell({ id, status }: { id: string; status: string }) {
 
 export function VideographerCell({ id, videographerId, options }: { id: string; videographerId: string | null; options: PersonOption[] }) {
   const { pending, err, run } = useSaver();
+  // Nog niet gekoppeld? Dan oranje, zodat direct opvalt dat deze opname nog
+  // een videograaf mist (i.p.v. een stille grijze melding).
+  const unassigned = !videographerId;
   return (
     <span className="inline-flex items-center gap-1" onClick={stop} onMouseDown={stop} title={err ?? undefined}>
       <select
-        className="sc-input h-7 w-32 py-0 text-xs"
+        className={`sc-input h-7 w-36 py-0 text-xs ${unassigned ? "border-[var(--color-warn)]/70 bg-[var(--color-warn-soft)]/50 font-medium text-[#8a5300]" : ""}`}
         value={videographerId ?? ""}
         disabled={pending}
         onChange={(e) => run(() => setProductionVideographer(id, e.target.value || null))}
       >
-        <option value="">— Geen videograaf —</option>
+        <option value="">⚠ Koppel videograaf…</option>
         {options.map((o) => (
           <option key={o.id} value={o.id}>{o.fullName}</option>
         ))}
