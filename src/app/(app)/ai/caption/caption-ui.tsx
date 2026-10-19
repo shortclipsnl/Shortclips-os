@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { CalendarPlus, Check, Loader2, RefreshCw, Sparkles, Upload } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { CalendarPlus, Check, FileText, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
 import { addCaptionToPlanning, generateCaptions, regenerateOneCaption, type ShortCaption } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote } from "@/components/ui";
 import { CopyButton, HistoryPanel, NoProviderNote, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
 
 type ClientOption = { id: string; name: string };
+
+const isDoc = (n: string) => /\.(pdf|docx)$/i.test(n);
+const PLATFORMS = "Instagram · TikTok · Facebook · YouTube Shorts";
 
 export function CaptionMaker({
   clients,
@@ -18,16 +21,22 @@ export function CaptionMaker({
   recent: HistoryEntry<ShortCaption[]>[];
 }) {
   const [clientId, setClientId] = useState("");
-  const [scriptText, setScriptText] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [docxBase64, setDocxBase64] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const [results, setResults] = useState<ShortCaption[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   async function onFile(file: File | undefined) {
     if (!file) return;
+    if (!isDoc(file.name)) {
+      setErr("Alleen een PDF- of Word-bestand (.pdf of .docx).");
+      return;
+    }
+    setErr(null);
     setFileName(file.name);
     const b64 = await fileToBase64(file);
     if (file.name.toLowerCase().endsWith(".docx")) {
@@ -39,14 +48,30 @@ export function CaptionMaker({
     }
   }
 
+  function clearFile() {
+    setFileName(null);
+    setPdfBase64(null);
+    setDocxBase64(null);
+  }
+
+  async function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    await onFile(e.dataTransfer.files?.[0]);
+  }
+
   function run() {
     if (!clientId) {
       setErr("Kies eerst een klant.");
       return;
     }
+    if (!pdfBase64 && !docxBase64) {
+      setErr("Sleep het scriptbestand erin (PDF of Word).");
+      return;
+    }
     setErr(null);
     start(async () => {
-      const res = await generateCaptions({ clientId, scriptText, pdfBase64: pdfBase64 ?? undefined, docxBase64: docxBase64 ?? undefined });
+      const res = await generateCaptions({ clientId, pdfBase64: pdfBase64 ?? undefined, docxBase64: docxBase64 ?? undefined });
       if (res.ok) setResults(res.data);
       else setErr(res.message);
     });
@@ -56,16 +81,46 @@ export function CaptionMaker({
     <div className="space-y-5">
       <ToolHowTo
         steps={[
-          "Kies een klant en plak het script — of upload het script als PDF of Word-bestand.",
-          "Klik op Genereren. Je krijgt meerdere caption-opties met passende hashtags.",
-          "Kies de beste optie; de toon per klant stel je in via de AI-kennisbank.",
+          "Kies de klant en sleep het scriptbestand erin (PDF of Word).",
+          "Klik op Captions genereren. Je krijgt per short één caption met eventuele hashtags.",
+          "De toon per klant stel je in via de AI-kennisbank.",
         ]}
       />
       {!aiReady ? <NoProviderNote /> : null}
       <HistoryPanel items={recent} onLoad={(o) => setResults(o)} />
 
       <Card>
-        <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+        {/* Scriptbestand links (hoofdinvoer, slepen), klant rechts. */}
+        <div className="grid gap-4 md:grid-cols-[1fr_240px]">
+          <div>
+            <label className="sc-label">Scriptbestand</label>
+            {fileName ? (
+              <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-line-strong)] bg-[var(--color-surface-sunken)] px-4 py-5">
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <FileText className="size-6 shrink-0 text-[var(--color-brand-600)]" strokeWidth={1.75} />
+                  <span className="truncate text-sm font-medium">{fileName}</span>
+                </span>
+                <button type="button" onClick={clearFile} aria-label="Bestand verwijderen" className="shrink-0 rounded p-1 text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-bad)]">
+                  <X className="size-4" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={onDrop}
+                onClick={() => inputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[var(--radius-md)] border-2 border-dashed px-4 py-8 text-center transition ${dragOver ? "border-[var(--color-brand-500)] bg-[var(--color-brand-50)]" : "border-[var(--color-line-strong)] hover:bg-[var(--color-surface-sunken)]"}`}
+              >
+                <FileText className="size-7 text-[var(--color-ink-faint)]" strokeWidth={1.5} />
+                <span className="text-sm font-medium">Sleep hier het scriptbestand naartoe</span>
+                <span className="text-xs text-[var(--color-ink-faint)]">of klik om te kiezen · PDF of Word (.docx)</span>
+              </div>
+            )}
+            <input ref={inputRef} type="file" accept=".pdf,.docx,application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+          </div>
           <div>
             <label className="sc-label">Klant</label>
             <select className="sc-input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
@@ -74,22 +129,9 @@ export function CaptionMaker({
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-            <label className="sc-label mt-4">Script-bestand (PDF of Word)</label>
-            <label className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] px-3 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]">
-              <Upload className="size-4" />
-              {fileName ?? "Bestand kiezen"}
-              <input type="file" accept=".pdf,.docx,application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-            </label>
-          </div>
-          <div>
-            <label className="sc-label">Of plak de scripts</label>
-            <textarea
-              className="sc-input resize-y font-mono text-xs leading-relaxed"
-              rows={12}
-              placeholder="Plak hier één of meer scripts. De AI herkent zelf hoeveel shorts erin staan."
-              value={scriptText}
-              onChange={(e) => setScriptText(e.target.value)}
-            />
+            <p className="mt-2 text-xs text-[var(--color-ink-faint)]">
+              Eén caption per short voor {PLATFORMS}, met eventueel toepasbare hashtags.
+            </p>
           </div>
         </div>
         <div className="mt-4 flex items-center gap-3 border-t border-[var(--color-line)] pt-4">
@@ -119,7 +161,6 @@ export function CaptionMaker({
               index={i}
               short={short}
               clientId={clientId}
-              scriptText={scriptText}
               pdfBase64={pdfBase64}
               onChange={(next) => setResults((cur) => cur!.map((s, j) => (j === i ? next : s)))}
             />
@@ -131,23 +172,20 @@ export function CaptionMaker({
 }
 
 function exportShort(s: ShortCaption, i: number): string {
-  const ig = `${s.instagram.caption}\n\n${(s.instagram.hashtags ?? []).join(" ")}`.trim();
-  const tt = `${s.tiktok.caption}\n\n${(s.tiktok.hashtags ?? []).join(" ")}`.trim();
-  return `SHORT ${i + 1}: ${s.shortTitle}\n\n[Instagram]\n${ig}\n\n[TikTok]\n${tt}`;
+  const tags = (s.hashtags ?? []).join(" ");
+  return `SHORT ${i + 1}: ${s.shortTitle}\n\n${s.caption}${tags ? `\n\n${tags}` : ""}`;
 }
 
 function ShortBlock({
   index,
   short,
   clientId,
-  scriptText,
   pdfBase64,
   onChange,
 }: {
   index: number;
   short: ShortCaption;
   clientId: string;
-  scriptText: string;
   pdfBase64: string | null;
   onChange: (s: ShortCaption) => void;
 }) {
@@ -155,6 +193,7 @@ function ShortBlock({
   const [planning, startPlanning] = useTransition();
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const full = `${short.caption}${short.hashtags?.length ? `\n\n${short.hashtags.join(" ")}` : ""}`.trim();
 
   function regen() {
     start(async () => {
@@ -162,7 +201,6 @@ function ShortBlock({
         clientId,
         shortTitle: short.shortTitle,
         hook: short.hook,
-        scriptText,
         pdfBase64: pdfBase64 ?? undefined,
       });
       if (res.ok) onChange(res.data);
@@ -173,12 +211,7 @@ function ShortBlock({
   function toPlanning() {
     setErr(null);
     startPlanning(async () => {
-      const res = await addCaptionToPlanning({
-        clientId,
-        shortTitle: short.shortTitle,
-        instagramCaption: short.instagram.caption,
-        tiktokCaption: short.tiktok.caption,
-      });
+      const res = await addCaptionToPlanning({ clientId, shortTitle: short.shortTitle, caption: short.caption });
       if (res.ok) setSaved(true);
       else setErr(res.message ?? "Mislukt");
     });
@@ -202,45 +235,28 @@ function ShortBlock({
         </div>
       </div>
       {short.hook ? <p className="mb-3 text-xs text-[var(--color-ink-faint)]">Hook: {short.hook}</p> : null}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Platform
-          label="Instagram"
-          caption={short.instagram.caption}
-          hashtags={short.instagram.hashtags ?? []}
-          onCaption={(v) => onChange({ ...short, instagram: { ...short.instagram, caption: v } })}
+
+      <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] p-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">Caption · {PLATFORMS}</span>
+          <CopyButton text={full} />
+        </div>
+        <textarea
+          className="sc-input resize-y text-sm"
+          rows={5}
+          value={short.caption}
+          onChange={(e) => onChange({ ...short, caption: e.target.value })}
         />
-        <Platform
-          label="TikTok"
-          caption={short.tiktok.caption}
-          hashtags={short.tiktok.hashtags ?? []}
-          onCaption={(v) => onChange({ ...short, tiktok: { ...short.tiktok, caption: v } })}
-        />
+        <div className="mt-3">
+          <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Eventueel toepasbare hashtags</span>
+          {short.hashtags?.length ? (
+            <p className="mt-1 text-sm text-[var(--color-brand-600)]">{short.hashtags.join(" ")}</p>
+          ) : (
+            <p className="mt-1 text-sm text-[var(--color-ink-faint)]">Geen hashtags voorgesteld.</p>
+          )}
+        </div>
       </div>
       {err ? <div className="mt-2"><ErrorNote>{err}</ErrorNote></div> : null}
     </Card>
-  );
-}
-
-function Platform({
-  label,
-  caption,
-  hashtags,
-  onCaption,
-}: {
-  label: string;
-  caption: string;
-  hashtags: string[];
-  onCaption: (v: string) => void;
-}) {
-  const full = `${caption}\n\n${hashtags.join(" ")}`.trim();
-  return (
-    <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">{label}</span>
-        <CopyButton text={full} />
-      </div>
-      <textarea className="sc-input resize-y text-sm" rows={5} value={caption} onChange={(e) => onCaption(e.target.value)} />
-      {hashtags.length ? <p className="mt-2 text-xs text-[var(--color-brand-600)]">{hashtags.join(" ")}</p> : null}
-    </div>
   );
 }

@@ -156,63 +156,51 @@ function BriefingView({ briefing }: { briefing: EditorBriefing }) {
         <h2 className="text-sm font-semibold">Briefing</h2>
         <CopyButton label="Hele briefing kopiëren" text={briefingToText(briefing)} />
       </div>
+      {/* Compacte, scanbare briefing — één kaart die je in z'n geheel kunt kopiëren. */}
       <Card>
-        <h3 className="text-sm font-semibold">Project</h3>
-        <dl className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-          <Row k="Klant" v={intro?.client} />
-          <Row k="Aantal video's" v={String(intro?.aantalShorts ?? "")} />
-          {intro?.project ? <Row k="Project" v={intro.project} /> : null}
-        </dl>
-        {intro?.omschrijving ? <p className="mt-3 text-sm text-[var(--color-ink-muted)]">{intro.omschrijving}</p> : null}
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <h3 className="text-sm font-semibold">{intro?.client || "Briefing"}</h3>
+          <span className="text-xs text-[var(--color-ink-muted)]">{intro?.aantalShorts ?? 0} video&apos;s</span>
+        </div>
+        {intro?.omschrijving ? <p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">{intro.omschrijving}</p> : null}
         {intro?.algemeneAandachtspunten?.length ? (
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
-            {intro.algemeneAandachtspunten.map((a, i) => <li key={i}>{a}</li>)}
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {intro.algemeneAandachtspunten.map((a, i) => (
+              <li key={i} className="rounded-full bg-[var(--color-surface-sunken)] px-2.5 py-1 text-xs text-[var(--color-ink)]">{a}</li>
+            ))}
           </ul>
         ) : null}
+
+        <ol className="mt-4 space-y-3 border-t border-[var(--color-line)] pt-3">
+          {(briefing.shorts ?? []).map((s, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--color-indigo-ink)] text-2xs font-bold text-white">{i + 1}</span>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold leading-snug">{s.titel}</div>
+                {s.omschrijving ? <p className="mt-0.5 text-sm leading-snug text-[var(--color-ink-muted)]">{s.omschrijving}</p> : null}
+                {s.aandachtspunten?.length ? (
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-[var(--color-ink)]">
+                    {s.aandachtspunten.map((a, j) => <li key={j}>{a}</li>)}
+                  </ul>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ol>
       </Card>
-
-      {(briefing.shorts ?? []).map((s, i) => (
-        <Card key={i}>
-          <h3 className="text-sm font-semibold">Short {i + 1}: <span className="font-normal text-[var(--color-ink-muted)]">{s.titel}</span></h3>
-          <dl className="mt-2 space-y-1.5 text-sm">
-            <Line k="Omschrijving" v={s.omschrijving} />
-            <Line k="Doel" v={s.doel} />
-            <Line k="Hook" v={s.hook} />
-            <Line k="Let op bij beelden" v={s.beelden} />
-            <Line k="Opbouw" v={s.opbouw} />
-            <Line k="Tekstelementen" v={s.tekstelementen} />
-            <Line k="Montagekeuzes" v={s.montagekeuzes} />
-            <Line k="Niet vergeten" v={s.nietVergeten} />
-          </dl>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-function Row({ k, v }: { k: string; v?: string }) {
-  return (
-    <div className="flex gap-2">
-      <dt className="text-[var(--color-ink-faint)]">{k}:</dt>
-      <dd className="font-medium">{v || "—"}</dd>
-    </div>
-  );
-}
-function Line({ k, v }: { k: string; v?: string }) {
-  if (!v) return null;
-  return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{k}</dt>
-      <dd className="text-[var(--color-ink)]">{v}</dd>
     </div>
   );
 }
 
 function briefingToText(b: EditorBriefing): string {
   const i = b.projectIntro;
-  const head = `EDITINGBRIEFING\nKlant: ${i?.client ?? ""}\nAantal video's: ${i?.aantalShorts ?? ""}${i?.project ? `\nProject: ${i.project}` : ""}\n\n${i?.omschrijving ?? ""}\n\nAlgemene aandachtspunten:\n${(i?.algemeneAandachtspunten ?? []).map((a) => `- ${a}`).join("\n")}`;
+  const algemeen = (i?.algemeneAandachtspunten ?? []).filter(Boolean);
+  const head = `EDITINGBRIEFING — ${i?.client ?? ""} (${i?.aantalShorts ?? 0} video's)\n${i?.omschrijving ?? ""}${algemeen.length ? `\nLet op: ${algemeen.join(" · ")}` : ""}`;
   const shorts = (b.shorts ?? [])
-    .map((s, n) => `\n\nSHORT ${n + 1}: ${s.titel}\n- Omschrijving: ${s.omschrijving}\n- Doel: ${s.doel}\n- Hook: ${s.hook}\n- Beelden: ${s.beelden}\n- Opbouw: ${s.opbouw}\n- Tekstelementen: ${s.tekstelementen}\n- Montagekeuzes: ${s.montagekeuzes}\n- Niet vergeten: ${s.nietVergeten}`)
+    .map((s, n) => {
+      const punten = (s.aandachtspunten ?? []).filter(Boolean);
+      return `\n\n${n + 1}. ${s.titel}\n${s.omschrijving ?? ""}${punten.length ? `\n${punten.map((p) => `- ${p}`).join("\n")}` : ""}`;
+    })
     .join("");
   return head + shorts;
 }

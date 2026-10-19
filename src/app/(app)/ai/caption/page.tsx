@@ -27,7 +27,7 @@ export default async function CaptionPage() {
     <div className="mx-auto max-w-[1100px]">
       <PageHeader
         title="AI Caption Maker"
-        description="Genereer per short captions voor Instagram en TikTok op basis van je scripts en de stijl van de klant."
+        description="Sleep het scriptbestand erin en kies de klant — je krijgt per short één caption voor Instagram, TikTok, Facebook en YouTube Shorts, met eventueel toepasbare hashtags."
       />
       <CaptionMaker clients={clients} aiReady={aiConfigured()} recent={recent} />
     </div>

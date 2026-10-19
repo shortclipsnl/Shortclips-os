@@ -69,8 +69,10 @@ async function saveOutput(params: {
 export type ShortCaption = {
   shortTitle: string;
   hook: string;
-  instagram: { caption: string; hashtags: string[] };
-  tiktok: { caption: string; hashtags: string[] };
+  /** Eén caption, bruikbaar voor Instagram, TikTok, Facebook en YouTube Shorts. */
+  caption: string;
+  /** Eventueel toepasbare hashtags. */
+  hashtags: string[];
 };
 
 export async function generateCaptions(input: {
@@ -105,20 +107,20 @@ REGELS VOOR DE CAPTIONS:
 - Gebruik de hook van het script als belangrijk uitgangspunt voor de opening, maar schrijf het script niet over — maak een aantrekkelijke caption die aansluit op de video.
 - Gebruik de tone of voice en schrijfstijl van deze klant. Laat het natuurlijk klinken, nooit herkenbaar als AI.
 - Gebruik passende emoji's alleen als dat bij deze klant past.
-- Voeg relevante hashtags toe die aansluiten op het onderwerp, de branche en het platform. Vermijd generieke of willekeurige hashtags.
 - Voeg contactgegevens alleen toe als dat onderdeel is van de captionstijl van de klant, en uitsluitend de gegevens die in het profiel staan. Verzin nooit gegevens.
-- Instagram mag wat meer toelichting bevatten; TikTok is korter en directer. Houd rekening met de eventueel ingestelde lengtes per platform.
+- Eén caption per short die werkt op Instagram, TikTok, Facebook én YouTube Shorts (niet per platform verschillend). Kort en pakkend.
+- Zet GEEN hashtags in de caption zelf; die geef je apart als eventueel toepasbare hashtags (relevant voor onderwerp en branche, geen generieke of willekeurige — mag een lege lijst zijn).
 - Zorg dat de captions onderling variëren — niet elke video dezelfde soort opening.`;
 
-    const user = `Hieronder staat een document of tekst met één of meer scripts voor afzonderlijke shorts. Herken automatisch hoeveel losse shorts erin staan. Analyseer per short de hook, het onderwerp, de inhoud en de call to action. Genereer per short twee captions: één voor Instagram en één voor TikTok.
+    const user = `Hieronder staat een document of tekst met één of meer scripts voor afzonderlijke shorts. Herken automatisch hoeveel losse shorts erin staan. Analyseer per short de hook, het onderwerp, de inhoud en de call to action. Genereer per short ÉÉN caption die bruikbaar is voor Instagram, TikTok, Facebook en YouTube Shorts, plus eventueel toepasbare hashtags.
 
 Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder omliggende tekst:
 [
   {
     "shortTitle": "korte titel van de short",
     "hook": "de herkende hook",
-    "instagram": { "caption": "...", "hashtags": ["#..", "#.."] },
-    "tiktok": { "caption": "...", "hashtags": ["#..", "#.."] }
+    "caption": "de caption (zonder hashtags erin)",
+    "hashtags": ["#..", "#.."]
   }
 ]
 
@@ -173,9 +175,9 @@ export async function regenerateOneCaption(input: {
 Je maakt captions voor klant "${name}". Houd je aan dit captionprofiel:
 ${caption}
 
-Baseer de caption op de inhoud van het script en de hook. Instagram mag wat meer toelichting bevatten; TikTok is korter en directer. Gebruik passende emoji's en relevante hashtags, geen generieke. Verzin geen contactgegevens.`;
+Baseer de caption op de inhoud van het script en de hook. Eén caption die werkt op Instagram, TikTok, Facebook en YouTube Shorts. Gebruik passende emoji's; zet geen hashtags in de caption maar geef ze apart. Verzin geen contactgegevens.`;
 
-    const user = `Genereer UITSLUITEND voor de volgende short nieuwe, frisse captions (andere invalshoek dan voorheen) voor Instagram en TikTok.
+    const user = `Genereer UITSLUITEND voor de volgende short één nieuwe, frisse caption (andere invalshoek dan voorheen), bruikbaar voor Instagram, TikTok, Facebook en YouTube Shorts, plus eventueel toepasbare hashtags.
 
 Short: "${input.shortTitle}"
 Hook: "${input.hook}"
@@ -185,8 +187,8 @@ Geef UITSLUITEND geldige JSON terug in dit formaat:
 {
   "shortTitle": "${input.shortTitle}",
   "hook": "${input.hook}",
-  "instagram": { "caption": "...", "hashtags": ["#.."] },
-  "tiktok": { "caption": "...", "hashtags": ["#.."] }
+  "caption": "...",
+  "hashtags": ["#.."]
 }`;
 
     const res = await runJsonPrompt<ShortCaption>({ system, user, documents: docFrom(input.pdfBase64), maxTokens: 2000 });
@@ -210,8 +212,7 @@ Geef UITSLUITEND geldige JSON terug in dit formaat:
 export async function addCaptionToPlanning(input: {
   clientId: string;
   shortTitle: string;
-  instagramCaption: string;
-  tiktokCaption: string;
+  caption: string;
 }): Promise<SimpleResult> {
   try {
     const viewer = await requirePermission("calendar:write");
@@ -227,8 +228,8 @@ export async function addCaptionToPlanning(input: {
         scheduledOn: today,
         status: "to_prepare",
         platforms: ["instagram", "tiktok"],
-        caption: input.instagramCaption.trim() || null,
-        notes: input.tiktokCaption.trim() ? `TikTok-caption:\n${input.tiktokCaption.trim()}` : null,
+        caption: input.caption.trim() || null,
+        notes: null,
         ownerId: viewer.id,
       })
       .returning({ id: contentCalendar.id });
@@ -249,23 +250,18 @@ export async function addCaptionToPlanning(input: {
 export type EditorBriefing = {
   projectIntro: {
     client: string;
-    project: string;
     aantalShorts: number;
-    editor: string;
-    deadline: string;
+    /** Eén of twee zinnen over de hele sessie. */
     omschrijving: string;
+    /** Max ~3 korte, algemene aandachtspunten. */
     algemeneAandachtspunten: string[];
   };
   shorts: Array<{
     titel: string;
+    /** Eén of twee zinnen over wat deze short inhoudt. */
     omschrijving: string;
-    doel: string;
-    hook: string;
-    beelden: string;
-    opbouw: string;
-    tekstelementen: string;
-    montagekeuzes: string;
-    nietVergeten: string;
+    /** Max 2 korte aandachtspunten voor de editor (optioneel). */
+    aandachtspunten: string[];
   }>;
 };
 
@@ -301,30 +297,28 @@ ${editing.aandachtspunten ? `\nKLANTSPECIFIEKE EDITINGVOORKEUREN:\n${editing.aan
 
 HEEL BELANGRIJK: presenteer nooit beelden, shots of opnamemomenten als daadwerkelijk beschikbaar wanneer die alleen uit het script worden afgeleid. Als een script bijvoorbeeld zegt dat een auto van binnen en buiten getoond wordt, adviseer dan daarop te letten, maar beweer niet dat die beelden er ook echt zijn. Maak onderscheid tussen algemene richtlijnen en instructies die echt uit het script volgen.`;
 
-    const user = `Hieronder staan de scripts van één opnamesessie (uit het aangeleverde scriptbestand). Herken de afzonderlijke scripts. Tel hoeveel video's/shorts het zijn. Analyseer per short het concept, de hook, de opbouw en de gewenste montage. Maak één compacte, overzichtelijke briefing voor het hele project: hoeveel video's het zijn en wat per video belangrijk is. Verzin geen project, editor of deadline — laat die velden leeg als ze niet uit het script blijken.
+    const user = `Hieronder staan de scripts van één opnamesessie (uit het aangeleverde scriptbestand). Herken de afzonderlijke scripts en tel hoeveel video's/shorts het zijn. Maak ÉÉN compacte, heel scanbare briefing voor de editor.
+
+HOUD HET KORT. Leg het script NIET volledig uit en herhaal de tekst niet. Per short geef je alleen:
+- een titel (kort);
+- een omschrijving van ÉÉN of TWEE zinnen over wat de short inhoudt;
+- maximaal 2 korte aandachtspunten voor de montage (alleen als ze echt helpen; anders een lege lijst).
+
+Voor het hele project: een omschrijving van één à twee zinnen en maximaal 3 korte algemene aandachtspunten. Verzin niets; presenteer geen beelden als beschikbaar wanneer die alleen uit het script zijn afgeleid.
 
 Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder omliggende tekst:
 {
   "projectIntro": {
     "client": "${name}",
-    "project": "...",
     "aantalShorts": 0,
-    "editor": "...",
-    "deadline": "...",
-    "omschrijving": "korte omschrijving van het project",
-    "algemeneAandachtspunten": ["..", ".."]
+    "omschrijving": "één of twee zinnen over de sessie",
+    "algemeneAandachtspunten": ["kort punt", "kort punt"]
   },
   "shorts": [
     {
-      "titel": "titel van het concept",
-      "omschrijving": "korte omschrijving van de video",
-      "doel": "wat het doel is van het concept",
-      "hook": "wat belangrijk is aan de hook",
-      "beelden": "welke beelden of momenten extra aandacht verdienen (als advies, niet als bewering dat ze bestaan)",
-      "opbouw": "hoe de video logisch opgebouwd moet worden",
-      "tekstelementen": "welke tekstuele elementen mogelijk nodig zijn",
-      "montagekeuzes": "welke montagekeuzes helpen de kijker vast te houden",
-      "nietVergeten": "wat absoluut niet vergeten mag worden"
+      "titel": "korte titel",
+      "omschrijving": "één of twee zinnen over deze short",
+      "aandachtspunten": ["kort punt", "kort punt"]
     }
   ]
 }
@@ -335,7 +329,7 @@ ${scriptText.trim() ? `De scripts:\n\n${scriptText.trim()}` : "De scripts staan 
       system,
       user,
       documents: docFrom(input.pdfBase64),
-      maxTokens: 14000,
+      maxTokens: 4000,
     });
     if (!res.ok) {
       return res.reason === "no_provider"
