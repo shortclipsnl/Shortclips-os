@@ -23,6 +23,7 @@ export default async function ClientsPage() {
     status: c.status,
     color: c.color,
     logoUrl: c.logoUrl,
+    coordinatorId: c.coordinatorId,
     coordinatorName: c.coordinatorName,
     nextShoot: c.nextShoot,
     inProduction: Number(c.inProduction),
@@ -32,6 +33,9 @@ export default async function ClientsPage() {
 
   const activeCount = clients.filter((c) => !STOPPED.has(c.status)).length;
   const inactiveCount = clients.filter((c) => STOPPED.has(c.status)).length;
+  // Eigen pod = klanten waar jij verantwoordelijke bent. Heb je een pod, dan
+  // staat "Mijn klanten" standaard aan (met een schakelaar naar Alle klanten).
+  const myCount = clients.filter((c) => c.coordinatorId === viewer.id).length;
 
   return (
     <div className="mx-auto max-w-[1400px]">
@@ -49,7 +53,7 @@ export default async function ClientsPage() {
           alles vanaf het begin en hoeft er later niets te worden aangevuld.
         </p>
       ) : null}
-      <ClientsBoard clients={clients} />
+      <ClientsBoard clients={clients} viewerId={viewer.id} defaultPod={myCount > 0 ? "mijn" : "alle"} />
     </div>
   );
 }

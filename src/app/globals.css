@@ -68,8 +68,8 @@
     "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
-  --text-2xs: 0.6875rem;
-  --text-2xs--line-height: 1rem;
+  --text-2xs: 0.75rem;
+  --text-2xs--line-height: 1.05rem;
 
   /* ---- Radius ---- */
   --radius-xs: 4px;
@@ -115,6 +115,10 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Basisgrootte een stap groter (17px i.p.v. 16px): alle rem-maten schalen
+     mee, dus kleine labels/subregels worden beter leesbaar zonder dat de
+     layout breekt. */
+  font-size: 106.25%;
   /* Reserveer altijd ruimte voor de scrollbar, zodat de layout (en dus het
      menu) niet horizontaal verspringt tussen korte en lange pagina's. */
   scrollbar-gutter: stable;
@@ -377,3 +381,13 @@ body {
   --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.55);
   --shadow-pop: 0 8px 16px rgba(0, 0, 0, 0.5), 0 24px 48px rgba(0, 0, 0, 0.65);
 }
+
+/* Logo wisselt mee met het thema: navy woordmerk op licht, wit op donker,
+   zodat het linksboven nooit donker-op-donker wegvalt. */
+.sc-logo-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .sc-logo-light { display: none; }
+  :root:not([data-theme="light"]) .sc-logo-dark { display: block; }
+}
+:root[data-theme="dark"] .sc-logo-light { display: none; }
+:root[data-theme="dark"] .sc-logo-dark { display: block; }

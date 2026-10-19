@@ -19,7 +19,10 @@ export function Sidebar({ groups }: { groups: NavGroup[] }) {
   return (
     <nav className="flex h-full flex-col gap-6 overflow-y-auto px-3 py-5">
       <Link href="/dashboard" className="px-2">
-        <Logo size={30} />
+        {/* Logo wisselt mee met het thema (navy op licht, wit op donker),
+            zodat het nooit donker-op-donker wegvalt. */}
+        <Logo size={30} className="sc-logo-light" />
+        <Logo size={30} onDark className="sc-logo-dark" />
       </Link>
 
       <div className="flex flex-1 flex-col gap-5">

@@ -51,6 +51,7 @@ export async function listClients(viewer: Viewer) {
       monthlyVideoQuota: clients.monthlyVideoQuota,
       startedOn: clients.startedOn,
       lastActivityAt: clients.lastActivityAt,
+      coordinatorId: clients.coordinatorId,
       coordinatorName: users.fullName,
       publishedThisMonth: sql<number>`(
         select count(*) from deliverables d

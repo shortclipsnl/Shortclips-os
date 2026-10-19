@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check } from "lucide-react";
 
 export type ScheduleItem = { from: string; to?: string; label: string; detail?: string };
 
@@ -82,10 +81,12 @@ export function Dagindeling({ items }: { items: ScheduleItem[] }) {
                 ) : status === "straks" ? (
                   <span className="shrink-0 text-2xs font-medium text-[var(--color-ink-faint)]">straks</span>
                 ) : (
-                  <span className="shrink-0 inline-flex items-center gap-0.5 text-2xs font-semibold text-[var(--color-good)]"><Check className="size-3" strokeWidth={3} />gedaan</span>
+                  <span className="shrink-0 text-2xs font-medium text-[var(--color-ink-faint)]">voorbij</span>
                 )}
               </div>
-              <div className={`mt-0.5 text-sm leading-snug ${done ? "text-[var(--color-good)] line-through decoration-[var(--color-good)]/60" : status === "nu" ? "font-semibold" : "font-medium"}`}>
+              {/* Geweest = neutraal "voorbij" (geen vinkje/doorstreep): het ritme-
+                  blok is geen afgevinkte taak, alleen het tijdstip is geweest. */}
+              <div className={`mt-0.5 text-sm leading-snug ${done ? "text-[var(--color-ink-faint)]" : status === "nu" ? "font-semibold" : "font-medium"}`}>
                 {it.label}
               </div>
               {it.detail ? (

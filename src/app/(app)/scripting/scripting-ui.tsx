@@ -191,7 +191,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                       </span>
                     </td>
                     <td className="px-2 py-2 align-top">
-                      <WriterCell id={r.id} writerId={r.scriptWriterId} writerName={r.scriptWriterName} options={writerOptions} canWrite={canWrite} />
+                      <WriterCell id={r.id} writerId={r.scriptWriterId} writerName={r.scriptWriterName} options={writerOptions} canWrite={canWrite} urgent={!r.done && r.daysToDeadline <= 7} />
                     </td>
                     <td className="px-2 py-2 align-top">
                       <StatusPicker id={r.id} status={r.status} canWrite={canWrite} />
@@ -214,7 +214,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
  * Verantwoordelijke scriptschrijver kiezen (Milou/Jiska/Jarno). Niet toegewezen
  * valt op in oranje, zodat meteen duidelijk is wie het script nog moet oppakken.
  */
-function WriterCell({ id, writerId, writerName, options, canWrite }: { id: string; writerId: string | null; writerName: string | null; options: WriterOption[]; canWrite: boolean }) {
+function WriterCell({ id, writerId, writerName, options, canWrite, urgent }: { id: string; writerId: string | null; writerName: string | null; options: WriterOption[]; canWrite: boolean; urgent: boolean }) {
   const [pending, start] = useTransition();
   const router = useRouter();
 
@@ -232,7 +232,10 @@ function WriterCell({ id, writerId, writerName, options, canWrite }: { id: strin
   const change = (next: string) => {
     start(async () => { await setScriptWriter(id, next || null); router.refresh(); });
   };
-  const unassigned = !writerId;
+  // Alleen oranje waarschuwen als er niemand staat én de deadline nadert
+  // (binnen 7 dagen). Anders een rustige grijze placeholder — zo valt het
+  // urgente écht op i.p.v. dat alles een waarschuwing is.
+  const warn = !writerId && urgent;
 
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -242,9 +245,9 @@ function WriterCell({ id, writerId, writerName, options, canWrite }: { id: strin
         onChange={(e) => change(e.target.value)}
         disabled={pending}
         aria-label="Verantwoordelijke"
-        className={`h-7 min-w-[120px] rounded-full border-0 py-0 pl-2.5 pr-6 text-xs font-semibold ${unassigned ? "bg-[var(--color-warn-soft)]/60 text-[#8a5300]" : "bg-[var(--color-surface-2)] text-[var(--color-ink)]"}`}
+        className={`h-7 min-w-[120px] rounded-full border-0 py-0 pl-2.5 pr-6 text-xs font-semibold ${warn ? "bg-[var(--color-warn-soft)]/60 text-[#8a5300]" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}
       >
-        <option value="">⚠ Wie schrijft dit?</option>
+        <option value="">{warn ? "⚠ Wie schrijft dit?" : "Wie schrijft dit?"}</option>
         {options.map((o) => (
           <option key={o.id} value={o.id}>{o.fullName.split(" ")[0]}</option>
         ))}

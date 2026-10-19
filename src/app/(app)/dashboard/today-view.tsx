@@ -57,8 +57,16 @@ const BLOCK_RING: Record<Accent, string> = {
 };
 
 /** "Klant — Titel", maar niet "Klant — Klant" als de titel gelijk is. */
+/** Ruwe ISO-datums (2026-10-20) in een titel vervangen door een leesbare datum. */
+function prettyTitle(title: string): string {
+  return title.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_, y, m, d) =>
+    new Date(Number(y), Number(m) - 1, Number(d)).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }),
+  );
+}
+
 function label(clientName: string, title: string): string {
-  return title.trim().toLowerCase() === clientName.trim().toLowerCase() ? clientName : `${clientName} — ${title}`;
+  const t = prettyTitle(title);
+  return t.trim().toLowerCase() === clientName.trim().toLowerCase() ? clientName : `${clientName} — ${t}`;
 }
 
 const DOT: Record<Tone, string> = {
@@ -214,7 +222,7 @@ function creativeBlocks(data: DashboardData, myDay: MyDay): Block[] {
     ...myDay.tasks.map((t) => ({
       key: `task-${t.id}`,
       href: "/tasks",
-      what: t.title,
+      what: prettyTitle(t.title),
       action: t.clientName ? `${t.clientName} → oppakken` : "Eigen taak → oppakken",
       meta: t.dueOn ? `${dayName(t.dueOn)}${t.overdue ? " · te laat" : ""}` : "geen datum",
       tone: (t.overdue ? "bad" : t.priority === "urgent" || t.priority === "high" ? "warn" : "neutral") as Tone,
@@ -263,7 +271,7 @@ function videographerBlocks(myDay: MyDay): Block[] {
   const tasks: Line[] = myDay.tasks.map((t) => ({
     key: `task-${t.id}`,
     href: "/tasks",
-    what: t.title,
+    what: prettyTitle(t.title),
     action: t.clientName ? `${t.clientName} → oppakken` : "Eigen taak → oppakken",
     meta: t.dueOn ? `${dayName(t.dueOn)}${t.overdue ? " · te laat" : ""}` : "geen datum",
     tone: (t.overdue ? "bad" : t.priority === "urgent" || t.priority === "high" ? "warn" : "neutral") as Tone,

@@ -14,6 +14,7 @@ export type BoardClient = {
   status: string;
   color: string | null;
   logoUrl: string | null;
+  coordinatorId: string | null;
   coordinatorName: string | null;
   nextShoot: string | null;
   inProduction: number;
@@ -35,27 +36,59 @@ function Chip({ children, tone }: { children: React.ReactNode; tone: "blue" | "i
 
 const STOPPED = new Set(["paused", "churned"]);
 
-export function ClientsBoard({ clients }: { clients: BoardClient[] }) {
+export function ClientsBoard({ clients, viewerId, defaultPod = "alle" }: { clients: BoardClient[]; viewerId?: string; defaultPod?: "mijn" | "alle" }) {
   const [q, setQ] = useState("");
   // Standaard alleen de actieve klanten; niet-actieve nemen pas ruimte in als je
   // daar bewust naar wisselt.
   const [view, setView] = useState<"active" | "inactive">("active");
+  // "Mijn klanten" = jouw pod (waar jij verantwoordelijke bent), met schakelaar
+  // naar "Alle klanten". Standaard je eigen pod als je er een hebt.
+  const [pod, setPod] = useState<"mijn" | "alle">(defaultPod);
+  const myCount = useMemo(() => (viewerId ? clients.filter((c) => c.coordinatorId === viewerId).length : 0), [clients, viewerId]);
+  const inPod = (c: BoardClient) => pod === "alle" || (!!viewerId && c.coordinatorId === viewerId);
 
   const { active, inactive } = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const match = (c: BoardClient) => !term || c.name.toLowerCase().includes(term);
+    const match = (c: BoardClient) => (!term || c.name.toLowerCase().includes(term)) && inPod(c);
     return {
       active: clients.filter((c) => !STOPPED.has(c.status) && match(c)),
       inactive: clients.filter((c) => STOPPED.has(c.status) && match(c)),
     };
-  }, [clients, q]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients, q, pod, viewerId]);
 
-  const totalActive = useMemo(() => clients.filter((c) => !STOPPED.has(c.status)).length, [clients]);
-  const totalInactive = clients.length - totalActive;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const totalActive = useMemo(() => clients.filter((c) => !STOPPED.has(c.status) && inPod(c)).length, [clients, pod, viewerId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const totalInactive = useMemo(() => clients.filter((c) => STOPPED.has(c.status) && inPod(c)).length, [clients, pod, viewerId]);
   const shown = view === "active" ? active : inactive;
 
   return (
     <div>
+      {/* Pod-schakelaar: eigen klanten vs. alle klanten (alleen als je een pod hebt). */}
+      {viewerId && myCount > 0 ? (
+        <div className="mb-3 inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
+          {([
+            { key: "mijn", label: "Mijn klanten", count: myCount },
+            { key: "alle", label: "Alle klanten", count: clients.length },
+          ] as const).map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setPod(opt.key)}
+              className={
+                pod === opt.key
+                  ? "inline-flex items-center gap-2 rounded-[4px] bg-[var(--color-brand-600)] px-3 py-1.5 text-xs font-semibold text-white"
+                  : "inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+              }
+            >
+              {opt.label}
+              <span className={`rounded-full px-1.5 text-2xs font-semibold ${pod === opt.key ? "bg-white/20" : "bg-[var(--color-surface-2)]"}`}>{opt.count}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         {/* Wissel tussen actieve en niet-actieve klanten. */}
         <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
