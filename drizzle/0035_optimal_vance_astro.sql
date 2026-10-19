@@ -1,0 +1,1 @@
+ALTER TABLE "production_days" ADD COLUMN "edit_due_on" date;

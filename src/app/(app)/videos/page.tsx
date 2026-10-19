@@ -61,10 +61,18 @@ export default async function VideosPage({
           batterij (14 werkdagen) en download-/scriptlink. Komt automatisch uit
           de opnames (Google Agenda). */}
       <section className="mb-6">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
           <h2 className="text-sm font-bold tracking-tight">Editing per editor</h2>
           <span className="text-xs text-white/80">14 werkdagen opname → oplevering · automatisch uit de opnames</span>
         </div>
+        <p className="mb-3 text-xs leading-relaxed text-[var(--color-ink-muted)]">
+          Elke opname is hier een edit-project en komt automatisch uit de agenda. Klik bovenin op een <strong>editor</strong> om alleen diens
+          projecten te zien, of op <strong>Hoofdtabel</strong> voor alles. Per rij stel je in: de <strong>editor</strong> (de shorts verhuizen mee),
+          de <strong>fase</strong> (verspringt naar de juiste groep), het <strong>aantal shorts</strong> (de klant-standaard staat al voor),
+          en zet je de <strong>download-link</strong> en het <strong>script</strong> klaar. De <strong>deadline</strong>-batterij loopt automatisch
+          (opname + 14 werkdagen), maar je kunt die aanklikken om hem handmatig aan te passen. <strong>Prioriteit</strong> en <strong>wacht op</strong>
+          bepalen we vanzelf.
+        </p>
         <EditingProjects projects={editingProjects} editors={boardEditors} clients={clientOptions} canEdit={canEdit} canAssign={canAssign} />
       </section>
 

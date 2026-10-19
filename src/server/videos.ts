@@ -99,9 +99,9 @@ export async function listVideos(viewer: Viewer, filter: VideoFilter = {}) {
 
 /** Editors voor de inline-keuzelijst: expliciete editors én iedereen die al
  *  eens een video heeft geëdit. */
-export async function listEditorOptions(): Promise<{ id: string; fullName: string }[]> {
+export async function listEditorOptions(): Promise<{ id: string; fullName: string; avatarUrl: string | null }[]> {
   const res = await db.execute(sql`
-    select u.id, u.full_name as "fullName"
+    select u.id, u.full_name as "fullName", u.avatar_url as "avatarUrl"
     from users u
     where u.deleted_at is null and u.status = 'active'
       and (u.primary_role = 'editor' or exists (
@@ -109,7 +109,7 @@ export async function listEditorOptions(): Promise<{ id: string; fullName: strin
       ))
     order by u.full_name
   `);
-  return ((res as unknown as { rows?: { id: string; fullName: string }[] }).rows ?? []);
+  return ((res as unknown as { rows?: { id: string; fullName: string; avatarUrl: string | null }[] }).rows ?? []);
 }
 
 /** Aandachtscijfers voor de highlight-blokken boven de videolijst. Respecteert

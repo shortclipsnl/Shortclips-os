@@ -24,6 +24,8 @@ export type EditingProject = {
   editorAvatar: string | null;
   editStatus: string;
   plannedShorts: number | null;
+  /** Standaard aantal shorts voor deze klant (maandquota) — als voorstel. */
+  clientDefaultShorts: number;
   shortsCount: number;
   footageUrl: string | null;
   scriptUrl: string | null;
@@ -31,6 +33,8 @@ export type EditingProject = {
   scriptFileName: string | null;
   editorDeadline: string;
   clientDeadline: string;
+  /** true = de deadline is handmatig gezet (niet uit de agenda berekend). */
+  deadlineManual: boolean;
   elapsedWorkdays: number;
   totalWorkdays: number;
   remainingWorkdays: number;
@@ -78,6 +82,8 @@ export async function listEditingProjects(
       editorAvatar: users.avatarUrl,
       editStatus: productionDays.editStatus,
       plannedShorts: productionDays.plannedShorts,
+      editDueOn: productionDays.editDueOn,
+      clientDefaultShorts: clients.monthlyVideoQuota,
       footageUrl: productionDays.footageUrl,
       scriptUrl: productionDays.scriptUrl,
       shortsCount: sql<number>`(select count(*) from deliverables d where d.production_day_id = production_days.id and d.deleted_at is null)`,
@@ -92,9 +98,14 @@ export async function listEditingProjects(
     .limit(400);
 
   const result = rows.map((r) => {
-    const clientDeadline = addWorkingDays(r.shootDate, TOTAL_WORKDAYS, holidays);
-    const editorDeadline = addWorkingDays(r.shootDate, TOTAL_WORKDAYS - EDITOR_LEAD, holidays);
-    const elapsed = Math.max(0, Math.min(TOTAL_WORKDAYS, workingDaysUntil(r.shootDate, today, holidays)));
+    // Handmatige deadline overschrijft de automatische (opname + 14 werkdagen).
+    const deadlineManual = !!r.editDueOn;
+    const autoDeadline = addWorkingDays(r.shootDate, TOTAL_WORKDAYS, holidays);
+    const clientDeadline = r.editDueOn ?? autoDeadline;
+    // Totaal aantal werkdagen in deze cyclus (opname → deadline), min. 1.
+    const totalWorkdays = Math.max(1, workingDaysUntil(r.shootDate, clientDeadline, holidays));
+    const editorDeadline = addWorkingDays(r.shootDate, Math.max(0, totalWorkdays - EDITOR_LEAD), holidays);
+    const elapsed = Math.max(0, Math.min(totalWorkdays, workingDaysUntil(r.shootDate, today, holidays)));
     const workdaysToClientDeadline = workingDaysUntil(today, clientDeadline, holidays);
     const done = r.editStatus === "afgerond";
     const atEditor = r.editStatus === "in_edit" || r.editStatus === "feedback_verwerken";
@@ -119,6 +130,7 @@ export async function listEditingProjects(
       editorAvatar: r.editorAvatar,
       editStatus: r.editStatus,
       plannedShorts: r.plannedShorts,
+      clientDefaultShorts: Number(r.clientDefaultShorts ?? 0),
       shortsCount: Number(r.shortsCount ?? 0),
       footageUrl: r.footageUrl,
       scriptUrl: r.scriptUrl,
@@ -126,9 +138,10 @@ export async function listEditingProjects(
       scriptFileName: r.scriptFileName,
       editorDeadline,
       clientDeadline,
+      deadlineManual,
       elapsedWorkdays: elapsed,
-      totalWorkdays: TOTAL_WORKDAYS,
-      remainingWorkdays: Math.max(0, TOTAL_WORKDAYS - elapsed),
+      totalWorkdays,
+      remainingWorkdays: Math.max(0, totalWorkdays - elapsed),
       workdaysToClientDeadline,
       batteryColor,
     };

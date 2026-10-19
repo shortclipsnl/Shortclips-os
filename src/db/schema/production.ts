@@ -121,6 +121,9 @@ export const productionDays = pgTable(
     editStatus: varchar("edit_status", { length: 24 }).notNull().default("te_plannen"),
     /** Aantal shorts dat uit deze opname moet komen (planning). */
     plannedShorts: integer("planned_shorts"),
+    /** Handmatige oplevering-deadline. Leeg = automatisch (opname + 14 werkdagen
+     *  uit de agenda); ingevuld = overschrijft die. */
+    editDueOn: date("edit_due_on"),
     /** Download-link met het ruwe beeldmateriaal voor de editor. */
     footageUrl: text("footage_url"),
     /** Link naar het script (bijv. een PDF in Drive) voor de editor. */

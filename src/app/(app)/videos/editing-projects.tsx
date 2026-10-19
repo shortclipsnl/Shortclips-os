@@ -4,13 +4,13 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Download, FileText, Loader2, Plus, Upload, X } from "lucide-react";
-import { ClientLogo } from "@/components/ui";
+import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase } from "@/lib/statuses";
-import { createEditingProject, deleteProjectScript, setProjectEditStatus, setProjectEditor, setProjectLinks, setProjectPlannedShorts, uploadProjectScript } from "@/server/actions/editing-board";
+import { createEditingProject, deleteProjectScript, setProjectDeadline, setProjectEditStatus, setProjectEditor, setProjectLinks, setProjectPlannedShorts, uploadProjectScript } from "@/server/actions/editing-board";
 import { fileToBase64 } from "../ai/_shared";
 import type { EditingProject, BatteryColor } from "@/server/editing-board";
 
-type Editor = { id: string; fullName: string };
+type Editor = { id: string; fullName: string; avatarUrl?: string | null };
 type ClientOption = { id: string; name: string };
 
 const BATTERY_COLOR: Record<BatteryColor, string> = {
@@ -95,17 +95,37 @@ export function EditingProjects({
 
   return (
     <div>
-      {/* Tabs: hoofdtabel + per editor (zoals in Monday). */}
+      {/* Editor-tabs: groot en opvallend, met de foto's van de editors. */}
       {!lockedEditor ? (
-        <div className="mb-3 flex flex-wrap items-center gap-1 border-b border-[var(--color-line)]">
-          <Tab active={editor === "alle"} onClick={() => setEditor("alle")}>Hoofdtabel · {projects.length}</Tab>
-          {editors.map((e) => (
-            <Tab key={e.id} active={editor === e.id} onClick={() => setEditor(e.id)} color={editorColor(e.fullName)}>
-              {e.fullName.split(" ")[0]} · {counts.get(e.id) ?? 0}
-            </Tab>
-          ))}
-          {geenCount > 0 ? <Tab active={editor === "geen"} onClick={() => setEditor("geen")}>Geen editor · {geenCount}</Tab> : null}
-          {canAssign && clients.length > 0 ? <span className="ml-auto pb-1"><NewProject clients={clients} editors={editors} /></span> : null}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <TextTab active={editor === "alle"} onClick={() => setEditor("alle")}>
+            Hoofdtabel <span className="opacity-70">· {projects.length}</span>
+          </TextTab>
+          {editors.map((e) => {
+            const on = editor === e.id;
+            const c = editorColor(e.fullName);
+            return (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => setEditor(e.id)}
+                className={`flex items-center gap-2 rounded-full border px-2 py-1 pr-3 text-sm font-semibold transition ${on ? "bg-[var(--color-surface)] text-[var(--color-ink)] shadow-[var(--shadow-card)]" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+                style={on ? { borderColor: c, boxShadow: `0 0 0 2px ${c}` } : undefined}
+              >
+                <span className="rounded-full p-[2px]" style={{ background: on ? c : "transparent" }}>
+                  <TeamAvatar name={e.fullName} avatarUrl={e.avatarUrl ?? null} size={30} />
+                </span>
+                {e.fullName.split(" ")[0]}
+                <span className="grid min-w-5 place-items-center rounded-full px-1 text-2xs font-bold text-white" style={{ background: c }}>{counts.get(e.id) ?? 0}</span>
+              </button>
+            );
+          })}
+          {geenCount > 0 ? (
+            <TextTab active={editor === "geen"} onClick={() => setEditor("geen")}>
+              Geen editor <span className="opacity-70">· {geenCount}</span>
+            </TextTab>
+          ) : null}
+          {canAssign && clients.length > 0 ? <span className="ml-auto"><NewProject clients={clients} editors={editors} /></span> : null}
         </div>
       ) : null}
 
@@ -154,14 +174,13 @@ export function EditingProjects({
   );
 }
 
-function Tab({ active, onClick, color, children }: { active: boolean; onClick: () => void; color?: string; children: React.ReactNode }) {
+function TextTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-xs font-semibold ${active ? "border-[var(--color-ink)] text-[var(--color-ink)]" : "border-transparent text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+      className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${active ? "bg-[var(--color-indigo-ink)] text-white" : "border border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
     >
-      {color ? <span className="size-2 rounded-full" style={{ background: color }} /> : null}
       {children}
     </button>
   );
@@ -208,15 +227,9 @@ function ProjectRow({ p, editors, canEdit, canAssign, phaseColor }: { p: Editing
         )}
       </div>
 
-      {/* Deadline — batterij met datumbereik */}
-      <div className="flex items-center p-1">
-        <div className="relative h-6 w-full overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
-          <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, background: battery }} />
-          <span className="absolute inset-0 grid place-items-center text-2xs font-semibold text-[var(--color-ink)]">
-            {fmtShort(p.shootDate)} – {fmtShort(p.clientDeadline)}
-          </span>
-        </div>
-      </div>
+      {/* Deadline — batterij met datumbereik, aanpasbaar */}
+      <DeadlineCell p={p} pct={pct} battery={battery} canEdit={canEdit} onSave={(d) => run(() => setProjectDeadline(p.id, d))} />
+
 
       {/* Fase — gekleurde keuzecel */}
       <div className="p-0.5">
@@ -262,20 +275,61 @@ function ProjectRow({ p, editors, canEdit, canAssign, phaseColor }: { p: Editing
   );
 }
 
+function DeadlineCell({ p, pct, battery, canEdit, onSave }: { p: EditingProject; pct: number; battery: string; canEdit: boolean; onSave: (d: string | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const [val, setVal] = useState(p.deadlineManual ? p.clientDeadline : "");
+
+  const bar = (
+    <div className="relative h-6 w-full overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
+      <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, background: battery }} />
+      <span className="absolute inset-0 grid place-items-center text-2xs font-semibold text-[var(--color-ink)]">
+        {fmtShort(p.shootDate)} – {fmtShort(p.clientDeadline)}{p.deadlineManual ? " ✎" : ""}
+      </span>
+    </div>
+  );
+
+  if (!canEdit) return <div className="flex items-center p-1">{bar}</div>;
+
+  return (
+    <div className="relative flex items-center p-1">
+      <button type="button" onClick={() => { setVal(p.deadlineManual ? p.clientDeadline : ""); setOpen((o) => !o); }} className="w-full" title="Deadline aanpassen">
+        {bar}
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
+          <div className="absolute left-1 top-full z-20 mt-1 flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
+            <input type="date" value={val} onChange={(e) => setVal(e.target.value)} className="sc-input h-8 w-36 py-0 text-xs" />
+            <button type="button" onClick={() => { onSave(val || null); setOpen(false); }} className="shrink-0 rounded bg-[var(--color-ink)] px-2 py-1.5 text-2xs font-semibold text-white">Opslaan</button>
+            {p.deadlineManual ? (
+              <button type="button" onClick={() => { onSave(null); setOpen(false); }} className="shrink-0 rounded px-2 py-1.5 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" title="Terug naar automatisch (opname + 14 werkdagen)">Auto</button>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function ShortsField({ p, canEdit, onSave }: { p: EditingProject; canEdit: boolean; onSave: (n: number | null) => void }) {
+  // Als er niets is ingevuld, tonen we de klant-standaard (maandquota) als
+  // voorstel — bij veel klanten is dat elke opname hetzelfde.
+  const fallback = p.clientDefaultShorts > 0 ? p.clientDefaultShorts : null;
+  const shown = p.plannedShorts ?? fallback;
   const [val, setVal] = useState(p.plannedShorts === null ? "" : String(p.plannedShorts));
-  if (!canEdit) return <span className="tabular-nums">{p.plannedShorts ?? "—"}</span>;
+  if (!canEdit) return <span className="tabular-nums">{shown ?? "—"}</span>;
   return (
     <input
       type="number"
       min={0}
       value={val}
+      placeholder={fallback !== null ? String(fallback) : ""}
       onChange={(e) => setVal(e.target.value)}
       onBlur={() => { const n = val === "" ? null : Number(val); if (n !== p.plannedShorts) onSave(n); }}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-      className="h-7 w-12 rounded border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-1 text-center text-sm tabular-nums"
+      className="h-7 w-12 rounded border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-1 text-center text-sm tabular-nums placeholder:text-[var(--color-ink-faint)]"
       aria-label="Aantal shorts"
-      title={`${p.shortsCount} klaar`}
+      title={fallback !== null ? `Standaard voor deze klant: ${fallback} · ${p.shortsCount} klaar` : `${p.shortsCount} klaar`}
     />
   );
 }

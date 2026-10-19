@@ -125,6 +125,24 @@ export async function setProjectEditStatus(id: string, status: string): Promise<
   }
 }
 
+/** Handmatige oplevering-deadline zetten (of wissen → terug naar automatisch). */
+export async function setProjectDeadline(id: string, dueOn: string | null): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    if (dueOn && !/^\d{4}-\d{2}-\d{2}$/.test(dueOn)) return { ok: false, message: "Ongeldige datum." };
+    const project = await loadProject(id);
+    if (!project) return { ok: false, message: "Project niet gevonden." };
+    assertClientAccess(viewer, project.clientId);
+
+    await db.update(productionDays).set({ editDueOn: dueOn ?? null, updatedAt: new Date() }).where(eq(productionDays.id, id));
+    revalidatePath("/videos");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 /** Aantal geplande shorts voor een opname zetten. */
 export async function setProjectPlannedShorts(id: string, plannedShorts: number | null): Promise<ActionResult> {
   try {
