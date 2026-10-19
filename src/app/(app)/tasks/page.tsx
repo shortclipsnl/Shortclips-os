@@ -100,7 +100,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       <PageHeader title="Taken" description={selectedLabel ? `Taken van ${selectedLabel}` : "Kies een persoon om direct de taken te zien."} />
 
       {/* Personen als primaire navigatie */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
         {core.map((u) => (
           <PersonCard key={u.id} id={u.id} name={u.fullName} count={openCountFor(u.id)} active={persoon === u.id} />
         ))}
@@ -156,17 +156,17 @@ function PersonCard({ id, name, count, active, generic }: { id: string; name: st
     <Link
       href={`/tasks?persoon=${id}`}
       // Actieve staat heeft een donkere achtergrond, dus tekst wit maken voor leesbaarheid
-      className={`flex items-center gap-3 rounded-[var(--radius-md)] border px-3 py-2.5 ${active ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-mist)] text-white" : "border-[var(--color-line)] hover:bg-[var(--color-surface-2)]"}`}
+      className={`flex items-center gap-3.5 rounded-[var(--radius-md)] border px-4 py-3.5 ${active ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-mist)] text-white" : "border-[var(--color-line)] hover:bg-[var(--color-surface-2)]"}`}
     >
       {generic ? (
         // Op de donkere actieve kaart een doorschijnend-witte chip gebruiken zodat 'AL' leesbaar blijft
-        <span className={`grid size-11 shrink-0 place-items-center rounded-full text-sm font-semibold ${active ? "bg-white/15 text-white" : "bg-[var(--color-surface-sunken)] text-[var(--color-ink-muted)]"}`}>AL</span>
+        <span className={`grid size-16 shrink-0 place-items-center rounded-full text-base font-semibold ${active ? "bg-white/15 text-white" : "bg-[var(--color-surface-sunken)] text-[var(--color-ink-muted)]"}`}>AL</span>
       ) : (
-        <TeamAvatar name={name} size={44} />
+        <TeamAvatar name={name} size={64} />
       )}
       <span className="min-w-0">
-        <span className="block truncate text-sm font-medium">{name.split(" ")[0]}</span>
-        <span className={`text-xs ${active ? "text-white/70" : "text-[var(--color-ink-muted)]"}`}>{count} open</span>
+        <span className="block truncate text-lg font-semibold">{name.split(" ")[0]}</span>
+        <span className={`text-sm ${active ? "text-white/70" : "text-[var(--color-ink-muted)]"}`}>{count} open</span>
       </span>
     </Link>
   );
