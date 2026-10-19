@@ -19,6 +19,14 @@ export function isCoreStaff(email: string | null | undefined): boolean {
   return !!email && (CORE_STAFF_EMAILS as readonly string[]).includes(email.toLowerCase());
 }
 
+/** Kernteam herkennen op voornaam (voor bronnen zonder e-mail, zoals de
+ *  capaciteitstabel). Afgeleid van hetzelfde vaste lijstje. */
+export function isCoreStaffByName(fullName: string | null | undefined): boolean {
+  if (!fullName) return false;
+  const first = fullName.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+  return CORE_STAFF_EMAILS.some((e) => e.split("@")[0] === first);
+}
+
 /** Sorteersleutel volgens de vaste volgorde; onbekende e-mails komen achteraan. */
 export function coreStaffRank(email: string | null | undefined): number {
   if (!email) return CORE_STAFF_EMAILS.length;

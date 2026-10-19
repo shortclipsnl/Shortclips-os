@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireInternal } from "@/server/auth/context";
 import { getCapacityOverview } from "@/server/capacity";
+import { isCoreStaffByName } from "@/server/core-staff";
 import { PageHeader, Card, Stat, Badge, TeamAvatar } from "@/components/ui";
 import { euro } from "@/lib/format";
 import { GrowthSimulator } from "./simulator";
@@ -30,6 +31,55 @@ export default async function CapacityPage() {
 
   const paramMap = new Map(params.map((p) => [p.key, p.value ?? 0]));
 
+  // Zelfde indeling als de Teampagina: vast kernteam vs. freelancers & overig.
+  const core = people.filter((p) => isCoreStaffByName(p.name));
+  const rest = people.filter((p) => !isCoreStaffByName(p.name));
+
+  const renderCard = (p: (typeof people)[number]) => {
+    const st = STATUS_STYLE[p.status]!;
+    const pct = p.occupancy ?? 0;
+    return (
+      <div key={p.id} className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4"
+        style={{ boxShadow: `inset 3px 0 0 ${st.bar}` }}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-3">
+            <TeamAvatar name={p.name} size={48} />
+            <div className="min-w-0">
+              <div className="truncate font-semibold">{p.name}</div>
+              <div className="text-xs text-[var(--color-ink-muted)]">
+                {p.role ?? "—"}{p.employment ? ` · ${p.employment}` : ""}
+              </div>
+            </div>
+          </div>
+          <Badge tone={st.tone}>{st.label}</Badge>
+        </div>
+
+        {p.load !== null ? (
+          <>
+            <div className="mt-3 flex items-end justify-between">
+              <div className="text-2xl font-bold tabular-nums leading-none">
+                {p.load}
+                {p.green !== null ? <span className="text-sm font-medium text-[var(--color-ink-faint)]"> / {p.green}</span> : null}
+              </div>
+              {p.occupancy !== null ? <div className="text-xs font-semibold" style={{ color: st.bar }}>{p.occupancy}%</div> : null}
+            </div>
+            <div className="mt-1 text-2xs text-[var(--color-ink-faint)]">{p.unitLabel}</div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
+              <span className="block h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, background: st.bar }} />
+            </div>
+          </>
+        ) : (
+          <p className="mt-3 text-xs text-[var(--color-ink-faint)]">Belasting niet gemeten voor deze rol.</p>
+        )}
+
+        {p.detail ? <p className="mt-2 text-2xs text-[var(--color-ink-muted)]">{p.detail}</p> : null}
+        {canSeeFinance && p.costPerMonth ? (
+          <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">kosten {euro(p.costPerMonth)}/mnd</p>
+        ) : null}
+      </div>
+    );
+  };
+
   return (
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
@@ -38,54 +88,37 @@ export default async function CapacityPage() {
       />
 
       {people.length === 0 ? (
-        <Card><p className="text-sm text-[var(--color-ink-muted)]">Nog geen capaciteitsgegevens. Draai de import (Beheer → Koppelingen) of de nachtelijke sync.</p></Card>
+        <Card className="mb-6"><p className="text-sm text-[var(--color-ink-muted)]">Nog geen capaciteitsgegevens. Draai de import (Beheer → Koppelingen) of de nachtelijke sync.</p></Card>
       ) : (
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {people.map((p) => {
-            const st = STATUS_STYLE[p.status]!;
-            const pct = p.occupancy ?? 0;
-            return (
-              <div key={p.id} className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4"
-                style={{ boxShadow: `inset 3px 0 0 ${st.bar}` }}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <TeamAvatar name={p.name} size={48} />
-                    <div className="min-w-0">
-                      <div className="truncate font-semibold">{p.name}</div>
-                      <div className="text-xs text-[var(--color-ink-muted)]">
-                        {p.role ?? "—"}{p.employment ? ` · ${p.employment}` : ""}
-                      </div>
-                    </div>
-                  </div>
-                  <Badge tone={st.tone}>{st.label}</Badge>
-                </div>
+        <>
+          {/* Vaste medewerkers (het vaste kernteam) */}
+          <div className="mb-3 flex items-center gap-3 border-l-4 border-[var(--color-indigo-ink)] pl-3">
+            <div>
+              <h2 className="text-base font-bold tracking-tight">Vaste medewerkers</h2>
+              <p className="text-xs text-[var(--color-ink-muted)]">Het vaste kernteam</p>
+            </div>
+            <span className="ml-auto rounded-full bg-[var(--color-indigo-ink)] px-2.5 py-0.5 text-xs font-semibold text-white">{core.length}</span>
+          </div>
+          {core.length === 0 ? (
+            <Card className="mb-6"><p className="text-sm text-[var(--color-ink-muted)]">Geen vaste medewerkers met capaciteitsgegevens.</p></Card>
+          ) : (
+            <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{core.map(renderCard)}</div>
+          )}
 
-                {p.load !== null ? (
-                  <>
-                    <div className="mt-3 flex items-end justify-between">
-                      <div className="text-2xl font-bold tabular-nums leading-none">
-                        {p.load}
-                        {p.green !== null ? <span className="text-sm font-medium text-[var(--color-ink-faint)]"> / {p.green}</span> : null}
-                      </div>
-                      {p.occupancy !== null ? <div className="text-xs font-semibold" style={{ color: st.bar }}>{p.occupancy}%</div> : null}
-                    </div>
-                    <div className="mt-1 text-2xs text-[var(--color-ink-faint)]">{p.unitLabel}</div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
-                      <span className="block h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, background: st.bar }} />
-                    </div>
-                  </>
-                ) : (
-                  <p className="mt-3 text-xs text-[var(--color-ink-faint)]">Belasting niet gemeten voor deze rol.</p>
-                )}
-
-                {p.detail ? <p className="mt-2 text-2xs text-[var(--color-ink-muted)]">{p.detail}</p> : null}
-                {canSeeFinance && p.costPerMonth ? (
-                  <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">kosten {euro(p.costPerMonth)}/mnd</p>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
+          {/* Freelancers & overig team */}
+          <div className="mb-3 flex items-center gap-3 border-l-4 border-[var(--color-warn)] pl-3">
+            <div>
+              <h2 className="text-base font-bold tracking-tight">Freelancers &amp; overig team</h2>
+              <p className="text-xs text-[var(--color-ink-muted)]">Flexibele inzet</p>
+            </div>
+            <span className="ml-auto rounded-full bg-[var(--color-warn)] px-2.5 py-0.5 text-xs font-semibold text-white">{rest.length}</span>
+          </div>
+          {rest.length === 0 ? (
+            <Card className="mb-6"><p className="text-sm text-[var(--color-ink-muted)]">Geen freelancers of overig team met capaciteitsgegevens.</p></Card>
+          ) : (
+            <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{rest.map(renderCard)}</div>
+          )}
+        </>
       )}
 
       {/* Teamsamenvatting — in kleur, zodat je in één oogopslag kunt scannen. */}
