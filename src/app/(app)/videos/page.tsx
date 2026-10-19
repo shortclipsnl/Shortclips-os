@@ -74,14 +74,14 @@ export default async function VideosPage({
             <strong> fase</strong> zodra je verder bent: binnenkort beschikbaar → in edit → interne review → feedback klant → feedback klant verwerken → afgerond.
           </p>
         ) : (
-          <p className="mb-3 text-xs leading-relaxed text-[var(--color-ink-muted)]">
-            Elke opname is hier een edit-project en komt automatisch uit de agenda. Klik bovenin op een <strong>editor</strong> om alleen diens
-            projecten te zien, of op <strong>Hoofdtabel</strong> voor alles. Per rij stel je in: de <strong>editor</strong> (de shorts verhuizen mee),
-            de <strong>fase</strong> (verspringt naar de juiste groep), het <strong>aantal shorts</strong> (de klant-standaard staat al voor),
-            en zet je de <strong>download-link</strong> en het <strong>script</strong> klaar. De <strong>deadline</strong>-batterij loopt automatisch
-            (opname + 14 werkdagen), maar je kunt die aanklikken om hem handmatig aan te passen. <strong>Prioriteit</strong> en <strong>wacht op</strong>
-            bepalen we vanzelf.
-          </p>
+          <ul className="mb-3 grid gap-x-5 gap-y-1 text-xs text-[var(--color-ink-muted)] sm:grid-cols-2">
+            <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span>Elke opname is automatisch een edit-project (uit de agenda).</span></li>
+            <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span>Klik bovenin op een <strong>editor</strong> voor diens projecten, of <strong>Hoofdtabel</strong> voor alles.</span></li>
+            <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span>Per rij: <strong>editor</strong>, <strong>fase</strong> en <strong>aantal shorts</strong> instellen (klant-standaard staat voor).</span></li>
+            <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span><strong>Scriptbestand</strong> uploaden en de <strong>download-link</strong> invullen per project.</span></li>
+            <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span><strong>Deadline</strong> loopt automatisch (opname + 14 werkdagen); aanklikken om aan te passen.</span></li>
+            <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span><strong>Prioriteit</strong> en <strong>wacht op</strong> bepalen we vanzelf.</span></li>
+          </ul>
         )}
         <EditingProjects projects={editingProjects} editors={boardEditors} clients={clientOptions} canEdit={canEdit} canAssign={canAssign} />
       </section>
@@ -134,9 +134,9 @@ export default async function VideosPage({
       ) : null}
 
       <div className="mb-5 grid gap-3 lg:grid-cols-3">
-        <DrillCard title="Te laat" count={highlights.late} accent="var(--color-bad)" href="/videos?filter=te-laat"
+        <DrillCard title="Te laat" count={highlights.late} accent="var(--color-bad)" href="/videos?filter=te-laat" solid
           items={highlights.lateList.map((v) => ({ id: v.id, primary: v.clientName, secondary: v.title, meta: `${Number(v.days)} d te laat` }))} empty="Niets te laat" />
-        <DrillCard title="Wacht op klant" count={highlights.atClient} accent="var(--color-warn)" href="/videos?filter=bij-klant"
+        <DrillCard title="Wacht op klant" count={highlights.atClient} accent="var(--color-warn)" href="/videos?filter=bij-klant" solid
           items={highlights.atClientList.map((v) => ({ id: v.id, primary: v.clientName, secondary: v.title, meta: `${Number(v.days)} d geen reactie` }))} empty="Niets bij de klant" />
         <DrillCard title="Wacht op editor" count={highlights.awaitingEditor} accent="var(--color-info)" href="/videos?status=awaiting_editor"
           items={highlights.awaitingEditorList.map((v) => ({ id: v.id, primary: v.editorName ?? "Geen editor", secondary: v.title, meta: `${Number(v.days)} d bij editor` }))} empty="Niets bij een editor" />
@@ -157,6 +157,7 @@ function DrillCard({
   href,
   items,
   empty,
+  solid = false,
 }: {
   title: string;
   count: number;
@@ -164,8 +165,12 @@ function DrillCard({
   href: string;
   items: { id: string; primary: string; secondary: string; meta?: string }[];
   empty: string;
+  solid?: boolean;
 }) {
   const active = count > 0;
+  // "solid" vult de hele balk met de accentkleur (bijv. te laat = rood, wacht op
+  // klant = oranje) zodat het meteen opvalt.
+  const fullColor = solid && active;
   return (
     <div
       className="overflow-hidden rounded-[var(--radius-lg)] border bg-[var(--color-surface)]"
@@ -173,10 +178,10 @@ function DrillCard({
     >
       <Link
         href={href}
-        className="flex items-center justify-between gap-2 px-4 py-2.5 transition-[filter] hover:brightness-[0.98]"
+        className="flex items-center justify-between gap-2 px-4 py-2.5 transition-[filter] hover:brightness-[0.97]"
         style={{
-          background: active ? `color-mix(in srgb, ${accent} 13%, var(--color-surface))` : "var(--color-surface-sunken)",
-          color: active ? accent : "var(--color-ink-muted)",
+          background: fullColor ? accent : active ? `color-mix(in srgb, ${accent} 13%, var(--color-surface))` : "var(--color-surface-sunken)",
+          color: fullColor ? "#fff" : active ? accent : "var(--color-ink-muted)",
           borderBottom: `2px solid ${active ? accent : "var(--color-line)"}`,
         }}
       >

@@ -2,7 +2,7 @@ import { getEditingDashboard, listEditorsWithRates } from "@/server/editing";
 import { editorCapacityMap } from "@/server/metrics";
 import { editorLoad, LOAD_LABEL } from "@/lib/metrics";
 import type { Viewer } from "@/server/auth/context";
-import { Avatar, Card, CardHeader, EmptyState } from "@/components/ui";
+import { Card, CardHeader, EmptyState, TeamAvatar } from "@/components/ui";
 import { euro, formatDate, num } from "@/lib/format";
 import { defaultEditorRate, editorDisplayName } from "@/lib/editors";
 import { RateRow } from "./editing-ui";
@@ -47,7 +47,7 @@ export async function WorkloadSection({ viewer }: { viewer: Viewer }) {
             return (
               <div key={e.editor_id} className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3.5">
                 <div className="flex items-center gap-3">
-                  <Avatar name={e.editor_name} size={46} />
+                  <TeamAvatar name={e.editor_name} avatarUrl={e.avatar_url} size={46} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-base font-semibold">{editorDisplayName(e.editor_name)}</div>
                     <div className="flex flex-wrap items-center gap-1.5 text-xs" style={{ color: level.color }}>

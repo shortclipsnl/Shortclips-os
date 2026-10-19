@@ -268,13 +268,17 @@ function ProjectRow({ p, editors, canEdit, canAssign, phaseColor }: { p: Editing
   );
 }
 
-/** Script: openen als er een link/pdf is, anders een link plakken of pdf uploaden. */
+/** Script is altijd een bestand: openen als er een pdf is, anders slepen/uploaden. */
 function ScriptCell({ p, canEdit, run, pending }: { p: EditingProject; canEdit: boolean; run: (fn: () => Promise<unknown>) => void; pending: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [over, setOver] = useState(false);
+  // Alleen geüploade scriptbestanden; een eventuele oude scriptlink tonen we
+  // nog wel als er geen bestand is, maar nieuw toevoegen kan alleen als bestand.
   const scriptHref = p.scriptFileId ? `/api/edit-files/${p.scriptFileId}` : p.scriptUrl;
 
-  async function onFile(file: File) {
+  async function onFile(file: File | undefined) {
+    if (!file) return;
     if (!(file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))) return;
     if (file.size > 10 * 1024 * 1024) return;
     setBusy(true);
@@ -294,7 +298,7 @@ function ScriptCell({ p, canEdit, run, pending }: { p: EditingProject; canEdit: 
           <FileText className="size-3.5" /> Script
         </a>
         {canEdit && p.scriptFileId ? (
-          <button type="button" onClick={() => run(() => deleteProjectScript(p.id))} title="Script verwijderen" className="grid size-6 place-items-center rounded text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]">
+          <button type="button" onClick={() => run(() => deleteProjectScript(p.id))} title="Scriptbestand verwijderen" className="grid size-6 place-items-center rounded text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]">
             <X className="size-3.5" />
           </button>
         ) : null}
@@ -303,13 +307,22 @@ function ScriptCell({ p, canEdit, run, pending }: { p: EditingProject; canEdit: 
   }
   if (!canEdit) return <span className="text-2xs text-[var(--color-ink-faint)]">—</span>;
   return (
-    <span className="flex items-center gap-0.5">
-      <LinkEditor current={null} label="+ link" icon={<FileText className="size-3.5" />} title="Scriptlink toevoegen" onSave={(u) => run(() => setProjectLinks(p.id, { scriptUrl: u }))} />
-      <input ref={inputRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
-      <button type="button" onClick={() => inputRef.current?.click()} disabled={busy || pending} title="Script-pdf uploaden" className="grid size-6 place-items-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]">
+    <>
+      <input ref={inputRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { onFile(e.target.files?.[0]); e.currentTarget.value = ""; }} />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => { e.preventDefault(); setOver(false); onFile(e.dataTransfer.files?.[0]); }}
+        disabled={busy || pending}
+        title="Scriptbestand (pdf) slepen of kiezen"
+        className={`inline-flex items-center gap-1 rounded-[4px] border border-dashed px-2 py-1 text-2xs font-medium transition ${over ? "border-[var(--color-brand-500)] bg-[var(--color-brand-50)] text-[var(--color-brand-700)]" : "border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+      >
         {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+        Sleep/upload
       </button>
-    </span>
+    </>
   );
 }
 

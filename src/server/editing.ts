@@ -15,7 +15,7 @@ const DONE = sql`d.status in ('published','analysis_available')`;
 const FEEDBACK = sql`d.status in ('client_review','client_revision')`;
 
 export type EditorRow = {
-  editor_id: string; editor_name: string; rate: number; capacity: number;
+  editor_id: string; editor_name: string; avatar_url: string | null; rate: number; capacity: number;
   in_production: number; awaiting_feedback: number; late: number; done_month: number;
   clients_active: number; next_due: string | null; cost_active: number;
 };
@@ -32,7 +32,7 @@ export type LeaveWindow = { user_id: string; start_on: string; end_on: string };
 export async function getEditingDashboard(_viewer: Viewer) {
   const [editorRes, clientRes, leaveRes] = await Promise.all([
     db.execute(sql`
-      select u.id editor_id, u.full_name editor_name,
+      select u.id editor_id, u.full_name editor_name, u.avatar_url,
         coalesce(er.rate_per_video,0)::float rate, coalesce(er.capacity_per_week,0)::int capacity,
         count(*) filter (where ${ACTIVE}) in_production,
         count(*) filter (where ${FEEDBACK}) awaiting_feedback,
@@ -44,7 +44,7 @@ export async function getEditingDashboard(_viewer: Viewer) {
       from users u
       join deliverables d on d.editor_id = u.id and d.deleted_at is null
       left join editor_rates er on er.user_id = u.id
-      group by u.id, u.full_name, er.rate_per_video, er.capacity_per_week
+      group by u.id, u.full_name, u.avatar_url, er.rate_per_video, er.capacity_per_week
       order by in_production desc, editor_name
     `),
     db.execute(sql`
