@@ -71,6 +71,11 @@ export const clients = pgTable(
     netMonthlyMonday: numeric("net_monthly_monday", { precision: 12, scale: 2 }),
     lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
+    /** Vaste caption-footer van de klant: het contact-/servicesblok met icoontjes
+     *  plus de standaard hashtags die onder élke post terugkomen. De Caption
+     *  Maker zet dit automatisch onder de caption, zodat alleen de bovenste
+     *  tekst nog geschreven hoeft te worden. */
+    captionFooter: text("caption_footer"),
     notes: text("notes"),
     /** Werklast/complexiteit van de klant: laag | gemiddeld | hoog. Overgenomen
      *  uit Monday "KLANT VERDELING" (werklastanalyse). */

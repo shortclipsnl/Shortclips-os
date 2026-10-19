@@ -1,10 +1,18 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { CalendarPlus, Check, FileText, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { CalendarPlus, Check, FileText, Loader2, RefreshCw, Sparkles, Tag, X } from "lucide-react";
 import { addCaptionToPlanning, generateCaptions, regenerateOneCaption, type ShortCaption } from "@/server/actions/ai-tools";
+import { getCaptionFooter, setCaptionFooter } from "@/server/actions/caption-footer";
 import { Button, Card, ErrorNote } from "@/components/ui";
 import { CopyButton, HistoryPanel, NoProviderNote, SaveInsight, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
+
+/** Caption + de vaste footer van de klant eronder (de standaard dingetjes). */
+function withFooter(caption: string, footer: string): string {
+  const c = caption.trimEnd();
+  const f = footer.trim();
+  return f ? `${c}\n\n${f}` : c;
+}
 
 type ClientOption = { id: string; name: string };
 
@@ -29,6 +37,28 @@ export function CaptionMaker({
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Standaard footer van de gekozen klant (contact + hashtags) — komt
+  // automatisch onder elke caption. Laadt bij het kiezen van een klant.
+  const [footer, setFooter] = useState("");
+  const [footerLoading, setFooterLoading] = useState(false);
+
+  useEffect(() => {
+    if (!clientId) {
+      setFooter("");
+      return;
+    }
+    let active = true;
+    setFooterLoading(true);
+    void getCaptionFooter(clientId).then((res) => {
+      if (!active) return;
+      setFooter(res.ok ? res.footer ?? "" : "");
+      setFooterLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [clientId]);
 
   async function onFile(file: File | undefined) {
     if (!file) return;
@@ -149,13 +179,15 @@ export function CaptionMaker({
         {err ? <div className="mt-3"><ErrorNote>{err}</ErrorNote></div> : null}
       </Card>
 
+      {clientId ? <FooterEditor clientId={clientId} footer={footer} setFooter={setFooter} loading={footerLoading} /> : null}
+
       {results && results.length > 0 ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">{results.length} shorts · captions</h2>
             <div className="flex items-center gap-2">
               <SaveInsight clientId={clientId} defaultCategory="tone_of_voice" />
-              <CopyButton label="Alles kopiëren" text={results.map((r, i) => exportShort(r, i)).join("\n\n———\n\n")} />
+              <CopyButton label="Alles kopiëren" text={results.map((r, i) => exportShort(r, i, footer)).join("\n\n———\n\n")} />
             </div>
           </div>
           {results.map((short, i) => (
@@ -164,6 +196,7 @@ export function CaptionMaker({
               index={i}
               short={short}
               clientId={clientId}
+              footer={footer}
               pdfBase64={pdfBase64}
               onChange={(next) => setResults((cur) => cur!.map((s, j) => (j === i ? next : s)))}
             />
@@ -174,21 +207,25 @@ export function CaptionMaker({
   );
 }
 
-function exportShort(s: ShortCaption, i: number): string {
-  const tags = (s.hashtags ?? []).join(" ");
-  return `SHORT ${i + 1}: ${s.shortTitle}\n\n${s.caption}${tags ? `\n\n${tags}` : ""}`;
+function exportShort(s: ShortCaption, i: number, footer: string): string {
+  const body = footer.trim()
+    ? withFooter(s.caption, footer)
+    : `${s.caption}${(s.hashtags ?? []).length ? `\n\n${(s.hashtags ?? []).join(" ")}` : ""}`;
+  return `SHORT ${i + 1}: ${s.shortTitle}\n\n${body}`;
 }
 
 function ShortBlock({
   index,
   short,
   clientId,
+  footer,
   pdfBase64,
   onChange,
 }: {
   index: number;
   short: ShortCaption;
   clientId: string;
+  footer: string;
   pdfBase64: string | null;
   onChange: (s: ShortCaption) => void;
 }) {
@@ -196,7 +233,11 @@ function ShortBlock({
   const [planning, startPlanning] = useTransition();
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const full = `${short.caption}${short.hashtags?.length ? `\n\n${short.hashtags.join(" ")}` : ""}`.trim();
+  const hasFooter = footer.trim().length > 0;
+  const full = (hasFooter
+    ? withFooter(short.caption, footer)
+    : `${short.caption}${short.hashtags?.length ? `\n\n${short.hashtags.join(" ")}` : ""}`
+  ).trim();
 
   function regen() {
     start(async () => {
@@ -214,7 +255,7 @@ function ShortBlock({
   function toPlanning() {
     setErr(null);
     startPlanning(async () => {
-      const res = await addCaptionToPlanning({ clientId, shortTitle: short.shortTitle, caption: short.caption });
+      const res = await addCaptionToPlanning({ clientId, shortTitle: short.shortTitle, caption: hasFooter ? withFooter(short.caption, footer) : short.caption });
       if (res.ok) setSaved(true);
       else setErr(res.message ?? "Mislukt");
     });
@@ -250,16 +291,77 @@ function ShortBlock({
           value={short.caption}
           onChange={(e) => onChange({ ...short, caption: e.target.value })}
         />
-        <div className="mt-3">
-          <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Eventueel toepasbare hashtags</span>
-          {short.hashtags?.length ? (
-            <p className="mt-1 text-sm text-[var(--color-brand-600)]">{short.hashtags.join(" ")}</p>
-          ) : (
-            <p className="mt-1 text-sm text-[var(--color-ink-faint)]">Geen hashtags voorgesteld.</p>
-          )}
-        </div>
+        {hasFooter ? (
+          <div className="mt-3 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] bg-[var(--color-surface-sunken)]/60 p-2.5">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Standaard footer — komt hier automatisch onder</span>
+            <p className="mt-1 whitespace-pre-line text-sm text-[var(--color-ink-muted)]">{footer}</p>
+          </div>
+        ) : (
+          <div className="mt-3">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Eventueel toepasbare hashtags</span>
+            {short.hashtags?.length ? (
+              <p className="mt-1 text-sm text-[var(--color-brand-600)]">{short.hashtags.join(" ")}</p>
+            ) : (
+              <p className="mt-1 text-sm text-[var(--color-ink-faint)]">Geen hashtags voorgesteld.</p>
+            )}
+          </div>
+        )}
       </div>
       {err ? <div className="mt-2"><ErrorNote>{err}</ErrorNote></div> : null}
+    </Card>
+  );
+}
+
+/**
+ * Bewerkbare standaard footer per klant: het vaste contactblok + hashtags dat
+ * automatisch onder elke caption komt. Vooraf gevuld uit de contentplanning.
+ */
+function FooterEditor({ clientId, footer, setFooter, loading }: { clientId: string; footer: string; setFooter: (s: string) => void; loading: boolean }) {
+  const [saving, startSave] = useTransition();
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  function save() {
+    setErr(null);
+    startSave(async () => {
+      const res = await setCaptionFooter({ clientId, footer });
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1500);
+      } else setErr(res.message ?? "Opslaan mislukt.");
+    });
+  }
+
+  return (
+    <Card className="border-[var(--color-brand-500)]/25 bg-[color-mix(in_srgb,var(--color-brand-500)_4%,var(--color-surface))]">
+      <div className="flex items-center gap-2">
+        <Tag className="size-4 text-[var(--color-brand-600)]" />
+        <h3 className="text-sm font-semibold">Standaard footer voor deze klant</h3>
+      </div>
+      <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
+        Het vaste contactblok en de hashtags die onder élke post van deze klant komen — automatisch onder elke caption. Je schrijft dus alleen de bovenste tekst. Aanpassen mag.
+      </p>
+      {loading ? (
+        <p className="mt-3 flex items-center gap-2 text-sm text-[var(--color-ink-muted)]"><Loader2 className="size-4 animate-spin" /> Footer laden…</p>
+      ) : (
+        <>
+          <textarea
+            className="sc-input mt-3 resize-y text-sm leading-relaxed"
+            rows={7}
+            value={footer}
+            onChange={(e) => setFooter(e.target.value)}
+            placeholder="Nog geen standaard footer voor deze klant. Plak hier het vaste contactblok + hashtags, of laat leeg."
+          />
+          <div className="mt-2 flex items-center gap-3">
+            <Button onClick={save} disabled={saving} size="sm" variant="secondary">
+              {saving ? <Loader2 className="size-4 animate-spin" /> : saved ? <Check className="size-4 text-[var(--color-good)]" /> : null}
+              {saved ? "Opgeslagen" : "Footer opslaan"}
+            </Button>
+            <span className="text-xs text-[var(--color-ink-faint)]">Komt automatisch onder elke caption.</span>
+          </div>
+          {err ? <div className="mt-2"><ErrorNote>{err}</ErrorNote></div> : null}
+        </>
+      )}
     </Card>
   );
 }
