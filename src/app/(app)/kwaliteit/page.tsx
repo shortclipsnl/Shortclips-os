@@ -62,7 +62,7 @@ export default async function QualityPage() {
                   className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums"
                   style={{ background: `color-mix(in srgb, ${s.color} 15%, var(--color-surface))`, color: s.color }}
                 >
-                  {bucket.length}
+                  {counts[s.severity]}
                 </span>
               </div>
               {bucket.length === 0 ? (
