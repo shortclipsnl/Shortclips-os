@@ -29,7 +29,20 @@ function dayName(input: string | Date): string {
 
 type Line = { key: string; href: string; what: string; action: string; meta: string; tone: Tone };
 type Accent = "bad" | "warn" | "info" | "good" | "ink";
-type Block = { key: string; title: string; subtitle?: string; icon: React.ReactNode; accent?: Accent; lines: Line[]; empty: string };
+type ScheduleItem = { from: string; to?: string; label: string };
+type Block = { key: string; title: string; subtitle?: string; icon: React.ReactNode; accent?: Accent; lines: Line[]; empty: string; schedule?: ScheduleItem[] };
+
+/** Het vaste dagritme van het team. */
+const DAGINDELING: ScheduleItem[] = [
+  { from: "08:30", to: "09:00", label: "Dagstart" },
+  { from: "12:30", to: "13:00", label: "Pauze" },
+  { from: "13:00", to: "13:30", label: "Wat moet er vandaag echt af?" },
+  { from: "16:45", label: "To-do-lijst voor morgen maken" },
+];
+const toMin = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+};
 
 /** Functionele koptekst-kleur per blok, zodat blokken niet allemaal gelijk ogen. */
 const BLOCK_HEADER: Record<Accent, string> = {
@@ -230,32 +243,10 @@ function creativeBlocks(data: DashboardData, myDay: MyDay): Block[] {
     tone: daysSince(v.statusChangedAt) > 4 ? "bad" : "warn",
   }));
 
-  const soon: Line[] = [
-    ...data.shoots.slice(0, 5).map((s) => {
-      const open = Number(s.openBlockers) + Number(s.unapprovedScripts);
-      return {
-        key: `shoot-${s.id}`,
-        href: `/productions/${s.id}`,
-        what: `${s.clientName} — opname`,
-        action: open > 0 ? `${open} punt(en) open → voorbereiden` : "Rond → klaar voor opname",
-        meta: dayName(s.scheduledOn),
-        tone: (open > 0 && daysUntil(s.scheduledOn) <= 2 ? "warn" : "neutral") as Tone,
-      };
-    }),
-    ...data.scripts.slice(0, 4).map((s) => ({
-      key: `script-${s.id}`,
-      href: `/scripting`,
-      what: label(s.clientName, s.title),
-      action: "Script ter goedkeuring → nakijken",
-      meta: s.shootOn ? dayName(s.shootOn) : "",
-      tone: "neutral" as Tone,
-    })),
-  ];
-
   return [
     { key: "mine", title: "Mijn acties vandaag", subtitle: "Jouw taken en video's die op jou wachten.", icon: <ListChecks className="size-5" />, accent: "info", lines: mine.slice(0, 8), empty: "Geen openstaande acties op jouw naam." },
     { key: "waiting", title: "Mijn klanten wachten", subtitle: "Video's die te lang bij de klant liggen.", icon: <Users className="size-5" />, accent: "warn", lines: waiting.slice(0, 8), empty: "Geen klanten die op feedback laten wachten." },
-    { key: "soon", title: "Komende dagen", subtitle: "Opnames en scripts die eraan komen.", icon: <CalendarClock className="size-5" />, accent: "ink", lines: soon.slice(0, 8), empty: "Niets op de planning de komende dagen." },
+    { key: "dag", title: "Dagindeling", subtitle: "Het vaste dagritme van het team.", icon: <CalendarClock className="size-5" />, accent: "ink", lines: [], empty: "", schedule: DAGINDELING },
   ];
 }
 
@@ -299,11 +290,13 @@ function BlockCard({ block }: { block: Block }) {
           <h2 className="truncate text-base font-bold tracking-tight">{block.title}</h2>
           {block.subtitle ? <p className="truncate text-xs text-white/70">{block.subtitle}</p> : null}
         </div>
-        {block.lines.length > 0 ? (
+        {!block.schedule && block.lines.length > 0 ? (
           <span className="ml-auto shrink-0 rounded-full bg-white/20 px-2.5 py-0.5 text-sm font-semibold">{block.lines.length}</span>
         ) : null}
       </div>
-      {block.lines.length === 0 ? (
+      {block.schedule ? (
+        <ScheduleList items={block.schedule} />
+      ) : block.lines.length === 0 ? (
         <EmptyState title={block.empty} />
       ) : (
         <ul className="divide-y divide-[var(--color-line)]">
@@ -322,5 +315,40 @@ function BlockCard({ block }: { block: Block }) {
         </ul>
       )}
     </Card>
+  );
+}
+
+/** De vaste dagindeling, met het blok van nú gemarkeerd (tijd in NL). */
+function ScheduleList({ items }: { items: ScheduleItem[] }) {
+  const now = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" });
+  const [nh, nm] = now.split(":").map(Number);
+  const nowMin = (nh ?? 0) * 60 + (nm ?? 0);
+
+  return (
+    <ul className="divide-y divide-[var(--color-line)]">
+      {items.map((it) => {
+        const start = toMin(it.from);
+        const end = it.to ? toMin(it.to) : start + 15;
+        const status: "nu" | "straks" | "geweest" = nowMin >= start && nowMin < end ? "nu" : nowMin < start ? "straks" : "geweest";
+        const done = status === "geweest";
+        return (
+          <li key={it.from + it.label} className={`flex items-center gap-2.5 px-4 py-3 ${status === "nu" ? "bg-[var(--color-good-soft)]/60" : ""}`}>
+            <span className={`w-[68px] shrink-0 text-xs font-semibold tabular-nums leading-tight ${done ? "text-[var(--color-ink-faint)]" : status === "nu" ? "text-[var(--color-good)]" : "text-[var(--color-ink)]"}`}>
+              {it.from}{it.to ? <><br />–{it.to}</> : null}
+            </span>
+            <span className={`min-w-0 flex-1 text-sm leading-snug ${done ? "text-[var(--color-ink-faint)] line-through decoration-[var(--color-line-strong)]" : status === "nu" ? "font-semibold" : "font-medium"}`}>
+              {it.label}
+            </span>
+            {status === "nu" ? (
+              <span className="shrink-0 rounded-full bg-[var(--color-good)] px-2 py-0.5 text-2xs font-bold text-white">Nu</span>
+            ) : status === "straks" ? (
+              <span className="shrink-0 text-2xs font-medium text-[var(--color-ink-faint)]">straks</span>
+            ) : (
+              <span className="shrink-0 text-2xs text-[var(--color-ink-faint)]">gedaan</span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
