@@ -63,6 +63,9 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/capaciteit", label: "Teamcapaciteit", icon: "Gauge", permissions: ["team:read", "editors:read"], match: "/capaciteit" },
       { href: "/verlof", label: "Vakantie", icon: "Palmtree", match: "/verlof" },
       { href: "/meetings", label: "Teammeetings", icon: "Presentation", match: "/meetings" },
+      // Interne kennisbank (vervanger van Skool): lezen voor iedereen intern,
+      // beheren alleen voor de eigenaar (afgedwongen op de server).
+      { href: "/kennisbank", label: "Shortclips Kennisbank", icon: "GraduationCap", match: "/kennisbank" },
     ],
   },
   {

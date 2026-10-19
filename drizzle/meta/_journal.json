@@ -253,6 +253,13 @@
       "when": 1792388513781,
       "tag": "0035_optimal_vance_astro",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792406284821,
+      "tag": "0036_kennisbank",
+      "breakpoints": true
     }
   ]
 }

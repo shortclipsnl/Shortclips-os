@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "vercel-build": "npm run db:migrate && next build",
+    "vercel-build": "npm run db:migrate && (npm run kb:import || echo \"[kennisbank-import] mislukt, zie log hierboven\") && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
@@ -17,12 +17,18 @@
     "frameio:token": "node scripts/frameio-token.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "kb:import": "tsx scripts/kennisbank-import.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
     "@electric-sql/pglite": "^0.5.5",
     "@sparticuz/chromium": "^131.0.1",
+    "@tiptap/core": "3.32.0",
+    "@tiptap/extension-image": "3.32.0",
+    "@tiptap/pm": "3.32.0",
+    "@tiptap/react": "3.32.0",
+    "@tiptap/starter-kit": "3.32.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "docx": "^9.5.1",

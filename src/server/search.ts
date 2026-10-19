@@ -23,6 +23,7 @@ import {
   videoAnalyses,
 } from "@/db/schema";
 import { scopeToClients, type Viewer } from "@/server/auth/context";
+import { searchKennisbank } from "@/server/kennisbank";
 import {
   INVOICE_STATUS,
   SCRIPT_STATUS,
@@ -180,6 +181,21 @@ export async function universalSearch(
     ...invoiceHits.map((r) => ({ kind: "invoice", kindLabel: "Factuur", title: r.number, subtitle: INVOICE_STATUS[r.status]?.label ?? r.status, href: `/finance?factuur=${r.id}`, clientName: r.clientName })),
     ...viHits.map((r) => ({ kind: "video_intelligence", kindLabel: "Video Intelligence", title: r.title ?? "Video-analyse", subtitle: r.platform ?? (r.caption ? r.caption.slice(0, 60) : null), href: `/video-intelligence/${r.id}`, clientName: r.clientName })),
   ];
+
+  // Shortclips Kennisbank: zoekt in lestitels én in de tekst van de lessen.
+  // Faalt de kennisbank (bijv. tabel nog niet gemigreerd), dan blijft de rest
+  // van de zoekfunctie gewoon werken.
+  const kbHits = await searchKennisbank(viewer, q, LIMIT_PER_KIND).catch(() => []);
+  hits.push(
+    ...kbHits.map((r) => ({
+      kind: "kennisbank",
+      kindLabel: "Kennisbank",
+      title: r.lessonTitle,
+      subtitle: r.snippet,
+      href: `/kennisbank/${r.courseId}?les=${r.lessonId}`,
+      clientName: r.courseTitle,
+    })),
+  );
 
   return hits;
 }
