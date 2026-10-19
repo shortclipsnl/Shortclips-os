@@ -5,12 +5,14 @@ import { requireInternal } from "@/server/auth/context";
 import { getVideoHighlights, listEditorOptions, listVideos } from "@/server/videos";
 import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { listEditingProjects } from "@/server/editing-board";
+import { listEditorBoard } from "@/server/editor-board";
 import { isBoardEditor } from "@/server/edit-board-editors";
 import { listClients } from "@/server/clients";
 import { ShootTimers } from "../editing/shoot-timers";
 import { WorkloadSection } from "../editing/workload-section";
 import { Card, PageHeader } from "@/components/ui";
 import { EditingProjects } from "./editing-projects";
+import { EditorBoard } from "./editor-board";
 
 export const metadata: Metadata = { title: "Editing" };
 export const dynamic = "force-dynamic";
@@ -22,6 +24,36 @@ export default async function VideosPage({
 }) {
   const viewer = await requireInternal();
   const params = await searchParams;
+
+  // Editors zien een board op basis van hún video's (deliverables) — niet op
+  // opnames. Veel video's komen via Monday binnen zonder opname, dus het
+  // opname-board zou leeg blijven. Dit toont de editor precies zijn eigen werk.
+  if (viewer.isEditorOnly) {
+    const videos = await listEditorBoard(viewer);
+    return (
+      <div className="mx-auto max-w-[1100px]">
+        <PageHeader title="Editing" description={`${videos.length} video's van jou`} />
+        <section className="mb-6">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+            <h2 className="text-sm font-bold tracking-tight">Jouw edit-projecten</h2>
+            <span className="text-xs text-white/80">Gegroepeerd per fase · zet je video telkens in de juiste stap</span>
+          </div>
+          <p className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)] px-4 py-2.5 text-sm leading-relaxed text-[var(--color-ink)]">
+            <strong>Dit zijn jouw video&apos;s.</strong> Houd goed rekening met de <strong>deadlines</strong>. Bij elke video vind je het
+            <strong> script</strong>, het <strong>materiaal</strong> en <strong>Frame.io</strong>, en openstaande feedback. Zet je video in de juiste
+            <strong> fase</strong> zodra je verder bent: binnenkort beschikbaar → in edit → interne review → feedback klant → feedback klant verwerken → afgerond.
+          </p>
+          {videos.length > 0 ? (
+            <EditorBoard videos={videos} />
+          ) : (
+            <p className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">
+              Je hebt op dit moment geen video&apos;s toegewezen gekregen.
+            </p>
+          )}
+        </section>
+      </div>
+    );
+  }
 
   const preset = params.filter && params.filter !== "alles"
     ? (params.filter as "te-laat" | "bij-klant" | "mijn-werk" | "actief")

@@ -17,6 +17,7 @@ import { changeVideoStatus } from "@/server/actions/videos";
  *  eerste versie/definitief aangeleverd (internal_review) · feedback verwerken (editor_revision)
  */
 const EDITOR_STEPS: { value: VideoStage; label: string }[] = [
+  { value: "recorded", label: "Binnenkort beschikbaar" },
   { value: "awaiting_editor", label: "Nog niet gestart" },
   { value: "editing", label: "Bezig met editing" },
   { value: "internal_review", label: "Aangeleverd voor controle" },
