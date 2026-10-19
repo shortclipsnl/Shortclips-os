@@ -6,8 +6,9 @@ import {
   teamMembers,
   users,
 } from "@/db/schema";
-import { requirePermission } from "@/server/auth/context";
+import { requirePermission, isOwner } from "@/server/auth/context";
 import { isCoreStaff, coreStaffRank } from "@/server/core-staff";
+import { TeamLogins } from "./team-logins";
 import {
   Badge,
   Card,
@@ -40,6 +41,7 @@ export default async function TeamPage() {
   const viewer = await requirePermission("team:read");
   const canSeeCosts = viewer.permissions.has("finance:read_costs");
   const canWrite = viewer.permissions.has("team:write");
+  const owner = isOwner(viewer);
 
   const [people, editorStats] = await Promise.all([
     db.select({
@@ -155,6 +157,8 @@ export default async function TeamPage() {
         description="Vaste medewerkers en freelancers, met beschikbaarheid en openstaand werk in één oogopslag."
         actions={canWrite ? <LinkButton href="/team/new">Nieuw teamlid</LinkButton> : undefined}
       />
+
+      {owner ? <TeamLogins /> : null}
 
       <div className="mb-3 flex items-center gap-3 border-l-4 border-[var(--color-indigo-ink)] pl-3">
         <div>
