@@ -180,16 +180,16 @@ export default async function AnalyticsPage({
       {/* Klant-tegels: logo's naast elkaar met bedrijfsnaam, groot en klikbaar —
           makkelijk aan te wijzen op een scherm. Klik opent alle resultaten van
           die klant. Gekoppelde klanten eerst. */}
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {tileClients.map((c) => (
           <Link
             key={c.slug}
             href={`/analytics/${c.slug}`}
-            className="group inline-flex items-center gap-2.5 rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 transition hover:border-[var(--color-brand-500)] hover:shadow-[var(--shadow-raised)]"
+            className="group flex items-center gap-2.5 rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5 transition hover:border-[var(--color-brand-500)] hover:shadow-[var(--shadow-raised)]"
             title={`Alle resultaten van ${c.name}`}
           >
-            <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={40} />
-            <span className="min-w-0">
+            <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={38} />
+            <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold leading-tight group-hover:text-[var(--color-brand-700)]">{c.name}</span>
               <span className="mt-0.5 inline-flex items-center gap-1 text-2xs font-medium">
                 <span className="size-1.5 rounded-full" style={{ background: c.linked ? "var(--color-good)" : "var(--color-line-strong)" }} />

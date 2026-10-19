@@ -6,11 +6,14 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients } from "@/db/schema";
 import { requirePermission, assertClientAccess } from "@/server/auth/context";
-import { Card, CardHeader, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
+import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import { compact, formatDate, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
 import { ClientSelector, type SelectorClient } from "../client-selector";
 import { VideoThumb } from "../video-thumb";
+
+// Vaste platformvolgorde voor de filterknoppen.
+const PLATFORM_ORDER = ["instagram", "tiktok", "facebook", "youtube", "linkedin"] as const;
 
 export const metadata: Metadata = { title: "Klantresultaten" };
 export const dynamic = "force-dynamic";
@@ -22,14 +25,16 @@ export default async function ClientResultsPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ dagen?: string }>;
+  searchParams: Promise<{ dagen?: string; platform?: string }>;
 }) {
   const viewer = await requirePermission("analytics:read");
   const { slug } = await params;
-  const days = Number((await searchParams).dagen) || 90;
+  const sp = await searchParams;
+  const days = Number(sp.dagen) || 90;
+  const platform = sp.platform && PLATFORM[sp.platform] ? sp.platform : null;
 
   const [client] = await db
-    .select({ id: clients.id, name: clients.name, color: clients.color, quota: clients.monthlyVideoQuota })
+    .select({ id: clients.id, name: clients.name, color: clients.color, logoUrl: clients.logoUrl, quota: clients.monthlyVideoQuota })
     .from(clients)
     .where(and(eq(clients.slug, slug), isNull(clients.deletedAt)))
     .limit(1);
@@ -38,6 +43,10 @@ export default async function ClientResultsPage({
   const cid = client.id;
   const dInt = `interval '${days} days'`;
   const dPrev = `interval '${2 * days} days'`;
+  // Platformfilter voor de cijfers uit daily_metrics (leeg = alle platforms).
+  const platCond = platform ? sql`and platform = ${platform}` : sql``;
+  const qp = (d: number) => `/analytics/${slug}?dagen=${d}${platform ? `&platform=${platform}` : ""}`;
+  const qpPlat = (p: string | null) => `/analytics/${slug}?dagen=${days}${p ? `&platform=${p}` : ""}`;
 
   const [totals, prevTotals, perMonth, perPlatform, videoRows, publishedRow, allClientsRaw] =
     await Promise.all([
@@ -47,15 +56,15 @@ export default async function ClientResultsPage({
                coalesce(sum(likes),0)::int likes, coalesce(sum(comments),0)::int comments,
                coalesce(sum(shares),0)::int shares, coalesce(sum(saves),0)::int saves,
                coalesce(sum(watch_seconds),0)::bigint watch_seconds, coalesce(sum(video_views),0)::bigint video_views
-        from daily_metrics where client_id = ${cid} and measured_on >= current_date - ${sql.raw(dInt)}`),
+        from daily_metrics where client_id = ${cid} and measured_on >= current_date - ${sql.raw(dInt)} ${platCond}`),
       db.execute(sql`
         select coalesce(sum(views),0)::int views, coalesce(sum(reach),0)::int reach, coalesce(sum(engagements),0)::int engagements,
                coalesce(sum(follower_delta),0)::int follower_growth
         from daily_metrics where client_id = ${cid}
-          and measured_on >= current_date - ${sql.raw(dPrev)} and measured_on < current_date - ${sql.raw(dInt)}`),
+          and measured_on >= current_date - ${sql.raw(dPrev)} and measured_on < current_date - ${sql.raw(dInt)} ${platCond}`),
       db.execute(sql`
         select to_char(measured_on,'YYYY-MM') maand, coalesce(sum(views),0)::int views
-        from daily_metrics where client_id = ${cid} and measured_on >= current_date - interval '12 months'
+        from daily_metrics where client_id = ${cid} and measured_on >= current_date - interval '12 months' ${platCond}
         group by 1 order by 1`),
       db.execute(sql`
         select platform, coalesce(sum(views),0)::int views, coalesce(sum(reach),0)::int reach, coalesce(sum(follower_delta),0)::int volgers
@@ -117,17 +126,35 @@ export default async function ClientResultsPage({
   const top = videos.slice(0, 5);
   const bottom = videos.filter((v) => Number(v.views) > 0).slice(-5).reverse();
 
+  // Bevindingen: concrete inzichten uit de cijfers (deterministisch, geen AI).
+  const findings: string[] = [];
+  {
+    const vD = deltaPct(Number(t.views ?? 0), Number(prev.views ?? 0));
+    if (vD !== null) findings.push(`Weergaven zijn met ${Math.abs(vD)}% ${vD >= 0 ? "gestegen" : "gedaald"} ten opzichte van de vorige periode.`);
+    const fg = Number(t.follower_growth ?? 0);
+    if (fg !== 0) findings.push(fg > 0 ? `Er kwamen ${num(fg)} nieuwe volgers bij in deze periode.` : `Het volgersaantal daalde met ${num(Math.abs(fg))}.`);
+    if (!platform && platforms.length > 0) {
+      const best = platforms[0]!;
+      findings.push(`${PLATFORM[String(best.platform)]?.label ?? String(best.platform)} levert de meeste weergaven (${compact(Number(best.views))}).`);
+    }
+    if (top.length > 0 && Number(top[0]!.views) > 0) {
+      findings.push(`Best bekeken video: “${top[0]!.title}” met ${compact(Number(top[0]!.views))} weergaven.`);
+    }
+    if (avgViews > 0) findings.push(`Gemiddeld haalt een video ${compact(avgViews)} weergaven.`);
+    if (avgWatch != null) findings.push(`De gemiddelde kijktijd is ${avgWatch.toFixed(1)} seconden per videoweergave.`);
+  }
+
   return (
     <div className="mx-auto max-w-[1100px]">
       <Link href="/analytics" className="text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">← Resultaten</Link>
       <PageHeader
-        title={client.name}
-        description={`Volledige resultaten · afgelopen ${days} dagen · uit je eigen database (dagelijkse snapshots)`}
+        title={<span className="flex items-center gap-3"><ClientLogo name={client.name} logoUrl={client.logoUrl} color={client.color} size={40} />{client.name}</span>}
+        description={`Volledige resultaten · afgelopen ${days} dagen${platform ? ` · ${PLATFORM[platform]?.label}` : ""} · uit je eigen database (dagelijkse snapshots)`}
         actions={
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
               {[30, 90, 365].map((d) => (
-                <Link key={d} href={`/analytics/${slug}?dagen=${d}`} className={days === d ? "rounded-[4px] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white" : "px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)]"}>
+                <Link key={d} href={qp(d)} className={days === d ? "rounded-[4px] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white" : "px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)]"}>
                   {d === 365 ? "1 jaar" : `${d} dagen`}
                 </Link>
               ))}
@@ -142,6 +169,17 @@ export default async function ClientResultsPage({
       />
 
       <ClientSelector clients={selectorClients} currentSlug={slug} />
+
+      {/* Platformfilter: klik op een platform om alleen die cijfers te zien. */}
+      <div className="mb-5 flex flex-wrap items-center gap-1.5">
+        <Link href={qpPlat(null)} className={platChip(!platform)}>Alle platforms</Link>
+        {PLATFORM_ORDER.filter((p) => PLATFORM[p]).map((p) => (
+          <Link key={p} href={qpPlat(p)} className={platChip(platform === p)}>
+            <span className="size-2 rounded-full" style={{ background: PLATFORM[p]!.color }} />
+            {PLATFORM[p]!.label}
+          </Link>
+        ))}
+      </div>
 
       {!hasData ? (
         <Card><EmptyState title="Nog geen resultaten" description="Zodra Metricool cijfers voor deze klant levert, verschijnen ze hier." /></Card>
@@ -162,6 +200,18 @@ export default async function ClientResultsPage({
             <Stat label="Profielbezoeken" value="—" hint="niet via Metricool" />
             <Stat label="Uitkijkpercentage" value={completionPct != null ? `${completionPct}%` : "—"} hint="niet via Metricool" />
           </div>
+
+          {/* Bevindingen op basis van de resultaten. */}
+          {findings.length > 0 ? (
+            <Card className="mb-5 border-[var(--color-info)]/25 bg-[var(--color-info-soft)]/40">
+              <h3 className="text-sm font-semibold">Bevindingen</h3>
+              <ul className="mt-2 space-y-1.5 text-sm">
+                {findings.map((f, i) => (
+                  <li key={i} className="flex gap-2"><span className="text-[var(--color-info)]">•</span><span>{f}</span></li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
 
           <div className="mb-5 grid gap-5 xl:grid-cols-2">
             {/* Weergaven per maand */}
@@ -246,6 +296,12 @@ type VideoRow = {
 
 function platformList(s: string | null): string[] {
   return s ? s.split(",").filter(Boolean) : [];
+}
+
+function platChip(active: boolean): string {
+  return `inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+    active ? "bg-[var(--color-indigo-ink)] text-white" : "border border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+  }`;
 }
 
 function VideoCard({ v }: { v: VideoRow }) {
