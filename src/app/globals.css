@@ -231,10 +231,12 @@ body {
 
   /* Skeleton */
   .sc-skeleton {
+    /* Shimmer-highlight uit themakleuren, zodat het op donker niet fel-wit
+       oplicht maar een rustige, iets lichtere tint toont. */
     background: linear-gradient(
       90deg,
       var(--color-surface-sunken) 25%,
-      #ecebe7 37%,
+      var(--color-surface-2) 37%,
       var(--color-surface-sunken) 63%
     );
     background-size: 400% 100%;

@@ -402,7 +402,7 @@ export async function generateReply(input: {
    *  wordt de klant automatisch herkend uit het bericht/screenshot. */
   clientId?: string;
   messageText?: string;
-  tone?: "standaard" | "korter" | "vriendelijker" | "directer" | "uitgebreider";
+  tone?: "standaard" | "korter" | "vriendelijker" | "netter" | "duidelijker" | "directer" | "uitgebreider";
   images?: AiImage[];
 }): Promise<AiActionResult<ReplyDraft>> {
   try {

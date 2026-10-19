@@ -9,6 +9,7 @@ import {
   deliverables,
   reviewComments,
   reviewThreads,
+  users,
 } from "@/db/schema";
 import {
   assertClientAccess,
@@ -18,6 +19,7 @@ import {
 } from "@/server/auth/context";
 import { auditLog, recordActivity } from "@/server/audit";
 import { dispatch } from "@/server/automation";
+import { notify } from "@/server/notifications";
 import { syncContentForDeliverable } from "@/server/content-sync";
 import { VIDEO_STAGES, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 
@@ -302,7 +304,7 @@ export async function resolveThread(threadId: string): Promise<ActionResult> {
 export async function listClientEditProjects(clientId: string): Promise<{
   ok: boolean;
   message?: string;
-  projects: { id: string; title: string; statusLabel: string; hasBriefing: boolean }[];
+  projects: { id: string; title: string; statusLabel: string; hasBriefing: boolean; editorId: string | null; editorName: string | null }[];
 }> {
   try {
     const viewer = await requirePermission("videos:write");
@@ -314,8 +316,11 @@ export async function listClientEditProjects(clientId: string): Promise<{
         title: deliverables.title,
         status: deliverables.status,
         briefing: deliverables.briefing,
+        editorId: deliverables.editorId,
+        editorName: users.fullName,
       })
       .from(deliverables)
+      .leftJoin(users, eq(users.id, deliverables.editorId))
       .where(and(eq(deliverables.clientId, clientId), isNull(deliverables.deletedAt)))
       .orderBy(desc(deliverables.statusChangedAt))
       .limit(60);
@@ -326,10 +331,39 @@ export async function listClientEditProjects(clientId: string): Promise<{
         title: r.title,
         statusLabel: VIDEO_STATUS[r.status]?.label ?? r.status,
         hasBriefing: !!(r.briefing && r.briefing.trim()),
+        editorId: r.editorId,
+        editorName: r.editorName,
       })),
     };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message, projects: [] };
+    throw error;
+  }
+}
+
+/** De editor van een project een berichtje sturen dat de briefing klaarstaat. */
+export async function notifyEditorOfBriefing(videoId: string): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const video = await loadVideo(videoId);
+    if (!video) return { ok: false, message: "Project niet gevonden." };
+    assertClientAccess(viewer, video.clientId);
+    if (!video.editorId) return { ok: false, message: "Dit project heeft nog geen editor." };
+    await notify({
+      userIds: [video.editorId],
+      clientId: video.clientId,
+      type: "briefing_ready",
+      level: "info",
+      title: `Nieuwe briefing klaar van ${viewer.fullName}`,
+      body: `De editingbriefing voor "${video.title}" staat klaar op het project.`,
+      href: `/videos/${videoId}`,
+      entityType: "deliverable",
+      entityId: videoId,
+      dedupeKey: `briefing_ready:${videoId}`,
+    });
+    return { ok: true, message: "Editor is op de hoogte gebracht." };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
   }
 }

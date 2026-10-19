@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { AlertTriangle, ImageUp, Loader2, Sparkles, X } from "lucide-react";
 import { generateReply, type ReplyDraft } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote, InfoNote } from "@/components/ui";
-import { CopyButton, HistoryPanel, NoProviderNote, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
+import { CopyButton, HistoryPanel, NoProviderNote, ToolHowTo, VoiceButton, fileToBase64, type HistoryEntry } from "../_shared";
 
 type Img = { name: string; base64: string; mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif" };
 
@@ -12,8 +12,10 @@ const IMG_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
 const TONES = [
   { value: "standaard", label: "Standaard" },
-  { value: "korter", label: "Korter" },
   { value: "vriendelijker", label: "Vriendelijker" },
+  { value: "netter", label: "Netter" },
+  { value: "duidelijker", label: "Duidelijker" },
+  { value: "korter", label: "Korter" },
   { value: "directer", label: "Directer" },
   { value: "uitgebreider", label: "Uitgebreider" },
 ] as const;
@@ -168,9 +170,13 @@ export function BerichtAssistent({
               {" · "}
               {result.detectedClientName ? `Klant: ${result.detectedClientName}` : "Klant niet herkend"}
             </span>
-            <CopyButton text={draft} />
+            <div className="flex items-center gap-2">
+              <VoiceButton onText={(t) => setDraft((d) => (d.trim() ? `${d.trim()} ${t}` : t))} label="Inspreken" />
+              <CopyButton text={draft} />
+            </div>
           </div>
           <textarea className="sc-input resize-y text-sm" rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">Pas de tekst zelf aan, of klik op <strong>Inspreken</strong> om je aanvulling in te spreken.</p>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-xs text-[var(--color-ink-faint)]">Pas de toon aan:</span>

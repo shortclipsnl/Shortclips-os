@@ -4,12 +4,12 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, FileText, Link2, Loader2, Sparkles, X } from "lucide-react";
 import { generateBriefing, type EditorBriefing } from "@/server/actions/ai-tools";
-import { attachBriefingToProject, listClientEditProjects } from "@/server/actions/videos";
+import { attachBriefingToProject, listClientEditProjects, notifyEditorOfBriefing } from "@/server/actions/videos";
 import { Button, Card, ErrorNote } from "@/components/ui";
-import { CopyButton, HistoryPanel, NoProviderNote, SaveInsight, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
+import { CopyButton, HistoryPanel, NoProviderNote, SaveInsight, ToolHowTo, VoiceButton, fileToBase64, type HistoryEntry } from "../_shared";
 
 type ClientOption = { id: string; name: string };
-type EditProject = { id: string; title: string; statusLabel: string; hasBriefing: boolean };
+type EditProject = { id: string; title: string; statusLabel: string; hasBriefing: boolean; editorId: string | null; editorName: string | null };
 
 const isDoc = (n: string) => /\.(pdf|docx)$/i.test(n);
 
@@ -174,13 +174,16 @@ export function BriefingMaker({
 
 function BriefingView({ briefing, clientId, canAttach }: { briefing: EditorBriefing; clientId: string; canAttach: boolean }) {
   const intro = briefing.projectIntro;
+  // Bewerkbare tekstversie van de briefing: dit is wat gekopieerd en gekoppeld
+  // wordt. Je kunt 'm zelf aanpassen of met voice mode inspreken.
+  const [text, setText] = useState(briefingToText(briefing));
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">Briefing</h2>
         <div className="flex items-center gap-2">
           <SaveInsight clientId={clientId} defaultCategory="editing_style" />
-          <CopyButton label="Hele briefing kopiëren" text={briefingToText(briefing)} />
+          <CopyButton label="Kopiëren" text={text} />
         </div>
       </div>
       {/* Compacte, scanbare briefing — één kaart die je in z'n geheel kunt kopiëren. */}
@@ -216,7 +219,22 @@ function BriefingView({ briefing, clientId, canAttach }: { briefing: EditorBrief
         </ol>
       </Card>
 
-      {canAttach ? <AttachToProject clientId={clientId} briefingText={briefingToText(briefing)} /> : null}
+      {/* Bewerkbare briefing-tekst + inspreken (voice mode). */}
+      <Card>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">Briefing aanpassen</span>
+          <VoiceButton onText={(t) => setText((c) => (c.trim() ? `${c.trim()}\n${t}` : t))} label="Inspreken" />
+        </div>
+        <textarea
+          className="sc-input resize-y text-sm leading-relaxed"
+          rows={9}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">Pas de tekst zelf aan of spreek je wijziging in. Dit is wat gekopieerd én aan het project gekoppeld wordt.</p>
+      </Card>
+
+      {canAttach ? <AttachToProject clientId={clientId} briefingText={text} /> : null}
     </div>
   );
 }
@@ -227,9 +245,11 @@ function AttachToProject({ clientId, briefingText }: { clientId: string; briefin
   const [projects, setProjects] = useState<EditProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [projectId, setProjectId] = useState("");
-  const [done, setDone] = useState<{ id: string; title: string } | null>(null);
+  const [done, setDone] = useState<{ id: string; title: string; editorName: string | null } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [msgDone, setMsgDone] = useState(false);
+  const [msgPending, startMsg] = useTransition();
 
   useEffect(() => {
     let active = true;
@@ -255,8 +275,20 @@ function AttachToProject({ clientId, briefingText }: { clientId: string; briefin
     const chosen = projects.find((p) => p.id === projectId);
     start(async () => {
       const res = await attachBriefingToProject({ videoId: projectId, briefing: briefingText });
-      if (res.ok) setDone({ id: projectId, title: chosen?.title ?? "project" });
-      else setErr(res.message ?? "Koppelen mislukt.");
+      if (res.ok) {
+        setMsgDone(false);
+        setDone({ id: projectId, title: chosen?.title ?? "project", editorName: chosen?.editorName ?? null });
+      } else setErr(res.message ?? "Koppelen mislukt.");
+    });
+  }
+
+  function messageEditor() {
+    if (!done) return;
+    setErr(null);
+    startMsg(async () => {
+      const res = await notifyEditorOfBriefing(done.id);
+      if (res.ok) setMsgDone(true);
+      else setErr(res.message ?? "Berichtje sturen mislukt.");
     });
   }
 
@@ -271,12 +303,24 @@ function AttachToProject({ clientId, briefingText }: { clientId: string; briefin
       </p>
 
       {done ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-good)]/30 bg-[var(--color-good-soft)]/50 px-3 py-2 text-sm text-[#1d6b4c]">
-          <Check className="size-4 shrink-0" />
-          <span>Gekoppeld aan <strong>{done.title}</strong>.</span>
-          <Link href={`/videos/${done.id}`} className="inline-flex items-center gap-1 font-semibold text-[var(--color-brand-600)] hover:underline">
-            Open project <ArrowRight className="size-3.5" />
-          </Link>
+        <div className="mt-3 space-y-2 rounded-[var(--radius-md)] border border-[var(--color-good)]/30 bg-[var(--color-good-soft)]/50 px-3 py-2.5 text-sm text-[#1d6b4c]">
+          <div className="flex flex-wrap items-center gap-2">
+            <Check className="size-4 shrink-0" />
+            <span>Gekoppeld aan <strong>{done.title}</strong>{done.editorName ? <> · editor <strong>{done.editorName.split(" ")[0]}</strong></> : " · nog geen editor"}.</span>
+            <Link href={`/videos/${done.id}`} className="inline-flex items-center gap-1 font-semibold text-[var(--color-brand-600)] hover:underline">
+              Open project <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
+          {done.editorName ? (
+            msgDone ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium"><Check className="size-3.5" /> {done.editorName.split(" ")[0]} is op de hoogte gebracht.</span>
+            ) : (
+              <Button onClick={messageEditor} disabled={msgPending} size="sm" variant="secondary">
+                {msgPending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                Stuur {done.editorName.split(" ")[0]} een berichtje
+              </Button>
+            )
+          ) : null}
         </div>
       ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -290,7 +334,7 @@ function AttachToProject({ clientId, briefingText }: { clientId: string; briefin
             <option value="">{loading ? "Projecten laden…" : projects.length ? "Kies een project…" : "Geen projecten gevonden"}</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.title} · {p.statusLabel}{p.hasBriefing ? " · heeft al een briefing" : ""}
+                {p.title} · {p.statusLabel} · {p.editorName ? p.editorName.split(" ")[0] : "geen editor"}{p.hasBriefing ? " · heeft al een briefing" : ""}
               </option>
             ))}
           </select>

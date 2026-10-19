@@ -1,8 +1,79 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Brain, Check, Copy, History, Lightbulb, Loader2, Save } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Brain, Check, Copy, History, Lightbulb, Loader2, Mic, Save } from "lucide-react";
 import { saveClientKnowledge } from "@/server/actions/client-knowledge";
+
+/* --------------------------- Voice mode (STT) --------------------------- */
+
+type SpeechRec = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+type SpeechCtor = new () => SpeechRec;
+
+/**
+ * Inspreken (voice mode): zet gesproken Nederlands om naar tekst en geeft het
+ * terug via onText, zodat je het in een tekstveld kunt toevoegen/aanpassen.
+ * Werkt waar de browser spraakherkenning ondersteunt (Chrome/desktop-app);
+ * anders verschijnt de knop simpelweg niet.
+ */
+export function VoiceButton({ onText, label = "Inspreken" }: { onText: (text: string) => void; label?: string }) {
+  const [listening, setListening] = useState(false);
+  const [supported, setSupported] = useState(false);
+  const recRef = useRef<SpeechRec | null>(null);
+
+  useEffect(() => {
+    const w = window as unknown as { SpeechRecognition?: SpeechCtor; webkitSpeechRecognition?: SpeechCtor };
+    setSupported(Boolean(w.SpeechRecognition || w.webkitSpeechRecognition));
+  }, []);
+
+  function toggle() {
+    const w = window as unknown as { SpeechRecognition?: SpeechCtor; webkitSpeechRecognition?: SpeechCtor };
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SR) return;
+    if (listening) {
+      recRef.current?.stop();
+      return;
+    }
+    const rec = new SR();
+    rec.lang = "nl-NL";
+    rec.interimResults = false;
+    rec.continuous = false;
+    rec.onresult = (e) => {
+      const text = Array.from(e.results, (r) => r[0]?.transcript ?? "").join(" ").trim();
+      if (text) onText(text);
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recRef.current = rec;
+    setListening(true);
+    try {
+      rec.start();
+    } catch {
+      setListening(false);
+    }
+  }
+
+  if (!supported) return null;
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      title="Inspreken — spreek je aanvulling of wijziging in"
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${listening ? "animate-pulse border-[var(--color-bad)] bg-[var(--color-bad-soft)] text-[var(--color-bad)]" : "border-[var(--color-line-strong)] hover:bg-[var(--color-surface-sunken)]"}`}
+    >
+      <Mic className="size-3.5" />
+      {listening ? "Luistert… (klik om te stoppen)" : label}
+    </button>
+  );
+}
 
 /** Vaste categorieën voor geleerde klantvoorkeuren (de AI-leerlaag). */
 export const CLIENT_KNOWLEDGE_CATEGORIES: { value: string; label: string }[] = [
