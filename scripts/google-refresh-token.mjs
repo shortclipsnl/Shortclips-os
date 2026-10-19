@@ -17,7 +17,8 @@
  *   5. Het script toont je refresh-token — zet die als GOOGLE_REFRESH_TOKEN in
  *      .env.local en herstart de dev-server.
  *
- * Scopes: calendar.readonly + drive.readonly (alleen lezen).
+ * Scopes: calendar.readonly + drive.readonly (lezen) + drive.file (schrijven,
+ * alleen bestanden die de app zelf maakt — nodig voor de database-backups).
  */
 import http from "node:http";
 import { readFileSync } from "node:fs";
@@ -28,6 +29,7 @@ const REDIRECT = `http://localhost:${PORT}/callback`;
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/drive.file",
 ].join(" ");
 
 /** Leest een sleutel uit process.env of uit .env.local. */

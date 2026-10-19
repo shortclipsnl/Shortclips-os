@@ -205,6 +205,65 @@ export class DriveService {
   static isFolder(file: DriveFile): boolean {
     return file.mimeType === FOLDER_MIME;
   }
+
+  /* --- Schrijven (voor database-backups). Vereist de drive.file-scope. --- */
+
+  /** Vind of maak een map met deze naam (in My Drive). Met de drive.file-scope
+   *  ziet de app alleen de mappen die ze zelf heeft aangemaakt — precies goed
+   *  voor een eigen backup-map. */
+  async ensureFolder(name: string): Promise<string> {
+    const safe = name.replace(/'/g, "\\'");
+    const res = await this.request<{ files: { id: string }[] }>("/files", {
+      q: `mimeType = '${FOLDER_MIME}' and name = '${safe}' and trashed = false`,
+      fields: "files(id,name)",
+      pageSize: 1,
+    });
+    if (res.files?.[0]?.id) return res.files[0].id;
+
+    const token = await this.token();
+    const r = await fetch(`${API}/files?fields=id&supportsAllDrives=true`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ name, mimeType: FOLDER_MIME }),
+    });
+    if (!r.ok) {
+      throw new IntegrationError("google_drive", `Map aanmaken mislukt (HTTP ${r.status})`, r.status, r.status >= 500);
+    }
+    return ((await r.json()) as { id: string }).id;
+  }
+
+  /** Upload een bestand (bytes) naar een map. Multipart upload in één request. */
+  async uploadBytes(name: string, mimeType: string, bytes: Uint8Array, parentId: string): Promise<{ id: string }> {
+    const token = await this.token();
+    const boundary = "scbackup_" + Math.random().toString(36).slice(2);
+    const meta = JSON.stringify({ name, parents: [parentId] });
+    const pre = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`;
+    const post = `\r\n--${boundary}--`;
+    const body = Buffer.concat([Buffer.from(pre, "utf8"), Buffer.from(bytes), Buffer.from(post, "utf8")]);
+
+    const r = await fetch(`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id&supportsAllDrives=true`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+      body,
+    });
+    if (!r.ok) {
+      const detail = await r.text().catch(() => "");
+      throw new IntegrationError("google_drive", `Upload mislukt (HTTP ${r.status})${detail ? `: ${detail.slice(0, 200)}` : ""}`, r.status, r.status >= 500);
+    }
+    return (await r.json()) as { id: string };
+  }
+
+  /** Een bestand verwijderen (voor het opruimen van oude backups). */
+  async deleteFileById(id: string): Promise<void> {
+    const token = await this.token();
+    const r = await fetch(`${API}/files/${id}?supportsAllDrives=true`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok && r.status !== 404) {
+      throw new IntegrationError("google_drive", `Verwijderen mislukt (HTTP ${r.status})`, r.status, r.status >= 500);
+    }
+  }
 }
 
 export const drive = new DriveService();
