@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, Copy, ExternalLink, MessageSquare, X } from "lucide-react";
 import { PLATFORM } from "@/lib/statuses";
+import { ClientLogo } from "@/components/ui";
 
 export type ContentItemLite = {
   id: string;
@@ -11,6 +12,8 @@ export type ContentItemLite = {
   caption: string | null;
   clientName: string;
   clientSlug: string | null;
+  clientLogo: string | null;
+  clientColor: string | null;
   scheduledOn: string;
   scheduledAt: string | null;
   contentType: string | null;
@@ -53,18 +56,22 @@ export function ContentChip({ item, color }: { item: ContentItemLite; color: str
         type="button"
         onClick={() => setOpen(true)}
         title={has ? cleanCaption(item.caption!) : "Nog geen caption"}
-        className="block w-full rounded-[4px] border-l-2 bg-[var(--color-surface-sunken)] px-1.5 py-1 text-left hover:bg-[var(--color-neutral-soft)]"
+        className="flex w-full items-start gap-1.5 rounded-[4px] border-l-2 bg-[var(--color-surface-sunken)] px-1.5 py-1 text-left hover:bg-[var(--color-neutral-soft)]"
         style={{ borderLeftColor: color }}
       >
-        <span className="flex items-start gap-1">
-          <span className="block min-w-0 flex-1 truncate text-2xs leading-tight font-medium">{item.title}</span>
-          <span className="mt-0.5 size-1.5 shrink-0 rounded-full" style={{ background: has ? "var(--color-good)" : "var(--color-line-strong)" }} />
-        </span>
-        <span className="mt-0.5 flex items-center gap-1">
-          {item.platforms.slice(0, 3).map((p) => (
-            <span key={p} className="size-1.5 rounded-full" style={{ background: PLATFORM[p]?.color ?? "#999" }} />
-          ))}
-          <span className="truncate text-2xs text-[var(--color-ink-faint)]">{item.clientName}</span>
+        {/* Klantlogo altijd links op dezelfde plek — maakt de maand scanbaar. */}
+        <ClientLogo name={item.clientName} logoUrl={item.clientLogo} color={item.clientColor} size={18} />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-start gap-1">
+            <span className="block min-w-0 flex-1 truncate text-2xs leading-tight font-medium">{item.title}</span>
+            <span className="mt-0.5 size-1.5 shrink-0 rounded-full" style={{ background: has ? "var(--color-good)" : "var(--color-line-strong)" }} />
+          </span>
+          <span className="mt-0.5 flex items-center gap-1">
+            {item.platforms.slice(0, 3).map((p) => (
+              <span key={p} className="size-1.5 rounded-full" style={{ background: PLATFORM[p]?.color ?? "#999" }} />
+            ))}
+            <span className="truncate text-2xs text-[var(--color-ink-faint)]">{item.clientName}</span>
+          </span>
         </span>
       </button>
       {open ? <CaptionModal item={item} onClose={() => setOpen(false)} /> : null}
@@ -109,21 +116,24 @@ function CaptionModal({ item, onClose }: { item: ContentItemLite; onClose: () =>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-[var(--radius-lg)] bg-[var(--color-surface)] shadow-[var(--shadow-raised)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 border-b border-[var(--color-line)] p-4">
-          <div className="min-w-0">
-            <div className="truncate font-semibold">{item.title}</div>
-            <div className="text-xs text-[var(--color-ink-muted)]">
-              {item.clientName} · {fmtDate(item.scheduledOn)}{item.scheduledAt ? ` · ${item.scheduledAt.slice(0, 5)}` : ""}{item.contentType ? ` · ${item.contentType}` : ""}
-            </div>
-            {item.platforms.length > 0 ? (
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                {item.platforms.map((p) => (
-                  <span key={p} className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-2xs text-[var(--color-ink-muted)]">
-                    <span className="size-1.5 rounded-full" style={{ background: PLATFORM[p]?.color ?? "#999" }} />
-                    {PLATFORM[p]?.label ?? p}
-                  </span>
-                ))}
+          <div className="flex min-w-0 items-start gap-2.5">
+            <ClientLogo name={item.clientName} logoUrl={item.clientLogo} color={item.clientColor} size={34} />
+            <div className="min-w-0">
+              <div className="truncate font-semibold">{item.title}</div>
+              <div className="text-xs text-[var(--color-ink-muted)]">
+                {item.clientName} · {fmtDate(item.scheduledOn)}{item.scheduledAt ? ` · ${item.scheduledAt.slice(0, 5)}` : ""}{item.contentType ? ` · ${item.contentType}` : ""}
               </div>
-            ) : null}
+              {item.platforms.length > 0 ? (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {item.platforms.map((p) => (
+                    <span key={p} className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-2xs text-[var(--color-ink-muted)]">
+                      <span className="size-1.5 rounded-full" style={{ background: PLATFORM[p]?.color ?? "#999" }} />
+                      {PLATFORM[p]?.label ?? p}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
           <button type="button" onClick={onClose} className="shrink-0 rounded p-1 text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]" aria-label="Sluiten">
             <X className="size-4" />

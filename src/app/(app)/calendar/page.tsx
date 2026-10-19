@@ -4,7 +4,7 @@ import { requireInternal } from "@/server/auth/context";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { listCalendar, monthGrid, type CalendarItem } from "@/server/calendar";
 import { listClients } from "@/server/clients";
-import { Avatar, Badge, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Badge, Card, ClientLogo, EmptyState, PageHeader } from "@/components/ui";
 import { formatDateFull, periodLabel } from "@/lib/format";
 import { PLATFORM, PUBLICATION_STATUS } from "@/lib/statuses";
 import { cn } from "@/lib/cn";
@@ -156,6 +156,7 @@ export default async function CalendarPage({
         </Link>
         {chipClients.map((c) => (
           <Link key={c.id} href={withParam("klant", c.slug)} className={chip(params.klant === c.slug)}>
+            <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={18} />
             {c.name}
           </Link>
         ))}
@@ -204,7 +205,7 @@ export default async function CalendarPage({
                       <span className="text-sm text-[var(--color-ink-muted)]">{formatDateFull(i.scheduledOn)}</span>
                     )}
                   </span>
-                  <Avatar name={i.clientName} color={i.clientColor} size={22} />
+                  <ClientLogo name={i.clientName} logoUrl={i.clientLogo} color={i.clientColor} size={26} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{i.title}</span>
                     <span className="block truncate text-xs text-[var(--color-ink-muted)]">
@@ -225,6 +226,8 @@ export default async function CalendarPage({
                       caption: i.caption,
                       clientName: i.clientName,
                       clientSlug: i.clientSlug,
+                      clientLogo: i.clientLogo,
+                      clientColor: i.clientColor,
                       scheduledOn: i.scheduledOn,
                       scheduledAt: i.scheduledAt,
                       contentType: i.contentType,
@@ -306,6 +309,8 @@ export default async function CalendarPage({
                           caption: i.caption,
                           clientName: i.clientName,
                           clientSlug: i.clientSlug,
+                          clientLogo: i.clientLogo,
+                          clientColor: i.clientColor,
                           scheduledOn: i.scheduledOn,
                           scheduledAt: i.scheduledAt,
                           contentType: i.contentType,
@@ -335,7 +340,8 @@ export default async function CalendarPage({
 }
 
 function chip(active: boolean): string {
+  const base = "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium";
   return active
-    ? "rounded-full bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white"
-    : "rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]";
+    ? `${base} bg-[var(--color-indigo-ink)] text-white`
+    : `${base} border border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]`;
 }
