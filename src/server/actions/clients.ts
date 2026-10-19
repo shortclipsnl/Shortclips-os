@@ -18,6 +18,46 @@ export type ActionResult = { ok: boolean; message?: string; slug?: string };
  *  vergrendelen we ze zodat de nachtelijke sync ze met rust laat. */
 const MONDAY_MANAGED = ["name", "status", "coordinatorId", "monthlyRevenue", "startedOn"] as const;
 
+/** Edit-economie van een klant aanpassen: aantal shorts per maand (quota) en de
+ *  prijs per short (editkosten per video). Beide worden vergrendeld zodat de
+ *  Monday-sync ze niet overschrijft. */
+export async function setClientEditEconomics(
+  clientId: string,
+  input: { quota?: number | null; costPerVideo?: number | null },
+): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("clients:write");
+    const [existing] = await db
+      .select({ id: clients.id, managedFields: clients.managedFields })
+      .from(clients)
+      .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
+      .limit(1);
+    if (!existing) return { ok: false, message: "Klant niet gevonden." };
+    assertClientAccess(viewer, existing.id);
+
+    const managed = new Set<string>(existing.managedFields ?? []);
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (input.quota !== undefined) {
+      patch.monthlyVideoQuota = Math.max(0, Math.min(999, Math.round(input.quota ?? 0)));
+      managed.add("monthlyVideoQuota");
+    }
+    if (input.costPerVideo !== undefined) {
+      patch.editCostPerVideo = input.costPerVideo === null ? null : String(Math.max(0, input.costPerVideo));
+      managed.add("editCostPerVideo");
+    }
+    patch.managedFields = [...managed];
+
+    await db.update(clients).set(patch).where(eq(clients.id, existing.id));
+    await auditLog({ viewer, action: "client.edit_economics", entityType: "client", entityId: existing.id, clientId: existing.id, changes: input });
+    revalidatePath("/videos");
+    revalidatePath("/clients");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 const CLIENT_STATUSES = ["prospect", "onboarding", "active", "paused", "churned"] as const;
 type ClientStatus = (typeof CLIENT_STATUSES)[number];
 

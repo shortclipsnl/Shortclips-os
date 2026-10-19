@@ -199,9 +199,9 @@ function ProjectRow({ p, editors, canEdit, canAssign, phaseColor }: { p: Editing
   return (
     <div className="grid items-stretch gap-px border-b border-[var(--color-line)] bg-[var(--color-surface)] text-sm hover:bg-[var(--color-surface-sunken)]/40" style={{ gridTemplateColumns: GRID }}>
       {/* Item (klant) */}
-      <div className="flex items-center gap-2 px-2 py-1.5" style={{ boxShadow: `inset 3px 0 0 ${battery}` }}>
-        <Link href={`/clients/${p.clientSlug}?tab=opnames`} className="flex min-w-0 items-center gap-2 font-medium hover:underline">
-          <ClientLogo name={p.clientName} logoUrl={p.clientLogo} color={p.clientColor} size={22} />
+      <div className="flex items-center gap-2.5 px-2.5 py-2" style={{ boxShadow: `inset 3px 0 0 ${battery}` }}>
+        <Link href={`/clients/${p.clientSlug}?tab=opnames`} className="flex min-w-0 items-center gap-2.5 font-medium hover:underline">
+          <ClientLogo name={p.clientName} logoUrl={p.clientLogo} color={p.clientColor} size={32} />
           <span className="truncate">{p.clientName}</span>
         </Link>
       </div>
@@ -214,14 +214,14 @@ function ProjectRow({ p, editors, canEdit, canAssign, phaseColor }: { p: Editing
             disabled={pending}
             onChange={(e) => run(() => setProjectEditor(p.id, e.target.value || null))}
             aria-label="Editor"
-            className="h-full w-full cursor-pointer rounded-[4px] border-0 px-2 text-center text-xs font-semibold text-white outline-none"
+            className="h-full w-full cursor-pointer rounded-[4px] border-0 px-2 text-center text-sm font-bold text-white outline-none"
             style={{ background: p.editorId ? ecolor : "var(--color-surface-2)", color: p.editorId ? "#fff" : "var(--color-ink-muted)" }}
           >
             <option value="">Geen editor</option>
             {editors.map((ed) => <option key={ed.id} value={ed.id}>{ed.fullName.split(" ")[0]}</option>)}
           </select>
         ) : (
-          <div className="grid h-full place-items-center rounded-[4px] text-xs font-semibold text-white" style={{ background: p.editorId ? ecolor : "var(--color-surface-2)" }}>
+          <div className="grid h-full place-items-center rounded-[4px] text-sm font-bold text-white" style={{ background: p.editorId ? ecolor : "var(--color-surface-2)" }}>
             {p.editorName?.split(" ")[0] ?? "—"}
           </div>
         )}

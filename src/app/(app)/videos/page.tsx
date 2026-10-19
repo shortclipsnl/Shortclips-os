@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ExternalLink, MessageSquare } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
-import { getReviewQueue, getVideoHighlights, listEditorOptions, listVideos, type ReviewQueueItem } from "@/server/videos";
+import { getVideoHighlights, listEditorOptions, listVideos } from "@/server/videos";
 import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { listEditingProjects } from "@/server/editing-board";
 import { isBoardEditor } from "@/server/edit-board-editors";
 import { listClients } from "@/server/clients";
 import { ShootTimers } from "../editing/shoot-timers";
 import { WorkloadSection } from "../editing/workload-section";
-import { Card, ClientLogo, PageHeader } from "@/components/ui";
+import { Card, PageHeader } from "@/components/ui";
 import { EditingProjects } from "./editing-projects";
 
 export const metadata: Metadata = { title: "Editing" };
@@ -29,7 +29,7 @@ export default async function VideosPage({
       ? undefined
       : "actief";
 
-  const [rows, highlights, reviewQueue, editors, shoots, editingProjects, clientList] = await Promise.all([
+  const [rows, highlights, editors, shoots, editingProjects, clientList] = await Promise.all([
     listVideos(viewer, {
       preset,
       status: params.status,
@@ -37,7 +37,6 @@ export default async function VideosPage({
       editorId: params.editor,
     }),
     getVideoHighlights(viewer),
-    getReviewQueue(viewer),
     listEditorOptions(),
     getShootDeadlines(viewer),
     listEditingProjects(viewer),
@@ -129,90 +128,9 @@ export default async function VideosPage({
           items={highlights.awaitingEditorList.map((v) => ({ id: v.id, primary: v.editorName ?? "Geen editor", secondary: v.title, meta: `${Number(v.days)} d bij editor` }))} empty="Niets bij een editor" />
       </div>
 
-      {/* Video's om te checken — interne controle, automatisch gevuld uit de pipeline. */}
-      <ReviewQueue queue={reviewQueue} />
-
       {/* Editorbelasting & tarieven — samengevoegd vanuit de oude /editing-pagina. */}
       <WorkloadSection viewer={viewer} />
     </div>
-  );
-}
-
-function ReviewQueue({ queue }: { queue: { teControleren: ReviewQueueItem[]; feedbackOntvangen: ReviewQueueItem[]; goedgekeurd: ReviewQueueItem[] } }) {
-  const groups = [
-    { key: "check", title: "Te controleren", hint: "klaar voor interne controle", accent: "var(--color-brand-600)", items: queue.teControleren, empty: "Niets te controleren" },
-    { key: "feedback", title: "Feedback ontvangen", hint: "editor verwerkt de interne feedback", accent: "var(--color-warn)", items: queue.feedbackOntvangen, empty: "Geen feedback openstaand" },
-    { key: "approved", title: "Goedgekeurd", hint: "intern akkoord", accent: "var(--color-good)", items: queue.goedgekeurd, empty: "Nog niets goedgekeurd" },
-  ] as const;
-  const total = queue.teControleren.length + queue.feedbackOntvangen.length + queue.goedgekeurd.length;
-
-  return (
-    <Card padded={false} className="mb-5 overflow-hidden ring-1 ring-[var(--color-violet)]/25">
-      <div className="flex items-center justify-between gap-2 bg-[var(--color-violet)] px-5 py-3 text-white">
-        <div>
-          <h2 className="text-base font-bold tracking-tight">Video&apos;s om te checken</h2>
-          <p className="text-xs text-white/70">Automatisch gevuld zodra een video klaarstaat voor controle. Klik door naar Frame.io.</p>
-        </div>
-        <span className="shrink-0 rounded-full bg-white/15 px-2.5 py-0.5 text-sm font-semibold">{total}</span>
-      </div>
-      <div className="grid gap-px bg-[var(--color-line)] lg:grid-cols-3">
-        {groups.map((g) => (
-          <div key={g.key} className="bg-[var(--color-surface)]">
-            <div className="flex items-center justify-between gap-2 px-4 py-2.5">
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <span className="size-2.5 rounded-full" style={{ background: g.accent }} />
-                {g.title}
-              </span>
-              <span className="text-2xs text-[var(--color-ink-faint)]">{g.items.length}</span>
-            </div>
-            <p className="px-4 pb-2 text-2xs text-[var(--color-ink-faint)]">{g.hint}</p>
-            {g.items.length === 0 ? (
-              <p className="px-4 pb-4 text-xs text-[var(--color-ink-faint)]">{g.empty}</p>
-            ) : (
-              <ul className="divide-y divide-[var(--color-line)] border-t border-[var(--color-line)]">
-                {g.items.map((v) => <ReviewRow key={v.id} v={v} accent={g.accent} />)}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function ReviewRow({ v, accent }: { v: ReviewQueueItem; accent: string }) {
-  const comments = Number(v.openComments);
-  const days = Number(v.days);
-  return (
-    <li className="flex items-center gap-2 px-4 py-2.5">
-      <Link href={`/videos/${v.id}`} className="flex min-w-0 flex-1 items-center gap-2.5">
-        <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={24} />
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium">{v.title}</span>
-          <span className="block truncate text-xs text-[var(--color-ink-muted)]">
-            {v.clientName}{v.editorName ? ` · ${v.editorName}` : ""} · {days} d
-          </span>
-        </span>
-      </Link>
-      {comments > 0 ? (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-surface-sunken)] px-2 py-0.5 text-2xs font-medium text-[var(--color-ink-muted)]" title={`${comments} open opmerkingen`}>
-          <MessageSquare className="size-3" /> {comments}
-        </span>
-      ) : null}
-      {v.frameUrl ? (
-        <a
-          href={v.frameUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-1 text-2xs font-medium text-[var(--color-brand-600)] hover:bg-[var(--color-surface-sunken)]"
-          title="Open in Frame.io"
-        >
-          Frame.io <ExternalLink className="size-3" />
-        </a>
-      ) : (
-        <span className="shrink-0 text-2xs text-[var(--color-ink-faint)]">geen Frame.io</span>
-      )}
-    </li>
   );
 }
 
