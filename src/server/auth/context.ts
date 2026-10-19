@@ -194,6 +194,24 @@ export async function requireManageClients(): Promise<Viewer> {
 }
 
 /**
+ * SOP's en cursussen in de kennisbank schrijven: de eigenaar én
+ * projectcoördinatoren (Jarno, Milou, Jiska, Tim …). Zo hoeft niet alles via
+ * de eigenaar te lopen. Rolgebaseerd, net als klantbeheer.
+ */
+export function canAuthorKennisbank(viewer: Viewer | null): boolean {
+  if (!viewer) return false;
+  return isOwner(viewer) || viewer.primaryRole === "project_coordinator";
+}
+
+export async function requireAuthorKennisbank(): Promise<Viewer> {
+  const viewer = await requireInternal();
+  if (!canAuthorKennisbank(viewer)) {
+    throw new ForbiddenError("De kennisbank beheren kan de eigenaar en projectcoördinatoren.");
+  }
+  return viewer;
+}
+
+/**
  * Bouwt een WHERE-conditie die queries beperkt tot de klanten die deze viewer
  * mag zien. Gebruik dit in élke query op klantgebonden tabellen.
  */

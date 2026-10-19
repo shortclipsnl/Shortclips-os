@@ -99,6 +99,15 @@ export default async function CoursePage({
                 <h2 className="min-w-0 text-xl font-bold tracking-tight text-[var(--color-ink)] sm:text-2xl">{lesson.title}</h2>
                 <div className="flex items-center gap-2">
                   <CompleteButton lessonId={lesson.id} completed={completed} />
+                  <a
+                    href={`/api/kennisbank/${courseId}/lessons/${lesson.id}/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Deze SOP als PDF downloaden"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-surface-2)]"
+                  >
+                    <Download className="h-3.5 w-3.5" /> PDF
+                  </a>
                   {manage ? (
                     <Link href={`/kennisbank/${courseId}?les=${lesson.id}&bewerk=1`} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-surface-2)]">
                       <Pencil className="h-3.5 w-3.5" /> Bewerken

@@ -3,9 +3,11 @@ import Link from "next/link";
 import { Lock, EyeOff } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { canManageKennisbank, listCourses } from "@/server/kennisbank";
+import { aiConfigured } from "@/server/ai/client";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { KbProgressBar } from "@/components/kennisbank/progress-bar";
 import { CourseAdminMenu, NewCourseCard } from "./admin-ui";
+import { SopMaker } from "./sop-maker";
 
 export const metadata: Metadata = { title: "Shortclips Kennisbank" };
 export const dynamic = "force-dynamic";
@@ -22,9 +24,12 @@ export default async function KennisbankPage() {
         description="Onze bedrijfsprocessen, werkinstructies, trainingen en SOP's op één plek."
         actions={
           manage ? (
-            <Link href="/kennisbank/migratie" className="rounded-md border border-[var(--color-line-strong)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-surface-2)]">
-              Migratiestatus
-            </Link>
+            <div className="flex items-center gap-2">
+              <SopMaker courses={courses.map((c) => ({ id: c.id, title: c.title }))} aiReady={aiConfigured()} />
+              <Link href="/kennisbank/migratie" className="rounded-md border border-[var(--color-line-strong)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-surface-2)]">
+                Migratiestatus
+              </Link>
+            </div>
           ) : null
         }
       />

@@ -5,18 +5,21 @@ import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { kbChapters, kbCourses, kbLessonRevisions, kbLessons, kbProgress, type KbDoc } from "@/db/schema";
-import { ForbiddenError, requireInternal, requireOwner } from "@/server/auth/context";
+import { ForbiddenError, requireAuthorKennisbank, requireInternal } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { canSeeCourse } from "@/server/kennisbank";
 import { docToPlainText, type PMDoc } from "@/lib/kennisbank-doc";
+import { runJsonPrompt } from "@/server/ai/client";
+import { centralKnowledgeText } from "@/server/ai/knowledge";
 
 /**
  * Beheeracties van de Shortclips Kennisbank.
  *
- * Elke schrijfactie begint met `requireOwner()`: alleen Jarno (rol owner) mag
- * de kennisbank wijzigen. Dat geldt ook voor directe aanroepen buiten de
- * interface om — een server action is gewoon een POST-verzoek, dus de controle
- * zit hier en niet in het verbergen van knoppen.
+ * Elke schrijfactie begint met `requireAuthorKennisbank()`: de eigenaar én
+ * projectcoördinatoren (Jarno, Milou, Jiska, Tim …) mogen de kennisbank
+ * wijzigen. Dat geldt ook voor directe aanroepen buiten de interface om — een
+ * server action is gewoon een POST-verzoek, dus de controle zit hier en niet in
+ * het verbergen van knoppen.
  *
  * Uitzondering: voortgang (les afronden) mag iedere interne gebruiker, en
  * uitsluitend voor zichzelf.
@@ -77,7 +80,7 @@ const courseSchema = z.object({
 
 export async function createCourse(input: z.input<typeof courseSchema>): Promise<KbActionResult> {
   return guard(async () => {
-    const viewer = await requireOwner();
+    const viewer = await requireAuthorKennisbank();
     const data = courseSchema.parse(input);
     const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${kbCourses.sortOrder}), 0)::int` }).from(kbCourses).where(isNull(kbCourses.deletedAt));
     const [created] = await db
@@ -92,7 +95,7 @@ export async function createCourse(input: z.input<typeof courseSchema>): Promise
 
 export async function updateCourse(courseId: string, input: z.input<typeof courseSchema>): Promise<KbActionResult> {
   return guard(async () => {
-    const viewer = await requireOwner();
+    const viewer = await requireAuthorKennisbank();
     uuid.parse(courseId);
     const data = courseSchema.parse(input);
     await db
@@ -107,7 +110,7 @@ export async function updateCourse(courseId: string, input: z.input<typeof cours
 
 export async function deleteCourse(courseId: string): Promise<KbActionResult> {
   return guard(async () => {
-    const viewer = await requireOwner();
+    const viewer = await requireAuthorKennisbank();
     uuid.parse(courseId);
     // Soft delete: herstelbaar, niets wordt definitief gewist.
     await db.update(kbCourses).set({ deletedAt: new Date(), updatedById: viewer.id }).where(eq(kbCourses.id, courseId));
@@ -120,7 +123,7 @@ export async function deleteCourse(courseId: string): Promise<KbActionResult> {
 /** Cursus één plek omhoog (-1) of omlaag (+1). */
 export async function moveCourse(courseId: string, direction: -1 | 1): Promise<KbActionResult> {
   return guard(async () => {
-    const viewer = await requireOwner();
+    const viewer = await requireAuthorKennisbank();
     uuid.parse(courseId);
     const rows = await db.select({ id: kbCourses.id }).from(kbCourses).where(isNull(kbCourses.deletedAt)).orderBy(asc(kbCourses.sortOrder), asc(kbCourses.createdAt));
     const ids = rows.map((r) => r.id);
@@ -150,7 +153,7 @@ async function topLevel(courseId: string) {
 
 export async function createChapter(courseId: string, title: string): Promise<KbActionResult> {
   return guard(async () => {
-    const viewer = await requireOwner();
+    const viewer = await requireAuthorKennisbank();
     uuid.parse(courseId);
     const t = z.string().trim().min(1, "Geef het hoofdstuk een naam.").max(300).parse(title);
     const top = await topLevel(courseId);
@@ -164,7 +167,7 @@ export async function createChapter(courseId: string, title: string): Promise<Kb
 
 export async function renameChapter(chapterId: string, title: string): Promise<KbActionResult> {
   return guard(async () => {
-    const viewer = await requireOwner();
+    const viewer = await requireAuthorKennisbank();
     uuid.parse(chapterId);
     const t = z.string().trim().min(1, "Geef het hoofdstuk een naam.").max(300).parse(title);
     const [row] = await db.update(kbChapters).set({ title: t, updatedById: viewer.id, updatedAt: new Date() }).where(eq(kbChapters.id, chapterId)).returning({ courseId: kbChapters.courseId });
@@ -176,7 +179,7 @@ export async function renameChapter(chapterId: string, title: string): Promise<K
 
 export async function deleteChapter(chapterId: string): Promise<KbActionResult> {
   return guard(async () => {
-    const viewer = await requireOwner();
+    const viewer = await requireAuthorKennisbank();
     uuid.parse(chapterId);
     const now = new Date();
     const [row] = await db.update(kbChapters).set({ deletedAt: now, updatedById: viewer.id }).where(eq(kbChapters.id, chapterId)).returning({ courseId: kbChapters.courseId });
@@ -190,7 +193,7 @@ export async function deleteChapter(chapterId: string): Promise<KbActionResult> 
 /** Hoofdstuk (of losse les op cursusniveau) een plek omhoog/omlaag. */
 export async function moveTopLevel(courseId: string, itemId: string, direction: -1 | 1): Promise<KbActionResult> {
   return guard(async () => {
-    const viewer = await requireOwner();
+    const viewer = await requireAuthorKennisbank();
     uuid.parse(courseId);
     uuid.parse(itemId);
     const top = await topLevel(courseId);
@@ -214,7 +217,7 @@ export async function moveTopLevel(courseId: string, itemId: string, direction: 
 
 export async function createLesson(courseId: string, chapterId: string | null, title: string): Promise<KbActionResult> {
   return guard(async () => {
-    const viewer = await requireOwner();
+    const viewer = await requireAuthorKennisbank();
     uuid.parse(courseId);
     if (chapterId) uuid.parse(chapterId);
     const t = z.string().trim().min(1, "Geef de les een titel.").max(300).parse(title);
@@ -259,7 +262,7 @@ const lessonSchema = z.object({
  */
 export async function saveLesson(lessonId: string, input: z.input<typeof lessonSchema>): Promise<KbActionResult> {
   return guard(async () => {
-    const viewer = await requireOwner();
+    const viewer = await requireAuthorKennisbank();
     uuid.parse(lessonId);
     const data = lessonSchema.parse(input);
     const json = JSON.stringify(data.content);
@@ -300,7 +303,7 @@ export async function saveLesson(lessonId: string, input: z.input<typeof lessonS
 
 export async function deleteLesson(lessonId: string): Promise<KbActionResult> {
   return guard(async () => {
-    const viewer = await requireOwner();
+    const viewer = await requireAuthorKennisbank();
     uuid.parse(lessonId);
     const [row] = await db.update(kbLessons).set({ deletedAt: new Date(), updatedById: viewer.id }).where(eq(kbLessons.id, lessonId)).returning({ courseId: kbLessons.courseId });
     await auditLog({ viewer, action: "kennisbank.lesson.delete", entityType: "kb_lesson", entityId: lessonId });
@@ -312,7 +315,7 @@ export async function deleteLesson(lessonId: string): Promise<KbActionResult> {
 /** Les binnen een hoofdstuk omhoog/omlaag, of naar een ander hoofdstuk verplaatsen. */
 export async function moveLesson(lessonId: string, move: { direction?: -1 | 1; toChapterId?: string | null }): Promise<KbActionResult> {
   return guard(async () => {
-    const viewer = await requireOwner();
+    const viewer = await requireAuthorKennisbank();
     uuid.parse(lessonId);
     const [lesson] = await db.select().from(kbLessons).where(eq(kbLessons.id, lessonId)).limit(1);
     if (!lesson) return { ok: false, message: "Les niet gevonden." };
@@ -353,7 +356,7 @@ export async function moveLesson(lessonId: string, move: { direction?: -1 | 1; t
 /** Een eerdere versie van een les terugzetten (de huidige wordt eerst bewaard). */
 export async function restoreRevision(revisionId: string): Promise<KbActionResult> {
   return guard(async () => {
-    await requireOwner();
+    await requireAuthorKennisbank();
     uuid.parse(revisionId);
     const [rev] = await db.select().from(kbLessonRevisions).where(eq(kbLessonRevisions.id, revisionId)).limit(1);
     if (!rev) return { ok: false, message: "Versie niet gevonden." };
@@ -366,4 +369,82 @@ export async function restoreRevision(revisionId: string): Promise<KbActionResul
       isPublished: lesson?.isPublished ?? true,
     });
   }) as Promise<KbActionResult>;
+}
+
+/* ------------------------------ SOP-maker ------------------------------ */
+
+/** Hoofdstukken van een cursus — voor de categoriekeuze in de SOP-maker. */
+export async function kennisbankChaptersForCourse(courseId: string): Promise<{ ok: boolean; chapters: { id: string; title: string }[] }> {
+  try {
+    await requireAuthorKennisbank();
+    uuid.parse(courseId);
+    const rows = await db
+      .select({ id: kbChapters.id, title: kbChapters.title })
+      .from(kbChapters)
+      .where(and(eq(kbChapters.courseId, courseId), isNull(kbChapters.deletedAt)))
+      .orderBy(asc(kbChapters.sortOrder), asc(kbChapters.createdAt));
+    return { ok: true, chapters: rows };
+  } catch {
+    return { ok: false, chapters: [] };
+  }
+}
+
+type SopGen = { intro?: string; sections?: { heading?: string; paragraphs?: string[]; steps?: string[] }[] };
+
+function sopText(t: string) {
+  return t ? [{ type: "text", text: t }] : [];
+}
+function sopPara(t: string) {
+  return { type: "paragraph", content: sopText(t) };
+}
+/** Gestructureerde AI-uitvoer → TipTap-document voor de les-editor. */
+function sopToDoc(d: SopGen): KbDoc {
+  const content: unknown[] = [];
+  if (d.intro?.trim()) content.push(sopPara(d.intro.trim()));
+  for (const s of d.sections ?? []) {
+    if (s.heading?.trim()) content.push({ type: "heading", attrs: { level: 2 }, content: sopText(s.heading.trim()) });
+    for (const p of s.paragraphs ?? []) if (p?.trim()) content.push(sopPara(p.trim()));
+    const steps = (s.steps ?? []).filter((x) => x?.trim());
+    if (steps.length) {
+      content.push({
+        type: "orderedList",
+        content: steps.map((st) => ({ type: "listItem", content: [sopPara(st.trim())] })),
+      });
+    }
+  }
+  if (content.length === 0) content.push(sopPara(""));
+  return { type: "doc", content } as KbDoc;
+}
+
+export type SopGenResult =
+  | { ok: true; content: KbDoc }
+  | { ok: false; reason?: "no_provider"; message: string };
+
+/**
+ * Genereert automatisch een concept-SOP in onze huisstijl op basis van een korte
+ * omschrijving van de taak. Zonder AI-sleutel komt er een nette melding terug en
+ * maak je de SOP gewoon handmatig in de editor.
+ */
+export async function generateSop(input: { title?: string; topic?: string }): Promise<SopGenResult> {
+  try {
+    await requireAuthorKennisbank();
+    const title = (input.title ?? "").trim();
+    const topic = (input.topic ?? "").trim();
+    if (!title && !topic) return { ok: false, message: "Beschrijf kort waar de SOP over gaat." };
+
+    const house = await centralKnowledgeText(["schrijfstijl", "branding", "algemeen", "productie", "kwaliteit"]);
+    const system = `Je bent de interne kennisbank-redacteur van Shortclips, een Nederlands bureau voor korte video's. Je schrijft heldere, praktische SOP's (werkinstructies) in natuurlijk, vlot Nederlands — precies zoals het team zelf schrijft, nooit stijve AI-taal. Je verzint geen feiten, cijfers, namen, tools, prijzen of afspraken; blijf bij wat algemeen geldt voor het beschreven proces en houd het concreet en uitvoerbaar.${house ? `\n\nONZE HUISSTIJL EN WERKWIJZE:\n${house}` : ""}`;
+    const user = `Schrijf een complete, praktische SOP voor:\nTitel: ${title || topic}\nOnderwerp/taak: ${topic || title}\n\nBegin met een korte inleiding (1-2 zinnen: waarom en wanneer gebruik je dit). Daarna logische secties met een duidelijke kop. Geef per sectie óf korte genummerde stappen (imperatief: "Doe X") óf korte alinea's. Houd het bondig en direct toepasbaar voor een teamlid.\n\nAntwoord UITSLUITEND als JSON in deze vorm:\n{"intro":"...","sections":[{"heading":"...","steps":["stap 1","stap 2"]},{"heading":"...","paragraphs":["korte uitleg"]}]}`;
+
+    const res = await runJsonPrompt<SopGen>({ system, user, maxTokens: 2500 });
+    if (!res.ok) {
+      return res.reason === "no_provider"
+        ? { ok: false, reason: "no_provider", message: "Er is nog geen AI-sleutel ingesteld. Maak de SOP handmatig aan en schrijf hem in de editor." }
+        : { ok: false, message: res.error ?? "Automatisch genereren is niet gelukt." };
+    }
+    return { ok: true, content: sopToDoc(res.data) };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
 }

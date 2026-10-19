@@ -2,18 +2,19 @@ import "server-only";
 import { and, asc, eq, inArray, isNull, or, ilike, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { kbChapters, kbCourses, kbLessons, kbProgress, type KbDoc, type KbResource } from "@/db/schema";
-import { isOwner, type Viewer } from "@/server/auth/context";
+import { canAuthorKennisbank, type Viewer } from "@/server/auth/context";
 
 /**
  * Leeslaag van de Shortclips Kennisbank.
  *
  * Lezen: iedere interne gebruiker (medewerkers en freelancers).
- * Beheren: uitsluitend de eigenaar — afgedwongen in `src/server/actions/kennisbank.ts`
- * en in de upload-route, niet alleen in de interface.
+ * Beheren: de eigenaar én projectcoördinatoren (zodat ook Milou/Jiska/Tim SOP's
+ * kunnen maken) — afgedwongen in `src/server/actions/kennisbank.ts` en in de
+ * upload-route, niet alleen in de interface.
  */
 
 export function canManageKennisbank(viewer: Viewer | null): boolean {
-  return isOwner(viewer);
+  return canAuthorKennisbank(viewer);
 }
 
 type CourseRow = typeof kbCourses.$inferSelect;

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { kbAssetParts, kbAssets, KB_PART_SIZE } from "@/db/schema";
-import { getViewer, isOwner } from "@/server/auth/context";
+import { getViewer, canAuthorKennisbank } from "@/server/auth/context";
 import { canViewAsset } from "@/server/kennisbank";
 import { streamAssetRange } from "@/server/kennisbank-assets";
 
@@ -22,7 +22,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (!UUID.test(id)) return new Response("Niet gevonden", { status: 404 });
 
   const [asset] = await db.select().from(kbAssets).where(eq(kbAssets.id, id)).limit(1);
-  if (!asset || (!asset.isComplete && !isOwner(viewer))) return new Response("Niet gevonden", { status: 404 });
+  if (!asset || (!asset.isComplete && !canAuthorKennisbank(viewer))) return new Response("Niet gevonden", { status: 404 });
   if (!(await canViewAsset(viewer, id))) return new Response("Niet toegestaan", { status: 403 });
 
   const size = asset.byteSize;
@@ -64,7 +64,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 /** Eén deel van een upload (alleen de eigenaar). Body = ruwe bytes, max. 3 MB. */
 export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const viewer = await getViewer();
-  if (!viewer || !isOwner(viewer)) return Response.json({ ok: false, message: "Alleen de eigenaar mag bestanden uploaden." }, { status: 403 });
+  if (!viewer || !canAuthorKennisbank(viewer)) return Response.json({ ok: false, message: "Alleen de eigenaar en projectcoördinatoren mogen bestanden uploaden." }, { status: 403 });
   const { id } = await ctx.params;
   if (!UUID.test(id)) return Response.json({ ok: false }, { status: 404 });
   const part = Number(new URL(req.url).searchParams.get("part"));
