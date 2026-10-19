@@ -49,12 +49,22 @@ export default async function MeetingsPage() {
           <span className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium">Open de meeting →</span>
         </Link>
 
-        {/* Duidelijke oproep: zet hier je bespreekpunten neer voor de meeting. */}
+        {/* Duidelijke oproep + voorbeelden: wat zet je neer als bespreekpunt? */}
         <div className="px-4 pt-3">
           <p className="text-sm font-semibold">Zet hier je bespreekpunten neer</p>
           <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
             Heb je iets te bespreken? Voeg het de hele week door toe — dan behandelen we het samen tijdens de vaste teammeeting.
           </p>
+          <div className="mt-2.5 rounded-[var(--radius-sm)] border border-[var(--color-info)]/25 bg-[var(--color-info-soft)]/60 px-3 py-2.5 text-xs text-[var(--color-ink)]">
+            <p className="font-semibold">Waar kun je aan denken?</p>
+            <ul className="mt-1 space-y-1 text-[var(--color-ink-muted)]">
+              <li className="flex gap-2"><span className="text-[var(--color-info)]">•</span><span>Loop je ergens tegenaan? (een proces, een tool, de samenwerking)</span></li>
+              <li className="flex gap-2"><span className="text-[var(--color-info)]">•</span><span>Denk je dat iets beter kan bij ShortClips? Deel je idee of verbeterpunt.</span></li>
+              <li className="flex gap-2"><span className="text-[var(--color-info)]">•</span><span>Gaat het over een specifieke klant? <strong>Noem de klant erbij</strong>, zodat het meteen duidelijk is.</span></li>
+              <li className="flex gap-2"><span className="text-[var(--color-info)]">•</span><span>Een vraag, knelpunt of iets waarvan je vindt dat we het samen moeten bespreken.</span></li>
+            </ul>
+            <p className="mt-1.5 text-2xs text-[var(--color-ink-faint)]">Kort en concreet is prima — we behandelen het tijdens de volgende teammeeting.</p>
+          </div>
         </div>
         <AddItemForm meetingId={weeklyId} kind="agenda" members={members} />
       </Card>
