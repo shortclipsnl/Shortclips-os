@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { FileDown } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getScript } from "@/server/scripts";
 import { Avatar, Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
@@ -64,6 +65,26 @@ export default async function ScriptPage({
             {script.pillar ? <span>· {script.pillar}</span> : null}
             {script.shootOn ? <span>· opname {formatDate(script.shootOn)}</span> : null}
           </span>
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={`/api/scripts/export?script=${script.id}`}
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--color-indigo-soft)]"
+              title="Dit script downloaden als Word-document in de Shortclips-opmaak"
+            >
+              <FileDown className="size-4" /> Download Word
+            </a>
+            {script.productionDayId ? (
+              <a
+                href={`/api/scripts/export?session=${script.productionDayId}`}
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--color-surface-sunken)]"
+                title="Alle scripts van deze opnamesessie in één Word-document"
+              >
+                <FileDown className="size-4" /> Exporteer opnamesessie
+              </a>
+            ) : null}
+          </div>
         }
       />
 
