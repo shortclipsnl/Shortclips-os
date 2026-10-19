@@ -216,6 +216,12 @@ export async function createClient(input: ClientInput): Promise<ActionResult> {
     const slug = await uniqueSlug(name);
     const status: ClientStatus = input.status ?? "active";
 
+    // Een actieve klant moet een verantwoordelijke (coördinator) hebben — zo
+    // blijft geen enkele klant zonder eigenaar staan.
+    if (status === "active" && !input.coordinatorId) {
+      return { ok: false, message: "Kies een verantwoordelijke (coördinator) voor deze klant." };
+    }
+
     // Handmatig aangemaakte klant: de Monday-velden die we nu invullen
     // vergrendelen, zodat een latere Monday-match ze niet overschrijft.
     const managed = new Set<string>(["name", "status"]);

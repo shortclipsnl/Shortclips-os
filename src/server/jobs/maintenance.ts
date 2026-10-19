@@ -480,24 +480,31 @@ export async function runClientsWithoutShootSignal() {
       id: string; name: string; slug: string; coordinator_id: string | null; quota: number; last_shoot: string | null; voorraad: number;
     }>;
 
+    // Per coördinator bundelen: één melding met alle klanten zonder opname,
+    // i.p.v. een stortvloed van (bijna) identieke losse meldingen.
+    const byCoord = new Map<string, string[]>();
     for (const c of rows) {
       ctx.counters.processed++;
       // Voldoende voorraad (minstens één maand publicaties klaar) → geen waarschuwing.
       if (c.voorraad >= Math.max(c.quota, 1)) continue;
       if (!c.coordinator_id) continue; // zonder verantwoordelijke geen gerichte melding
+      const list = byCoord.get(c.coordinator_id) ?? [];
+      list.push(c.name);
+      byCoord.set(c.coordinator_id, list);
+    }
+    for (const [coordId, names] of byCoord) {
       await notify({
-        userIds: [c.coordinator_id],
-        clientId: c.id,
+        userIds: [coordId],
         type: "client_without_shoot",
         level: "warning",
-        title: `${c.name} heeft geen volgende opname gepland`,
-        body: `${c.last_shoot ? `Laatste opname ${c.last_shoot}. ` : ""}Voorraad: ${c.voorraad} video('s). Plan een opnamedag in.`,
-        href: `/clients/${c.slug}`,
-        dedupeKey: `client_without_shoot:${c.id}:${week}`,
+        title: names.length === 1 ? `${names[0]} heeft geen volgende opname gepland` : `${names.length} klanten zonder geplande opname`,
+        body: names.length === 1 ? "Plan een opnamedag in." : `${names.join(", ")} → plan opnamedagen in.`,
+        href: "/productions",
+        dedupeKey: `client_without_shoot:${coordId}:${week}`,
       });
       ctx.counters.updated++;
     }
-    ctx.log(`${ctx.counters.updated} coördinator-meldingen voor klanten zonder opname`);
+    ctx.log(`${ctx.counters.updated} gebundelde meldingen voor klanten zonder opname`);
   });
 }
 

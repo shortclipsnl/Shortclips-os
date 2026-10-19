@@ -54,9 +54,12 @@ export async function WorkloadSection({ viewer }: { viewer: Viewer }) {
                       {level.label}
                       {e.leave ? <span className="rounded-full bg-[var(--color-warn-soft)] px-1.5 py-0.5 text-2xs font-medium text-[#8a5300]">afwezig {formatDate(e.leave.start_on)}–{formatDate(e.leave.end_on)}</span> : null}
                     </div>
-                    <div className="mt-0.5 text-xs font-semibold text-[var(--color-ink)]">
-                      {rate > 0 ? `${euro(rate)} per short` : <span className="font-normal text-[var(--color-ink-faint)]">prijs niet ingesteld</span>}
-                    </div>
+                    {/* Tarief per short: alleen zichtbaar voor de eigenaar (financieel). */}
+                    {canSeeCosts ? (
+                      <div className="mt-0.5 text-xs font-semibold text-[var(--color-ink)]">
+                        {rate > 0 ? `${euro(rate)} per short` : <span className="font-normal text-[var(--color-ink-faint)]">prijs niet ingesteld</span>}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold leading-none tabular-nums">{open}</div>
@@ -91,8 +94,8 @@ export async function WorkloadSection({ viewer }: { viewer: Viewer }) {
       {/* Per klant — met editor-filterknoppen en een aanpasbare editor per klant. */}
       <PerClientEditors clients={data.clients} canManage={canManage} canSeeCosts={canSeeCosts} />
 
-      {/* Editor-tarieven beheer */}
-      {canManage ? (
+      {/* Editor-tarieven beheer — alleen de eigenaar (financieel). */}
+      {canSeeCosts ? (
         <Card padded={false}>
           <CardHeader title="Prijs per editor & capaciteit" subtitle="De prijs per short en de weekcapaciteit per editor. Hiermee worden de editkosten automatisch berekend." className="p-5 pb-2" />
           {editors.length === 0 ? <EmptyState title="Geen editors gevonden" /> : (

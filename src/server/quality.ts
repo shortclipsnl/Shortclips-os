@@ -327,12 +327,14 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
     });
   }
 
-  // Actieve klanten zonder geplande opname.
-  for (const c of data.clients.withoutShoot) {
+  // Actieve klanten zonder geplande opname — gebundeld tot één melding.
+  if (data.clients.withoutShoot.length > 0) {
+    const names = data.clients.withoutShoot.map((c) => c.name);
     items.push({
-      id: `noshoot-${c.id}`, severity: "oranje", category: "Geen opname gepland",
-      title: c.name, detail: `Geen opnamedag gepland${c.lastShoot ? ` · laatst ${c.lastShoot}` : ""} → opname plannen`,
-      href: `/clients/${c.slug}`, roles: SHOOT,
+      id: "noshoot-all", severity: "oranje", category: "Geen opname gepland",
+      title: `${names.length} klant${names.length === 1 ? "" : "en"} zonder geplande opname`,
+      detail: `${names.slice(0, 6).join(", ")}${names.length > 6 ? ` +${names.length - 6} meer` : ""} → opnames inplannen`,
+      href: "/productions", roles: SHOOT,
     });
   }
 

@@ -32,6 +32,7 @@ import { seedAutomationRules } from "@/server/jobs/automations-seed";
 import { runProductionPhaseAdvance } from "@/server/jobs/production-phases";
 import { runLinkSuggestions } from "@/server/jobs/link-suggestions";
 import { runContentSync } from "@/server/jobs/content-sync";
+import { runAutoPublishDueContent } from "@/server/jobs/content-publish";
 import { runTaskArchive } from "@/server/jobs/task-archive";
 import { snapshotFinanceMonth } from "@/server/jobs/finance-snapshot";
 import { curateTeam } from "@/server/jobs/team-curate";
@@ -87,6 +88,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "production.advance_phases": runProductionPhaseAdvance,
   "editing.suggest_opname_links": runLinkSuggestions,
   "content.sync_from_videos": runContentSync,
+  "content.auto_publish_due": runAutoPublishDueContent,
   "tasks.archive_done": runTaskArchive,
   "reports.generate_drafts": runMonthlyReportDrafts,
   "drive.sync_all": runDriveSync,
