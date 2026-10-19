@@ -71,6 +71,20 @@ export function AssistantConsole({ firstName, aiReady }: { firstName: string; ai
         </form>
       </Card>
 
+      {/* Antwoord — direct onder de vraag. */}
+      {pending ? (
+        <Card><p className="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]"><Loader2 className="size-4 animate-spin" /> Even zoeken in de Hub…</p></Card>
+      ) : asked ? (
+        "error" in asked ? (
+          <Card className="border-[var(--color-bad)]/30 bg-[var(--color-bad-soft)]/40">
+            <p className="text-sm font-medium">{asked.question}</p>
+            <p className="mt-1 text-sm text-[var(--color-bad)]">{asked.error}</p>
+          </Card>
+        ) : (
+          <AnswerView question={asked.question} answer={asked.answer} aiReady={aiReady} />
+        )
+      ) : null}
+
       {/* Voorbeeldvragen — per categorie, onder elkaar. */}
       <div>
         <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Voorbeeldvragen</span>
@@ -100,20 +114,6 @@ export function AssistantConsole({ firstName, aiReady }: { firstName: string; ai
           ))}
         </div>
       </div>
-
-      {/* Antwoord. */}
-      {pending ? (
-        <Card><p className="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]"><Loader2 className="size-4 animate-spin" /> Even zoeken in de Hub…</p></Card>
-      ) : asked ? (
-        "error" in asked ? (
-          <Card className="border-[var(--color-bad)]/30 bg-[var(--color-bad-soft)]/40">
-            <p className="text-sm font-medium">{asked.question}</p>
-            <p className="mt-1 text-sm text-[var(--color-bad)]">{asked.error}</p>
-          </Card>
-        ) : (
-          <AnswerView question={asked.question} answer={asked.answer} aiReady={aiReady} />
-        )
-      ) : null}
     </div>
   );
 }

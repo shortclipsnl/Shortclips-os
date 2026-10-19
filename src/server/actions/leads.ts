@@ -78,6 +78,23 @@ export async function createLead(input: z.infer<typeof createLeadSchema>): Promi
   });
 }
 
+const sourceSchema = z.object({
+  id: z.string().uuid(),
+  source: z.string().trim().max(40).nullable(),
+});
+
+/** De bron van een lead zetten (waar de lead binnenkwam). */
+export async function setLeadSource(input: z.infer<typeof sourceSchema>): Promise<ActionResult> {
+  return wrap(async () => {
+    await requireOwner();
+    const p = sourceSchema.safeParse(input);
+    if (!p.success) return { ok: false, message: "Ongeldige bron." };
+    await db.update(salesLeads).set({ source: p.data.source || null, updatedAt: new Date() }).where(eq(salesLeads.id, p.data.id));
+    revalidatePath("/leads");
+    return { ok: true };
+  });
+}
+
 /** Opvolgdatum zetten of wissen. */
 export async function setLeadFollowUp(input: z.infer<typeof followUpSchema>): Promise<ActionResult> {
   return wrap(async () => {

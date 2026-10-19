@@ -3,9 +3,21 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRightCircle, Check, Loader2, Plus, Search } from "lucide-react";
-import { convertLeadToClient, createLead, setLeadFollowUp, setLeadStatus } from "@/server/actions/leads";
+import { convertLeadToClient, createLead, setLeadFollowUp, setLeadSource, setLeadStatus } from "@/server/actions/leads";
 import type { LeadRow } from "@/server/leads";
 import { LEAD_STATUS } from "@/lib/statuses";
+
+/** Vaste bronnen met een eigen kleur, zodat ze goed herkenbaar zijn. */
+const LEAD_SOURCES: { value: string; color: string }[] = [
+  { value: "Meta advertentiecampagne", color: "#1877F2" },
+  { value: "Mail", color: "#0f766e" },
+  { value: "Social media", color: "#d6336c" },
+  { value: "Netwerk", color: "#f2843b" },
+  { value: "LinkedIn", color: "#5b9bf0" },
+];
+function sourceColor(s: string | null | undefined): string {
+  return LEAD_SOURCES.find((x) => x.value.toLowerCase() === (s ?? "").toLowerCase())?.color ?? "var(--color-ink-faint)";
+}
 
 /** Snel een nieuwe lead toevoegen (handmatig, naast de webhook-intake). */
 export function QuickAddLead() {
@@ -14,6 +26,7 @@ export function QuickAddLead() {
   const [contact, setContact] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [src, setSrc] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -21,8 +34,8 @@ export function QuickAddLead() {
   function add() {
     if (!company.trim()) return;
     start(async () => {
-      const res = await createLead({ company, contactName: contact || undefined, email: email || undefined, phone: phone || undefined });
-      if (res.ok) { setCompany(""); setContact(""); setEmail(""); setPhone(""); setErr(null); setOpen(false); router.refresh(); }
+      const res = await createLead({ company, contactName: contact || undefined, email: email || undefined, phone: phone || undefined, source: src || undefined });
+      if (res.ok) { setCompany(""); setContact(""); setEmail(""); setPhone(""); setSrc(""); setErr(null); setOpen(false); router.refresh(); }
       else setErr(res.message ?? "Mislukt");
     });
   }
@@ -42,6 +55,10 @@ export function QuickAddLead() {
       <input className="sc-input h-8 w-36 py-0 text-sm" placeholder="Contactpersoon" value={contact} onChange={(e) => setContact(e.target.value)} />
       <input className="sc-input h-8 w-44 py-0 text-sm" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
       <input className="sc-input h-8 w-36 py-0 text-sm" placeholder="Telefoon" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <select className="sc-input h-8 w-auto py-0 text-sm" value={src} onChange={(e) => setSrc(e.target.value)} aria-label="Bron">
+        <option value="">Bron…</option>
+        {LEAD_SOURCES.map((s) => <option key={s.value} value={s.value}>{s.value}</option>)}
+      </select>
       <button type="button" onClick={add} disabled={pending || !company.trim()}
         className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
         {pending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Toevoegen
@@ -77,6 +94,8 @@ export function LeadsBoard({ rows, segments, sources }: { rows: LeadRow[]; segme
   const [status, setStatus] = useState<string>("open");
   const [segment, setSegment] = useState<string>("alle");
   const [source, setSource] = useState<string>("alle");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
@@ -85,13 +104,20 @@ export function LeadsBoard({ rows, segments, sources }: { rows: LeadRow[]; segme
       if (status === "open" ? !["lead", "offerte", "onderhandeling"].includes(r.status) : status !== "alle" && r.status !== status) return false;
       if (segment !== "alle" && r.segment !== segment) return false;
       if (source !== "alle" && r.source !== source) return false;
+      // Datumfilter op binnenkomstdatum (firstContactOn).
+      if (from || to) {
+        const d = r.firstContactOn;
+        if (!d) return false;
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+      }
       if (needle) {
         const hay = `${r.company} ${r.contactName ?? ""} ${r.email ?? ""} ${r.phone ?? ""}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [rows, status, segment, source, q]);
+  }, [rows, status, segment, source, from, to, q]);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -112,6 +138,14 @@ export function LeadsBoard({ rows, segments, sources }: { rows: LeadRow[]; segme
           })}
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          {/* Datumfilter op binnenkomstdatum. */}
+          <span className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-0.5 text-2xs text-[var(--color-ink-muted)]">
+            <span className="text-[var(--color-ink-faint)]">Datum</span>
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-7 bg-transparent text-xs outline-none" aria-label="Van" title="Vanaf" />
+            <span className="text-[var(--color-ink-faint)]">–</span>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-7 bg-transparent text-xs outline-none" aria-label="Tot" title="Tot en met" />
+            {from || to ? <button type="button" onClick={() => { setFrom(""); setTo(""); }} className="text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]" title="Datumfilter wissen">×</button> : null}
+          </span>
           <select className="sc-input h-8 w-auto py-0 text-xs" value={segment} onChange={(e) => setSegment(e.target.value)} aria-label="Jaargang">
             <option value="alle">Alle jaren</option>
             {segments.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -191,7 +225,7 @@ function LeadRowView({ r, today }: { r: LeadRow; today: string }) {
           {pending ? <Loader2 className="pointer-events-none absolute right-1.5 size-3 animate-spin opacity-60" /> : null}
         </div>
       </td>
-      <td className="px-2 py-2 text-xs text-[var(--color-ink-muted)]">{r.source ?? "–"}</td>
+      <td className="px-2 py-2"><SourceCell id={r.id} source={r.source} /></td>
       <td className="px-2 py-2 text-center">
         {r.leadScore != null ? (
           <span className="inline-flex items-center gap-1 text-xs tabular-nums">
@@ -214,6 +248,34 @@ function LeadRowView({ r, today }: { r: LeadRow; today: string }) {
         <ConvertCell id={r.id} convertedSlug={r.convertedClientSlug} />
       </td>
     </tr>
+  );
+}
+
+/** Bewerkbare, gekleurde bron per lead. */
+function SourceCell({ id, source }: { id: string; source: string | null }) {
+  const [val, setVal] = useState(source ?? "");
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  const inList = LEAD_SOURCES.some((s) => s.value.toLowerCase() === val.toLowerCase());
+  const color = sourceColor(val || null);
+
+  function change(next: string) {
+    setVal(next);
+    start(async () => { await setLeadSource({ id, source: next || null }); router.refresh(); });
+  }
+
+  return (
+    <span className="relative inline-flex items-center">
+      <span className="mr-1.5 size-2 shrink-0 rounded-full" style={{ background: color }} />
+      <select value={val} onChange={(e) => change(e.target.value)} disabled={pending}
+        className="max-w-[150px] cursor-pointer appearance-none rounded-full py-1 pl-2 pr-5 text-xs font-medium"
+        style={{ background: `color-mix(in srgb, ${color} 15%, var(--color-surface))`, color: val ? color : "var(--color-ink-muted)" }}>
+        <option value="">Bron kiezen…</option>
+        {LEAD_SOURCES.map((s) => <option key={s.value} value={s.value}>{s.value}</option>)}
+        {val && !inList ? <option value={val}>{val}</option> : null}
+      </select>
+      {pending ? <Loader2 className="pointer-events-none absolute right-1 size-3 animate-spin opacity-60" /> : null}
+    </span>
   );
 }
 
