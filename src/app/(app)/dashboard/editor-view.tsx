@@ -70,6 +70,11 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
             <h2 className="text-sm font-bold tracking-tight">Jouw editing-projecten</h2>
             <span className="text-xs text-white/80">14 werkdagen tot oplevering · download &amp; script per project</span>
           </div>
+          <p className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)] px-4 py-2.5 text-sm leading-relaxed text-[var(--color-ink)]">
+            <strong>Dit zijn jouw projecten.</strong> Houd goed rekening met de <strong>deadlines</strong> — de batterij loopt vanaf de opnamedag.
+            Per project vind je de <strong>download-link</strong> van het beeldmateriaal en het <strong>script</strong>. Zet je project telkens in de juiste
+            <strong> fase</strong>: binnenkort beschikbaar → in edit → interne review → feedback klant → feedback klant verwerken → afgerond.
+          </p>
           <EditingProjects projects={editingProjects} editors={[]} canEdit={canEdit} canAssign={false} lockedEditor />
         </div>
       ) : null}

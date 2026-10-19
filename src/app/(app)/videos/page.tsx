@@ -45,9 +45,12 @@ export default async function VideosPage({
   const canEdit = viewer.permissions.has("videos:write");
   const canAssign = viewer.permissions.has("videos:assign");
   const clientOptions = clientList.filter((c) => c.status === "active").map((c) => ({ id: c.id, name: c.name }));
-  // Edit-boards zijn alleen voor de vaste editors: Sem, Noah, Fabian, Quinn, Senna.
+  // Edit-boards zijn alleen voor de vaste editors: Quinn, Noah, Sam, Senna, Fabian.
   const boardEditors = editors.filter((e) => isBoardEditor(e.fullName));
   const shootsAtRisk = shoots.filter((s) => s.atRisk).length;
+  // Editors (freelance) zien alleen hun eigen editbord met de fases — niet de
+  // deadlinebewaking, aandachtsblokken of de werkvoorraad/tarieven eronder.
+  const editorView = viewer.isEditorOnly;
 
   return (
     <div className="mx-auto max-w-[1500px]">
@@ -64,17 +67,28 @@ export default async function VideosPage({
           <h2 className="text-sm font-bold tracking-tight">Editing per editor</h2>
           <span className="text-xs text-white/80">14 werkdagen opname → oplevering · automatisch uit de opnames</span>
         </div>
-        <p className="mb-3 text-xs leading-relaxed text-[var(--color-ink-muted)]">
-          Elke opname is hier een edit-project en komt automatisch uit de agenda. Klik bovenin op een <strong>editor</strong> om alleen diens
-          projecten te zien, of op <strong>Hoofdtabel</strong> voor alles. Per rij stel je in: de <strong>editor</strong> (de shorts verhuizen mee),
-          de <strong>fase</strong> (verspringt naar de juiste groep), het <strong>aantal shorts</strong> (de klant-standaard staat al voor),
-          en zet je de <strong>download-link</strong> en het <strong>script</strong> klaar. De <strong>deadline</strong>-batterij loopt automatisch
-          (opname + 14 werkdagen), maar je kunt die aanklikken om hem handmatig aan te passen. <strong>Prioriteit</strong> en <strong>wacht op</strong>
-          bepalen we vanzelf.
-        </p>
+        {editorView ? (
+          <p className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)] px-4 py-2.5 text-sm leading-relaxed text-[var(--color-ink)]">
+            <strong>Dit zijn jouw edit-projecten.</strong> Houd goed rekening met de <strong>deadlines</strong> — de batterij loopt vanaf de opnamedag.
+            Bij elk project vind je de <strong>download-link</strong> van het beeldmateriaal en het <strong>script</strong>. Zet je project in de juiste
+            <strong> fase</strong> zodra je verder bent: binnenkort beschikbaar → in edit → interne review → feedback klant → feedback klant verwerken → afgerond.
+          </p>
+        ) : (
+          <p className="mb-3 text-xs leading-relaxed text-[var(--color-ink-muted)]">
+            Elke opname is hier een edit-project en komt automatisch uit de agenda. Klik bovenin op een <strong>editor</strong> om alleen diens
+            projecten te zien, of op <strong>Hoofdtabel</strong> voor alles. Per rij stel je in: de <strong>editor</strong> (de shorts verhuizen mee),
+            de <strong>fase</strong> (verspringt naar de juiste groep), het <strong>aantal shorts</strong> (de klant-standaard staat al voor),
+            en zet je de <strong>download-link</strong> en het <strong>script</strong> klaar. De <strong>deadline</strong>-batterij loopt automatisch
+            (opname + 14 werkdagen), maar je kunt die aanklikken om hem handmatig aan te passen. <strong>Prioriteit</strong> en <strong>wacht op</strong>
+            bepalen we vanzelf.
+          </p>
+        )}
         <EditingProjects projects={editingProjects} editors={boardEditors} clients={clientOptions} canEdit={canEdit} canAssign={canAssign} />
       </section>
 
+      {/* Alles hieronder is voor coördinatie/beheer — editors zien dit niet. */}
+      {editorView ? null : (
+      <>
       {/* Deadlinebewaking per klantopname (§7): 14 werkdagen tot klantoplevering,
           editor levert 2 werkdagen eerder. Live uit de datum van vandaag. */}
       {shoots.length > 0 ? (
@@ -130,6 +144,8 @@ export default async function VideosPage({
 
       {/* Editorbelasting & tarieven — samengevoegd vanuit de oude /editing-pagina. */}
       <WorkloadSection viewer={viewer} />
+      </>
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 import { upsertEditorRate } from "@/server/actions/editor-rates";
 import { setClientEditEconomics } from "@/server/actions/clients";
+import { defaultEditorRate } from "@/lib/editors";
 
 export type RateEditor = { id: string; name: string; rate: number; capacity: number; has_rate: boolean };
 
@@ -44,7 +45,7 @@ export function ClientEconField({ clientId, field, value, prefix }: { clientId: 
 }
 
 export function RateRow({ editor }: { editor: RateEditor }) {
-  const [rate, setRate] = useState(String(editor.rate || ""));
+  const [rate, setRate] = useState(String(editor.rate || defaultEditorRate(editor.name) || ""));
   const [cap, setCap] = useState(String(editor.capacity || ""));
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();

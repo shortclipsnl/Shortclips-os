@@ -4,7 +4,7 @@ import { editorLoad, LOAD_LABEL } from "@/lib/metrics";
 import type { Viewer } from "@/server/auth/context";
 import { Avatar, Card, CardHeader, EmptyState } from "@/components/ui";
 import { euro, formatDate, num } from "@/lib/format";
-import { editorDisplayName } from "@/lib/editors";
+import { defaultEditorRate, editorDisplayName } from "@/lib/editors";
 import { RateRow } from "./editing-ui";
 import { PerClientEditors } from "./per-client-editors";
 
@@ -42,6 +42,8 @@ export async function WorkloadSection({ viewer }: { viewer: Viewer }) {
             const capacity = capMap.get(e.editor_id) ?? 0;
             const { pct, level: lvl } = editorLoad(open, capacity);
             const level = { label: LOAD_LABEL[lvl], color: LEVEL_COLOR[lvl]! };
+            // Afwijkend tarief uit de database wint; anders het vaste standaardtarief.
+            const rate = Number(e.rate) > 0 ? Number(e.rate) : defaultEditorRate(e.editor_name);
             return (
               <div key={e.editor_id} className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3.5">
                 <div className="flex items-center gap-3">
@@ -53,7 +55,7 @@ export async function WorkloadSection({ viewer }: { viewer: Viewer }) {
                       {e.leave ? <span className="rounded-full bg-[var(--color-warn-soft)] px-1.5 py-0.5 text-2xs font-medium text-[#8a5300]">afwezig {formatDate(e.leave.start_on)}–{formatDate(e.leave.end_on)}</span> : null}
                     </div>
                     <div className="mt-0.5 text-xs font-semibold text-[var(--color-ink)]">
-                      {Number(e.rate) > 0 ? `${euro(Number(e.rate))} per short` : <span className="font-normal text-[var(--color-ink-faint)]">prijs niet ingesteld</span>}
+                      {rate > 0 ? `${euro(rate)} per short` : <span className="font-normal text-[var(--color-ink-faint)]">prijs niet ingesteld</span>}
                     </div>
                   </div>
                   <div className="text-right">
@@ -78,7 +80,7 @@ export async function WorkloadSection({ viewer }: { viewer: Viewer }) {
                   <span>{num(Number(e.clients_active))} klanten</span>
                   {e.next_due ? <span>eerstvolgende deadline {formatDate(e.next_due)}</span> : null}
                   {canSeeCosts ? <span className="font-semibold text-[var(--color-ink)]">editkosten lopend: {euro(Number(e.cost_active))}</span> : null}
-                  {canSeeCosts && Number(e.rate) > 0 ? <span>{euro(Number(e.rate))}/video</span> : null}
+                  {canSeeCosts && rate > 0 ? <span>{euro(rate)}/video</span> : null}
                 </div>
               </div>
             );

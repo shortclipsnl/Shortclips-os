@@ -21,6 +21,21 @@ export const EDITOR_COLOR: Record<string, string> = {
   fabian: "#0f766e",
 };
 
+/** Vaste prijs per short per editor (euro). Wordt gebruikt als standaard zodra
+ *  er nog geen afwijkend tarief in de database staat. Op voornaam. */
+export const EDITOR_RATE: Record<string, number> = {
+  quinn: 25,
+  noah: 35,
+  senna: 40,
+  fabian: 48,
+  sam: 60,
+};
+
+/** Het standaardtarief voor een editornaam (0 als onbekend). */
+export function defaultEditorRate(name: string | null | undefined): number {
+  return EDITOR_RATE[firstNameKey(name)] ?? 0;
+}
+
 /** Canonieke sleutel: eerste woord van de naam, kleine letters, aliassen
  *  samengevoegd (sem → sam). */
 export function firstNameKey(fullName: string | null | undefined): string {

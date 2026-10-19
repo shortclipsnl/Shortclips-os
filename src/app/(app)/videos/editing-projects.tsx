@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Download, FileText, Loader2, Plus, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, FileText, Loader2, Pencil, Plus, Upload, X } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { editorColor, editorDisplayName } from "@/lib/editors";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase } from "@/lib/statuses";
@@ -35,7 +35,7 @@ function priority(p: EditingProject): { label: string; color: string } | null {
 }
 
 // Kolombreedtes — gelijk voor de kop en alle rijen, zodat alles uitlijnt.
-const GRID = "minmax(150px,1.6fr) 132px minmax(150px,1.3fr) 168px minmax(140px,1fr) 70px 108px";
+const GRID = "minmax(150px,1.6fr) 132px minmax(150px,1.3fr) 168px minmax(130px,1fr) 64px 118px 118px";
 
 export function EditingProjects({
   projects,
@@ -96,11 +96,11 @@ export function EditingProjects({
                 key={e.id}
                 type="button"
                 onClick={() => setEditor(e.id)}
-                className={`flex items-center gap-2 rounded-full border px-2 py-1 pr-3 text-sm font-semibold transition ${on ? "bg-[var(--color-surface)] text-[var(--color-ink)] shadow-[var(--shadow-card)]" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+                className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3.5 text-sm font-semibold transition ${on ? "bg-[var(--color-surface)] text-[var(--color-ink)] shadow-[var(--shadow-card)]" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
                 style={on ? { borderColor: c, boxShadow: `0 0 0 2px ${c}` } : undefined}
               >
                 <span className="rounded-full p-[2px]" style={{ background: on ? c : "transparent" }}>
-                  <TeamAvatar name={e.fullName} avatarUrl={e.avatarUrl ?? null} size={30} />
+                  <TeamAvatar name={e.fullName} avatarUrl={e.avatarUrl ?? null} size={44} />
                 </span>
                 {editorDisplayName(e.fullName)}
                 <span className="grid min-w-5 place-items-center rounded-full px-1 text-2xs font-bold text-white" style={{ background: c }}>{counts.get(e.id) ?? 0}</span>
@@ -117,7 +117,7 @@ export function EditingProjects({
       ) : null}
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <div className="min-w-[940px]">
+        <div className="min-w-[1000px]">
           {/* Kolomkoppen */}
           <div className="grid items-center gap-px border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]" style={{ gridTemplateColumns: GRID }}>
             <span className="px-1">Item</span>
@@ -126,7 +126,8 @@ export function EditingProjects({
             <span className="px-1 text-center">Fase</span>
             <span className="px-1 text-center">Prioriteit</span>
             <span className="px-1 text-center">Shorts</span>
-            <span className="px-1 text-center">Bestanden</span>
+            <span className="px-1 text-center">Script</span>
+            <span className="px-1 text-center">Download</span>
           </div>
 
           {/* Alle fases altijd onder elkaar — ook de lege, zodat de hele
@@ -254,12 +255,81 @@ function ProjectRow({ p, editors, canEdit, canAssign, phaseColor }: { p: Editing
         <ShortsField p={p} canEdit={canEdit} onSave={(n) => run(() => setProjectPlannedShorts(p.id, n))} />
       </div>
 
-      {/* Bestanden — download + script */}
-      <div className="relative flex items-center justify-center gap-1 px-1">
-        <FilesCell p={p} canEdit={canEdit} run={run} pending={pending} />
+      {/* Script — link of geüploade pdf */}
+      <div className="relative flex items-center justify-center px-1">
+        <ScriptCell p={p} canEdit={canEdit} run={run} pending={pending} />
+      </div>
+
+      {/* Download — link naar het beeldmateriaal */}
+      <div className="relative flex items-center justify-center px-1">
+        <DownloadCell p={p} canEdit={canEdit} run={run} />
       </div>
     </div>
   );
+}
+
+/** Script: openen als er een link/pdf is, anders een link plakken of pdf uploaden. */
+function ScriptCell({ p, canEdit, run, pending }: { p: EditingProject; canEdit: boolean; run: (fn: () => Promise<unknown>) => void; pending: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const scriptHref = p.scriptFileId ? `/api/edit-files/${p.scriptFileId}` : p.scriptUrl;
+
+  async function onFile(file: File) {
+    if (!(file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))) return;
+    if (file.size > 10 * 1024 * 1024) return;
+    setBusy(true);
+    try {
+      const base64 = await fileToBase64(file);
+      run(() => uploadProjectScript(p.id, { fileName: file.name, contentType: file.type || "application/pdf", base64 }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (scriptHref) {
+    return (
+      <span className="flex items-center gap-1">
+        <a href={scriptHref} target="_blank" rel="noopener noreferrer" title={p.scriptFileName ?? "Script openen"}
+          className="inline-flex items-center gap-1 rounded-[4px] bg-[var(--color-brand-50)] px-2 py-1 text-2xs font-semibold text-[var(--color-brand-700)] hover:brightness-95">
+          <FileText className="size-3.5" /> Script
+        </a>
+        {canEdit && p.scriptFileId ? (
+          <button type="button" onClick={() => run(() => deleteProjectScript(p.id))} title="Script verwijderen" className="grid size-6 place-items-center rounded text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]">
+            <X className="size-3.5" />
+          </button>
+        ) : null}
+      </span>
+    );
+  }
+  if (!canEdit) return <span className="text-2xs text-[var(--color-ink-faint)]">—</span>;
+  return (
+    <span className="flex items-center gap-0.5">
+      <LinkEditor current={null} label="+ link" icon={<FileText className="size-3.5" />} title="Scriptlink toevoegen" onSave={(u) => run(() => setProjectLinks(p.id, { scriptUrl: u }))} />
+      <input ref={inputRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
+      <button type="button" onClick={() => inputRef.current?.click()} disabled={busy || pending} title="Script-pdf uploaden" className="grid size-6 place-items-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]">
+        {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+      </button>
+    </span>
+  );
+}
+
+/** Download-link naar het beeldmateriaal — openen of een link plakken. */
+function DownloadCell({ p, canEdit, run }: { p: EditingProject; canEdit: boolean; run: (fn: () => Promise<unknown>) => void }) {
+  if (p.footageUrl) {
+    return (
+      <span className="flex items-center gap-1">
+        <a href={p.footageUrl} target="_blank" rel="noopener noreferrer" title="Download beeldmateriaal"
+          className="inline-flex items-center gap-1 rounded-[4px] bg-[var(--color-brand-50)] px-2 py-1 text-2xs font-semibold text-[var(--color-brand-700)] hover:brightness-95">
+          <Download className="size-3.5" /> Download
+        </a>
+        {canEdit ? (
+          <LinkEditor current={p.footageUrl} label="" icon={<Pencil className="size-3.5" />} title="Download-link wijzigen" onSave={(u) => run(() => setProjectLinks(p.id, { footageUrl: u }))} />
+        ) : null}
+      </span>
+    );
+  }
+  if (!canEdit) return <span className="text-2xs text-[var(--color-ink-faint)]">—</span>;
+  return <LinkEditor current={null} label="+ link" icon={<Download className="size-3.5" />} title="Download-link toevoegen" onSave={(u) => run(() => setProjectLinks(p.id, { footageUrl: u }))} />;
 }
 
 function DeadlineCell({ p, pct, battery, canEdit, onSave }: { p: EditingProject; pct: number; battery: string; canEdit: boolean; onSave: (d: string | null) => void }) {
@@ -321,71 +391,14 @@ function ShortsField({ p, canEdit, onSave }: { p: EditingProject; canEdit: boole
   );
 }
 
-function FilesCell({ p, canEdit, run, pending }: { p: EditingProject; canEdit: boolean; run: (fn: () => Promise<unknown>) => void; pending: boolean }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function onFile(file: File) {
-    if (!(file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))) return;
-    if (file.size > 10 * 1024 * 1024) return;
-    setBusy(true);
-    try {
-      const base64 = await fileToBase64(file);
-      run(() => uploadProjectScript(p.id, { fileName: file.name, contentType: file.type || "application/pdf", base64 }));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const footage = p.footageUrl;
-  const scriptHref = p.scriptFileId ? `/api/edit-files/${p.scriptFileId}` : p.scriptUrl;
-
-  return (
-    <>
-      {/* Download (beeldmateriaal) */}
-      {footage ? (
-        <a href={footage} target="_blank" rel="noopener noreferrer" title="Download beeldmateriaal" className="grid size-7 place-items-center rounded text-[var(--color-brand-600)] hover:bg-[var(--color-surface-2)]">
-          <Download className="size-4" />
-        </a>
-      ) : canEdit ? (
-        <LinkEditor current={null} icon={<Download className="size-4" />} title="Download-link toevoegen" onSave={(u) => run(() => setProjectLinks(p.id, { footageUrl: u }))} />
-      ) : (
-        <span className="grid size-7 place-items-center text-[var(--color-ink-faint)]" title="Geen download-link"><Download className="size-4 opacity-40" /></span>
-      )}
-
-      {/* Script (pdf) */}
-      {scriptHref ? (
-        <a href={scriptHref} target="_blank" rel="noopener noreferrer" title={p.scriptFileName ?? "Script openen"} className="grid size-7 place-items-center rounded text-[var(--color-brand-600)] hover:bg-[var(--color-surface-2)]">
-          <FileText className="size-4" />
-        </a>
-      ) : canEdit ? (
-        <>
-          <input ref={inputRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
-          <button type="button" onClick={() => inputRef.current?.click()} disabled={busy || pending} title="Script-pdf uploaden" className="grid size-7 place-items-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]">
-            {busy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          </button>
-        </>
-      ) : (
-        <span className="grid size-7 place-items-center text-[var(--color-ink-faint)]" title="Geen script"><FileText className="size-4 opacity-40" /></span>
-      )}
-
-      {/* Script verwijderen (alleen als een pdf is geüpload) */}
-      {canEdit && p.scriptFileId ? (
-        <button type="button" onClick={() => run(() => deleteProjectScript(p.id))} title="Script verwijderen" className="grid size-7 place-items-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-bad)]">
-          <X className="size-3.5" />
-        </button>
-      ) : null}
-    </>
-  );
-}
-
-function LinkEditor({ current, icon, title, onSave }: { current: string | null; icon: React.ReactNode; title: string; onSave: (u: string | null) => void }) {
+function LinkEditor({ current, icon, label, title, onSave }: { current: string | null; icon: React.ReactNode; label?: string; title: string; onSave: (u: string | null) => void }) {
   const [open, setOpen] = useState(false);
   const [val, setVal] = useState(current ?? "");
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} title={title} className="grid size-7 place-items-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]">
-        {icon}
+      <button type="button" onClick={() => setOpen(true)} title={title}
+        className={label ? "inline-flex items-center gap-1 rounded-[4px] border border-dashed border-[var(--color-line-strong)] px-1.5 py-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" : "grid size-6 place-items-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]"}>
+        {icon}{label ? <span>{label}</span> : null}
       </button>
     );
   }
