@@ -40,6 +40,13 @@ function dayLabel(d: string) {
   return new Date(y!, (m ?? 1) - 1, day).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "short" });
 }
 
+/** n dagen na een YYYY-MM-DD, weer als YYYY-MM-DD. */
+function addDaysIso(d: string, n: number) {
+  const [y, m, day] = d.split("-").map(Number);
+  const dt = new Date(y!, (m ?? 1) - 1, day! + n);
+  return dt.toLocaleDateString("en-CA");
+}
+
 export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; clientOptions: string[] }) {
   const [client, setClient] = useState("alle");
   const [kinds, setKinds] = useState<Record<Kind, boolean>>({ opname: true, oplevering: true, publicatie: true, meeting: true });
@@ -72,7 +79,13 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
       if (kinds.meeting && client === "alle") {
         w.meetings.forEach((m) => push(m.date, { id: m.id, kind: "meeting", main: m.title, sub: m.location, time: m.time, href: "/meetings", clientName: null, clientColor: null, clientLogo: null }));
       }
-      const days = [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, items]) => ({ date, items }));
+      // Toon altijd de hele werkweek (ma–vr), ook dagen zonder items, zodat
+      // je ziet dat er bijv. op donderdag niets gepland staat. Weekenddagen
+      // tonen we alleen als er wél iets op staat.
+      const weekdays = Array.from({ length: 5 }, (_, i) => addDaysIso(w.startOn, i));
+      const weekend = [addDaysIso(w.startOn, 5), addDaysIso(w.startOn, 6)].filter((d) => byDate.has(d));
+      const dates = [...weekdays, ...weekend].sort((a, b) => a.localeCompare(b));
+      const days = dates.map((date) => ({ date, items: byDate.get(date) ?? [] }));
       const total = days.reduce((n, d) => n + d.items.length, 0);
       return { ...w, days, total };
     });
@@ -107,9 +120,9 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
       </div>
 
       <div className="space-y-4">
-        {view.map((w, wi) => (
+        {view.map((w) => (
           <div key={w.key} className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)]">
-            <WeekHeader w={w} count={w.total} color={WEEK_BAR[wi % WEEK_BAR.length]!}>
+            <WeekHeader w={w} count={w.total} color={weekBarColor(w)}>
               {w.conflicts.map((c) => (
                 <span key={c.editor} className="inline-flex items-center gap-1 rounded-full bg-[var(--color-bad-soft)] px-2 py-0.5 text-2xs font-medium text-[#a3271c]">
                   <AlertTriangle className="size-3" /> {c.editor}: {c.count} opleveringen
@@ -122,21 +135,24 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
               ))}
             </WeekHeader>
 
-            {w.days.length === 0 ? (
+            {w.total === 0 ? (
               <p className="px-4 py-3 text-xs text-[var(--color-ink-faint)]">Niets gepland in deze week.</p>
             ) : (
               <ul className="divide-y divide-[var(--color-line)]">
                 {w.days.map((d) => {
                   const isToday = d.date === todayIso;
                   return (
-                    <li key={d.date} className="flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:gap-3">
+                    <li key={d.date} className={`flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:gap-3 ${d.items.length === 0 ? "bg-[var(--color-surface-sunken)]/40" : ""}`}>
                       {/* Daglabel */}
-                      <div className={`shrink-0 pt-0.5 text-xs font-bold capitalize sm:w-36 ${isToday ? "text-[var(--color-brand-700)]" : "text-[var(--color-ink)]"}`}>
+                      <div className={`shrink-0 pt-0.5 text-xs font-bold capitalize sm:w-36 ${isToday ? "text-[var(--color-brand-700)]" : d.items.length === 0 ? "text-[var(--color-ink-faint)]" : "text-[var(--color-ink)]"}`}>
                         {dayLabel(d.date)}
                         {isToday ? <span className="ml-1 rounded bg-[var(--color-brand-600)] px-1 py-0.5 text-[10px] font-bold text-white">vandaag</span> : null}
                       </div>
                       {/* Items van die dag */}
                       <div className="min-w-0 flex-1 space-y-1">
+                        {d.items.length === 0 ? (
+                          <span className="text-xs text-[var(--color-ink-faint)]">—</span>
+                        ) : null}
                         {d.items.map((it) => (
                           <Link key={`${it.kind}-${it.id}`} href={it.href}
                             className="flex items-center gap-2 rounded-[var(--radius-sm)] border-l-[3px] bg-[var(--color-surface)] px-2 py-1 text-xs hover:bg-[var(--color-surface-sunken)]"
@@ -169,13 +185,33 @@ function KindIcon({ kind }: { kind: Kind }) {
   return <Icon className="size-3.5 shrink-0" style={{ color: k.color }} strokeWidth={2} />;
 }
 
-/** Volle kleur per week-balk, zodat je van week naar week kunt scannen. */
-const WEEK_BAR = [
-  "var(--color-brand-600)",
-  "var(--color-indigo-ink)",
-  "var(--color-violet)",
-  "var(--color-info)",
+/** Eén vaste kleur per maand (jan…dec), zodat alle weken van dezelfde maand
+ *  dezelfde kleur hebben en je de maanden uit elkaar kunt houden terwijl je
+ *  scrollt. Allemaal donker genoeg voor witte tekst. */
+const MONTH_COLOR = [
+  "#1e40af", // januari
+  "#0369a1", // februari
+  "#0e7490", // maart
+  "#0f766e", // april
+  "#1a7f37", // mei
+  "#4d7c0f", // juni
+  "#a16207", // juli
+  "#b45309", // augustus
+  "#c2410c", // september
+  "#9d174d", // oktober
+  "#7c2d6b", // november
+  "#6d28d9", // december
 ];
+
+/** Kleur van de weekbalk: deze week altijd groen, anders de maandkleur
+ *  (bepaald op basis van de woensdag, zodat randweken bij de juiste maand
+ *  horen). */
+function weekBarColor(w: PlanWeek): string {
+  if (w.startOn <= todayIso && todayIso <= w.endOn) return "var(--color-good)";
+  const mid = addDaysIso(w.startOn, 3); // woensdag
+  const month = Number(mid.split("-")[1]) - 1;
+  return MONTH_COLOR[month] ?? MONTH_COLOR[0]!;
+}
 
 /** "20 – 26 okt" uit twee YYYY-MM-DD datums. */
 function rangeLabel(startOn: string, endOn: string) {
