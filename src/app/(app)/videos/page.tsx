@@ -83,7 +83,7 @@ export default async function VideosPage({
             <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span><strong>Prioriteit</strong> en <strong>wacht op</strong> bepalen we vanzelf.</span></li>
           </ul>
         )}
-        <EditingProjects projects={editingProjects} editors={boardEditors} clients={clientOptions} canEdit={canEdit} canAssign={canAssign} />
+        <EditingProjects projects={editingProjects} editors={boardEditors} clients={clientOptions} canEdit={canEdit} canAssign={canAssign} lockedEditor={editorView} />
       </section>
 
       {/* Alles hieronder is voor coördinatie/beheer — editors zien dit niet. */}

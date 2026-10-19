@@ -13,9 +13,15 @@ export default async function AppLayout({
   // Navigatie tonen op basis van rechten: geen menu-items die tot een
   // foutmelding leiden.
   const owner = isOwner(viewer);
+  // Een editor ziet alleen wat hij nodig heeft: Vandaag, Onze klanten (zijn
+  // eigen klanten), Productieplanning en Editing (zijn eigen projecten).
+  const editorOnly = viewer.primaryRole === "editor";
+  const EDITOR_NAV = new Set(["/dashboard", "/clients", "/planning", "/videos"]);
   const groups = NAVIGATION.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
+      // Editors: strikte allowlist — alles daarbuiten blijft verborgen.
+      if (editorOnly && !EDITOR_NAV.has(item.href)) return false;
       // Eigenaar-only items: alleen voor Janno.
       if (item.ownerOnly && !owner) return false;
       // Rolgebaseerde zichtbaarheid (geen e-mailuitzonderingen): eigenaar ziet
