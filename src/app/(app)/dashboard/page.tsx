@@ -12,6 +12,7 @@ import { LinkButton } from "@/components/ui";
 import { EditorDashboard } from "./editor-view";
 import { TodayView } from "./today-view";
 import { WeekPlanning, type WeekUpload } from "./week-planning";
+import { PostingReminder, type TodayPost } from "./posting-reminder";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
@@ -53,6 +54,12 @@ export default async function DashboardPage() {
     clientColor: c.clientColor,
     clientLogo: null,
   }));
+
+  // Posts die vandaag online moeten (nog niet gepubliceerd) — voor de
+  // dagelijkse postherinnering rechtsonder.
+  const todaysPosts: TodayPost[] = contentItems
+    .filter((c) => c.scheduledOn === contentFrom && c.status !== "published")
+    .map((c) => ({ id: c.id, title: c.title, clientName: c.clientName, at: c.scheduledAt }));
 
   const firstName = viewer.fullName.split(" ")[0];
   const hour = new Date().getHours();
@@ -98,6 +105,9 @@ export default async function DashboardPage() {
 
       {/* Weekplanning: opnames en meetings die eraan komen. */}
       <WeekPlanning shoots={weekShoots} meetings={meetings} uploads={uploads} />
+
+      {/* Dagelijkse postherinnering (rechtsonder, met pingetje om 14:00). */}
+      <PostingReminder posts={todaysPosts} />
     </div>
   );
 }

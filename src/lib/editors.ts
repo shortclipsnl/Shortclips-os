@@ -1,22 +1,24 @@
 /**
  * De vaste set editors met een eigen edit-board, in weergavevolgorde:
- * Quinn, Noah, Sam, Senna en Fabian. Bewust één "Sam" (geen losse "Sem").
+ * Quinn, Noah, Sem, Senna en Fabian. Bewust één "Sem" (geen losse "Sam").
  * Eén bron van waarheid voor zowel de server (board-filtering) als de UI
  * (editor-knoppen en -keuzes).
  */
-export const BOARD_EDITORS = ["Quinn", "Noah", "Sam", "Senna", "Fabian"] as const;
+export const BOARD_EDITORS = ["Quinn", "Noah", "Sem", "Senna", "Fabian"] as const;
 
 export const BOARD_EDITOR_FIRST_NAMES: readonly string[] = BOARD_EDITORS.map((n) => n.toLowerCase());
 
-/** Oude/afwijkende schrijfwijzen die naar één editor horen. "Sem" is dezelfde
- *  persoon als "Sam" — zo telt, kleurt en filtert alles als één Sam. */
-const FIRST_NAME_ALIAS: Record<string, string> = { sem: "sam" };
+/** Oude/afwijkende schrijfwijzen die naar één editor horen. "Sam" is een
+ *  verkeerde schrijfwijze van "Sem" — zo telt, kleurt en filtert alles als
+ *  één Sem. */
+const FIRST_NAME_ALIAS: Record<string, string> = { sam: "sem" };
 
-/** Vaste kleur per editor (zoals in Monday), op voornaam. */
+/** Vaste kleur per editor (zoals in Monday), op voornaam. Sem heeft bewust een
+ *  duidelijk andere kleur (framboos) dan Fabian (teal). */
 export const EDITOR_COLOR: Record<string, string> = {
   quinn: "#7c5cff",
   noah: "#5b9bf0",
-  sam: "#22b573",
+  sem: "#d6336c",
   senna: "#f2843b",
   fabian: "#0f766e",
 };
@@ -28,7 +30,7 @@ export const EDITOR_RATE: Record<string, number> = {
   noah: 35,
   senna: 40,
   fabian: 48,
-  sam: 60,
+  sem: 60,
 };
 
 /** Het standaardtarief voor een editornaam (0 als onbekend). */
@@ -37,14 +39,14 @@ export function defaultEditorRate(name: string | null | undefined): number {
 }
 
 /** Canonieke sleutel: eerste woord van de naam, kleine letters, aliassen
- *  samengevoegd (sem → sam). */
+ *  samengevoegd (sam → sem). */
 export function firstNameKey(fullName: string | null | undefined): string {
   const raw = fullName?.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
   return FIRST_NAME_ALIAS[raw] ?? raw;
 }
 
 /** De nette weergavenaam van een editor: als de naam bij het vaste board hoort
- *  (ook via alias), de canonieke naam (bijv. "Sam"); anders de naam zelf. */
+ *  (ook via alias), de canonieke naam (bijv. "Sem"); anders de naam zelf. */
 export function editorDisplayName(name: string | null | undefined): string {
   const key = firstNameKey(name);
   const match = BOARD_EDITORS.find((e) => e.toLowerCase() === key);

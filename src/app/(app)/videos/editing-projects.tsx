@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Download, FileText, Loader2, Pencil, Plus, Upload, X } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
-import { editorColor, editorDisplayName } from "@/lib/editors";
+import { editorColor, editorDisplayName, firstNameKey } from "@/lib/editors";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase } from "@/lib/statuses";
 import { createEditingProject, deleteProjectScript, setProjectDeadline, setProjectEditStatus, setProjectEditor, setProjectLinks, setProjectPlannedShorts, uploadProjectScript } from "@/server/actions/editing-board";
 import { fileToBase64 } from "../ai/_shared";
@@ -55,13 +55,40 @@ export function EditingProjects({
   const [editor, setEditor] = useState<string>("alle");
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(["afgerond"]));
 
+  // Editors groeperen op canonieke voornaam, zodat dubbele accounts (bijv. een
+  // "Sem" én een verkeerd gespelde "Sam") één tab worden.
+  const groups = useMemo(() => {
+    const idToKey = new Map<string, string>();
+    for (const e of editors) idToKey.set(e.id, firstNameKey(e.fullName));
+    const map = new Map<string, { key: string; displayName: string; color: string; avatarUrl: string | null; name: string; ids: Set<string> }>();
+    for (const e of editors) {
+      const key = firstNameKey(e.fullName);
+      const g = map.get(key) ?? { key, displayName: editorDisplayName(e.fullName), color: editorColor(e.fullName), avatarUrl: e.avatarUrl ?? null, name: e.fullName, ids: new Set<string>() };
+      g.ids.add(e.id);
+      if (!g.avatarUrl && e.avatarUrl) g.avatarUrl = e.avatarUrl;
+      map.set(key, g);
+    }
+    return { list: [...map.values()], idToKey };
+  }, [editors]);
+
   const counts = useMemo(() => {
     const m = new Map<string, number>();
-    for (const p of projects) if (p.editorId) m.set(p.editorId, (m.get(p.editorId) ?? 0) + 1);
+    for (const p of projects) {
+      if (!p.editorId) continue;
+      const key = groups.idToKey.get(p.editorId);
+      if (key) m.set(key, (m.get(key) ?? 0) + 1);
+    }
     return m;
-  }, [projects]);
+  }, [projects, groups]);
 
-  const shown = editor === "alle" ? projects : editor === "geen" ? projects.filter((p) => !p.editorId) : projects.filter((p) => p.editorId === editor);
+  const activeGroup = groups.list.find((g) => g.key === editor) ?? null;
+  const shown = editor === "alle"
+    ? projects
+    : editor === "geen"
+      ? projects.filter((p) => !p.editorId)
+      : activeGroup
+        ? projects.filter((p) => p.editorId && activeGroup.ids.has(p.editorId))
+        : projects;
   const geenCount = projects.filter((p) => !p.editorId).length;
 
   const byPhase = useMemo(() => {
@@ -88,22 +115,22 @@ export function EditingProjects({
           <TextTab active={editor === "alle"} onClick={() => setEditor("alle")}>
             Hoofdtabel <span className="opacity-70">· {projects.length}</span>
           </TextTab>
-          {editors.map((e) => {
-            const on = editor === e.id;
-            const c = editorColor(e.fullName);
+          {groups.list.map((g) => {
+            const on = editor === g.key;
+            const c = g.color;
             return (
               <button
-                key={e.id}
+                key={g.key}
                 type="button"
-                onClick={() => setEditor(e.id)}
+                onClick={() => setEditor(g.key)}
                 className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3.5 text-sm font-semibold transition ${on ? "bg-[var(--color-surface)] text-[var(--color-ink)] shadow-[var(--shadow-card)]" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
                 style={on ? { borderColor: c, boxShadow: `0 0 0 2px ${c}` } : undefined}
               >
                 <span className="rounded-full p-[2px]" style={{ background: on ? c : "transparent" }}>
-                  <TeamAvatar name={e.fullName} avatarUrl={e.avatarUrl ?? null} size={44} />
+                  <TeamAvatar name={g.name} avatarUrl={g.avatarUrl} size={44} />
                 </span>
-                {editorDisplayName(e.fullName)}
-                <span className="grid min-w-5 place-items-center rounded-full px-1 text-2xs font-bold text-white" style={{ background: c }}>{counts.get(e.id) ?? 0}</span>
+                {g.displayName}
+                <span className="grid min-w-5 place-items-center rounded-full px-1 text-2xs font-bold text-white" style={{ background: c }}>{counts.get(g.key) ?? 0}</span>
               </button>
             );
           })}
