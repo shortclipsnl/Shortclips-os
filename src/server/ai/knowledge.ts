@@ -6,6 +6,7 @@ import {
   aiOutputs,
   clientAiProfiles,
   clientContacts,
+  clientKnowledge,
   clients,
   deliverables,
   productionDays,
@@ -52,6 +53,34 @@ export async function centralKnowledgeText(categories?: string[]): Promise<strin
   const filtered = categories ? rows.filter((r) => categories.includes(r.category)) : rows;
   if (filtered.length === 0) return "";
   return filtered.map((r) => `## ${r.title} (${r.category})\n${r.body}`).join("\n\n");
+}
+
+/* ------------------------------------------------------------------ *
+ * Geleerde klantvoorkeuren (client_knowledge) — het "leer"-geheugen.
+ * Hiermee onthoudt de AI bevestigde voorkeuren en terugkerende correcties
+ * per klant, en gebruikt die bij nieuwe scripts, captions en antwoorden.
+ * ------------------------------------------------------------------ */
+
+export type ClientKnowledgeRow = {
+  id: string; category: string; title: string; body: string; tags: string[];
+  source: string; isPinned: boolean; createdAt: Date;
+};
+
+export async function getClientKnowledgeForAi(clientId: string, limit = 24): Promise<ClientKnowledgeRow[]> {
+  const rows = await db
+    .select({ id: clientKnowledge.id, category: clientKnowledge.category, title: clientKnowledge.title, body: clientKnowledge.body, tags: clientKnowledge.tags, source: clientKnowledge.source, isPinned: clientKnowledge.isPinned, createdAt: clientKnowledge.createdAt })
+    .from(clientKnowledge)
+    .where(and(eq(clientKnowledge.clientId, clientId), isNull(clientKnowledge.deletedAt)))
+    .orderBy(desc(clientKnowledge.isPinned), desc(clientKnowledge.createdAt))
+    .limit(limit);
+  return rows.map((r) => ({ ...r, tags: (r.tags as string[]) ?? [] }));
+}
+
+/** Geleerde voorkeuren als tekstblok voor de AI-prompt (leeg = niets geleerd). */
+export async function clientLearnedText(clientId: string): Promise<string> {
+  const rows = await getClientKnowledgeForAi(clientId, 24);
+  if (rows.length === 0) return "";
+  return rows.map((r) => `- [${r.category}] ${r.title}: ${r.body}`).join("\n");
 }
 
 export async function getClientAiProfile(clientId: string) {

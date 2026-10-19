@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { FileText, Loader2, Sparkles, X } from "lucide-react";
 import { generateBriefing, type EditorBriefing } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote } from "@/components/ui";
-import { CopyButton, HistoryPanel, NoProviderNote, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
+import { CopyButton, HistoryPanel, NoProviderNote, SaveInsight, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
 
 type ClientOption = { id: string; name: string };
 
@@ -143,18 +143,21 @@ export function BriefingMaker({
         {err ? <div className="mt-3"><ErrorNote>{err}</ErrorNote></div> : null}
       </Card>
 
-      {result ? <BriefingView briefing={result} /> : null}
+      {result ? <BriefingView briefing={result} clientId={clientId} /> : null}
     </div>
   );
 }
 
-function BriefingView({ briefing }: { briefing: EditorBriefing }) {
+function BriefingView({ briefing, clientId }: { briefing: EditorBriefing; clientId: string }) {
   const intro = briefing.projectIntro;
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">Briefing</h2>
-        <CopyButton label="Hele briefing kopiëren" text={briefingToText(briefing)} />
+        <div className="flex items-center gap-2">
+          <SaveInsight clientId={clientId} defaultCategory="editing_style" />
+          <CopyButton label="Hele briefing kopiëren" text={briefingToText(briefing)} />
+        </div>
       </div>
       {/* Compacte, scanbare briefing — één kaart die je in z'n geheel kunt kopiëren. */}
       <Card>

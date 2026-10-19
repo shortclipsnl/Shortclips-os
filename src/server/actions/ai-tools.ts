@@ -11,6 +11,7 @@ import { extractDocxText } from "@/server/ai/docx";
 import {
   captionProfileToText,
   centralKnowledgeText,
+  clientLearnedText,
   getClientAiProfile,
   getClientContextFacts,
   listActiveClientsForAi,
@@ -93,6 +94,7 @@ export async function generateCaptions(input: {
     const profile = await getClientAiProfile(input.clientId);
     const caption = captionProfileToText((profile?.captionProfile as CaptionProfile) ?? null);
     const knowledge = await centralKnowledgeText(["branding", "schrijfstijl", "communicatie", "algemeen"]);
+    const learned = await clientLearnedText(input.clientId);
 
     const system = `${SHORTCLIPS_IDENTITY}
 
@@ -100,6 +102,7 @@ Je maakt social media captions voor klant "${name}".
 
 CAPTIONPROFIEL VAN DEZE KLANT:
 ${caption}
+${learned ? `\nGELEERDE KLANTVOORKEUREN (bevestigd uit eerder werk — volg deze):\n${learned}\n` : ""}
 
 ${knowledge ? `ALGEMENE SHORTCLIPS-KENNIS:\n${knowledge}\n` : ""}
 REGELS VOOR DE CAPTIONS:
@@ -286,6 +289,7 @@ export async function generateBriefing(input: {
     const profile = await getClientAiProfile(input.clientId);
     const editing = (profile?.editingProfile as EditingProfile) ?? {};
     const guidelines = await centralKnowledgeText(["editing", "kwaliteit"]);
+    const learned = await clientLearnedText(input.clientId);
 
     const system = `${SHORTCLIPS_IDENTITY}
 
@@ -294,6 +298,7 @@ Je maakt een praktische, scanbare editingbriefing voor een editor, voor klant "$
 ALGEMENE SHORTCLIPS-EDITINGRICHTLIJNEN (algemeen, niet per se uit dit script):
 ${guidelines || "- Kies momenten waarop presentatoren goed in beeld staan; vermijd ongelukkige gezichtsuitdrukkingen, gesloten ogen en vreemde tussenframes.\n- Houd belangrijke producten, auto's en onderwerpen goed zichtbaar; plaats tekst/ondertiteling niet over belangrijke onderdelen.\n- Zorg dat de eerste seconden visueel sterk zijn; houd het tempo passend bij het concept.\n- Gebruik alleen relevante, beschikbare beelden; vermijd onnodige effecten. Edit sluit aan op de premium uitstraling van Shortclips."}
 ${editing.aandachtspunten ? `\nKLANTSPECIFIEKE EDITINGVOORKEUREN:\n${editing.aandachtspunten}` : ""}
+${learned ? `\nGELEERDE KLANTVOORKEUREN (bevestigd uit eerder werk — houd hier rekening mee):\n${learned}` : ""}
 
 HEEL BELANGRIJK: presenteer nooit beelden, shots of opnamemomenten als daadwerkelijk beschikbaar wanneer die alleen uit het script worden afgeleid. Als een script bijvoorbeeld zegt dat een auto van binnen en buiten getoond wordt, adviseer dan daarop te letten, maar beweer niet dat die beelden er ook echt zijn. Maak onderscheid tussen algemene richtlijnen en instructies die echt uit het script volgen.`;
 
@@ -422,6 +427,7 @@ export async function generateReply(input: {
     const profile = clientId ? await getClientAiProfile(clientId) : null;
     const comms = (profile?.communicationProfile as CommunicationProfile) ?? {};
     const facts = clientId ? await getClientContextFacts(viewer, clientId) : "";
+    const learned = clientId ? await clientLearnedText(clientId) : "";
     const knowledge = await centralKnowledgeText(["communicatie", "productie", "escalatie", "algemeen"]);
 
     const system = `${SHORTCLIPS_IDENTITY}
@@ -432,7 +438,8 @@ ${name ? `Dit bericht hoort bij klant "${name}".
 
 LIVE KLANTCONTEXT (uit ons dashboard):
 ${facts}
-${comms.afspraken ? `\nAFSPRAKEN MET DEZE KLANT:\n${comms.afspraken}` : ""}` : `Het is niet gelukt om automatisch vast te stellen bij welke klant dit bericht hoort. Schrijf een correct, algemeen Shortclips-antwoord zonder klantspecifieke aannames, en geef in "note" aan dat de klant niet automatisch herkend kon worden.`}
+${comms.afspraken ? `\nAFSPRAKEN MET DEZE KLANT:\n${comms.afspraken}` : ""}
+${learned ? `\nGELEERDE KLANTVOORKEUREN (bevestigd uit eerder werk):\n${learned}` : ""}` : `Het is niet gelukt om automatisch vast te stellen bij welke klant dit bericht hoort. Schrijf een correct, algemeen Shortclips-antwoord zonder klantspecifieke aannames, en geef in "note" aan dat de klant niet automatisch herkend kon worden.`}
 
 ${knowledge ? `SHORTCLIPS-KENNISBANK (werkwijze, afspraken, escalatie):\n${knowledge}\n` : ""}
 COMMUNICATIESTIJL:

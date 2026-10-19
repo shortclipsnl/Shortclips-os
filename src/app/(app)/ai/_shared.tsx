@@ -1,7 +1,76 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Copy, History, Lightbulb, Save } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Brain, Check, Copy, History, Lightbulb, Loader2, Save } from "lucide-react";
+import { saveClientKnowledge } from "@/server/actions/client-knowledge";
+
+/** Vaste categorieën voor geleerde klantvoorkeuren (de AI-leerlaag). */
+export const CLIENT_KNOWLEDGE_CATEGORIES: { value: string; label: string }[] = [
+  { value: "recurring_correction", label: "Terugkerende correctie" },
+  { value: "tone_of_voice", label: "Tone of voice" },
+  { value: "hook_style", label: "Hookstijl" },
+  { value: "editing_style", label: "Editingstijl" },
+  { value: "avoid_words", label: "Woorden/onderwerpen vermijden" },
+  { value: "strong_example", label: "Sterk voorbeeld" },
+  { value: "weak_example", label: "Zwak voorbeeld" },
+  { value: "fact", label: "Feit over de klant" },
+];
+
+/**
+ * "Bewaar als klantvoorkeur" — de leer-functie die in elke AI-tool past.
+ * Legt een gecontroleerde voorkeur vast bij de klant; toekomstige AI-generaties
+ * gebruiken die automatisch. Altijd een bewuste actie, nooit automatisch.
+ */
+export function SaveInsight({ clientId, defaultBody = "", defaultCategory = "recurring_correction" }: { clientId: string; defaultBody?: string; defaultCategory?: string }) {
+  const [open, setOpen] = useState(false);
+  const [cat, setCat] = useState(defaultCategory);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState(defaultBody);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  if (!clientId) return null;
+
+  function save() {
+    setErr(null);
+    start(async () => {
+      const res = await saveClientKnowledge({ clientId, category: cat, title, body, source: "manual" });
+      if (res.ok) { setSaved(true); setOpen(false); setTitle(""); }
+      else setErr(res.message);
+    });
+  }
+
+  if (saved) {
+    return <span className="inline-flex items-center gap-1 text-2xs font-medium text-[var(--color-good)]"><Check className="size-3.5" /> Opgeslagen als klantvoorkeur</span>;
+  }
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} title="Een bevestigde voorkeur van deze klant vastleggen zodat de AI er voortaan rekening mee houdt"
+        className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] px-2.5 py-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+        <Brain className="size-3.5" /> Bewaar als klantvoorkeur
+      </button>
+    );
+  }
+  return (
+    <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={cat} onChange={(e) => setCat(e.target.value)} className="sc-input h-8 w-auto py-0 text-xs">
+          {CLIENT_KNOWLEDGE_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+        </select>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Korte titel (bv. 'Hooks korter')" className="sc-input h-8 flex-1 py-0 text-xs" />
+      </div>
+      <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder="De voorkeur/correctie zoals de AI die moet onthouden." className="sc-input mt-2 resize-y text-xs" />
+      {err ? <p className="mt-1 text-2xs text-[var(--color-bad)]">{err}</p> : null}
+      <div className="mt-2 flex items-center gap-2">
+        <button type="button" onClick={save} disabled={pending} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-50">
+          {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />} Opslaan bij klant
+        </button>
+        <button type="button" onClick={() => setOpen(false)} className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleren</button>
+      </div>
+    </div>
+  );
+}
 
 /** Leest een bestand als base64 (zonder de data:-prefix). */
 export function fileToBase64(file: File): Promise<string> {

@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { CalendarPlus, Check, FileText, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
 import { addCaptionToPlanning, generateCaptions, regenerateOneCaption, type ShortCaption } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote } from "@/components/ui";
-import { CopyButton, HistoryPanel, NoProviderNote, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
+import { CopyButton, HistoryPanel, NoProviderNote, SaveInsight, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
 
 type ClientOption = { id: string; name: string };
 
@@ -151,9 +151,12 @@ export function CaptionMaker({
 
       {results && results.length > 0 ? (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">{results.length} shorts · captions</h2>
-            <CopyButton label="Alles kopiëren" text={results.map((r, i) => exportShort(r, i)).join("\n\n———\n\n")} />
+            <div className="flex items-center gap-2">
+              <SaveInsight clientId={clientId} defaultCategory="tone_of_voice" />
+              <CopyButton label="Alles kopiëren" text={results.map((r, i) => exportShort(r, i)).join("\n\n———\n\n")} />
+            </div>
           </div>
           {results.map((short, i) => (
             <ShortBlock
