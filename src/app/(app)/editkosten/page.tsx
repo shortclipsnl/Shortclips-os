@@ -38,7 +38,7 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
 
   // Maandoverzicht: winst per maand over alle klanten (uit de maandstaten).
-  const [monthAgg, vgAgg] = await Promise.all([
+  const [monthAgg, vgAgg, editTotalRes] = await Promise.all([
     db.execute(sql`
       select period,
         coalesce(sum(revenue),0)::float rev, coalesce(sum(extra_revenue),0)::float extra,
@@ -59,11 +59,17 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
       where deleted_at is null and status <> 'cancelled'
       group by 1
     `),
+    // Verwachte editkosten/maand, live gekoppeld aan de klanten: Σ prijs/video × shorts.
+    db.execute(sql`
+      select coalesce(sum(coalesce(edit_cost_per_video,0) * coalesce(monthly_video_quota,0)),0)::float total
+      from clients where deleted_at is null and status = 'active'
+    `),
   ]);
   const vgByPeriod = new Map<string, { days: number; hours: number; cost: number }>();
   for (const v of rows2<{ period: string; shoot_days: number; hours: number }>(vgAgg)) {
     vgByPeriod.set(v.period, { days: Number(v.shoot_days), hours: Number(v.hours), cost: Number(v.hours) * VG_RATE });
   }
+  const liveEditTotal = Number(rows2<{ total: number }>(editTotalRes)[0]?.total ?? 0);
 
   type MRow = { period: string; rev: number; extra: number; edit: number; shoot: number; strat: number; other: number; n: number };
   const monthsRaw = rows2<MRow>(monthAgg);
@@ -71,8 +77,10 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
     const income = m.rev + m.extra;
     const vg = vgByPeriod.get(m.period)?.cost ?? 0;
     const overige = m.strat + m.other; // directe kosten excl. opname (die zit in vg)
-    const net = income - m.edit - vg - overige;
-    return { ...m, income, vg, overige, net, hasOverige: overige > 0, marginPct: income > 0 ? Math.round((net / income) * 100) : 0 };
+    // Editkosten live gekoppeld aan de contracten (prijs/video × shorts), niet de snapshot.
+    const edit = liveEditTotal;
+    const net = income - edit - vg - overige;
+    return { ...m, income, edit, vg, overige, net, hasOverige: overige > 0, marginPct: income > 0 ? Math.round((net / income) * 100) : 0 };
   });
   const latestPeriod = months.length ? months[months.length - 1]!.period : null;
 
@@ -90,7 +98,8 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
       ? db.execute(sql`
           select c.id, c.name, c.slug, c.color, c.logo_url,
             (m.revenue + m.extra_revenue)::float income,
-            m.edit_cost::float edit
+            -- Editkosten live gekoppeld aan de klant: prijs/video × shorts per maand.
+            (coalesce(c.edit_cost_per_video,0) * coalesce(c.monthly_video_quota,0))::float edit
           from client_finance_months m
           join clients c on c.id = m.client_id and c.deleted_at is null
           where m.period = ${selPeriod}
