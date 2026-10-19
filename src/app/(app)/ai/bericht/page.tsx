@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requirePermission } from "@/server/auth/context";
-import { listActiveClientsForAi, listAiOutputs } from "@/server/ai/knowledge";
+import { listAiOutputs } from "@/server/ai/knowledge";
 import { aiConfigured } from "@/server/ai/client";
 import { PageHeader } from "@/components/ui";
 import { BerichtAssistent } from "./bericht-ui";
@@ -11,10 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function BerichtPage() {
   const viewer = await requirePermission("ai:read");
-  const [clients, outputs] = await Promise.all([
-    listActiveClientsForAi(viewer),
-    listAiOutputs(viewer, "message"),
-  ]);
+  const outputs = await listAiOutputs(viewer, "message");
   const recent = outputs.map((o) => ({
     id: o.id,
     title: o.title,
@@ -27,9 +24,9 @@ export default async function BerichtPage() {
     <div className="mx-auto max-w-[1100px]">
       <PageHeader
         title="AI Klantbericht Assistent"
-        description="Stel snel een professioneel conceptantwoord op in de Shortclips-stijl, met context uit het dashboard."
+        description="Sleep een screenshot erin of plak het bericht — de assistent herkent zelf de klant en het kanaal en stelt een conceptantwoord op in de Shortclips-stijl."
       />
-      <BerichtAssistent clients={clients} aiReady={aiConfigured()} recent={recent} />
+      <BerichtAssistent aiReady={aiConfigured()} recent={recent} />
     </div>
   );
 }

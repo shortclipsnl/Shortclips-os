@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Loader2, Sparkles, Upload } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { FileText, Loader2, Sparkles, X } from "lucide-react";
 import { generateBriefing, type EditorBriefing } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote } from "@/components/ui";
 import { CopyButton, HistoryPanel, NoProviderNote, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
 
 type ClientOption = { id: string; name: string };
+
+const isDoc = (n: string) => /\.(pdf|docx)$/i.test(n);
 
 export function BriefingMaker({
   clients,
@@ -18,19 +20,22 @@ export function BriefingMaker({
   recent: HistoryEntry<EditorBriefing>[];
 }) {
   const [clientId, setClientId] = useState("");
-  const [projectName, setProjectName] = useState("");
-  const [editorName, setEditorName] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [scriptText, setScriptText] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [docxBase64, setDocxBase64] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const [result, setResult] = useState<EditorBriefing | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   async function onFile(file: File | undefined) {
     if (!file) return;
+    if (!isDoc(file.name)) {
+      setErr("Alleen een PDF- of Word-bestand (.pdf of .docx).");
+      return;
+    }
+    setErr(null);
     setFileName(file.name);
     const b64 = await fileToBase64(file);
     if (file.name.toLowerCase().endsWith(".docx")) {
@@ -42,14 +47,30 @@ export function BriefingMaker({
     }
   }
 
+  function clearFile() {
+    setFileName(null);
+    setPdfBase64(null);
+    setDocxBase64(null);
+  }
+
+  async function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    await onFile(e.dataTransfer.files?.[0]);
+  }
+
   function run() {
     if (!clientId) {
       setErr("Kies eerst een klant.");
       return;
     }
+    if (!pdfBase64 && !docxBase64) {
+      setErr("Sleep het scriptbestand erin (PDF of Word).");
+      return;
+    }
     setErr(null);
     start(async () => {
-      const res = await generateBriefing({ clientId, projectName, editorName, deadline, scriptText, pdfBase64: pdfBase64 ?? undefined, docxBase64: docxBase64 ?? undefined });
+      const res = await generateBriefing({ clientId, pdfBase64: pdfBase64 ?? undefined, docxBase64: docxBase64 ?? undefined });
       if (res.ok) setResult(res.data);
       else setErr(res.message);
     });
@@ -59,8 +80,8 @@ export function BriefingMaker({
     <div className="space-y-5">
       <ToolHowTo
         steps={[
-          "Kies de klant en het script of de video.",
-          "Je krijgt een complete editor-briefing met structuur, hooks en aandachtspunten.",
+          "Kies de klant en sleep het scriptbestand erin (PDF of Word).",
+          "Je krijgt een compacte briefing: hoeveel video's het zijn en wat per video belangrijk is.",
           "Controleer hem en deel hem met je editor.",
         ]}
       />
@@ -68,7 +89,37 @@ export function BriefingMaker({
       <HistoryPanel items={recent} onLoad={(o) => setResult(o)} />
 
       <Card>
-        <div className="grid gap-4 md:grid-cols-4">
+        {/* Scriptbestand staat links en is de hoofdinvoer; klant kiezen rechts. */}
+        <div className="grid gap-4 md:grid-cols-[1fr_240px]">
+          <div>
+            <label className="sc-label">Scriptbestand</label>
+            {fileName ? (
+              <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-line-strong)] bg-[var(--color-surface-sunken)] px-4 py-5">
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <FileText className="size-6 shrink-0 text-[var(--color-brand-600)]" strokeWidth={1.75} />
+                  <span className="truncate text-sm font-medium">{fileName}</span>
+                </span>
+                <button type="button" onClick={clearFile} aria-label="Bestand verwijderen" className="shrink-0 rounded p-1 text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-bad)]">
+                  <X className="size-4" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={onDrop}
+                onClick={() => inputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[var(--radius-md)] border-2 border-dashed px-4 py-8 text-center transition ${dragOver ? "border-[var(--color-brand-500)] bg-[var(--color-brand-50)]" : "border-[var(--color-line-strong)] hover:bg-[var(--color-surface-sunken)]"}`}
+              >
+                <FileText className="size-7 text-[var(--color-ink-faint)]" strokeWidth={1.5} />
+                <span className="text-sm font-medium">Sleep hier het scriptbestand naartoe</span>
+                <span className="text-xs text-[var(--color-ink-faint)]">of klik om te kiezen · PDF of Word (.docx)</span>
+              </div>
+            )}
+            <input ref={inputRef} type="file" accept=".pdf,.docx,application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+          </div>
           <div>
             <label className="sc-label">Klant</label>
             <select className="sc-input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
@@ -77,33 +128,9 @@ export function BriefingMaker({
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="sc-label">Project / opnamesessie</label>
-            <input className="sc-input" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
-          </div>
-          <div>
-            <label className="sc-label">Editor (optioneel)</label>
-            <input className="sc-input" value={editorName} onChange={(e) => setEditorName(e.target.value)} />
-          </div>
-          <div>
-            <label className="sc-label">Deadline (optioneel)</label>
-            <input className="sc-input" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-[1fr_220px]">
-          <div>
-            <label className="sc-label">Scripts (plakken)</label>
-            <textarea className="sc-input resize-y font-mono text-xs" rows={10} placeholder="Plak de scripts van de opnamesessie." value={scriptText} onChange={(e) => setScriptText(e.target.value)} />
-          </div>
-          <div>
-            <label className="sc-label">of Script-bestand (PDF/Word)</label>
-            <label className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] px-3 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]">
-              <Upload className="size-4" />
-              {fileName ?? "Bestand kiezen"}
-              <input type="file" accept=".pdf,.docx,application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-            </label>
+            <p className="mt-2 text-xs text-[var(--color-ink-faint)]">
+              De assistent telt zelf hoeveel video&apos;s het zijn en maakt per video een korte, scanbare omschrijving.
+            </p>
           </div>
         </div>
 
@@ -133,10 +160,8 @@ function BriefingView({ briefing }: { briefing: EditorBriefing }) {
         <h3 className="text-sm font-semibold">Project</h3>
         <dl className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
           <Row k="Klant" v={intro?.client} />
-          <Row k="Project" v={intro?.project} />
-          <Row k="Aantal shorts" v={String(intro?.aantalShorts ?? "")} />
-          <Row k="Editor" v={intro?.editor} />
-          <Row k="Deadline" v={intro?.deadline} />
+          <Row k="Aantal video's" v={String(intro?.aantalShorts ?? "")} />
+          {intro?.project ? <Row k="Project" v={intro.project} /> : null}
         </dl>
         {intro?.omschrijving ? <p className="mt-3 text-sm text-[var(--color-ink-muted)]">{intro.omschrijving}</p> : null}
         {intro?.algemeneAandachtspunten?.length ? (
@@ -185,7 +210,7 @@ function Line({ k, v }: { k: string; v?: string }) {
 
 function briefingToText(b: EditorBriefing): string {
   const i = b.projectIntro;
-  const head = `EDITINGBRIEFING\nKlant: ${i?.client ?? ""}\nProject: ${i?.project ?? ""}\nAantal shorts: ${i?.aantalShorts ?? ""}\nEditor: ${i?.editor ?? ""}\nDeadline: ${i?.deadline ?? ""}\n\n${i?.omschrijving ?? ""}\n\nAlgemene aandachtspunten:\n${(i?.algemeneAandachtspunten ?? []).map((a) => `- ${a}`).join("\n")}`;
+  const head = `EDITINGBRIEFING\nKlant: ${i?.client ?? ""}\nAantal video's: ${i?.aantalShorts ?? ""}${i?.project ? `\nProject: ${i.project}` : ""}\n\n${i?.omschrijving ?? ""}\n\nAlgemene aandachtspunten:\n${(i?.algemeneAandachtspunten ?? []).map((a) => `- ${a}`).join("\n")}`;
   const shorts = (b.shorts ?? [])
     .map((s, n) => `\n\nSHORT ${n + 1}: ${s.titel}\n- Omschrijving: ${s.omschrijving}\n- Doel: ${s.doel}\n- Hook: ${s.hook}\n- Beelden: ${s.beelden}\n- Opbouw: ${s.opbouw}\n- Tekstelementen: ${s.tekstelementen}\n- Montagekeuzes: ${s.montagekeuzes}\n- Niet vergeten: ${s.nietVergeten}`)
     .join("");

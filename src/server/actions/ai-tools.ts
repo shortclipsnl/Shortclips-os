@@ -13,6 +13,7 @@ import {
   centralKnowledgeText,
   getClientAiProfile,
   getClientContextFacts,
+  listActiveClientsForAi,
   type CaptionProfile,
   type CommunicationProfile,
   type EditingProfile,
@@ -300,12 +301,7 @@ ${editing.aandachtspunten ? `\nKLANTSPECIFIEKE EDITINGVOORKEUREN:\n${editing.aan
 
 HEEL BELANGRIJK: presenteer nooit beelden, shots of opnamemomenten als daadwerkelijk beschikbaar wanneer die alleen uit het script worden afgeleid. Als een script bijvoorbeeld zegt dat een auto van binnen en buiten getoond wordt, adviseer dan daarop te letten, maar beweer niet dat die beelden er ook echt zijn. Maak onderscheid tussen algemene richtlijnen en instructies die echt uit het script volgen.`;
 
-    const user = `Hieronder staan de scripts van één opnamesessie. Herken de afzonderlijke scripts. Analyseer per short het concept, de hook, de opbouw en de gewenste montage. Maak één overzichtelijke briefing voor het hele project.
-
-Projectgegevens (gebruik wat beschikbaar is, verzin niets):
-- Project/opnamesessie: ${input.projectName?.trim() || "(niet opgegeven)"}
-- Editor: ${input.editorName?.trim() || "(niet opgegeven)"}
-- Deadline: ${input.deadline?.trim() || "(niet opgegeven)"}
+    const user = `Hieronder staan de scripts van één opnamesessie (uit het aangeleverde scriptbestand). Herken de afzonderlijke scripts. Tel hoeveel video's/shorts het zijn. Analyseer per short het concept, de hook, de opbouw en de gewenste montage. Maak één compacte, overzichtelijke briefing voor het hele project: hoeveel video's het zijn en wat per video belangrijk is. Verzin geen project, editor of deadline — laat die velden leeg als ze niet uit het script blijken.
 
 Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder omliggende tekst:
 {
@@ -372,35 +368,77 @@ export type ReplyDraft = {
   isSensitive: boolean;
   needsJarno: boolean;
   note: string;
+  /** Welke klant automatisch herkend is (null als het niet lukte). */
+  detectedClientName: string | null;
 };
 
-export async function generateReply(input: {
-  clientId: string;
+/**
+ * Herkent automatisch bij welke actieve klant een bericht/screenshot hoort,
+ * puur door het model te laten kiezen uit de lijst met klantnamen. Geeft null
+ * terug als het niet met redelijke zekerheid kan.
+ */
+async function detectClientFromMessage(input: {
   messageText?: string;
-  channelHint?: "whatsapp" | "email" | "auto";
+  images?: AiImage[];
+  candidates: { id: string; name: string }[];
+}): Promise<{ id: string; name: string } | null> {
+  if (input.candidates.length === 0) return null;
+  const list = input.candidates.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
+  const system = `Je bepaalt bij welke klant van Shortclips een ontvangen bericht of screenshot hoort. Kies ALLEEN uit de genummerde klantenlijst. Gebruik aanwijzingen zoals de naam van de afzender, het bedrijf, de contactpersoon of de inhoud. Als je het niet met redelijke zekerheid kunt bepalen, kies 0.`;
+  const user = `Klanten:
+${list}
+
+Bepaal bij welk klantnummer het onderstaande bericht/screenshot hoort. Geef UITSLUITEND geldige JSON terug: {"nummer": <getal; 0 als onbekend>}.
+
+${input.messageText?.trim() ? `Het bericht:\n\n${input.messageText.trim()}` : "Het bericht staat in de bijgevoegde screenshot(s)."}`;
+  const res = await runJsonPrompt<{ nummer: number }>({ system, user, images: input.images, maxTokens: 200 });
+  if (!res.ok) return null;
+  const idx = Number(res.data?.nummer) - 1;
+  if (!Number.isInteger(idx) || idx < 0 || idx >= input.candidates.length) return null;
+  return input.candidates[idx] ?? null;
+}
+
+export async function generateReply(input: {
+  /** Optioneel: als een klant al bekend is (bijv. uit geschiedenis). Anders
+   *  wordt de klant automatisch herkend uit het bericht/screenshot. */
+  clientId?: string;
+  messageText?: string;
   tone?: "standaard" | "korter" | "vriendelijker" | "directer" | "uitgebreider";
   images?: AiImage[];
 }): Promise<AiActionResult<ReplyDraft>> {
   try {
     const viewer = await requirePermission("ai:read");
-    assertClientAccess(viewer, input.clientId);
     if (!input.messageText?.trim() && (!input.images || input.images.length === 0)) {
-      return { ok: false, message: "Plak het klantbericht of upload een screenshot." };
+      return { ok: false, message: "Plak het klantbericht of sleep een screenshot erin." };
     }
 
-    const name = await clientName(input.clientId);
-    const profile = await getClientAiProfile(input.clientId);
+    // Klant bepalen: gebruik de meegegeven klant, of herken hem automatisch.
+    let clientId = input.clientId;
+    if (clientId) {
+      assertClientAccess(viewer, clientId);
+    } else {
+      const candidates = await listActiveClientsForAi(viewer);
+      const detected = await detectClientFromMessage({ messageText: input.messageText, images: input.images, candidates });
+      clientId = detected?.id;
+    }
+
+    // Context opbouwen. Met herkende klant: volledige dashboardcontext.
+    // Zonder klant: algemeen antwoord met een duidelijke notitie.
+    const name = clientId ? await clientName(clientId) : null;
+    const profile = clientId ? await getClientAiProfile(clientId) : null;
     const comms = (profile?.communicationProfile as CommunicationProfile) ?? {};
-    const facts = await getClientContextFacts(viewer, input.clientId);
+    const facts = clientId ? await getClientContextFacts(viewer, clientId) : "";
     const knowledge = await centralKnowledgeText(["communicatie", "productie", "escalatie", "algemeen"]);
 
     const system = `${SHORTCLIPS_IDENTITY}
 
-Je helpt een medewerker een professioneel conceptantwoord op te stellen voor een bericht van klant "${name}". Het antwoord is altijd een CONCEPT — er wordt niets automatisch verstuurd.
+Je helpt een medewerker een professioneel conceptantwoord op te stellen voor een ontvangen klantbericht. Het antwoord is altijd een CONCEPT — er wordt niets automatisch verstuurd.
+
+${name ? `Dit bericht hoort bij klant "${name}".
 
 LIVE KLANTCONTEXT (uit ons dashboard):
 ${facts}
-${comms.afspraken ? `\nAFSPRAKEN MET DEZE KLANT:\n${comms.afspraken}` : ""}
+${comms.afspraken ? `\nAFSPRAKEN MET DEZE KLANT:\n${comms.afspraken}` : ""}` : `Het is niet gelukt om automatisch vast te stellen bij welke klant dit bericht hoort. Schrijf een correct, algemeen Shortclips-antwoord zonder klantspecifieke aannames, en geef in "note" aan dat de klant niet automatisch herkend kon worden.`}
 
 ${knowledge ? `SHORTCLIPS-KENNISBANK (werkwijze, afspraken, escalatie):\n${knowledge}\n` : ""}
 COMMUNICATIESTIJL:
@@ -417,7 +455,7 @@ ESCALATIE: signaleer gevoelige onderwerpen zoals klachten, financiële afspraken
         ? `\n\nMaak het antwoord ${input.tone}.`
         : "";
 
-    const user = `Hier is een ontvangen klantbericht (als tekst en/of screenshot). Lees het, bepaal of het een WhatsApp-bericht of e-mail is${input.channelHint && input.channelHint !== "auto" ? ` (hint: ${input.channelHint})` : ""}, begrijp wat de klant vraagt, en stel één passend conceptantwoord op in de Shortclips-stijl.${toneInstr}
+    const user = `Hier is een ontvangen klantbericht (als tekst en/of screenshot). Lees het, bepaal zelf of het een WhatsApp-bericht of e-mail is, begrijp wat de klant vraagt, en stel één passend conceptantwoord op in de Shortclips-stijl.${toneInstr}
 
 Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder omliggende tekst:
 {
@@ -441,16 +479,20 @@ ${input.messageText?.trim() ? `Het bericht:\n\n${input.messageText.trim()}` : "H
         ? { ok: false, reason: "no_provider", message: "Er is nog geen AI-sleutel ingesteld." }
         : { ok: false, message: res.error ?? "Genereren mislukt." };
     }
-    await saveOutput({
-      clientId: input.clientId,
-      tool: "message",
-      title: res.data.channel === "email" ? "E-mailconcept" : "WhatsApp-concept",
-      inputSummary: (input.messageText ?? "Screenshot").slice(0, 200),
-      output: res.data,
-      userId: viewer.id,
-    });
-    await auditLog({ viewer, action: "ai.reply_generated", entityType: "client", entityId: input.clientId, clientId: input.clientId, changes: { needsJarno: res.data.needsJarno } });
-    return { ok: true, data: res.data };
+    const data: ReplyDraft = { ...res.data, detectedClientName: name };
+    // Alleen bewaren in de geschiedenis als we een klant hebben (vereist veld).
+    if (clientId) {
+      await saveOutput({
+        clientId,
+        tool: "message",
+        title: data.channel === "email" ? "E-mailconcept" : "WhatsApp-concept",
+        inputSummary: (input.messageText ?? "Screenshot").slice(0, 200),
+        output: data,
+        userId: viewer.id,
+      });
+      await auditLog({ viewer, action: "ai.reply_generated", entityType: "client", entityId: clientId, clientId, changes: { needsJarno: data.needsJarno } });
+    }
+    return { ok: true, data };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
