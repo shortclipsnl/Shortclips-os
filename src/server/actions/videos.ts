@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -291,6 +291,89 @@ export async function resolveThread(threadId: string): Promise<ActionResult> {
 
     revalidatePath(`/videos/${thread.deliverableId}`);
     return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/** Editing-projecten van een klant — voor het koppelen van een briefing aan
+ *  het project waar hij bij hoort. Nieuwste bovenaan. */
+export async function listClientEditProjects(clientId: string): Promise<{
+  ok: boolean;
+  message?: string;
+  projects: { id: string; title: string; statusLabel: string; hasBriefing: boolean }[];
+}> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    if (!clientId) return { ok: false, message: "Geen klant.", projects: [] };
+    assertClientAccess(viewer, clientId);
+    const rows = await db
+      .select({
+        id: deliverables.id,
+        title: deliverables.title,
+        status: deliverables.status,
+        briefing: deliverables.briefing,
+      })
+      .from(deliverables)
+      .where(and(eq(deliverables.clientId, clientId), isNull(deliverables.deletedAt)))
+      .orderBy(desc(deliverables.statusChangedAt))
+      .limit(60);
+    return {
+      ok: true,
+      projects: rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        statusLabel: VIDEO_STATUS[r.status]?.label ?? r.status,
+        hasBriefing: !!(r.briefing && r.briefing.trim()),
+      })),
+    };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message, projects: [] };
+    throw error;
+  }
+}
+
+const briefingSchema = z.object({
+  videoId: z.string().uuid(),
+  briefing: z.string().trim().min(1, "Lege briefing.").max(8000),
+});
+
+/** De gegenereerde editingbriefing aan een project koppelen: hij verschijnt dan
+ *  op de projectpagina en bij de editor — zo staat de briefing waar hij hoort. */
+export async function attachBriefingToProject(input: { videoId: string; briefing: string }): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const p = briefingSchema.safeParse(input);
+    if (!p.success) return { ok: false, message: p.error.issues[0]?.message ?? "Ongeldig." };
+    const video = await loadVideo(p.data.videoId);
+    if (!video) return { ok: false, message: "Project niet gevonden." };
+    assertClientAccess(viewer, video.clientId);
+
+    await db
+      .update(deliverables)
+      .set({ briefing: p.data.briefing, updatedAt: new Date() })
+      .where(eq(deliverables.id, p.data.videoId));
+
+    await auditLog({
+      viewer,
+      action: "video.briefing_attached",
+      entityType: "deliverable",
+      entityId: p.data.videoId,
+      clientId: video.clientId,
+    });
+    await recordActivity({
+      clientId: video.clientId,
+      type: "video.briefing_attached",
+      title: `Briefing gekoppeld: ${video.title}`,
+      entityType: "deliverable",
+      entityId: p.data.videoId,
+      actor: { id: viewer.id, fullName: viewer.fullName },
+    });
+
+    revalidatePath(`/videos/${p.data.videoId}`);
+    revalidatePath("/videos");
+    return { ok: true, message: "Briefing gekoppeld aan het project." };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;

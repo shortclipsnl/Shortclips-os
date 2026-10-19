@@ -1,12 +1,15 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { FileText, Loader2, Sparkles, X } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { ArrowRight, Check, FileText, Link2, Loader2, Sparkles, X } from "lucide-react";
 import { generateBriefing, type EditorBriefing } from "@/server/actions/ai-tools";
+import { attachBriefingToProject, listClientEditProjects } from "@/server/actions/videos";
 import { Button, Card, ErrorNote } from "@/components/ui";
 import { CopyButton, HistoryPanel, NoProviderNote, SaveInsight, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
 
 type ClientOption = { id: string; name: string };
+type EditProject = { id: string; title: string; statusLabel: string; hasBriefing: boolean };
 
 const isDoc = (n: string) => /\.(pdf|docx)$/i.test(n);
 
@@ -14,10 +17,12 @@ export function BriefingMaker({
   clients,
   aiReady,
   recent,
+  canAttach,
 }: {
   clients: ClientOption[];
   aiReady: boolean;
   recent: HistoryEntry<EditorBriefing>[];
+  canAttach: boolean;
 }) {
   const [clientId, setClientId] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
@@ -25,6 +30,9 @@ export function BriefingMaker({
   const [docxBase64, setDocxBase64] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [result, setResult] = useState<EditorBriefing | null>(null);
+  // De klant waarvoor dit resultaat is gemaakt — nodig om de juiste projecten
+  // te tonen bij het koppelen (bij laden uit geschiedenis onbekend → null).
+  const [resultClientId, setResultClientId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,8 +79,10 @@ export function BriefingMaker({
     setErr(null);
     start(async () => {
       const res = await generateBriefing({ clientId, pdfBase64: pdfBase64 ?? undefined, docxBase64: docxBase64 ?? undefined });
-      if (res.ok) setResult(res.data);
-      else setErr(res.message);
+      if (res.ok) {
+        setResult(res.data);
+        setResultClientId(clientId);
+      } else setErr(res.message);
     });
   }
 
@@ -86,7 +96,15 @@ export function BriefingMaker({
         ]}
       />
       {!aiReady ? <NoProviderNote /> : null}
-      <HistoryPanel items={recent} onLoad={(o) => setResult(o)} />
+      <HistoryPanel
+        items={recent}
+        onLoad={(o, entry) => {
+          setResult(o);
+          // Klant uit de geschiedenis terugzoeken, zodat ook een eerder
+          // gemaakte briefing aan een project gekoppeld kan worden.
+          setResultClientId(clients.find((c) => c.name === entry.clientName)?.id ?? null);
+        }}
+      />
 
       <Card>
         {/* Scriptbestand staat links en is de hoofdinvoer; klant kiezen rechts. */}
@@ -143,12 +161,18 @@ export function BriefingMaker({
         {err ? <div className="mt-3"><ErrorNote>{err}</ErrorNote></div> : null}
       </Card>
 
-      {result ? <BriefingView briefing={result} clientId={clientId} /> : null}
+      {result ? (
+        <BriefingView
+          briefing={result}
+          clientId={resultClientId ?? clientId}
+          canAttach={canAttach && !!resultClientId}
+        />
+      ) : null}
     </div>
   );
 }
 
-function BriefingView({ briefing, clientId }: { briefing: EditorBriefing; clientId: string }) {
+function BriefingView({ briefing, clientId, canAttach }: { briefing: EditorBriefing; clientId: string; canAttach: boolean }) {
   const intro = briefing.projectIntro;
   return (
     <div className="space-y-4">
@@ -191,7 +215,93 @@ function BriefingView({ briefing, clientId }: { briefing: EditorBriefing; client
           ))}
         </ol>
       </Card>
+
+      {canAttach ? <AttachToProject clientId={clientId} briefingText={briefingToText(briefing)} /> : null}
     </div>
+  );
+}
+
+/** Koppel de gemaakte briefing aan het editing-project waar hij bij hoort.
+ *  Hij verschijnt dan op de projectpagina en bij de editor — één systeem. */
+function AttachToProject({ clientId, briefingText }: { clientId: string; briefingText: string }) {
+  const [projects, setProjects] = useState<EditProject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [projectId, setProjectId] = useState("");
+  const [done, setDone] = useState<{ id: string; title: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setDone(null);
+    listClientEditProjects(clientId).then((res) => {
+      if (!active) return;
+      setProjects(res.ok ? res.projects : []);
+      if (!res.ok) setErr(res.message ?? "Kon projecten niet laden.");
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [clientId]);
+
+  function attach() {
+    if (!projectId) {
+      setErr("Kies eerst een project.");
+      return;
+    }
+    setErr(null);
+    const chosen = projects.find((p) => p.id === projectId);
+    start(async () => {
+      const res = await attachBriefingToProject({ videoId: projectId, briefing: briefingText });
+      if (res.ok) setDone({ id: projectId, title: chosen?.title ?? "project" });
+      else setErr(res.message ?? "Koppelen mislukt.");
+    });
+  }
+
+  return (
+    <Card className="border-[var(--color-brand-500)]/30 bg-[color-mix(in_srgb,var(--color-brand-500)_4%,var(--color-surface))]">
+      <div className="flex items-center gap-2">
+        <Link2 className="size-4 text-[var(--color-brand-600)]" />
+        <h3 className="text-sm font-semibold">Koppel aan project</h3>
+      </div>
+      <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
+        Zet de briefing bij het editing-project waar hij bij hoort. Hij staat dan meteen op de projectpagina en bij de editor.
+      </p>
+
+      {done ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-good)]/30 bg-[var(--color-good-soft)]/50 px-3 py-2 text-sm text-[#1d6b4c]">
+          <Check className="size-4 shrink-0" />
+          <span>Gekoppeld aan <strong>{done.title}</strong>.</span>
+          <Link href={`/videos/${done.id}`} className="inline-flex items-center gap-1 font-semibold text-[var(--color-brand-600)] hover:underline">
+            Open project <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select
+            className="sc-input min-w-56 flex-1"
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            disabled={loading || pending}
+            aria-label="Project"
+          >
+            <option value="">{loading ? "Projecten laden…" : projects.length ? "Kies een project…" : "Geen projecten gevonden"}</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title} · {p.statusLabel}{p.hasBriefing ? " · heeft al een briefing" : ""}
+              </option>
+            ))}
+          </select>
+          <Button onClick={attach} disabled={pending || loading || !projectId} size="sm">
+            {pending ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
+            Koppel aan project
+          </Button>
+        </div>
+      )}
+      {err ? <div className="mt-2"><ErrorNote>{err}</ErrorNote></div> : null}
+    </Card>
   );
 }
 

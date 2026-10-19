@@ -116,7 +116,7 @@ export type HistoryEntry<T> = {
   output: T;
 };
 
-export function HistoryPanel<T>({ items, onLoad }: { items: HistoryEntry<T>[]; onLoad: (output: T) => void }) {
+export function HistoryPanel<T>({ items, onLoad }: { items: HistoryEntry<T>[]; onLoad: (output: T, entry: HistoryEntry<T>) => void }) {
   const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
   return (
@@ -136,7 +136,7 @@ export function HistoryPanel<T>({ items, onLoad }: { items: HistoryEntry<T>[]; o
             <li key={it.id}>
               <button
                 type="button"
-                onClick={() => onLoad(it.output)}
+                onClick={() => onLoad(it.output, it)}
                 className="flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm hover:bg-[var(--color-surface-2)]"
               >
                 <span className="min-w-0">

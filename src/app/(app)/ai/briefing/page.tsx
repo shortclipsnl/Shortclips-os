@@ -29,7 +29,12 @@ export default async function BriefingPage() {
         title="AI Editor Briefing Maker"
         description="Genereer één duidelijke editingbriefing per opnamesessie op basis van de scripts."
       />
-      <BriefingMaker clients={clients} aiReady={aiConfigured()} recent={recent} />
+      <BriefingMaker
+        clients={clients}
+        aiReady={aiConfigured()}
+        recent={recent}
+        canAttach={viewer.permissions.has("videos:write")}
+      />
     </div>
   );
 }
