@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { dispatch } from "@/server/automation";
 import { notify } from "@/server/notifications";
+import { getVrijdagcheck } from "@/server/vrijdagcheck";
 import { CORE_STAFF_EMAILS } from "@/server/core-staff";
 import { addWorkingDays } from "@/lib/workdays";
 import { runJob } from "./runner";
@@ -498,6 +499,46 @@ export async function runDailyTeamTodoReminder() {
     }
     ctx.log(`${ctx.counters.updated} teamleden een dagelijkse to-do-reminder gestuurd`);
   });
+}
+
+/**
+ * Vrijdagcheck als melding (vervangt de losse pagina): controleert of volgende
+ * week rond staat en stuurt de uitkomst als één melding naar de coördinator(en)
+ * en content creative. Eén melding per week (dedupe). Bedoeld voor een cron op
+ * vrijdag; handmatig triggeren mag op elke dag.
+ */
+export async function runVrijdagcheckNotification() {
+  const { weekLabel, checks, okCount } = await getVrijdagcheck();
+  const open = checks.filter((c) => !c.ok);
+  // Eigenaar erbij: Jarno wil de vrijdagcheck zelf ook als melding ontvangen.
+  const roles = ["owner", "project_coordinator", "content_creator"];
+  const dedupeKey = `vrijdagcheck:${mondayIso()}`;
+
+  if (open.length === 0) {
+    const sent = await notify({
+      roles,
+      type: "vrijdagcheck",
+      level: "success",
+      title: `Vrijdagcheck: alles staat klaar voor volgende week (${weekLabel})`,
+      body: `Alle ${checks.length} punten zijn op orde. Fijn weekend!`,
+      href: "/dashboard",
+      dedupeKey,
+    });
+    return { week: weekLabel, okCount, open: 0, sent };
+  }
+
+  const lines = open.map((c) => `• ${c.label}: ${c.summary}`).join("\n");
+  const sent = await notify({
+    roles,
+    type: "vrijdagcheck",
+    level: "warning",
+    title: `Vrijdagcheck: ${okCount}/${checks.length} op orde — ${open.length} punt(en) nog regelen (${weekLabel})`,
+    body: `Voor volgende week vragen deze punten nog aandacht:\n${lines}`,
+    // Eén melding kan maar één link hebben; spring naar het eerste open punt.
+    href: open[0]?.href ?? "/dashboard",
+    dedupeKey,
+  });
+  return { week: weekLabel, okCount, open: open.length, sent };
 }
 
 /** Maandag van de huidige week (voor wekelijkse dedupe). */
