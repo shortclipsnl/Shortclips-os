@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, Loader2, UserPlus } from "lucide-react";
+import { ChevronDown, Loader2, MessageSquareText, UserPlus } from "lucide-react";
 import { setScriptingNote, setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS } from "@/lib/statuses";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
@@ -56,11 +56,13 @@ function weekBucket(days: number): { order: number; label: string } {
   return { order: 4, label: "Later" };
 }
 
-/** Volle kleur per week-kop, zodat je van week naar week kunt scannen. */
+/** Volle kleur per week-kop, zodat je van week naar week kunt scannen. "Deze
+ *  week" krijgt bewust een afwijkende (violette) kleur, los van het blauw van de
+ *  latere weken, zodat de huidige week er direct uitspringt. */
 const WEEK_COLOR: Record<number, string> = {
-  1: "var(--color-brand-600)",
-  2: "var(--color-info)",
-  3: "var(--color-violet)",
+  1: "var(--color-violet)",
+  2: "var(--color-brand-600)",
+  3: "var(--color-info)",
   4: "var(--color-ink-muted)",
 };
 
@@ -144,7 +146,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
       <div className="mb-2 text-xs text-[var(--color-ink-faint)]">{filtered.length} van {rows.length} opnames</div>
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <table className="w-full min-w-[900px] text-sm">
+        <table className="w-full min-w-[1040px] text-sm">
           <thead>
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] text-left text-xs text-[var(--color-ink-faint)]">
               <th className="px-3 py-2 font-medium">Klant</th>
@@ -153,6 +155,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
               <th className="px-2 py-2 font-medium">Afteller</th>
               <th className="px-2 py-2 font-medium">Verantwoordelijke</th>
               <th className="px-2 py-2 font-medium">Scriptingstatus</th>
+              <th className="px-2 py-2 font-medium">Notitie</th>
             </tr>
           </thead>
           <tbody>
@@ -161,12 +164,12 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                 {/* Ruimte tussen de weekgroepen, zodat het beter scanbaar is. */}
                 {gi > 0 ? (
                   <tr aria-hidden>
-                    <td colSpan={6} className="h-6 bg-[var(--color-surface)]" />
+                    <td colSpan={7} className="h-6 bg-[var(--color-surface)]" />
                   </tr>
                 ) : null}
                 {/* Week-kop in volle kleur, zodat je van week naar week kunt scannen. */}
                 <tr>
-                  <td colSpan={6} className="p-0">
+                  <td colSpan={7} className="p-0">
                     <div
                       className="flex items-center gap-2 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white"
                       style={{ background: WEEK_COLOR[g.order] ?? "var(--color-ink-muted)" }}
@@ -197,17 +200,17 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                       <WriterCell id={r.id} writerId={r.scriptWriterId} writerName={r.scriptWriterName} writerAvatar={r.scriptWriterAvatar} options={writerOptions} canWrite={canWrite} urgent={!r.done && r.daysToDeadline <= 7} />
                     </td>
                     <td className="px-2 py-2 align-top">
-                      <div className="flex flex-col gap-1.5">
-                        <StatusPicker id={r.id} status={r.status} canWrite={canWrite} />
-                        <NoteCell id={r.id} note={r.note} canWrite={canWrite} />
-                      </div>
+                      <StatusPicker id={r.id} status={r.status} canWrite={canWrite} />
+                    </td>
+                    <td className="px-2 py-2 align-top">
+                      <NoteCell id={r.id} note={r.note} canWrite={canWrite} />
                     </td>
                   </tr>
                 ))}
               </Fragment>
             ))}
             {groups.length === 0 ? (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
+              <tr><td colSpan={7} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
             ) : null}
           </tbody>
         </table>
@@ -234,10 +237,10 @@ function WriterCell({ id, writerId, writerName, writerAvatar, options, canWrite,
   };
 
   const face = writerName ? (
-    <TeamAvatar name={writerName} avatarUrl={writerAvatar} size={40} />
+    <TeamAvatar name={writerName} avatarUrl={writerAvatar} size={48} />
   ) : (
-    <span className={`grid size-10 place-items-center rounded-full border-2 border-dashed ${warn ? "border-[var(--color-warn)] text-[var(--color-warn)]" : "border-[var(--color-line-strong)] text-[var(--color-ink-faint)]"}`}>
-      <UserPlus className="size-4" />
+    <span className={`grid size-12 place-items-center rounded-full border-2 border-dashed ${warn ? "border-[var(--color-warn)] text-[var(--color-warn)]" : "border-[var(--color-line-strong)] text-[var(--color-ink-faint)]"}`}>
+      <UserPlus className="size-5" />
     </span>
   );
 
@@ -291,18 +294,29 @@ function WriterCell({ id, writerId, writerName, writerAvatar, options, canWrite,
 }
 
 /**
- * Vrije notitie bij de scriptingstatus: context naast de korte status (bijv. "nog
- * beeld nodig van klant"). Opslaan gebeurt bij verlaten van het veld of op Enter.
+ * Vrije notitie in een eigen kolom rechts: context naast de korte status (bijv.
+ * "nog beeld nodig van klant"), zodat de statuskolom schoon en op elkaar leesbaar
+ * blijft. Een gevuld notitie-icoon maakt meteen duidelijk waar een opmerking bij
+ * staat. Opslaan gebeurt bij verlaten van het veld of op Enter.
  */
 function NoteCell({ id, note, canWrite }: { id: string; note: string | null; canWrite: boolean }) {
   const [pending, start] = useTransition();
   const [val, setVal] = useState(note ?? "");
   const router = useRouter();
 
+  // Alleen-lezen: toon de notitie met icoon, of een rustig streepje.
   if (!canWrite) {
-    return note ? <p className="max-w-[220px] text-xs leading-snug text-[var(--color-ink-muted)]">{note}</p> : null;
+    return note ? (
+      <div className="flex max-w-[260px] items-start gap-1.5 text-xs leading-snug text-[var(--color-ink)]">
+        <MessageSquareText className="mt-0.5 size-4 shrink-0 text-[var(--color-brand-600)]" />
+        <span>{note}</span>
+      </div>
+    ) : (
+      <span className="text-xs text-[var(--color-ink-faint)]">—</span>
+    );
   }
 
+  const heeftNotitie = Boolean(val.trim());
   const save = () => {
     const next = val.trim();
     if (next === (note ?? "").trim()) return;
@@ -310,7 +324,10 @@ function NoteCell({ id, note, canWrite }: { id: string; note: string | null; can
   };
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1.5">
+      <MessageSquareText
+        className={`size-4 shrink-0 ${heeftNotitie ? "text-[var(--color-brand-600)]" : "text-[var(--color-ink-faint)]"}`}
+      />
       <input
         value={val}
         onChange={(e) => setVal(e.target.value)}
@@ -319,9 +336,11 @@ function NoteCell({ id, note, canWrite }: { id: string; note: string | null; can
           if (e.key === "Enter") e.currentTarget.blur();
         }}
         maxLength={500}
-        placeholder="+ notitie voor team…"
+        placeholder="Opmerking voor team…"
         aria-label="Notitie bij scriptingstatus"
-        className="h-7 w-[210px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] px-2 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:outline-none"
+        className={`h-8 w-[220px] rounded-[var(--radius-sm)] border px-2 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:outline-none ${
+          heeftNotitie ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)]" : "border-[var(--color-line)] bg-[var(--color-surface)]"
+        }`}
       />
       {pending ? <Loader2 className="size-3 animate-spin text-[var(--color-ink-faint)]" /> : null}
     </div>
