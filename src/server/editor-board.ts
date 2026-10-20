@@ -43,6 +43,8 @@ export type EditorBoardVideo = {
   editorId: string | null;
   editorName: string | null;
   plannedShorts: number | null;
+  /** Standaard aantal shorts voor deze klant (maandquota) — uit de portal. */
+  clientDefaultShorts: number;
   dueOn: string | null;
   statusChangedAt: string;
   currentVersion: number;
@@ -90,6 +92,7 @@ export async function listEditorBoard(
       editorId: deliverables.editorId,
       editorName: users.fullName,
       plannedShorts: deliverables.plannedShorts,
+      clientDefaultShorts: clients.monthlyVideoQuota,
       scriptId: deliverables.scriptId,
       scriptUrl: deliverables.scriptUrl,
       footageUrl: deliverables.footageUrl,
@@ -170,6 +173,7 @@ export async function listEditorBoard(
       editorId: r.editorId,
       editorName: r.editorName,
       plannedShorts: r.plannedShorts === null ? null : Number(r.plannedShorts),
+      clientDefaultShorts: Number(r.clientDefaultShorts ?? 0),
       dueOn: r.dueOn,
       statusChangedAt:
         typeof r.statusChangedAt === "string"

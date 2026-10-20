@@ -180,15 +180,20 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
 }
 
 function ShortsField({ v, canEdit, onSave }: { v: EditorBoardVideo; canEdit: boolean; onSave: (n: number | null) => void }) {
+  // Standaard = het maandquotum van de klant (uit de portal). Een eigen aantal
+  // per opdracht (plannedShorts) overschrijft dat.
+  const fallback = v.clientDefaultShorts > 0 ? v.clientDefaultShorts : null;
+  const shown = v.plannedShorts ?? fallback;
   const [val, setVal] = useState(v.plannedShorts === null ? "" : String(v.plannedShorts));
-  if (!canEdit) return <span className="tabular-nums">{v.plannedShorts ?? "—"}</span>;
+  if (!canEdit) return <span className="tabular-nums">{shown ?? "—"}</span>;
   return (
-    <input type="number" min={0} value={val} placeholder="—"
+    <input type="number" min={0} value={val} placeholder={fallback !== null ? String(fallback) : "—"}
       onChange={(e) => setVal(e.target.value)}
       onBlur={() => { const n = val === "" ? null : Number(val); if (n !== v.plannedShorts) onSave(n); }}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
       className="h-7 w-12 rounded border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-1 text-center text-sm tabular-nums placeholder:text-[var(--color-ink-faint)]"
-      aria-label="Aantal shorts" />
+      aria-label="Aantal shorts"
+      title={fallback !== null ? `Standaard voor deze klant: ${fallback}` : undefined} />
   );
 }
 
