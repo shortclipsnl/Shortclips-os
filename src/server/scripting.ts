@@ -9,7 +9,7 @@ export const SCRIPT_LEAD_DAYS = 7;
 
 /** Vanaf "Klaar Shortclips" is de scriptdeadline gehaald → telt als afgerond
  *  (niet meer "te laat"). Alles daarna (scriptmeeting, final) ook. */
-const SCRIPT_DONE_STATUSES = ["klaar_shortclips", "scriptmeeting", "final"];
+const SCRIPT_DONE_STATUSES = ["final"];
 
 function parseUTC(d: string): number {
   return new Date(d.slice(0, 10) + "T00:00:00Z").getTime();

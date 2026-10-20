@@ -20,28 +20,28 @@ const FILTERS = [
 ] as const;
 
 const STATUS_PILL: Record<string, string> = {
-  afstemmen: "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]",
   concepting: "bg-[var(--color-info-soft)] text-[#0060a8]",
-  klaar_shortclips: "bg-[var(--color-lime-soft)] text-[#54700a]",
   scriptmeeting: "bg-[var(--color-warn-soft)] text-[#8a5300]",
+  afwachting_klant: "bg-[var(--color-violet-soft)] text-[#4a2fb8]",
+  nog_aanvullen: "bg-[var(--color-lime-soft)] text-[#54700a]",
   final: "bg-[var(--color-good-soft)] text-[#1d6b4c]",
 };
 
 /** Volle accentkleur per status, voor de rand van de actieve knop. */
 const STATUS_ACCENT: Record<string, string> = {
-  afstemmen: "var(--color-ink-faint)",
   concepting: "var(--color-info)",
-  klaar_shortclips: "var(--color-lime)",
   scriptmeeting: "var(--color-warn)",
+  afwachting_klant: "var(--color-violet)",
+  nog_aanvullen: "var(--color-lime)",
   final: "var(--color-good)",
 };
 
 /** Korte labels voor de knoppen (de volledige labels zijn soms lang). */
 const STATUS_SHORT: Record<string, string> = {
-  afstemmen: "Afstemmen",
   concepting: "Concepting",
-  klaar_shortclips: "Klaar",
   scriptmeeting: "Scriptmeeting",
+  afwachting_klant: "Afwachting klant",
+  nog_aanvullen: "Nog aanvullen",
   final: "Final",
 };
 
@@ -267,7 +267,7 @@ function StatusPicker({ id, status, canWrite }: { id: string; status: string; ca
   const [val, setVal] = useState(status);
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const meta = SCRIPTING_STATUS[val] ?? SCRIPTING_STATUS.afstemmen!;
+  const meta = SCRIPTING_STATUS[val] ?? SCRIPTING_STATUS.concepting!;
 
   const choose = (v: string) => {
     setVal(v);
@@ -277,34 +277,39 @@ function StatusPicker({ id, status, canWrite }: { id: string; status: string; ca
 
   if (!canWrite) {
     return (
-      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val]}`}>
-        <span className="size-2 rounded-full" style={{ background: STATUS_ACCENT[val] }} />
+      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val] ?? "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
+        <span className="size-2 rounded-full" style={{ background: STATUS_ACCENT[val] ?? "var(--color-ink-faint)" }} />
         {STATUS_SHORT[val] ?? meta.label}
       </span>
     );
   }
 
+  // De opties klappen uit als een zwevende laag (absolute), zodat de tabel niet
+  // verspringt. Een onzichtbare achtergrond vangt een klik ernaast op om te sluiten.
   return (
-    <div className="min-w-[150px]">
+    <div className="relative min-w-[150px]">
       <button type="button" onClick={() => setOpen((o) => !o)} disabled={pending}
         title={meta.label}
-        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val]}`}
-        style={open ? { boxShadow: `0 0 0 2px ${STATUS_ACCENT[val]}` } : undefined}>
-        <span className="size-2 rounded-full" style={{ background: STATUS_ACCENT[val] }} />
+        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val] ?? "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}
+        style={open ? { boxShadow: `0 0 0 2px ${STATUS_ACCENT[val] ?? "var(--color-ink-faint)"}` } : undefined}>
+        <span className="size-2 rounded-full" style={{ background: STATUS_ACCENT[val] ?? "var(--color-ink-faint)" }} />
         {STATUS_SHORT[val] ?? meta.label}
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <ChevronDown className="size-3.5 opacity-60" />}
       </button>
       {open ? (
-        <div className="mt-1.5 flex flex-wrap gap-1.5">
-          {SCRIPTING_ORDER.map((s) => (
-            <button key={s} type="button" onClick={() => choose(s)} title={SCRIPTING_STATUS[s]!.label}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[s]} ${s === val ? "" : "opacity-75 hover:opacity-100"}`}
-              style={s === val ? { boxShadow: `0 0 0 2px ${STATUS_ACCENT[s]}` } : undefined}>
-              <span className="size-2 rounded-full" style={{ background: STATUS_ACCENT[s] }} />
-              {STATUS_SHORT[s]}
-            </button>
-          ))}
-        </div>
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full z-20 mt-1.5 flex w-max max-w-[220px] flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
+            {SCRIPTING_ORDER.map((s) => (
+              <button key={s} type="button" onClick={() => choose(s)} title={SCRIPTING_STATUS[s]!.label}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-left text-sm font-semibold ${STATUS_PILL[s]} ${s === val ? "" : "opacity-80 hover:opacity-100"}`}
+                style={s === val ? { boxShadow: `0 0 0 2px ${STATUS_ACCENT[s]}` } : undefined}>
+                <span className="size-2 shrink-0 rounded-full" style={{ background: STATUS_ACCENT[s] }} />
+                {STATUS_SHORT[s]}
+              </button>
+            ))}
+          </div>
+        </>
       ) : null}
     </div>
   );

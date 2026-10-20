@@ -288,6 +288,13 @@
       "when": 1792478892939,
       "tag": "0040_perpetual_vision",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792482716238,
+      "tag": "0041_short_shadowcat",
+      "breakpoints": true
     }
   ]
 }
