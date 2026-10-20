@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS } from "@/lib/statuses";
-import { Avatar, ClientLogo } from "@/components/ui";
+import { ClientLogo, TeamAvatar } from "@/components/ui";
 import type { ScriptingRow, WriterOption } from "@/server/scripting";
 
 const FILTERS = [
@@ -191,7 +191,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                       </span>
                     </td>
                     <td className="px-2 py-2 align-top">
-                      <WriterCell id={r.id} writerId={r.scriptWriterId} writerName={r.scriptWriterName} options={writerOptions} canWrite={canWrite} urgent={!r.done && r.daysToDeadline <= 7} />
+                      <WriterCell id={r.id} writerId={r.scriptWriterId} writerName={r.scriptWriterName} writerAvatar={r.scriptWriterAvatar} options={writerOptions} canWrite={canWrite} urgent={!r.done && r.daysToDeadline <= 7} />
                     </td>
                     <td className="px-2 py-2 align-top">
                       <StatusPicker id={r.id} status={r.status} canWrite={canWrite} />
@@ -214,14 +214,14 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
  * Verantwoordelijke scriptschrijver kiezen (Milou/Jiska/Jarno). Niet toegewezen
  * valt op in oranje, zodat meteen duidelijk is wie het script nog moet oppakken.
  */
-function WriterCell({ id, writerId, writerName, options, canWrite, urgent }: { id: string; writerId: string | null; writerName: string | null; options: WriterOption[]; canWrite: boolean; urgent: boolean }) {
+function WriterCell({ id, writerId, writerName, writerAvatar, options, canWrite, urgent }: { id: string; writerId: string | null; writerName: string | null; writerAvatar: string | null; options: WriterOption[]; canWrite: boolean; urgent: boolean }) {
   const [pending, start] = useTransition();
   const router = useRouter();
 
   if (!canWrite) {
     return writerName ? (
-      <span className="inline-flex items-center gap-1.5 text-sm">
-        <Avatar name={writerName} size={20} />
+      <span className="inline-flex items-center gap-2 text-sm font-medium">
+        <TeamAvatar name={writerName} avatarUrl={writerAvatar} size={32} />
         {writerName.split(" ")[0]}
       </span>
     ) : (
@@ -238,8 +238,8 @@ function WriterCell({ id, writerId, writerName, options, canWrite, urgent }: { i
   const warn = !writerId && urgent;
 
   return (
-    <span className="inline-flex items-center gap-1.5">
-      {writerName ? <Avatar name={writerName} size={20} /> : null}
+    <span className="inline-flex items-center gap-2">
+      {writerName ? <TeamAvatar name={writerName} avatarUrl={writerAvatar} size={32} /> : null}
       <select
         value={writerId ?? ""}
         onChange={(e) => change(e.target.value)}

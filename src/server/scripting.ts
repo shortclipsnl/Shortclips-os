@@ -1,8 +1,9 @@
 import "server-only";
-import { and, asc, eq, gte, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, productionDays, users } from "@/db/schema";
 import { requireInternal, scopeToClients, type Viewer } from "@/server/auth/context";
+import { CORE_STAFF_EMAILS, coreStaffRank } from "@/server/core-staff";
 
 /** Aantal scriptingdagen vóór de opname dat de scripts klaar moeten zijn. */
 export const SCRIPT_LEAD_DAYS = 7;
@@ -40,9 +41,10 @@ export type ScriptingRow = {
   /** Verantwoordelijke scriptschrijver (optioneel). */
   scriptWriterId: string | null;
   scriptWriterName: string | null;
+  scriptWriterAvatar: string | null;
 };
 
-export type WriterOption = { id: string; fullName: string };
+export type WriterOption = { id: string; fullName: string; avatarUrl: string | null };
 
 /**
  * Scripting-overzicht: één regel per aankomende klantopname, rechtstreeks uit de
@@ -66,6 +68,7 @@ export async function listScripting(viewer: Viewer) {
       clientLogo: clients.logoUrl,
       scriptWriterId: productionDays.scriptWriterId,
       scriptWriterName: users.fullName,
+      scriptWriterAvatar: users.avatarUrl,
     })
     .from(productionDays)
     .innerJoin(clients, eq(clients.id, productionDays.clientId))
@@ -106,6 +109,7 @@ export async function listScripting(viewer: Viewer) {
       flag,
       scriptWriterId: r.scriptWriterId,
       scriptWriterName: r.scriptWriterName,
+      scriptWriterAvatar: r.scriptWriterAvatar,
     };
   });
 
@@ -125,21 +129,24 @@ export async function listScripting(viewer: Viewer) {
 
   const clientOptions = [...new Set(list.map((r) => r.clientName))].sort();
 
-  // Verantwoordelijken die scripts schrijven: eigenaar + projectcoördinatoren
-  // (Milou, Jiska, Jarno). Zo kun je per opname kiezen wie het script oppakt.
+  // Verantwoordelijken die scripts schrijven: het vaste kernteam (Jarno, Milou,
+  // Jiska), ongeacht hun exacte rol — behalve de videograaf (Rutger). Zo staat
+  // Jiska er altijd bij, ook als haar rol afwijkt.
   const writerOptions: WriterOption[] = (
     await db
-      .select({ id: users.id, fullName: users.fullName })
+      .select({ id: users.id, fullName: users.fullName, email: users.email, avatarUrl: users.avatarUrl })
       .from(users)
       .where(
         and(
           isNull(users.deletedAt),
           eq(users.status, "active"),
-          inArray(users.primaryRole, ["owner", "project_coordinator"]),
+          sql`lower(${users.email}) in (${sql.join(CORE_STAFF_EMAILS.map((e) => sql`${e}`), sql`, `)})`,
+          ne(users.primaryRole, "videographer"),
         ),
       )
-      .orderBy(asc(users.fullName))
-  ).map((u) => ({ id: u.id, fullName: u.fullName }));
+  )
+    .sort((a, b) => coreStaffRank(a.email) - coreStaffRank(b.email))
+    .map((u) => ({ id: u.id, fullName: u.fullName, avatarUrl: u.avatarUrl }));
 
   return { rows: list, stats, clientOptions, writerOptions };
 }
