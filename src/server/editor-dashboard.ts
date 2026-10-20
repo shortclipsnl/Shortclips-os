@@ -64,6 +64,7 @@ export async function getEditorDashboard(viewer: Viewer) {
     db.execute(sql`
       select
         count(*) filter (where status in ('published','approved','scheduled','ready_to_publish','analysis_available'))::int as opgeleverd,
+        count(*) filter (where status in ('published','approved','scheduled','ready_to_publish','analysis_available') and internal_revision_rounds > 0)::int as intern_gecorrigeerd,
         count(*) filter (where status in ('editing','editor_revision'))::int as lopend,
         round(avg(internal_revision_rounds)::numeric, 2) as gem_intern,
         round(avg(client_revision_rounds)::numeric, 2) as gem_klant,
@@ -134,6 +135,8 @@ export async function getEditorDashboard(viewer: Viewer) {
 
   const onTime = Number(row.op_tijd ?? 0);
   const withDeadline = Number(row.met_deadline ?? 0);
+  const delivered = Number(row.opgeleverd ?? 0);
+  const internCorrected = Number(row.intern_gecorrigeerd ?? 0);
 
   return {
     queue,
@@ -141,12 +144,14 @@ export async function getEditorDashboard(viewer: Viewer) {
     tasks: openTasks,
     branding,
     stats: {
-      delivered: Number(row.opgeleverd ?? 0),
+      delivered,
       inProgress: Number(row.lopend ?? 0),
       avgInternalRevisions: row.gem_intern ? Number(row.gem_intern) : null,
       avgClientRevisions: row.gem_klant ? Number(row.gem_klant) : null,
       onTimeRate: withDeadline > 0 ? (onTime / withDeadline) * 100 : null,
       withDeadline,
+      // Aandeel opgeleverde video's dat een interne correctie nodig had (doel < 5%).
+      internalCorrectionRate: delivered > 0 ? (internCorrected / delivered) * 100 : null,
     },
   };
 }

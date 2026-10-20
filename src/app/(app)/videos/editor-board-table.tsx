@@ -3,11 +3,11 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Download, FileText, Pencil } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, FileText, MessageSquare, Pencil } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { editorColor, editorDisplayName, firstNameKey } from "@/lib/editors";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase, type VideoStage } from "@/lib/statuses";
-import { assignEditor, changeVideoStatus, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts } from "@/server/actions/videos";
+import { askEditorQuestion, assignEditor, changeVideoStatus, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts } from "@/server/actions/videos";
 import type { EditorBoardVideo } from "@/server/editor-board";
 
 type Editor = { id: string; fullName: string };
@@ -186,6 +186,60 @@ export function EditorBoardTable({
   );
 }
 
+/** "Vraag van editor": knop per video die een directe melding (pop-up + geluid)
+ *  stuurt naar de coördinator/eigenaar, zodat de editor snel antwoord krijgt. */
+function AskButton({ videoId }: { videoId: string }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [sent, setSent] = useState(false);
+  const [pending, start] = useTransition();
+
+  const submit = () => {
+    if (!text.trim()) return;
+    start(async () => {
+      const r = await askEditorQuestion(videoId, text);
+      if (r.ok) {
+        setSent(true);
+        setText("");
+        setTimeout(() => { setOpen(false); setSent(false); }, 1600);
+      }
+    });
+  };
+
+  return (
+    <span className="relative shrink-0">
+      <button type="button" onClick={() => setOpen((o) => !o)} title="Vraag stellen over deze video"
+        className="grid size-6 place-items-center rounded-full text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-brand-600)]">
+        <MessageSquare className="size-3.5" />
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
+            {sent ? (
+              <p className="px-1 py-2 text-xs font-semibold text-[var(--color-good)]">Vraag verstuurd ✓</p>
+            ) : (
+              <>
+                <p className="mb-1 px-1 text-2xs font-semibold text-[var(--color-ink-muted)]">Vraag van editor</p>
+                <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={3}
+                  placeholder="Je vraag over deze video…"
+                  className="sc-input w-full resize-none py-1 text-xs"
+                  onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit(); }} />
+                <div className="mt-1.5 flex justify-end">
+                  <button type="button" onClick={submit} disabled={pending || !text.trim()}
+                    className="rounded bg-[var(--color-ink)] px-2.5 py-1 text-2xs font-semibold text-white disabled:opacity-50">
+                    {pending ? "Versturen…" : "Versturen"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      ) : null}
+    </span>
+  );
+}
+
 function TextTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button type="button" onClick={onClick}
@@ -205,12 +259,13 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
 
   return (
     <div className="grid items-stretch gap-px border-b border-[var(--color-line)] bg-[var(--color-surface)] text-sm hover:bg-[var(--color-surface-sunken)]/40" style={{ gridTemplateColumns: GRID }}>
-      {/* Item (klant) */}
-      <div className="flex items-center gap-2.5 px-2.5 py-2" style={{ boxShadow: `inset 4px 0 0 ${phaseColor}` }}>
-        <Link href={`/videos/${v.id}`} className="flex min-w-0 items-center gap-2.5 font-medium hover:underline">
+      {/* Item (klant) + "Vraag stellen"-knop voor de editor */}
+      <div className="flex items-center gap-1.5 px-2.5 py-2" style={{ boxShadow: `inset 4px 0 0 ${phaseColor}` }}>
+        <Link href={`/videos/${v.id}`} className="flex min-w-0 flex-1 items-center gap-2.5 font-medium hover:underline">
           <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={28} />
           <span className="truncate">{v.clientName}</span>
         </Link>
+        <AskButton videoId={v.id} />
       </div>
 
       {/* Editor */}

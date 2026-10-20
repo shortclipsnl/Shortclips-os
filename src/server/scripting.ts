@@ -4,6 +4,8 @@ import { db } from "@/db/client";
 import { clients, productionDays, users } from "@/db/schema";
 import { requireInternal, scopeToClients, type Viewer } from "@/server/auth/context";
 import { CORE_STAFF_EMAILS, coreStaffRank } from "@/server/core-staff";
+import { subWorkingDays } from "@/lib/workdays";
+import { nlHolidaySet } from "@/lib/holidays";
 
 /** Aantal scriptingdagen vóór de opname dat de scripts klaar moeten zijn. */
 export const SCRIPT_LEAD_DAYS = 7;
@@ -14,10 +16,6 @@ const SCRIPT_DONE_STATUSES = ["final"];
 
 function parseUTC(d: string): number {
   return new Date(d.slice(0, 10) + "T00:00:00Z").getTime();
-}
-function addCalendarDays(dateStr: string, n: number): string {
-  const d = new Date(parseUTC(dateStr) + n * 86_400_000);
-  return d.toISOString().slice(0, 10);
 }
 /** Gesigneerd verschil in kalenderdagen (a − b). */
 function daysDiff(a: string, b: string): number {
@@ -83,8 +81,11 @@ export async function listScripting(viewer: Viewer) {
     )
     .orderBy(asc(productionDays.scheduledOn));
 
+  const holidays = nlHolidaySet();
   const list: ScriptingRow[] = rows.map((r) => {
-    const deadline = addCalendarDays(r.scheduledOn, -SCRIPT_LEAD_DAYS);
+    // Scriptdeadline = 7 wérkdagen vóór de opname (niet kalenderdagen), conform
+    // de afspraak. Bijv. opname 21 okt → deadline 12 okt (niet 14 okt).
+    const deadline = subWorkingDays(r.scheduledOn, SCRIPT_LEAD_DAYS, holidays);
     const daysToDeadline = daysDiff(deadline, today);
     const done = SCRIPT_DONE_STATUSES.includes(r.status);
     const flag: ScriptingRow["flag"] = done

@@ -37,12 +37,49 @@ async function loadVideo(id: string) {
       internalRevisionRounds: deliverables.internalRevisionRounds,
       clientRevisionRounds: deliverables.clientRevisionRounds,
       coordinatorId: clients.coordinatorId,
+      clientName: clients.name,
     })
     .from(deliverables)
     .innerJoin(clients, eq(clients.id, deliverables.clientId))
     .where(eq(deliverables.id, id))
     .limit(1);
   return row;
+}
+
+/**
+ * Vraag van de editor over een video → directe melding (pop-up + geluid) naar de
+ * verantwoordelijke coördinator en de eigenaar, zodat er snel antwoord komt.
+ */
+export async function askEditorQuestion(videoId: string, question: string): Promise<ActionResult> {
+  try {
+    const viewer = await requireViewer();
+    const q = question.trim();
+    if (q.length < 2) return { ok: false, message: "Typ eerst je vraag." };
+    const video = await loadVideo(videoId);
+    if (!video) return { ok: false, message: "Video niet gevonden." };
+    assertClientAccess(viewer, video.clientId);
+
+    await notify({
+      userIds: video.coordinatorId ? [video.coordinatorId] : [],
+      roles: ["owner"],
+      clientId: video.clientId,
+      type: "editor_question",
+      level: "warning",
+      title: `Vraag van ${viewer.fullName.split(" ")[0] ?? "editor"} — ${video.clientName}`,
+      body: q,
+      href: `/videos/${videoId}`,
+    });
+    await recordActivity({
+      clientId: video.clientId,
+      type: "editor.question",
+      title: `Vraag van editor over "${video.title}": ${q.slice(0, 140)}`,
+      actor: { id: viewer.id, fullName: viewer.fullName },
+    });
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
 }
 
 /** Downloadlink (beeldmateriaal) en/of scriptlink van een video zetten. */
@@ -143,6 +180,15 @@ export async function changeVideoStatus(
     }
     if (["scheduled", "published"].includes(nextStatus) && !viewer.permissions.has("videos:publish")) {
       return { ok: false, message: "Je mag video's niet publiceren." };
+    }
+    // Interne review verplicht: een video gaat niet naar de klant zonder akkoord
+    // van de Content Creative. Alleen een Content Creative/coördinator/eigenaar
+    // mag de status op "Feedback klant" (naar de klant) zetten.
+    if (nextStatus === "client_review") {
+      const approverRoles = ["owner", "admin", "project_coordinator", "content_creator"];
+      if (!approverRoles.includes(viewer.primaryRole)) {
+        return { ok: false, message: "Alleen een Content Creative mag een video naar de klant sturen — laat de interne review eerst akkoord geven." };
+      }
     }
 
     const patch: Record<string, unknown> = {

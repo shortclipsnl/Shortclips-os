@@ -133,17 +133,18 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
           <Stat label="Totaal opgeleverd" value={data.stats.delivered} tone="good" icon={<CheckCircle2 />} />
           <Stat label="Nu in bewerking" value={data.stats.inProgress} tone="info" icon={<Film />} />
           <Stat
-            label="Op tijd geleverd"
+            label="Deadline gehaald"
             value={data.stats.onTimeRate !== null ? pct(data.stats.onTimeRate, 0) : "–"}
-            hint={data.stats.withDeadline > 0 ? `over ${plural(data.stats.withDeadline, "video", "video's")} met deadline` : "nog geen deadline-video's"}
-            tone={data.stats.onTimeRate !== null && data.stats.onTimeRate >= 80 ? "good" : "neutral"}
+            hint="doel 95%"
+            tone={data.stats.onTimeRate === null ? "neutral" : data.stats.onTimeRate >= 95 ? "good" : "warn"}
             icon={<Clock />}
           />
           <Stat
-            label="Gem. klantrevisies"
-            value={data.stats.avgClientRevisions?.toFixed(1) ?? "–"}
-            hint="per video"
-            tone="neutral"
+            label="Interne correcties"
+            value={data.stats.internalCorrectionRate !== null ? pct(data.stats.internalCorrectionRate, 0) : "–"}
+            hint="doel onder 5%"
+            tone={data.stats.internalCorrectionRate === null ? "neutral" : data.stats.internalCorrectionRate < 5 ? "good" : "warn"}
+            icon={<AlertTriangle />}
           />
         </div>
       </div>
