@@ -3,15 +3,21 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Download, FileText, Loader2, Pencil } from "lucide-react";
-import { ClientLogo } from "@/components/ui";
-import { formatDate, relativeDays } from "@/lib/format";
-import { editorColor, editorDisplayName } from "@/lib/editors";
+import { ChevronDown, ChevronRight, Download, FileText, Pencil } from "lucide-react";
+import { ClientLogo, TeamAvatar } from "@/components/ui";
+import { editorColor, editorDisplayName, firstNameKey } from "@/lib/editors";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase, type VideoStage } from "@/lib/statuses";
 import { assignEditor, changeVideoStatus, setEditingVideoLinks, setEditingVideoShorts } from "@/server/actions/videos";
 import type { EditorBoardVideo } from "@/server/editor-board";
 
 type Editor = { id: string; fullName: string };
+
+const BATTERY_COLOR: Record<EditorBoardVideo["batteryColor"], string> = {
+  groen: "var(--color-good)",
+  blauw: "var(--color-info)",
+  oranje: "var(--color-warn)",
+  rood: "var(--color-bad)",
+};
 
 /** Fase (kolom) → de status die we zetten als je 'm kiest. */
 const PHASE_TO_STATUS: Record<EditPhase, VideoStage> = {
@@ -24,12 +30,24 @@ const PHASE_TO_STATUS: Record<EditPhase, VideoStage> = {
 };
 
 // Kolombreedtes — gelijk voor kop en rijen zodat alles uitlijnt.
-const GRID = "minmax(150px,1.5fr) 128px 150px 150px 70px minmax(130px,1fr) minmax(120px,1fr)";
+const GRID = "minmax(140px,1.4fr) 120px minmax(150px,1.3fr) 150px minmax(120px,1fr) 64px minmax(120px,1fr) minmax(110px,1fr)";
+
+function fmtShort(d: string): string {
+  const [y, m, day] = d.split("-").map(Number);
+  return new Date(y!, (m ?? 1) - 1, day).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+}
+
+function priority(v: EditorBoardVideo): { label: string; color: string } | null {
+  if (v.phase === "afgerond" || v.workdaysToDeadline === null) return null;
+  if (v.workdaysToDeadline < 0) return { label: `Te laat · ${Math.abs(v.workdaysToDeadline)} wd`, color: "var(--color-bad)" };
+  if (v.workdaysToDeadline <= 2) return { label: `Dag ${v.elapsedWorkdays} · bijna deadline`, color: "var(--color-warn)" };
+  return { label: `Dag ${v.elapsedWorkdays} · in productie`, color: "var(--color-info)" };
+}
 
 /**
- * Editing-opdrachten als tabel (Monday-stijl), per fase gegroepeerd. Per rij:
- * klant, editor, deadline, fase, aantal shorts, downloadlink en script — met de
- * links en het script direct in te vullen.
+ * Editing-opdrachten als tabel (Monday-stijl): editor-tabs bovenaan, per fase
+ * gegroepeerd, met een deadline-batterij, prioriteit, aantal shorts, downloadlink
+ * en script — allemaal direct in te vullen.
  */
 export function EditorBoardTable({
   videos,
@@ -43,13 +61,47 @@ export function EditorBoardTable({
   canAssign: boolean;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(["afgerond"]));
+  const [editor, setEditor] = useState<string>("alle");
+
+  // Editors groeperen op voornaam (dubbele accounts zoals Sam/Sem → één tab).
+  const groups = useMemo(() => {
+    const map = new Map<string, { key: string; displayName: string; color: string; name: string; ids: Set<string> }>();
+    for (const e of editors) {
+      const key = firstNameKey(e.fullName);
+      const g = map.get(key) ?? { key, displayName: editorDisplayName(e.fullName), color: editorColor(e.fullName), name: e.fullName, ids: new Set<string>() };
+      g.ids.add(e.id);
+      map.set(key, g);
+    }
+    return [...map.values()];
+  }, [editors]);
+
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const v of videos) {
+      if (v.phase === "afgerond" || !v.editorName) continue;
+      const key = firstNameKey(v.editorName);
+      m.set(key, (m.get(key) ?? 0) + 1);
+    }
+    return m;
+  }, [videos]);
+  const activeTotal = useMemo(() => videos.filter((v) => v.phase !== "afgerond").length, [videos]);
+
+  const activeGroup = groups.find((g) => g.key === editor) ?? null;
+  const shown = editor === "alle"
+    ? videos
+    : editor === "geen"
+      ? videos.filter((v) => !v.editorId)
+      : activeGroup
+        ? videos.filter((v) => v.editorId && activeGroup.ids.has(v.editorId))
+        : videos;
+  const geenCount = videos.filter((v) => !v.editorId && v.phase !== "afgerond").length;
 
   const byPhase = useMemo(() => {
     const m = new Map<EditPhase, EditorBoardVideo[]>();
     for (const ph of EDIT_PHASE_ORDER) m.set(ph, []);
-    for (const v of videos) (m.get(v.phase) ?? m.get("te_plannen")!).push(v);
+    for (const v of shown) (m.get(v.phase) ?? m.get("te_plannen")!).push(v);
     return m;
-  }, [videos]);
+  }, [shown]);
 
   function toggle(ph: string) {
     setCollapsed((s) => {
@@ -61,44 +113,81 @@ export function EditorBoardTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-      <div className="min-w-[1000px]">
-        {/* Kolomkoppen */}
-        <div className="grid items-center gap-px border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]" style={{ gridTemplateColumns: GRID }}>
-          <span className="px-1">Item</span>
-          <span className="px-1 text-center">Editor</span>
-          <span className="px-1 text-center">Deadline</span>
-          <span className="px-1 text-center">Fase</span>
-          <span className="px-1 text-center">Shorts</span>
-          <span className="px-1 text-center">Links shorts</span>
-          <span className="px-1 text-center">Script</span>
-        </div>
-
-        {EDIT_PHASE_ORDER.map((ph) => {
-          const list = byPhase.get(ph)!;
-          const meta = EDIT_PHASE_META[ph];
-          const open = !collapsed.has(ph);
+    <div>
+      {/* Editor-tabs bovenaan: Hoofdtabel + per editor met foto en aantal. */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <TextTab active={editor === "alle"} onClick={() => setEditor("alle")}>
+          Hoofdtabel <span className="opacity-70">· {activeTotal}</span>
+        </TextTab>
+        {groups.map((g) => {
+          const on = editor === g.key;
           return (
-            <div key={ph}>
-              <button type="button" onClick={() => toggle(ph)}
-                className="flex w-full items-center gap-2 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2.5 py-2 text-left"
-                style={{ boxShadow: `inset 4px 0 0 ${meta.color}` }}>
-                <span style={{ color: meta.color }}>{open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</span>
-                <span className="text-sm font-bold" style={{ color: meta.color }}>{meta.label}</span>
-                <span className="rounded-full px-2 py-0.5 text-2xs font-bold tabular-nums" style={{ background: `color-mix(in srgb, ${meta.color} 15%, var(--color-surface))`, color: meta.color }}>{list.length}</span>
-              </button>
-              {open ? (
-                list.length > 0 ? (
-                  list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} phaseColor={meta.color} />)
-                ) : (
-                  <p className="border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2.5 text-2xs text-[var(--color-ink-faint)]">Nog geen video&apos;s in deze fase.</p>
-                )
-              ) : null}
-            </div>
+            <button key={g.key} type="button" onClick={() => setEditor(g.key)}
+              className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3.5 text-sm font-semibold transition ${on ? "bg-[var(--color-surface)] text-[var(--color-ink)] shadow-[var(--shadow-card)]" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+              style={on ? { borderColor: g.color, boxShadow: `0 0 0 2px ${g.color}` } : undefined}>
+              <span className="rounded-full p-[2px]" style={{ background: on ? g.color : "transparent" }}>
+                <TeamAvatar name={g.name} size={36} />
+              </span>
+              {g.displayName}
+              <span className="grid min-w-5 place-items-center rounded-full px-1 text-2xs font-bold text-white" style={{ background: g.color }}>{counts.get(g.key) ?? 0}</span>
+            </button>
           );
         })}
+        {geenCount > 0 ? (
+          <TextTab active={editor === "geen"} onClick={() => setEditor("geen")}>
+            Geen editor <span className="opacity-70">· {geenCount}</span>
+          </TextTab>
+        ) : null}
+      </div>
+
+      <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
+        <div className="min-w-[1050px]">
+          <div className="grid items-center gap-px border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]" style={{ gridTemplateColumns: GRID }}>
+            <span className="px-1">Item</span>
+            <span className="px-1 text-center">Editor</span>
+            <span className="px-1 text-center">Deadline</span>
+            <span className="px-1 text-center">Fase</span>
+            <span className="px-1 text-center">Prioriteit</span>
+            <span className="px-1 text-center">Shorts</span>
+            <span className="px-1 text-center">Links shorts</span>
+            <span className="px-1 text-center">Script</span>
+          </div>
+
+          {EDIT_PHASE_ORDER.map((ph) => {
+            const list = byPhase.get(ph)!;
+            const meta = EDIT_PHASE_META[ph];
+            const open = !collapsed.has(ph);
+            return (
+              <div key={ph}>
+                <button type="button" onClick={() => toggle(ph)}
+                  className="flex w-full items-center gap-2 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2.5 py-2 text-left"
+                  style={{ boxShadow: `inset 4px 0 0 ${meta.color}` }}>
+                  <span style={{ color: meta.color }}>{open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</span>
+                  <span className="text-sm font-bold" style={{ color: meta.color }}>{meta.label}</span>
+                  <span className="rounded-full px-2 py-0.5 text-2xs font-bold tabular-nums" style={{ background: `color-mix(in srgb, ${meta.color} 15%, var(--color-surface))`, color: meta.color }}>{list.length}</span>
+                </button>
+                {open ? (
+                  list.length > 0 ? (
+                    list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} phaseColor={meta.color} />)
+                  ) : (
+                    <p className="border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2.5 text-2xs text-[var(--color-ink-faint)]">Nog geen video&apos;s in deze fase.</p>
+                  )
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
+  );
+}
+
+function TextTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${active ? "bg-[var(--color-indigo-ink)] text-white" : "border border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>
+      {children}
+    </button>
   );
 }
 
@@ -107,7 +196,8 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
   const router = useRouter();
   const run = (fn: () => Promise<unknown>) => start(async () => { await fn(); router.refresh(); });
   const ecolor = editorColor(v.editorName ?? "");
-  const deadlineColor = v.workdaysToDeadline === null ? "var(--color-ink-muted)" : v.workdaysToDeadline < 0 ? "var(--color-bad)" : v.workdaysToDeadline <= 2 ? "var(--color-warn)" : "var(--color-ink)";
+  const prio = priority(v);
+  const pct = Math.min(100, Math.max(6, Math.round((v.elapsedWorkdays / Math.max(1, v.totalWorkdays)) * 100)));
 
   return (
     <div className="grid items-stretch gap-px border-b border-[var(--color-line)] bg-[var(--color-surface)] text-sm hover:bg-[var(--color-surface-sunken)]/40" style={{ gridTemplateColumns: GRID }}>
@@ -137,9 +227,18 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
         )}
       </div>
 
-      {/* Deadline */}
-      <div className="flex items-center justify-center px-1 text-center text-xs font-medium" style={{ color: deadlineColor }}>
-        {v.dueOn ? <span>{formatDate(v.dueOn)}<br /><span className="font-normal text-2xs">{relativeDays(v.dueOn)}</span></span> : <span className="text-[var(--color-ink-faint)]">—</span>}
+      {/* Deadline — batterij met datumbereik */}
+      <div className="flex items-center p-1">
+        {v.dueOn && v.shootDate ? (
+          <div className="relative h-6 w-full overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
+            <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, background: BATTERY_COLOR[v.batteryColor] }} />
+            <span className="absolute inset-0 grid place-items-center text-2xs font-semibold text-[var(--color-ink)]">
+              {fmtShort(v.shootDate)} – {fmtShort(v.dueOn)}
+            </span>
+          </div>
+        ) : (
+          <span className="w-full text-center text-2xs text-[var(--color-ink-faint)]">Geen deadline</span>
+        )}
       </div>
 
       {/* Fase */}
@@ -156,6 +255,15 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
           <div className="grid h-full place-items-center rounded-[4px] px-1 text-center text-xs font-semibold" style={{ background: `color-mix(in srgb, ${phaseColor} 13%, var(--color-surface))`, color: phaseColor }}>
             {EDIT_PHASE_META[v.phase].label}
           </div>
+        )}
+      </div>
+
+      {/* Prioriteit */}
+      <div className="flex items-center justify-center px-1 py-1">
+        {prio ? (
+          <span className="inline-flex w-full items-center justify-center rounded-[4px] px-2 py-1 text-2xs font-semibold text-white" style={{ background: prio.color }}>{prio.label}</span>
+        ) : (
+          <span className="text-2xs text-[var(--color-ink-faint)]">—</span>
         )}
       </div>
 
@@ -180,8 +288,6 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
 }
 
 function ShortsField({ v, canEdit, onSave }: { v: EditorBoardVideo; canEdit: boolean; onSave: (n: number | null) => void }) {
-  // Standaard = het maandquotum van de klant (uit de portal). Een eigen aantal
-  // per opdracht (plannedShorts) overschrijft dat.
   const fallback = v.clientDefaultShorts > 0 ? v.clientDefaultShorts : null;
   const shown = v.plannedShorts ?? fallback;
   const [val, setVal] = useState(v.plannedShorts === null ? "" : String(v.plannedShorts));

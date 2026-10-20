@@ -3,7 +3,7 @@ import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, deliverables, users } from "@/db/schema";
 import { scopeToClients, type Viewer } from "@/server/auth/context";
-import { workingDaysUntil } from "@/lib/workdays";
+import { subWorkingDays, workingDaysUntil } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { type EditPhase, type VideoStage } from "@/lib/statuses";
 
@@ -58,7 +58,14 @@ export type EditorBoardVideo = {
   /** Werkdagen tot de deadline (negatief = te laat). null als er geen deadline is. */
   workdaysToDeadline: number | null;
   overdue: boolean;
+  /** Startdatum voor de batterij (opname = deadline − 14 werkdagen). */
+  shootDate: string | null;
+  elapsedWorkdays: number;
+  totalWorkdays: number;
+  batteryColor: "groen" | "blauw" | "oranje" | "rood";
 };
+
+const TOTAL_WORKDAYS = 14; // opname → klantoplevering
 
 /**
  * @param opts.allEditors  true = alle editors (voor eigenaar/coördinator, met de
@@ -147,6 +154,21 @@ export async function listEditorBoard(
 
   return rows.map((r) => {
     const workdaysToDeadline = r.dueOn ? workingDaysUntil(today, r.dueOn, holidays) : null;
+    const status = r.status as VideoStage;
+    const phase = STATUS_TO_EDIT_PHASE[status] ?? "te_plannen";
+    // Batterij: opname (synthetisch = deadline − 14 werkdagen) → oplevering.
+    const shootDate = r.dueOn ? subWorkingDays(r.dueOn, TOTAL_WORKDAYS, holidays) : null;
+    const elapsedWorkdays = shootDate
+      ? Math.max(0, Math.min(TOTAL_WORKDAYS, workingDaysUntil(shootDate, today, holidays)))
+      : 0;
+    const done = phase === "afgerond";
+    const atEditor = status === "editing" || status === "editor_revision" || status === "client_revision";
+    let batteryColor: "groen" | "blauw" | "oranje" | "rood";
+    if (done) batteryColor = "groen";
+    else if (workdaysToDeadline !== null && workdaysToDeadline < 0) batteryColor = "rood";
+    else if (workdaysToDeadline !== null && workdaysToDeadline <= 2) batteryColor = "oranje";
+    else if (atEditor) batteryColor = "blauw";
+    else batteryColor = "groen";
     // Script: interne scriptpagina > scriptlink van de video (Monday) >
     // geüpload scriptbestand van de opname > externe scriptlink van de opname.
     const scriptHref = r.scriptId
@@ -164,8 +186,8 @@ export async function listEditorBoard(
     return {
       id: r.id,
       title: r.title,
-      status: r.status as VideoStage,
-      phase: STATUS_TO_EDIT_PHASE[r.status as VideoStage] ?? "te_plannen",
+      status,
+      phase,
       clientName: r.clientName,
       clientSlug: r.clientSlug,
       clientColor: r.clientColor,
@@ -187,6 +209,10 @@ export async function listEditorBoard(
       downloadHref,
       workdaysToDeadline,
       overdue: !!r.dueOn && r.dueOn < today,
+      shootDate,
+      elapsedWorkdays,
+      totalWorkdays: TOTAL_WORKDAYS,
+      batteryColor,
     };
   });
 }
