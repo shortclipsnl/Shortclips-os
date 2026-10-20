@@ -73,11 +73,13 @@ export async function listEditorBoard(viewer: Viewer): Promise<EditorBoardVideo[
       clientColor: clients.color,
       clientLogo: clients.logoUrl,
       scriptId: deliverables.scriptId,
+      scriptUrl: deliverables.scriptUrl,
+      footageUrl: deliverables.footageUrl,
       driveFolderId: deliverables.driveFolderId,
       frameUrl: deliverables.frameUrl,
-      // Beeldmateriaal- en scriptlink van de gekoppelde opname (indien aanwezig):
-      // daar zet de coördinator de downloadlink en het script neer.
-      footageUrl: sql<string | null>`(
+      // Beeldmateriaal- en scriptlink van de gekoppelde opname (fallback):
+      // daar zet de coördinator de downloadlink en het script ook neer.
+      dayFootageUrl: sql<string | null>`(
         select pd.footage_url from production_days pd where pd.id = deliverables.production_day_id
       )`,
       dayScriptUrl: sql<string | null>`(
@@ -116,16 +118,19 @@ export async function listEditorBoard(viewer: Viewer): Promise<EditorBoardVideo[
 
   return rows.map((r) => {
     const workdaysToDeadline = r.dueOn ? workingDaysUntil(today, r.dueOn, holidays) : null;
-    // Script: interne scriptpagina > geüpload scriptbestand van de opname >
-    // externe scriptlink van de opname.
+    // Script: interne scriptpagina > scriptlink van de video (Monday) >
+    // geüpload scriptbestand van de opname > externe scriptlink van de opname.
     const scriptHref = r.scriptId
       ? `/scripts/${r.scriptId}`
-      : r.dayScriptFileId
-        ? `/api/edit-files/${r.dayScriptFileId}`
-        : r.dayScriptUrl || null;
-    // Download: footage van de opname > Drive-map van de video.
+      : r.scriptUrl ||
+        (r.dayScriptFileId ? `/api/edit-files/${r.dayScriptFileId}` : null) ||
+        r.dayScriptUrl ||
+        null;
+    // Download: downloadlink van de video (Monday) > footage van de opname >
+    // Drive-map van de video.
     const downloadHref =
       r.footageUrl ||
+      r.dayFootageUrl ||
       (r.driveFolderId ? `https://drive.google.com/drive/folders/${r.driveFolderId}` : null);
     return {
       id: r.id,

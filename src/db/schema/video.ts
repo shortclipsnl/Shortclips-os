@@ -76,6 +76,10 @@ export const deliverables = pgTable(
     frameProjectId: varchar("frame_project_id", { length: 200 }),
     frameUrl: text("frame_url"),
     driveFolderId: varchar("drive_folder_id", { length: 200 }),
+    /** Downloadlink naar het beeldmateriaal voor de editor (bijv. WeTransfer). */
+    footageUrl: text("footage_url"),
+    /** Link naar het script (extern bestand of document) voor de editor. */
+    scriptUrl: text("script_url"),
     currentVersion: integer("current_version").notNull().default(0),
     /** Tellers voor doorlooptijd- en kwaliteitsanalyse. */
     internalRevisionRounds: integer("internal_revision_rounds")

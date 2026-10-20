@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
-import { requireInternal } from "@/server/auth/context";
+import { requireInternal, isOwner } from "@/server/auth/context";
 import { getVideoHighlights, listEditorOptions, listVideos } from "@/server/videos";
 import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { listEditingProjects } from "@/server/editing-board";
@@ -13,6 +13,7 @@ import { WorkloadSection } from "../editing/workload-section";
 import { Card, PageHeader } from "@/components/ui";
 import { EditingProjects } from "./editing-projects";
 import { EditorBoard } from "./editor-board";
+import { MondayImportButton } from "./monday-import";
 
 export const metadata: Metadata = { title: "Editing" };
 export const dynamic = "force-dynamic";
@@ -90,6 +91,8 @@ export default async function VideosPage({
         title="Editing"
         description={`${editingProjects.length} projecten · ${rows.length} video's in productie`}
       />
+
+      {isOwner(viewer) ? <MondayImportButton /> : null}
 
       {/* Editing per editor: elke opname is een edit-project met editor, fase,
           batterij (14 werkdagen) en download-/scriptlink. Komt automatisch uit

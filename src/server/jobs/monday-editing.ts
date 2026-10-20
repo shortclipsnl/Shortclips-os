@@ -27,7 +27,15 @@ const C = {
   fase: "color_mm517q5h",
   shorts: "numeric_mkx1dbx4",
   feedbackTermijn: "timerange_mm7fms4x",
+  links: "long_text_mkx1yahk", // "Links shorts" — downloadlink beeldmateriaal
+  script: "file_mm7s1571", // "Script bestand"
 };
+
+/** Eerste http(s)-link uit een tekst halen (voor de downloadlink). */
+function firstUrl(text: string): string | null {
+  const m = text.match(/https?:\/\/\S+/);
+  return m ? m[0] : null;
+}
 
 /** Fase op het Monday-bord → videostatus in ShortClips OS. */
 const FASE_TO_STATUS: Record<
@@ -158,11 +166,16 @@ export async function runMondayEditingImport() {
       const dueRaw = timelineEnd(item, C.deadline);
       const dueOn = dueRaw ? snapToWorkingDay(dueRaw) : null;
       const clientName = clientRows.find((c) => c.id === clientId)?.name ?? "Klant";
+      // Downloadlink (beeldmateriaal) en script voor de editor overnemen.
+      const footageUrl = firstUrl(col(item, C.links));
+      const scriptUrl = firstUrl(col(item, C.script));
       const base = {
         clientId,
         status,
         ...(editorId ? { editorId } : {}),
         ...(dueOn ? { dueOn } : {}),
+        footageUrl,
+        scriptUrl,
         updatedAt: new Date(),
       };
 
