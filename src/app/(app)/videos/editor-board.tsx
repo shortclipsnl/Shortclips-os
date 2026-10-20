@@ -14,7 +14,7 @@ import type { EditorBoardVideo } from "@/server/editor-board";
  * video is één regel met klant, deadline, de fase (zelf te zetten binnen de
  * eigen stappen) en snelkoppelingen naar script, materiaal en Frame.io.
  */
-export function EditorBoard({ videos }: { videos: EditorBoardVideo[] }) {
+export function EditorBoard({ videos, showEditor = false }: { videos: EditorBoardVideo[]; showEditor?: boolean }) {
   // "Afgerond" standaard ingeklapt — dat is historie, geen werkvoorraad.
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(["afgerond"]));
 
@@ -56,7 +56,7 @@ export function EditorBoard({ videos }: { videos: EditorBoardVideo[] }) {
               list.length > 0 ? (
                 <ul className="divide-y divide-[var(--color-line)]">
                   {list.map((v) => (
-                    <VideoRow key={v.id} v={v} />
+                    <VideoRow key={v.id} v={v} showEditor={showEditor} />
                   ))}
                 </ul>
               ) : (
@@ -70,7 +70,7 @@ export function EditorBoard({ videos }: { videos: EditorBoardVideo[] }) {
   );
 }
 
-function VideoRow({ v }: { v: EditorBoardVideo }) {
+function VideoRow({ v, showEditor = false }: { v: EditorBoardVideo; showEditor?: boolean }) {
   const days = daysSince(v.statusChangedAt);
   // Deadlinekleur: te laat = rood, ≤ 2 werkdagen = oranje, anders rustig.
   const deadlineColor =
@@ -92,6 +92,11 @@ function VideoRow({ v }: { v: EditorBoardVideo }) {
               <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={16} />
               {v.clientName}
             </span>
+            {showEditor ? (
+              <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-2xs font-semibold text-[var(--color-ink)]">
+                {v.editorName ?? "Geen editor"}
+              </span>
+            ) : null}
             <span>· {days} dagen in deze stap</span>
           </p>
 

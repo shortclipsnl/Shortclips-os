@@ -84,6 +84,10 @@ export default async function VideosPage({
   // Editors (freelance) zien alleen hun eigen editbord met de fases — niet de
   // deadlinebewaking, aandachtsblokken of de werkvoorraad/tarieven eronder.
   const editorView = viewer.isEditorOnly;
+  const owner = isOwner(viewer);
+  // Alle editing-opdrachten (video's) over alle editors — het volledige beeld
+  // dat uit Monday is overgenomen, gegroepeerd per fase met de editor erbij.
+  const allEditorVideos = owner ? await listEditorBoard(viewer, { allEditors: true }) : [];
 
   return (
     <div className="mx-auto max-w-[1500px]">
@@ -92,7 +96,23 @@ export default async function VideosPage({
         description={`${editingProjects.length} projecten · ${rows.length} video's in productie`}
       />
 
-      {isOwner(viewer) ? <MondayImportButton /> : null}
+      {owner ? <MondayImportButton /> : null}
+
+      {owner ? (
+        <section className="mb-6">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+            <h2 className="text-sm font-bold tracking-tight">Alle editing-opdrachten</h2>
+            <span className="text-xs text-white/80">{allEditorVideos.length} video&apos;s · per fase, met editor, deadline, downloadlink en script</span>
+          </div>
+          {allEditorVideos.length > 0 ? (
+            <EditorBoard videos={allEditorVideos} showEditor />
+          ) : (
+            <p className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">
+              Nog geen editing-opdrachten. Klik hierboven op &quot;Nu overnemen uit Monday&quot;.
+            </p>
+          )}
+        </section>
+      ) : null}
 
       {/* Editing per editor: elke opname is een edit-project met editor, fase,
           batterij (14 werkdagen) en download-/scriptlink. Komt automatisch uit

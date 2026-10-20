@@ -1,8 +1,8 @@
 import "server-only";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, deliverables } from "@/db/schema";
-import type { Viewer } from "@/server/auth/context";
+import { clients, deliverables, users } from "@/db/schema";
+import { scopeToClients, type Viewer } from "@/server/auth/context";
 import { workingDaysUntil } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { type EditPhase, type VideoStage } from "@/lib/statuses";
@@ -40,6 +40,7 @@ export type EditorBoardVideo = {
   clientSlug: string;
   clientColor: string | null;
   clientLogo: string | null;
+  editorName: string | null;
   dueOn: string | null;
   statusChangedAt: string;
   currentVersion: number;
@@ -55,9 +56,21 @@ export type EditorBoardVideo = {
   overdue: boolean;
 };
 
-export async function listEditorBoard(viewer: Viewer): Promise<EditorBoardVideo[]> {
+/**
+ * @param opts.allEditors  true = alle editors (voor eigenaar/coördinator, met de
+ *   editor per rij). Standaard alleen de eigen video's van de viewer.
+ */
+export async function listEditorBoard(
+  viewer: Viewer,
+  opts: { allEditors?: boolean } = {},
+): Promise<EditorBoardVideo[]> {
   const holidays = nlHolidaySet();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+
+  // Eigen werk (editor) óf alle editors binnen de toegestane klanten (eigenaar).
+  const scopeCond = opts.allEditors
+    ? scopeToClients(viewer, deliverables.clientId)
+    : eq(deliverables.editorId, viewer.id);
 
   const rows = await db
     .select({
@@ -72,6 +85,7 @@ export async function listEditorBoard(viewer: Viewer): Promise<EditorBoardVideo[
       clientSlug: clients.slug,
       clientColor: clients.color,
       clientLogo: clients.logoUrl,
+      editorName: users.fullName,
       scriptId: deliverables.scriptId,
       scriptUrl: deliverables.scriptUrl,
       footageUrl: deliverables.footageUrl,
@@ -98,10 +112,11 @@ export async function listEditorBoard(viewer: Viewer): Promise<EditorBoardVideo[
     })
     .from(deliverables)
     .innerJoin(clients, eq(clients.id, deliverables.clientId))
+    .leftJoin(users, eq(users.id, deliverables.editorId))
     .where(
       and(
         isNull(deliverables.deletedAt),
-        eq(deliverables.editorId, viewer.id),
+        scopeCond,
         // Actief werk altijd; afgeronde video's alleen de laatste 45 dagen, zodat
         // het board niet eindeloos volloopt met oude opleveringen.
         sql`(
@@ -113,8 +128,15 @@ export async function listEditorBoard(viewer: Viewer): Promise<EditorBoardVideo[
         )`,
       ),
     )
-    .orderBy(asc(deliverables.dueOn), desc(deliverables.statusChangedAt))
-    .limit(300);
+    // Actief werk eerst, afgeronde video's achteraan — anders kunnen oude
+    // opleveringen (met een deadline in het verleden) het limiet opvullen en de
+    // lopende opdrachten wegdrukken.
+    .orderBy(
+      sql`case when ${deliverables.status} in ('approved','ready_to_publish','scheduled','published','analysis_available') then 1 else 0 end`,
+      asc(deliverables.dueOn),
+      desc(deliverables.statusChangedAt),
+    )
+    .limit(400);
 
   return rows.map((r) => {
     const workdaysToDeadline = r.dueOn ? workingDaysUntil(today, r.dueOn, holidays) : null;
@@ -141,6 +163,7 @@ export async function listEditorBoard(viewer: Viewer): Promise<EditorBoardVideo[
       clientSlug: r.clientSlug,
       clientColor: r.clientColor,
       clientLogo: r.clientLogo,
+      editorName: r.editorName,
       dueOn: r.dueOn,
       statusChangedAt:
         typeof r.statusChangedAt === "string"
