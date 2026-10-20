@@ -1,46 +1,30 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, Camera, FileSignature, ListChecks, Users } from "lucide-react";
+import { AlertTriangle, ListChecks } from "lucide-react";
 import { Card, EmptyState } from "@/components/ui";
-import { daysSince, daysUntil, formatDate, plural } from "@/lib/format";
-import { editorLoad } from "@/lib/metrics";
-import { isOwner, type Viewer } from "@/server/auth/context";
+import { daysSince, daysUntil, plural } from "@/lib/format";
+import { type Viewer } from "@/server/auth/context";
 import type { DashboardData } from "@/server/dashboard";
 import type { getMyDay } from "@/server/my-day";
-import { Dagindeling, type ScheduleItem } from "./dagindeling";
 
 type MyDay = Awaited<ReturnType<typeof getMyDay>>;
 type Tone = "bad" | "warn" | "good" | "neutral";
 
-/** "wo 22 okt" — dagnaam + datum, zodat het team in één oogopslag ziet op welke
- *  dag een opname/taak/script valt. */
+/** "wo 22 okt" — dagnaam + datum. */
 function dayName(input: string | Date): string {
   const d = new Date(typeof input === "string" ? `${input.slice(0, 10)}T00:00:00` : input);
   return d.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" });
 }
 
 /**
- * Het "Vandaag"-dashboard toont per rol maximaal drie blokken. Elke regel zegt
- * in één oogopslag: wát er speelt, bij wélke klant/persoon, wat de volgende
- * stap is en hoeveel dagen het al loopt. Nooit tweemaal hetzelfde item. Doel:
- * wie inlogt weet binnen een minuut wat als eerste moet, zonder te scrollen.
- *
- * Losse KPI-tegels, de dagindeling-strip en de pipelinegrafiek zijn hier bewust
- * weggelaten — die leidden af van de vraag "wat moet ik nú doen?".
+ * Het "Vandaag"-dashboard voor het kantoorteam (Jarno, Milou, Jiska, Rutger):
+ * precies twee blokken onder elkaar — je eigen to-do's (uit de takenpagina) en
+ * de editing die nu aandacht vraagt (te laat, wacht op klant). Meer hoeft er op
+ * vandaag niet te staan.
  */
-
 type Line = { key: string; href: string; what: string; action: string; meta: string; tone: Tone };
 type Accent = "bad" | "warn" | "info" | "good" | "ink";
-type Block = { key: string; title: string; subtitle?: string; icon: React.ReactNode; accent?: Accent; lines: Line[]; empty: string; schedule?: ScheduleItem[] };
+type Block = { key: string; title: string; subtitle?: string; icon: React.ReactNode; accent: Accent; lines: Line[]; empty: string };
 
-/** Het vaste dagritme van het team, met een korte toelichting per moment. */
-const DAGINDELING: ScheduleItem[] = [
-  { from: "08:30", to: "09:00", label: "Dagstart", detail: "Samen de dag doornemen: wat staat er op de planning en wat heeft prioriteit." },
-  { from: "12:30", to: "13:00", label: "Pauze", detail: "Even weg van het scherm — tot 13:00." },
-  { from: "13:00", to: "13:30", label: "Wat moet er vandaag echt af?", detail: "Check de belangrijkste deadlines en stem af waar nodig." },
-  { from: "16:45", label: "To-do-lijst voor morgen maken", detail: "Zet klaar wat morgen als eerste moet, zodat je direct kunt starten." },
-];
-
-/** Functionele koptekst-kleur per blok, zodat blokken niet allemaal gelijk ogen. */
 const BLOCK_HEADER: Record<Accent, string> = {
   bad: "bg-[var(--color-bad)]",
   warn: "bg-[var(--color-warn)]",
@@ -56,14 +40,12 @@ const BLOCK_RING: Record<Accent, string> = {
   ink: "ring-1 ring-[var(--color-indigo-ink)]/10",
 };
 
-/** "Klant — Titel", maar niet "Klant — Klant" als de titel gelijk is. */
 /** Ruwe ISO-datums (2026-10-20) in een titel vervangen door een leesbare datum. */
 function prettyTitle(title: string): string {
   return title.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_, y, m, d) =>
     new Date(Number(y), Number(m) - 1, Number(d)).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }),
   );
 }
-
 function label(clientName: string, title: string): string {
   const t = prettyTitle(title);
   return t.trim().toLowerCase() === clientName.trim().toLowerCase() ? clientName : `${clientName} — ${t}`;
@@ -82,19 +64,10 @@ const META: Record<Tone, string> = {
   neutral: "text-[var(--color-ink-muted)]",
 };
 
-export function TodayView({ viewer, data, myDay, capMap }: { viewer: Viewer; data: DashboardData; myDay: MyDay; capMap: Map<string, number> }) {
-  const role = viewer.primaryRole;
-  const ownerView = isOwner(viewer) || role === "admin" || role === "finance";
-  const videographerView = role === "videographer";
-
-  const blocks = ownerView
-    ? ownerBlocks(data, capMap)
-    : videographerView
-      ? videographerBlocks(myDay)
-      : creativeBlocks(data, myDay);
-
+export function TodayView({ data, myDay }: { viewer: Viewer; data: DashboardData; myDay: MyDay; capMap: Map<string, number> }) {
+  const blocks = officeBlocks(data, myDay);
   return (
-    <div className="grid gap-5 lg:grid-cols-3">
+    <div className="grid gap-5 lg:grid-cols-2">
       {blocks.map((b) => (
         <BlockCard key={b.key} block={b} />
       ))}
@@ -102,190 +75,47 @@ export function TodayView({ viewer, data, myDay, capMap }: { viewer: Viewer; dat
   );
 }
 
-/* ---------------- Eigenaar / beheer ---------------- */
-function ownerBlocks(data: DashboardData, capMap: Map<string, number>): Block[] {
-  const urgentShoots = data.shoots.filter(
-    (s) => daysUntil(s.scheduledOn) <= 2 && (Number(s.openBlockers) > 0 || Number(s.unapprovedScripts) > 0),
-  );
-
-  // Een video die al als "te laat" staat, niet nóg eens als "stil bij de klant"
-  // tonen — één regel per video.
-  const lateIds = new Set(data.videos.late.map((v) => v.id));
-  const stalled = data.videos.stalledAtClient.filter((v) => daysSince(v.statusChangedAt) > 3 && !lateIds.has(v.id));
-
-  const attention: Line[] = [
-    ...data.videos.late.map((v) => {
-      const d = Math.max(1, -daysUntil(v.dueOn));
-      return {
-        key: `late-${v.id}`,
-        href: `/videos/${v.id}`,
-        what: label(v.clientName, v.title),
-        action: `Over de deadline · ${v.editorName ?? "geen editor"} → afmaken`,
-        meta: `${plural(d, "dag", "dagen")} te laat`,
-        tone: "bad" as const,
-      };
-    }),
-    ...stalled.map((v) => ({
-      key: `stall-${v.id}`,
-      href: `/videos/${v.id}`,
-      what: label(v.clientName, v.title),
-      action: "Klant reageert niet → achterna bellen",
-      meta: `${plural(daysSince(v.statusChangedAt), "dag", "dagen")} stil`,
-      tone: "warn" as const,
-    })),
-    ...urgentShoots.map((s) => ({
-      key: `ushoot-${s.id}`,
-      href: `/productions/${s.id}`,
-      what: `${s.clientName} — opname ${dayName(s.scheduledOn)}`,
-      action: `Nog niet rond · ${s.videographerName ?? "geen videograaf"} → voorbereiden`,
-      meta: `${Number(s.openBlockers) + Number(s.unapprovedScripts)} open`,
-      tone: "warn" as const,
-    })),
-  ];
-
-  // Klanten die actie nodig hebben — één regel per klant, geen dubbele.
-  const seen = new Set<string>();
-  const clientLines: Line[] = [];
-  for (const c of data.clients.atRisk) {
-    if (seen.has(c.id)) continue;
-    seen.add(c.id);
-    clientLines.push({
-      key: `risk-${c.id}`,
-      href: `/clients/${c.slug}`,
-      what: c.name,
-      action: `${c.riskReason ?? "Risico"} → contact opnemen`,
-      meta: "risico",
-      tone: "bad",
-    });
-  }
-  for (const q of data.clients.quotaGap) {
-    if (seen.has(q.clientId)) continue;
-    seen.add(q.clientId);
-    clientLines.push({
-      key: `gap-${q.clientId}`,
-      href: `/clients/${q.clientSlug}`,
-      what: q.clientName,
-      action: `${q.published + q.inProgress} van ${q.quota} deze maand → opname of edit inplannen`,
-      meta: `${q.gap} tekort`,
-      tone: "warn",
-    });
-  }
-  for (const c of data.clients.withoutShoot) {
-    if (seen.has(c.id)) continue;
-    seen.add(c.id);
-    clientLines.push({
-      key: `noshoot-${c.id}`,
-      href: `/clients/${c.slug}`,
-      what: c.name,
-      action: `Geen opname gepland${c.lastShoot ? ` · laatst ${formatDate(c.lastShoot)}` : ""} → opnamedag plannen`,
-      meta: "plannen",
-      tone: "warn",
-    });
-  }
-
-  // Team & contracten — overbelaste editors en aflopende contracten.
-  const teamLines: Line[] = [];
-  for (const e of data.editors) {
-    const { pct, level } = editorLoad(Number(e.open), capMap.get(e.editorId) ?? 0);
-    if (level !== "hoog" && level !== "overbelast") continue;
-    teamLines.push({
-      key: `editor-${e.editorId}`,
-      href: "/editing",
-      what: e.editorName,
-      action: level === "overbelast" ? "Overbelast → werk herverdelen" : "Hoge belasting → in de gaten houden",
-      meta: pct != null ? `${pct}%` : `${e.open} open`,
-      tone: level === "overbelast" ? "bad" : "warn",
-    });
-  }
-  for (const c of data.contracts.slice(0, 5)) {
-    const d = daysUntil(c.endsOn);
-    teamLines.push({
-      key: `contract-${c.id}`,
-      href: `/clients/${c.clientSlug}?tab=contract`,
-      what: c.clientName,
-      action: `Contract loopt af · ${c.autoRenew ? "verlengt automatisch" : "verlengt niet"} → ${c.autoRenew ? "bevestigen" : "verlengen bespreken"}`,
-      meta: `over ${d} d`,
-      tone: d < 60 ? "bad" : "warn",
-    });
-  }
-
-  return [
-    { key: "attention", title: "Vraagt nu aandacht", subtitle: "Over de deadline, stil bij de klant of opname niet rond.", icon: <AlertTriangle className="size-5" strokeWidth={2.25} />, accent: "bad", lines: attention, empty: "Niets urgents — alles loopt op schema." },
-    { key: "clients", title: "Klanten die actie nodig hebben", subtitle: "Risico, achterstand op de afspraak of geen opname.", icon: <Users className="size-5" />, accent: "warn", lines: clientLines.slice(0, 8), empty: "Alle klanten lopen op schema." },
-    { key: "team", title: "Team & contracten", subtitle: "Capaciteit van editors en aflopende contracten.", icon: <FileSignature className="size-5" />, accent: "ink", lines: teamLines.slice(0, 8), empty: "Capaciteit in orde, geen contracten binnen 90 dagen." },
-  ];
-}
-
-/* ---------------- Content Creative / coördinator ---------------- */
-function creativeBlocks(data: DashboardData, myDay: MyDay): Block[] {
-  const mine: Line[] = [
-    ...myDay.tasks.map((t) => ({
-      key: `task-${t.id}`,
-      href: "/tasks",
-      what: prettyTitle(t.title),
-      action: t.clientName ? `${t.clientName} → oppakken` : "Eigen taak → oppakken",
-      meta: t.dueOn ? `${dayName(t.dueOn)}${t.overdue ? " · te laat" : ""}` : "geen datum",
-      tone: (t.overdue ? "bad" : t.priority === "urgent" || t.priority === "high" ? "warn" : "neutral") as Tone,
-    })),
-    ...myDay.videos.map((v) => ({
-      key: `myvid-${v.id}`,
-      href: `/videos/${v.id}`,
-      what: label(v.clientName, v.title),
-      action: "Jouw video → volgende stap zetten",
-      meta: v.dueOn ? dayName(v.dueOn) : "",
-      tone: "neutral" as Tone,
-    })),
-  ];
-
-  const stalled = data.videos.stalledAtClient.filter((v) => daysSince(v.statusChangedAt) > 2);
-  const waiting: Line[] = stalled.map((v) => ({
-    key: `wait-${v.id}`,
-    href: `/videos/${v.id}`,
-    what: label(v.clientName, v.title),
-    action: "Wacht op feedback van de klant → herinneren",
-    meta: `${plural(daysSince(v.statusChangedAt), "dag", "dagen")} stil`,
-    tone: daysSince(v.statusChangedAt) > 4 ? "bad" : "warn",
-  }));
-
-  return [
-    { key: "mine", title: "Mijn acties vandaag", subtitle: "Jouw taken en video's die op jou wachten.", icon: <ListChecks className="size-5" />, accent: "info", lines: mine.slice(0, 8), empty: "Geen openstaande acties op jouw naam." },
-    { key: "waiting", title: "Mijn klanten wachten", subtitle: "Video's die te lang bij de klant liggen.", icon: <Users className="size-5" />, accent: "warn", lines: waiting.slice(0, 8), empty: "Geen klanten die op feedback laten wachten." },
-    { key: "dag", title: "Dagindeling", subtitle: "Het vaste dagritme van het team.", icon: <CalendarClock className="size-5" />, accent: "ink", lines: [], empty: "", schedule: DAGINDELING },
-  ];
-}
-
-/* ---------------- Videograaf ---------------- */
-function videographerBlocks(myDay: MyDay): Block[] {
-  const shoots: Line[] = myDay.shoots.map((s) => ({
-    key: `shoot-${s.id}`,
-    href: `/productions/${s.id}`,
-    what: `${s.clientName}`,
-    action: `${s.locationName ?? "locatie onbekend"}${s.startTime ? ` · ${s.startTime.slice(0, 5)}` : ""} → opnemen`,
-    meta: dayName(s.scheduledOn),
-    tone: (daysUntil(s.scheduledOn) <= 1 ? "warn" : "neutral") as Tone,
-  }));
-
-  // "Na de opname": opnames van gisteren/vandaag waarvan de beelden nog geüpload
-  // moeten worden. We leiden dit af uit de eerstvolgende opnames niet; in plaats
-  // daarvan tonen we de taken, die de uploadherinnering bevatten.
-  const tasks: Line[] = myDay.tasks.map((t) => ({
+function officeBlocks(data: DashboardData, myDay: MyDay): Block[] {
+  // 1) Mijn to-do — de eigen taken van deze medewerker (uit de takenpagina).
+  const todo: Line[] = myDay.tasks.map((t) => ({
     key: `task-${t.id}`,
     href: "/tasks",
     what: prettyTitle(t.title),
     action: t.clientName ? `${t.clientName} → oppakken` : "Eigen taak → oppakken",
-    meta: t.dueOn ? `${dayName(t.dueOn)}${t.overdue ? " · te laat" : ""}` : "geen datum",
+    meta: t.dueOn ? `${dayName(t.dueOn)}${t.overdue ? " · te laat" : ""}` : "",
     tone: (t.overdue ? "bad" : t.priority === "urgent" || t.priority === "high" ? "warn" : "neutral") as Tone,
   }));
 
+  // 2) Editing die aandacht vraagt — te laat en wacht op klant (één regel per video).
+  const lateIds = new Set(data.videos.late.map((v) => v.id));
+  const stalled = data.videos.stalledAtClient.filter((v) => !lateIds.has(v.id));
+  const editing: Line[] = [
+    ...data.videos.late.map((v) => ({
+      key: `late-${v.id}`,
+      href: `/videos/${v.id}`,
+      what: label(v.clientName, v.title),
+      action: `Over de deadline · ${v.editorName ?? "geen editor"} → afmaken`,
+      meta: `${plural(Math.max(1, -daysUntil(v.dueOn)), "dag", "dagen")} te laat`,
+      tone: "bad" as Tone,
+    })),
+    ...stalled.map((v) => ({
+      key: `wait-${v.id}`,
+      href: `/videos/${v.id}`,
+      what: label(v.clientName, v.title),
+      action: "Wacht op klantfeedback → herinneren",
+      meta: `${plural(daysSince(v.statusChangedAt), "dag", "dagen")} stil`,
+      tone: (daysSince(v.statusChangedAt) > 4 ? "bad" : "warn") as Tone,
+    })),
+  ];
+
   return [
-    { key: "shoots", title: "Mijn opnames", subtitle: "Jouw opnamedagen, eerstvolgende bovenaan.", icon: <Camera className="size-5" />, accent: "info", lines: shoots.slice(0, 8), empty: "Geen opnames op jouw naam de komende twee weken." },
-    { key: "tasks", title: "Mijn taken", subtitle: "Beelden uploaden en andere acties op jouw naam.", icon: <ListChecks className="size-5" />, accent: "ink", lines: tasks.slice(0, 8), empty: "Geen openstaande taken." },
+    { key: "todo", title: "Mijn to-do", subtitle: "Jouw taken van de takenpagina.", icon: <ListChecks className="size-5" />, accent: "info", lines: todo.slice(0, 15), empty: "Geen openstaande taken op jouw naam." },
+    { key: "editing", title: "Editing", subtitle: "Te laat en wacht op klantfeedback — pak dit als eerste op.", icon: <AlertTriangle className="size-5" strokeWidth={2.25} />, accent: "bad", lines: editing.slice(0, 15), empty: "Geen editing die nu aandacht vraagt." },
   ];
 }
 
-/* ---------------- Weergave ---------------- */
 function BlockCard({ block }: { block: Block }) {
-  const accent: Accent = block.accent ?? "ink";
+  const accent = block.accent;
   return (
     <Card padded={false} className={`overflow-hidden ${BLOCK_RING[accent]}`}>
       <div className={`flex items-center gap-2.5 px-5 py-3 text-white ${BLOCK_HEADER[accent]}`}>
@@ -294,13 +124,11 @@ function BlockCard({ block }: { block: Block }) {
           <h2 className="truncate text-base font-bold tracking-tight">{block.title}</h2>
           {block.subtitle ? <p className="truncate text-xs text-white/70">{block.subtitle}</p> : null}
         </div>
-        {!block.schedule && block.lines.length > 0 ? (
+        {block.lines.length > 0 ? (
           <span className="ml-auto shrink-0 rounded-full bg-white/20 px-2.5 py-0.5 text-sm font-semibold">{block.lines.length}</span>
         ) : null}
       </div>
-      {block.schedule ? (
-        <Dagindeling items={block.schedule} />
-      ) : block.lines.length === 0 ? (
+      {block.lines.length === 0 ? (
         <EmptyState title={block.empty} />
       ) : (
         <ul className="divide-y divide-[var(--color-line)]">
