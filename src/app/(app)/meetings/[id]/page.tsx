@@ -53,7 +53,7 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
       ) : null}
 
       <div className="space-y-5">
-        <Section title="Agenda" subtitle="Bespreekpunten">
+        <Section title="Agenda" subtitle="Bespreekpunten — voeg hieronder een nieuw punt toe aan deze meeting">
           {agenda.length === 0 ? <Empty text="Nog geen bespreekpunten" /> : (
             <ul className="divide-y divide-[var(--color-line)]">
               {agenda.map((i) => (

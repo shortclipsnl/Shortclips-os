@@ -36,7 +36,9 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
         </Link>
       ) : null}
 
-      <ScriptingBoard rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} />
+      {/* key op de actieve filter: zo herstart het board met de juiste filter
+          zodra je op een blok bovenin klikt (anders blijft de begin-filter staan). */}
+      <ScriptingBoard key={filter ?? "alle"} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} />
     </div>
   );
 }

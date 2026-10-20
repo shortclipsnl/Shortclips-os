@@ -46,12 +46,15 @@ export default async function MeetingsPage() {
             <div className="text-base font-bold tracking-tight">Vaste teammeeting · {dateTime(new Date(w.scheduledAt))}</div>
             <div className="text-xs text-white/70">{agendaCount} bespreekpunt{agendaCount === 1 ? "" : "en"} klaar · niet-behandelde punten gaan automatisch mee naar volgende week.</div>
           </div>
-          <span className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium">Open de meeting →</span>
+          <span className="shrink-0 text-right">
+            <span className="inline-block rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium">Open de meeting →</span>
+            <span className="mt-1 block text-2xs text-white/60">om de bespreekpunten te bekijken</span>
+          </span>
         </Link>
 
         {/* Duidelijke oproep + voorbeelden: wat zet je neer als bespreekpunt? */}
         <div className="px-4 pt-3">
-          <p className="text-sm font-semibold">Zet hier je bespreekpunten neer</p>
+          <p className="text-sm font-semibold">Voeg hieronder een nieuw bespreekpunt toe aan deze meeting</p>
           <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
             Heb je iets te bespreken? Voeg het de hele week door toe — dan behandelen we het samen tijdens de vaste teammeeting.
           </p>
