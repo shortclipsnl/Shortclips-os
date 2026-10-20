@@ -3,8 +3,8 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, Loader2 } from "lucide-react";
-import { setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
+import { ChevronDown, Loader2, UserPlus } from "lucide-react";
+import { setScriptingNote, setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS } from "@/lib/statuses";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import type { ScriptingRow, WriterOption } from "@/server/scripting";
@@ -40,10 +40,10 @@ const STATUS_ACCENT: Record<string, string> = {
 
 /** Korte labels voor de knoppen (de volledige labels zijn soms lang). */
 const STATUS_SHORT: Record<string, string> = {
-  concepting: "Concepting",
-  scriptmeeting: "Scriptmeeting",
+  concepting: "Scripts opstellen",
+  scriptmeeting: "Meeting plannen",
   afwachting_klant: "Afwachting klant",
-  scripts_bij_klant: "Bij klant",
+  scripts_bij_klant: "Controle bij klant",
   nog_aanvullen: "Nog aanvullen",
   final: "Final",
 };
@@ -197,7 +197,10 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                       <WriterCell id={r.id} writerId={r.scriptWriterId} writerName={r.scriptWriterName} writerAvatar={r.scriptWriterAvatar} options={writerOptions} canWrite={canWrite} urgent={!r.done && r.daysToDeadline <= 7} />
                     </td>
                     <td className="px-2 py-2 align-top">
-                      <StatusPicker id={r.id} status={r.status} canWrite={canWrite} />
+                      <div className="flex flex-col gap-1.5">
+                        <StatusPicker id={r.id} status={r.status} canWrite={canWrite} />
+                        <NoteCell id={r.id} note={r.note} canWrite={canWrite} />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -214,49 +217,114 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
 }
 
 /**
- * Verantwoordelijke scriptschrijver kiezen (Milou/Jiska/Jarno). Niet toegewezen
- * valt op in oranje, zodat meteen duidelijk is wie het script nog moet oppakken.
+ * Verantwoordelijke scriptschrijver: alleen de (grotere) avatar, geen naam — het
+ * team herkent elkaar aan het gezicht. Klik op de avatar om tussen de schrijvers
+ * te wisselen. Niet toegewezen valt op als een stippelcirkel (oranje als de
+ * deadline nadert), zodat meteen duidelijk is wie het nog moet oppakken.
  */
 function WriterCell({ id, writerId, writerName, writerAvatar, options, canWrite, urgent }: { id: string; writerId: string | null; writerName: string | null; writerAvatar: string | null; options: WriterOption[]; canWrite: boolean; urgent: boolean }) {
   const [pending, start] = useTransition();
+  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const warn = !writerId && urgent;
+
+  const change = (next: string) => {
+    setOpen(false);
+    start(async () => { await setScriptWriter(id, next || null); router.refresh(); });
+  };
+
+  const face = writerName ? (
+    <TeamAvatar name={writerName} avatarUrl={writerAvatar} size={40} />
+  ) : (
+    <span className={`grid size-10 place-items-center rounded-full border-2 border-dashed ${warn ? "border-[var(--color-warn)] text-[var(--color-warn)]" : "border-[var(--color-line-strong)] text-[var(--color-ink-faint)]"}`}>
+      <UserPlus className="size-4" />
+    </span>
+  );
+
+  if (!canWrite) return face;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={pending}
+        title={writerName ? `${writerName} — klik om te wisselen` : "Kies wie dit script schrijft"}
+        className="relative inline-flex rounded-full ring-offset-2 ring-offset-[var(--color-surface)] transition hover:ring-2 hover:ring-[var(--color-brand-300)]"
+      >
+        {face}
+        {pending ? (
+          <span className="absolute inset-0 grid place-items-center rounded-full bg-[var(--color-surface)]/70">
+            <Loader2 className="size-4 animate-spin text-[var(--color-ink-faint)]" />
+          </span>
+        ) : null}
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full z-20 mt-1.5 flex w-max flex-col gap-0.5 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-1.5 shadow-[var(--shadow-raised)]">
+            {options.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => change(o.id)}
+                className={`flex items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1 text-left text-sm hover:bg-[var(--color-surface-sunken)] ${o.id === writerId ? "font-semibold text-[var(--color-ink)]" : "text-[var(--color-ink-muted)]"}`}
+              >
+                <TeamAvatar name={o.fullName} avatarUrl={o.avatarUrl} size={28} />
+                {o.fullName.split(" ")[0]}
+              </button>
+            ))}
+            {writerId ? (
+              <button
+                type="button"
+                onClick={() => change("")}
+                className="mt-0.5 border-t border-[var(--color-line)] px-2 pt-1.5 text-left text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-bad)]"
+              >
+                Niemand
+              </button>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Vrije notitie bij de scriptingstatus: context naast de korte status (bijv. "nog
+ * beeld nodig van klant"). Opslaan gebeurt bij verlaten van het veld of op Enter.
+ */
+function NoteCell({ id, note, canWrite }: { id: string; note: string | null; canWrite: boolean }) {
+  const [pending, start] = useTransition();
+  const [val, setVal] = useState(note ?? "");
   const router = useRouter();
 
   if (!canWrite) {
-    return writerName ? (
-      <span className="inline-flex items-center gap-2 text-sm font-medium">
-        <TeamAvatar name={writerName} avatarUrl={writerAvatar} size={32} />
-        {writerName.split(" ")[0]}
-      </span>
-    ) : (
-      <span className="text-xs text-[var(--color-ink-faint)]">—</span>
-    );
+    return note ? <p className="max-w-[220px] text-xs leading-snug text-[var(--color-ink-muted)]">{note}</p> : null;
   }
 
-  const change = (next: string) => {
-    start(async () => { await setScriptWriter(id, next || null); router.refresh(); });
+  const save = () => {
+    const next = val.trim();
+    if (next === (note ?? "").trim()) return;
+    start(async () => { await setScriptingNote(id, next); router.refresh(); });
   };
-  // Alleen oranje waarschuwen als er niemand staat én de deadline nadert
-  // (binnen 7 dagen). Anders een rustige grijze placeholder — zo valt het
-  // urgente écht op i.p.v. dat alles een waarschuwing is.
-  const warn = !writerId && urgent;
 
   return (
-    <span className="inline-flex items-center gap-2">
-      {writerName ? <TeamAvatar name={writerName} avatarUrl={writerAvatar} size={32} /> : null}
-      <select
-        value={writerId ?? ""}
-        onChange={(e) => change(e.target.value)}
-        disabled={pending}
-        aria-label="Verantwoordelijke"
-        className={`h-7 min-w-[120px] rounded-full border-0 py-0 pl-2.5 pr-6 text-xs font-semibold ${warn ? "bg-[var(--color-warn-soft)]/60 text-[#8a5300]" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}
-      >
-        <option value="">{warn ? "⚠ Wie schrijft dit?" : "Wie schrijft dit?"}</option>
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>{o.fullName.split(" ")[0]}</option>
-        ))}
-      </select>
+    <div className="flex items-center gap-1">
+      <input
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        maxLength={500}
+        placeholder="+ notitie voor team…"
+        aria-label="Notitie bij scriptingstatus"
+        className="h-7 w-[210px] rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] px-2 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:outline-none"
+      />
       {pending ? <Loader2 className="size-3 animate-spin text-[var(--color-ink-faint)]" /> : null}
-    </span>
+    </div>
   );
 }
 

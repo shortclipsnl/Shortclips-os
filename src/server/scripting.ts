@@ -33,6 +33,8 @@ export type ScriptingRow = {
   daysToShoot: number;
   daysToDeadline: number;
   status: string;
+  /** Vrije notitie bij de status (wat er nog moet gebeuren). */
+  note: string | null;
   done: boolean;
   /** Kleurindicatie: green / amber / red / done. */
   flag: "green" | "amber" | "red" | "done";
@@ -60,6 +62,7 @@ export async function listScripting(viewer: Viewer) {
       id: productionDays.id,
       scheduledOn: productionDays.scheduledOn,
       status: productionDays.scriptingStatus,
+      note: productionDays.scriptingNote,
       clientName: clients.name,
       clientSlug: clients.slug,
       clientColor: clients.color,
@@ -106,6 +109,7 @@ export async function listScripting(viewer: Viewer) {
       daysToShoot: daysDiff(r.scheduledOn, today),
       daysToDeadline,
       status: r.status,
+      note: r.note,
       done,
       flag,
       scriptWriterId: r.scriptWriterId,

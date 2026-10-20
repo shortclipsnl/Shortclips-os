@@ -100,6 +100,9 @@ export const productionDays = pgTable(
      *  klaar_shortclips → scriptmeeting → final. Blijft bij deze opname bewaard,
      *  ook als de opnamedatum verandert. "final" = klaar voor opname. */
     scriptingStatus: varchar("scripting_status", { length: 24 }).notNull().default("concepting"),
+    /** Vrije notitie bij de scriptingstatus: wat er nog moet gebeuren, zodat het
+     *  team context heeft naast de korte status (bijv. "wacht op beeld klant"). */
+    scriptingNote: text("scripting_note"),
     /** Verantwoordelijke die het script voor deze opname schrijft
      *  (Milou/Jiska/Jarno). Zo is er geen onduidelijkheid wie het oppakt. */
     scriptWriterId: uuid("script_writer_id").references(() => users.id, {

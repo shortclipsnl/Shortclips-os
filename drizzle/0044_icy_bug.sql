@@ -1,0 +1,1 @@
+ALTER TABLE "production_days" ADD COLUMN "scripting_note" text;

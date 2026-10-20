@@ -167,11 +167,11 @@ export const SCRIPT_STATUS: Record<string, { label: string; tone: Tone }> = {
 
 /** Scriptingfases voor het Scripting-dashboard. "final" telt als afgerond. */
 export const SCRIPTING_STATUS: Record<string, { label: string; tone: Tone; done?: boolean }> = {
-  concepting: { label: "Concepting", tone: "info" },
-  scriptmeeting: { label: "Scriptmeeting", tone: "warn" },
+  concepting: { label: "Scripts nog opstellen", tone: "info" },
+  scriptmeeting: { label: "Script meeting plannen", tone: "warn" },
   afwachting_klant: { label: "Afwachting van klant", tone: "violet" },
-  scripts_bij_klant: { label: "Scripts liggen bij klant", tone: "ink" },
-  nog_aanvullen: { label: "Nog aanvullen", tone: "lime" },
+  scripts_bij_klant: { label: "Controle bij klant", tone: "ink" },
+  nog_aanvullen: { label: "Nog aanvullen met info", tone: "lime" },
   final: { label: "Final voor opname", tone: "good", done: true },
 };
 export const SCRIPTING_ORDER = ["concepting", "scriptmeeting", "afwachting_klant", "scripts_bij_klant", "nog_aanvullen", "final"] as const;

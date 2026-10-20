@@ -33,6 +33,31 @@ export async function setScriptingStatus(productionDayId: string, status: string
   }
 }
 
+/** Notitie bij de scriptingstatus zetten of wissen (wat er nog moet gebeuren). */
+export async function setScriptingNote(productionDayId: string, note: string): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("scripts:write");
+    const [day] = await db
+      .select({ id: productionDays.id, clientId: productionDays.clientId })
+      .from(productionDays)
+      .where(eq(productionDays.id, productionDayId))
+      .limit(1);
+    if (!day) return { ok: false, message: "Opname niet gevonden." };
+    assertClientAccess(viewer, day.clientId);
+
+    const trimmed = note.trim().slice(0, 500);
+    await db
+      .update(productionDays)
+      .set({ scriptingNote: trimmed || null, updatedAt: new Date() })
+      .where(eq(productionDays.id, productionDayId));
+    revalidatePath("/scripting");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 /** Verantwoordelijke scriptschrijver van een opname zetten of wissen. */
 export async function setScriptWriter(productionDayId: string, writerId: string | null): Promise<ActionResult> {
   try {
