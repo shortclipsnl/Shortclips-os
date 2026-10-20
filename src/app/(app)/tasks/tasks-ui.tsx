@@ -213,7 +213,6 @@ export function TaskItem({
   const [justDone, setJustDone] = useState(false);
   const router = useRouter();
   const done = task.status === "done";
-  const overdue = task.dueOn && !done && task.dueOn < new Date().toISOString().slice(0, 10);
 
   function run(fn: () => Promise<unknown>) {
     start(async () => {
@@ -267,7 +266,7 @@ export function TaskItem({
 
       {task.assigneeName ? (
         <span className="hidden shrink-0 items-center gap-1.5 text-xs text-[var(--color-ink-muted)] sm:inline-flex" title={`Toegewezen aan ${task.assigneeName}`}>
-          <TeamAvatar name={task.assigneeName} avatarUrl={task.assigneeAvatar} size={20} />
+          <TeamAvatar name={task.assigneeName} avatarUrl={task.assigneeAvatar} size={32} />
         </span>
       ) : null}
 
@@ -299,15 +298,6 @@ export function TaskItem({
             ))}
           </select>
 
-          <input
-            type="date"
-            className={cn("sc-input h-8 w-32 py-0 text-xs", overdue && "text-[var(--color-bad)]")}
-            value={task.dueOn ?? ""}
-            disabled={pending}
-            onChange={(e) => run(() => updateTask(task.id, { dueOn: e.target.value || null }))}
-            aria-label="Deadline"
-          />
-
           <button
             type="button"
             disabled={pending}
@@ -320,7 +310,7 @@ export function TaskItem({
         </>
       ) : (
         <span className="text-xs text-[var(--color-ink-muted)]">
-          {task.dueOn ? task.dueOn : ""} · {PRIORITIES.find((p) => p.value === task.priority)?.label}
+          {PRIORITIES.find((p) => p.value === task.priority)?.label}
         </span>
       )}
     </li>

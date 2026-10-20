@@ -14,12 +14,6 @@ export const dynamic = "force-dynamic";
 
 const OPEN = ["todo", "in_progress", "blocked"] as const;
 
-function addDays(n: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-
 export default async function TasksPage({ searchParams }: { searchParams: Promise<{ persoon?: string }> }) {
   const viewer = await requireInternal();
   const canWrite = viewer.permissions.has("tasks:write");
@@ -86,14 +80,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       // Gearchiveerd (automatisch na 7 dagen klaar) — blijft terugvindbaar.
       fetchTasks(and(isNull(tasks.deletedAt), isNotNull(tasks.archivedAt), assigneeCond, scopeToClients(viewer, tasks.clientId))),
     ]);
-    const today = addDays(0);
-    const weekEnd = addDays(7);
     const o = open as TaskItemData[];
     buckets = [
-      { label: "Te laat", tone: "bad", items: o.filter((t) => t.dueOn && t.dueOn < today) },
-      { label: "Vandaag", tone: "warn", items: o.filter((t) => t.dueOn === today) },
-      { label: "Deze week", items: o.filter((t) => t.dueOn && t.dueOn > today && t.dueOn <= weekEnd) },
-      { label: "Later / zonder datum", items: o.filter((t) => !t.dueOn || t.dueOn > weekEnd) },
+      { label: "Openstaand", items: o },
       { label: "Afgerond", items: (done as TaskItemData[]).slice(0, 20) },
       { label: `Gearchiveerd (${archived.length})`, items: (archived as TaskItemData[]).slice(0, 30) },
     ];
@@ -170,7 +159,18 @@ function PersonCard({ id, name, count, active, generic }: { id: string; name: st
       )}
       <span className="min-w-0">
         <span className="block truncate text-lg font-semibold">{name.split(" ")[0]}</span>
-        <span className={`text-sm ${active ? "text-white/70" : "text-[var(--color-ink-muted)]"}`}>{count} open</span>
+        {/* Open taken krijgen een kleurtje zodat ze opvallen; 0 blijft rustig. */}
+        <span
+          className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${
+            active
+              ? "bg-white/20 text-white"
+              : count > 0
+                ? "bg-[var(--color-warn-soft)] text-[#8a5300]"
+                : "bg-[var(--color-surface-2)] text-[var(--color-ink-faint)] font-medium"
+          }`}
+        >
+          {count} open
+        </span>
       </span>
     </Link>
   );
