@@ -367,9 +367,9 @@ function StatusPicker({ id, status, canWrite }: { id: string; status: string; ca
 
   if (!canWrite) {
     return (
-      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val] ?? "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
-        <span className="size-2 rounded-full" style={{ background: STATUS_ACCENT[val] ?? "var(--color-ink-faint)" }} />
-        {STATUS_SHORT[val] ?? meta.label}
+      <span className={`inline-flex w-[200px] items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val] ?? "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
+        <span className="size-2 shrink-0 rounded-full" style={{ background: STATUS_ACCENT[val] ?? "var(--color-ink-faint)" }} />
+        <span className="truncate">{STATUS_SHORT[val] ?? meta.label}</span>
       </span>
     );
   }
@@ -377,25 +377,27 @@ function StatusPicker({ id, status, canWrite }: { id: string; status: string; ca
   // De opties klappen uit als een zwevende laag (absolute), zodat de tabel niet
   // verspringt. Een onzichtbare achtergrond vangt een klik ernaast op om te sluiten.
   return (
-    <div className="relative min-w-[150px]">
+    <div className="relative w-[200px]">
       <button type="button" onClick={() => setOpen((o) => !o)} disabled={pending}
         title={meta.label}
-        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val] ?? "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}
+        className={`flex w-full items-center justify-between gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val] ?? "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}
         style={open ? { boxShadow: `0 0 0 2px ${STATUS_ACCENT[val] ?? "var(--color-ink-faint)"}` } : undefined}>
-        <span className="size-2 rounded-full" style={{ background: STATUS_ACCENT[val] ?? "var(--color-ink-faint)" }} />
-        {STATUS_SHORT[val] ?? meta.label}
-        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <ChevronDown className="size-3.5 opacity-60" />}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="size-2 shrink-0 rounded-full" style={{ background: STATUS_ACCENT[val] ?? "var(--color-ink-faint)" }} />
+          <span className="truncate">{STATUS_SHORT[val] ?? meta.label}</span>
+        </span>
+        {pending ? <Loader2 className="size-3.5 shrink-0 animate-spin" /> : <ChevronDown className="size-3.5 shrink-0 opacity-60" />}
       </button>
       {open ? (
         <>
           <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-20 mt-1.5 flex w-max max-w-[220px] flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
+          <div className="absolute left-0 top-full z-20 mt-1.5 flex w-[200px] flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
             {SCRIPTING_ORDER.map((s) => (
               <button key={s} type="button" onClick={() => choose(s)} title={SCRIPTING_STATUS[s]!.label}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-left text-sm font-semibold ${STATUS_PILL[s]} ${s === val ? "" : "opacity-80 hover:opacity-100"}`}
+                className={`flex w-full items-center gap-1.5 rounded-full px-3 py-1.5 text-left text-sm font-semibold ${STATUS_PILL[s]} ${s === val ? "" : "opacity-80 hover:opacity-100"}`}
                 style={s === val ? { boxShadow: `0 0 0 2px ${STATUS_ACCENT[s]}` } : undefined}>
                 <span className="size-2 shrink-0 rounded-full" style={{ background: STATUS_ACCENT[s] }} />
-                {STATUS_SHORT[s]}
+                <span className="truncate">{STATUS_SHORT[s]}</span>
               </button>
             ))}
           </div>
