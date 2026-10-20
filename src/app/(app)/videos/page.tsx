@@ -27,7 +27,6 @@ export default async function VideosPage({
   // opname-board zou leeg blijven. Dit toont de editor precies zijn eigen werk.
   if (viewer.isEditorOnly) {
     const videos = await listEditorBoard(viewer);
-    const canEditOwn = viewer.permissions.has("videos:write");
     return (
       <div className="mx-auto max-w-[1500px]">
         <PageHeader title="Editing" description={`${videos.length} video's van jou`} />
@@ -36,8 +35,16 @@ export default async function VideosPage({
             <h2 className="text-sm font-bold tracking-tight">Jouw edit-projecten</h2>
             <span className="text-xs text-white/80">Per fase · deadline, aantal shorts, downloadlink en script</span>
           </div>
+          {/* Korte uitleg bovenaan — editors hoeven niets in te vullen; ze
+              openen alleen het materiaal en het script en bewaken de deadline. */}
+          <p className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)] px-4 py-3 text-sm leading-relaxed text-[var(--color-ink)]">
+            Hieronder staan de projecten die <strong>binnenkort beschikbaar</strong> komen en de projecten die nu <strong>in edit</strong> staan.
+            Klik op <strong>Download</strong> voor het beeldmateriaal en op <strong>Script</strong> voor het script — die kun je meteen openen.
+            Check goed de <strong>deadlines</strong>, plan ze in je eigen agenda en zorg dat je op tijd oplevert.
+            Vragen of kom je ergens niet uit? Neem contact op met je contactpersoon bij ShortClips.
+          </p>
           {videos.length > 0 ? (
-            <EditorBoardTable videos={videos} editors={[]} canEdit={canEditOwn} canAssign={false} showTabs={false} />
+            <EditorBoardTable videos={videos} editors={[]} canEdit={false} canAssign={false} showTabs={false} />
           ) : (
             <p className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">
               Je hebt op dit moment geen video&apos;s toegewezen gekregen.

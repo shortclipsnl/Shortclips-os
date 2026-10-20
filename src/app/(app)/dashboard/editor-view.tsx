@@ -1,22 +1,18 @@
 import Link from "next/link";
-import { AlertTriangle, ExternalLink, FileText, Folder, Film, CheckCircle2, Clock } from "lucide-react";
+import { AlertTriangle, FileText, Film, CheckCircle2, Clock } from "lucide-react";
 import { getEditorDashboard } from "@/server/editor-dashboard";
-import { listEditingProjects } from "@/server/editing-board";
 import type { Viewer } from "@/server/auth/context";
 import { Card, CardHeader, ClientLogo, EmptyState, Stat } from "@/components/ui";
-import { daysSince, pct, plural, relativeDays } from "@/lib/format";
-import { stageOverdue, type VideoStage } from "@/lib/statuses";
-import { EditingProjects } from "../videos/editing-projects";
-import { EditorStatusControl } from "./editor-status";
+import { pct, plural, relativeDays } from "@/lib/format";
 
 /**
- * Dashboard voor editors: alleen eigen werk, met alles wat nodig is om te
- * beginnen — script, materiaal, briefing en openstaande feedback.
+ * Dashboard voor editors: zo compact mogelijk. Alleen wat ze echt moeten weten —
+ * wat komt eraan, hun video's op deadlinevolgorde en hun eigen cijfers. Downloaden
+ * en het script openen doen ze op de Editing-pagina.
  */
 export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
-  const [data, editingProjects] = await Promise.all([getEditorDashboard(viewer), listEditingProjects(viewer)]);
+  const data = await getEditorDashboard(viewer);
   const firstName = viewer.fullName.split(" ")[0];
-  const canEdit = viewer.permissions.has("videos:write");
 
   const todayList = data.queue.filter(
     (v) => v.dueOn && v.dueOn <= new Date().toISOString().slice(0, 10),
@@ -57,26 +53,13 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
         </div>
       </div>
 
-      {editingProjects.length > 0 ? (
-        <div>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
-            <h2 className="text-sm font-bold tracking-tight">Jouw editing-projecten</h2>
-            <span className="text-xs text-white/80">14 werkdagen tot oplevering · download &amp; script per project</span>
-          </div>
-          <p className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)] px-4 py-2.5 text-sm leading-relaxed text-[var(--color-ink)]">
-            <strong>Dit zijn jouw projecten.</strong> Houd goed rekening met de <strong>deadlines</strong> — de batterij loopt vanaf de opnamedag.
-            Per project vind je de <strong>download-link</strong> van het beeldmateriaal en het <strong>script</strong>. Zet je project telkens in de juiste
-            <strong> fase</strong>: binnenkort beschikbaar → in edit → interne review → feedback klant → feedback klant verwerken → afgerond.
-          </p>
-          <EditingProjects projects={editingProjects} editors={[]} canEdit={canEdit} canAssign={false} lockedEditor />
-        </div>
-      ) : null}
-
+      {/* Jouw video's — compact, op deadlinevolgorde. Alleen klant, titel en
+          deadline; downloaden en het script openen doe je op de Editing-pagina. */}
       <Card padded={false}>
         <div className="p-5 pb-3">
           <CardHeader
-            title="Jouw werk"
-            subtitle="Op volgorde van deadline. Werk je status bij, en klik door voor script, materiaal en feedback."
+            title="Jouw video's"
+            subtitle="Op volgorde van deadline. Klik een video aan voor de download en het script."
           />
         </div>
         {data.queue.length === 0 ? (
@@ -87,101 +70,23 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
         ) : (
           <ul className="divide-y divide-[var(--color-line)]">
             {data.queue.map((v) => {
-              const days = daysSince(v.statusChangedAt);
-              const late = stageOverdue(v.status, days);
               const overdue = v.dueOn && v.dueOn < new Date().toISOString().slice(0, 10);
               return (
-                <li key={v.id} className="px-5 py-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <Link href={`/videos/${v.id}`} className="font-medium hover:underline">
-                        {v.title}
-                      </Link>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-ink-muted)]">
-                        <span className="inline-flex items-center gap-1.5">
-                          <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={16} />
-                          {v.clientName}
-                        </span>
-                        <span>· versie {v.currentVersion}</span>
-                        <span className={late ? "font-medium text-[var(--color-warn)]" : undefined}>
-                          · {days} dagen in deze stap
-                        </span>
-                        {v.clientRevisionRounds > 0 ? (
-                          <span>· {plural(v.clientRevisionRounds, "klantrevisie", "klantrevisies")}</span>
-                        ) : null}
-                      </p>
-                      {v.briefing ? (
-                        <p className="mt-2 rounded-[var(--radius-sm)] bg-[var(--color-surface-sunken)] px-3 py-2 text-sm text-[var(--color-ink-muted)]">
-                          {v.briefing}
-                        </p>
-                      ) : null}
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-                        {v.scriptId ? (
-                          <Link
-                            href={`/scripts/${v.scriptId}`}
-                            className="inline-flex items-center gap-1 text-[var(--color-brand-600)] hover:underline"
-                          >
-                            <FileText className="size-3.5" /> Script
-                          </Link>
-                        ) : null}
-                        {v.driveFolderId ? (
-                          <a
-                            href={`https://drive.google.com/drive/folders/${v.driveFolderId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[var(--color-brand-600)] hover:underline"
-                          >
-                            <Folder className="size-3.5" /> Materiaal
-                          </a>
-                        ) : null}
-                        {v.frameUrl ? (
-                          <a
-                            href={v.frameUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[var(--color-brand-600)] hover:underline"
-                          >
-                            <ExternalLink className="size-3.5" /> Frame.io
-                          </a>
-                        ) : null}
-                        {Number(v.openComments) > 0 ? (
-                          <span className="text-[var(--color-warn)]">
-                            {plural(Number(v.openComments), "openstaande opmerking", "openstaande opmerkingen")}
-                          </span>
-                        ) : null}
-                      </div>
-                      {(() => {
-                        const missing: string[] = [];
-                        if (!v.scriptId) missing.push("script");
-                        if (!v.driveFolderId) missing.push("materiaal");
-                        if (!v.frameUrl) missing.push("Frame.io");
-                        return missing.length > 0 ? (
-                          <p className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-[var(--color-warn)]">
-                            <AlertTriangle className="size-3" /> Nog koppelen vóór start: {missing.join(" · ")}
-                          </p>
-                        ) : (
-                          <p className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-[var(--color-good)]">
-                            <CheckCircle2 className="size-3" /> Script, materiaal en Frame.io beschikbaar
-                          </p>
-                        );
-                      })()}
-                    </div>
-
-                    <div className="flex shrink-0 flex-col items-end gap-1.5">
-                      <EditorStatusControl videoId={v.id} status={v.status} />
-                      {v.dueOn ? (
-                        <span
-                          className={
-                            overdue
-                              ? "text-xs font-medium text-[var(--color-bad)]"
-                              : "text-xs text-[var(--color-ink-muted)]"
-                          }
-                        >
-                          {relativeDays(v.dueOn)}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
+                <li key={v.id}>
+                  <Link href={`/videos/${v.id}`} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-[var(--color-surface-2)]">
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={22} />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium">{v.title}</span>
+                        <span className="block truncate text-xs text-[var(--color-ink-muted)]">{v.clientName}</span>
+                      </span>
+                    </span>
+                    {v.dueOn ? (
+                      <span className={`shrink-0 text-xs font-semibold ${overdue ? "text-[var(--color-bad)]" : "text-[var(--color-ink-muted)]"}`}>
+                        {relativeDays(v.dueOn)}
+                      </span>
+                    ) : null}
+                  </Link>
                 </li>
               );
             })}
