@@ -3,9 +3,9 @@ import { AlertTriangle, ExternalLink, FileText, Folder, Film, CheckCircle2, Cloc
 import { getEditorDashboard } from "@/server/editor-dashboard";
 import { listEditingProjects } from "@/server/editing-board";
 import type { Viewer } from "@/server/auth/context";
-import { Badge, Card, CardHeader, ClientLogo, EmptyState, Stat } from "@/components/ui";
+import { Card, CardHeader, ClientLogo, EmptyState, Stat } from "@/components/ui";
 import { daysSince, pct, plural, relativeDays } from "@/lib/format";
-import { TASK_PRIORITY, VIDEO_STATUS, stageOverdue, type VideoStage } from "@/lib/statuses";
+import { stageOverdue, type VideoStage } from "@/lib/statuses";
 import { EditingProjects } from "../videos/editing-projects";
 import { EditorStatusControl } from "./editor-status";
 
@@ -47,21 +47,14 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Nu op je bord" value={data.queue.length} tone="info" icon={<Film />} />
-        <Stat label="Over deadline" value={data.overdue} tone={data.overdue > 0 ? "bad" : "good"} icon={<AlertTriangle />} emphasis={data.overdue > 0} />
-        <Stat label="Totaal opgeleverd" value={data.stats.delivered} tone="good" icon={<CheckCircle2 />} />
-        <Stat
-          label="Op tijd geleverd"
-          value={data.stats.onTimeRate !== null ? pct(data.stats.onTimeRate, 0) : "–"}
-          hint={
-            data.stats.withDeadline > 0
-              ? `over ${plural(data.stats.withDeadline, "video", "video's")} met deadline`
-              : "nog geen video's met deadline"
-          }
-          tone={data.stats.onTimeRate !== null && data.stats.onTimeRate >= 80 ? "good" : "neutral"}
-          icon={<Clock />}
-        />
+      {/* Wat komt er aan — in één oogopslag wat er op je bord staat en wat te laat is. */}
+      <div>
+        <h2 className="mb-2 text-sm font-bold tracking-tight">Wat komt er aan</h2>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Stat label="Nu op je bord" value={data.queue.length} tone="info" icon={<Film />} emphasis />
+          <Stat label="Vandaag of eerder af" value={todayList.length} tone={todayList.length > 0 ? "warn" : "good"} icon={<Clock />} emphasis={todayList.length > 0} />
+          <Stat label="Over deadline" value={data.overdue} tone={data.overdue > 0 ? "bad" : "good"} icon={<AlertTriangle />} emphasis={data.overdue > 0} />
+        </div>
       </div>
 
       {editingProjects.length > 0 ? (
@@ -228,66 +221,28 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
         </Card>
       ) : null}
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <Card padded={false}>
-          <div className="p-5 pb-3">
-            <CardHeader title="Jouw taken" />
-          </div>
-          {data.tasks.length === 0 ? (
-            <EmptyState title="Geen openstaande taken" />
-          ) : (
-            <ul className="divide-y divide-[var(--color-line)]">
-              {data.tasks.map((t) => (
-                <li key={t.id} className="flex items-center gap-3 px-5 py-3">
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm">{t.title}</span>
-                    {t.dueOn ? (
-                      <span className="block text-xs text-[var(--color-ink-muted)]">
-                        {relativeDays(t.dueOn)}
-                      </span>
-                    ) : null}
-                  </span>
-                  <Badge tone={TASK_PRIORITY[t.priority]?.tone ?? "neutral"}>
-                    {TASK_PRIORITY[t.priority]?.label}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Jouw cijfers"
-            subtitle="Rechtstreeks uit de pipeline. Ze zeggen niets over de moeilijkheidsgraad van een opdracht."
+      {/* Jouw cijfers — groot en duidelijk. Rechtstreeks uit de pipeline. */}
+      <div>
+        <h2 className="mb-2 text-sm font-bold tracking-tight">Jouw cijfers</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat label="Totaal opgeleverd" value={data.stats.delivered} tone="good" icon={<CheckCircle2 />} />
+          <Stat label="Nu in bewerking" value={data.stats.inProgress} tone="info" icon={<Film />} />
+          <Stat
+            label="Op tijd geleverd"
+            value={data.stats.onTimeRate !== null ? pct(data.stats.onTimeRate, 0) : "–"}
+            hint={data.stats.withDeadline > 0 ? `over ${plural(data.stats.withDeadline, "video", "video's")} met deadline` : "nog geen deadline-video's"}
+            tone={data.stats.onTimeRate !== null && data.stats.onTimeRate >= 80 ? "good" : "neutral"}
+            icon={<Clock />}
           />
-          <dl className="mt-4 space-y-3 text-sm">
-            <Row label="Opgeleverd" value={String(data.stats.delivered)} />
-            <Row label="Nu in bewerking" value={String(data.stats.inProgress)} />
-            <Row
-              label="Gemiddeld interne revisierondes"
-              value={data.stats.avgInternalRevisions?.toFixed(2) ?? "–"}
-            />
-            <Row
-              label="Gemiddeld klantrevisierondes"
-              value={data.stats.avgClientRevisions?.toFixed(2) ?? "–"}
-            />
-            <Row
-              label="Op tijd geleverd"
-              value={data.stats.onTimeRate !== null ? pct(data.stats.onTimeRate, 0) : "–"}
-            />
-          </dl>
-        </Card>
+          <Stat
+            label="Gem. klantrevisies"
+            value={data.stats.avgClientRevisions?.toFixed(1) ?? "–"}
+            hint="per video"
+            tone="neutral"
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <dt className="text-[var(--color-ink-muted)]">{label}</dt>
-      <dd className="font-medium tabular-nums">{value}</dd>
-    </div>
-  );
-}

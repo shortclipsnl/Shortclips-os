@@ -2,6 +2,8 @@ import { requireInternal, isOwner } from "@/server/auth/context";
 import { NAVIGATION } from "@/components/layout/nav-config";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { AssistantWidget } from "@/components/ai/assistant-widget";
+import { aiConfigured } from "@/server/ai/client";
 
 export default async function AppLayout({
   children,
@@ -13,10 +15,10 @@ export default async function AppLayout({
   // Navigatie tonen op basis van rechten: geen menu-items die tot een
   // foutmelding leiden.
   const owner = isOwner(viewer);
-  // Een editor ziet alleen wat hij nodig heeft: Vandaag, Onze klanten (zijn
-  // eigen klanten), Productieplanning en Editing (zijn eigen projecten).
+  // Een editor ziet alleen wat hij nodig heeft: Vandaag en Editing (zijn eigen
+  // projecten). Onze klanten en Productieplanning heeft hij niet nodig.
   const editorOnly = viewer.primaryRole === "editor";
-  const EDITOR_NAV = new Set(["/dashboard", "/clients", "/planning", "/videos"]);
+  const EDITOR_NAV = new Set(["/dashboard", "/videos"]);
   const groups = NAVIGATION.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
@@ -49,6 +51,11 @@ export default async function AppLayout({
         <Topbar viewer={viewer} />
         <main className="flex-1 px-5 py-6 lg:px-8">{children}</main>
       </div>
+
+      {/* AI-assistent zwevend rechtsonder, voor wie 'm mag gebruiken. */}
+      {viewer.permissions.has("ai:read") ? (
+        <AssistantWidget firstName={viewer.fullName.split(" ")[0] ?? ""} aiReady={aiConfigured()} />
+      ) : null}
     </div>
   );
 }
