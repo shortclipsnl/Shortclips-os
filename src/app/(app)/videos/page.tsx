@@ -11,8 +11,6 @@ import { listClients } from "@/server/clients";
 import { ShootTimers } from "../editing/shoot-timers";
 import { WorkloadSection } from "../editing/workload-section";
 import { Card, PageHeader } from "@/components/ui";
-import { EditingProjects } from "./editing-projects";
-import { EditorBoard } from "./editor-board";
 import { EditorBoardTable } from "./editor-board-table";
 import { MondayImportButton } from "./monday-import";
 
@@ -32,21 +30,17 @@ export default async function VideosPage({
   // opname-board zou leeg blijven. Dit toont de editor precies zijn eigen werk.
   if (viewer.isEditorOnly) {
     const videos = await listEditorBoard(viewer);
+    const canEditOwn = viewer.permissions.has("videos:write");
     return (
-      <div className="mx-auto max-w-[1100px]">
+      <div className="mx-auto max-w-[1500px]">
         <PageHeader title="Editing" description={`${videos.length} video's van jou`} />
         <section className="mb-6">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
             <h2 className="text-sm font-bold tracking-tight">Jouw edit-projecten</h2>
-            <span className="text-xs text-white/80">Gegroepeerd per fase · zet je video telkens in de juiste stap</span>
+            <span className="text-xs text-white/80">Per fase · deadline, aantal shorts, downloadlink en script</span>
           </div>
-          <p className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)] px-4 py-2.5 text-sm leading-relaxed text-[var(--color-ink)]">
-            <strong>Dit zijn jouw video&apos;s.</strong> Bij elke video zie je de <strong>deadline</strong>, het <strong>script</strong> en de
-            <strong> downloadlink</strong> van het beeldmateriaal, plus openstaande feedback. Zet je video telkens in de juiste
-            <strong> fase</strong>: binnenkort beschikbaar → in edit → interne review → feedback klant → feedback klant verwerken → afgerond.
-          </p>
           {videos.length > 0 ? (
-            <EditorBoard videos={videos} />
+            <EditorBoardTable videos={videos} editors={[]} canEdit={canEditOwn} canAssign={false} showTabs={false} />
           ) : (
             <p className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">
               Je hebt op dit moment geen video&apos;s toegewezen gekregen.
@@ -78,7 +72,6 @@ export default async function VideosPage({
   ]);
   const canEdit = viewer.permissions.has("videos:write");
   const canAssign = viewer.permissions.has("videos:assign");
-  const clientOptions = clientList.filter((c) => c.status === "active").map((c) => ({ id: c.id, name: c.name }));
   // Edit-boards zijn alleen voor de vaste editors: Quinn, Noah, Sam, Senna, Fabian.
   const boardEditors = editors.filter((e) => isBoardEditor(e.fullName));
   const shootsAtRisk = shoots.filter((s) => s.atRisk).length;
@@ -119,33 +112,6 @@ export default async function VideosPage({
           )}
         </section>
       ) : null}
-
-      {/* Editing per editor: elke opname is een edit-project met editor, fase,
-          batterij (14 werkdagen) en download-/scriptlink. Komt automatisch uit
-          de opnames (Google Agenda). */}
-      <section className="mb-6">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
-          <h2 className="text-sm font-bold tracking-tight">Editing per editor</h2>
-          <span className="text-xs text-white/80">14 werkdagen opname → oplevering · automatisch uit de opnames</span>
-        </div>
-        {editorView ? (
-          <p className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)] px-4 py-2.5 text-sm leading-relaxed text-[var(--color-ink)]">
-            <strong>Dit zijn jouw edit-projecten.</strong> Houd goed rekening met de <strong>deadlines</strong> — de batterij loopt vanaf de opnamedag.
-            Bij elk project vind je de <strong>download-link</strong> van het beeldmateriaal en het <strong>script</strong>. Zet je project in de juiste
-            <strong> fase</strong> zodra je verder bent: binnenkort beschikbaar → in edit → interne review → feedback klant → feedback klant verwerken → afgerond.
-          </p>
-        ) : (
-          <ul className="mb-3 grid gap-x-5 gap-y-1 text-xs text-[var(--color-ink-muted)] sm:grid-cols-2">
-            <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span>Elke opname is automatisch een edit-project (uit de agenda).</span></li>
-            <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span>Klik bovenin op een <strong>editor</strong> voor diens projecten, of <strong>Hoofdtabel</strong> voor alles.</span></li>
-            <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span>Per rij: <strong>editor</strong>, <strong>fase</strong> en <strong>aantal shorts</strong> instellen (klant-standaard staat voor).</span></li>
-            <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span><strong>Scriptbestand</strong> uploaden en de <strong>download-link</strong> invullen per project.</span></li>
-            <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span><strong>Deadline</strong> loopt automatisch (opname + 14 werkdagen); aanklikken om aan te passen.</span></li>
-            <li className="flex gap-1.5"><span className="text-[var(--color-brand-500)]">•</span><span><strong>Prioriteit</strong> en <strong>wacht op</strong> bepalen we vanzelf.</span></li>
-          </ul>
-        )}
-        <EditingProjects projects={editingProjects} editors={boardEditors} clients={clientOptions} canEdit={canEdit} canAssign={canAssign} lockedEditor={editorView} />
-      </section>
 
       {/* Alles hieronder is voor coördinatie/beheer — editors zien dit niet. */}
       {editorView ? null : (

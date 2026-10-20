@@ -54,11 +54,13 @@ export function EditorBoardTable({
   editors,
   canEdit,
   canAssign,
+  showTabs = true,
 }: {
   videos: EditorBoardVideo[];
   editors: Editor[];
   canEdit: boolean;
   canAssign: boolean;
+  showTabs?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(["afgerond"]));
   const [editor, setEditor] = useState<string>("alle");
@@ -115,6 +117,7 @@ export function EditorBoardTable({
   return (
     <div>
       {/* Editor-tabs bovenaan: Hoofdtabel + per editor met foto en aantal. */}
+      {showTabs ? (
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <TextTab active={editor === "alle"} onClick={() => setEditor("alle")}>
           Hoofdtabel <span className="opacity-70">· {activeTotal}</span>
@@ -139,6 +142,7 @@ export function EditorBoardTable({
           </TextTab>
         ) : null}
       </div>
+      ) : null}
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
         <div className="min-w-[1050px]">
