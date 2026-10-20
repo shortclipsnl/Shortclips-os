@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronDown, ChevronRight, ExternalLink, FileText, Folder } from "lucide-react";
+import { CalendarClock, ChevronDown, ChevronRight, Download, ExternalLink, FileText } from "lucide-react";
 import { ClientLogo } from "@/components/ui";
-import { daysSince, relativeDays, plural } from "@/lib/format";
+import { daysSince, formatDate, relativeDays, plural } from "@/lib/format";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase } from "@/lib/statuses";
 import { EditorStatusControl } from "../dashboard/editor-status";
 import type { EditorBoardVideo } from "@/server/editor-board";
@@ -72,10 +72,15 @@ export function EditorBoard({ videos }: { videos: EditorBoardVideo[] }) {
 
 function VideoRow({ v }: { v: EditorBoardVideo }) {
   const days = daysSince(v.statusChangedAt);
-  const missing: string[] = [];
-  if (!v.scriptId) missing.push("script");
-  if (!v.driveFolderId) missing.push("materiaal");
-  if (!v.frameUrl) missing.push("Frame.io");
+  // Deadlinekleur: te laat = rood, ≤ 2 werkdagen = oranje, anders rustig.
+  const deadlineColor =
+    v.workdaysToDeadline === null
+      ? "var(--color-ink-muted)"
+      : v.workdaysToDeadline < 0
+        ? "var(--color-bad)"
+        : v.workdaysToDeadline <= 2
+          ? "var(--color-warn)"
+          : "var(--color-ink)";
 
   return (
     <li className="bg-[var(--color-surface)] px-4 py-3 hover:bg-[var(--color-surface-sunken)]/40">
@@ -87,43 +92,53 @@ function VideoRow({ v }: { v: EditorBoardVideo }) {
               <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={16} />
               {v.clientName}
             </span>
-            <span>· versie {v.currentVersion}</span>
             <span>· {days} dagen in deze stap</span>
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-            {v.scriptId ? (
-              <Link href={`/scripts/${v.scriptId}`} className="inline-flex items-center gap-1 text-[var(--color-brand-600)] hover:underline">
-                <FileText className="size-3.5" /> Script
-              </Link>
-            ) : null}
-            {v.driveFolderId ? (
-              <a href={`https://drive.google.com/drive/folders/${v.driveFolderId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[var(--color-brand-600)] hover:underline">
-                <Folder className="size-3.5" /> Materiaal
+
+          {/* Wat de editor nodig heeft: deadline, script en downloadlink. */}
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+            <span className="inline-flex items-center gap-1 font-medium" style={{ color: deadlineColor }}>
+              <CalendarClock className="size-3.5" />
+              {v.dueOn ? <>Deadline {formatDate(v.dueOn)} · {relativeDays(v.dueOn)}</> : "Geen deadline"}
+            </span>
+
+            {v.scriptHref ? (
+              v.scriptHref.startsWith("/scripts/") ? (
+                <Link href={v.scriptHref} className="inline-flex items-center gap-1 font-medium text-[var(--color-brand-600)] hover:underline">
+                  <FileText className="size-3.5" /> Script
+                </Link>
+              ) : (
+                <a href={v.scriptHref} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-[var(--color-brand-600)] hover:underline">
+                  <FileText className="size-3.5" /> Script
+                </a>
+              )
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[var(--color-ink-faint)]"><FileText className="size-3.5" /> Script nog niet toegevoegd</span>
+            )}
+
+            {v.downloadHref ? (
+              <a href={v.downloadHref} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-[var(--color-brand-600)] hover:underline">
+                <Download className="size-3.5" /> Download beeldmateriaal
               </a>
-            ) : null}
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[var(--color-ink-faint)]"><Download className="size-3.5" /> Downloadlink nog niet toegevoegd</span>
+            )}
+
             {v.frameUrl ? (
               <a href={v.frameUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[var(--color-brand-600)] hover:underline">
                 <ExternalLink className="size-3.5" /> Frame.io
               </a>
             ) : null}
+
             {v.openComments > 0 ? (
               <span className="text-[var(--color-warn)]">{plural(v.openComments, "openstaande opmerking", "openstaande opmerkingen")}</span>
             ) : null}
           </div>
-          {missing.length > 0 ? (
-            <p className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-[var(--color-warn)]">
-              <AlertTriangle className="size-3" /> Nog koppelen vóór start: {missing.join(" · ")}
-            </p>
-          ) : null}
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <EditorStatusControl videoId={v.id} status={v.status} />
-          {v.dueOn ? (
-            <span className={v.overdue ? "text-xs font-medium text-[var(--color-bad)]" : "text-xs text-[var(--color-ink-muted)]"}>
-              {relativeDays(v.dueOn)}
-            </span>
-          ) : null}
+          <span className="text-2xs text-[var(--color-ink-faint)]">versie {v.currentVersion}</span>
         </div>
       </div>
     </li>

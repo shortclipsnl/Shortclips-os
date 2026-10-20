@@ -108,3 +108,31 @@ export async function setupMissingTeamLogins(): Promise<{
 
   return { ok: true, created, alreadyHadLogin, credentials };
 }
+
+/**
+ * Stelt voor één teamlid een nieuw wachtwoord in en geeft het terug (één keer te
+ * tonen). Nodig wanneer een bestaand wachtwoord nooit is doorgegeven of kwijt is:
+ * het oude is versleuteld en niet op te halen, dus we zetten gewoon een nieuw.
+ * Alleen aanroepen vanuit een eigenaar-geverifieerde route.
+ */
+export async function resetTeamLogin(userId: string): Promise<
+  | { ok: true; fullName: string; email: string; role: string; password: string }
+  | { ok: false; message: string }
+> {
+  const [member] = await db
+    .select({ id: users.id, fullName: users.fullName, email: users.email, role: users.primaryRole })
+    .from(users)
+    .innerJoin(teamMembers, eq(teamMembers.userId, users.id))
+    .where(and(eq(users.id, userId), isNull(teamMembers.deletedAt), isNull(users.deletedAt), ne(users.primaryRole, "client")))
+    .limit(1);
+  if (!member) return { ok: false, message: "Teamlid niet gevonden." };
+
+  // Rol-koppeling (rechten) zekeren en een vers wachtwoord zetten.
+  const [role] = await db.select({ id: roles.id }).from(roles).where(eq(roles.key, member.role)).limit(1);
+  if (role) await db.insert(userRoles).values({ userId: member.id, roleId: role.id }).onConflictDoNothing();
+
+  const pw = tempPassword();
+  await db.update(users).set({ passwordHash: await hashPassword(pw), status: "active", updatedAt: new Date() }).where(eq(users.id, member.id));
+
+  return { ok: true, fullName: member.fullName, email: member.email, role: member.role, password: pw };
+}

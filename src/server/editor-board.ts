@@ -43,11 +43,13 @@ export type EditorBoardVideo = {
   dueOn: string | null;
   statusChangedAt: string;
   currentVersion: number;
-  scriptId: string | null;
-  driveFolderId: string | null;
   frameUrl: string | null;
   briefing: string | null;
   openComments: number;
+  /** Link naar het script (interne scriptpagina, geüpload bestand of externe link). */
+  scriptHref: string | null;
+  /** Downloadlink naar het beeldmateriaal (opname-footage of Drive-map). */
+  downloadHref: string | null;
   /** Werkdagen tot de deadline (negatief = te laat). null als er geen deadline is. */
   workdaysToDeadline: number | null;
   overdue: boolean;
@@ -73,6 +75,19 @@ export async function listEditorBoard(viewer: Viewer): Promise<EditorBoardVideo[
       scriptId: deliverables.scriptId,
       driveFolderId: deliverables.driveFolderId,
       frameUrl: deliverables.frameUrl,
+      // Beeldmateriaal- en scriptlink van de gekoppelde opname (indien aanwezig):
+      // daar zet de coördinator de downloadlink en het script neer.
+      footageUrl: sql<string | null>`(
+        select pd.footage_url from production_days pd where pd.id = deliverables.production_day_id
+      )`,
+      dayScriptUrl: sql<string | null>`(
+        select pd.script_url from production_days pd where pd.id = deliverables.production_day_id
+      )`,
+      dayScriptFileId: sql<string | null>`(
+        select f.id from edit_project_files f
+        where f.production_day_id = deliverables.production_day_id and f.kind = 'script'
+        order by f.created_at desc limit 1
+      )`,
       openComments: sql<number>`(
         select count(*) from review_threads rt
         where rt.deliverable_id = deliverables.id
@@ -101,6 +116,17 @@ export async function listEditorBoard(viewer: Viewer): Promise<EditorBoardVideo[
 
   return rows.map((r) => {
     const workdaysToDeadline = r.dueOn ? workingDaysUntil(today, r.dueOn, holidays) : null;
+    // Script: interne scriptpagina > geüpload scriptbestand van de opname >
+    // externe scriptlink van de opname.
+    const scriptHref = r.scriptId
+      ? `/scripts/${r.scriptId}`
+      : r.dayScriptFileId
+        ? `/api/edit-files/${r.dayScriptFileId}`
+        : r.dayScriptUrl || null;
+    // Download: footage van de opname > Drive-map van de video.
+    const downloadHref =
+      r.footageUrl ||
+      (r.driveFolderId ? `https://drive.google.com/drive/folders/${r.driveFolderId}` : null);
     return {
       id: r.id,
       title: r.title,
@@ -116,11 +142,11 @@ export async function listEditorBoard(viewer: Viewer): Promise<EditorBoardVideo[
           ? r.statusChangedAt
           : (r.statusChangedAt as Date).toISOString(),
       currentVersion: Number(r.currentVersion ?? 0),
-      scriptId: r.scriptId,
-      driveFolderId: r.driveFolderId,
       frameUrl: r.frameUrl,
       briefing: r.briefing,
       openComments: Number(r.openComments ?? 0),
+      scriptHref,
+      downloadHref,
       workdaysToDeadline,
       overdue: !!r.dueOn && r.dueOn < today,
     };

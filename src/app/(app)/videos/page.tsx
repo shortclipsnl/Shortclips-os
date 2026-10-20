@@ -39,9 +39,9 @@ export default async function VideosPage({
             <span className="text-xs text-white/80">Gegroepeerd per fase · zet je video telkens in de juiste stap</span>
           </div>
           <p className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)] px-4 py-2.5 text-sm leading-relaxed text-[var(--color-ink)]">
-            <strong>Dit zijn jouw video&apos;s.</strong> Houd goed rekening met de <strong>deadlines</strong>. Bij elke video vind je het
-            <strong> script</strong>, het <strong>materiaal</strong> en <strong>Frame.io</strong>, en openstaande feedback. Zet je video in de juiste
-            <strong> fase</strong> zodra je verder bent: binnenkort beschikbaar → in edit → interne review → feedback klant → feedback klant verwerken → afgerond.
+            <strong>Dit zijn jouw video&apos;s.</strong> Bij elke video zie je de <strong>deadline</strong>, het <strong>script</strong> en de
+            <strong> downloadlink</strong> van het beeldmateriaal, plus openstaande feedback. Zet je video telkens in de juiste
+            <strong> fase</strong>: binnenkort beschikbaar → in edit → interne review → feedback klant → feedback klant verwerken → afgerond.
           </p>
           {videos.length > 0 ? (
             <EditorBoard videos={videos} />

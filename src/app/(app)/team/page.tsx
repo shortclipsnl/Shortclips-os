@@ -158,7 +158,13 @@ export default async function TeamPage() {
         actions={canWrite ? <LinkButton href="/team/new">Nieuw teamlid</LinkButton> : undefined}
       />
 
-      {owner ? <TeamLogins /> : null}
+      {owner ? (
+        <TeamLogins
+          members={[...core, ...freelancers]
+            .filter((p) => p.role !== "owner")
+            .map((p) => ({ id: p.id, fullName: p.fullName, email: p.email, role: p.role }))}
+        />
+      ) : null}
 
       <div className="mb-3 flex items-center gap-3 border-l-4 border-[var(--color-indigo-ink)] pl-3">
         <div>
