@@ -8,6 +8,7 @@ import { EmptyState, PageHeader } from "@/components/ui";
 import { KbProgressBar } from "@/components/kennisbank/progress-bar";
 import { CourseAdminMenu, NewCourseCard } from "./admin-ui";
 import { SopMaker } from "./sop-maker";
+import { KbSearch } from "./kb-search";
 
 export const metadata: Metadata = { title: "Shortclips Kennisbank" };
 export const dynamic = "force-dynamic";
@@ -33,6 +34,10 @@ export default async function KennisbankPage() {
           ) : null
         }
       />
+
+      {/* Zoekbalk bovenaan: typ een vraag/trefwoord en zie meteen de lessen
+          waar het antwoord in staat. */}
+      <KbSearch />
 
       {courses.length === 0 && !manage ? (
         <EmptyState title="Nog geen cursussen" description="De kennisbank wordt op dit moment gevuld." />

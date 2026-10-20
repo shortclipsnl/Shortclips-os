@@ -7,7 +7,7 @@ import { db } from "@/db/client";
 import { kbChapters, kbCourses, kbLessonRevisions, kbLessons, kbProgress, type KbDoc } from "@/db/schema";
 import { ForbiddenError, requireAuthorKennisbank, requireInternal } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
-import { canSeeCourse } from "@/server/kennisbank";
+import { canSeeCourse, searchKennisbank, type KbSearchHit } from "@/server/kennisbank";
 import { docToPlainText, type PMDoc } from "@/lib/kennisbank-doc";
 import { runJsonPrompt } from "@/server/ai/client";
 import { centralKnowledgeText } from "@/server/ai/knowledge";
@@ -45,6 +45,13 @@ function revalidateKb(courseId?: string) {
 }
 
 /* ----------------------------- Voortgang ----------------------------- */
+
+/** Zoeken vanuit de kennisbank-zoekbalk: lestitels én lesinhoud, afgeschermd op
+ *  toegang. Herbruikt de bestaande searchKennisbank-logica. */
+export async function searchKennisbankLessons(query: string): Promise<KbSearchHit[]> {
+  const viewer = await requireInternal();
+  return searchKennisbank(viewer, query, 10);
+}
 
 export async function setLessonCompleted(lessonId: string, completed: boolean): Promise<KbActionResult> {
   return guard(async () => {
