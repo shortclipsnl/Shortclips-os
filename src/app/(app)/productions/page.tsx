@@ -99,7 +99,7 @@ export default async function ProductionsPage() {
           <div className="bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">Volgende opname per klant</div>
           {/* Kolomkoppen: klant · videograaf · datum. Videograaf erbij zodat
               Rutger direct ziet wie welke opname draait. */}
-          <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)] sm:grid-cols-[1.4fr_1fr_auto_auto]">
+          <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)] sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1.3fr)_150px_100px]">
             <span>Klant</span>
             <span className="hidden sm:block">Videograaf</span>
             <span className="hidden sm:block">Scripting</span>
@@ -108,12 +108,12 @@ export default async function ProductionsPage() {
           <ul className="divide-y divide-[var(--color-line)]">
             {nextPerClient.map((n) => (
               <li key={n.clientId}>
-                <Link href={`/clients/${n.clientSlug}?tab=opnames`} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-2)] sm:grid-cols-[1.4fr_1fr_auto_auto]">
+                <Link href={`/clients/${n.clientSlug}?tab=opnames`} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-2)] sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1.3fr)_150px_100px]">
                   <span className="flex min-w-0 items-center gap-2.5">
                     <ClientLogo name={n.clientName} logoUrl={n.clientLogo} color={n.clientColor} size={24} />
                     <span className="truncate font-medium">{n.clientName}</span>
                   </span>
-                  <span className="order-last col-span-2 flex items-center gap-2 sm:order-none sm:col-span-1">
+                  <span className="order-last col-span-2 flex min-w-0 items-center gap-2 sm:order-none sm:col-span-1">
                     {canAssign && videographerOptions.length > 0 ? (
                       <>
                         {n.videographerName ? <Avatar name={n.videographerName} size={22} /> : null}
@@ -132,7 +132,7 @@ export default async function ProductionsPage() {
                   </span>
                   {/* Scriptingstatus bij deze opname — meteen zichtbaar of het
                       script al klaar is (uit dezelfde opnamedag als het scripting-board). */}
-                  <span className="hidden items-center sm:flex">
+                  <span className="hidden min-w-0 items-center overflow-hidden sm:flex">
                     <Badge tone={SCRIPTING_STATUS[n.scriptingStatus]?.done ? "good" : SCRIPTING_STATUS[n.scriptingStatus]?.tone ?? "neutral"}>
                       {SCRIPTING_STATUS[n.scriptingStatus]?.label ?? n.scriptingStatus}
                     </Badge>

@@ -1,10 +1,19 @@
 import Link from "next/link";
-import { AlertTriangle, ListChecks } from "lucide-react";
+import { AlertTriangle, CalendarClock, ListChecks } from "lucide-react";
 import { Card, EmptyState } from "@/components/ui";
 import { daysSince, daysUntil, plural } from "@/lib/format";
 import { type Viewer } from "@/server/auth/context";
 import type { DashboardData } from "@/server/dashboard";
 import type { getMyDay } from "@/server/my-day";
+import { Dagindeling, type ScheduleItem } from "./dagindeling";
+
+/** Het vaste dagritme van het kantoorteam — loopt live mee: geweest = groen. */
+const DAGINDELING: ScheduleItem[] = [
+  { from: "08:30", to: "09:00", label: "Dagstart", detail: "Samen de dag doornemen: wat staat er op de planning en wat heeft prioriteit." },
+  { from: "12:30", to: "13:00", label: "Pauze", detail: "Even weg van het scherm — tot 13:00." },
+  { from: "13:00", to: "13:30", label: "Wat moet er vandaag echt af?", detail: "Check de belangrijkste deadlines en stem af waar nodig." },
+  { from: "16:45", label: "To-do-lijst voor morgen maken", detail: "Zet klaar wat morgen als eerste moet, zodat je direct kunt starten." },
+];
 
 type MyDay = Awaited<ReturnType<typeof getMyDay>>;
 type Tone = "bad" | "warn" | "good" | "neutral";
@@ -67,11 +76,28 @@ const META: Record<Tone, string> = {
 export function TodayView({ data, myDay }: { viewer: Viewer; data: DashboardData; myDay: MyDay; capMap: Map<string, number> }) {
   const blocks = officeBlocks(data, myDay);
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    // Links de twee werkblokken (Mijn to-do + Editing), rechts de live dagindeling.
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(280px,340px)]">
       {blocks.map((b) => (
         <BlockCard key={b.key} block={b} />
       ))}
+      <DagindelingCard />
     </div>
+  );
+}
+
+function DagindelingCard() {
+  return (
+    <Card padded={false} className="overflow-hidden ring-1 ring-[var(--color-good)]/20">
+      <div className="flex items-center gap-2.5 bg-[var(--color-good)] px-5 py-3 text-white">
+        <CalendarClock className="size-5 shrink-0 opacity-90" />
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-bold tracking-tight">Dagindeling</h2>
+          <p className="truncate text-xs text-white/70">Het dagritme — geweest wordt groen.</p>
+        </div>
+      </div>
+      <Dagindeling items={DAGINDELING} />
+    </Card>
   );
 }
 

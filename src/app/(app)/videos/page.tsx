@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { requireInternal, isOwner } from "@/server/auth/context";
+import { isCoreStaff } from "@/server/core-staff";
 import { getVideoHighlights, listEditorOptions, listVideos } from "@/server/videos";
 import { listEditingProjects } from "@/server/editing-board";
 import { listEditorBoard } from "@/server/editor-board";
@@ -81,9 +82,13 @@ export default async function VideosPage({
   // deadlinebewaking, aandachtsblokken of de werkvoorraad/tarieven eronder.
   const editorView = viewer.isEditorOnly;
   const owner = isOwner(viewer);
-  // Alle editing-opdrachten (video's) over alle editors — het volledige beeld
-  // dat uit Monday is overgenomen, gegroepeerd per fase met de editor erbij.
-  const allEditorVideos = owner ? await listEditorBoard(viewer, { allEditors: true }) : [];
+  // Het volledige editing-board (alle editors, per fase) is voor het kantoorteam:
+  // de eigenaar én de vaste kernmedewerkers (Milou, Jiska, Rutger). Zij zien
+  // precies hetzelfde overzicht als Jarno.
+  const showAllBoard = owner || isCoreStaff(viewer.email);
+  // Alle editing-opdrachten (video's) over alle editors — het volledige beeld,
+  // gegroepeerd per fase met de editor erbij.
+  const allEditorVideos = showAllBoard ? await listEditorBoard(viewer, { allEditors: true }) : [];
 
   return (
     <div className="mx-auto max-w-[1500px]">
@@ -92,7 +97,7 @@ export default async function VideosPage({
         description={`${editingProjects.length} projecten · ${rows.length} video's in productie`}
       />
 
-      {owner ? (
+      {showAllBoard ? (
         <section className="mb-6">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
             <h2 className="text-sm font-bold tracking-tight">Alle editing-opdrachten</h2>

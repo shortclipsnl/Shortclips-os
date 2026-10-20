@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Check } from "lucide-react";
 
 export type ScheduleItem = { from: string; to?: string; label: string; detail?: string };
 
@@ -70,27 +71,35 @@ export function Dagindeling({ items }: { items: ScheduleItem[] }) {
           return (
             <li
               key={it.from + it.label}
-              className={`rounded-[var(--radius-sm)] px-2.5 py-2 ${status === "nu" ? "bg-[var(--color-good-soft)]/70 ring-1 ring-[var(--color-good)]/30" : "bg-[var(--color-surface-sunken)]/40"}`}
+              className={`rounded-[var(--radius-sm)] px-2.5 py-2 ${
+                status === "nu"
+                  ? "bg-[var(--color-good-soft)]/80 ring-1 ring-[var(--color-good)]/40"
+                  : done
+                    ? "bg-[var(--color-good-soft)]/50 ring-1 ring-[var(--color-good)]/20"
+                    : "bg-[var(--color-surface-sunken)]/40"
+              }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className={`text-xs font-bold tabular-nums ${done ? "text-[var(--color-ink-faint)]" : status === "nu" ? "text-[var(--color-good)]" : "text-[var(--color-ink)]"}`}>
+                <span className={`text-xs font-bold tabular-nums ${done || status === "nu" ? "text-[var(--color-good)]" : "text-[var(--color-ink)]"}`}>
                   {it.from}{it.to ? ` – ${it.to}` : ""}
                 </span>
                 {status === "nu" ? (
                   <span className="shrink-0 rounded-full bg-[var(--color-good)] px-2 py-0.5 text-2xs font-bold text-white">Nu</span>
-                ) : status === "straks" ? (
-                  <span className="shrink-0 text-2xs font-medium text-[var(--color-ink-faint)]">straks</span>
+                ) : done ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-good)] px-2 py-0.5 text-2xs font-bold text-white">
+                    <Check className="size-3" strokeWidth={3} /> Geweest
+                  </span>
                 ) : (
-                  <span className="shrink-0 text-2xs font-medium text-[var(--color-ink-faint)]">voorbij</span>
+                  <span className="shrink-0 text-2xs font-medium text-[var(--color-ink-faint)]">straks</span>
                 )}
               </div>
-              {/* Geweest = neutraal "voorbij" (geen vinkje/doorstreep): het ritme-
-                  blok is geen afgevinkte taak, alleen het tijdstip is geweest. */}
-              <div className={`mt-0.5 text-sm leading-snug ${done ? "text-[var(--color-ink-faint)]" : status === "nu" ? "font-semibold" : "font-medium"}`}>
+              {/* Tijd geweest = helemaal groen (afgerond blokje); nu = gemarkeerd;
+                  straks = neutraal. */}
+              <div className={`mt-0.5 text-sm leading-snug ${status === "nu" ? "font-semibold" : "font-medium"} ${done ? "text-[var(--color-ink)]" : ""}`}>
                 {it.label}
               </div>
               {it.detail ? (
-                <div className={`mt-0.5 text-xs leading-snug ${done ? "text-[var(--color-ink-faint)]" : "text-[var(--color-ink-muted)]"}`}>
+                <div className="mt-0.5 text-xs leading-snug text-[var(--color-ink-muted)]">
                   {it.detail}
                 </div>
               ) : null}
