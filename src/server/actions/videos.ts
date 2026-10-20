@@ -21,6 +21,8 @@ import { auditLog, recordActivity } from "@/server/audit";
 import { dispatch } from "@/server/automation";
 import { notify } from "@/server/notifications";
 import { syncContentForDeliverable } from "@/server/content-sync";
+import { addWorkingDays } from "@/lib/workdays";
+import { nlHolidaySet } from "@/lib/holidays";
 import { VIDEO_STAGES, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 
 export type ActionResult = { ok: boolean; message?: string };
@@ -120,15 +122,19 @@ export async function setEditingVideoDeadline(
 
     const clean = (d?: string | null) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null);
     const set: Record<string, unknown> = { updatedAt: new Date() };
-    // Allebei de datums zijn los bewerkbaar op het board: opnamedatum (shootOn)
-    // en opleverdeadline (dueOn). Alleen meegegeven velden worden aangepast.
-    if (input.dueOn !== undefined) {
+    // De opnamedatum is het startpunt; de deadline is altijd 14 werkdagen later en
+    // wordt automatisch gezet (niet apart invullen). Zet je de opname → deadline
+    // volgt vanzelf; wis je de opname → deadline ook weg.
+    if (input.shootOn !== undefined) {
+      const shoot = clean(input.shootOn);
+      set.shootOn = shoot;
+      set.dueOn = shoot ? addWorkingDays(shoot, 14, nlHolidaySet()) : null;
+      set.dueOnSource = "auto";
+    } else if (input.dueOn !== undefined) {
+      // Alleen een losse deadline aanpassen (handmatige override).
       const due = clean(input.dueOn);
       set.dueOn = due;
       set.dueOnSource = due ? "manual" : "auto";
-    }
-    if (input.shootOn !== undefined) {
-      set.shootOn = clean(input.shootOn);
     }
     await db.update(deliverables).set(set).where(eq(deliverables.id, videoId));
 

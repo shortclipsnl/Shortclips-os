@@ -6,6 +6,8 @@ import Link from "next/link";
 import { ChevronDown, ChevronRight, Download, FileText, MessageSquare, Pencil } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { editorColor, editorDisplayName, firstNameKey } from "@/lib/editors";
+import { addWorkingDays } from "@/lib/workdays";
+import { nlHolidaySet } from "@/lib/holidays";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase, type VideoStage } from "@/lib/statuses";
 import { askEditorQuestion, assignEditor, changeVideoStatus, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts } from "@/server/actions/videos";
 import type { EditorBoardVideo } from "@/server/editor-board";
@@ -39,9 +41,12 @@ function fmtShort(d: string): string {
 
 function priority(v: EditorBoardVideo): { label: string; color: string } | null {
   if (v.phase === "afgerond" || v.workdaysToDeadline === null) return null;
+  // "Dag X van 14" maakt in één oogopslag duidelijk hoeveel werkdagen er nog over
+  // zijn (14 werkdagen van opname tot oplevering).
+  const voortgang = `Dag ${v.elapsedWorkdays} van ${v.totalWorkdays}`;
   if (v.workdaysToDeadline < 0) return { label: `Te laat · ${Math.abs(v.workdaysToDeadline)} wd`, color: "var(--color-bad)" };
-  if (v.workdaysToDeadline <= 2) return { label: `Dag ${v.elapsedWorkdays} · bijna deadline`, color: "var(--color-warn)" };
-  return { label: `Dag ${v.elapsedWorkdays} · in productie`, color: "var(--color-info)" };
+  if (v.workdaysToDeadline <= 2) return { label: `${voortgang} · bijna deadline`, color: "var(--color-warn)" };
+  return { label: voortgang, color: "var(--color-info)" };
 }
 
 /**
@@ -337,10 +342,12 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
 
 /** Deadline-batterij; voor wie mag bewerken: aanklikken opent twee datumvelden
  *  (opnamedatum én opleverdeadline), die los van elkaar aangepast kunnen worden. */
-function DeadlineCell({ v, pct, canEdit, onSave }: { v: EditorBoardVideo; pct: number; canEdit: boolean; onSave: (dates: { shootOn: string | null; dueOn: string | null }) => void }) {
+function DeadlineCell({ v, pct, canEdit, onSave }: { v: EditorBoardVideo; pct: number; canEdit: boolean; onSave: (dates: { shootOn: string | null }) => void }) {
   const [open, setOpen] = useState(false);
   const [shootVal, setShootVal] = useState(v.shootDate ?? "");
-  const [dueVal, setDueVal] = useState(v.dueOn ?? "");
+  // De deadline is altijd 14 werkdagen na de opname — automatisch, niet apart in
+  // te vullen. We tonen 'm alvast ter controle; de server zet 'm bij het opslaan.
+  const autoDeadline = shootVal ? addWorkingDays(shootVal, 14, nlHolidaySet()) : "";
 
   const bar =
     v.dueOn && v.shootDate ? (
@@ -358,26 +365,30 @@ function DeadlineCell({ v, pct, canEdit, onSave }: { v: EditorBoardVideo; pct: n
 
   return (
     <div className="relative flex items-center p-1">
-      <button type="button" className="w-full" title="Opname- en opleverdatum wijzigen" onClick={() => { setShootVal(v.shootDate ?? ""); setDueVal(v.dueOn ?? ""); setOpen((o) => !o); }}>
+      <button type="button" className="w-full" title="Opnamedatum wijzigen (deadline = 14 werkdagen, automatisch)" onClick={() => { setShootVal(v.shootDate ?? ""); setOpen((o) => !o); }}>
         {bar}
       </button>
       {open ? (
         <>
           <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
-          <div className="absolute left-1 top-full z-20 mt-1 flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2.5 shadow-[var(--shadow-raised)]">
+          <div className="absolute left-1 top-full z-20 mt-1 flex w-56 flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2.5 shadow-[var(--shadow-raised)]">
             <label className="flex items-center justify-between gap-2 text-2xs font-semibold text-[var(--color-ink-muted)]">
               Opname
               <input type="date" value={shootVal} onChange={(e) => setShootVal(e.target.value)} className="sc-input h-8 w-36 py-0 text-xs" />
             </label>
-            <label className="flex items-center justify-between gap-2 text-2xs font-semibold text-[var(--color-ink-muted)]">
+            {/* Deadline is afgeleid, niet apart in te vullen. */}
+            <div className="flex items-center justify-between gap-2 text-2xs font-semibold text-[var(--color-ink-muted)]">
               Deadline
-              <input type="date" value={dueVal} onChange={(e) => setDueVal(e.target.value)} className="sc-input h-8 w-36 py-0 text-xs" />
-            </label>
+              <span className="inline-flex h-8 w-36 items-center rounded-[var(--radius-sm)] bg-[var(--color-surface-sunken)] px-2 text-xs font-semibold tabular-nums text-[var(--color-ink)]">
+                {autoDeadline ? fmtShort(autoDeadline) : "—"}
+              </span>
+            </div>
+            <p className="text-[10px] leading-tight text-[var(--color-ink-faint)]">Automatisch 14 werkdagen na de opname.</p>
             <div className="flex items-center justify-end gap-1.5">
-              {v.dueOn || v.shootDate ? (
-                <button type="button" onClick={() => { onSave({ shootOn: null, dueOn: null }); setOpen(false); }} className="shrink-0 rounded px-2 py-1.5 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" title="Beide datums wissen">Wissen</button>
+              {v.shootDate || v.dueOn ? (
+                <button type="button" onClick={() => { onSave({ shootOn: null }); setOpen(false); }} className="shrink-0 rounded px-2 py-1.5 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" title="Datums wissen">Wissen</button>
               ) : null}
-              <button type="button" onClick={() => { onSave({ shootOn: shootVal || null, dueOn: dueVal || null }); setOpen(false); }} className="shrink-0 rounded bg-[var(--color-ink)] px-2.5 py-1.5 text-2xs font-semibold text-white">Opslaan</button>
+              <button type="button" onClick={() => { onSave({ shootOn: shootVal || null }); setOpen(false); }} className="shrink-0 rounded bg-[var(--color-ink)] px-2.5 py-1.5 text-2xs font-semibold text-white">Opslaan</button>
             </div>
           </div>
         </>

@@ -200,19 +200,25 @@ export function NewTaskForm({ users, clients }: { users: UserOption[]; clients: 
   );
 }
 
+const PRAISE = ["Goed bezig", "Lekker bezig", "Weer eentje af", "Alweer afgerond", "Topper"];
+
 export function TaskItem({
   task,
   users,
   canWrite,
+  celebrateName,
 }: {
   task: TaskItemData;
   users: UserOption[];
   canWrite: boolean;
+  celebrateName?: string;
 }) {
   const [pending, start] = useTransition();
   const [justDone, setJustDone] = useState(false);
+  const [optimisticDone, setOptimisticDone] = useState(false);
+  const [celebration, setCelebration] = useState<string | null>(null);
   const router = useRouter();
-  const done = task.status === "done";
+  const done = task.status === "done" || optimisticDone;
 
   function run(fn: () => Promise<unknown>) {
     start(async () => {
@@ -222,17 +228,36 @@ export function TaskItem({
   }
 
   function toggleDone() {
-    const next = done ? "todo" : "done";
-    if (next === "done") {
+    if (!done) {
+      // Afvinken: meteen groen vinkje + geluidje + een kort schouderklopje, en
+      // pas ná de viering de lijst verversen (anders springt de taak direct weg).
       playDing();
+      setOptimisticDone(true);
       setJustDone(true);
+      const name = celebrateName?.trim();
+      const msg = PRAISE[Math.floor(Math.random() * PRAISE.length)];
+      setCelebration(name ? `${msg}, ${name}! 🎉` : `${msg}! 🎉`);
       setTimeout(() => setJustDone(false), 600);
+      void (async () => {
+        await setTaskStatus(task.id, "done");
+        await new Promise((r) => setTimeout(r, 1700));
+        setCelebration(null);
+        router.refresh();
+      })();
+      return;
     }
-    run(() => setTaskStatus(task.id, next));
+    // Heropenen.
+    setOptimisticDone(false);
+    run(() => setTaskStatus(task.id, "todo"));
   }
 
   return (
-    <li className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+    <li className="relative flex flex-wrap items-center gap-3 px-4 py-2.5">
+      {celebration ? (
+        <span className="pointer-events-none absolute left-9 top-0 z-10 -translate-y-1.5 whitespace-nowrap rounded-full bg-[var(--color-good)] px-2.5 py-1 text-xs font-semibold text-white shadow-[var(--shadow-raised)] [animation:scNotifIn_.2s_ease-out]">
+          {celebration}
+        </span>
+      ) : null}
       {/* Afvinkknop met positief belletje bij afronden. */}
       <button
         type="button"

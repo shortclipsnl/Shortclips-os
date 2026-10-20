@@ -129,7 +129,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
                 </h2>
                 <Card padded={false}>
                   <ul className="divide-y divide-[var(--color-line)]">
-                    {b.items.map((t) => <TaskItem key={t.id} task={t} users={userOptions} canWrite={canWrite} />)}
+                    {b.items.map((t) => <TaskItem key={t.id} task={t} users={userOptions} canWrite={canWrite} celebrateName={viewer.fullName.split(" ")[0] ?? ""} />)}
                   </ul>
                 </Card>
               </div>

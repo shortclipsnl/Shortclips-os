@@ -31,7 +31,7 @@ export default async function ClientResultsPage({
   const viewer = await requirePermission("analytics:read");
   const { slug } = await params;
   const sp = await searchParams;
-  const days = Number(sp.dagen) || 90;
+  const days = Number(sp.dagen) || 30;
   const platform = sp.platform && PLATFORM[sp.platform] ? sp.platform : null;
 
   const [client] = await db
@@ -253,8 +253,18 @@ export default async function ClientResultsPage({
                   {months.map((m) => (
                     <div key={String(m.maand)} className="flex items-center gap-3">
                       <span className="w-16 shrink-0 text-xs text-[var(--color-ink-muted)]">{monthLabelNL(String(m.maand)).replace(/ \d{4}$/, "")}</span>
-                      <span className="h-3 rounded-full bg-[var(--color-indigo-ink)]" style={{ width: `${Math.max(3, (Number(m.views) / maxMonth) * 100)}%` }} />
-                      <span className="shrink-0 text-xs tabular-nums text-[var(--color-ink-muted)]">{compact(Number(m.views))}</span>
+                      {/* Balk in een vaste baan + waarde in een vaste kolom, zodat de
+                          getallen altijd netjes onder elkaar staan (niet verspringen). */}
+                      <span className="h-3.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
+                        <span
+                          className="block h-full rounded-full"
+                          style={{
+                            width: `${Math.max(3, (Number(m.views) / maxMonth) * 100)}%`,
+                            background: "linear-gradient(90deg, var(--color-brand-500), var(--color-info))",
+                          }}
+                        />
+                      </span>
+                      <span className="w-14 shrink-0 text-right text-xs font-semibold tabular-nums text-[var(--color-ink)]">{compact(Number(m.views))}</span>
                     </div>
                   ))}
                   {monthInsights.length > 0 ? (
