@@ -15,6 +15,7 @@ import {
 import { dispatch } from "@/server/automation";
 import { notify } from "@/server/notifications";
 import { CORE_STAFF_EMAILS } from "@/server/core-staff";
+import { addWorkingDays } from "@/lib/workdays";
 import { runJob } from "./runner";
 
 const day = (offset: number) => {
@@ -557,6 +558,59 @@ export async function runClientsWithoutShootSignal() {
       ctx.counters.updated++;
     }
     ctx.log(`${ctx.counters.updated} gebundelde meldingen voor klanten zonder opname`);
+  });
+}
+
+/**
+ * Signaleert een gat in de contentplanning: actieve klanten zonder enige geplande
+ * publicatie in de komende 10 werkdagen. De verantwoordelijke coördinator krijgt
+ * één gebundelde melding per week (dedupe), zodat het team scherp blijft op
+ * klanten die dreigen stil te vallen.
+ */
+export async function runContentGapSignal() {
+  return runJob("monday", "signals.content_gap", {}, async (ctx) => {
+    const week = mondayIso();
+    const today = day(0);
+    const until = addWorkingDays(today, 10); // ~10 werkdagen vooruit
+    const res = await db.execute(sql`
+      select c.id, c.name, c.slug, c.coordinator_id
+      from clients c
+      where c.deleted_at is null and c.status = 'active'
+        and not exists (
+          select 1 from content_calendar cc
+          where cc.client_id = c.id and cc.deleted_at is null
+            and cc.status <> 'cancelled'
+            and cc.scheduled_on >= ${today} and cc.scheduled_on <= ${until}
+        )`);
+    const rows = ((res as { rows?: unknown[] }).rows ?? (res as unknown as unknown[])) as Array<{
+      id: string; name: string; slug: string; coordinator_id: string | null;
+    }>;
+
+    // Per coördinator bundelen: één melding met alle klanten met een planningsgat.
+    const byCoord = new Map<string, string[]>();
+    for (const c of rows) {
+      ctx.counters.processed++;
+      if (!c.coordinator_id) continue;
+      const list = byCoord.get(c.coordinator_id) ?? [];
+      list.push(c.name);
+      byCoord.set(c.coordinator_id, list);
+    }
+    for (const [coordId, names] of byCoord) {
+      await notify({
+        userIds: [coordId],
+        type: "content_gap",
+        level: "warning",
+        title: names.length === 1 ? `Gat in de planning: ${names[0]}` : `${names.length} klanten met een gat in de planning`,
+        body:
+          names.length === 1
+            ? "Geen publicatie gepland in de komende 10 werkdagen — plan content in."
+            : `${names.join(", ")} hebben geen publicatie in de komende 10 werkdagen — plan content in.`,
+        href: "/calendar",
+        dedupeKey: `content_gap:${coordId}:${week}`,
+      });
+      ctx.counters.updated++;
+    }
+    ctx.log(`${ctx.counters.updated} gebundelde meldingen voor gaten in de contentplanning`);
   });
 }
 

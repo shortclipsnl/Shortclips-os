@@ -393,3 +393,9 @@ body {
 }
 :root[data-theme="dark"] .sc-logo-light { display: none; }
 :root[data-theme="dark"] .sc-logo-dark { display: block; }
+
+/* Toast-melding die rechtsboven invliegt (notification-popper). */
+@keyframes scNotifIn {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}

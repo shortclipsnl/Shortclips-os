@@ -3,6 +3,7 @@ import { NAVIGATION } from "@/components/layout/nav-config";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { AssistantWidget } from "@/components/ai/assistant-widget";
+import { NotificationPopper } from "@/components/notifications/notification-popper";
 import { aiConfigured } from "@/server/ai/client";
 
 export default async function AppLayout({
@@ -56,6 +57,10 @@ export default async function AppLayout({
       {viewer.permissions.has("ai:read") ? (
         <AssistantWidget firstName={viewer.fullName.split(" ")[0] ?? ""} aiReady={aiConfigured()} />
       ) : null}
+
+      {/* Nieuwe meldingen poppen rechtsboven op met een geluidje — voor het hele
+          team én editors, zodat ze opvallen. */}
+      <NotificationPopper viewerId={viewer.id} />
     </div>
   );
 }

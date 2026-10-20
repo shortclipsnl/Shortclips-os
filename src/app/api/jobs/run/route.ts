@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
-import { runClientsWithoutShootSignal, runDailySignals, runDailyTeamTodoReminder, runEditorDeadlineReminders, runHourlySignals, runPostShootTodoReminders, runScriptTodoReminders, runTaskDeadlineReminders } from "@/server/jobs/maintenance";
+import { runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runDailyTeamTodoReminder, runEditorDeadlineReminders, runHourlySignals, runPostShootTodoReminders, runScriptTodoReminders, runTaskDeadlineReminders } from "@/server/jobs/maintenance";
 import {
   inspectFrameProject,
   listFrameProjects,
@@ -56,6 +56,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "reminders.editor_deadlines": runEditorDeadlineReminders,
   "reminders.task_deadlines": runTaskDeadlineReminders,
   "signals.clients_without_shoot": runClientsWithoutShootSignal,
+  "signals.content_gap": runContentGapSignal,
   "reminders.script_todo": runScriptTodoReminders,
   "reminders.post_shoot_todo": runPostShootTodoReminders,
   "reminders.daily_todo": runDailyTeamTodoReminder,
