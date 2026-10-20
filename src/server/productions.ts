@@ -191,6 +191,7 @@ export async function nextShootPerClient(viewer: Viewer) {
       status: productionDays.status,
       videographerId: productionDays.videographerId,
       videographerName: users.fullName,
+      scriptingStatus: productionDays.scriptingStatus,
     })
     .from(productionDays)
     .innerJoin(clients, eq(clients.id, productionDays.clientId))

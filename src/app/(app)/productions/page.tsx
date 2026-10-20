@@ -5,8 +5,9 @@ import { requireInternal } from "@/server/auth/context";
 import { getMonthShootStats, getShootOverview, nextShootPerClient, shootsInRange } from "@/server/productions";
 import { listAssignableUsers } from "@/server/clients";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
-import { Avatar, Card, ClientLogo, PageHeader, Stat } from "@/components/ui";
+import { Avatar, Badge, Card, ClientLogo, PageHeader, Stat } from "@/components/ui";
 import { formatDate } from "@/lib/format";
+import { SCRIPTING_STATUS } from "@/lib/statuses";
 import { ShootAgenda, type AgendaShoot } from "./shoot-agenda";
 import { VideographerCell, type PersonOption } from "./prod-cells";
 
@@ -98,15 +99,16 @@ export default async function ProductionsPage() {
           <div className="bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">Volgende opname per klant</div>
           {/* Kolomkoppen: klant · videograaf · datum. Videograaf erbij zodat
               Rutger direct ziet wie welke opname draait. */}
-          <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)] sm:grid-cols-[1.4fr_1fr_auto]">
+          <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)] sm:grid-cols-[1.4fr_1fr_auto_auto]">
             <span>Klant</span>
             <span className="hidden sm:block">Videograaf</span>
+            <span className="hidden sm:block">Scripting</span>
             <span className="text-right">Opname</span>
           </div>
           <ul className="divide-y divide-[var(--color-line)]">
             {nextPerClient.map((n) => (
               <li key={n.clientId}>
-                <Link href={`/clients/${n.clientSlug}?tab=opnames`} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-2)] sm:grid-cols-[1.4fr_1fr_auto]">
+                <Link href={`/clients/${n.clientSlug}?tab=opnames`} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-2)] sm:grid-cols-[1.4fr_1fr_auto_auto]">
                   <span className="flex min-w-0 items-center gap-2.5">
                     <ClientLogo name={n.clientName} logoUrl={n.clientLogo} color={n.clientColor} size={24} />
                     <span className="truncate font-medium">{n.clientName}</span>
@@ -127,6 +129,13 @@ export default async function ProductionsPage() {
                         ⚠ Nog geen videograaf
                       </span>
                     )}
+                  </span>
+                  {/* Scriptingstatus bij deze opname — meteen zichtbaar of het
+                      script al klaar is (uit dezelfde opnamedag als het scripting-board). */}
+                  <span className="hidden items-center sm:flex">
+                    <Badge tone={SCRIPTING_STATUS[n.scriptingStatus]?.done ? "good" : SCRIPTING_STATUS[n.scriptingStatus]?.tone ?? "neutral"}>
+                      {SCRIPTING_STATUS[n.scriptingStatus]?.label ?? n.scriptingStatus}
+                    </Badge>
                   </span>
                   <span className="flex items-center justify-end gap-2 text-sm text-[var(--color-ink-muted)]">
                     <CalendarCheck className="size-4 shrink-0 text-[var(--color-ink-faint)]" />

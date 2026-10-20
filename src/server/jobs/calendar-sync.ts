@@ -13,6 +13,7 @@ import {
   integrationConnections,
   mondayMappings,
   productionDays,
+  users,
 } from "@/db/schema";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
@@ -364,6 +365,14 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
       const holidays = nlHolidaySet();
       const clientNameById = new Map(matchers.map((m) => [m.id, m.name]));
 
+      // Videograaf automatisch koppelen: meestal Rutger, Luxewagen → Jarno.
+      const vgRows = await db
+        .select({ id: users.id, email: users.email })
+        .from(users)
+        .where(inArray(users.email, ["rutger@shortclips.nl", "jarno@shortclips.nl"]));
+      const rutgerId = vgRows.find((r) => r.email.toLowerCase() === "rutger@shortclips.nl")?.id ?? null;
+      const jarnoId = vgRows.find((r) => r.email.toLowerCase() === "jarno@shortclips.nl")?.id ?? null;
+
       let shoots = 0;
       const seenShoot = new Map<string, string>(); // dedup-sleutel → productionDayId
       for (const ev of shootEvents) {
@@ -422,6 +431,19 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         // editing-board komt ("binnenkort beschikbaar") — zonder handwerk. Eén
         // deliverable per opname (dedup op production_day_id).
         if (!alreadyCounted) {
+          // Videograaf standaard koppelen als er nog geen staat (handmatige keuze
+          // blijft behouden): Luxewagen → Jarno, de rest → Rutger.
+          const [pd] = await db
+            .select({ vid: productionDays.videographerId })
+            .from(productionDays)
+            .where(eq(productionDays.id, targetPdId))
+            .limit(1);
+          if (pd && !pd.vid) {
+            const cname = clientNameById.get(ev.clientId) ?? "";
+            const vgId = /luxewagen/i.test(cname) ? jarnoId : rutgerId;
+            if (vgId) await db.update(productionDays).set({ videographerId: vgId, updatedAt: new Date() }).where(eq(productionDays.id, targetPdId));
+          }
+
           const [existing] = await db
             .select({ id: deliverables.id })
             .from(deliverables)
