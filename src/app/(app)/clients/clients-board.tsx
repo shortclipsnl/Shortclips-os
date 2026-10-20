@@ -38,7 +38,7 @@ function Chip({ children, tone }: { children: React.ReactNode; tone: "blue" | "i
 
 const STOPPED = new Set(["paused", "churned"]);
 
-export function ClientsBoard({ clients, viewerId, defaultPod = "alle" }: { clients: BoardClient[]; viewerId?: string; defaultPod?: "mijn" | "alle" }) {
+export function ClientsBoard({ clients, viewerId, defaultPod = "alle", coveringIds = [], coveringNames = [] }: { clients: BoardClient[]; viewerId?: string; defaultPod?: "mijn" | "alle"; coveringIds?: string[]; coveringNames?: string[] }) {
   const [q, setQ] = useState("");
   // Standaard alleen de actieve klanten; niet-actieve nemen pas ruimte in als je
   // daar bewust naar wisselt.
@@ -46,8 +46,10 @@ export function ClientsBoard({ clients, viewerId, defaultPod = "alle" }: { clien
   // "Mijn klanten" = jouw pod (waar jij verantwoordelijke bent), met schakelaar
   // naar "Alle klanten". Standaard je eigen pod als je er een hebt.
   const [pod, setPod] = useState<"mijn" | "alle">(defaultPod);
-  const myCount = useMemo(() => (viewerId ? clients.filter((c) => c.coordinatorId === viewerId).length : 0), [clients, viewerId]);
-  const inPod = (c: BoardClient) => pod === "alle" || (!!viewerId && c.coordinatorId === viewerId);
+  // Vervanging bij afwezigheid: klanten van wie je nu vervangt horen ook bij "mijn".
+  const isMine = (c: BoardClient) => !!viewerId && (c.coordinatorId === viewerId || (!!c.coordinatorId && coveringIds.includes(c.coordinatorId)));
+  const myCount = useMemo(() => clients.filter(isMine).length, [clients, viewerId, coveringIds]); // eslint-disable-line react-hooks/exhaustive-deps
+  const inPod = (c: BoardClient) => pod === "alle" || isMine(c);
 
   const { active, inactive } = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -67,6 +69,12 @@ export function ClientsBoard({ clients, viewerId, defaultPod = "alle" }: { clien
 
   return (
     <div>
+      {coveringNames.length > 0 ? (
+        <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-info)]/25 bg-[var(--color-info-soft)]/60 px-3 py-2 text-xs text-[var(--color-ink)]">
+          🤝 Je vervangt <strong>{coveringNames.join(", ")}</strong> — hun klanten staan nu ook bij &ldquo;Mijn klanten&rdquo;.
+        </div>
+      ) : null}
+
       {/* Pod-schakelaar: eigen klanten vs. alle klanten (alleen als je een pod hebt). */}
       {viewerId && myCount > 0 ? (
         <div className="mb-3 inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">

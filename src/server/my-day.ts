@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm"
 import { db } from "@/db/client";
 import { clients, deliverables, productionDays, tasks } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
+import { coveringForUser } from "@/server/leave-cover";
 
 export type MyShoot = { id: string; clientName: string; clientColor: string | null; scheduledOn: string; startTime: string | null; locationName: string | null };
 export type MyTask = { id: string; title: string; dueOn: string | null; priority: string; clientName: string | null; overdue: boolean };
@@ -16,6 +17,11 @@ export type MyVideo = { id: string; title: string; clientName: string; status: s
 export async function getMyDay(viewer: Viewer): Promise<{ shoots: MyShoot[]; tasks: MyTask[]; videos: MyVideo[]; hasAny: boolean }> {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
   const in14 = new Date(Date.now() + 14 * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+
+  // Vervanging bij afwezigheid: neem ook de taken over van collega's die nu met
+  // verlof zijn en door deze persoon worden vervangen (Milou ↔ Jiska).
+  const covering = await coveringForUser(viewer.id);
+  const taskAssignees = [viewer.id, ...covering.map((c) => c.absentId)];
 
   const [shootRows, taskRows, videoRows] = await Promise.all([
     db
@@ -53,7 +59,7 @@ export async function getMyDay(viewer: Viewer): Promise<{ shoots: MyShoot[]; tas
       .leftJoin(clients, eq(clients.id, tasks.clientId))
       .where(
         and(
-          eq(tasks.assigneeId, viewer.id),
+          inArray(tasks.assigneeId, taskAssignees),
           isNull(tasks.deletedAt),
           isNull(tasks.archivedAt),
           inArray(tasks.status, ["todo", "in_progress", "blocked"]),

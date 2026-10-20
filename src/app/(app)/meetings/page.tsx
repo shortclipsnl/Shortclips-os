@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { CalendarClock } from "lucide-react";
 import { db } from "@/db/client";
-import { meetingItems, teamMeetings } from "@/db/schema";
+import { meetingItems, teamMeetings, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { listAssignableUsers } from "@/server/clients";
 import { ensureWeeklyMeeting } from "@/server/meetings";
-import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
+import { Avatar, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { AddItemForm, NewMeetingForm } from "./meetings-ui";
 
@@ -22,15 +22,23 @@ export default async function MeetingsPage() {
   await requireInternal();
   // Zorg dat de vaste woensdag-16:00-meeting bestaat (met carry-over).
   const weeklyId = await ensureWeeklyMeeting();
-  const [members, meetings, weekly, weeklyCount] = await Promise.all([
+  const [members, meetings, weekly, weeklyItems] = await Promise.all([
     listAssignableUsers(),
     db.select().from(teamMeetings).orderBy(desc(teamMeetings.scheduledAt)).limit(100),
     db.select().from(teamMeetings).where(eq(teamMeetings.id, weeklyId)).limit(1),
-    db.select({ n: sql<number>`count(*)` }).from(meetingItems).where(eq(meetingItems.meetingId, weeklyId)),
+    // De bespreekpunten zelf, mét wie ze heeft toegevoegd — zodat je in één
+    // oogopslag ziet waar de meeting over gaat, zonder door te klikken.
+    db
+      .select({ id: meetingItems.id, body: meetingItems.body, isDone: meetingItems.isDone, byName: users.fullName })
+      .from(meetingItems)
+      .leftJoin(users, eq(users.id, meetingItems.createdById))
+      .where(and(eq(meetingItems.meetingId, weeklyId), eq(meetingItems.kind, "agenda")))
+      .orderBy(asc(meetingItems.createdAt)),
   ]);
   const now = Date.now();
   const w = weekly[0]!;
-  const agendaCount = Number(weeklyCount[0]?.n ?? 0);
+  const openItems = weeklyItems.filter((i) => !i.isDone);
+  const agendaCount = openItems.length;
   // De wekelijkse meeting niet dubbel in de "komende" lijst.
   const upcoming = meetings.filter((m) => m.id !== weeklyId && new Date(m.scheduledAt).getTime() >= now - 2 * 60 * 60 * 1000).reverse();
 
@@ -51,6 +59,32 @@ export default async function MeetingsPage() {
             <span className="mt-1 block text-2xs text-white/60">om de bespreekpunten te bekijken</span>
           </span>
         </Link>
+
+        {/* Bespreekpunten die al genoteerd zijn — met wie ze toevoegde. Zo zie je
+            in één oogopslag waar de meeting over gaat, zonder door te klikken. */}
+        <div className="px-4 pt-4">
+          <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
+            Bespreekpunten voor deze meeting{openItems.length > 0 ? ` · ${openItems.length}` : ""}
+          </p>
+          {openItems.length === 0 ? (
+            <p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">Nog geen bespreekpunten — voeg hieronder het eerste toe.</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-[var(--color-line)] rounded-[var(--radius-md)] border border-[var(--color-line)]">
+              {openItems.map((i) => (
+                <li key={i.id} className="flex items-start gap-2.5 px-3 py-2.5">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--color-brand-500)]" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm">{i.body}</span>
+                    <span className="mt-0.5 flex items-center gap-1 text-2xs text-[var(--color-ink-faint)]">
+                      {i.byName ? <Avatar name={i.byName} size={14} /> : null}
+                      door {i.byName ?? "onbekend"}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {/* Duidelijke oproep + voorbeelden: wat zet je neer als bespreekpunt? */}
         <div className="px-4 pt-3">

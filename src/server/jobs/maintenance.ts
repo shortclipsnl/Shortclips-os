@@ -579,7 +579,7 @@ export async function runContentGapSignal() {
         and not exists (
           select 1 from content_calendar cc
           where cc.client_id = c.id and cc.deleted_at is null
-            and cc.status <> 'cancelled'
+            and cc.status <> 'failed'
             and cc.scheduled_on >= ${today} and cc.scheduled_on <= ${until}
         )`);
     const rows = ((res as { rows?: unknown[] }).rows ?? (res as unknown as unknown[])) as Array<{

@@ -7,6 +7,7 @@ import {
 } from "drizzle-orm";
 import { db } from "@/db/client";
 import { notifications, users } from "@/db/schema";
+import { activeCoverMap } from "./leave-cover";
 
 export type NotifyInput = {
   userIds?: string[];
@@ -47,6 +48,20 @@ export async function notify(input: NotifyInput): Promise<number> {
   }
 
   if (targets.size === 0) return 0;
+
+  // Vervanging bij afwezigheid: is een ontvanger met goedgekeurd verlof, dan
+  // krijgt de vervanger de melding er automatisch bij — zodat niets blijft liggen.
+  try {
+    const covers = await activeCoverMap();
+    if (covers.size > 0) {
+      for (const uid of [...targets]) {
+        const rep = covers.get(uid);
+        if (rep) targets.add(rep);
+      }
+    }
+  } catch {
+    /* vervanging mag nooit het versturen van de melding tegenhouden */
+  }
 
   const values = [...targets].map((userId) => ({
     userId,

@@ -31,6 +31,7 @@ export const NAVIGATION: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Vandaag", icon: "LayoutDashboard" },
       { href: "/kwaliteit", label: "Kwaliteit & Aandachtspunten", icon: "ShieldCheck", match: "/kwaliteit" },
+      { href: "/vrijdagcheck", label: "Vrijdagcheck", icon: "CalendarCheck", roles: ["project_coordinator", "content_creator"], match: "/vrijdagcheck" },
     ],
   },
   {

@@ -8,6 +8,7 @@ import {
 } from "@/db/schema";
 import { requirePermission, isOwner } from "@/server/auth/context";
 import { isCoreStaff, coreStaffRank } from "@/server/core-staff";
+import { isBoardEditorName } from "@/lib/editors";
 import { TeamLogins } from "./team-logins";
 import {
   Badge,
@@ -133,7 +134,9 @@ export default async function TeamPage() {
           <span className="font-semibold leading-tight">{p.fullName}</span>
           {p.status === "suspended" ? <Badge tone="neutral">Gedeactiveerd</Badge> : null}
         </div>
-        <div className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}</div>
+        {/* De vaste short-video-editors (Quinn, Noah, Sam, Senna, Fabian) tonen
+            we als "Short Video Editor", niet als creative. */}
+        <div className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{isBoardEditorName(p.fullName) ? "Short Video Editor" : p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}</div>
 
         {availability ? (
           <div className="mt-2">
