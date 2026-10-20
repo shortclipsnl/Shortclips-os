@@ -73,6 +73,12 @@ const schema = z.object({
   // --- Achtergrondtaken ---
   CRON_SECRET: z.string().optional(),
 
+  // --- Kostenmonitor-import ---
+  // Geheim token dat de maandelijkse DigiBoox-uitlezing meestuurt naar
+  // POST /api/kosten/import (header Authorization: Bearer <token>). Zonder dit
+  // token is het endpoint dicht.
+  KOSTEN_IMPORT_TOKEN: z.string().optional(),
+
   // --- Lead-intake webhook (Meta-advertentie / Framer-formulier) ---
   // Gedeeld geheim dat het externe formulier meestuurt (header x-webhook-secret
   // of ?secret=). Zonder deze waarde is het endpoint dicht.

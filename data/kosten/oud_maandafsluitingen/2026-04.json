@@ -1,0 +1,657 @@
+{
+ "afwijkingen": [],
+ "belasting": 12633,
+ "bijgewerkt": "2026-10-04",
+ "bronnen": [
+  "Knab zakelijk afschrift"
+ ],
+ "categorieen": [
+  {
+   "bedrag": 6398.67,
+   "naam": "Personeel"
+  },
+  {
+   "bedrag": 5000,
+   "naam": "Marketing en lidmaatschap"
+  },
+  {
+   "bedrag": 3372.78,
+   "naam": "Freelancers"
+  },
+  {
+   "bedrag": 1433.8,
+   "naam": "Nog controleren"
+  },
+  {
+   "bedrag": 1064.64,
+   "naam": "Auto en vervoer"
+  },
+  {
+   "bedrag": 978.45,
+   "naam": "Verzekeringen"
+  },
+  {
+   "bedrag": 750.2,
+   "naam": "Huur en kantoor"
+  },
+  {
+   "bedrag": 584.94,
+   "naam": "Inkopen en inrichting"
+  },
+  {
+   "bedrag": 463.42,
+   "naam": "Reizen, horeca en boodschappen"
+  },
+  {
+   "bedrag": 236.74,
+   "naam": "Privé via zakelijke rekening"
+  },
+  {
+   "bedrag": 105.01,
+   "naam": "Bank en administratie"
+  },
+  {
+   "bedrag": 43.84,
+   "naam": "Telefoon en internet"
+  },
+  {
+   "bedrag": 35.94,
+   "naam": "Software en tools"
+  }
+ ],
+ "eenmalig": 1661.64,
+ "eindsaldo": 4979.16,
+ "intern": 14050,
+ "label": "April 2026",
+ "maand": "2026-04",
+ "nieuwe_leveranciers": [],
+ "nog_controleren": 1897.22,
+ "norm": {
+  "gemiddeld": 18984.07,
+  "structureel": 18322.68,
+  "vast": 12862.92
+ },
+ "ontbrekende_vaste_posten": [
+  "Loon J.R. Batema",
+  "Huur KOM Beheer",
+  "Simpel"
+ ],
+ "operationeel": 20468.43,
+ "posten": [
+  {
+   "bedrag": 12633,
+   "categorie": "Belastingen (BTW e.d.)",
+   "datum": "30-04-2026",
+   "naam": "Belastingdienst Te apeldoorn",
+   "omschrijving": "Overboeking,1241343061601210",
+   "pz": "Belasting",
+   "soort": "belasting"
+  },
+  {
+   "bedrag": 10000,
+   "categorie": "Intern en privé-opname",
+   "datum": "13-04-2026",
+   "naam": "JKsocials",
+   "omschrijving": "Overboeking,overboeking naar buffer",
+   "pz": "Intern",
+   "soort": "intern"
+  },
+  {
+   "bedrag": 5000,
+   "categorie": "Marketing en lidmaatschap",
+   "datum": "14-04-2026",
+   "naam": "Rocket Leads Ltd.",
+   "omschrijving": "iDEAL,0C3PZP5 ROCKET LEADS LTD., 2026-04-14T06: 55 0220156259827796",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 3000,
+   "categorie": "Intern en privé-opname",
+   "datum": "02-04-2026",
+   "naam": "J. Klijnsma",
+   "omschrijving": "Overboeking,Prive overboeking",
+   "pz": "Intern",
+   "soort": "intern"
+  },
+  {
+   "bedrag": 2665.03,
+   "categorie": "Freelancers",
+   "datum": "27-04-2026",
+   "naam": "Fabian Media",
+   "omschrijving": "Overboeking,2026010",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 2639.76,
+   "categorie": "Personeel",
+   "datum": "27-04-2026",
+   "naam": "R.L van Hettema",
+   "omschrijving": "Overboeking,april - Shortclips",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 2333.91,
+   "categorie": "Personeel",
+   "datum": "27-04-2026",
+   "naam": "M sjoerdsma",
+   "omschrijving": "Overboeking,april - Shortclips",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 1425,
+   "categorie": "Personeel",
+   "datum": "27-04-2026",
+   "naam": "Belastingdienst",
+   "omschrijving": "iDEAL,3241343066601040 Betaling loonaangifte 4-202 6, 2026-04-26T05:10 7051135662519078",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 1050,
+   "categorie": "Intern en privé-opname",
+   "datum": "30-04-2026",
+   "naam": "J. Klijnsma",
+   "omschrijving": "Overboeking,Maandelijkse prive overboeking - Jarno",
+   "pz": "Intern",
+   "soort": "intern"
+  },
+  {
+   "bedrag": 901.45,
+   "categorie": "Nog controleren",
+   "datum": "29-04-2026",
+   "naam": "D.J. Overeem",
+   "omschrijving": "Overboeking,factuur 10041",
+   "pz": "Nog controleren",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 750.2,
+   "categorie": "Huur en kantoor",
+   "datum": "07-04-2026",
+   "naam": "Rienk van Terwisga Beheer B.V.",
+   "omschrijving": "Overboeking,8503 / 86883",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 526,
+   "categorie": "Inkopen en inrichting",
+   "datum": "28-04-2026",
+   "naam": "AFIUM Bouwbedrijf + Bouwmaterialen B.V.",
+   "omschrijving": "iDEAL,M01669041MR0C37A ORD36084, 2026-04-28T0 6:57 0380464774513648",
+   "pz": "Zakelijk",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 341.1,
+   "categorie": "Nog controleren",
+   "datum": "07-04-2026",
+   "naam": "Luxewagen B.V",
+   "omschrijving": "Overboeking,Factuur 22381",
+   "pz": "Nog controleren",
+   "soort": "onbekend"
+  },
+  {
+   "bedrag": 332.75,
+   "categorie": "Freelancers",
+   "datum": "27-04-2026",
+   "naam": "Hero Media Producties",
+   "omschrijving": "Overboeking,F26033",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 320.39,
+   "categorie": "Verzekeringen",
+   "datum": "10-04-2026",
+   "naam": "DAS NED RECHTSBYST VERZ",
+   "omschrijving": "Periodieke incasso,/10254745/12173307/01042026/ 01072026/-/10254745/12173307/01042026/0107202 6/-Machtigingskenmerk V518788-,536-10254745-12",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 225,
+   "categorie": "Freelancers",
+   "datum": "20-04-2026",
+   "naam": "Mangre via Tikkie",
+   "omschrijving": "iDEAL,001209768371 Videos Strevon NL64ABNA0550 208240, 2026-04-20T10:02 0031644453567165",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 214.2,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "01-04-2026",
+   "naam": "CCV*Brasserie La Fonta",
+   "omschrijving": "HEERENVEEN 01-04-2026 18:37 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 185.25,
+   "categorie": "Privé via zakelijke rekening",
+   "datum": "27-04-2026",
+   "naam": "De Friesland Zorgverzekeraar N.V.",
+   "omschrijving": "Periodieke incasso,Premie De Friesland Relatienumm er 101081596 Periode 01-05-2026 - 01-06-2026,435042 573432,NL15 ZZZ 508845650000,11200009",
+   "pz": "Privé",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 175.25,
+   "categorie": "Nog controleren",
+   "datum": "24-04-2026",
+   "naam": "2421 Ventures B.V. via Stichting Mollie Payments",
+   "omschrijving": "iDEAL,b1e21d82b1489d17ba4f69f58afef757 AFTER D RIVE 2026 - GDQJEPKN7W- 126 2421 Ventures B.V., 20 26-04-24T05:08 8152954768435570",
+   "pz": "Nog controleren",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 139.82,
+   "categorie": "Verzekeringen",
+   "datum": "20-04-2026",
+   "naam": "Allianz Direct Vers.",
+   "omschrijving": "Periodieke incasso,DN114164330,ACB26105-E489823 63,NL66 ZZZ 290379290000,01DN0000000000000000 000000002015233",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 131,
+   "categorie": "Verzekeringen",
+   "datum": "29-04-2026",
+   "naam": "NH1816 VERZEKERINGEN",
+   "omschrijving": "Periodieke incasso,KENMERK 6091198 Pakketpremie Nh1816 Combipolis Verzamelnr. 78005564 Vvd. 29-04- 2026,78005564,NL20 ZZZ 370312090000,00010",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 125,
+   "categorie": "Auto en vervoer",
+   "datum": "28-04-2026",
+   "naam": "BELASTINGDIENST",
+   "omschrijving": "Periodieke incasso,JGD-84-N LET OP, NIEUW TARIEF 1 9-03-2026 t/m 18-04-2026 MEER INFO WWW.BELASTIN GDIENST.NL,IOAXX982fb273efe84e139956faa36",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 121.54,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "02-04-2026",
+   "naam": "Gang van zaken Topsport Catering B.v.",
+   "omschrijving": "Overboeking,Factuur H253895",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 117.98,
+   "categorie": "Verzekeringen",
+   "datum": "02-04-2026",
+   "naam": "TURIEN CO ASSURADEUREN",
+   "omschrijving": "Periodieke incasso,Prolongatie 01-04-2026 tot 01-07-2 026, pakketnr. 50959389-Prolongatie 01-04-2026 tot 01 -07-2026, pakketnr. 50959389--,1",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 112.47,
+   "categorie": "Auto en vervoer",
+   "datum": "07-04-2026",
+   "naam": "Esso Sneek Lorentzst",
+   "omschrijving": "SNEEK 05-04-2026 21:18 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 107.43,
+   "categorie": "Verzekeringen",
+   "datum": "01-04-2026",
+   "naam": "NH1816 VERZEKERINGEN",
+   "omschrijving": "Periodieke incasso,KENMERK 6141061 Pakketpremie Nh1816 Combipolis v Verzamelnr. 77615012 Vvd. 01-0 4-2026,77615012,NL20 ZZZ 370312090000,000",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 105,
+   "categorie": "Freelancers",
+   "datum": "09-04-2026",
+   "naam": "van den Esker via Tikkie",
+   "omschrijving": "iDEAL,001203725460 Editten maart shortclips NL22R ABO0363812709, 2026-04-09T05:30 00312556689015 57",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 99.89,
+   "categorie": "Auto en vervoer",
+   "datum": "01-04-2026",
+   "naam": "ARGOS Spikerboor",
+   "omschrijving": "AKKRUM 01-04-2026 08:41 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 99.55,
+   "categorie": "Auto en vervoer",
+   "datum": "27-04-2026",
+   "naam": "Esso Express Joure",
+   "omschrijving": "JOURE 26-04-2026 17:46 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 98.01,
+   "categorie": "Bank en administratie",
+   "datum": "13-04-2026",
+   "naam": "De boekhalder",
+   "omschrijving": "Overboeking,2026-268",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 96.78,
+   "categorie": "Auto en vervoer",
+   "datum": "20-04-2026",
+   "naam": "BP Joure",
+   "omschrijving": "JOURE 20-04-2026 14:51 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 94.51,
+   "categorie": "Auto en vervoer",
+   "datum": "15-04-2026",
+   "naam": "BCK*SHELL BOULEVARD",
+   "omschrijving": "ZEIST 15-04-2026 14:18 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 94.21,
+   "categorie": "Auto en vervoer",
+   "datum": "10-04-2026",
+   "naam": "Esso Sneek Lorentzst",
+   "omschrijving": "SNEEK 10-04-2026 15:52 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 89.65,
+   "categorie": "Auto en vervoer",
+   "datum": "29-04-2026",
+   "naam": "CCV*BP JOUSTERPOORT",
+   "omschrijving": "JOURE 29-04-2026 09:49 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 88,
+   "categorie": "Auto en vervoer",
+   "datum": "28-04-2026",
+   "naam": "BELASTINGDIENST",
+   "omschrijving": "Periodieke incasso,H-073-KV 28-03-2026 t/m 27-04-20 26 MEER INFO WWW.BELASTINGDIENST.NL,IOAXXd71 dd53b79bd4c429c1268e59d1284,NL35 ZZZ 273653",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 80.5,
+   "categorie": "Verzekeringen",
+   "datum": "07-04-2026",
+   "naam": "ASR Betalingscentrum B.V.",
+   "omschrijving": "Overboeking,1000125004903171",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 73.97,
+   "categorie": "Auto en vervoer",
+   "datum": "27-04-2026",
+   "naam": "Esso Express Joure",
+   "omschrijving": "JOURE 25-04-2026 08:30 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 58.94,
+   "categorie": "Inkopen en inrichting",
+   "datum": "15-04-2026",
+   "naam": "Cameranu via Stichting Mollie Payments",
+   "omschrijving": "iDEAL,6bed540e486b5089e0b995b32e5d9d72 Ordern ummer 177623475251 Cameranu, 2026-04-15T06:32 8 152955362673437",
+   "pz": "Zakelijk",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 49.11,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "10-04-2026",
+   "naam": "BCK*Jumbo Joure Knolwe",
+   "omschrijving": "JOURE 10-04-2026 08:45 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 48,
+   "categorie": "Auto en vervoer",
+   "datum": "09-04-2026",
+   "naam": "Q PARK MAHLER",
+   "omschrijving": "AMSTERDAM 09-04-2026 13:17 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 45,
+   "categorie": "Freelancers",
+   "datum": "16-04-2026",
+   "naam": "Mangre via Tikkie",
+   "omschrijving": "iDEAL,001207546237 Video 1 NL64ABNA0550208240, 2026-04-16T01:18 0031295053789675",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 43.82,
+   "categorie": "Telefoon en internet",
+   "datum": "22-04-2026",
+   "naam": "VODAFONE LIBERTEL BV",
+   "omschrijving": "Periodieke incasso,Klant Nr 510047294/402242422 A pril Factuur Nr 320176984476 zie vodafone.nl/my,292U 001041594863,NL85 ZZZ 140522640000,10",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 38.5,
+   "categorie": "Privé via zakelijke rekening",
+   "datum": "27-04-2026",
+   "naam": "De Friesland Zorgverzekeraar N.V.",
+   "omschrijving": "Periodieke incasso,De Friesland ER regeling 202603 1 01081596,435042573431,NL15 ZZZ 508845650000,15 60000926460",
+   "pz": "Privé",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 34.64,
+   "categorie": "Verzekeringen",
+   "datum": "02-04-2026",
+   "naam": "TURIEN CO ASSURADEUREN",
+   "omschrijving": "Periodieke incasso,Prolongatie 01-04-2026 tot 01-05-2 026, pakketnr. 51032996-Prolongatie 01-04-2026 tot 01 -05-2026, pakketnr. 51032996--,1",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 34.64,
+   "categorie": "Verzekeringen",
+   "datum": "30-04-2026",
+   "naam": "TURIEN CO ASSURADEUREN",
+   "omschrijving": "Periodieke incasso,Prolongatie 01-05-2026 tot 01-06-2 026, pakketnr. 51032996-Prolongatie 01-05-2026 tot 01 -06-2026, pakketnr. 51032996--,1",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 19.6,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "24-04-2026",
+   "naam": "Stoker Koffiebar",
+   "omschrijving": "JOURE 24-04-2026 17:13 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 19.58,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "07-04-2026",
+   "naam": "BCK*Jumbo Joure Knolwe",
+   "omschrijving": "JOURE 07-04-2026 08:38 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 19,
+   "categorie": "Software en tools",
+   "datum": "14-04-2026",
+   "naam": "Dropbox",
+   "omschrijving": "Periodieke incasso,Dropbox Dropbox KKR6J7SKL2PG, N3TR6LHHNW8GHFG3,NL48 ZZZ 342764500000,MF7S CJCGH5XNZSG6",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 18.36,
+   "categorie": "Auto en vervoer",
+   "datum": "28-04-2026",
+   "naam": "Esso Kampen",
+   "omschrijving": "ZALK 28-04-2026 14:53 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 16.94,
+   "categorie": "Software en tools",
+   "datum": "13-04-2026",
+   "naam": "DigiBoox via Mollie",
+   "omschrijving": "Periodieke incasso,Factuur 202604-011345,SD57-526 1-5668-5190,NL08 ZZZ 502057730000,MD76-8068-300 4-6226",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 16,
+   "categorie": "Auto en vervoer",
+   "datum": "23-04-2026",
+   "naam": "XL Indoor Carwash Heer",
+   "omschrijving": "HEERENVEEN 23-04-2026 14:43 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 13.39,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "29-04-2026",
+   "naam": "BCK*Jumbo Joure Knolwe",
+   "omschrijving": "JOURE 29-04-2026 09:45 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 13.1,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "17-04-2026",
+   "naam": "Snackbar Chefke",
+   "omschrijving": "JOURE 17-04-2026 12:19 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 13,
+   "categorie": "Nog controleren",
+   "datum": "20-04-2026",
+   "naam": "Hilde knol h.o.d.n. do",
+   "omschrijving": "SNEEK 18-04-2026 12:14 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "onbekend"
+  },
+  {
+   "bedrag": 12.99,
+   "categorie": "Privé via zakelijke rekening",
+   "datum": "10-04-2026",
+   "naam": "SpotifyAB",
+   "omschrijving": "Periodieke incasso,SpotifyAB P413E39DF7,PFX64BH QCD4B528Q9P,NL48 ZZZ 342764500000,KRF2PK8JX GGQTHG3",
+   "pz": "Privé",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 12.05,
+   "categorie": "Verzekeringen",
+   "datum": "27-04-2026",
+   "naam": "Centraal Beheer",
+   "omschrijving": "Periodieke incasso,Bedrijfsverzekering 350239973 Pe riode 23.04.2026 - 23.05.2026 Centraal Beheer,059673 030298,NL51 ZZZ 080534100001,000280",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 11.58,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "07-04-2026",
+   "naam": "BCK*Jumbo Joure Knolwe",
+   "omschrijving": "JOURE 07-04-2026 12:35 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 8.25,
+   "categorie": "Auto en vervoer",
+   "datum": "08-04-2026",
+   "naam": "Flitsmeister Parkeren",
+   "omschrijving": "Periodieke incasso,Flitsmeister Parking,B62427C0C9 8B495F995ED46BF9C67747,NL85 ZZZ 355517320000, FMI1369540",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 7,
+   "categorie": "Bank en administratie",
+   "datum": "02-04-2026",
+   "naam": "Knab",
+   "omschrijving": "Pakketkosten",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 3,
+   "categorie": "Nog controleren",
+   "datum": "07-04-2026",
+   "naam": "CARMEN",
+   "omschrijving": "PARIS FR 05-04-2026 01:59 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "onbekend"
+  },
+  {
+   "bedrag": 1.32,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "07-04-2026",
+   "naam": "BCK*Jumbo Joure Knolwe",
+   "omschrijving": "JOURE 07-04-2026 12:39 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 0.01,
+   "categorie": "Telefoon en internet",
+   "datum": "13-04-2026",
+   "naam": "Simyo",
+   "omschrijving": "iDEAL,AA26227646495 Opwaardering voor, 2026-04-11 T09:21 7051554771865848",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 0.01,
+   "categorie": "Telefoon en internet",
+   "datum": "15-04-2026",
+   "naam": "Youfone Nederland B.V.",
+   "omschrijving": "iDEAL,202604150840201586919 Aansluitkosten 1020 294350, 2026-04-15T06:40 8030475677644616",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  }
+ ],
+ "prive": 236.74,
+ "revolut_aanwezig": false,
+ "status": "definitief",
+ "totaal_af": 47151.43,
+ "totaal_bij": 38449.59,
+ "variabel": 10057.93,
+ "vast": 8748.86,
+ "zakelijk": 18334.47
+}

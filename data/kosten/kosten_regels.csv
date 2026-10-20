@@ -1,0 +1,958 @@
+maand;leverancier;subcategorie;groep;soort;bedrag_met_btw;bedrag_zonder_btw;aantal_betalingen
+2025-01;The Leadership Community;Marketing en leads;marketing;variabel;279;279;1
+2025-01;Thialf B.V. HEERENVEEN;Overige kosten;operationeel;variabel;16;16;1
+2025-01;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;350;350;1
+2025-01;Amazon Payments Europe SCA;Apparatuur en inkopen;operationeel;eenmalig;70;70;2
+2025-01;Jumbo;Reizen en horeca;operationeel;variabel;42;42;3
+2025-01;BP;Auto en vervoer;operationeel;variabel;523;432;7
+2025-01;Kamera Express Rotterdam;Apparatuur en inkopen;operationeel;eenmalig;248;205;2
+2025-01;Dropbox;Software en tools;vast;vast;17;17;1
+2025-01;Van der Valk Hotel;Reizen en horeca;operationeel;variabel;32;29;1
+2025-01;Studiopries;Freelancers;freelancers;variabel;508;420;1
+2025-01;Beek Autoracing;Auto en vervoer;operationeel;variabel;1219;1219;1
+2025-01;S.C. Heerenveen B.V;Marketing en leads;marketing;variabel;200;165;1
+2025-01;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;34412;34412;5
+2025-01;de Hofvlietvilla ZWOLLE;Reizen en horeca;operationeel;variabel;144;144;1
+2025-01;Esso;Auto en vervoer;operationeel;variabel;33;27;1
+2025-01;Quinn Borghart;Editors;editors;variabel;1941;1604;1
+2025-01;Gang van zaken Topsport;Overige kosten;operationeel;variabel;52;52;1
+2025-01;Bleijerveld Juridisch advies;Overige kosten;operationeel;variabel;45;45;1
+2025-01;CENTRAAL BEHEER MKB Meerkeuzep;Verzekeringen;vast;vast;10;10;1
+2025-01;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;30;24;1
+2025-01;Cameranu;Apparatuur en inkopen;operationeel;eenmalig;289;239;1
+2025-01;KAPSALON SCISSORS Z JOURE;Overige kosten;operationeel;variabel;25;25;1
+2025-01;Bureau Bont;Freelancers;freelancers;variabel;820;678;1
+2025-01;George WPA Amsterdam;Overige kosten;operationeel;variabel;110;110;1
+2025-01;Revolut Bank UAB;Software en tools;vast;vast;250;250;1
+2025-01;Auto Christiaan B.V;Overige kosten;operationeel;variabel;1547;1547;1
+2025-01;De Bijenkorf Amsterdam;Overige kosten;operationeel;variabel;44;44;1
+2025-01;Q PARK DE BIJENKORF;Auto en vervoer;operationeel;variabel;60;50;1
+2025-01;DigiBoox;Software en tools;vast;vast;15;12;1
+2025-01;Strato;Overige kosten;operationeel;variabel;7;7;1
+2025-01;INTERPARKING NED.B GRONINGEN;Auto en vervoer;operationeel;variabel;15;12;1
+2025-01;Parking Antartica AMSTERDAM;Auto en vervoer;operationeel;variabel;3;2;1
+2025-01;Werkstof;Overige kosten;operationeel;variabel;368;368;2
+2025-01;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;635;525;1
+2025-01;Just Post;Overige kosten;operationeel;variabel;1125;1125;1
+2025-01;Centraal Beheer Autoverzekerin;Verzekeringen;vast;vast;131;131;1
+2025-01;Wiersma Banden JOURE;Auto en vervoer;operationeel;variabel;430;355;1
+2025-01;Bru Branding Management;Overige kosten;operationeel;variabel;157;157;1
+2025-01;Turien & Co;Verzekeringen;vast;vast;137;137;1
+2025-01;Knab;Boekhouding en bank;vast;vast;14;14;2
+2025-02;Esso;Auto en vervoer;operationeel;variabel;19;16;1
+2025-02;YK Rastanlagen GmbH Bad;Overige kosten;operationeel;variabel;26;26;1
+2025-02;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;350;350;1
+2025-02;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;59;59;1
+2025-02;Jumbo;Reizen en horeca;operationeel;variabel;10;10;1
+2025-02;Chocoladebezorgd;Overige kosten;operationeel;variabel;35;35;1
+2025-02;BP;Auto en vervoer;operationeel;variabel;371;307;5
+2025-02;Amazon Payments Europe SCA;Apparatuur en inkopen;operationeel;eenmalig;33;33;1
+2025-02;Amazon EU SARL MWYTUQQ;Apparatuur en inkopen;operationeel;eenmalig;349;349;1
+2025-02;Karwei Joure JOURE;Apparatuur en inkopen;operationeel;eenmalig;8;6;1
+2025-02;bol.com;Apparatuur en inkopen;operationeel;eenmalig;80;66;1
+2025-02;Booking.com;Reizen en horeca;operationeel;variabel;763;700;1
+2025-02;CENTRAAL BEHEER MKB Meerkeuzep;Verzekeringen;vast;vast;10;10;1
+2025-02;Cameranu;Apparatuur en inkopen;operationeel;eenmalig;873;722;3
+2025-02;Kamera Express Rotterdam;Apparatuur en inkopen;operationeel;eenmalig;6430;5314;4
+2025-02;S.C. Heerenveen B.V;Marketing en leads;marketing;variabel;83;69;1
+2025-02;Centraal Beheer Autoverzekerin;Verzekeringen;vast;vast;178;178;2
+2025-02;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;30;24;1
+2025-02;Jysk_L695 WOLVEGA;Apparatuur en inkopen;operationeel;eenmalig;85;70;1
+2025-02;Bru Branding Management;Overige kosten;operationeel;variabel;157;157;1
+2025-02;R.L. van Hettema;Lonen;personeel;vast;214;211;4
+2025-02;A-Mac B.V;Overige kosten;operationeel;variabel;85;85;1
+2025-02;Aziz Maral BV;Overige kosten;operationeel;variabel;96;79;1
+2025-02;S. Nijhof;Overige kosten;operationeel;variabel;75;75;1
+2025-02;Ultimate Mastermind B.V;Overige kosten;operationeel;variabel;12;12;1
+2025-02;DigiBoox;Software en tools;vast;vast;15;12;1
+2025-02;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;635;525;1
+2025-02;Studiopries;Freelancers;freelancers;variabel;726;600;1
+2025-02;Alipay EUROPE LTD S.A;Overige kosten;operationeel;variabel;66;66;1
+2025-02;JYSK_L642 HEERENVEEN;Apparatuur en inkopen;operationeel;eenmalig;170;140;1
+2025-02;Markt;Overige kosten;operationeel;variabel;95;95;1
+2025-02;Karwei Sneek SNEEK;Apparatuur en inkopen;operationeel;eenmalig;41;34;1
+2025-02;Coolblue;Apparatuur en inkopen;operationeel;eenmalig;196;162;1
+2025-02;De Boekhalder;Boekhouding en bank;vast;vast;233;193;1
+2025-02;Vincent De Bock;Overige kosten;operationeel;variabel;60;60;1
+2025-02;N. Bergsma;Overige kosten;operationeel;variabel;150;150;1
+2025-02;Knab;Boekhouding en bank;vast;vast;7;7;1
+2025-02;N.N.A.B. BV SURHUISTERVE;Overige kosten;operationeel;variabel;79;79;1
+2025-02;XL Indoor Carwash Heer;Auto en vervoer;operationeel;variabel;19;16;1
+2025-03;Fabian Media;Editors;editors;variabel;1016;840;4
+2025-03;Gang van zaken Topsport;Overige kosten;operationeel;variabel;64;64;1
+2025-03;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;40350;40350;2
+2025-03;Turien & Co;Verzekeringen;vast;vast;118;118;1
+2025-03;Bistro Cockpit Adenau DE;Overige kosten;operationeel;variabel;12;12;1
+2025-03;Restaurant zur Nuerbur Nuerbur;Reizen en horeca;operationeel;variabel;24;24;1
+2025-03;CLASSIC TANKSTELLE BAR BARWEIL;Overige kosten;operationeel;variabel;24;24;1
+2025-03;STEIGENBERGER PARKHOTE Duessel;Overige kosten;operationeel;variabel;54;54;2
+2025-03;Tankstelle Moenchengla Moenche;Overige kosten;operationeel;variabel;65;65;1
+2025-03;LSP*ABACCOS STEAKHOUSE Duessel;Overige kosten;operationeel;variabel;130;130;1
+2025-03;Q-PARK;Auto en vervoer;operationeel;variabel;13;11;1
+2025-03;SB Tank;Overige kosten;operationeel;variabel;59;59;1
+2025-03;Esso;Auto en vervoer;operationeel;variabel;15;12;1
+2025-03;TINQ HOOGEVEEN HOOGEVEEN;Auto en vervoer;operationeel;variabel;72;59;1
+2025-03;XL Indoor Carwash Heer;Auto en vervoer;operationeel;variabel;38;31;2
+2025-03;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;59;59;1
+2025-03;SUBWAY;Overige kosten;operationeel;variabel;35;35;1
+2025-03;Q PARK DE BIJENKORF;Auto en vervoer;operationeel;variabel;18;15;1
+2025-03;APPLE.COM/BILL ITUNES.COM IE;Overige kosten;operationeel;variabel;7;7;1
+2025-03;L.w.p Jansen;Overige kosten;operationeel;variabel;73;73;1
+2025-03;BP;Auto en vervoer;operationeel;variabel;372;308;5
+2025-03;CENTRAAL BEHEER MKB Meerkeuzep;Verzekeringen;vast;vast;10;10;1
+2025-03;Lidl;Reizen en horeca;operationeel;variabel;16;16;2
+2025-03;Studiopries;Freelancers;freelancers;variabel;813;672;1
+2025-03;S.C. Heerenveen B.V;Marketing en leads;marketing;variabel;480;396;2
+2025-03;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;30;24;1
+2025-03;De Visschotel B.V. LEEUWARDEN;Reizen en horeca;operationeel;variabel;15;14;1
+2025-03;Karwei Joure JOURE;Apparatuur en inkopen;operationeel;eenmalig;40;33;1
+2025-03;Alipay EUROPE LTD S.A;Overige kosten;operationeel;variabel;7;7;1
+2025-03;Kamera Express Rotterdam;Apparatuur en inkopen;operationeel;eenmalig;174;144;2
+2025-03;Jumbo;Reizen en horeca;operationeel;variabel;36;36;4
+2025-03;Amazon EU SARL;Apparatuur en inkopen;operationeel;eenmalig;23;23;1
+2025-03;Brasserie La Fontaine Heerenve;Reizen en horeca;operationeel;variabel;78;78;1
+2025-03;Bakker Bart Heerenveen HEERENV;Overige kosten;operationeel;variabel;22;22;1
+2025-03;JYSK_L642 HEERENVEEN;Apparatuur en inkopen;operationeel;eenmalig;6;5;1
+2025-03;Kwantum Heerenveen HEERENVEEN;Overige kosten;operationeel;variabel;13;13;1
+2025-03;DigiBoox;Software en tools;vast;vast;15;12;1
+2025-03;Amazon Payments Europe SCA;Apparatuur en inkopen;operationeel;eenmalig;39;39;1
+2025-03;OK Breukelen BREUKELEN;Overige kosten;operationeel;variabel;35;35;1
+2025-03;De Koperen Kees SNEEK;Reizen en horeca;operationeel;variabel;223;223;1
+2025-03;PartyBoss B.V;Overige kosten;operationeel;variabel;62;62;1
+2025-03;VEGAOO;Overige kosten;operationeel;variabel;66;66;1
+2025-03;INTERPARKING NED.B GRONINGEN;Auto en vervoer;operationeel;variabel;15;12;1
+2025-03;Knab;Boekhouding en bank;vast;vast;7;7;1
+2025-03;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;659;545;1
+2025-03;KENTFAITHIN;Overige kosten;operationeel;variabel;63;63;1
+2025-03;Bru Branding Management;Overige kosten;operationeel;variabel;157;157;1
+2025-03;Centraal Beheer Autoverzekerin;Verzekeringen;vast;vast;154;154;1
+2025-03;Quinn Borghart;Editors;editors;variabel;1745;1442;1
+2025-04;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;8670;8670;2
+2025-04;BP;Auto en vervoer;operationeel;variabel;567;469;8
+2025-04;APPLE.COM/BILL ITUNES.COM IE;Overige kosten;operationeel;variabel;4;4;1
+2025-04;Budgetcam Zwolle Zwolle;Apparatuur en inkopen;operationeel;eenmalig;278;230;1
+2025-04;Budgetcam Amsterdam-N Amsterda;Apparatuur en inkopen;operationeel;eenmalig;139;115;1
+2025-04;Fabian Media;Editors;editors;variabel;381;315;1
+2025-04;RAN Commerce;Apparatuur en inkopen;operationeel;eenmalig;1815;1815;1
+2025-04;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;30;24;1
+2025-04;CENTRAAL BEHEER MKB Meerkeuzep;Verzekeringen;vast;vast;10;10;1
+2025-04;J.H. Kooistra;Overige kosten;operationeel;variabel;240;240;2
+2025-04;Jay Vink;Overige kosten;operationeel;variabel;30;30;1
+2025-04;PARKEN SCHAENGELCENTER KOBLENZ;Overige kosten;operationeel;variabel;24;24;1
+2025-04;Esso;Auto en vervoer;operationeel;variabel;78;65;2
+2025-04;ED-Tankstelle Kempenich DE;Overige kosten;operationeel;variabel;58;58;1
+2025-04;Studiopries;Freelancers;freelancers;variabel;1234;1020;1
+2025-04;FREIE Service Station MONSCHAU;Overige kosten;operationeel;variabel;46;46;1
+2025-04;SHELL DE LUCHT WES;Auto en vervoer;operationeel;variabel;73;60;1
+2025-04;bol.com;Apparatuur en inkopen;operationeel;eenmalig;139;115;2
+2025-04;Total;Auto en vervoer;operationeel;variabel;59;49;1
+2025-04;Auto Christiaan B.V;Overige kosten;operationeel;variabel;414;414;1
+2025-04;Cameranu;Apparatuur en inkopen;operationeel;eenmalig;239;197;3
+2025-04;ANWB Verzekeren;Auto en vervoer;operationeel;variabel;39;39;1
+2025-04;Hotel Nuland;Reizen en horeca;operationeel;variabel;149;136;1
+2025-04;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;2200;2200;1
+2025-04;Ondernemersver. Skarsterlan;Overige kosten;operationeel;variabel;130;130;1
+2025-04;DigiBoox;Software en tools;vast;vast;17;14;1
+2025-04;KENTFAITHIN;Overige kosten;operationeel;variabel;91;91;1
+2025-04;Kamera Express Rotterdam;Apparatuur en inkopen;operationeel;eenmalig;1711;1414;2
+2025-04;Revolut Bank UAB;Software en tools;vast;vast;300;300;1
+2025-04;DAS NED RECHTSBYST VERZ;Verzekeringen;vast;vast;152;152;1
+2025-04;Partywinkel B.V;Apparatuur en inkopen;operationeel;eenmalig;52;52;1
+2025-04;R.L. van Hettema;Lonen;personeel;vast;85;85;1
+2025-04;Quinn Borghart;Editors;editors;variabel;1751;1447;1
+2025-04;Jumbo;Reizen en horeca;operationeel;variabel;12;12;1
+2025-04;Crooke Tuning Auto BUNSCHOTEN-;Auto en vervoer;operationeel;variabel;1389;1148;1
+2025-04;Loetje Laren B.V. LAREN;Overige kosten;operationeel;variabel;36;36;1
+2025-04;Wiersma Banden JOURE;Auto en vervoer;operationeel;variabel;45;37;1
+2025-04;Centraal Beheer Autoverzekerin;Verzekeringen;vast;vast;154;154;1
+2025-04;S.C. Heerenveen B.V;Marketing en leads;marketing;variabel;83;69;1
+2025-04;Knab;Boekhouding en bank;vast;vast;7;7;1
+2025-04;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;659;545;1
+2025-05;BP;Auto en vervoer;operationeel;variabel;421;348;6
+2025-05;Jumbo;Reizen en horeca;operationeel;variabel;25;25;3
+2025-05;Revolut Bank UAB;Software en tools;vast;vast;450;450;1
+2025-05;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;1120;1120;4
+2025-05;Matthijs van Toor;Overige kosten;operationeel;variabel;563;563;2
+2025-05;Fabian Media;Editors;editors;variabel;1361;1125;2
+2025-05;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;59;59;1
+2025-05;RAN Commerce;Apparatuur en inkopen;operationeel;eenmalig;1815;1815;1
+2025-05;bol.com;Apparatuur en inkopen;operationeel;eenmalig;115;95;1
+2025-05;Flitsmeister;Auto en vervoer;operationeel;variabel;55;46;1
+2025-05;CENTRAAL BEHEER MKB Meerkeuzep;Verzekeringen;vast;vast;10;10;1
+2025-05;Cameranu;Apparatuur en inkopen;operationeel;eenmalig;144;119;1
+2025-05;CustomConcepts;Overige kosten;operationeel;variabel;28;28;1
+2025-05;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;30;24;1
+2025-05;DetailingJS;Auto en vervoer;operationeel;variabel;303;303;1
+2025-05;Fieten Olie;Auto en vervoer;operationeel;variabel;67;55;1
+2025-05;De Boekhalder;Boekhouding en bank;vast;vast;299;248;1
+2025-05;La Place Tolnegen;Overige kosten;operationeel;variabel;13;13;1
+2025-05;DigiBoox;Software en tools;vast;vast;17;14;1
+2025-05;XL Carwash Heerenv HEERENVEEN;Auto en vervoer;operationeel;variabel;2;2;1
+2025-05;Kamera Express Rotterdam;Apparatuur en inkopen;operationeel;eenmalig;10;8;1
+2025-05;Spotify AB;Privé en reserveringen;prive;geen;13;13;1
+2025-05;WHOOP Inc;Privé en reserveringen;prive;geen;411;411;1
+2025-05;SHELL WELLERZAND WELLERZAND;Auto en vervoer;operationeel;variabel;63;52;1
+2025-05;Lidl;Reizen en horeca;operationeel;variabel;8;8;1
+2025-05;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;659;545;1
+2025-05;Centraal Beheer Autoverzekerin;Verzekeringen;vast;vast;154;154;1
+2025-05;Quinn Borghart;Editors;editors;variabel;1491;1232;1
+2025-05;NH;Verzekeringen;vast;vast;170;170;1
+2025-05;Stichting Degiro DEGIRO deposi;Overige kosten;operationeel;variabel;260;260;2
+2025-05;Knab;Boekhouding en bank;vast;vast;7;7;1
+2025-06;Jumbo;Reizen en horeca;operationeel;variabel;19;19;2
+2025-06;XXL Nutrition B.V;Overige kosten;operationeel;variabel;42;42;1
+2025-06;J.H. Kooistra;Overige kosten;operationeel;variabel;67;67;1
+2025-06;NH;Verzekeringen;vast;vast;90;90;1
+2025-06;Turien & Co;Verzekeringen;vast;vast;118;118;1
+2025-06;Snackbar-ijssalon HEERENVEEN;Reizen en horeca;operationeel;variabel;5;5;1
+2025-06;Cafe Bleeker BV HEERENVEEN;Overige kosten;operationeel;variabel;14;14;1
+2025-06;Belastingdienst;Loonheffing;personeel;vast;270;270;2
+2025-06;R.L. van Hettema;Lonen;personeel;vast;1399;1399;2
+2025-06;Flitsmeister;Auto en vervoer;operationeel;variabel;8;7;1
+2025-06;BP;Auto en vervoer;operationeel;variabel;619;512;8
+2025-06;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;59;59;1
+2025-06;De Friesland Zorgverzeke Premi;Privé en reserveringen;prive;geen;181;181;1
+2025-06;Studiopries;Freelancers;freelancers;variabel;1095;905;1
+2025-06;Rocket Leads;Marketing en leads;marketing;variabel;20000;20000;1
+2025-06;VNO-NCW MKB Noord;Marketing en leads;marketing;variabel;861;712;1
+2025-06;Fabian Media;Editors;editors;variabel;883;730;1
+2025-06;De Buik van Parijs;Overige kosten;operationeel;variabel;85;85;1
+2025-06;CENTRAAL BEHEER MKB Meerkeuzep;Verzekeringen;vast;vast;10;10;1
+2025-06;2421 Ventures;Nog controleren;controle;controle;175;175;1
+2025-06;t Vaticaan SNEEK;Overige kosten;operationeel;variabel;208;208;1
+2025-06;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;850;850;2
+2025-06;Texaco Apeldoorn De Br;Auto en vervoer;operationeel;variabel;1;1;1
+2025-06;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;47;38;1
+2025-06;Chocoladebezorgd;Overige kosten;operationeel;variabel;32;32;1
+2025-06;DigiBoox;Software en tools;vast;vast;17;14;1
+2025-06;Texaco Oldeholtwolde OLDEHOLTW;Auto en vervoer;operationeel;variabel;12;10;1
+2025-06;KAPSALON SCISSORS Z JOURE;Overige kosten;operationeel;variabel;25;25;1
+2025-06;Mollie B.V;Overige kosten;operationeel;variabel;0;0;1
+2025-06;CJIB Verkeersboetes;Auto en vervoer;operationeel;variabel;439;439;1
+2025-06;SpotifyAB SpotifyAB;Privé en reserveringen;prive;geen;13;13;1
+2025-06;Drukwerkdeal.nl B.V;Marketing en leads;marketing;variabel;301;249;1
+2025-06;Swatch Store D?sseldor Duessel;Overige kosten;operationeel;variabel;275;275;1
+2025-06;STEIGENBERGER PARKHOTE Duessel;Overige kosten;operationeel;variabel;120;120;1
+2025-06;Quinn Borghart;Editors;editors;variabel;1358;1122;1
+2025-06;EU Dronebewijs;Overige kosten;operationeel;variabel;99;99;1
+2025-06;BVBA OPTIEK DOBBELAERE;Overige kosten;operationeel;variabel;272;272;1
+2025-06;C&A Haus;Overige kosten;operationeel;variabel;18;18;2
+2025-06;Esso;Auto en vervoer;operationeel;variabel;12;10;1
+2025-06;The Grill GmbH &;Reizen en horeca;operationeel;variabel;250;250;1
+2025-06;Knab;Boekhouding en bank;vast;vast;7;7;1
+2025-06;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;659;545;1
+2025-06;Centraal Beheer Autoverzekerin;Verzekeringen;vast;vast;154;154;1
+2025-06;S.C. Heerenveen B.V;Marketing en leads;marketing;variabel;83;69;1
+2025-06;Dark;Overige kosten;operationeel;variabel;42;42;1
+2025-06;De Friesland zorgverzekeraar;Privé en reserveringen;prive;geen;181;181;1
+2025-06;Fedex;Overige kosten;operationeel;variabel;10;10;1
+2025-06;Hotel Post Plaza LEEUWARDEN;Reizen en horeca;operationeel;variabel;120;110;1
+2025-07;Belastingdienst;Loonheffing;personeel;vast;191;191;1
+2025-07;R.L. van Hettema;Lonen;personeel;vast;941;941;1
+2025-07;IJben Season Sports B.V;Overige kosten;operationeel;variabel;669;669;1
+2025-07;Rocket Leads;Marketing en leads;marketing;variabel;500;413;1
+2025-07;BP;Auto en vervoer;operationeel;variabel;638;527;10
+2025-07;APPLE.COM/BILL ITUNES.COM IE;Overige kosten;operationeel;variabel;17;17;2
+2025-07;Fabian Media;Editors;editors;variabel;2118;1750;2
+2025-07;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;6139;6139;2
+2025-07;Postma Financiele Planning;Overige kosten;operationeel;variabel;605;605;1
+2025-07;De Friesland Zorgverzeke Premi;Privé en reserveringen;prive;geen;181;181;1
+2025-07;NH1816;Verzekeringen;vast;vast;90;90;1
+2025-07;Q PARK DE BIJENKORF;Auto en vervoer;operationeel;variabel;57;47;1
+2025-07;Cafetaria Skroei JOURE;Overige kosten;operationeel;variabel;12;12;1
+2025-07;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;47350;47350;3
+2025-07;De Friesland zorgverzekeraar;Privé en reserveringen;prive;geen;201;201;1
+2025-07;CENTRAAL BEHEER MKB Meerkeuzep;Verzekeringen;vast;vast;10;10;1
+2025-07;Chocoladebezorgd;Overige kosten;operationeel;variabel;37;37;1
+2025-07;Future Flows;Overige kosten;operationeel;variabel;45;45;1
+2025-07;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;50;41;1
+2025-07;Shell Steenwijk STEENWYK;Auto en vervoer;operationeel;variabel;16;13;1
+2025-07;bol.com;Apparatuur en inkopen;operationeel;eenmalig;23;19;1
+2025-07;De Boekhalder;Boekhouding en bank;vast;vast;1214;1003;2
+2025-07;Dirk Tankstation;Overige kosten;operationeel;variabel;51;51;1
+2025-07;DigiBoox;Software en tools;vast;vast;17;14;1
+2025-07;WeTransfer;Software en tools;vast;vast;228;228;1
+2025-07;KLM;Reizen en horeca;operationeel;variabel;307;307;1
+2025-07;Quinn Borghart;Editors;editors;variabel;862;712;1
+2025-07;DAS NED RECHTSBYST VERZ;Verzekeringen;vast;vast;152;152;1
+2025-07;SpotifyAB SpotifyAB;Privé en reserveringen;prive;geen;13;13;1
+2025-07;Intechniek.com;Overige kosten;operationeel;variabel;51;51;1
+2025-07;Hans Anders;Overige kosten;operationeel;variabel;97;97;1
+2025-07;Poiesz Supermarkt;Overige kosten;operationeel;variabel;3;3;1
+2025-07;Jumbo;Reizen en horeca;operationeel;variabel;7;7;1
+2025-07;La Place De Somp;Overige kosten;operationeel;variabel;22;22;1
+2025-07;Bureau Bont;Freelancers;freelancers;variabel;2323;1920;1
+2025-07;De LEurope Amsterdam;Reizen en horeca;operationeel;variabel;75;75;1
+2025-07;Swatch Netherlands;Overige kosten;operationeel;variabel;45;45;1
+2025-07;Knab;Boekhouding en bank;vast;vast;7;7;1
+2025-07;J.J. de Graaf;Overige kosten;operationeel;variabel;40;40;1
+2025-07;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;659;545;1
+2025-08;BP;Auto en vervoer;operationeel;variabel;491;406;7
+2025-08;Jumbo;Reizen en horeca;operationeel;variabel;50;50;2
+2025-08;APPLE.COM/BILL ITUNES.COM IE;Overige kosten;operationeel;variabel;17;17;2
+2025-08;NH1816;Verzekeringen;vast;vast;90;90;1
+2025-08;Shell Steenwijk STEENWYK;Auto en vervoer;operationeel;variabel;16;13;1
+2025-08;bol.com;Apparatuur en inkopen;operationeel;eenmalig;46;38;1
+2025-08;Esso;Auto en vervoer;operationeel;variabel;118;97;2
+2025-08;Fabian Media;Editors;editors;variabel;1186;980;1
+2025-08;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;36669;36669;3
+2025-08;De Friesland Zorgverzeke Premi;Privé en reserveringen;prive;geen;181;181;1
+2025-08;Studiopries;Freelancers;freelancers;variabel;835;690;1
+2025-08;KLM;Reizen en horeca;operationeel;variabel;2786;2786;2
+2025-08;Budget Cameraverhuur B.V. Fact;Apparatuur en inkopen;operationeel;eenmalig;1229;1016;1
+2025-08;CENTRAAL BEHEER MKB Meerkeuzep;Verzekeringen;vast;vast;10;10;1
+2025-08;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;2650;2650;4
+2025-08;Tango Leeuwarden G LEEUWARDEN;Auto en vervoer;operationeel;variabel;51;42;1
+2025-08;Hotel Exploitatie Maat Zwolle;Reizen en horeca;operationeel;variabel;11;10;1
+2025-08;PENDING.UBER.COM Amsterdam;Reizen en horeca;operationeel;variabel;59;59;2
+2025-08;CM.com Ticketing BV;Overige kosten;operationeel;variabel;46;46;1
+2025-08;Your Productions Eindhoven;Overige kosten;operationeel;variabel;10;10;1
+2025-08;Leyten Vastgoedexp LEEUWARDEN;Overige kosten;operationeel;variabel;5;5;1
+2025-08;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;42;35;1
+2025-08;De Boekhalder;Boekhouding en bank;vast;vast;299;248;1
+2025-08;R.L. van Hettema;Lonen;personeel;vast;363;363;1
+2025-08;Flitsmeister;Auto en vervoer;operationeel;variabel;0;0;1
+2025-08;Auto Christiaan B.V;Overige kosten;operationeel;variabel;1381;1381;1
+2025-08;Tank S Blokzijl BLOKZYL;Overige kosten;operationeel;variabel;39;39;1
+2025-08;Reporterstore;Apparatuur en inkopen;operationeel;eenmalig;150;150;3
+2025-08;Gang van zaken Topsport;Overige kosten;operationeel;variabel;55;55;1
+2025-08;The Leadership Community;Marketing en leads;marketing;variabel;178;178;1
+2025-08;SpotifyAB SpotifyAB;Privé en reserveringen;prive;geen;13;13;1
+2025-08;DigiBoox;Software en tools;vast;vast;17;14;1
+2025-08;DAS NED RECHTSBYST VERZ;Verzekeringen;vast;vast;243;243;1
+2025-08;Booking.com;Reizen en horeca;operationeel;variabel;132;121;1
+2025-08;ASR;Verzekeringen;vast;vast;30;30;1
+2025-08;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;659;545;1
+2025-08;S.C. Heerenveen B.V;Marketing en leads;marketing;variabel;1927;1592;1
+2025-08;Turien & Co;Verzekeringen;vast;vast;49;49;1
+2025-08;Quinn Borghart;Editors;editors;variabel;1022;845;1
+2025-08;Knab;Boekhouding en bank;vast;vast;7;7;1
+2025-08;Rocket Leads;Marketing en leads;marketing;variabel;750;750;1
+2025-08;De Arbodienst bv;Boekhouding en bank;vast;vast;79;65;1
+2025-09;APPLE.COM/BILL CORK IE;Overige kosten;operationeel;variabel;7;7;1
+2025-09;De Friesland Zorgverzeke Premi;Privé en reserveringen;prive;geen;181;181;1
+2025-09;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;59;59;1
+2025-09;NH1816;Verzekeringen;vast;vast;90;90;1
+2025-09;Rocket Leads;Marketing en leads;marketing;variabel;1250;1250;1
+2025-09;Fabian Media;Editors;editors;variabel;2971;2455;1
+2025-09;APPLE.COM/BILL ITUNES.COM IE;Overige kosten;operationeel;variabel;10;10;1
+2025-09;Esso;Auto en vervoer;operationeel;variabel;508;420;8
+2025-09;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;4200;4200;8
+2025-09;R.L. van Hettema;Lonen;personeel;vast;2714;2714;2
+2025-09;Allianz Direct Vers;Verzekeringen;vast;vast;119;119;1
+2025-09;Maysha;Overige kosten;operationeel;variabel;350;350;1
+2025-09;ANWB Energie B.V. Laadpassen;Auto en vervoer;operationeel;variabel;4;4;2
+2025-09;CENTRAAL BEHEER MKB Meerkeuzep;Verzekeringen;vast;vast;10;10;1
+2025-09;Studiopries;Freelancers;freelancers;variabel;762;630;1
+2025-09;S.C. Heerenveen B.V;Marketing en leads;marketing;variabel;86;71;1
+2025-09;bol.com;Apparatuur en inkopen;operationeel;eenmalig;220;182;1
+2025-09;Coolblue;Apparatuur en inkopen;operationeel;eenmalig;379;313;1
+2025-09;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;42;35;1
+2025-09;Jumbo;Reizen en horeca;operationeel;variabel;24;24;2
+2025-09;Dropbox;Software en tools;vast;vast;19;19;1
+2025-09;Stickerland;Overige kosten;operationeel;variabel;19;19;1
+2025-09;Cameranu;Apparatuur en inkopen;operationeel;eenmalig;126;104;2
+2025-09;Startselect B.V;Apparatuur en inkopen;operationeel;eenmalig;809;809;2
+2025-09;MRCR Mobile Pay Zagreb;Overige kosten;operationeel;variabel;259;259;1
+2025-09;ASR;Verzekeringen;vast;vast;61;61;2
+2025-09;Db Journey;Overige kosten;operationeel;variabel;105;105;1
+2025-09;the HERD creative agency;Overige kosten;operationeel;variabel;212;212;1
+2025-09;DigiBoox;Software en tools;vast;vast;17;14;1
+2025-09;SpotifyAB SpotifyAB;Privé en reserveringen;prive;geen;13;13;1
+2025-09;Mango;Overige kosten;operationeel;variabel;140;140;1
+2025-09;Flitsmeister;Auto en vervoer;operationeel;variabel;74;61;1
+2025-09;Quinn Borghart;Editors;editors;variabel;653;540;1
+2025-09;HEB_Restaurant Best;Reizen en horeca;operationeel;variabel;20;20;1
+2025-09;Hotel Amsterdam-Amstel Amsterd;Reizen en horeca;operationeel;variabel;44;40;1
+2025-09;BP;Auto en vervoer;operationeel;variabel;59;49;1
+2025-09;Restaria t Hoekske Heerenveen;Overige kosten;operationeel;variabel;37;37;1
+2025-09;Knab;Boekhouding en bank;vast;vast;11;11;2
+2025-09;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;659;545;1
+2025-09;Riverty GmbH;Overige kosten;operationeel;variabel;123;123;3
+2025-09;Q PARK DE BIJENKORF;Auto en vervoer;operationeel;variabel;26;21;1
+2025-09;Turien & Co;Verzekeringen;vast;vast;35;35;1
+2025-10;Belastingdienst;Loonheffing;personeel;vast;1324;1324;3
+2025-10;R.L. van Hettema;Lonen;personeel;vast;2512;2499;3
+2025-10;D.J. Overeem;Nog controleren;controle;controle;900;900;2
+2025-10;Cameranu;Apparatuur en inkopen;operationeel;eenmalig;50;41;1
+2025-10;Garage Modern Horeca B;Reizen en horeca;operationeel;variabel;96;96;1
+2025-10;Turien & Co;Verzekeringen;vast;vast;187;187;3
+2025-10;APPLE.COM/BILL CORK IE;Overige kosten;operationeel;variabel;17;17;2
+2025-10;Alipay EUROPE LTD S.A;Overige kosten;operationeel;variabel;78;78;2
+2025-10;Fabian Media;Editors;editors;variabel;1966;1625;1
+2025-10;Transavia;Auto en vervoer;operationeel;variabel;464;383;1
+2025-10;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;6350;6350;5
+2025-10;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;165;165;2
+2025-10;Belastingdienst;Auto en vervoer;operationeel;variabel;92;92;1
+2025-10;De Friesland Zorgverzekeraar N;Privé en reserveringen;prive;geen;181;181;1
+2025-10;ASR;Verzekeringen;vast;vast;30;30;1
+2025-10;Jumbo;Reizen en horeca;operationeel;variabel;15;15;2
+2025-10;Allianz Direct Vers;Verzekeringen;vast;vast;161;161;2
+2025-10;ANWB Energie B.V. Laadpassen;Auto en vervoer;operationeel;variabel;21;21;2
+2025-10;Kamera Express Rotterdam;Apparatuur en inkopen;operationeel;eenmalig;438;362;2
+2025-10;CENTRAAL BEHEER MKB Meerkeuzep;Verzekeringen;vast;vast;10;10;1
+2025-10;Shell Steenwijk STEENWYK;Auto en vervoer;operationeel;variabel;16;13;1
+2025-10;Esso;Auto en vervoer;operationeel;variabel;65;54;1
+2025-10;Rocket Leads;Marketing en leads;marketing;variabel;1250;1250;1
+2025-10;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;124;103;1
+2025-10;TOTAL;Auto en vervoer;operationeel;variabel;71;59;1
+2025-10;Boumas Body Shop, spuiterij;Overige kosten;operationeel;variabel;678;560;1
+2025-10;LA PAELLA BEACH TORREMOLINOS;Overige kosten;operationeel;variabel;30;30;1
+2025-10;CEPSA EL HIGUERON FUENGIROLA;Overige kosten;operationeel;variabel;36;36;1
+2025-10;PICU MARBELLA ES;Overige kosten;operationeel;variabel;115;115;1
+2025-10;Dropbox;Software en tools;vast;vast;19;19;1
+2025-10;EASYJET DNATA IN FLIGH;Overige kosten;operationeel;variabel;3;3;1
+2025-10;CAF Y REST MIEL;Overige kosten;operationeel;variabel;32;32;1
+2025-10;Studiopries;Freelancers;freelancers;variabel;690;570;1
+2025-10;HMS Host International Amsterd;Overige kosten;operationeel;variabel;28;28;1
+2025-10;Revolut Bank UAB;Software en tools;vast;vast;640;640;1
+2025-10;LIDL MIJAS CALAHONDA MALAGA;Reizen en horeca;operationeel;variabel;21;21;1
+2025-10;MAX RIVIERA DEL ES;Overige kosten;operationeel;variabel;120;120;1
+2025-10;DigiBoox;Software en tools;vast;vast;17;14;1
+2025-10;De Boekhalder;Boekhouding en bank;vast;vast;265;219;1
+2025-10;PENDING.UBER.COM Amsterdam;Reizen en horeca;operationeel;variabel;275;275;3
+2025-10;UBER *TRIP Amsterdam;Reizen en horeca;operationeel;variabel;3;3;2
+2025-10;SPIZZ Leipzig DE;Overige kosten;operationeel;variabel;127;127;1
+2025-10;Bedrijfskledingonline;Apparatuur en inkopen;operationeel;eenmalig;184;152;1
+2025-10;Hotel Bavaria Brehna DE;Reizen en horeca;operationeel;variabel;79;73;1
+2025-10;Revolut Bank UAB LHKHVPF;Software en tools;vast;vast;1500;1500;1
+2025-10;SpotifyAB SpotifyAB;Privé en reserveringen;prive;geen;13;13;1
+2025-10;DAS NED RECHTSBYST VERZ;Verzekeringen;vast;vast;243;243;1
+2025-10;Reporterstore;Apparatuur en inkopen;operationeel;eenmalig;117;117;1
+2025-10;FUTUREFLOWS Factuur;Overige kosten;operationeel;variabel;330;330;1
+2025-10;AIRALO SINGAPORE SG;Overige kosten;operationeel;variabel;26;26;3
+2025-10;Knab;Boekhouding en bank;vast;vast;15;15;2
+2025-10;Bureau Bont;Freelancers;freelancers;variabel;2323;1920;1
+2025-10;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;659;545;1
+2025-10;Quinn Borghart;Editors;editors;variabel;635;525;1
+2025-11;D.J. Overeem;Nog controleren;controle;controle;1500;1500;1
+2025-11;R.L. van Hettema;Lonen;personeel;vast;2420;2420;1
+2025-11;APPLE.COM/BILL CORK IE;Overige kosten;operationeel;variabel;17;17;2
+2025-11;Bureau Bont;Freelancers;freelancers;variabel;774;640;1
+2025-11;CM.com Ticketing B.V;Overige kosten;operationeel;variabel;158;158;1
+2025-11;Esso;Auto en vervoer;operationeel;variabel;327;270;5
+2025-11;Aziz Maral BV;Overige kosten;operationeel;variabel;3455;2856;1
+2025-11;Belastingdienst;Auto en vervoer;operationeel;variabel;92;92;1
+2025-11;De Friesland Zorgverzekeraar N;Privé en reserveringen;prive;geen;181;181;1
+2025-11;Fabian Media;Editors;editors;variabel;4780;3950;1
+2025-11;ANWB Energie B.V. Laadpassen;Auto en vervoer;operationeel;variabel;9;9;2
+2025-11;Studiopries;Freelancers;freelancers;variabel;1475;1219;1
+2025-11;S.C. Heerenveen B.V;Marketing en leads;marketing;variabel;2159;1784;2
+2025-11;Flexiblaze media;Overige kosten;operationeel;variabel;36;36;1
+2025-11;CENTRAAL BEHEER MKB Meerkeuzep;Verzekeringen;vast;vast;10;10;1
+2025-11;Media heerenveen vof;Overige kosten;operationeel;variabel;303;250;1
+2025-11;Q PARK DE BIJENKORF;Auto en vervoer;operationeel;variabel;29;24;1
+2025-11;2421 Ventures;Nog controleren;controle;controle;999;999;1
+2025-11;Allianz Direct Vers;Verzekeringen;vast;vast;140;140;1
+2025-11;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;101;84;1
+2025-11;Rocket Leads;Marketing en leads;marketing;variabel;1250;1250;1
+2025-11;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;390;390;3
+2025-11;Shell Kampen KAMPEN;Auto en vervoer;operationeel;variabel;71;59;1
+2025-11;BP;Auto en vervoer;operationeel;variabel;234;194;3
+2025-11;Dropbox;Software en tools;vast;vast;19;19;1
+2025-11;Quinn Borghart;Editors;editors;variabel;1110;918;1
+2025-11;SpotifyAB SpotifyAB;Privé en reserveringen;prive;geen;13;13;1
+2025-11;DigiBoox;Software en tools;vast;vast;17;14;1
+2025-11;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;659;545;1
+2025-11;EHM Hotel Hulshorst De;Reizen en horeca;operationeel;variabel;96;88;1
+2025-11;Flitsmeister;Auto en vervoer;operationeel;variabel;24;20;1
+2025-11;Shell Willemsbos Nunspeet;Auto en vervoer;operationeel;variabel;9;8;1
+2025-11;Bedrijfskledingonline;Apparatuur en inkopen;operationeel;eenmalig;85;70;1
+2025-11;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;6282;6282;1
+2025-11;NH1816;Verzekeringen;vast;vast;143;143;1
+2025-11;VA Exploitatiemaat ZWOLLE;Overige kosten;operationeel;variabel;33;33;1
+2025-11;Knab;Boekhouding en bank;vast;vast;15;15;2
+2025-11;Mercure Zwolle Zwolle;Reizen en horeca;operationeel;variabel;151;138;1
+2025-12;Turien & Co;Verzekeringen;vast;vast;187;187;3
+2025-12;Hero Media Producties;Freelancers;freelancers;variabel;569;470;1
+2025-12;Quinn Borghart;Editors;editors;variabel;787;650;1
+2025-12;Rocket Leads;Marketing en leads;marketing;variabel;7250;7250;2
+2025-12;APPLE.COM/BILL CORK IE;Overige kosten;operationeel;variabel;7;7;1
+2025-12;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;58775;58775;9
+2025-12;Hotel Sneek Sneek;Reizen en horeca;operationeel;variabel;120;110;1
+2025-12;ANWB Energie B.V. Laadpassen;Auto en vervoer;operationeel;variabel;8;8;2
+2025-12;Belastingdienst;Auto en vervoer;operationeel;variabel;92;92;1
+2025-12;De Friesland Zorgverzekeraar N;Privé en reserveringen;prive;geen;185;185;1
+2025-12;Mango;Overige kosten;operationeel;variabel;80;80;1
+2025-12;Belastingdienst;Loonheffing;personeel;vast;1288;1288;2
+2025-12;Fabian Media;Editors;editors;variabel;2468;2040;1
+2025-12;R.L. van Hettema;Lonen;personeel;vast;2227;2227;2
+2025-12;Coolblue;Apparatuur en inkopen;operationeel;eenmalig;1610;1330;1
+2025-12;Jumbo;Reizen en horeca;operationeel;variabel;25;25;2
+2025-12;BP;Auto en vervoer;operationeel;variabel;79;66;1
+2025-12;Esso;Auto en vervoer;operationeel;variabel;205;169;3
+2025-12;De Keizer Hospital LELYSTAD;Overige kosten;operationeel;variabel;125;125;1
+2025-12;CENTRAAL BEHEER MKB Meerkeuzep;Verzekeringen;vast;vast;10;10;1
+2025-12;ASR;Verzekeringen;vast;vast;61;61;2
+2025-12;Allianz Direct Vers;Verzekeringen;vast;vast;140;140;1
+2025-12;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;44;36;1
+2025-12;Chocoladebezorgd;Overige kosten;operationeel;variabel;76;76;3
+2025-12;Supermarkt Zijlstr JOURE;Overige kosten;operationeel;variabel;20;20;1
+2025-12;Cafetaria Skroei JOURE;Overige kosten;operationeel;variabel;27;27;1
+2025-12;HEMA;Reizen en horeca;operationeel;variabel;12;12;1
+2025-12;Q PARK DE BIJENKORF;Auto en vervoer;operationeel;variabel;30;25;1
+2025-12;Primera Joure JOURE;Overige kosten;operationeel;variabel;75;75;1
+2025-12;Dropbox;Software en tools;vast;vast;19;19;1
+2025-12;OK Terwispel TERWISPEL;Overige kosten;operationeel;variabel;78;78;1
+2025-12;De IJsfabriek JOURE;Reizen en horeca;operationeel;variabel;120;120;1
+2025-12;VOF U. en W;Overige kosten;operationeel;variabel;50;50;1
+2025-12;DigiBoox;Software en tools;vast;vast;17;14;1
+2025-12;XL Indoor Carwash Heer;Auto en vervoer;operationeel;variabel;19;16;1
+2025-12;Studiopries;Freelancers;freelancers;variabel;799;660;1
+2025-12;SpotifyAB SpotifyAB;Privé en reserveringen;prive;geen;13;13;1
+2025-12;Danilo Wattez;Overige kosten;operationeel;variabel;654;540;1
+2025-12;Flitsmeister;Auto en vervoer;operationeel;variabel;8;7;1
+2025-12;CM.com Ticketing B.V;Overige kosten;operationeel;variabel;79;79;1
+2025-12;Transavia Inflight Sho Schipho;Auto en vervoer;operationeel;variabel;23;19;2
+2025-12;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;659;545;1
+2025-12;Knab;Boekhouding en bank;vast;vast;14;14;2
+2025-12;NH1816;Verzekeringen;vast;vast;107;107;1
+2026-01;D.J. Overeem;Nog controleren;controle;controle;2408;2408;1
+2026-01;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;13699;13699;1
+2026-01;BP;Auto en vervoer;operationeel;variabel;371;306;5
+2026-01;Luxewagen;Nog controleren;controle;controle;35500;35500;1
+2026-01;APPLE.COM/BILL CORK IE;Overige kosten;operationeel;variabel;7;7;1
+2026-01;Turien & Co;Verzekeringen;vast;vast;35;35;1
+2026-01;Coolblue;Apparatuur en inkopen;operationeel;eenmalig;685;566;1
+2026-01;AH;Overige kosten;operationeel;variabel;7;7;1
+2026-01;Studiopries;Freelancers;freelancers;variabel;1836;1518;2
+2026-01;Fabian Media;Editors;editors;variabel;1010;835;1
+2026-01;Esso;Auto en vervoer;operationeel;variabel;134;111;2
+2026-01;ANWB Energie B.V. Laadpassen;Auto en vervoer;operationeel;variabel;4;4;1
+2026-01;Belastingdienst;Auto en vervoer;operationeel;variabel;92;92;1
+2026-01;De Friesland Zorgverzekeraar N;Privé en reserveringen;prive;geen;185;185;1
+2026-01;Koffievoordeel.nl;Huur en kantoor;vast;vast;58;48;1
+2026-01;Belastingdienst;Loonheffing;personeel;vast;1046;1046;1
+2026-01;R.L. van Hettema;Lonen;personeel;vast;2095;2095;1
+2026-01;M. Sjoerdsma;Lonen;personeel;vast;2334;2334;1
+2026-01;bol.com;Apparatuur en inkopen;operationeel;eenmalig;58;48;2
+2026-01;Kamera Express Rotterdam;Apparatuur en inkopen;operationeel;eenmalig;33;27;1
+2026-01;Centraal Beheer Bedrijfsverzek;Verzekeringen;vast;vast;12;12;1
+2026-01;Bureau Bont;Freelancers;freelancers;variabel;532;440;1
+2026-01;Jumbo;Reizen en horeca;operationeel;variabel;37;37;4
+2026-01;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;186;154;1
+2026-01;XL Indoor Carwash Heer;Auto en vervoer;operationeel;variabel;19;16;1
+2026-01;Allianz Direct Vers;Verzekeringen;vast;vast;140;140;1
+2026-01;N. Atsma;Overige kosten;operationeel;variabel;227;227;1
+2026-01;Tweetal Busine Groningen;Overige kosten;operationeel;variabel;46;46;3
+2026-01;De Boekhalder;Boekhouding en bank;vast;vast;366;303;1
+2026-01;S.C. Heerenveen B.V;Marketing en leads;marketing;variabel;104;86;1
+2026-01;Bedrijfskledingonline;Apparatuur en inkopen;operationeel;eenmalig;44;36;1
+2026-01;Lidl;Reizen en horeca;operationeel;variabel;9;9;2
+2026-01;Tamoil 'Strand ZURICH;Overige kosten;operationeel;variabel;57;57;1
+2026-01;Dropbox;Software en tools;vast;vast;19;19;1
+2026-01;BoelsNL Heerenveen;Auto en vervoer;operationeel;variabel;500;413;1
+2026-01;DigiBoox;Software en tools;vast;vast;17;14;1
+2026-01;SpotifyAB SpotifyAB;Privé en reserveringen;prive;geen;13;13;1
+2026-01;DAS NED RECHTSBYST VERZ;Verzekeringen;vast;vast;320;320;1
+2026-01;Hotel Utrecht Utrecht;Reizen en horeca;operationeel;variabel;70;64;1
+2026-01;Flitsmeister;Auto en vervoer;operationeel;variabel;7;6;1
+2026-01;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;659;545;1
+2026-01;De Arbodienst bv;Boekhouding en bank;vast;vast;188;155;1
+2026-01;Amazon Payments Europe SCA;Apparatuur en inkopen;operationeel;eenmalig;66;66;1
+2026-01;NH1816;Verzekeringen;vast;vast;107;107;1
+2026-01;Knab;Boekhouding en bank;vast;vast;15;15;2
+2026-02;APPLE.COM/BILL CORK IE;Overige kosten;operationeel;variabel;7;7;1
+2026-02;De Visschotel B.V. LEEUWARDEN;Reizen en horeca;operationeel;variabel;27;24;1
+2026-02;Esso;Auto en vervoer;operationeel;variabel;164;136;2
+2026-02;De Friesland Zorgverzekeraar N;Privé en reserveringen;prive;geen;185;185;1
+2026-02;Belastingdienst;Auto en vervoer;operationeel;variabel;179;179;2
+2026-02;Belastingdienst;Loonheffing;personeel;vast;1053;1053;1
+2026-02;M. Sjoerdsma;Lonen;personeel;vast;2334;2334;1
+2026-02;R.L. van Hettema;Lonen;personeel;vast;2125;2125;1
+2026-02;Jumbo;Reizen en horeca;operationeel;variabel;81;81;7
+2026-02;Turien & Co;Verzekeringen;vast;vast;35;35;1
+2026-02;ANWB Energie B.V. Laadpassen;Auto en vervoer;operationeel;variabel;4;4;1
+2026-02;Centraal Beheer Bedrijfsverzek;Verzekeringen;vast;vast;12;12;1
+2026-02;De Boekhalder;Boekhouding en bank;vast;vast;548;453;2
+2026-02;Rocket Leads;Marketing en leads;marketing;variabel;1250;1250;1
+2026-02;Fabian Media;Editors;editors;variabel;1228;1015;1
+2026-02;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;49;40;1
+2026-02;hoesjesdirect.nl;Overige kosten;operationeel;variabel;18;18;1
+2026-02;XL Indoor Carwash Heer;Auto en vervoer;operationeel;variabel;38;31;2
+2026-02;VNO-NCW MKB Noord VEVR;Marketing en leads;marketing;variabel;513;424;1
+2026-02;home24 SE;Apparatuur en inkopen;operationeel;eenmalig;263;217;1
+2026-02;bol.com;Apparatuur en inkopen;operationeel;eenmalig;530;438;2
+2026-02;Spot Langweer LANGWEER;Reizen en horeca;operationeel;variabel;719;719;1
+2026-02;C&M*Pizzeria en Grillr Joure;Overige kosten;operationeel;variabel;19;19;1
+2026-02;Allianz Direct Vers;Verzekeringen;vast;vast;140;140;1
+2026-02;BP;Auto en vervoer;operationeel;variabel;201;166;3
+2026-02;De Keizer Hospital LELYSTAD;Overige kosten;operationeel;variabel;99;99;1
+2026-02;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;500;500;1
+2026-02;Dropbox;Software en tools;vast;vast;19;19;1
+2026-02;SHELL;Auto en vervoer;operationeel;variabel;87;72;1
+2026-02;DigiBoox;Software en tools;vast;vast;17;14;1
+2026-02;Gang van zaken Topsport;Overige kosten;operationeel;variabel;62;62;1
+2026-02;SpotifyAB SpotifyAB;Privé en reserveringen;prive;geen;13;13;1
+2026-02;S.C. Heerenveen B.V;Marketing en leads;marketing;variabel;728;602;1
+2026-02;Amazon Payments Europe SCA;Apparatuur en inkopen;operationeel;eenmalig;26;26;1
+2026-02;Flitsmeister;Auto en vervoer;operationeel;variabel;9;8;1
+2026-02;Action;Apparatuur en inkopen;operationeel;eenmalig;2;2;1
+2026-02;NH1816;Verzekeringen;vast;vast;369;369;2
+2026-02;Bureau Bont;Freelancers;freelancers;variabel;240;198;1
+2026-02;Rovideocreations;Freelancers;freelancers;variabel;182;150;1
+2026-02;Knab;Boekhouding en bank;vast;vast;7;7;1
+2026-02;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;726;600;1
+2026-02;RESTAURANT 'T GERECHT Heerenve;Reizen en horeca;operationeel;variabel;51;51;1
+2026-03;Q PARK GROTE MARKT;Auto en vervoer;operationeel;variabel;24;20;1
+2026-03;Shell De Lepelaar LELYSTAD;Auto en vervoer;operationeel;variabel;15;12;1
+2026-03;SuperTank Bant BANT;Auto en vervoer;operationeel;variabel;167;138;2
+2026-03;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;2750;2750;3
+2026-03;BP;Auto en vervoer;operationeel;variabel;185;152;2
+2026-03;Nieuwenhuijse Meppel B.V;Apparatuur en inkopen;operationeel;eenmalig;675;558;1
+2026-03;D.J. Overeem;Nog controleren;controle;controle;5182;5182;2
+2026-03;NH1816;Verzekeringen;vast;vast;238;238;2
+2026-03;Simpel;Telefoon en internet;vast;vast;3;2;1
+2026-03;Esso;Auto en vervoer;operationeel;variabel;526;434;7
+2026-03;Hero Media Producties;Freelancers;freelancers;variabel;1261;1042;1
+2026-03;Belastingdienst;Auto en vervoer;operationeel;variabel;179;179;2
+2026-03;De Friesland Zorgverzekeraar N;Privé en reserveringen;prive;geen;262;262;3
+2026-03;Belastingdienst;Loonheffing;personeel;vast;1080;1080;1
+2026-03;M. Sjoerdsma;Lonen;personeel;vast;2334;2334;1
+2026-03;R.L. van Hettema;Lonen;personeel;vast;2375;2359;3
+2026-03;Studiopries;Freelancers;freelancers;variabel;1147;948;2
+2026-03;ANWB Energie B.V. Laadpassen;Auto en vervoer;operationeel;variabel;4;4;1
+2026-03;Centraal Beheer Bedrijfsverzek;Verzekeringen;vast;vast;12;12;1
+2026-03;Parkeergarage Foru GRONINGEN;Auto en vervoer;operationeel;variabel;24;20;1
+2026-03;XL Indoor Carwash Heer;Auto en vervoer;operationeel;variabel;16;13;1
+2026-03;Cameranu;Apparatuur en inkopen;operationeel;eenmalig;723;597;2
+2026-03;Fabian Media;Editors;editors;variabel;2287;1890;1
+2026-03;Allianz Direct Vers;Verzekeringen;vast;vast;140;140;1
+2026-03;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;44;36;1
+2026-03;Joontjes;Reizen en horeca;operationeel;variabel;81;81;1
+2026-03;Bergsma Joure Tankstat JOURE;Overige kosten;operationeel;variabel;2;2;1
+2026-03;bol.com;Apparatuur en inkopen;operationeel;eenmalig;25;21;1
+2026-03;Dropbox;Software en tools;vast;vast;19;19;1
+2026-03;RoomRaccoon.Hotel Sand;Reizen en horeca;operationeel;variabel;229;210;1
+2026-03;Wijndeal.nl;Apparatuur en inkopen;operationeel;eenmalig;152;152;1
+2026-03;Crooke Tuning Auto BUNSCHOTEN-;Auto en vervoer;operationeel;variabel;1643;1358;1
+2026-03;Waswereld Joure JOURE;Overige kosten;operationeel;variabel;2;2;1
+2026-03;CCrally Car Events;Overige kosten;operationeel;variabel;252;252;1
+2026-03;DigiBoox;Software en tools;vast;vast;17;14;1
+2026-03;Shell Steenwijk STEENWYK;Auto en vervoer;operationeel;variabel;8;7;1
+2026-03;Quinn Borghart;Editors;editors;variabel;1004;830;1
+2026-03;SpotifyAB SpotifyAB;Privé en reserveringen;prive;geen;13;13;1
+2026-03;Maysha;Overige kosten;operationeel;variabel;250;250;1
+2026-03;Flitsmeister;Auto en vervoer;operationeel;variabel;14;12;1
+2026-03;WILLIAMS AMSTERDAM;Overige kosten;operationeel;variabel;80;80;1
+2026-03;. Esso Express JoureJOURE;Auto en vervoer;operationeel;variabel;91;75;1
+2026-03;Bleijerveld Juridisch advies;Overige kosten;operationeel;variabel;91;91;1
+2026-03;PIZZERIA RISTORANT JOURE;Overige kosten;operationeel;variabel;28;28;1
+2026-03;Hotel Zaltbommel;Reizen en horeca;operationeel;variabel;249;228;1
+2026-03;Crooke Tuning Automotive B.V;Auto en vervoer;operationeel;variabel;450;372;1
+2026-03;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;750;620;1
+2026-03;Knab;Boekhouding en bank;vast;vast;7;7;1
+2026-04;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;12633;12633;1
+2026-04;Turien & Co;Verzekeringen;vast;vast;187;187;3
+2026-04;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;14050;14050;3
+2026-04;Jumbo;Reizen en horeca;operationeel;variabel;95;95;5
+2026-04;BP;Auto en vervoer;operationeel;variabel;186;154;2
+2026-04;D.J. Overeem;Nog controleren;controle;controle;901;901;1
+2026-04;NH1816;Verzekeringen;vast;vast;238;238;2
+2026-04;Esso;Auto en vervoer;operationeel;variabel;399;329;5
+2026-04;AFIUM Bouwbedrijf + Bouwmateri;Apparatuur en inkopen;operationeel;eenmalig;526;435;1
+2026-04;Belastingdienst;Auto en vervoer;operationeel;variabel;213;213;2
+2026-04;R.L. van Hettema;Lonen;personeel;vast;2640;2640;1
+2026-04;M. Sjoerdsma;Lonen;personeel;vast;2334;2334;1
+2026-04;Hero Media Producties;Freelancers;freelancers;variabel;333;275;1
+2026-04;Belastingdienst;Loonheffing;personeel;vast;1425;1425;1
+2026-04;De Friesland Zorgverzekeraar N;Privé en reserveringen;prive;geen;224;224;2
+2026-04;Centraal Beheer Bedrijfsverzek;Verzekeringen;vast;vast;12;12;1
+2026-04;Fabian Media;Editors;editors;variabel;2665;2203;1
+2026-04;Stoker Koffiebar JOURE;Overige kosten;operationeel;variabel;20;20;1
+2026-04;2421 Ventures;Nog controleren;controle;controle;175;175;1
+2026-04;XL Indoor Carwash Heer;Auto en vervoer;operationeel;variabel;16;13;1
+2026-04;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;44;36;1
+2026-04;Mangre;Freelancers;freelancers;variabel;270;270;2
+2026-04;Allianz Direct Vers;Verzekeringen;vast;vast;140;140;1
+2026-04;Hilde knol h.o.d.n. do;Overige kosten;operationeel;variabel;13;13;1
+2026-04;Snackbar Chefke JOURE;Reizen en horeca;operationeel;variabel;13;13;1
+2026-04;Cameranu;Apparatuur en inkopen;operationeel;eenmalig;59;49;1
+2026-04;Youfone Nederland B.V;Telefoon en internet;vast;vast;0;0;1
+2026-04;SHELL BOULEVARD ZEIST;Auto en vervoer;operationeel;variabel;95;78;1
+2026-04;Rocket Leads;Marketing en leads;marketing;variabel;5000;5000;1
+2026-04;Dropbox;Software en tools;vast;vast;19;19;1
+2026-04;DigiBoox;Software en tools;vast;vast;17;14;1
+2026-04;Simyo;Telefoon en internet;vast;vast;0;0;1
+2026-04;De Boekhalder;Boekhouding en bank;vast;vast;98;81;1
+2026-04;SpotifyAB SpotifyAB;Privé en reserveringen;prive;geen;13;13;1
+2026-04;DAS NED RECHTSBYST VERZ;Verzekeringen;vast;vast;320;320;1
+2026-04;Q PARK MAHLER AMSTERDAM;Auto en vervoer;operationeel;variabel;48;40;1
+2026-04;Noah van den Esker;Editors;editors;variabel;105;105;1
+2026-04;Flitsmeister;Auto en vervoer;operationeel;variabel;8;7;1
+2026-04;ASR;Verzekeringen;vast;vast;81;81;1
+2026-04;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;750;620;1
+2026-04;Luxewagen;Nog controleren;controle;controle;341;341;1
+2026-04;CARMEN PARIS FR;Overige kosten;operationeel;variabel;3;3;1
+2026-04;Gang van zaken Topsport;Overige kosten;operationeel;variabel;122;122;1
+2026-04;Knab;Boekhouding en bank;vast;vast;7;7;1
+2026-04;ARGOS Spikerboor AKKRUM;Auto en vervoer;operationeel;variabel;100;83;1
+2026-04;Brasserie La Fonta HEERENVEEN;Reizen en horeca;operationeel;variabel;214;214;1
+2026-05;Esso;Auto en vervoer;operationeel;variabel;284;235;5
+2026-05;Action;Apparatuur en inkopen;operationeel;eenmalig;33;27;1
+2026-05;GAMMA SNEEK SNEEK;Apparatuur en inkopen;operationeel;eenmalig;16;14;1
+2026-05;R.L. van Hettema;Lonen;personeel;vast;3690;3690;1
+2026-05;Strandweg Parking BV;Auto en vervoer;operationeel;variabel;25;20;1
+2026-05;NH1816;Verzekeringen;vast;vast;238;238;2
+2026-05;ARGOS Oppe Veenwg BURGUM;Auto en vervoer;operationeel;variabel;91;75;1
+2026-05;Fabian Media;Editors;editors;variabel;1694;1400;1
+2026-05;Karwei Joure JOURE;Apparatuur en inkopen;operationeel;eenmalig;18;15;1
+2026-05;Centraal Beheer Bedrijfsverzek;Verzekeringen;vast;vast;12;12;1
+2026-05;M. Sjoerdsma;Lonen;personeel;vast;2899;2899;1
+2026-05;Albert Heijn;Reizen en horeca;operationeel;variabel;18;18;1
+2026-05;Belastingdienst;Auto en vervoer;operationeel;variabel;213;213;2
+2026-05;De Friesland Zorgverzekeraar N;Privé en reserveringen;prive;geen;224;224;2
+2026-05;bol.com;Apparatuur en inkopen;operationeel;eenmalig;645;533;2
+2026-05;Hero Media Producties;Freelancers;freelancers;variabel;2130;1760;3
+2026-05;XL Indoor Carwash Heer;Auto en vervoer;operationeel;variabel;16;13;1
+2026-05;Youfone Nederland B.V;Telefoon en internet;vast;vast;11;9;1
+2026-05;Allianz Direct Vers;Verzekeringen;vast;vast;140;140;1
+2026-05;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;44;36;1
+2026-05;sem van tilburg;Editors;editors;variabel;1561;1290;1
+2026-05;BP;Auto en vervoer;operationeel;variabel;101;83;1
+2026-05;Jumbo;Reizen en horeca;operationeel;variabel;13;13;1
+2026-05;Simpel;Telefoon en internet;vast;vast;3;2;1
+2026-05;Lufthansa;Reizen en horeca;operationeel;variabel;357;357;1
+2026-05;Shortclips (eigen rekening);Privé en reserveringen;prive;geen;10000;10000;1
+2026-05;Studiopries;Freelancers;freelancers;variabel;1271;1050;1
+2026-05;IKEA;Apparatuur en inkopen;operationeel;eenmalig;1784;1474;1
+2026-05;Dropbox;Software en tools;vast;vast;10;10;1
+2026-05;Koffievoordeel.nl;Huur en kantoor;vast;vast;55;45;1
+2026-05;SpotifyAB SpotifyAB;Privé en reserveringen;prive;geen;13;13;1
+2026-05;DigiBoox;Software en tools;vast;vast;17;14;1
+2026-05;Rimowa GmbH;Privé en reserveringen;prive;geen;885;885;1
+2026-05;TINQ EELDERWOLDE GRONI EELDERW;Auto en vervoer;operationeel;variabel;91;75;1
+2026-05;Flitsmeister;Auto en vervoer;operationeel;variabel;28;23;1
+2026-05;Outlet Friesland HEERENVEEN;Apparatuur en inkopen;operationeel;eenmalig;1733;1432;1
+2026-05;Joontjes;Reizen en horeca;operationeel;variabel;102;102;1
+2026-05;De Boekhalder;Boekhouding en bank;vast;vast;393;325;1
+2026-05;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;750;620;1
+2026-05;Noah van den Esker;Editors;editors;variabel;455;455;1
+2026-05;Rocket Leads;Marketing en leads;marketing;variabel;1250;1250;1
+2026-05;Knab;Boekhouding en bank;vast;vast;7;7;1
+2026-05;Snackbar Chefke JOURE;Reizen en horeca;operationeel;variabel;14;14;1
+2026-06;R.L. van Hettema;Lonen;personeel;vast;2111;2111;1
+2026-06;M. Sjoerdsma;Lonen;personeel;vast;2428;2428;4
+2026-06;Belastingdienst;Loonheffing;personeel;vast;1068;1068;1
+2026-06;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;2800;2800;4
+2026-06;Esso;Auto en vervoer;operationeel;variabel;399;330;4
+2026-06;pillar media;Freelancers;freelancers;variabel;182;150;1
+2026-06;VNO-NCW MKB Noord VEVR;Marketing en leads;marketing;variabel;887;733;1
+2026-06;Cadeaubonnen.nl BV;Overige kosten;operationeel;variabel;37;37;1
+2026-06;Fabian Media;Editors;editors;variabel;2263;1870;1
+2026-06;Belastingdienst;Auto en vervoer;operationeel;variabel;212;212;2
+2026-06;De Friesland Zorgverzekeraar N;Privé en reserveringen;prive;geen;224;224;2
+2026-06;NH1816;Verzekeringen;vast;vast;238;238;2
+2026-06;FinexHome;Apparatuur en inkopen;operationeel;eenmalig;90;90;1
+2026-06;Shortclips (eigen rekening);Privé en reserveringen;prive;geen;33000;33000;3
+2026-06;Rienk van Terwisga Beheer;Huur en kantoor;vast;vast;750;620;1
+2026-06;EasyPay B.V. Heerenveen;Overige kosten;operationeel;variabel;13;13;1
+2026-06;Centraal Beheer Bedrijfsverzek;Verzekeringen;vast;vast;12;12;1
+2026-06;Total;Auto en vervoer;operationeel;variabel;79;65;1
+2026-06;GAMMA SNEEK SNEEK;Apparatuur en inkopen;operationeel;eenmalig;6;5;1
+2026-06;Action;Apparatuur en inkopen;operationeel;eenmalig;52;43;3
+2026-06;bol.com;Apparatuur en inkopen;operationeel;eenmalig;148;122;5
+2026-06;KOM Beheer;Huur en kantoor;vast;vast;3146;2600;2
+2026-06;Youfone Nederland B.V;Telefoon en internet;vast;vast;7;6;1
+2026-06;Coolblue;Apparatuur en inkopen;operationeel;eenmalig;212;175;1
+2026-06;Allianz Direct Vers;Verzekeringen;vast;vast;140;140;1
+2026-06;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;45;37;1
+2026-06;Jumbo;Reizen en horeca;operationeel;variabel;103;103;3
+2026-06;Lidl;Reizen en horeca;operationeel;variabel;15;15;2
+2026-06;FEBO Zwolle Drive ZWOLLE;Reizen en horeca;operationeel;variabel;22;22;1
+2026-06;Tango Winschoten WINSCHOTEN;Auto en vervoer;operationeel;variabel;77;64;1
+2026-06;Simpel;Telefoon en internet;vast;vast;22;19;1
+2026-06;Dropbox;Software en tools;vast;vast;10;10;1
+2026-06;Studiopries;Freelancers;freelancers;variabel;250;207;1
+2026-06;ASR;Verzekeringen;vast;vast;111;111;1
+2026-06;Ranzijn Tuin & Dier;Apparatuur en inkopen;operationeel;eenmalig;80;66;2
+2026-06;DigiBoox;Software en tools;vast;vast;19;16;1
+2026-06;Karwei Joure JOURE;Apparatuur en inkopen;operationeel;eenmalig;14;12;1
+2026-06;Fieten Olie;Auto en vervoer;operationeel;variabel;74;61;1
+2026-06;Cookinglife;Overige kosten;operationeel;variabel;75;75;1
+2026-06;Karwei Sneek SNEEK;Apparatuur en inkopen;operationeel;eenmalig;35;29;1
+2026-06;Spotify Spotify;Privé en reserveringen;prive;geen;13;13;1
+2026-06;IKEA;Apparatuur en inkopen;operationeel;eenmalig;621;513;2
+2026-06;createyourhome.nl;Apparatuur en inkopen;operationeel;eenmalig;130;107;1
+2026-06;Flitsmeister;Auto en vervoer;operationeel;variabel;2;2;1
+2026-06;SuperTank Bant BANT;Auto en vervoer;operationeel;variabel;82;68;1
+2026-06;Easyplants B.V;Apparatuur en inkopen;operationeel;eenmalig;192;159;1
+2026-06;www.lampen24.nl;Apparatuur en inkopen;operationeel;eenmalig;159;131;1
+2026-06;PS: E-commerce;Apparatuur en inkopen;operationeel;eenmalig;160;132;1
+2026-06;JYSK-L654 SNEEK;Apparatuur en inkopen;operationeel;eenmalig;55;45;1
+2026-06;Joontjes;Reizen en horeca;operationeel;variabel;93;93;1
+2026-06;the neon company B.v;Apparatuur en inkopen;operationeel;eenmalig;841;695;1
+2026-06;Knab;Boekhouding en bank;vast;vast;7;7;1
+2026-06;BP;Auto en vervoer;operationeel;variabel;87;72;1
+2026-06;Noah van den Esker;Editors;editors;variabel;805;805;1
+2026-06;Turien & Co;Verzekeringen;vast;vast;35;35;1
+2026-06;AFIUM Bouwbedrijf + Bouwmateri;Apparatuur en inkopen;operationeel;eenmalig;230;190;1
+2026-07;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;16611;16611;1
+2026-07;Loof Sneek SNEEK;Overige kosten;operationeel;variabel;60;60;1
+2026-07;mkb coffee Factuur;Huur en kantoor;vast;vast;91;75;1
+2026-07;Action;Apparatuur en inkopen;operationeel;eenmalig;49;40;4
+2026-07;Turien & Co;Verzekeringen;vast;vast;332;332;4
+2026-07;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;3200;3200;6
+2026-07;Coolblue;Apparatuur en inkopen;operationeel;eenmalig;5328;4403;6
+2026-07;NH1816;Verzekeringen;vast;vast;238;238;2
+2026-07;Kabelshop BV;Overige kosten;operationeel;variabel;19;19;1
+2026-07;Fabian Media;Editors;editors;variabel;2021;1670;1
+2026-07;MoneyBird B.V;Overige kosten;operationeel;variabel;0;0;1
+2026-07;Jumbo;Reizen en horeca;operationeel;variabel;84;84;4
+2026-07;M. Sjoerdsma;Lonen;personeel;vast;2296;2296;1
+2026-07;R.L. van Hettema;Lonen;personeel;vast;2037;2037;1
+2026-07;Belastingdienst;Loonheffing;personeel;vast;1046;1046;1
+2026-07;GAMMA SNEEK SNEEK;Apparatuur en inkopen;operationeel;eenmalig;147;121;3
+2026-07;Shell Steenwijk STEENWYK;Auto en vervoer;operationeel;variabel;18;15;1
+2026-07;Belastingdienst;Auto en vervoer;operationeel;variabel;213;213;2
+2026-07;De Friesland Zorgverzekeraar N;Privé en reserveringen;prive;geen;224;224;2
+2026-07;Centraal Beheer Bedrijfsverzek;Verzekeringen;vast;vast;12;12;1
+2026-07;KOM Beheer;Huur en kantoor;vast;vast;1573;1300;1
+2026-07;Fieten Olie;Auto en vervoer;operationeel;variabel;464;383;5
+2026-07;Esso;Auto en vervoer;operationeel;variabel;94;78;2
+2026-07;Tango Bolsward BOLSWARD;Auto en vervoer;operationeel;variabel;95;78;1
+2026-07;Karwei Sneek SNEEK;Apparatuur en inkopen;operationeel;eenmalig;114;94;1
+2026-07;Amazon Payments Europe SCA;Apparatuur en inkopen;operationeel;eenmalig;280;280;3
+2026-07;Q PARK OSSENMARKT GRONINGEN;Auto en vervoer;operationeel;variabel;4;3;1
+2026-07;AFIUM Bouwbedrijf + Bouwmateri;Apparatuur en inkopen;operationeel;eenmalig;378;312;1
+2026-07;Youfone Nederland B.V;Telefoon en internet;vast;vast;7;6;1
+2026-07;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;44;36;1
+2026-07;Markt;Overige kosten;operationeel;variabel;90;90;2
+2026-07;De Boekhalder;Boekhouding en bank;vast;vast;314;260;1
+2026-07;Vieren bij Fier Sneek;Reizen en horeca;operationeel;variabel;140;140;1
+2026-07;ETQ Amsterdam;Privé en reserveringen;prive;geen;308;308;1
+2026-07;Allianz Direct Vers;Verzekeringen;vast;vast;140;140;1
+2026-07;Temu.com;Apparatuur en inkopen;operationeel;eenmalig;53;53;1
+2026-07;Lunch & Dinner 'T;Reizen en horeca;operationeel;variabel;295;295;2
+2026-07;Grandcafe De Kroon B.V;Reizen en horeca;operationeel;variabel;13;13;1
+2026-07;Shortclips (eigen rekening);Privé en reserveringen;prive;geen;23500;23500;4
+2026-07;J.J. Visser;Nog controleren;controle;controle;242;242;1
+2026-07;Simpel;Telefoon en internet;vast;vast;3;2;1
+2026-07;Dropbox;Software en tools;vast;vast;10;10;1
+2026-07;Interlinie;Nog controleren;controle;controle;1815;1815;1
+2026-07;JYSK BV;Apparatuur en inkopen;operationeel;eenmalig;95;79;1
+2026-07;LumenXL.nl;Overige kosten;operationeel;variabel;35;35;1
+2026-07;DigiBoox;Software en tools;vast;vast;19;16;1
+2026-07;Spotify Spotify;Privé en reserveringen;prive;geen;13;13;1
+2026-07;DAS NED RECHTSBYST VERZ;Verzekeringen;vast;vast;320;320;1
+2026-07;sem van tilburg;Editors;editors;variabel;2868;2370;1
+2026-07;Flitsmeister;Auto en vervoer;operationeel;variabel;6;5;1
+2026-07;2421 Ventures;Nog controleren;controle;controle;300;300;1
+2026-07;AVIA XPRESS ZIEUWENT ZIEUWENT;Auto en vervoer;operationeel;variabel;102;85;1
+2026-07;Hero Media Producties;Freelancers;freelancers;variabel;584;483;1
+2026-07;Noah van den Esker;Editors;editors;variabel;875;875;1
+2026-07;Knab;Boekhouding en bank;vast;vast;7;7;1
+2026-08;Fieten Olie;Auto en vervoer;operationeel;variabel;566;468;6
+2026-08;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;81750;81750;6
+2026-08;Q PARK OSSENMARKT GRONINGEN;Auto en vervoer;operationeel;variabel;18;15;1
+2026-08;Turien & Co;Verzekeringen;vast;vast;35;35;1
+2026-08;NH1816;Verzekeringen;vast;vast;238;238;2
+2026-08;Zwennes Krimpfoliebedrijf B.V;Nog controleren;controle;controle;5566;5566;1
+2026-08;Bureau Bont;Freelancers;freelancers;variabel;581;480;1
+2026-08;Van de Groep B.V;Overige kosten;operationeel;variabel;21;21;1
+2026-08;R.L. van Hettema;Lonen;personeel;vast;2922;2922;1
+2026-08;De Friesland Zorgverzekeraar N;Privé en reserveringen;prive;geen;224;224;2
+2026-08;Belastingdienst;Auto en vervoer;operationeel;variabel;213;213;2
+2026-08;Jumbo;Reizen en horeca;operationeel;variabel;26;26;3
+2026-08;ASR;Verzekeringen;vast;vast;71;71;1
+2026-08;M. Sjoerdsma;Lonen;personeel;vast;2458;2458;1
+2026-08;J. Batema;Lonen;personeel;vast;2269;2269;1
+2026-08;Centraal Beheer Bedrijfsverzek;Verzekeringen;vast;vast;12;12;1
+2026-08;Partywinkel B.V;Apparatuur en inkopen;operationeel;eenmalig;90;90;1
+2026-08;De Horeca Bazaar;Reizen en horeca;operationeel;variabel;121;121;1
+2026-08;Vendrig Packaging B.V;Apparatuur en inkopen;operationeel;eenmalig;116;96;1
+2026-08;Disposable Discounter - Nederl;Overige kosten;operationeel;variabel;50;50;1
+2026-08;Fabian Media;Editors;editors;variabel;2572;2126;1
+2026-08;Belastingdienst;Btw en inkomstenbelasting;belasting;geen;2832;2832;1
+2026-08;Youfone Nederland B.V;Telefoon en internet;vast;vast;7;6;1
+2026-08;TanQyou Opeinde OPEINDE;Auto en vervoer;operationeel;variabel;93;76;1
+2026-08;2421 Ventures;Nog controleren;controle;controle;4620;4620;1
+2026-08;Hema Sneek Sneek;Reizen en horeca;operationeel;variabel;23;23;1
+2026-08;Gang van zaken Topsport;Overige kosten;operationeel;variabel;68;68;1
+2026-08;Allianz Direct Vers;Verzekeringen;vast;vast;140;140;1
+2026-08;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;44;36;1
+2026-08;Shell De Lepelaar LELYSTAD;Auto en vervoer;operationeel;variabel;29;24;1
+2026-08;KLM;Reizen en horeca;operationeel;variabel;1380;1380;1
+2026-08;WeTransfer;Software en tools;vast;vast;23;23;5
+2026-08;Simpel;Telefoon en internet;vast;vast;3;2;1
+2026-08;Joontjes;Reizen en horeca;operationeel;variabel;97;97;1
+2026-08;sem van tilburg;Editors;editors;variabel;2862;2365;1
+2026-08;Responz Media B.V;Freelancers;freelancers;variabel;2535;2095;1
+2026-08;Studiopries;Freelancers;freelancers;variabel;661;547;1
+2026-08;XL Indoor Carwash Heer;Auto en vervoer;operationeel;variabel;19;16;1
+2026-08;Dropbox;Software en tools;vast;vast;10;10;1
+2026-08;Esso;Auto en vervoer;operationeel;variabel;15;12;1
+2026-08;Spotify Spotify;Privé en reserveringen;prive;geen;13;13;1
+2026-08;DigiBoox;Software en tools;vast;vast;19;16;1
+2026-08;VNO-NCW MKB Noord VEVR;Marketing en leads;marketing;variabel;194;160;1
+2026-08;Action;Apparatuur en inkopen;operationeel;eenmalig;21;18;1
+2026-08;Praxis;Apparatuur en inkopen;operationeel;eenmalig;16;13;1
+2026-08;Joybuy;Nog controleren;controle;controle;345;345;1
+2026-08;Shortclips (eigen rekening);Privé en reserveringen;prive;geen;27553;27553;1
+2026-08;Agip Service-Station H?nxe DE;Auto en vervoer;operationeel;variabel;120;100;1
+2026-08;Flitsmeister;Auto en vervoer;operationeel;variabel;24;20;1
+2026-08;Quinn Borghart;Editors;editors;variabel;3152;2605;1
+2026-08;De Boekhalder;Boekhouding en bank;vast;vast;393;325;1
+2026-08;Noah van den Esker;Editors;editors;variabel;210;210;1
+2026-08;S.C. Heerenveen B.V;Marketing en leads;marketing;variabel;2036;1682;1
+2026-08;Knab;Boekhouding en bank;vast;vast;11;11;3
+2026-09;Action;Apparatuur en inkopen;operationeel;eenmalig;103;85;4
+2026-09;Booking.com;Reizen en horeca;operationeel;variabel;233;214;1
+2026-09;Jarno Klijnsma (privé);Privé en reserveringen;prive;geen;1050;1050;1
+2026-09;NH1816;Verzekeringen;vast;vast;238;238;2
+2026-09;Fieten Olie;Auto en vervoer;operationeel;variabel;760;628;8
+2026-09;De Friesland Zorgverzekeraar N;Privé en reserveringen;prive;geen;224;224;2
+2026-09;Belastingdienst;Auto en vervoer;operationeel;variabel;212;212;2
+2026-09;TMC*C-ZWOLLE-20208 ZWOLLE;Overige kosten;operationeel;variabel;36;36;1
+2026-09;mkb coffee Factuur;Huur en kantoor;vast;vast;91;75;1
+2026-09;M. Sjoerdsma;Lonen;personeel;vast;2458;2458;1
+2026-09;J. Batema;Lonen;personeel;vast;2269;2269;1
+2026-09;R.L. van Hettema;Lonen;personeel;vast;2283;2283;1
+2026-09;Shortclips (eigen rekening);Privé en reserveringen;prive;geen;5000;5000;1
+2026-09;Centraal Beheer Bedrijfsverzek;Verzekeringen;vast;vast;12;12;1
+2026-09;IVONO;Apparatuur en inkopen;operationeel;eenmalig;218;180;1
+2026-09;Fabian Media;Editors;editors;variabel;3136;2592;1
+2026-09;sem van tilburg;Editors;editors;variabel;3170;2620;1
+2026-09;Youfone Nederland B.V;Telefoon en internet;vast;vast;16;13;1
+2026-09;VODAFONE LIBERTEL BV Klant;Telefoon en internet;vast;vast;47;39;1
+2026-09;ASR;Verzekeringen;vast;vast;30;30;1
+2026-09;FACEBOOK PAYMENTS INTERNATIONA;Marketing en leads;marketing;variabel;150;150;1
+2026-09;Allianz Direct Vers;Verzekeringen;vast;vast;161;161;1
+2026-09;Van der Valk Hotel;Reizen en horeca;operationeel;variabel;329;302;1
+2026-09;Simpel;Telefoon en internet;vast;vast;4;3;2
+2026-09;WeTransfer;Software en tools;vast;vast;23;23;1
+2026-09;Ranzijn Tuin & Dier;Apparatuur en inkopen;operationeel;eenmalig;34;28;1
+2026-09;KOM Beheer;Huur en kantoor;vast;vast;3146;2600;2
+2026-09;Zanger Danilo Wattez;Overige kosten;operationeel;variabel;908;750;1
+2026-09;Jumbo;Reizen en horeca;operationeel;variabel;15;15;1
+2026-09;Lukoil;Auto en vervoer;operationeel;variabel;121;100;1
+2026-09;LUKOIL DE BEITEL HEERLEN;Auto en vervoer;operationeel;variabel;138;114;1
+2026-09;LUKOIL MARGRATEN MARGRATEN;Auto en vervoer;operationeel;variabel;125;103;1
+2026-09;De Visschotel JOURE;Reizen en horeca;operationeel;variabel;28;26;1
+2026-09;DigiBoox;Software en tools;vast;vast;19;16;1
+2026-09;Spotify Spotify;Privé en reserveringen;prive;geen;13;13;1
+2026-09;SHELL WELLERZAND WELLERZAND;Auto en vervoer;operationeel;variabel;19;16;1
+2026-09;Parkeergarage Euro Groningen;Auto en vervoer;operationeel;variabel;4;3;1
+2026-09;Stud Society B.V. correctie;Nog controleren;controle;controle;1428;1428;1
+2026-09;Flitsmeister;Auto en vervoer;operationeel;variabel;7;6;1
+2026-09;PENDING.UBER.COM Amsterdam;Reizen en horeca;operationeel;variabel;43;43;1
+2026-09;Noah van den Esker;Editors;editors;variabel;1050;1050;1
+2026-09;Joontjes;Reizen en horeca;operationeel;variabel;88;88;1
+2026-09;Knab;Boekhouding en bank;vast;vast;16;16;2
+2026-09;XL Indoor Carwash Heer;Auto en vervoer;operationeel;variabel;16;13;1
+2026-10;TransportenA Snacks SNEEK;Reizen en horeca;operationeel;variabel;17;17;1
+2026-10;IVONO;Apparatuur en inkopen;operationeel;eenmalig;109;90;1
+2026-10;Flitsmeister;Auto en vervoer;operationeel;variabel;10;8;1
+2026-10;Shortclips (eigen rekening);Privé en reserveringen;prive;geen;2000;2000;1
+2026-10;Fieten Olie;Auto en vervoer;operationeel;variabel;148;123;1
+2026-10;GAMMA SNEEK SNEEK;Apparatuur en inkopen;operationeel;eenmalig;14;12;1
+2026-10;Day1 B.V;Overige kosten;operationeel;variabel;144;144;1
+2026-10;Jumbo;Reizen en horeca;operationeel;variabel;10;10;1
+2026-10;Lunch & Dinner 'T;Reizen en horeca;operationeel;variabel;140;140;1
+2026-10;Noah van den Esker;Editors;editors;variabel;105;105;1
+2026-10;FACEBOOK PAYMENTS INTERNATIONA;Marketing en leads;marketing;variabel;315;315;1
+2026-10;Knab;Boekhouding en bank;vast;vast;14;14;2
+2026-10;Belastingdienst;Loonheffing;personeel;vast;3964;3964;2
+2026-10;Turien & Co;Verzekeringen;vast;vast;201;201;2
+2026-10;NH1816;Verzekeringen;vast;vast;96;96;1
+2026-10;ASR SCHADEVERZEKERING;Overige kosten;operationeel;variabel;30;30;1

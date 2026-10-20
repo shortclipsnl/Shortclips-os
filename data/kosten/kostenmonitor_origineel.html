@@ -1,0 +1,334 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>KOSTEN DASHBOARD - SHORTCLIPS 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: navy kop met maandkeuze, KPI-rij, categorieën met uitklapbare leveranciers naast topleveranciers, trendmatrix, vaste lasten, alle leveranciers */
+:root{
+  --bg:#F3F5F9; --surface:#FFFFFF; --ink:#0B1F3A; --muted:#5B6B82; --line:#DCE2EC; --grid:#E9EDF4;
+  --navy:#0B1F3A; --accent:#2457D6; --accent-soft:#E3EBFB;
+  --heat0:#EEF3FC; --heat1:#C9D9F6; --heat2:#8FB0EE; --heat3:#4F7FDF; --heat4:#2457D6;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s6:#6250d6; --s4:#eda100; --s5:#e87ba4; --sx:#98A3B3;
+  --ok:#1E7F5C; --ok-soft:#E1F3EB; --warn:#A6620A; --warn-soft:#FBEFD9; --bad:#B4322E; --bad-soft:#F9E2E1;
+  --font-display:"Poppins",system-ui,sans-serif; --font-body:"IBM Plex Sans",system-ui,sans-serif; --font-mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#08111F; --surface:#0F1C31; --ink:#E8EEF8; --muted:#93A3BC; --line:#22324C; --grid:#1A2840;
+  --navy:#0B1F3A; --accent:#7EA2F5; --accent-soft:#1A2D52;
+  --heat0:#13223A; --heat1:#1C3560; --heat2:#2A4F8C; --heat3:#3D6BC0; --heat4:#5C86E8;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s6:#9085e9; --s4:#c98500; --s5:#d55181; --sx:#5E6B80;
+  --ok:#4CC596; --ok-soft:#123628; --warn:#E9A84A; --warn-soft:#3A2A10; --bad:#F07A74; --bad-soft:#3D1716; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#08111F; --surface:#0F1C31; --ink:#E8EEF8; --muted:#93A3BC; --line:#22324C; --grid:#1A2840;
+  --navy:#0B1F3A; --accent:#7EA2F5; --accent-soft:#1A2D52;
+  --heat0:#13223A; --heat1:#1C3560; --heat2:#2A4F8C; --heat3:#3D6BC0; --heat4:#5C86E8;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s6:#9085e9; --s4:#c98500; --s5:#d55181; --sx:#5E6B80;
+  --ok:#4CC596; --ok-soft:#123628; --warn:#E9A84A; --warn-soft:#3A2A10; --bad:#F07A74; --bad-soft:#3D1716; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.5}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:grid;gap:18px}
+header.top{background:var(--navy);color:#fff;border-radius:14px;padding:22px;display:grid;gap:14px}
+.top .row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+.top h1{font-family:var(--font-display);font-weight:700;font-size:26px;margin:0;letter-spacing:-.01em}
+.top p{margin:0;color:#B9C7DE;font-size:13px}
+.years{display:grid;gap:6px}
+.months{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.months .yr{font:600 12px var(--font-body);color:#93A6C6;width:38px}
+.months button{font:500 13px var(--font-body);border:1px solid #2C4468;background:transparent;color:#DCE6F7;border-radius:999px;padding:5px 11px;cursor:pointer}
+.months button[aria-pressed="true"]{background:#fff;color:#0B1F3A;border-color:#fff}
+.btwtoggle{display:inline-flex;border:1px solid #2C4468;border-radius:999px;padding:2px;gap:2px}
+.btwtoggle button{font:500 13px var(--font-body);border:0;background:transparent;color:#DCE6F7;border-radius:999px;padding:6px 12px;cursor:pointer}
+.btwtoggle button[aria-pressed="true"]{background:#fff;color:#0B1F3A}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (min-width:1000px){.kpis{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px;display:grid;gap:3px;align-content:start;min-width:0}
+.kpi.hero{background:var(--accent-soft);border-color:transparent}
+.lab{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:500}
+.val{font-family:var(--font-display);font-weight:600;font-size:21px;font-variant-numeric:tabular-nums;line-height:1.2}
+.sub{font-size:12px;color:var(--muted)}
+.up{color:var(--bad)} .down{color:var(--ok)}
+.grid2{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:10px;min-width:0;align-content:start}
+.card h2{font-family:var(--font-display);font-weight:600;font-size:16px;margin:0}
+.card .lead{margin:0;color:var(--muted);font-size:12.5px}
+.grp{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;margin-top:6px;display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:4px}
+.grp b{font-family:var(--font-mono);font-weight:500;color:var(--ink);letter-spacing:0}
+details.cat{border-radius:8px}
+details.cat summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) 92px 96px;gap:2px 10px;align-items:center;padding:6px 6px;border-radius:8px}
+details.cat summary::-webkit-details-marker{display:none}
+details.cat summary:hover{background:var(--bg)}
+.cat .nm{font-weight:500;display:flex;gap:7px;align-items:center;min-width:0}
+.cat .nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat .nm i{width:9px;height:9px;border-radius:2px;flex:none}
+.cat .nm .chev{font-style:normal;color:var(--muted);font-size:11px;width:auto;height:auto;transition:transform .15s}
+details[open] .chev{transform:rotate(90deg)}
+.am{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.dl{font-size:12px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bar{grid-column:1/-1;height:6px;background:var(--grid);border-radius:3px;overflow:hidden;position:relative}
+.bar span{display:block;height:100%;border-radius:3px}
+.bar em{position:absolute;top:-2px;width:2px;height:10px;background:var(--ink);opacity:.55}
+.levs{padding:4px 6px 8px 22px;display:grid;gap:3px}
+.lv{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;font-size:13px}
+.lv span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lv .n{color:var(--muted);font-size:12px}
+.top5{display:grid;gap:8px}
+.t5{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;font-size:13px}
+.t5 .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t5 .b{grid-column:1/-1;height:7px;border-radius:4px;background:var(--grid)}
+.t5 .b i{display:block;height:100%;border-radius:4px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:2px;gap:2px}
+.seg button{font:500 12px var(--font-body);border:0;background:transparent;color:var(--muted);border-radius:999px;padding:4px 10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;text-align:right;padding:6px 7px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface)}
+td{padding:6px 7px;border-bottom:1px solid var(--grid);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--surface);z-index:1}
+tr.tot td{font-weight:600;border-top:1px solid var(--line)}
+td.dim{color:var(--muted)}
+#tHeat td.h{font-family:var(--font-mono);font-size:12px;min-width:54px}
+#tHeat th.sel,#tHeat td.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.dots{display:inline-flex;gap:4px}
+.dots i{width:10px;height:10px;border-radius:50%;background:var(--grid);display:inline-block}
+.dots i.on{background:var(--ok)}
+.dots i.miss{background:var(--bad)}
+.pill{display:inline-flex;border-radius:999px;padding:1px 9px;font-size:12px;font-weight:500;white-space:nowrap}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.warn{background:var(--warn-soft);color:var(--warn)}.pill.ok{background:var(--ok-soft);color:var(--ok)}.pill.info{background:var(--accent-soft);color:var(--accent)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+input[type=search],select{font:inherit;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:6px 10px;min-width:0}
+.notes{font-size:12px;color:var(--muted);display:grid;gap:4px}
+.notes p{margin:0;max-width:100ch}
+.empty{padding:28px;text-align:center;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:12px}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="row">
+      <div>
+        <h1>Kostenmonitor</h1>
+        <p id="meta">Gegevens laden…</p>
+      </div>
+      <div class="btwtoggle" role="group" aria-label="Bedragen met of zonder btw"><button type="button" id="bEx" aria-pressed="true">Zonder btw</button><button type="button" id="bIn" aria-pressed="false">Met btw</button></div>
+    </div>
+    <div class="years" id="months" aria-label="Kies maand"></div>
+  </header>
+
+  <div id="leeg" class="empty" hidden>Nog geen kosten. Na de maandelijkse uitlezing van DigiBoox op de 1e verschijnen hier alle afschrijvingen per categorie en leverancier.</div>
+
+  <div id="main" hidden style="display:grid;gap:18px">
+    <div class="kpis" id="kpis"></div>
+
+    <section class="card">
+      <h2>Onder de streep voor Jarno</h2>
+      <p class="lead" id="odslead"></p>
+      <div class="tbl"><table id="tOds"></table></div>
+      <p class="sub" id="odsnote"></p>
+    </section>
+
+    <div class="grid2">
+      <section class="card">
+        <h2>Waar ging het geld naartoe</h2>
+        <p class="lead" id="catlead"></p>
+        <div id="cats"></div>
+      </section>
+      <section class="card">
+        <div class="tools"><h2>Grootste leveranciers</h2><div class="seg" role="group" aria-label="Periode"><button type="button" id="tM" aria-pressed="true">Deze maand</button><button type="button" id="tY" aria-pressed="false">Dit jaar</button></div></div>
+        <p class="lead" id="toplead"></p>
+        <div class="top5" id="top"></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Kosten per categorie, maand voor maand</h2>
+      <p class="lead">De laatste twaalf maanden tot en met de gekozen maand. Hoe donkerder het vakje, hoe hoger het bedrag binnen die categorie.</p>
+      <div class="tbl"><table id="tHeat"></table></div>
+    </section>
+
+    <div class="grid2">
+      <section class="card">
+        <h2>Vaste lasten</h2>
+        <p class="lead">Leveranciers die je bijna elke maand betaalt. Rood betekent: verwacht, maar deze maand niet gezien.</p>
+        <div class="tbl"><table id="tVast"></table></div>
+      </section>
+      <section class="card">
+        <h2>Geen kosten</h2>
+        <p class="lead">Privé-opnames, reserveringen en btw/IB-betalingen. Die gaan van de rekening af, maar tellen niet als bedrijfskosten.</p>
+        <div class="tbl"><table id="tNiet"></table></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="tools">
+        <h2>Alle leveranciers deze maand</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><input type="search" id="q" placeholder="Zoek leverancier" aria-label="Zoek leverancier"><select id="fcat" aria-label="Filter categorie"><option value="">Alle categorieën</option></select></div>
+      </div>
+      <div class="tbl"><table id="tAll"></table></div>
+    </section>
+
+    <section class="notes">
+      <p><b>Bron.</b> Alle afschrijvingen van de Knab-rekening (NL60KNAB…8372) zoals ze in DigiBoox staan, elke maand op de 1e automatisch uitgelezen. Dezelfde indeling als het CEO-dashboard, met meer detail per categorie en leverancier.</p>
+      <p><b>Met en zonder btw.</b> Met btw is wat er echt van de rekening ging. Zonder btw is per leverancier bepaald: 21% waar de bedragen precies op een bedrag plus 21% uitkomen, 9% bij hotels, 0% bij lonen, loonheffing, verzekeringen, bankkosten, buitenlandse diensten en eten en drinken.</p>
+      <p><b>Wat ontbreekt.</b> Revolut-uitgaven (vooral software) staan niet in DigiBoox; alleen de opwaarderingen naar Revolut zijn zichtbaar, onder Software en tools. Privé-opnames en reserveringen staan apart onder Geen kosten.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const eur=v=>"€ "+Math.round(v).toLocaleString("nl-NL");
+const eurk=v=>Math.abs(v)>=1000?(v/1000).toLocaleString("nl-NL",{maximumFractionDigits:1})+"k":Math.round(v).toString();
+const MN=["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
+const MNL=["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"];
+const GRP={personeel:["Personeel","--s1"],editors:["Editors","--s2"],freelancers:["Freelancers","--s3"],marketing:["Marketing en leads","--s6"],vast:["Vaste lasten","--s4"],operationeel:["Operationeel","--s5"],controle:["Nog controleren","--sx"]};
+const GORDER=["personeel","editors","freelancers","marketing","vast","operationeel","controle"];
+const KOST=g=>GORDER.includes(g)&&g!=="controle";
+let D=null, MODE="ex", sel=null, topMode="m", openCats=new Set();
+try{MODE=localStorage.getItem("km_btw")||"ex";sel=localStorage.getItem("km_maand")}catch(e){}
+
+const months=()=>Object.keys(D.m).sort();
+const v=e=>MODE==="ex"?e[3]:e[2];
+const rows=k=>D.m[k]||[];
+const subOf=e=>D.subs[e[1]];
+const sumBy=(k,f)=>rows(k).reduce((a,e)=>a+(f(e)?v(e):0),0);
+const kosten=k=>sumBy(k,e=>KOST(subOf(e)[1]));
+const prevMonth=k=>{const [y,m]=k.split("-").map(Number);return m===1?`${y-1}-12`:`${y}-${String(m-1).padStart(2,"0")}`};
+const lastYear=k=>`${+k.slice(0,4)-1}${k.slice(4)}`;
+const label=k=>`${MNL[+k.slice(5)-1]} ${k.slice(0,4)}`;
+const closed=()=>{const b=D.bijgewerkt?new Date(D.bijgewerkt):new Date();const k=`${b.getFullYear()}-${String(b.getMonth()+1).padStart(2,"0")}`;return months().filter(x=>x<k)};
+
+function render(){
+  if(!D){$("leeg").hidden=false;$("main").hidden=true;return}
+  $("leeg").hidden=true;$("main").hidden=false;
+  const ms=closed(); if(!ms.includes(sel)) sel=ms.at(-1);
+  $("meta").textContent=`Bron Knab DigiBoox · bijgewerkt ${D.bijgewerkt?new Date(D.bijgewerkt).toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"}):"onbekend"} · ${MODE==="ex"?"bedragen zonder btw":"bedragen met btw"}`;
+  $("bEx").setAttribute("aria-pressed",MODE==="ex");$("bIn").setAttribute("aria-pressed",MODE!=="ex");
+  const yrs=[...new Set(ms.map(k=>k.slice(0,4)))].reverse();
+  $("months").innerHTML=yrs.map(y=>`<div class="months"><span class="yr">${y}</span>${ms.filter(k=>k.startsWith(y)).map(k=>`<button type="button" data-k="${k}" aria-pressed="${k===sel}">${MN[+k.slice(5)-1]}</button>`).join("")}</div>`).join("");
+  $("months").querySelectorAll("button").forEach(b=>b.onclick=()=>{sel=b.dataset.k;try{localStorage.setItem("km_maand",sel)}catch(e){};render()});
+  renderKpis(); renderOds(); renderCats(); renderTop(); renderHeat(); renderVast(); renderNiet(); renderAll();
+}
+
+function delta(a,b,inv){if(!b)return"";const p=Math.round((a/b-1)*100);return `<span class="${p>0?"up":"down"}">${p>0?"+":""}${p}%</span>`}
+function renderKpis(){
+  const k=sel, p=prevMonth(k), ly=lastYear(k), t=kosten(k);
+  const soort=s=>sumBy(k,e=>KOST(subOf(e)[1])&&subOf(e)[2]===s);
+  const ctrl=sumBy(k,e=>subOf(e)[1]==="controle"), niet=sumBy(k,e=>["prive","belasting"].includes(subOf(e)[1]));
+  const avg=(()=>{const ms=closed().filter(x=>x<=k).slice(-12);return ms.reduce((a,x)=>a+kosten(x),0)/ms.length})();
+  const card=(l,val,sub,c="")=>`<div class="kpi ${c}"><span class="lab">${l}</span><span class="val">${val}</span><span class="sub">${sub}</span></div>`;
+  $("kpis").innerHTML=
+    card(`Kosten ${MNL[+k.slice(5)-1]}`,eur(t),`${delta(t,kosten(p))} t.o.v. ${MN[+p.slice(5)-1]}${D.m[ly]?` · ${delta(t,kosten(ly))} t.o.v. ${MN[+k.slice(5)-1]} ${ly.slice(0,4)}`:""}`,"hero")+
+    card("Gemiddeld per maand",eur(avg),"laatste 12 maanden")+
+    card("Vast",eur(soort("vast")),"lonen, huur, verzekeringen, software")+
+    card("Variabel",eur(soort("variabel")),"editors, freelancers, marketing, auto")+
+    card("Eenmalig",eur(soort("eenmalig")),"apparatuur en inkopen")+
+    card("Nog te beoordelen",eur(ctrl),`niet in de kosten · geen kosten ${eur(niet)}`);
+}
+
+function subRows(k,i){return rows(k).filter(e=>e[1]===i)}
+
+const IB26={s1:38883,s2:78426,t1:.3575,t2:.3756,t3:.495,za:1200,mkb:.127,ahk:3115,ahkVan:29736,ahkAf:.06398,ak:5685,akVan:45592,akAf:.0651,zvw:.0485,zvwMax:79409};
+function ibCalc(W){const P=IB26;W=Math.max(0,W);const za=Math.min(P.za,W),w1=W-za,mkb=w1*P.mkb,T=w1-mkb;
+  let ib=Math.min(T,P.s1)*P.t1+Math.max(0,Math.min(T,P.s2)-P.s1)*P.t2+Math.max(0,T-P.s2)*P.t3;
+  ib+=Math.min(za+mkb,Math.max(0,W-P.s2))*(P.t3-P.t2);
+  const ahk=T>=P.s2?0:Math.max(0,P.ahk-Math.max(0,T-P.ahkVan)*P.ahkAf), ak=Math.max(0,P.ak-Math.max(0,w1-P.akVan)*P.akAf);
+  const ibNet=Math.max(0,ib-ahk-ak), zvw=Math.min(T,P.zvwMax)*P.zvw;
+  return {W,ibNet,zvw,tax:ibNet+zvw,netto:W-ibNet-zvw,eff:W?(ibNet+zvw)/W:0};}
+function renderOds(){
+  const k=sel, Y=k.slice(0,4), om=m=>D.omzet?.[m]||0, koEx=m=>rows(m).reduce((a,e)=>a+(KOST(subOf(e)[1])?e[3]:0),0);
+  const ms=closed().filter(x=>x.startsWith(Y)&&x<=k), all=closed().filter(x=>x.startsWith(Y)), l3=all.slice(-3), rest=12-all.length;
+  const omY=ms.reduce((a,m)=>a+om(m),0), koY=ms.reduce((a,m)=>a+koEx(m),0);
+  const omP=all.reduce((a,m)=>a+om(m),0)+rest*l3.reduce((a,m)=>a+om(m),0)/l3.length, koP=all.reduce((a,m)=>a+koEx(m),0)+rest*l3.reduce((a,m)=>a+koEx(m),0)/l3.length;
+  const J=ibCalc(omP-koP), eff=J.eff;
+  const col=(o,c)=>{const w=o-c,t=Math.max(0,w)*eff;return [o,c,w,t,w-t]};
+  const M=col(om(k),koEx(k)), YT=col(omY,koY);
+  const r=(n,i,cls="")=>`<tr class="${cls}"><td>${n}</td><td>${i===1||i===3?"−":""}${eur(M[i])}</td><td>${i===1||i===3?"−":""}${eur(YT[i])}</td></tr>`;
+  $("odslead").textContent=`Gefactureerde omzet min kosten, min de verwachte inkomstenbelasting en Zvw. Alles zonder btw, ongeacht de knop bovenaan.`;
+  $("tOds").innerHTML=`<thead><tr><th></th><th>${MNL[+k.slice(5)-1]}</th><th>${Y} t/m ${MN[+k.slice(5)-1]}</th></tr></thead><tbody>${r("Omzet (gefactureerd)",0)}${r("Kosten",1)}${r("Winst",2,"tot")}${r(`Verwachte belasting (${Math.round(eff*100)}%)`,3)}${r("Netto voor Jarno",4,"tot")}</tbody>`;
+  $("odsnote").textContent=`Belasting geschat met de tarieven van 2026 over de verwachte jaarwinst van ${eur(J.W)} (effectief ${Math.round(eff*100)}%, inclusief zelfstandigenaftrek, mkb-winstvrijstelling en heffingskortingen). Per maand schommelt dit sterk, omdat facturen soms in één keer worden gemaakt. Niet meegenomen: privé-aftrekposten, al betaalde voorlopige aanslagen en een eventuele winstverdeling met een compagnon.`;
+}
+function renderCats(){
+  const k=sel,p=prevMonth(k),ms12=closed().filter(x=>x<=k).slice(-12);
+  const tot=kosten(k);
+  $("catlead").textContent=`${label(k)}: ${eur(tot)} aan kosten. Het streepje op elke balk is het gemiddelde van de laatste 12 maanden. Klik op een categorie voor de leveranciers.`;
+  const max=Math.max(1,...D.subs.map((s,i)=>KOST(s[1])||s[1]==="controle"?Math.max(subRows(k,i).reduce((a,e)=>a+v(e),0),ms12.reduce((a,x)=>a+subRows(x,i).reduce((b,e)=>b+v(e),0),0)/ms12.length):0));
+  let h="";
+  for(const g of GORDER){
+    const idx=D.subs.map((s,i)=>[s,i]).filter(([s])=>s[1]===g);
+    const gt=idx.reduce((a,[,i])=>a+subRows(k,i).reduce((b,e)=>b+v(e),0),0);
+    if(!gt&&!idx.some(([,i])=>ms12.some(x=>subRows(x,i).length))) continue;
+    h+=`<div class="grp"><span>${GRP[g][0]}</span><b>${eur(gt)}</b></div>`;
+    for(const [s,i] of idx){
+      const r=subRows(k,i), a=r.reduce((b,e)=>b+v(e),0), pa=subRows(p,i).reduce((b,e)=>b+v(e),0), av=ms12.reduce((x,m)=>x+subRows(m,i).reduce((b,e)=>b+v(e),0),0)/ms12.length;
+      if(!a&&!av) continue;
+      const d=a-pa;
+      const levs=[...r].sort((x,y)=>v(y)-v(x));
+      h+=`<details class="cat" data-i="${i}" ${openCats.has(i)?"open":""}><summary><span class="nm"><i class="chev">▶</i><i style="background:var(${GRP[g][1]})"></i><span>${esc(s[0])}</span></span><span class="am">${eur(a)}</span><span class="dl ${d>0?"up":d<0?"down":""}">${pa||a?(d>=0?"+":"−")+eur(Math.abs(d)).slice(2):""}</span><span class="bar"><span style="width:${a/max*100}%;background:var(${GRP[g][1]})"></span><em style="left:calc(${Math.min(100,av/max*100)}% - 1px)" title="gemiddeld ${eur(av)}"></em></span></summary>
+      <div class="levs">${levs.length?levs.map(e=>`<div class="lv"><span>${esc(D.lev[e[0]])}</span><span class="n">${e[4]}×</span><span class="am">${eur(v(e))}</span></div>`).join(""):'<div class="lv"><span class="n">Geen betalingen deze maand</span></div>'}<div class="lv"><span class="n">Gemiddeld per maand (12 mnd)</span><span></span><span class="am n">${eur(av)}</span></div></div></details>`;
+    }
+  }
+  $("cats").innerHTML=h;
+  $("cats").querySelectorAll("details").forEach(d=>d.addEventListener("toggle",()=>{const i=+d.dataset.i;d.open?openCats.add(i):openCats.delete(i)}));
+}
+
+function renderTop(){
+  const k=sel, ms=topMode==="m"?[k]:closed().filter(x=>x.startsWith(k.slice(0,4))&&x<=k);
+  const agg={};for(const m of ms)for(const e of rows(m)){const s=subOf(e);if(!KOST(s[1]))continue;const key=D.lev[e[0]];(agg[key]=agg[key]||{a:0,g:s[1],c:s[0]}).a+=v(e)}
+  const tot=Object.values(agg).reduce((a,x)=>a+x.a,0), top=Object.entries(agg).sort((a,b)=>b[1].a-a[1].a).slice(0,12), max=top[0]?.[1].a||1;
+  $("toplead").textContent=topMode==="m"?`${label(k)}. Samen ${Math.round(top.reduce((a,x)=>a+x[1].a,0)/tot*100)}% van de kosten.`:`Januari t/m ${MNL[+k.slice(5)-1]} ${k.slice(0,4)}. Samen ${Math.round(top.reduce((a,x)=>a+x[1].a,0)/tot*100)}% van de kosten.`;
+  $("top").innerHTML=top.map(([n,x])=>`<div class="t5"><span class="n">${esc(n)} <span class="sub">${esc(x.c)}</span></span><span class="am">${eur(x.a)}</span><div class="b"><i style="width:${x.a/max*100}%;background:var(${GRP[x.g][1]})"></i></div></div>`).join("");
+}
+
+function renderHeat(){
+  const ms=closed().filter(x=>x<=sel).slice(-12);
+  const list=D.subs.map((s,i)=>[s,i]).filter(([s])=>KOST(s[1])||s[1]==="controle");
+  const val=(i,m)=>subRows(m,i).reduce((a,e)=>a+v(e),0);
+  const body=list.map(([s,i])=>{const vals=ms.map(m=>val(i,m));if(!vals.some(Boolean))return"";const mx=Math.max(...vals);const tot=vals.reduce((a,b)=>a+b,0);
+    return `<tr><td><i style="display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px;background:var(${GRP[s[1]][1]})"></i>${esc(s[0])}</td>${vals.map((x,j)=>{const lv=x?Math.min(4,Math.ceil(x/mx*4)):-1;return `<td class="h ${ms[j]===sel?"sel":""}" style="${lv>=0?`background:var(--heat${lv});${lv>=3?"color:#fff":""}`:""}">${x?eurk(x):"·"}</td>`}).join("")}<td><b>${eurk(tot/ms.length)}</b></td></tr>`}).join("");
+  const tots=ms.map(m=>kosten(m));
+  $("tHeat").innerHTML=`<thead><tr><th>Categorie</th>${ms.map(m=>`<th class="${m===sel?"sel":""}">${MN[+m.slice(5)-1]} '${m.slice(2,4)}</th>`).join("")}<th>Gem.</th></tr></thead><tbody>${body}<tr class="tot"><td>Totale kosten</td>${tots.map((x,j)=>`<td class="${ms[j]===sel?"sel":""}">${eurk(x)}</td>`).join("")}<td>${eurk(tots.reduce((a,b)=>a+b,0)/ms.length)}</td></tr></tbody>`;
+}
+
+function renderVast(){
+  const ms=closed().filter(x=>x<=sel).slice(-6);
+  const per={};
+  for(const m of ms)for(const e of rows(m)){const s=subOf(e);if(!KOST(s[1])||s[2]!=="vast")continue;const n=D.lev[e[0]];const o=per[n]=per[n]||{c:s[0],m:{}};o.m[m]=(o.m[m]||0)+v(e)}
+  const list=Object.entries(per).filter(([,o])=>Object.keys(o.m).length>=3).sort((a,b)=>(b[1].m[sel]||0)-(a[1].m[sel]||0));
+  const miss=list.filter(([,o])=>!o.m[sel]&&o.m[prevMonth(sel)]);
+  $("tVast").innerHTML=`<thead><tr><th>Leverancier</th><th>Laatste 6 mnd</th><th>${MN[+sel.slice(5)-1]}</th><th>Gem.</th></tr></thead><tbody>${list.map(([n,o])=>{const av=Object.values(o.m).reduce((a,b)=>a+b,0)/Object.keys(o.m).length;return `<tr><td>${esc(n)}<div class="sub">${esc(o.c)}</div></td><td><span class="dots">${ms.map(m=>`<i class="${o.m[m]?"on":m===sel?"miss":""}" title="${label(m)}: ${o.m[m]?eur(o.m[m]):"niet gezien"}"></i>`).join("")}</span></td><td>${o.m[sel]?eur(o.m[sel]):`<span class="pill bad">niet gezien</span>`}</td><td class="dim">${eur(av)}</td></tr>`}).join("")}</tbody>`;
+}
+
+function renderNiet(){
+  const r=rows(sel).filter(e=>["prive","belasting"].includes(subOf(e)[1])).sort((a,b)=>b[2]-a[2]);
+  const tot=r.reduce((a,e)=>a+e[2],0);
+  $("tNiet").innerHTML=r.length?`<thead><tr><th>Naar</th><th>Soort</th><th>Bedrag</th></tr></thead><tbody>${r.map(e=>`<tr><td>${esc(D.lev[e[0]])} <span class="sub">${e[4]}×</span></td><td class="dim">${esc(subOf(e)[0])}</td><td>${eur(e[2])}</td></tr>`).join("")}<tr class="tot"><td>Totaal</td><td></td><td>${eur(tot)}</td></tr></tbody>`:`<tbody><tr><td>Geen privé-opnames of belastingbetalingen deze maand.</td></tr></tbody>`;
+}
+
+function renderAll(){
+  const fc=$("fcat"), cur=fc.value;
+  fc.innerHTML='<option value="">Alle categorieën</option>'+D.subs.map((s,i)=>`<option value="${i}" ${String(i)===cur?"selected":""}>${esc(s[0])}</option>`).join("");
+  const q=$("q").value.trim().toLowerCase(), f=fc.value;
+  const p=prevMonth(sel), prevBy={};for(const e of rows(p))prevBy[e[0]+"_"+e[1]]=v(e);
+  const seenBefore=new Set();for(const m of closed().filter(x=>x<sel))for(const e of rows(m))seenBefore.add(e[0]);
+  const r=rows(sel).filter(e=>(!f||String(e[1])===f)&&(!q||D.lev[e[0]].toLowerCase().includes(q))).sort((a,b)=>v(b)-v(a));
+  const tot=r.reduce((a,e)=>a+v(e),0);
+  $("tAll").innerHTML=`<thead><tr><th>Leverancier</th><th>Categorie</th><th>Aantal</th><th>Met btw</th><th>Zonder btw</th><th>Vorige maand</th></tr></thead><tbody>${r.map(e=>{const s=subOf(e);const pv=prevBy[e[0]+"_"+e[1]];return `<tr><td>${esc(D.lev[e[0]])}${seenBefore.has(e[0])?"":' <span class="pill info">nieuw</span>'}</td><td class="dim" style="text-align:left">${esc(s[0])}</td><td class="dim">${e[4]}</td><td>${eur(e[2])}</td><td>${eur(e[3])}</td><td class="dim">${pv?eur(pv):"-"}</td></tr>`}).join("")}<tr class="tot"><td>Totaal (${r.length})</td><td></td><td></td><td>${eur(r.reduce((a,e)=>a+e[2],0))}</td><td>${eur(r.reduce((a,e)=>a+e[3],0))}</td><td></td></tr></tbody>`;
+}
+
+$("bEx").onclick=()=>{MODE="ex";try{localStorage.setItem("km_btw",MODE)}catch(e){};render()};
+$("bIn").onclick=()=>{MODE="in";try{localStorage.setItem("km_btw",MODE)}catch(e){};render()};
+$("tM").onclick=()=>{topMode="m";$("tM").setAttribute("aria-pressed","true");$("tY").setAttribute("aria-pressed","false");renderTop()};
+$("tY").onclick=()=>{topMode="y";$("tY").setAttribute("aria-pressed","true");$("tM").setAttribute("aria-pressed","false");renderTop()};
+$("q").addEventListener("input",()=>D&&renderAll());$("fcat").addEventListener("change",()=>D&&renderAll());
+
+(async()=>{
+  const db=await window.claude?.use?.("db");
+  if(!db){$("meta").textContent="De gegevens kunnen in deze weergave niet worden geladen. Open de monitor ingelogd op claude.ai.";return}
+  db.doc("kosten/data").onSnapshot(s=>{D=s.exists?s.data():null;render()},e=>{$("meta").textContent=`Laden mislukt (${e.code}). Vernieuw de pagina.`});
+})();
+</script>
+
+</body></html>

@@ -302,6 +302,13 @@
       "when": 1792501729195,
       "tag": "0042_square_star_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792520147490,
+      "tag": "0043_high_master_mold",
+      "breakpoints": true
     }
   ]
 }

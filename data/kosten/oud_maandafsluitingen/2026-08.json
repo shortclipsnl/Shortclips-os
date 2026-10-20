@@ -1,0 +1,785 @@
+{
+ "afwijkingen": [],
+ "belasting": 2832,
+ "bijgewerkt": "2026-10-04",
+ "bronnen": [
+  "Knab zakelijk afschrift",
+  "Revolut maandtotaal"
+ ],
+ "categorieen": [
+  {
+   "bedrag": 12573.18,
+   "naam": "Freelancers"
+  },
+  {
+   "bedrag": 10648.83,
+   "naam": "Nog controleren"
+  },
+  {
+   "bedrag": 7648.75,
+   "naam": "Personeel"
+  },
+  {
+   "bedrag": 2229.96,
+   "naam": "Marketing en lidmaatschap"
+  },
+  {
+   "bedrag": 1769.94,
+   "naam": "Software en tools"
+  },
+  {
+   "bedrag": 1496.5,
+   "naam": "Reizen, horeca en boodschappen"
+  },
+  {
+   "bedrag": 1097.43,
+   "naam": "Auto en vervoer"
+  },
+  {
+   "bedrag": 495.44,
+   "naam": "Verzekeringen"
+  },
+  {
+   "bedrag": 412.7,
+   "naam": "Inkopen en inrichting"
+  },
+  {
+   "bedrag": 404.06,
+   "naam": "Bank en administratie"
+  },
+  {
+   "bedrag": 236.74,
+   "naam": "Privé via zakelijke rekening"
+  },
+  {
+   "bedrag": 53.32,
+   "naam": "Telefoon en internet"
+  }
+ ],
+ "eenmalig": 10943.6,
+ "eindsaldo": 2443.39,
+ "intern": 109303,
+ "label": "Augustus 2026",
+ "maand": "2026-08",
+ "nieuwe_leveranciers": [
+  "2421 Ventures B.V.",
+  "Agip Service-Station",
+  "Bureau Bont",
+  "De Horeca Bazaar",
+  "Fieten Olie H-veld",
+  "J Batema",
+  "Joybuy",
+  "KLM",
+  "Partywinkel B.V.",
+  "Quinn Borghart",
+  "Responz Media B.V.",
+  "S.C. Heerenveen B.V",
+  "TanQyou Opeinde",
+  "Vendrig Packaging B.V.",
+  "Zwennes Krimpfoliebedrijf B.V."
+ ],
+ "nog_controleren": 12145.33,
+ "norm": {
+  "gemiddeld": 18984.07,
+  "structureel": 18322.68,
+  "vast": 12862.92
+ },
+ "ontbrekende_vaste_posten": [
+  "Huur KOM Beheer"
+ ],
+ "operationeel": 39066.85,
+ "posten": [
+  {
+   "bedrag": 75000,
+   "categorie": "Intern en privé-opname",
+   "datum": "11-08-2026",
+   "naam": "Jarno Klijnsma",
+   "omschrijving": "Overboeking,prive overboeking",
+   "pz": "Intern",
+   "soort": "intern"
+  },
+  {
+   "bedrag": 27553,
+   "categorie": "Intern en privé-opname",
+   "datum": "10-08-2026",
+   "naam": "Shortclips",
+   "omschrijving": "Overboeking,eigen woning overboeking",
+   "pz": "Intern",
+   "soort": "intern"
+  },
+  {
+   "bedrag": 5566,
+   "categorie": "Nog controleren",
+   "datum": "31-08-2026",
+   "naam": "Zwennes Krimpfoliebedrijf B.V.",
+   "omschrijving": "Overboeking,26700008",
+   "pz": "Nog controleren",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 4620,
+   "categorie": "Nog controleren",
+   "datum": "20-08-2026",
+   "naam": "2421 Ventures B.V.",
+   "omschrijving": "Overboeking,Factuur 26023",
+   "pz": "Nog controleren",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 3152.05,
+   "categorie": "Freelancers",
+   "datum": "05-08-2026",
+   "naam": "Quinn Borghart",
+   "omschrijving": "Overboeking,2026-037",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 2921.92,
+   "categorie": "Personeel",
+   "datum": "27-08-2026",
+   "naam": "R.L van Hettema",
+   "omschrijving": "Overboeking,Augustus - Shortclips",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 2861.65,
+   "categorie": "Freelancers",
+   "datum": "17-08-2026",
+   "naam": "sem van tilburg",
+   "omschrijving": "Overboeking,826013",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 2832,
+   "categorie": "Belastingen (BTW e.d.)",
+   "datum": "21-08-2026",
+   "naam": "belastingdienst",
+   "omschrijving": "Overboeking,8241343060601050",
+   "pz": "Belasting",
+   "soort": "belasting"
+  },
+  {
+   "bedrag": 2700,
+   "categorie": "Intern en privé-opname",
+   "datum": "31-08-2026",
+   "naam": "Jarno Klijnsma",
+   "omschrijving": "Overboeking,prive overboeking",
+   "pz": "Intern",
+   "soort": "intern"
+  },
+  {
+   "bedrag": 2572.46,
+   "categorie": "Freelancers",
+   "datum": "21-08-2026",
+   "naam": "Fabian Media",
+   "omschrijving": "Overboeking,2026018",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 2534.95,
+   "categorie": "Freelancers",
+   "datum": "17-08-2026",
+   "naam": "Responz Media B.V.",
+   "omschrijving": "iDEAL,M13354828MS0WUUT Factuur 2026 / 220 resp onz.media, 2026-08-16T05:33 0380955635155466",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 2500,
+   "categorie": "Intern en privé-opname",
+   "datum": "31-08-2026",
+   "naam": "J. Klijnsma",
+   "omschrijving": "Overboeking,prive",
+   "pz": "Intern",
+   "soort": "intern"
+  },
+  {
+   "bedrag": 2457.83,
+   "categorie": "Personeel",
+   "datum": "26-08-2026",
+   "naam": "M sjoerdsma",
+   "omschrijving": "Overboeking,Augustus - Shortclips",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 2269,
+   "categorie": "Personeel",
+   "datum": "26-08-2026",
+   "naam": "J Batema",
+   "omschrijving": "Overboeking,Augustus - Shortclips",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 2035.8,
+   "categorie": "Marketing en lidmaatschap",
+   "datum": "03-08-2026",
+   "naam": "S.C. Heerenveen B.V",
+   "omschrijving": "Overboeking,V2601044",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 1717.63,
+   "categorie": "Software en tools",
+   "datum": "",
+   "naam": "Revolut (maandtotaal)",
+   "omschrijving": "Software, abonnementen en kaartbetalingen via Revolut",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 1380.38,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "19-08-2026",
+   "naam": "KLM",
+   "omschrijving": "iDEAL,MKDLFFPZQMPBZZP92K61D Airline, 2026-08-1 9T06:52 7180124407785446",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 1050,
+   "categorie": "Intern en privé-opname",
+   "datum": "31-08-2026",
+   "naam": "J. Klijnsma",
+   "omschrijving": "Overboeking,Maandelijkse prive overboeking - Jarno",
+   "pz": "Intern",
+   "soort": "intern"
+  },
+  {
+   "bedrag": 661.27,
+   "categorie": "Freelancers",
+   "datum": "17-08-2026",
+   "naam": "Studiopries",
+   "omschrijving": "Overboeking,F2026-0152",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 580.8,
+   "categorie": "Freelancers",
+   "datum": "28-08-2026",
+   "naam": "Bureau Bont",
+   "omschrijving": "Overboeking,F2026-0130",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 393.26,
+   "categorie": "Bank en administratie",
+   "datum": "04-08-2026",
+   "naam": "De boekhalder",
+   "omschrijving": "Overboeking,2026-620",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 350,
+   "categorie": "Intern en privé-opname",
+   "datum": "28-08-2026",
+   "naam": "J. Klijnsma",
+   "omschrijving": "Overboeking,prive",
+   "pz": "Intern",
+   "soort": "intern"
+  },
+  {
+   "bedrag": 344.9,
+   "categorie": "Nog controleren",
+   "datum": "10-08-2026",
+   "naam": "Joybuy",
+   "omschrijving": "iDEAL,QKVD4WRKQG94TRF364U32 10584023500000 45229, 2026-08-08T12:33 7180015020269559",
+   "pz": "Nog controleren",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 210,
+   "categorie": "Freelancers",
+   "datum": "03-08-2026",
+   "naam": "Noah van den Esker via Tikkie",
+   "omschrijving": "iDEAL,001273292188 Editten juli shortclips NL22RABO 0363812709, 2026-08-03T12:20 0031414423582189",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 194.16,
+   "categorie": "Marketing en lidmaatschap",
+   "datum": "10-08-2026",
+   "naam": "VNO-NCW MKB Noord VEVR",
+   "omschrijving": "Overboeking,26750116",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 185.25,
+   "categorie": "Privé via zakelijke rekening",
+   "datum": "27-08-2026",
+   "naam": "De Friesland Zorgverzekeraar N.V.",
+   "omschrijving": "Periodieke incasso,Premie De Friesland Relatienumm er 101081596 Periode 01-09-2026 - 01-10-2026,490067 443452,NL15 ZZZ 508845650000,11200009",
+   "pz": "Privé",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 150,
+   "categorie": "Intern en privé-opname",
+   "datum": "24-08-2026",
+   "naam": "J. Klijnsma",
+   "omschrijving": "Overboeking,prive overboeking",
+   "pz": "Intern",
+   "soort": "intern"
+  },
+  {
+   "bedrag": 139.82,
+   "categorie": "Verzekeringen",
+   "datum": "20-08-2026",
+   "naam": "Allianz Direct Vers.",
+   "omschrijving": "Periodieke incasso,DN114164330,ACB26229-E531639 90,NL66 ZZZ 290379290000,01DN0000000000000000 000000002015233",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 131,
+   "categorie": "Verzekeringen",
+   "datum": "31-08-2026",
+   "naam": "NH1816 VERZEKERINGEN",
+   "omschrijving": "Periodieke incasso,KENMERK 6091198 Pakketpremie Nh1816 Combipolis Verzamelnr. 80717805 Vvd. 29-08- 2026,80717805,NL20 ZZZ 370312090000,00010",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 125,
+   "categorie": "Auto en vervoer",
+   "datum": "27-08-2026",
+   "naam": "Belastingdienst",
+   "omschrijving": "Periodieke incasso,JGD-84-N 19-07-2026 t/m 18-08-20 26 MEER INFO WWW.BELASTINGDIENST.NL,IOAXX48b 5b6ddbed8487abe8875b4a8ba22,NL35 ZZZ 273653",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 120.64,
+   "categorie": "Inkopen en inrichting",
+   "datum": "25-08-2026",
+   "naam": "De Horeca Bazaar",
+   "omschrijving": "iDEAL,475472 De Horeca Bazaar - Bestelling 47547, 20 26-08-25T06:09 8030226192797437",
+   "pz": "Zakelijk",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 120.42,
+   "categorie": "Auto en vervoer",
+   "datum": "10-08-2026",
+   "naam": "Agip Service-Station",
+   "omschrijving": "H?nxe DE 08-08-2026 23:16 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 115.8,
+   "categorie": "Inkopen en inrichting",
+   "datum": "25-08-2026",
+   "naam": "Vendrig Packaging B.V.",
+   "omschrijving": "iDEAL,3561769410Xa5115 977888, 2026-08-25T06:21 7370015601797692",
+   "pz": "Zakelijk",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 107.43,
+   "categorie": "Verzekeringen",
+   "datum": "03-08-2026",
+   "naam": "NH1816 VERZEKERINGEN",
+   "omschrijving": "Periodieke incasso,KENMERK 6141061 Pakketpremie Nh1816 Combipolis v Verzamelnr. 80342510 Vvd. 01-0 8-2026,80342510,NL20 ZZZ 370312090000,000",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 103.01,
+   "categorie": "Auto en vervoer",
+   "datum": "03-08-2026",
+   "naam": "Fieten Olie Sneek",
+   "omschrijving": "SNEEK 01-08-2026 18:31 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 99.26,
+   "categorie": "Auto en vervoer",
+   "datum": "31-08-2026",
+   "naam": "Fieten Olie Sneek",
+   "omschrijving": "SNEEK 31-08-2026 08:20 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 96.93,
+   "categorie": "Nog controleren",
+   "datum": "17-08-2026",
+   "naam": "Joontjes B.V.",
+   "omschrijving": "SNEEK 17-08-2026 14:43 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "onbekend"
+  },
+  {
+   "bedrag": 94.67,
+   "categorie": "Auto en vervoer",
+   "datum": "24-08-2026",
+   "naam": "Fieten Olie Sneek",
+   "omschrijving": "SNEEK 23-08-2026 17:37 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 94.26,
+   "categorie": "Auto en vervoer",
+   "datum": "10-08-2026",
+   "naam": "Fieten Olie Sneek",
+   "omschrijving": "SNEEK 10-08-2026 17:39 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 92.5,
+   "categorie": "Auto en vervoer",
+   "datum": "20-08-2026",
+   "naam": "TanQyou Opeinde",
+   "omschrijving": "OPEINDE 20-08-2026 13:34 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 92.01,
+   "categorie": "Auto en vervoer",
+   "datum": "07-08-2026",
+   "naam": "Fieten Olie Sneek",
+   "omschrijving": "SNEEK 07-08-2026 22:02 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 90,
+   "categorie": "Inkopen en inrichting",
+   "datum": "25-08-2026",
+   "naam": "Partywinkel B.V.",
+   "omschrijving": "iDEAL,51026359074X144b partyw rExVCVUCxos6IuM UdvGbRyg7S, 2026-08-25T06:01 7370154692887836",
+   "pz": "Zakelijk",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 88,
+   "categorie": "Auto en vervoer",
+   "datum": "27-08-2026",
+   "naam": "Belastingdienst",
+   "omschrijving": "Periodieke incasso,H-073-KV 28-07-2026 t/m 27-08-20 26 MEER INFO WWW.BELASTINGDIENST.NL,IOAXX1a6 61810837b45bda764605b06d333,NL35 ZZZ 273653",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 83.23,
+   "categorie": "Auto en vervoer",
+   "datum": "12-08-2026",
+   "naam": "Fieten Olie H-veld",
+   "omschrijving": "HOLLANDSCHEV 12-08-2026 16:20 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 70.5,
+   "categorie": "Verzekeringen",
+   "datum": "26-08-2026",
+   "naam": "ASR Betalingscentrum B.V.",
+   "omschrijving": "Overboeking,polis: 95354596",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 67.57,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "20-08-2026",
+   "naam": "Gang van zaken Topsport Catering B.v.",
+   "omschrijving": "Overboeking,factuur H254616",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 49.53,
+   "categorie": "Inkopen en inrichting",
+   "datum": "25-08-2026",
+   "naam": "Disposable Discounter - Nederland via MultiSafepay",
+   "omschrijving": "iDEAL,1664109216 Payment for order .2263121670 Di sposable Discounter- Nederland, 2026-08-25T06:26 81",
+   "pz": "Zakelijk",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 43.82,
+   "categorie": "Telefoon en internet",
+   "datum": "20-08-2026",
+   "naam": "VODAFONE LIBERTEL BV",
+   "omschrijving": "Periodieke incasso,Klant Nr 510047294/402242422 A ugustus Factuur Nr 320213600516 zie vodafone.nl/my, 292U001063432018,NL85 ZZZ 140522640000",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 38.5,
+   "categorie": "Privé via zakelijke rekening",
+   "datum": "27-08-2026",
+   "naam": "De Friesland Zorgverzekeraar N.V.",
+   "omschrijving": "Periodieke incasso,De Friesland ER regeling 202607 1 01081596,490067443451,NL15 ZZZ 508845650000,15 60000926460",
+   "pz": "Privé",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 34.64,
+   "categorie": "Verzekeringen",
+   "datum": "31-08-2026",
+   "naam": "TURIEN CO ASSURADEUREN",
+   "omschrijving": "Periodieke incasso,Prolongatie 01-09-2026 tot 01-10-2 026, pakketnr. 51032996-Prolongatie 01-09-2026 tot 01 -10-2026, pakketnr. 51032996--,1",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 28.69,
+   "categorie": "Auto en vervoer",
+   "datum": "19-08-2026",
+   "naam": "BCK*Shell De Lepelaar",
+   "omschrijving": "LELYSTAD 19-08-2026 17:18 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 23.95,
+   "categorie": "Auto en vervoer",
+   "datum": "07-08-2026",
+   "naam": "Flitsmeister Parkeren",
+   "omschrijving": "Periodieke incasso,Flitsmeister Parking,AA0B95072E 1543FBA12F8D07662A3478,NL85 ZZZ 355517320000, FMI1369540",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 23,
+   "categorie": "Software en tools",
+   "datum": "18-08-2026",
+   "naam": "WeTransfer B.V.",
+   "omschrijving": "Periodieke incasso,WETRANSFER,STR16NAV4SOTNG K7NJO3NRANJNYBUWBWOA,DE16 ZZZ 00001941136, XLQTSOE8IVUKJVFW",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 22.79,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "20-08-2026",
+   "naam": "BCK*Hema Sneek",
+   "omschrijving": "Sneek 20-08-2026 16:29 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 21.19,
+   "categorie": "Inkopen en inrichting",
+   "datum": "10-08-2026",
+   "naam": "Action 1011",
+   "omschrijving": "Sneek 10-08-2026 12:10 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 21,
+   "categorie": "Nog controleren",
+   "datum": "28-08-2026",
+   "naam": "Van de Groep B.V.",
+   "omschrijving": "BUNSCHOTEN-S 28-08-2026 12:59 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "onbekend"
+  },
+  {
+   "bedrag": 19.36,
+   "categorie": "Software en tools",
+   "datum": "11-08-2026",
+   "naam": "DigiBoox via Mollie",
+   "omschrijving": "Periodieke incasso,Factuur 202608-010630,SD89-211 6-8947-2189,NL08 ZZZ 502057730000,MD76-8068-300 4-6226",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 19,
+   "categorie": "Auto en vervoer",
+   "datum": "14-08-2026",
+   "naam": "XL Indoor Carwash Heer",
+   "omschrijving": "HEERENVEEN 14-08-2026 11:58 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 18.4,
+   "categorie": "Auto en vervoer",
+   "datum": "31-08-2026",
+   "naam": "Q PARK OSSENMARKT",
+   "omschrijving": "GRONINGEN 31-08-2026 14:53 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 15.54,
+   "categorie": "Inkopen en inrichting",
+   "datum": "10-08-2026",
+   "naam": "BCK*Praxis 250 Sneek",
+   "omschrijving": "SNEEK 10-08-2026 12:26 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "eenmalig"
+  },
+  {
+   "bedrag": 15.03,
+   "categorie": "Auto en vervoer",
+   "datum": "12-08-2026",
+   "naam": "Esso Zuidwolde",
+   "omschrijving": "VEENINGEN 12-08-2026 12:51 Pas: 6542",
+   "pz": "Zakelijk",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 12.99,
+   "categorie": "Privé via zakelijke rekening",
+   "datum": "11-08-2026",
+   "naam": "Spotify",
+   "omschrijving": "Periodieke incasso,Spotify P4571F9A77,BK4FD69FW PV6ZSZ3,NL48 ZZZ 342764500000,KRF2PK8JXGGQT HG3",
+   "pz": "Privé",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 12.05,
+   "categorie": "Verzekeringen",
+   "datum": "26-08-2026",
+   "naam": "Centraal Beheer",
+   "omschrijving": "51144716706699 Periodieke incasso,Bedrijfsverzekering 350239973 Pe riode 23.08.2026 - 23.09.2026 Centraal Beheer,050757 330506,NL51 ZZZ 0805",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 11.19,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "25-08-2026",
+   "naam": "Jumbo Sneek Centrum",
+   "omschrijving": "SNEEK 25-08-2026 12:40 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 9.91,
+   "categorie": "Software en tools",
+   "datum": "14-08-2026",
+   "naam": "Dropbox",
+   "omschrijving": "Periodieke incasso,Dropbox Dropbox YCSNLHKWZ7QS ,LC77J2C22K95KSZ3,NL48 ZZZ 342764500000,MF7S CJCGH5XNZSG6",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 8.08,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "27-08-2026",
+   "naam": "Jumbo Sneek Centrum",
+   "omschrijving": "SNEEK 27-08-2026 14:55 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 7,
+   "categorie": "Bank en administratie",
+   "datum": "04-08-2026",
+   "naam": "Knab",
+   "omschrijving": "Pakketkosten",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 7,
+   "categorie": "Telefoon en internet",
+   "datum": "21-08-2026",
+   "naam": "Youfone Nederland B.V.",
+   "omschrijving": "Periodieke incasso,1020294350 1586919202608,SDD 3CC706424A334A1AA6095ADB1CB09421,NL60 ZZZ 5 09468460000,7F764D21541E4C969FBD56B97E5CB1 3F",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 6.49,
+   "categorie": "Reizen, horeca en boodschappen",
+   "datum": "11-08-2026",
+   "naam": "Jumbo Sneek Centrum",
+   "omschrijving": "SNEEK 11-08-2026 17:42 Pas: 6542",
+   "pz": "Nog controleren",
+   "soort": "variabel"
+  },
+  {
+   "bedrag": 3.5,
+   "categorie": "Bank en administratie",
+   "datum": "03-08-2026",
+   "naam": "KNAB",
+   "omschrijving": "Transactiekosten juli 2026 35 transacties",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 2.5,
+   "categorie": "Telefoon en internet",
+   "datum": "18-08-2026",
+   "naam": "Simpel",
+   "omschrijving": "Periodieke incasso,Simpel factuur F2609867962 voor 06-24515365. Bekijk je factuur op mijn.simpel.nl of de app voor de specificatie.,F2609867",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 0.3,
+   "categorie": "Bank en administratie",
+   "datum": "03-08-2026",
+   "naam": "KNAB",
+   "omschrijving": "Kosten betaalverzoek juli 2026",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 0.01,
+   "categorie": "Software en tools",
+   "datum": "12-08-2026",
+   "naam": "WeTransfer B.V.",
+   "omschrijving": "iDEAL,AXV0H2A WETRANSFER, 2026-08-12T05:34 022 0225932047985",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 0.01,
+   "categorie": "Software en tools",
+   "datum": "12-08-2026",
+   "naam": "WeTransfer B.V.",
+   "omschrijving": "iDEAL,EJFJWVO WETRANSFER, 2026-08-12T05:37 022 0355041256998",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 0.01,
+   "categorie": "Software en tools",
+   "datum": "12-08-2026",
+   "naam": "WeTransfer B.V.",
+   "omschrijving": "iDEAL,1LEQAXP WETRANSFER, 2026-08-12T06:46 022 0675047196071",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  },
+  {
+   "bedrag": 0.01,
+   "categorie": "Software en tools",
+   "datum": "14-08-2026",
+   "naam": "WeTransfer B.V.",
+   "omschrijving": "iDEAL,AITWUWB WETRANSFER, 2026-08-14T12:06 022 0126820220515",
+   "pz": "Zakelijk",
+   "soort": "vast"
+  }
+ ],
+ "prive": 236.74,
+ "revolut_aanwezig": true,
+ "status": "definitief",
+ "totaal_af": 151201.85,
+ "totaal_bij": 137854.32,
+ "variabel": 17314.99,
+ "vast": 10808.26,
+ "zakelijk": 26684.78
+}

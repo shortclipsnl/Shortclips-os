@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "vercel-build": "npm run db:migrate && (npm run kb:import || echo \"[kennisbank-import] mislukt, zie log hierboven\") && next build",
+    "vercel-build": "npm run db:migrate && (npm run kb:import || echo \"[kennisbank-import] mislukt, zie log hierboven\") && (npm run kosten:seed || echo \"[kosten-seed] mislukt, zie log hierboven\") && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "kb:import": "tsx scripts/kennisbank-import.ts"
+    "kb:import": "tsx scripts/kennisbank-import.ts",
+  "kosten:seed": "tsx scripts/kosten-seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",

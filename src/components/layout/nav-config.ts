@@ -88,6 +88,7 @@ export const NAVIGATION: NavGroup[] = [
     items: [
       { href: "/leads", label: "Leads", icon: "Target", ownerOnly: true, match: "/leads" },
       { href: "/financien", label: "Financiën", icon: "Landmark", ownerOnly: true, match: "/financien" },
+      { href: "/kosten", label: "Kostenmonitor", icon: "ReceiptEuro", ownerOnly: true, match: "/kosten" },
       { href: "/editkosten", label: "Winst & editkosten", icon: "Euro", ownerOnly: true, match: "/editkosten" },
       { href: "/klantenbeheer", label: "Klantenbeheer", icon: "UserCog", roles: ["project_coordinator"], match: "/klantenbeheer" },
       { href: "/koppelingen", label: "Koppeling controleren", icon: "Link2", ownerOnly: true, match: "/koppelingen" },
