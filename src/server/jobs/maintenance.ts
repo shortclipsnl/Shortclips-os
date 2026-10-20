@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { dispatch } from "@/server/automation";
 import { notify } from "@/server/notifications";
+import { CORE_STAFF_EMAILS } from "@/server/core-staff";
 import { runJob } from "./runner";
 
 const day = (offset: number) => {
@@ -444,6 +445,57 @@ export async function runTaskDeadlineReminders() {
       ctx.counters.updated++;
     }
     ctx.log(`${ctx.counters.updated} teamleden een taak-herinnering gestuurd`);
+  });
+}
+
+/**
+ * Dagelijkse 13:30-reminder voor het kantoorteam (Jarno, Milou, Jiska, Rutger):
+ * één melding die herinnert om de to-do's van vandaag af te ronden en om de
+ * editors + de op te sturen projecten te checken. Draait via twee cron-slots
+ * (11:30 en 12:30 UTC) voor zomer-/wintertijd; de tijdcheck (alleen in het
+ * 13:xx-uur Amsterdam) + dedupe zorgen dat elk teamlid max. één keer per dag
+ * rond 13:30 lokaal een reminder krijgt.
+ */
+export async function runDailyTeamTodoReminder() {
+  return runJob("monday", "reminders.daily_todo", {}, async (ctx) => {
+    const hhmm = new Date().toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Europe/Amsterdam",
+    });
+    const hour = Number(hhmm.slice(0, 2));
+    if (hour !== 13) {
+      ctx.log(`Lokale tijd is ${hhmm} (Amsterdam), niet 13:xx — reminder overgeslagen.`);
+      return;
+    }
+
+    const today = day(0);
+    const team = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          isNull(users.deletedAt),
+          eq(users.status, "active"),
+          inArray(sql`lower(${users.email})`, [...CORE_STAFF_EMAILS]),
+        ),
+      );
+
+    for (const member of team) {
+      ctx.counters.processed++;
+      await notify({
+        userIds: [member.id],
+        type: "daily_todo_reminder",
+        level: "info",
+        title: "Reminder: rond je to-do's van vandaag af",
+        body: "Kijk goed wat je vandaag écht moet afmaken en rond het af. Check ook de editors en welke projecten opgestuurd kunnen worden.",
+        href: "/dashboard",
+        dedupeKey: `daily_todo_reminder:${member.id}:${today}`,
+      });
+      ctx.counters.updated++;
+    }
+    ctx.log(`${ctx.counters.updated} teamleden een dagelijkse to-do-reminder gestuurd`);
   });
 }
 

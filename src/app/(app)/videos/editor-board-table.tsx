@@ -231,8 +231,8 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
         )}
       </div>
 
-      {/* Deadline — batterij met datumbereik; aanklikken om de datum te wijzigen */}
-      <DeadlineCell v={v} pct={pct} canEdit={canEdit} onSave={(d) => run(() => setEditingVideoDeadline(v.id, d))} />
+      {/* Deadline — batterij met datumbereik; aanklikken om beide datums (opname + deadline) te wijzigen */}
+      <DeadlineCell v={v} pct={pct} canEdit={canEdit} onSave={(dates) => run(() => setEditingVideoDeadline(v.id, dates))} />
 
       {/* Fase */}
       <div className="p-0.5">
@@ -280,10 +280,12 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
   );
 }
 
-/** Deadline-batterij; voor wie mag bewerken: aanklikken opent een datumveld. */
-function DeadlineCell({ v, pct, canEdit, onSave }: { v: EditorBoardVideo; pct: number; canEdit: boolean; onSave: (d: string | null) => void }) {
+/** Deadline-batterij; voor wie mag bewerken: aanklikken opent twee datumvelden
+ *  (opnamedatum én opleverdeadline), die los van elkaar aangepast kunnen worden. */
+function DeadlineCell({ v, pct, canEdit, onSave }: { v: EditorBoardVideo; pct: number; canEdit: boolean; onSave: (dates: { shootOn: string | null; dueOn: string | null }) => void }) {
   const [open, setOpen] = useState(false);
-  const [val, setVal] = useState(v.dueOn ?? "");
+  const [shootVal, setShootVal] = useState(v.shootDate ?? "");
+  const [dueVal, setDueVal] = useState(v.dueOn ?? "");
 
   const bar =
     v.dueOn && v.shootDate ? (
@@ -294,25 +296,34 @@ function DeadlineCell({ v, pct, canEdit, onSave }: { v: EditorBoardVideo; pct: n
         </span>
       </div>
     ) : (
-      <span className="w-full rounded-full border border-dashed border-[var(--color-line-strong)] py-1 text-center text-2xs text-[var(--color-ink-faint)]">+ deadline</span>
+      <span className="w-full rounded-full border border-dashed border-[var(--color-line-strong)] py-1 text-center text-2xs text-[var(--color-ink-faint)]">+ datums</span>
     );
 
   if (!canEdit) return <div className="flex items-center p-1">{bar}</div>;
 
   return (
     <div className="relative flex items-center p-1">
-      <button type="button" className="w-full" title="Deadline wijzigen" onClick={() => { setVal(v.dueOn ?? ""); setOpen((o) => !o); }}>
+      <button type="button" className="w-full" title="Opname- en opleverdatum wijzigen" onClick={() => { setShootVal(v.shootDate ?? ""); setDueVal(v.dueOn ?? ""); setOpen((o) => !o); }}>
         {bar}
       </button>
       {open ? (
         <>
           <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
-          <div className="absolute left-1 top-full z-20 mt-1 flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
-            <input type="date" value={val} onChange={(e) => setVal(e.target.value)} className="sc-input h-8 w-36 py-0 text-xs" />
-            <button type="button" onClick={() => { onSave(val || null); setOpen(false); }} className="shrink-0 rounded bg-[var(--color-ink)] px-2 py-1.5 text-2xs font-semibold text-white">Opslaan</button>
-            {v.dueOn ? (
-              <button type="button" onClick={() => { onSave(null); setOpen(false); }} className="shrink-0 rounded px-2 py-1.5 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" title="Deadline wissen">Wissen</button>
-            ) : null}
+          <div className="absolute left-1 top-full z-20 mt-1 flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2.5 shadow-[var(--shadow-raised)]">
+            <label className="flex items-center justify-between gap-2 text-2xs font-semibold text-[var(--color-ink-muted)]">
+              Opname
+              <input type="date" value={shootVal} onChange={(e) => setShootVal(e.target.value)} className="sc-input h-8 w-36 py-0 text-xs" />
+            </label>
+            <label className="flex items-center justify-between gap-2 text-2xs font-semibold text-[var(--color-ink-muted)]">
+              Deadline
+              <input type="date" value={dueVal} onChange={(e) => setDueVal(e.target.value)} className="sc-input h-8 w-36 py-0 text-xs" />
+            </label>
+            <div className="flex items-center justify-end gap-1.5">
+              {v.dueOn || v.shootDate ? (
+                <button type="button" onClick={() => { onSave({ shootOn: null, dueOn: null }); setOpen(false); }} className="shrink-0 rounded px-2 py-1.5 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" title="Beide datums wissen">Wissen</button>
+              ) : null}
+              <button type="button" onClick={() => { onSave({ shootOn: shootVal || null, dueOn: dueVal || null }); setOpen(false); }} className="shrink-0 rounded bg-[var(--color-ink)] px-2.5 py-1.5 text-2xs font-semibold text-white">Opslaan</button>
+            </div>
           </div>
         </>
       ) : null}

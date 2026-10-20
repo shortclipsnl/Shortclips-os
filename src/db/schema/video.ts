@@ -58,6 +58,10 @@ export const deliverables = pgTable(
     /** Hoe de deadline is bepaald: "auto" = berekend uit opnamedatum + 14
      *  werkdagen; "manual" = handmatig vastgezet (wordt niet overschreven). */
     dueOnSource: varchar("due_on_source", { length: 8 }).notNull().default("auto"),
+    /** Handmatig gezette opnamedatum (startpunt van de deadline-batterij). Leeg =
+     *  afgeleid uit deadline − 14 werkdagen. Zo kan de editor op het board zowel
+     *  de opname- als de opleverdatum los aanpassen. */
+    shootOn: date("shoot_on"),
     /** Heuristisch voorgestelde opnamedag (nog te bevestigen in het
      *  koppel-controleoverzicht). linkConfidence: high/medium/low. */
     suggestedProductionDayId: uuid("suggested_production_day_id").references(

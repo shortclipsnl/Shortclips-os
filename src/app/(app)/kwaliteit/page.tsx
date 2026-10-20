@@ -9,22 +9,21 @@ export const dynamic = "force-dynamic";
 
 /**
  * Secties per ernst, in vaste volgorde: eerst directe actie, dan extra
- * aandacht, en vooruitkijken als laatste. Elke sectie krijgt alleen een
- * gekleurd bovenrandje + gekleurde kop-tekst (geen volle kleurbalk), een
- * subtiele gekleurde linkerrand per regel en een in kleur uitgelichte
- * detail-/deadlinetekst. Zo valt het urgente op zonder dat alles rood kleurt
- * en blijft de pagina goed te scannen.
+ * aandacht, en vooruitkijken als laatste. Elke sectie krijgt een VOLLE
+ * gekleurde balk bovenaan (rood/oranje/blauw) zodat je in één oogopslag de
+ * ernst ziet. De punten eronder staan bewust in zwart (geen kleur) om snel te
+ * kunnen scannen; alleen het categorie-label (bijv. "koppeling", "te laat bij
+ * klant") houdt zijn kleur, zodat het soort probleem wél opvalt.
  */
 const SECTIONS: {
   severity: QualitySeverity;
   label: string;
   tone: Tone;
   color: string;
-  detailClass: string;
 }[] = [
-  { severity: "rood", label: "Directe actie", tone: "bad", color: "var(--color-bad)", detailClass: "text-[#a3271c] font-medium" },
-  { severity: "oranje", label: "Extra aandachtspunten", tone: "warn", color: "var(--color-warn)", detailClass: "text-[#8a5300]" },
-  { severity: "blauw", label: "Vooruitkijken", tone: "info", color: "var(--color-info)", detailClass: "text-[var(--color-ink-muted)]" },
+  { severity: "rood", label: "Directe actie", tone: "bad", color: "var(--color-bad)" },
+  { severity: "oranje", label: "Extra aandachtspunten", tone: "warn", color: "var(--color-warn)" },
+  { severity: "blauw", label: "Vooruitkijken", tone: "info", color: "var(--color-info)" },
 ];
 
 export default async function QualityPage() {
@@ -52,16 +51,13 @@ export default async function QualityPage() {
           return (
             <div
               key={s.severity}
-              className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)] border-t-[3px]"
-              style={{ borderTopColor: s.color }}
+              className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)]"
             >
-              {/* Alleen een gekleurd bovenrandje + gekleurde kop-tekst — geen volle kleurbalk. */}
-              <div className="flex items-center justify-between gap-2 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-5 py-2.5">
-                <h2 className="text-sm font-bold tracking-tight" style={{ color: s.color }}>{s.label}</h2>
-                <span
-                  className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums"
-                  style={{ background: `color-mix(in srgb, ${s.color} 15%, var(--color-surface))`, color: s.color }}
-                >
+              {/* Volle gekleurde balk per sectie: rood (directe actie), oranje
+                  (extra aandacht), blauw (vooruitkijken). */}
+              <div className="flex items-center justify-between gap-2 px-5 py-2.5 text-white" style={{ background: s.color }}>
+                <h2 className="text-sm font-bold tracking-tight">{s.label}</h2>
+                <span className="shrink-0 rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold tabular-nums">
                   {counts[s.severity]}
                 </span>
               </div>
@@ -70,7 +66,7 @@ export default async function QualityPage() {
               ) : (
                 <ul className="divide-y divide-[var(--color-line)]">
                   {bucket.map((i) => (
-                    <QualityRow key={i.id} item={i} tone={s.tone} color={s.color} detailClass={s.detailClass} />
+                    <QualityRow key={i.id} item={i} tone={s.tone} />
                   ))}
                 </ul>
               )}
@@ -82,20 +78,19 @@ export default async function QualityPage() {
   );
 }
 
-/** Eén aandachtspunt-rij: titel, in kleur uitgelichte detail-/deadlinetekst en
- *  een getinte categorie-badge, als link naar `href`. Een gekleurde linkerrand
- *  maakt de ernst per regel zichtbaar. */
-function QualityRow({ item, tone, color, detailClass }: { item: QualityItem; tone: Tone; color: string; detailClass: string }) {
+/** Eén aandachtspunt-rij: titel en detail in zwart (geen kleur, goed scanbaar),
+ *  met alleen het categorie-label in kleur (bijv. "koppeling", "te laat bij
+ *  klant"), als link naar `href`. */
+function QualityRow({ item, tone }: { item: QualityItem; tone: Tone }) {
   return (
     <li>
       <Link
         href={item.href}
-        className="flex items-center gap-3 border-l-[3px] px-5 py-3 hover:bg-[var(--color-surface-sunken)]/50"
-        style={{ borderLeftColor: color }}
+        className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--color-surface-sunken)]/50"
       >
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold">{item.title}</span>
-          <span className={`block truncate text-xs ${detailClass}`}>{item.detail}</span>
+          <span className="block truncate text-sm font-semibold text-[var(--color-ink)]">{item.title}</span>
+          <span className="block truncate text-xs text-[var(--color-ink-muted)]">{item.detail}</span>
         </span>
         <Badge tone={tone} className="shrink-0">{item.category}</Badge>
       </Link>

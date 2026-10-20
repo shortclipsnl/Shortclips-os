@@ -90,6 +90,7 @@ export async function listEditorBoard(
       status: deliverables.status,
       statusChangedAt: deliverables.statusChangedAt,
       dueOn: deliverables.dueOn,
+      shootOn: deliverables.shootOn,
       briefing: deliverables.briefing,
       currentVersion: deliverables.currentVersion,
       clientName: clients.name,
@@ -156,10 +157,14 @@ export async function listEditorBoard(
     const workdaysToDeadline = r.dueOn ? workingDaysUntil(today, r.dueOn, holidays) : null;
     const status = r.status as VideoStage;
     const phase = STATUS_TO_EDIT_PHASE[status] ?? "te_plannen";
-    // Batterij: opname (synthetisch = deadline − 14 werkdagen) → oplevering.
-    const shootDate = r.dueOn ? subWorkingDays(r.dueOn, TOTAL_WORKDAYS, holidays) : null;
+    // Batterij: opname → oplevering. De opnamedatum is handmatig gezet (shootOn)
+    // of synthetisch (deadline − 14 werkdagen). Zo lopen beide uiteinden mee met
+    // wat op het board is ingevuld.
+    const shootDate = r.shootOn ?? (r.dueOn ? subWorkingDays(r.dueOn, TOTAL_WORKDAYS, holidays) : null);
+    const totalWorkdays =
+      shootDate && r.dueOn ? Math.max(1, workingDaysUntil(shootDate, r.dueOn, holidays)) : TOTAL_WORKDAYS;
     const elapsedWorkdays = shootDate
-      ? Math.max(0, Math.min(TOTAL_WORKDAYS, workingDaysUntil(shootDate, today, holidays)))
+      ? Math.max(0, Math.min(totalWorkdays, workingDaysUntil(shootDate, today, holidays)))
       : 0;
     const done = phase === "afgerond";
     const atEditor = status === "editing" || status === "editor_revision" || status === "client_revision";
@@ -211,7 +216,7 @@ export async function listEditorBoard(
       overdue: !!r.dueOn && r.dueOn < today,
       shootDate,
       elapsedWorkdays,
-      totalWorkdays: TOTAL_WORKDAYS,
+      totalWorkdays,
       batteryColor,
     };
   });

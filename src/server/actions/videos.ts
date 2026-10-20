@@ -71,18 +71,29 @@ export async function setEditingVideoLinks(
 }
 
 /** Deadline (opleverdatum) van een video handmatig zetten of wissen. */
-export async function setEditingVideoDeadline(videoId: string, dueOn: string | null): Promise<ActionResult> {
+export async function setEditingVideoDeadline(
+  videoId: string,
+  input: { dueOn?: string | null; shootOn?: string | null },
+): Promise<ActionResult> {
   try {
     const viewer = await requirePermission("videos:write");
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
 
-    const clean = dueOn && /^\d{4}-\d{2}-\d{2}$/.test(dueOn) ? dueOn : null;
-    await db
-      .update(deliverables)
-      .set({ dueOn: clean, dueOnSource: clean ? "manual" : "auto", updatedAt: new Date() })
-      .where(eq(deliverables.id, videoId));
+    const clean = (d?: string | null) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null);
+    const set: Record<string, unknown> = { updatedAt: new Date() };
+    // Allebei de datums zijn los bewerkbaar op het board: opnamedatum (shootOn)
+    // en opleverdeadline (dueOn). Alleen meegegeven velden worden aangepast.
+    if (input.dueOn !== undefined) {
+      const due = clean(input.dueOn);
+      set.dueOn = due;
+      set.dueOnSource = due ? "manual" : "auto";
+    }
+    if (input.shootOn !== undefined) {
+      set.shootOn = clean(input.shootOn);
+    }
+    await db.update(deliverables).set(set).where(eq(deliverables.id, videoId));
 
     revalidatePath("/videos");
     return { ok: true };

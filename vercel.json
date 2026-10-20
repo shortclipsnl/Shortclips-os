@@ -2,6 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     { "path": "/api/jobs/run?job=sync.frequent", "schedule": "0 12 * * *" },
-    { "path": "/api/jobs/run?job=sync.nightly", "schedule": "0 3 * * *" }
+    { "path": "/api/jobs/run?job=sync.nightly", "schedule": "0 3 * * *" },
+    { "path": "/api/jobs/run?job=reminders.daily_todo&slot=winter", "schedule": "30 12 * * *" },
+    { "path": "/api/jobs/run?job=reminders.daily_todo&slot=zomer", "schedule": "30 11 * * *" }
   ]
 }
