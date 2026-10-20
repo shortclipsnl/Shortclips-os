@@ -166,9 +166,11 @@ export async function runMondayEditingImport() {
       const dueRaw = timelineEnd(item, C.deadline);
       const dueOn = dueRaw ? snapToWorkingDay(dueRaw) : null;
       const clientName = clientRows.find((c) => c.id === clientId)?.name ?? "Klant";
-      // Downloadlink (beeldmateriaal) en script voor de editor overnemen.
+      // Downloadlink (beeldmateriaal), script en aantal shorts overnemen.
       const footageUrl = firstUrl(col(item, C.links));
       const scriptUrl = firstUrl(col(item, C.script));
+      const shortsRaw = col(item, C.shorts);
+      const plannedShorts = shortsRaw && /^\d+$/.test(shortsRaw) ? Number(shortsRaw) : null;
       const base = {
         clientId,
         status,
@@ -176,6 +178,7 @@ export async function runMondayEditingImport() {
         ...(dueOn ? { dueOn } : {}),
         footageUrl,
         scriptUrl,
+        plannedShorts,
         updatedAt: new Date(),
       };
 

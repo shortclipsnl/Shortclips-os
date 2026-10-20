@@ -80,6 +80,8 @@ export const deliverables = pgTable(
     footageUrl: text("footage_url"),
     /** Link naar het script (extern bestand of document) voor de editor. */
     scriptUrl: text("script_url"),
+    /** Aantal shorts dat voor deze opdracht gemaakt wordt (uit Monday). */
+    plannedShorts: integer("planned_shorts"),
     currentVersion: integer("current_version").notNull().default(0),
     /** Tellers voor doorlooptijd- en kwaliteitsanalyse. */
     internalRevisionRounds: integer("internal_revision_rounds")

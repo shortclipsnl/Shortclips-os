@@ -45,6 +45,50 @@ async function loadVideo(id: string) {
   return row;
 }
 
+/** Downloadlink (beeldmateriaal) en/of scriptlink van een video zetten. */
+export async function setEditingVideoLinks(
+  videoId: string,
+  links: { footageUrl?: string | null; scriptUrl?: string | null },
+): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const video = await loadVideo(videoId);
+    if (!video) return { ok: false, message: "Video niet gevonden." };
+    assertClientAccess(viewer, video.clientId);
+
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if ("footageUrl" in links) patch.footageUrl = links.footageUrl?.trim() || null;
+    if ("scriptUrl" in links) patch.scriptUrl = links.scriptUrl?.trim() || null;
+    await db.update(deliverables).set(patch).where(eq(deliverables.id, videoId));
+
+    revalidatePath("/videos");
+    revalidatePath(`/videos/${videoId}`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/** Aantal shorts van een video zetten. */
+export async function setEditingVideoShorts(videoId: string, shorts: number | null): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const video = await loadVideo(videoId);
+    if (!video) return { ok: false, message: "Video niet gevonden." };
+    assertClientAccess(viewer, video.clientId);
+
+    const n = shorts === null ? null : Math.max(0, Math.min(99, Math.round(shorts)));
+    await db.update(deliverables).set({ plannedShorts: n, updatedAt: new Date() }).where(eq(deliverables.id, videoId));
+
+    revalidatePath("/videos");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 /** Statuswissel: de kern van de pipeline. Zet ook tellers en automatiseringen aan. */
 export async function changeVideoStatus(
   videoId: string,

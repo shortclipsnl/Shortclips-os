@@ -40,7 +40,9 @@ export type EditorBoardVideo = {
   clientSlug: string;
   clientColor: string | null;
   clientLogo: string | null;
+  editorId: string | null;
   editorName: string | null;
+  plannedShorts: number | null;
   dueOn: string | null;
   statusChangedAt: string;
   currentVersion: number;
@@ -85,7 +87,9 @@ export async function listEditorBoard(
       clientSlug: clients.slug,
       clientColor: clients.color,
       clientLogo: clients.logoUrl,
+      editorId: deliverables.editorId,
       editorName: users.fullName,
+      plannedShorts: deliverables.plannedShorts,
       scriptId: deliverables.scriptId,
       scriptUrl: deliverables.scriptUrl,
       footageUrl: deliverables.footageUrl,
@@ -163,7 +167,9 @@ export async function listEditorBoard(
       clientSlug: r.clientSlug,
       clientColor: r.clientColor,
       clientLogo: r.clientLogo,
+      editorId: r.editorId,
       editorName: r.editorName,
+      plannedShorts: r.plannedShorts === null ? null : Number(r.plannedShorts),
       dueOn: r.dueOn,
       statusChangedAt:
         typeof r.statusChangedAt === "string"

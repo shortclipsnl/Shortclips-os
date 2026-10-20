@@ -13,6 +13,7 @@ import { WorkloadSection } from "../editing/workload-section";
 import { Card, PageHeader } from "@/components/ui";
 import { EditingProjects } from "./editing-projects";
 import { EditorBoard } from "./editor-board";
+import { EditorBoardTable } from "./editor-board-table";
 import { MondayImportButton } from "./monday-import";
 
 export const metadata: Metadata = { title: "Editing" };
@@ -105,7 +106,12 @@ export default async function VideosPage({
             <span className="text-xs text-white/80">{allEditorVideos.length} video&apos;s · per fase, met editor, deadline, downloadlink en script</span>
           </div>
           {allEditorVideos.length > 0 ? (
-            <EditorBoard videos={allEditorVideos} showEditor />
+            <EditorBoardTable
+              videos={allEditorVideos}
+              editors={boardEditors.map((e) => ({ id: e.id, fullName: e.fullName }))}
+              canEdit={canEdit}
+              canAssign={canAssign}
+            />
           ) : (
             <p className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">
               Nog geen editing-opdrachten. Klik hierboven op &quot;Nu overnemen uit Monday&quot;.
