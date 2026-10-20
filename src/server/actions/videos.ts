@@ -70,6 +70,28 @@ export async function setEditingVideoLinks(
   }
 }
 
+/** Deadline (opleverdatum) van een video handmatig zetten of wissen. */
+export async function setEditingVideoDeadline(videoId: string, dueOn: string | null): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const video = await loadVideo(videoId);
+    if (!video) return { ok: false, message: "Video niet gevonden." };
+    assertClientAccess(viewer, video.clientId);
+
+    const clean = dueOn && /^\d{4}-\d{2}-\d{2}$/.test(dueOn) ? dueOn : null;
+    await db
+      .update(deliverables)
+      .set({ dueOn: clean, dueOnSource: clean ? "manual" : "auto", updatedAt: new Date() })
+      .where(eq(deliverables.id, videoId));
+
+    revalidatePath("/videos");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 /** Aantal shorts van een video zetten. */
 export async function setEditingVideoShorts(videoId: string, shorts: number | null): Promise<ActionResult> {
   try {

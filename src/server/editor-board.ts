@@ -108,10 +108,10 @@ export async function listEditorBoard(
       // Beeldmateriaal- en scriptlink van de gekoppelde opname (fallback):
       // daar zet de coördinator de downloadlink en het script ook neer.
       dayFootageUrl: sql<string | null>`(
-        select pd.footage_url from production_days pd where pd.id = deliverables.production_day_id
+        select pd.footage_url from production_days pd where pd.id = deliverables.production_day_id limit 1
       )`,
       dayScriptUrl: sql<string | null>`(
-        select pd.script_url from production_days pd where pd.id = deliverables.production_day_id
+        select pd.script_url from production_days pd where pd.id = deliverables.production_day_id limit 1
       )`,
       dayScriptFileId: sql<string | null>`(
         select f.id from edit_project_files f

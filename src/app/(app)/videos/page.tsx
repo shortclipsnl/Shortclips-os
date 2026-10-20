@@ -3,16 +3,13 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { requireInternal, isOwner } from "@/server/auth/context";
 import { getVideoHighlights, listEditorOptions, listVideos } from "@/server/videos";
-import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { listEditingProjects } from "@/server/editing-board";
 import { listEditorBoard } from "@/server/editor-board";
 import { isBoardEditor } from "@/server/edit-board-editors";
 import { listClients } from "@/server/clients";
-import { ShootTimers } from "../editing/shoot-timers";
 import { WorkloadSection } from "../editing/workload-section";
 import { Card, PageHeader } from "@/components/ui";
 import { EditorBoardTable } from "./editor-board-table";
-import { MondayImportButton } from "./monday-import";
 
 export const metadata: Metadata = { title: "Editing" };
 export const dynamic = "force-dynamic";
@@ -57,7 +54,7 @@ export default async function VideosPage({
       ? undefined
       : "actief";
 
-  const [rows, highlights, editors, shoots, editingProjects, clientList] = await Promise.all([
+  const [rows, highlights, editors, editingProjects, clientList] = await Promise.all([
     listVideos(viewer, {
       preset,
       status: params.status,
@@ -66,7 +63,6 @@ export default async function VideosPage({
     }),
     getVideoHighlights(viewer),
     listEditorOptions(),
-    getShootDeadlines(viewer),
     listEditingProjects(viewer),
     listClients(viewer),
   ]);
@@ -74,7 +70,6 @@ export default async function VideosPage({
   const canAssign = viewer.permissions.has("videos:assign");
   // Edit-boards zijn alleen voor de vaste editors: Quinn, Noah, Sam, Senna, Fabian.
   const boardEditors = editors.filter((e) => isBoardEditor(e.fullName));
-  const shootsAtRisk = shoots.filter((s) => s.atRisk).length;
   // Editors (freelance) zien alleen hun eigen editbord met de fases — niet de
   // deadlinebewaking, aandachtsblokken of de werkvoorraad/tarieven eronder.
   const editorView = viewer.isEditorOnly;
@@ -89,8 +84,6 @@ export default async function VideosPage({
         title="Editing"
         description={`${editingProjects.length} projecten · ${rows.length} video's in productie`}
       />
-
-      {owner ? <MondayImportButton /> : null}
 
       {owner ? (
         <section className="mb-6">
@@ -107,7 +100,7 @@ export default async function VideosPage({
             />
           ) : (
             <p className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">
-              Nog geen editing-opdrachten. Klik hierboven op &quot;Nu overnemen uit Monday&quot;.
+              Nog geen editing-opdrachten. Zodra er een opname in de Google Agenda staat, verschijnt die hier automatisch.
             </p>
           )}
         </section>
@@ -116,21 +109,7 @@ export default async function VideosPage({
       {/* Alles hieronder is voor coördinatie/beheer — editors zien dit niet. */}
       {editorView ? null : (
       <>
-      {/* Deadlinebewaking per klantopname (§7): 14 werkdagen tot klantoplevering,
-          editor levert 2 werkdagen eerder. Live uit de datum van vandaag. */}
-      {shoots.length > 0 ? (
-        <div className="mb-6">
-          <div className="mb-3 flex items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
-            <h2 className="text-sm font-bold tracking-tight">Opnames & deadlines</h2>
-            <span className="text-xs text-white/80">
-              {shootsAtRisk > 0 ? `${shootsAtRisk} vragen aandacht · ` : ""}14 werkdagen tot oplevering, editor −2
-            </span>
-          </div>
-          <ShootTimers shoots={shoots} />
-        </div>
-      ) : null}
-
-      {/* Aandachtsblokken: automatisch uit Monday (fase + deadline). */}
+      {/* Aandachtsblokken: automatisch uit de fase + deadline. */}
       {highlights.late > 0 || highlights.atClient > 0 ? (
         <Card className="mb-4 border-[var(--color-bad)]/25 bg-[var(--color-bad-soft)]/40">
           <div className="flex items-start gap-3">

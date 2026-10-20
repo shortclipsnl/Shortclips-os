@@ -9,10 +9,13 @@ import {
   clientIntegrations,
   clients,
   contentCalendar,
+  deliverables,
   integrationConnections,
   mondayMappings,
   productionDays,
 } from "@/db/schema";
+import { addWorkingDays } from "@/lib/workdays";
+import { nlHolidaySet } from "@/lib/holidays";
 import {
   GoogleCalendarService,
   googleCalendar,
@@ -320,6 +323,12 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
             .limit(1);
           if (map?.entityId) {
             await db.update(productionDays).set({ status: "cancelled", updatedAt: new Date() }).where(eq(productionDays.id, map.entityId));
+            // De automatisch aangemaakte, nog niet gestarte editing-opdracht van
+            // deze opname ook intrekken (editwerk dat al loopt blijft staan).
+            await db
+              .update(deliverables)
+              .set({ deletedAt: new Date(), updatedAt: new Date() })
+              .where(and(eq(deliverables.productionDayId, map.entityId), eq(deliverables.status, "recorded"), isNull(deliverables.deletedAt)));
           }
           cancelled++;
         }
@@ -351,6 +360,10 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
       // Ontdubbelen: dezelfde opname kan in meerdere gekoppelde agenda's staan
       // (bijv. een gedeelde afspraak). We leiden er dan één opnamedag van af,
       // op basis van klant + datum + titel + starttijd.
+      // Voor de automatische deliverable per opname: klantnaam + werkdag-deadline.
+      const holidays = nlHolidaySet();
+      const clientNameById = new Map(matchers.map((m) => [m.id, m.name]));
+
       let shoots = 0;
       const seenShoot = new Map<string, string>(); // dedup-sleutel → productionDayId
       for (const ev of shootEvents) {
@@ -402,6 +415,29 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
             itemId: ev.id,
             lastSyncedAt: new Date(),
           });
+        }
+
+        // Elke opname wordt automatisch een editing-opdracht (deliverable), zodat
+        // een nieuwe of gewijzigde opname uit Google Agenda vanzelf op het
+        // editing-board komt ("binnenkort beschikbaar") — zonder handwerk. Eén
+        // deliverable per opname (dedup op production_day_id).
+        if (!alreadyCounted) {
+          const [existing] = await db
+            .select({ id: deliverables.id })
+            .from(deliverables)
+            .where(and(eq(deliverables.productionDayId, targetPdId), isNull(deliverables.deletedAt)))
+            .limit(1);
+          if (!existing) {
+            await db.insert(deliverables).values({
+              clientId: ev.clientId,
+              productionDayId: targetPdId,
+              title: ev.title?.slice(0, 240) || `${clientNameById.get(ev.clientId) ?? "Opname"} — ${scheduledOn}`,
+              status: "recorded",
+              dueOn: addWorkingDays(scheduledOn, 14, holidays),
+              dueOnSource: "auto",
+              statusChangedAt: ev.startsAt ?? new Date(),
+            });
+          }
         }
 
         if (!alreadyCounted) shoots++;

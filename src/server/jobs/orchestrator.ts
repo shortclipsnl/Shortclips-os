@@ -1,6 +1,5 @@
 import "server-only";
 import { runMondayClientImport } from "./monday-import";
-import { runMondayEditingImport } from "./monday-editing";
 import { runMondayContractImport } from "./monday-contracts";
 import { runMondayPlanningImport } from "./monday-planning";
 import { runMondayLeaveImport } from "./monday-leave";
@@ -79,7 +78,8 @@ export async function runNightlySync() {
     // Direct na de klant-import: portaaltoegang gelijktrekken met de nieuwe
     // samenwerkingsstatussen (gestopte klanten dicht, actieve weer open).
     results.push(await step("portal.enforce_access", () => enforcePortalAccess()));
-    results.push(await step("monday.import_editing", () => runMondayEditingImport()));
+    // Editing-opdrachten komen nu automatisch uit Google Agenda (opname →
+    // deliverable in calendar.sync), niet meer uit Monday.
     results.push(await step("monday.import_contracts", () => runMondayContractImport()));
     results.push(await step("monday.import_planning", () => runMondayPlanningImport()));
     results.push(await step("monday.import_leave", () => runMondayLeaveImport()));

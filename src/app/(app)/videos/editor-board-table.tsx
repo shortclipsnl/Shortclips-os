@@ -7,7 +7,7 @@ import { ChevronDown, ChevronRight, Download, FileText, Pencil } from "lucide-re
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { editorColor, editorDisplayName, firstNameKey } from "@/lib/editors";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase, type VideoStage } from "@/lib/statuses";
-import { assignEditor, changeVideoStatus, setEditingVideoLinks, setEditingVideoShorts } from "@/server/actions/videos";
+import { assignEditor, changeVideoStatus, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts } from "@/server/actions/videos";
 import type { EditorBoardVideo } from "@/server/editor-board";
 
 type Editor = { id: string; fullName: string };
@@ -231,19 +231,8 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
         )}
       </div>
 
-      {/* Deadline — batterij met datumbereik */}
-      <div className="flex items-center p-1">
-        {v.dueOn && v.shootDate ? (
-          <div className="relative h-6 w-full overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
-            <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, background: BATTERY_COLOR[v.batteryColor] }} />
-            <span className="absolute inset-0 grid place-items-center text-2xs font-semibold text-[var(--color-ink)]">
-              {fmtShort(v.shootDate)} – {fmtShort(v.dueOn)}
-            </span>
-          </div>
-        ) : (
-          <span className="w-full text-center text-2xs text-[var(--color-ink-faint)]">Geen deadline</span>
-        )}
-      </div>
+      {/* Deadline — batterij met datumbereik; aanklikken om de datum te wijzigen */}
+      <DeadlineCell v={v} pct={pct} canEdit={canEdit} onSave={(d) => run(() => setEditingVideoDeadline(v.id, d))} />
 
       {/* Fase */}
       <div className="p-0.5">
@@ -291,6 +280,46 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
   );
 }
 
+/** Deadline-batterij; voor wie mag bewerken: aanklikken opent een datumveld. */
+function DeadlineCell({ v, pct, canEdit, onSave }: { v: EditorBoardVideo; pct: number; canEdit: boolean; onSave: (d: string | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const [val, setVal] = useState(v.dueOn ?? "");
+
+  const bar =
+    v.dueOn && v.shootDate ? (
+      <div className="relative h-6 w-full overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
+        <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, background: BATTERY_COLOR[v.batteryColor] }} />
+        <span className="absolute inset-0 grid place-items-center text-2xs font-semibold text-[var(--color-ink)]">
+          {fmtShort(v.shootDate)} – {fmtShort(v.dueOn)}
+        </span>
+      </div>
+    ) : (
+      <span className="w-full rounded-full border border-dashed border-[var(--color-line-strong)] py-1 text-center text-2xs text-[var(--color-ink-faint)]">+ deadline</span>
+    );
+
+  if (!canEdit) return <div className="flex items-center p-1">{bar}</div>;
+
+  return (
+    <div className="relative flex items-center p-1">
+      <button type="button" className="w-full" title="Deadline wijzigen" onClick={() => { setVal(v.dueOn ?? ""); setOpen((o) => !o); }}>
+        {bar}
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
+          <div className="absolute left-1 top-full z-20 mt-1 flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
+            <input type="date" value={val} onChange={(e) => setVal(e.target.value)} className="sc-input h-8 w-36 py-0 text-xs" />
+            <button type="button" onClick={() => { onSave(val || null); setOpen(false); }} className="shrink-0 rounded bg-[var(--color-ink)] px-2 py-1.5 text-2xs font-semibold text-white">Opslaan</button>
+            {v.dueOn ? (
+              <button type="button" onClick={() => { onSave(null); setOpen(false); }} className="shrink-0 rounded px-2 py-1.5 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" title="Deadline wissen">Wissen</button>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function ShortsField({ v, canEdit, onSave }: { v: EditorBoardVideo; canEdit: boolean; onSave: (n: number | null) => void }) {
   const fallback = v.clientDefaultShorts > 0 ? v.clientDefaultShorts : null;
   const shown = v.plannedShorts ?? fallback;
@@ -315,12 +344,17 @@ function LinkCell({ href, canEdit, icon, label, onSave }: { href: string | null;
 
   if (open) {
     return (
-      <span className="absolute z-20 mt-8 flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-raised)]">
-        <input autoFocus value={val} placeholder="Plak een link…" onChange={(e) => setVal(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { onSave(val || null); setOpen(false); } if (e.key === "Escape") setOpen(false); }}
-          className="sc-input h-7 w-44 py-0 text-xs" />
-        <button type="button" onClick={() => { onSave(val || null); setOpen(false); }} className="shrink-0 rounded bg-[var(--color-ink)] px-2 py-1 text-2xs font-semibold text-white">Ok</button>
-      </span>
+      <>
+        <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
+        {/* Rechts uitlijnen zodat het veld naar links opent en de tabel nooit
+            breder wordt (voorkomt links/rechts verspringen). */}
+        <span className="absolute right-0 top-full z-20 mt-1 flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-raised)]">
+          <input autoFocus value={val} placeholder="Plak een link…" onChange={(e) => setVal(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { onSave(val || null); setOpen(false); } if (e.key === "Escape") setOpen(false); }}
+            className="sc-input h-7 w-44 py-0 text-xs" />
+          <button type="button" onClick={() => { onSave(val || null); setOpen(false); }} className="shrink-0 rounded bg-[var(--color-ink)] px-2 py-1 text-2xs font-semibold text-white">Ok</button>
+        </span>
+      </>
     );
   }
   if (href) {
