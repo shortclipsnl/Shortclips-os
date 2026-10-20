@@ -23,6 +23,7 @@ const STATUS_PILL: Record<string, string> = {
   concepting: "bg-[var(--color-info-soft)] text-[#0060a8]",
   scriptmeeting: "bg-[var(--color-warn-soft)] text-[#8a5300]",
   afwachting_klant: "bg-[var(--color-violet-soft)] text-[#4a2fb8]",
+  scripts_bij_klant: "bg-[var(--color-indigo-soft)] text-[var(--color-indigo-ink)]",
   nog_aanvullen: "bg-[var(--color-lime-soft)] text-[#54700a]",
   final: "bg-[var(--color-good-soft)] text-[#1d6b4c]",
 };
@@ -32,6 +33,7 @@ const STATUS_ACCENT: Record<string, string> = {
   concepting: "var(--color-info)",
   scriptmeeting: "var(--color-warn)",
   afwachting_klant: "var(--color-violet)",
+  scripts_bij_klant: "var(--color-indigo-ink)",
   nog_aanvullen: "var(--color-lime)",
   final: "var(--color-good)",
 };
@@ -41,6 +43,7 @@ const STATUS_SHORT: Record<string, string> = {
   concepting: "Concepting",
   scriptmeeting: "Scriptmeeting",
   afwachting_klant: "Afwachting klant",
+  scripts_bij_klant: "Bij klant",
   nog_aanvullen: "Nog aanvullen",
   final: "Final",
 };

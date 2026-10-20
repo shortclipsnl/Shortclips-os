@@ -170,10 +170,11 @@ export const SCRIPTING_STATUS: Record<string, { label: string; tone: Tone; done?
   concepting: { label: "Concepting", tone: "info" },
   scriptmeeting: { label: "Scriptmeeting", tone: "warn" },
   afwachting_klant: { label: "Afwachting van klant", tone: "violet" },
+  scripts_bij_klant: { label: "Scripts liggen bij klant", tone: "ink" },
   nog_aanvullen: { label: "Nog aanvullen", tone: "lime" },
   final: { label: "Final voor opname", tone: "good", done: true },
 };
-export const SCRIPTING_ORDER = ["concepting", "scriptmeeting", "afwachting_klant", "nog_aanvullen", "final"] as const;
+export const SCRIPTING_ORDER = ["concepting", "scriptmeeting", "afwachting_klant", "scripts_bij_klant", "nog_aanvullen", "final"] as const;
 
 export const PRODUCTION_STATUS: Record<string, { label: string; tone: Tone }> = {
   concept: { label: "Concept", tone: "neutral" },

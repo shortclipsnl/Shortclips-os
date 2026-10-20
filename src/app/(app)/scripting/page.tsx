@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Sparkles, CalendarClock, FileClock, AlarmClock, AlertTriangle } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { listScripting } from "@/server/scripting";
+import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { PageHeader, Stat } from "@/components/ui";
 import { ScriptingBoard } from "./scripting-ui";
 
@@ -11,6 +12,9 @@ export const dynamic = "force-dynamic";
 
 export default async function ScriptingPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const viewer = await requireInternal();
+  // Scripting leest dezelfde opnames (production_days) als de opnameplanning, dus
+  // ook hier de Google Agenda op de achtergrond verversen als 'ie >20 min oud is.
+  await syncCalendarIfStale();
   const canWrite = viewer.permissions.has("scripts:write");
   const { rows, stats, clientOptions, writerOptions } = await listScripting(viewer);
   const filter = (await searchParams).filter;

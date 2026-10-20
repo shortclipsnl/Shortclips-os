@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { Badge, ClientLogo } from "@/components/ui";
 import { CLIENT_STATUS } from "@/lib/statuses";
 import { formatDate } from "@/lib/format";
+import { setClientStatus } from "@/server/actions/clients";
 
 export type BoardClient = {
   id: string;
@@ -141,15 +143,33 @@ function Empty() {
 
 function ClientCard({ c }: { c: BoardClient }) {
   const stopped = STOPPED.has(c.status);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  // Klik op het status-icoontje = actief ↔ niet-actief wisselen. Niet-actief
+  // zetten we als "paused"; weer aan = "active".
+  const toggle = () =>
+    start(async () => {
+      await setClientStatus(c.slug, stopped ? "active" : "paused");
+      router.refresh();
+    });
 
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5 hover:shadow-[var(--shadow-raised)]">
-      {/* Statusindicator: groen = actief, rood = niet-actief. */}
-      <span
-        className="size-2.5 shrink-0 rounded-full"
-        style={{ background: stopped ? "var(--color-bad)" : "var(--color-good)" }}
-        title={stopped ? "Niet-actief" : "Actief"}
-      />
+      {/* Klikbare statusindicator: groen = actief, rood = niet-actief. Klik om te wisselen. */}
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={pending}
+        aria-label={stopped ? "Op actief zetten" : "Op niet-actief zetten"}
+        title={stopped ? "Niet-actief — klik om te activeren" : "Actief — klik om op niet-actief te zetten"}
+        className="grid size-6 shrink-0 place-items-center rounded-full transition hover:bg-[var(--color-surface-2)]"
+      >
+        {pending ? (
+          <Loader2 className="size-3 animate-spin text-[var(--color-ink-faint)]" />
+        ) : (
+          <span className="size-2.5 rounded-full ring-2 ring-transparent" style={{ background: stopped ? "var(--color-bad)" : "var(--color-good)" }} />
+        )}
+      </button>
       <Link href={`/clients/${c.slug}`} className="flex min-w-0 flex-1 items-center gap-3">
         <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={52} />
         <span className="min-w-0 flex-1">

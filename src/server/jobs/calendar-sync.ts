@@ -1,6 +1,6 @@
 import "server-only";
 import { after } from "next/server";
-import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { env } from "@/lib/env";
 import {
@@ -536,8 +536,32 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         if (!alreadyCounted) publications++;
       }
 
+      // Back-fill: opnames die nog géén videograaf hebben alsnog standaard
+      // koppelen (Luxewagen → Jarno, de rest → Rutger). Zo staat elke opname
+      // meteen op een videograaf; handmatige keuzes blijven altijd staan.
+      let coupledVg = 0;
+      if (rutgerId || jarnoId) {
+        const uncoupled = await db
+          .select({ id: productionDays.id, cname: clients.name })
+          .from(productionDays)
+          .innerJoin(clients, eq(clients.id, productionDays.clientId))
+          .where(
+            and(
+              isNull(productionDays.deletedAt),
+              isNull(productionDays.videographerId),
+              ne(productionDays.status, "cancelled"),
+            ),
+          );
+        for (const pd of uncoupled) {
+          const vgId = /luxewagen/i.test(pd.cname) ? jarnoId : rutgerId;
+          if (!vgId) continue;
+          await db.update(productionDays).set({ videographerId: vgId, updatedAt: new Date() }).where(eq(productionDays.id, pd.id));
+          coupledVg++;
+        }
+      }
+
       ctx.log(
-        `Klaar: ${ctx.counters.processed} afspraken, ${matched} gekoppeld, ${needsReview} voor review, ${shoots} opnamedagen, ${publications} publicaties afgeleid.`,
+        `Klaar: ${ctx.counters.processed} afspraken, ${matched} gekoppeld, ${needsReview} voor review, ${shoots} opnamedagen, ${publications} publicaties afgeleid${coupledVg > 0 ? `, ${coupledVg} videograaf-koppelingen` : ""}.`,
       );
     },
     { triggeredById: options.triggeredById },

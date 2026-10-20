@@ -37,10 +37,12 @@ export default async function ProductionsPage() {
     canAssign ? listAssignableUsers() : Promise.resolve([]),
   ]);
 
-  // Wie kan een opname draaien: videografen (en wie óók shoots doet binnen het
-  // kleine team). Zo kun je de videograaf direct hier koppelen i.p.v. losse boards.
+  // Videograaf is altijd Rutger, Jarno of een freelance videograaf (rol
+  // "videographer") — de rest van het team draait geen opnames. Alleen die
+  // tonen als keuze, zodat je per opname de juiste videograaf kunt koppelen.
+  const VG_EMAILS = new Set(["rutger@shortclips.nl", "jarno@shortclips.nl"]);
   const videographerOptions: PersonOption[] = assignable
-    .filter((u) => ["videographer", "content_creator", "owner", "admin"].includes(u.primaryRole))
+    .filter((u) => u.primaryRole === "videographer" || VG_EMAILS.has(u.email.toLowerCase()))
     .map((u) => ({ id: u.id, fullName: u.fullName }));
 
   const agendaShoots: AgendaShoot[] = shoots.map((x) => ({
