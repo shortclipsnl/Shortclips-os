@@ -11,7 +11,8 @@ import { dispatch } from "@/server/automation";
 
 export type ActionResult = { ok: boolean; message?: string };
 
-const KINDS = ["vakantie", "vrije dag", "ziek", "bijzonder verlof"] as const;
+// Een ziekmelding is géén verlofsoort en staat hier bewust niet tussen.
+const KINDS = ["vakantie", "vrije dag", "bijzonder verlof"] as const;
 
 const requestSchema = z.object({
   startOn: z.string().min(8, "Kies een startdatum."),
@@ -55,6 +56,58 @@ export async function requestLeave(input: z.input<typeof requestSchema>): Promis
 
     revalidatePath("/verlof");
     return { ok: true, message: "Aanvraag ingediend." };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+const sickSchema = z.object({
+  startOn: z.string().min(8, "Kies een startdatum."),
+  endOn: z.string().min(8, "Kies een einddatum."),
+});
+
+/**
+ * Ziek melden voor jezelf. Een ziekmelding is iets anders dan een verlofaanvraag:
+ * er is geen reden nodig, hij hoeft niet goedgekeurd te worden (direct geregeld),
+ * en collega's zien hem niet. Alleen de eigenaar wordt op de hoogte gebracht,
+ * zodat lopend werk kan worden overgenomen.
+ */
+export async function reportSick(input: z.input<typeof sickSchema>): Promise<ActionResult> {
+  try {
+    const viewer = await requireInternal();
+    const parsed = sickSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
+    if (parsed.data.endOn < parsed.data.startOn) return { ok: false, message: "De einddatum ligt vóór de startdatum." };
+
+    const [created] = await db
+      .insert(leaveRequests)
+      .values({
+        userId: viewer.id,
+        startOn: parsed.data.startOn,
+        endOn: parsed.data.endOn,
+        kind: "ziek",
+        note: null,
+        // Direct geregistreerd: een ziekmelding wordt niet "goedgekeurd".
+        status: "approved",
+        reviewedAt: new Date(),
+      })
+      .returning({ id: leaveRequests.id });
+
+    await notify({
+      roles: ["owner"],
+      type: "sick_reported",
+      level: "warning",
+      title: `Ziekmelding: ${viewer.fullName}`,
+      body: `${parsed.data.startOn} t/m ${parsed.data.endOn} — bekijk de overdracht op /verlof`,
+      href: "/verlof",
+      entityType: "leave_request",
+      entityId: created!.id,
+      dedupeKey: `sick_reported:${created!.id}`,
+    });
+
+    revalidatePath("/verlof");
+    return { ok: true, message: "Ziekmelding doorgegeven. Beterschap!" };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;

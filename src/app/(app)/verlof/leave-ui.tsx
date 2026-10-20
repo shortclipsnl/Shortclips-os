@@ -3,10 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Plus, X } from "lucide-react";
-import { cancelLeave, requestLeave, reviewLeave, setLeaveHours } from "@/server/actions/leave";
+import { cancelLeave, reportSick, requestLeave, reviewLeave, setLeaveHours } from "@/server/actions/leave";
 import { Button, ErrorNote, TeamAvatar } from "@/components/ui";
 
-const KINDS = ["vakantie", "vrije dag", "ziek", "bijzonder verlof"] as const;
+// Een ziekmelding is géén verlofsoort — die staat hier bewust niet tussen.
+const KINDS = ["vakantie", "vrije dag", "bijzonder verlof"] as const;
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
 
 export type Balance = {
   userId: string;
@@ -121,6 +124,74 @@ export function RequestLeaveForm() {
         </Button>
         {err ? <ErrorNote>{err}</ErrorNote> : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Ziekmelding: los van verlof. Geen reden, geen goedkeuring — alleen de datums.
+ * Standaard vandaag, zodat "ik ben vandaag ziek" één klik is.
+ */
+export function SickReportForm() {
+  const [open, setOpen] = useState(false);
+  const [startOn, setStart] = useState(todayISO());
+  const [endOn, setEnd] = useState(todayISO());
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+
+  function submit() {
+    setErr(null);
+    setMsg(null);
+    start(async () => {
+      const res = await reportSick({ startOn, endOn });
+      if (res.ok) {
+        setMsg(res.message ?? "Doorgegeven.");
+        setOpen(false);
+        router.refresh();
+      } else setErr(res.message ?? "Mislukt");
+    });
+  }
+
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold">Ziek melden</h3>
+          <p className="text-xs text-[var(--color-ink-muted)]">
+            Geen reden nodig. Alleen jij en de eigenaar zien dit — collega&apos;s niet.
+          </p>
+        </div>
+        {!open ? (
+          <Button size="sm" variant="secondary" onClick={() => { setOpen(true); setMsg(null); }}>
+            Ziekmelding doorgeven
+          </Button>
+        ) : null}
+      </div>
+
+      {msg ? <p className="mt-2 text-xs font-medium text-[var(--color-good)]">{msg}</p> : null}
+
+      {open ? (
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <div>
+            <label className="sc-label">Van</label>
+            <input type="date" className="sc-input" value={startOn} onChange={(e) => setStart(e.target.value)} />
+          </div>
+          <div>
+            <label className="sc-label">Tot en met</label>
+            <input type="date" className="sc-input" value={endOn} onChange={(e) => setEnd(e.target.value)} />
+          </div>
+          <Button onClick={submit} disabled={pending || !startOn || !endOn} size="sm">
+            {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+            Doorgeven
+          </Button>
+          <button type="button" onClick={() => setOpen(false)} className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+            Annuleren
+          </button>
+          {err ? <ErrorNote>{err}</ErrorNote> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

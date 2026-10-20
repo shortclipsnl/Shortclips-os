@@ -44,7 +44,8 @@ export async function getLeaveBalances(): Promise<LeaveBalance[]> {
     db
       .select({ userId: leaveRequests.userId, startOn: leaveRequests.startOn, endOn: leaveRequests.endOn })
       .from(leaveRequests)
-      .where(and(eq(leaveRequests.status, "approved"), gte(leaveRequests.startOn, yearStart))),
+      // Ziekmeldingen tellen niet mee in het vakantiesaldo.
+      .where(and(eq(leaveRequests.status, "approved"), ne(leaveRequests.kind, "ziek"), gte(leaveRequests.startOn, yearStart))),
   ]);
 
   const takenByUser = new Map<string, { hours: number; count: number }>();

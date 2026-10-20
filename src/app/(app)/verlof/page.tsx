@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
-import { and, asc, desc, eq, gte } from "drizzle-orm";
-import { CalendarClock } from "lucide-react";
+import { and, asc, desc, eq, gte, ne } from "drizzle-orm";
+import { CalendarClock, ArrowRightLeft, Clapperboard, Film, Send, Users } from "lucide-react";
 import { db } from "@/db/client";
 import { leaveRequests, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, TeamAvatar } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { getLeaveBalances } from "@/server/leave-balance";
-import { RequestLeaveForm, ReviewButtons, CancelButton, LeaveBalances } from "./leave-ui";
+import { getLeaveHandover, type LeaveHandover, type HandoverItem } from "@/server/leave-handover";
+import { RequestLeaveForm, ReviewButtons, CancelButton, LeaveBalances, SickReportForm } from "./leave-ui";
 
 export const metadata: Metadata = { title: "Vakantieplanning" };
 export const dynamic = "force-dynamic";
@@ -28,23 +29,52 @@ export default async function LeavePage() {
   const today = new Date().toISOString().slice(0, 10);
 
   const balances = await getLeaveBalances();
-  const [mine, pending, approved] = await Promise.all([
+  // Saldo is privé: iedereen ziet alleen het eigen saldo; de eigenaar ziet alles.
+  const visibleBalances = canApprove ? balances : balances.filter((b) => b.userId === viewer.id);
+
+  const [mine, pending, approved, upcoming] = await Promise.all([
     db.select().from(leaveRequests).where(eq(leaveRequests.userId, viewer.id)).orderBy(desc(leaveRequests.startOn)),
     canApprove
       ? db
           .select({ id: leaveRequests.id, userId: leaveRequests.userId, name: users.fullName, startOn: leaveRequests.startOn, endOn: leaveRequests.endOn, kind: leaveRequests.kind, note: leaveRequests.note })
           .from(leaveRequests)
           .innerJoin(users, eq(users.id, leaveRequests.userId))
-          .where(eq(leaveRequests.status, "requested"))
+          .where(and(eq(leaveRequests.status, "requested"), ne(leaveRequests.kind, "ziek")))
           .orderBy(asc(leaveRequests.startOn))
       : Promise.resolve([]),
+    // Team-brede afwezigheid: alléén verlof, nooit ziekmeldingen.
     db
       .select({ id: leaveRequests.id, name: users.fullName, startOn: leaveRequests.startOn, endOn: leaveRequests.endOn, kind: leaveRequests.kind })
       .from(leaveRequests)
       .innerJoin(users, eq(users.id, leaveRequests.userId))
-      .where(and(eq(leaveRequests.status, "approved"), gte(leaveRequests.endOn, today)))
+      .where(and(eq(leaveRequests.status, "approved"), ne(leaveRequests.kind, "ziek"), gte(leaveRequests.endOn, today)))
+      .orderBy(asc(leaveRequests.startOn)),
+    // Voor de overdrachtslijst: lopende/aankomende goedgekeurde afwezigheid
+    // (verlof én ziek). Eigenaar ziet iedereen, anderen alleen zichzelf.
+    db
+      .select({ id: leaveRequests.id, userId: leaveRequests.userId, name: users.fullName, startOn: leaveRequests.startOn, endOn: leaveRequests.endOn, kind: leaveRequests.kind })
+      .from(leaveRequests)
+      .innerJoin(users, eq(users.id, leaveRequests.userId))
+      .where(
+        and(
+          eq(leaveRequests.status, "approved"),
+          gte(leaveRequests.endOn, today),
+          canApprove ? undefined : eq(leaveRequests.userId, viewer.id),
+        ),
+      )
       .orderBy(asc(leaveRequests.startOn)),
   ]);
+
+  // Overdrachtslijst per afwezigheid: wat moet er tijdens de afwezigheid worden
+  // overgenomen? Automatisch afgeleid uit opnames, opleveringen, posts en klanten.
+  const handovers = await Promise.all(
+    upcoming.map(async (r) => ({ req: r, items: await getLeaveHandover(r.userId, r.startOn, r.endOn) })),
+  );
+  const handoversWithWork = handovers.filter((h) => h.items.total > 0);
+
+  // Ziekmeldingen zijn privé: alleen de eigenaar ziet ze hier (de persoon zelf
+  // ziet de eigen melding in "Mijn verlof").
+  const sickList = canApprove ? upcoming.filter((r) => r.kind === "ziek") : [];
 
   // Overlappingen: meerdere collega's tegelijk afwezig.
   const clashes: string[] = [];
@@ -77,8 +107,19 @@ export default async function LeavePage() {
       </div>
 
       <div className="mb-6">
-        <h2 className="mb-2 text-sm font-semibold text-[var(--color-ink)]">Vakantiesaldo vaste medewerkers <span className="font-normal text-[var(--color-ink-faint)]">· op uren (8 u per werkdag)</span></h2>
-        <LeaveBalances balances={balances} canEdit={canApprove} />
+        <SickReportForm />
+      </div>
+
+      <div className="mb-6">
+        <h2 className="mb-2 text-sm font-semibold text-[var(--color-ink)]">
+          {canApprove ? "Vakantiesaldo vaste medewerkers" : "Jouw vakantiesaldo"}{" "}
+          <span className="font-normal text-[var(--color-ink-faint)]">· op uren (8 u per werkdag)</span>
+        </h2>
+        {visibleBalances.length > 0 ? (
+          <LeaveBalances balances={visibleBalances} canEdit={canApprove} />
+        ) : (
+          <Card><p className="text-sm text-[var(--color-ink-muted)]">Voor jou wordt geen vakantiesaldo bijgehouden.</p></Card>
+        )}
       </div>
 
       {canApprove && pending.length > 0 ? (
@@ -99,6 +140,47 @@ export default async function LeavePage() {
         </Card>
       ) : null}
 
+      {/* Overdracht bij afwezigheid: automatisch samengesteld bij goedkeuring. */}
+      {handoversWithWork.length > 0 ? (
+        <Card className="mb-5" padded={false}>
+          <CardHeader
+            title={canApprove ? "Overdracht bij afwezigheid" : "Jouw overdracht"}
+            subtitle="Wat er tijdens de afwezigheid moet worden overgenomen — opnames, opleveringen, posts en klanten."
+            className="p-5 pb-2"
+          />
+          <ul className="divide-y divide-[var(--color-line)]">
+            {handoversWithWork.map(({ req, items }) => (
+              <li key={req.id} className="px-5 py-4">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  {canApprove ? <TeamAvatar name={req.name} size={24} /> : null}
+                  <span className="text-sm font-semibold">{canApprove ? req.name : "Jij"}</span>
+                  {req.kind === "ziek" ? <Badge tone="bad">ziek</Badge> : <Badge tone="warn">{req.kind}</Badge>}
+                  <span className="text-xs text-[var(--color-ink-muted)]">{formatDate(req.startOn)} – {formatDate(req.endOn)}</span>
+                  <span className="ml-auto text-2xs font-medium text-[var(--color-ink-faint)]">{items.total} over te dragen</span>
+                </div>
+                <HandoverGroups items={items} />
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      {/* Ziekmeldingen — uitsluitend voor de eigenaar. */}
+      {canApprove && sickList.length > 0 ? (
+        <Card className="mb-5" padded={false}>
+          <CardHeader title={`Ziekmeldingen (${sickList.length})`} subtitle="Alleen zichtbaar voor jou." className="p-5 pb-2" />
+          <ul className="divide-y divide-[var(--color-line)]">
+            {sickList.map((r) => (
+              <li key={r.id} className="flex items-center gap-3 px-5 py-3">
+                <TeamAvatar name={r.name} size={26} />
+                <span className="min-w-0 flex-1 text-sm font-medium">{r.name}</span>
+                <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">{formatDate(r.startOn)} – {formatDate(r.endOn)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       <div className="grid gap-5 lg:grid-cols-2">
         {/* Mijn aanvragen */}
         <Card padded={false}>
@@ -111,7 +193,7 @@ export default async function LeavePage() {
                 <li key={r.id} className="flex items-center gap-3 px-5 py-3">
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium">{formatDate(r.startOn)} t/m {formatDate(r.endOn)}</span>
-                    <span className="block text-xs text-[var(--color-ink-muted)]">{r.kind}{r.note ? ` · ${r.note}` : ""}</span>
+                    <span className="block text-xs text-[var(--color-ink-muted)]">{r.kind === "ziek" ? "ziekmelding" : r.kind}{r.note ? ` · ${r.note}` : ""}</span>
                   </span>
                   <Badge tone={STATUS[r.status]?.tone ?? "neutral"}>{STATUS[r.status]?.label ?? r.status}</Badge>
                   {r.status !== "rejected" ? <CancelButton id={r.id} /> : null}
@@ -148,6 +230,40 @@ export default async function LeavePage() {
           )}
         </Card>
       </div>
+    </div>
+  );
+}
+
+function HandoverGroups({ items }: { items: LeaveHandover }) {
+  const groups: { icon: React.ReactNode; label: string; list: HandoverItem[] }[] = [
+    { icon: <Clapperboard className="size-3.5" />, label: "Opnames", list: items.shoots },
+    { icon: <Film className="size-3.5" />, label: "Opleveringen", list: items.deliveries },
+    { icon: <Send className="size-3.5" />, label: "Posts", list: items.posts },
+    { icon: <Users className="size-3.5" />, label: "Klanten (coördinatie)", list: items.clients },
+  ].filter((g) => g.list.length > 0);
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {groups.map((g) => (
+        <div key={g.label} className="rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)]/50 p-2.5">
+          <div className="mb-1 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
+            <ArrowRightLeft className="size-3" /> {g.label} · {g.list.length}
+          </div>
+          <ul className="space-y-0.5 text-xs">
+            {g.list.slice(0, 6).map((it) => (
+              <li key={it.id} className="flex items-baseline justify-between gap-2">
+                <span className="min-w-0 truncate">
+                  {it.clientName ? <span className="font-medium">{it.clientName}</span> : null}
+                  {it.clientName && it.label !== it.clientName ? " · " : ""}
+                  {it.label !== it.clientName ? it.label : ""}
+                </span>
+                {it.date ? <span className="shrink-0 text-[var(--color-ink-faint)]">{formatDate(it.date)}</span> : null}
+              </li>
+            ))}
+            {g.list.length > 6 ? <li className="text-[var(--color-ink-faint)]">+{g.list.length - 6} meer</li> : null}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }

@@ -31,6 +31,15 @@ export default async function CapacityPage() {
 
   const paramMap = new Map(params.map((p) => [p.key, p.value ?? 0]));
 
+  // Financiële aannames (kosten, omzet, marges) zijn uitsluitend voor de
+  // eigenaar — niet voor de rest van het team. finance:read heeft alleen de
+  // eigenaar, dus canSeeFinance schermt dit af in de hele pagina.
+  const isFinanceParam = (p: (typeof params)[number]) =>
+    /euro|€/i.test(p.unit ?? "") ||
+    /kosten|omzet|marge|winst|resultaat|tarief|prijs/i.test(p.key) ||
+    /kosten|omzet|marge|winst|resultaat|tarief|prijs/i.test(p.label ?? "");
+  const visibleParams = canSeeFinance ? params : params.filter((p) => !isFinanceParam(p));
+
   // Zelfde indeling als de Teampagina: vast kernteam vs. freelancers & overig.
   const core = people.filter((p) => isCoreStaffByName(p.name));
   const rest = people.filter((p) => !isCoreStaffByName(p.name));
@@ -141,16 +150,16 @@ export default async function CapacityPage() {
           editPerEditor: paramMap.get("edit_cap_editor") ?? 24,
           ccClientsHigh: paramMap.get("cc_klanten_hoog") ?? 26,
           vgCapacity: paramMap.get("vg_hoog_4w") ?? 16,
-          revenuePerClient: paramMap.get("omzet_klant") ?? 1978,
-          costStaff: paramMap.get("kosten_medewerker") ?? 2775,
-          editCostShort: paramMap.get("edit_kosten_short") ?? 48,
-          costOverig: paramMap.get("kosten_overig") ?? 480,
+          revenuePerClient: canSeeFinance ? (paramMap.get("omzet_klant") ?? 1978) : 0,
+          costStaff: canSeeFinance ? (paramMap.get("kosten_medewerker") ?? 2775) : 0,
+          editCostShort: canSeeFinance ? (paramMap.get("edit_kosten_short") ?? 48) : 0,
+          costOverig: canSeeFinance ? (paramMap.get("kosten_overig") ?? 480) : 0,
         }}
       />
 
       {/* Aannames */}
       <details className="mt-6">
-        <summary className="cursor-pointer text-sm font-semibold">Aannames &amp; grenzen ({params.length})</summary>
+        <summary className="cursor-pointer text-sm font-semibold">Aannames &amp; grenzen ({visibleParams.length})</summary>
         <Card padded={false} className="mt-2 overflow-x-auto">
           <table className="w-full min-w-[520px] text-sm">
             <thead>
@@ -162,7 +171,7 @@ export default async function CapacityPage() {
               </tr>
             </thead>
             <tbody>
-              {params.map((p) => (
+              {visibleParams.map((p) => (
                 <tr key={p.key} className="border-b border-[var(--color-line)] last:border-0">
                   <td className="px-4 py-2">{p.label ?? p.key}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{p.value ?? "—"}</td>
