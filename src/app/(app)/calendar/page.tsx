@@ -259,10 +259,12 @@ export default async function CalendarPage({
                         {WEEKDAYS[i]} {Number(date.slice(8, 10))}
                         {isToday ? <span className="ml-1 rounded bg-[var(--color-good)] px-1 py-px text-[9px] font-bold text-white">vandaag</span> : null}
                       </span>
-                      {dayItems.length > 3 ? <span className="text-2xs text-[var(--color-ink-faint)]">+{dayItems.length - 3}</span> : null}
+                      {dayItems.length > 0 ? <span className="text-2xs text-[var(--color-ink-faint)]">{dayItems.length}</span> : null}
                     </div>
+                    {/* Alle posts van die dag onder elkaar — niets wegvouwen,
+                        zodat je in één oogopslag ziet wat er écht online moet. */}
                     <div className="space-y-1">
-                      {dayItems.slice(0, 3).map((it) => (
+                      {dayItems.map((it) => (
                         <ContentChip key={it.id} color={it.clientColor ?? "var(--color-brand-500)"} item={toChipItem(it)} today={isToday} />
                       ))}
                     </div>
