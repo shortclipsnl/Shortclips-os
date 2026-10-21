@@ -222,10 +222,11 @@ export async function getClientHub(viewer: Viewer, slug: string) {
       id: files.id, name: files.name, category: files.category,
       isFolder: files.isFolder, externalUrl: files.externalUrl,
       modifiedAt: files.modifiedAt, sizeBytes: files.sizeBytes, source: files.source,
+      path: files.path,
     })
       .from(files)
       .where(and(eq(files.clientId, client.id), isNull(files.deletedAt)))
-      .orderBy(desc(files.isFolder), desc(files.modifiedAt)).limit(80),
+      .orderBy(desc(files.isFolder), desc(files.modifiedAt)).limit(500),
 
     db.select({
       id: tasks.id, title: tasks.title, status: tasks.status,

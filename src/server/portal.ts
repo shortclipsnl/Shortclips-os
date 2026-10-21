@@ -20,6 +20,7 @@ import {
 } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 import { nextShootForClient, upcomingAppointmentsForClient } from "@/server/appointments";
+import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { cleanVideoTitle } from "@/lib/portal-status";
 
 /**
@@ -47,6 +48,13 @@ function dedupByTitle<T extends { title: string }>(rows: T[]): T[] {
 export async function getPortalData(viewer: Viewer) {
   const clientId = viewer.clientId;
   if (!clientId) notFound();
+
+  // Houd de Google Agenda vers in het portaal: elke keer dat een klant het
+  // portaal opent, controleren we of de laatste sync >15 min geleden is en
+  // verversen we 'm zo nodig op de achtergrond. Zo zien klanten wijzigingen in
+  // de agenda snel, los van wanneer het team een interne pagina opent of de
+  // nachtelijke/dagelijkse cron draait.
+  await syncCalendarIfStale(15);
 
   const [client] = await db
     .select({
