@@ -174,10 +174,7 @@ export function KostenDashboard({ data: D }: { data: KostenData }) {
 
       <Heatmap {...{ k, closedUpTo, subRows, kosten, v, D }} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <VasteLasten {...{ k, closedUpTo, rows, subOf, v, D }} />
-        <GeenKosten {...{ k, rows, subOf, D }} />
-      </div>
+      <GeenKosten {...{ k, rows, subOf, D }} />
 
       <AlleLeveranciers {...{ k, prevMonth, closed, rows, subOf, v, D }} />
 
@@ -195,7 +192,7 @@ export function KostenDashboard({ data: D }: { data: KostenData }) {
         <p>
           <strong className="text-[var(--color-ink)]">Wat ontbreekt.</strong> Revolut-uitgaven (vooral software) staan
           niet in DigiBoox; alleen de opwaarderingen naar Revolut zijn zichtbaar, onder Software en tools. Privé-opnames
-          en reserveringen staan apart onder Geen kosten.
+          en reserveringen staan apart onder Jarno privékosten.
         </p>
       </section>
     </div>
@@ -320,7 +317,7 @@ function Kpis({
     { key: "vast", label: "Vast", value: soort("vast"), hint: "lonen, huur, verzekeringen, software" },
     { key: "variabel", label: "Variabel", value: soort("variabel"), hint: "editors, freelancers, marketing, auto" },
     { key: "eenmalig", label: "Eenmalig", value: soort("eenmalig"), hint: "apparatuur en inkopen" },
-    { key: "controle", label: "Nog te beoordelen", value: ctrl, hint: <>niet in de kosten · geen kosten {euro(niet)}</> },
+    { key: "controle", label: "Nog te beoordelen", value: ctrl, hint: <>niet in de kosten · privékosten Jarno {euro(niet)}</> },
   ];
 
   return (
@@ -630,7 +627,7 @@ function JaarVergelijking({
   const max = Math.max(1, ...all);
   const curTot = Array.from({ length: 12 }, (_, i) => cur(i) ?? 0).reduce((a, b) => a + b, 0);
   const prevTot = Array.from({ length: 12 }, (_, i) => prev(i) ?? 0).reduce((a, b) => a + b, 0);
-  const H = 128;
+  const H = 160;
 
   return (
     <Card>
@@ -650,16 +647,31 @@ function JaarVergelijking({
         </div>
       </div>
       <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
-        Alleen afgesloten maanden. Zo zie je in één oogopslag of de kosten dit jaar hoger of lager liggen dan vorig jaar.
+        Alleen afgesloten maanden. De bedragen staan bij elke maand — {yCur} groen als het lager is dan {yPrev}, rood als
+        het hoger is — zodat je het verschil in één oogopslag ziet.
       </p>
       <div className="mt-4 overflow-x-auto">
-        <div className="flex min-w-[560px] items-end gap-1.5" style={{ height: `${H}px` }}>
+        <div className="flex min-w-[640px] items-end gap-1.5" style={{ height: `${H}px` }}>
           {Array.from({ length: 12 }).map((_, i) => {
             const c = cur(i);
             const p = prev(i);
+            const curTone =
+              c != null && p != null
+                ? c > p
+                  ? "text-[var(--color-bad)]"
+                  : c < p
+                    ? "text-[var(--color-good)]"
+                    : "text-[var(--color-ink)]"
+                : "text-[var(--color-ink)]";
             return (
-              <div key={i} className="flex flex-1 flex-col items-center justify-end gap-1" style={{ height: `${H}px` }}>
-                <div className="flex w-full items-end justify-center gap-0.5" style={{ height: `${H - 18}px` }}>
+              <div key={i} className="flex h-full flex-1 flex-col items-center gap-1">
+                {/* Bedragen boven de staven: vorig jaar gedempt, dit jaar vet en
+                    gekleurd op het verschil. */}
+                <div className="flex flex-col items-center leading-none">
+                  <span className="text-[9px] tabular-nums text-[var(--color-ink-faint)]">{p != null ? compact(p) : " "}</span>
+                  <span className={`text-[10px] font-semibold tabular-nums ${curTone}`}>{c != null ? compact(c) : " "}</span>
+                </div>
+                <div className="flex w-full flex-1 items-end justify-center gap-0.5">
                   {p != null ? (
                     <span
                       title={`${MN[i]} ${yPrev}: ${euro(p)}`}
@@ -914,16 +926,54 @@ function Heatmap({
   D: KostenData;
 }) {
   const ms = closedUpTo(k).slice(-12);
-  const list = D.subs.map((s, i) => [s, i] as const).filter(([s]) => isBedrijfskost(s[1]) || s[1] === "controle");
+  const cats = D.subs.map((s, i) => [s, i] as const).filter(([s]) => isBedrijfskost(s[1]) || s[1] === "controle");
   const val = (i: number, m: string) => subRows(m, i).reduce((a, e) => a + v(e), 0);
   const tots = ms.map((m) => kosten(m));
+
+  // Grootste categorieën bovenaan; de kleintjes vouwen we samen tot één
+  // "Overige"-rij, zodat de tabel scanbaar blijft i.p.v. een muur van vakjes.
+  const withTot = cats
+    .map(([s, i]) => ({ s, i, tot: ms.reduce((a, m) => a + val(i, m), 0) }))
+    .filter((x) => x.tot > 0)
+    .sort((a, b) => b.tot - a.tot);
+  const TOP = 8;
+  const top = withTot.slice(0, TOP);
+  const rest = withTot.slice(TOP);
+  const restVals = ms.map((m) => rest.reduce((a, rc) => a + val(rc.i, m), 0));
+
+  const heatCell = (x: number, mx: number, m: string, j: number) => {
+    const lv = x ? Math.min(4, Math.ceil((x / mx) * 4)) : -1;
+    return (
+      <td
+        key={j}
+        className={`px-2 py-1.5 text-right ${m === k ? "outline outline-1 -outline-offset-1 outline-[var(--color-brand-600)]" : ""}`}
+        style={lv >= 0 ? { background: HEAT[lv], color: lv >= 3 ? "#fff" : undefined } : undefined}
+      >
+        {x ? fmtK(x) : "·"}
+      </td>
+    );
+  };
+  const heatRow = (rowKey: string, labelText: string, color: string, vals: number[]) => {
+    const mx = Math.max(1, ...vals);
+    const tot = vals.reduce((a, b) => a + b, 0);
+    return (
+      <tr key={rowKey} className="border-b border-[var(--color-line)]">
+        <td className="sticky left-0 z-[1] whitespace-nowrap bg-[var(--color-surface)] px-2 py-1.5 text-left">
+          <span className="mr-1.5 inline-block size-2 rounded-[2px] align-middle" style={{ background: color }} />
+          {labelText}
+        </td>
+        {vals.map((x, j) => heatCell(x, mx, ms[j]!, j))}
+        <td className="px-2 py-1.5 text-right font-semibold">{fmtK(tot / ms.length)}</td>
+      </tr>
+    );
+  };
 
   return (
     <Card>
       <h3 className="text-base font-semibold text-[var(--color-ink)]">Kosten per categorie, maand voor maand</h3>
       <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
-        De laatste twaalf maanden tot en met de gekozen maand. Hoe donkerder het vakje, hoe hoger het bedrag binnen die
-        categorie.
+        De laatste twaalf maanden tot en met de gekozen maand, grootste categorieën bovenaan. Hoe donkerder het vakje,
+        hoe hoger het bedrag binnen die categorie.
       </p>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[720px] border-collapse text-[13px] tabular-nums">
@@ -942,36 +992,8 @@ function Heatmap({
             </tr>
           </thead>
           <tbody>
-            {list.map(([s, i]) => {
-              const vals = ms.map((m) => val(i, m));
-              if (!vals.some(Boolean)) return null;
-              const mx = Math.max(...vals);
-              const tot = vals.reduce((a, b) => a + b, 0);
-              return (
-                <tr key={i} className="border-b border-[var(--color-line)]">
-                  <td className="sticky left-0 z-[1] bg-[var(--color-surface)] px-2 py-1.5 text-left">
-                    <span
-                      className="mr-1.5 inline-block size-2 rounded-[2px] align-middle"
-                      style={{ background: GROUPS[s[1]]?.color ?? "#98a3b3" }}
-                    />
-                    {s[0]}
-                  </td>
-                  {vals.map((x, j) => {
-                    const lv = x ? Math.min(4, Math.ceil((x / mx) * 4)) : -1;
-                    return (
-                      <td
-                        key={j}
-                        className={`px-2 py-1.5 text-right ${ms[j] === k ? "outline outline-1 -outline-offset-1 outline-[var(--color-brand-600)]" : ""}`}
-                        style={lv >= 0 ? { background: HEAT[lv], color: lv >= 3 ? "#fff" : undefined } : undefined}
-                      >
-                        {x ? fmtK(x) : "·"}
-                      </td>
-                    );
-                  })}
-                  <td className="px-2 py-1.5 text-right font-semibold">{fmtK(tot / ms.length)}</td>
-                </tr>
-              );
-            })}
+            {top.map((t) => heatRow(String(t.i), t.s[0], GROUPS[t.s[1]]?.color ?? "#98a3b3", ms.map((m) => val(t.i, m))))}
+            {rest.length ? heatRow("overige", `Overige · ${rest.length} ${rest.length === 1 ? "categorie" : "categorieën"}`, "#98a3b3", restVals) : null}
             <tr className="border-t border-[var(--color-line-strong)] font-semibold">
               <td className="sticky left-0 z-[1] bg-[var(--color-surface)] px-2 py-1.5 text-left">Totale kosten</td>
               {tots.map((x, j) => (
@@ -991,101 +1013,7 @@ function Heatmap({
   );
 }
 
-/* ---------------------------- Vaste lasten ---------------------------- */
-function VasteLasten({
-  k,
-  closedUpTo,
-  rows,
-  subOf,
-  v,
-  D,
-}: {
-  k: string;
-  closedUpTo: (key: string) => string[];
-  rows: (key: string) => Regel[];
-  subOf: (e: Regel) => [string, string, string];
-  v: (e: Regel) => number;
-  D: KostenData;
-}) {
-  const ms = closedUpTo(k).slice(-6);
-  const per: Record<string, { c: string; g: string; m: Record<string, number> }> = {};
-  for (const m of ms)
-    for (const e of rows(m)) {
-      const s = subOf(e);
-      if (!isBedrijfskost(s[1]) || s[2] !== "vast") continue;
-      const n = D.lev[e[0]]!;
-      const o = (per[n] ??= { c: s[0], g: s[1], m: {} });
-      o.m[m] = (o.m[m] ?? 0) + v(e);
-    }
-  // Vaste leveranciers als balkgrafiek: grootste bovenaan, streepje = gemiddelde.
-  const list = Object.entries(per)
-    .filter(([, o]) => Object.keys(o.m).length >= 3)
-    .map(([n, o]) => {
-      const vals = Object.values(o.m);
-      return {
-        n,
-        c: o.c,
-        g: o.g,
-        av: vals.reduce((a, b) => a + b, 0) / vals.length,
-        now: o.m[k] ?? null,
-      };
-    })
-    .sort((a, b) => (b.now ?? b.av) - (a.now ?? a.av));
-  const max = Math.max(1, ...list.map((o) => Math.max(o.now ?? 0, o.av)));
-
-  return (
-    <Card>
-      <h3 className="text-base font-semibold text-[var(--color-ink)]">Vaste lasten</h3>
-      <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
-        Leveranciers die je bijna elke maand betaalt, grootste bovenaan. De balk is {MNL[+k.slice(5) - 1]}; het streepje
-        is het gemiddelde. Rood betekent: verwacht, maar deze maand niet gezien.
-      </p>
-      <div className="mt-3 grid gap-2">
-        {list.length ? (
-          list.map((o) => {
-            const color = GROUPS[o.g]?.color ?? "#98a3b3";
-            const missing = o.now == null;
-            return (
-              <div key={o.n} className="grid grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-0.5 text-[13px]">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="size-2 shrink-0 rounded-[2px]" style={{ background: color }} />
-                  <span className="truncate font-medium text-[var(--color-ink)]">{o.n}</span>
-                  <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">{o.c}</span>
-                </span>
-                <span className="whitespace-nowrap text-right tabular-nums">
-                  {missing ? (
-                    <span className="inline-flex rounded-full bg-[var(--color-bad-soft)] px-2 py-0.5 text-xs font-medium text-[var(--color-bad)]">
-                      niet gezien
-                    </span>
-                  ) : (
-                    <span className="text-[var(--color-ink)]">{euro(o.now!)}</span>
-                  )}
-                </span>
-                <span className="col-span-full relative h-2 overflow-hidden rounded-full bg-[var(--color-surface-2)]">
-                  {!missing ? (
-                    <span
-                      className="block h-full rounded-full"
-                      style={{ width: `${(o.now! / max) * 100}%`, background: color }}
-                    />
-                  ) : null}
-                  <span
-                    className="absolute top-[-2px] h-[12px] w-0.5 bg-[var(--color-ink)] opacity-50"
-                    style={{ left: `calc(${Math.min(100, (o.av / max) * 100)}% - 1px)` }}
-                    title={`gemiddeld ${euro(o.av)}`}
-                  />
-                </span>
-              </div>
-            );
-          })
-        ) : (
-          <p className="text-sm text-[var(--color-ink-muted)]">Nog geen vaste lasten in beeld.</p>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-/* ----------------------------- Geen kosten ----------------------------- */
+/* -------------------------- Jarno privékosten -------------------------- */
 function GeenKosten({
   k,
   rows,
@@ -1104,10 +1032,10 @@ function GeenKosten({
 
   return (
     <Card>
-      <h3 className="text-base font-semibold text-[var(--color-ink)]">Geen kosten</h3>
+      <h3 className="text-base font-semibold text-[var(--color-ink)]">Jarno privékosten</h3>
       <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
-        Privé-opnames, reserveringen en btw/IB-betalingen. Die gaan van de rekening af, maar tellen niet als
-        bedrijfskosten.
+        Alle privé-uitgaven van Jarno: privé-opnames en reserveringen én btw/IB-betalingen. Die gaan van de rekening af,
+        maar tellen niet mee als bedrijfskosten.
       </p>
       <div className="mt-3 overflow-x-auto">
         {r.length ? (
@@ -1137,7 +1065,7 @@ function GeenKosten({
             </tbody>
           </table>
         ) : (
-          <p className="text-sm text-[var(--color-ink-muted)]">Geen privé-opnames of belastingbetalingen deze maand.</p>
+          <p className="text-sm text-[var(--color-ink-muted)]">Geen privékosten van Jarno deze maand.</p>
         )}
       </div>
     </Card>
