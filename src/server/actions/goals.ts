@@ -6,7 +6,8 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { goalMilestones, goals, goalUpdates } from "@/db/schema";
 import { ForbiddenError, requireInternal, requireOwner } from "@/server/auth/context";
-import { recomputeAndNotify } from "@/server/goals/recompute";
+import { recomputeAllGoals, recomputeAndNotify } from "@/server/goals/recompute";
+import { seedGoals } from "@/server/goals/seed";
 
 export type GoalActionResult = { ok: boolean; message?: string };
 
@@ -14,6 +15,20 @@ function revalidateGoals() {
   revalidatePath("/doelen");
   revalidatePath("/dashboard");
   revalidatePath("/kwaliteit");
+}
+
+/** De 22 Q4-doelen plaatsen (alleen Jarno). Idempotent: doet niets als ze er al staan. */
+export async function seedGoalsNow(): Promise<GoalActionResult> {
+  try {
+    await requireOwner();
+    const { inserted } = await seedGoals();
+    if (inserted > 0) await recomputeAllGoals();
+    revalidateGoals();
+    return { ok: true, message: inserted > 0 ? `${inserted} doelen geplaatst.` : "De doelen stonden er al." };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
 }
 
 const standSchema = z.object({ value: z.number().finite(), note: z.string().trim().max(1000).optional() });

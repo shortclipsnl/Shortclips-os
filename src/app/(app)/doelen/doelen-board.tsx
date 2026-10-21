@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, ChevronDown, Loader2, Pencil } from "lucide-react";
 import type { GoalRow, GoalsOverview } from "@/server/goals/overview";
 import type { GoalStatus } from "@/server/goals/status";
-import { archiveGoal, setGoalOwner, setGoalTarget, toggleGoalMilestone, updateGoalStand } from "@/server/actions/goals";
+import { archiveGoal, seedGoalsNow, setGoalOwner, setGoalTarget, toggleGoalMilestone, updateGoalStand } from "@/server/actions/goals";
 
 type TeamMember = { id: string; name: string };
 
@@ -40,8 +40,50 @@ function daysAgo(iso: string | null): number | null {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
 }
 
+function DoelenLegeStaat({ isOwner }: { isOwner: boolean }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-8 text-center">
+      <h2 className="text-base font-semibold">De Q4-doelen staan nog niet klaar</h2>
+      <p className="mx-auto mt-1 max-w-md text-sm text-[var(--color-ink-muted)]">
+        {isOwner
+          ? "Plaats de 22 doelen voor dit kwartaal. Daarna wijs je per doel een eigenaar toe en werkt de status zich vanzelf bij."
+          : "De doelen voor dit kwartaal worden binnenkort geplaatst door Jarno."}
+      </p>
+      {isOwner ? (
+        <>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                const r = await seedGoalsNow();
+                setMsg(r.message ?? null);
+                if (r.ok) router.refresh();
+              })
+            }
+            className="mt-4 inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          >
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Plaats de Q4-doelen
+          </button>
+          {msg ? <p className="mt-2 text-xs text-[var(--color-ink-muted)]">{msg}</p> : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function DoelenBoard({ overview, isOwner, viewerId, team }: { overview: GoalsOverview; isOwner: boolean; viewerId: string; team: TeamMember[] }) {
   const [filter, setFilter] = useState<string>("alles");
+
+  // Lege staat: de doelen staan nog niet in deze omgeving.
+  if (overview.rows.length === 0) {
+    return <DoelenLegeStaat isOwner={isOwner} />;
+  }
 
   const rows = useMemo(() => {
     if (filter === "alles") return overview.rows;

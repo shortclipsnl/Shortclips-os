@@ -5,6 +5,7 @@ import { goalMilestones, goals, goalSnapshots, goalUpdates, users } from "@/db/s
 import { notify } from "@/server/notifications";
 import { computeGoalStatus, type GoalStatus, type GoalType } from "./status";
 import { METRIC_RESOLVERS } from "./metrics";
+import { seedGoals } from "./seed";
 
 type GoalRecord = typeof goals.$inferSelect;
 
@@ -113,6 +114,9 @@ export async function recomputeAndNotify(goalId: string, now = new Date()): Prom
 /** Nachtelijke job: alle doelen herberekenen, snapshot opslaan, melden bij wissel.
  *  Op maandagochtend ook een herinnering voor doelen met status niet_bijgewerkt. */
 export async function recomputeAllGoals(now = new Date()): Promise<{ processed: number; changed: number }> {
+  // Vangnet: als er nog geen doelen staan (bijv. net na een deploy), plaats ze.
+  // seedGoals is idempotent en doet niets zodra er al doelen bestaan.
+  await seedGoals();
   const all = await db.select({ id: goals.id }).from(goals).where(eq(goals.archived, false));
   let changed = 0;
   const isMonday = now.toLocaleDateString("en-US", { weekday: "short", timeZone: "Europe/Amsterdam" }) === "Mon";
