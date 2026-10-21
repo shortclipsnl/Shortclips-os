@@ -164,14 +164,14 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
       {/* Beschikbaarheid: zelf aangeven wanneer je niet beschikbaar bent. */}
       <AvailabilityBox note={data.availabilityNote} />
 
-      {/* Contactpersoon bij ShortClips — de projectcoördinatoren (Milou, Jiska).
-          Met foto, zodat de editor bij vragen weet wie ze kunnen bereiken via
-          WhatsApp of telefoon. */}
+      {/* Contactpersonen bij ShortClips — Milou links, Jiska rechts. Allebei via
+          WhatsApp bereikbaar (of via de WhatsApp-groep). Met vaste vrije dag,
+          zodat de editor weet met wie hij op welke dag rekening moet houden. */}
       {data.contacts.length > 0 ? (
         <Card>
           <CardHeader
-            title="Contactpersoon bij ShortClips"
-            subtitle="Vragen over een video of je planning? Onze projectcoördinatoren helpen je graag — bereik ze via WhatsApp of bel ze gerust."
+            title="Jouw contactpersonen bij ShortClips"
+            subtitle="Vragen over een video of je planning? Bereik Milou of Jiska via WhatsApp — of stel je vraag in de WhatsApp-groep. Houd rekening met wie wanneer vrij is."
           />
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {data.contacts.map((c) => {
@@ -182,6 +182,9 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{c.fullName}</div>
                     <div className="text-xs text-[var(--color-ink-muted)]">Projectcoördinator</div>
+                    {c.offDay ? (
+                      <div className="mt-0.5 text-2xs font-medium text-[var(--color-warn)]">Werkt niet op {c.offDay}</div>
+                    ) : null}
                     {c.phone ? (
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
                         {digits ? (

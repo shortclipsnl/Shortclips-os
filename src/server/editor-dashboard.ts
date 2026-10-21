@@ -117,12 +117,28 @@ export async function getEditorDashboard(viewer: Viewer) {
     // (Milou, Jiska). Met foto en telefoon, zodat de editor ze makkelijk kan
     // bereiken via WhatsApp of bellen.
     db
-      .select({ id: users.id, fullName: users.fullName, avatarUrl: users.avatarUrl, phone: users.phone })
+      .select({ id: users.id, fullName: users.fullName, email: users.email, avatarUrl: users.avatarUrl, phone: users.phone })
       .from(users)
       .where(and(isNull(users.deletedAt), eq(users.status, "active"), eq(users.primaryRole, "project_coordinator")))
       .orderBy(asc(users.fullName))
       .limit(4),
   ]);
+
+  // Vaste contactpersonen voor editors: Milou links, Jiska rechts. Allebei via
+  // WhatsApp bereikbaar (of via de WhatsApp-groep). Vaste vrije dag erbij, zodat
+  // editors weten wie ze op welke dag beter niet benaderen.
+  const CONTACT_RANK: Record<string, number> = { "milou@shortclips.nl": 0, "jiska@shortclips.nl": 1 };
+  const OFF_DAY: Record<string, string> = { "milou@shortclips.nl": "maandag", "jiska@shortclips.nl": "donderdag" };
+  const contactRank = (email: string) => CONTACT_RANK[email.toLowerCase()] ?? 99;
+  const contacts = [...contactRows]
+    .sort((a, b) => contactRank(a.email) - contactRank(b.email) || a.fullName.localeCompare(b.fullName, "nl"))
+    .map((c) => ({
+      id: c.id,
+      fullName: c.fullName,
+      avatarUrl: c.avatarUrl,
+      phone: c.phone,
+      offDay: OFF_DAY[c.email.toLowerCase()] ?? null,
+    }));
 
   // Huisstijl & referenties per klant waar de editor werk voor heeft (§5):
   // Drive-map "Branding" + klantkennis over stijl/tone-of-voice. Alleen bestaande
@@ -199,7 +215,7 @@ export async function getEditorDashboard(viewer: Viewer) {
     branding,
     deliveredByMonth,
     availabilityNote: meRows[0]?.note ?? null,
-    contacts: contactRows,
+    contacts,
     stats: {
       delivered,
       inProgress: Number(row.lopend ?? 0),

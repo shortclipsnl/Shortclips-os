@@ -527,6 +527,48 @@ export async function runDailyTeamTodoReminder() {
 }
 
 /**
+ * Vrijdagherinnering voor editors: op vrijdagochtend (09:00 Amsterdam) een
+ * melding om vóór 13:00 af te ronden wat nog deze week de deur uit kan — zodat
+ * het team het vóór het weekend naar de klant kan sturen (buiten werktijd
+ * sturen we niets richting klanten). Eén melding per editor per vrijdag.
+ * De cron draait op twee UTC-tijden; de lokale-uur-check laat er precies één
+ * om 09:xx Amsterdam doorkomen (zomer- én wintertijd).
+ */
+export async function runEditorFridayWrapUp() {
+  return runJob("monday", "reminders.editor_friday_wrapup", {}, async (ctx) => {
+    const now = new Date();
+    const weekday = now.toLocaleDateString("en-US", { weekday: "short", timeZone: "Europe/Amsterdam" });
+    const hhmm = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" });
+    const hour = Number(hhmm.slice(0, 2));
+    if (weekday !== "Fri" || hour !== 9) {
+      ctx.log(`Lokaal ${weekday} ${hhmm} (Amsterdam) — niet vrijdag 09:xx, overgeslagen.`);
+      return;
+    }
+
+    const editors = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(isNull(users.deletedAt), eq(users.status, "active"), eq(users.primaryRole, "editor")));
+
+    const fri = day(0);
+    for (const e of editors) {
+      ctx.counters.processed++;
+      await notify({
+        userIds: [e.id],
+        type: "editor_friday_wrapup",
+        level: "warning",
+        title: "Vrijdag: rond vóór 13:00 af wat nog deze week de deur uit kan",
+        body: "Maak de video's en taken die nog deze week opgeleverd kunnen worden vóór 13:00 af, zodat we ze nog vóór het weekend naar de klant kunnen sturen. Buiten werktijd sturen we niets richting klanten.",
+        href: "/dashboard",
+        dedupeKey: `editor_friday_wrapup:${e.id}:${fri}`,
+      });
+      ctx.counters.updated++;
+    }
+    ctx.log(`${ctx.counters.updated} editors een vrijdag-afrondherinnering gestuurd`);
+  });
+}
+
+/**
  * Vrijdagcheck als melding (vervangt de losse pagina): controleert of volgende
  * week rond staat en stuurt de uitkomst als één melding naar de coördinator(en)
  * en content creative. Eén melding per week (dedupe). Bedoeld voor een cron op
