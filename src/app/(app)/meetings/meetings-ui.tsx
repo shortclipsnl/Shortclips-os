@@ -119,6 +119,34 @@ export function DeleteMeetingButton({ id }: { id: string }) {
   );
 }
 
+/** Compacte verwijderknop voor in de meetinglijst (naast de rij-link). Vraagt
+ *  eerst om bevestiging, zodat een verkeerd toegevoegde meeting makkelijk weg
+ *  kan zonder per ongeluk te verwijderen. */
+export function DeleteMeetingRowButton({ id, title }: { id: string; title: string }) {
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      aria-label={`Meeting "${title}" verwijderen`}
+      title="Meeting verwijderen"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm(`Meeting "${title}" verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return;
+        start(async () => {
+          await deleteMeeting(id);
+          router.refresh();
+        });
+      }}
+      className="inline-flex shrink-0 items-center rounded-[var(--radius-sm)] p-1.5 text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-bad)] disabled:opacity-60"
+    >
+      {pending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+    </button>
+  );
+}
+
 export function ItemActions({ id, kind, hasTask }: { id: string; kind: string; hasTask: boolean }) {
   const [pending, start] = useTransition();
   const router = useRouter();

@@ -9,7 +9,7 @@ import { listAssignableUsers } from "@/server/clients";
 import { ensureWeeklyMeeting } from "@/server/meetings";
 import { Avatar, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/format";
-import { AddItemForm, NewMeetingForm } from "./meetings-ui";
+import { AddItemForm, DeleteMeetingRowButton, NewMeetingForm } from "./meetings-ui";
 
 export const metadata: Metadata = { title: "Teammeetings" };
 export const dynamic = "force-dynamic";
@@ -122,8 +122,8 @@ export default async function MeetingsPage() {
 
 function MeetingRow({ m }: { m: typeof teamMeetings.$inferSelect }) {
   return (
-    <li>
-      <Link href={`/meetings/${m.id}`} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-[var(--color-surface-2)]">
+    <li className="flex items-center gap-2 px-5 py-3 hover:bg-[var(--color-surface-2)]">
+      <Link href={`/meetings/${m.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3">
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium">{m.title}</span>
           <span className="block truncate text-xs text-[var(--color-ink-muted)]">
@@ -132,6 +132,7 @@ function MeetingRow({ m }: { m: typeof teamMeetings.$inferSelect }) {
         </span>
         <span className="shrink-0 text-xs text-[var(--color-brand-600)]">openen →</span>
       </Link>
+      <DeleteMeetingRowButton id={m.id} title={m.title} />
     </li>
   );
 }
