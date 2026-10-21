@@ -2,16 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import {
-  ArrowUpRight,
   CalendarClock,
   ExternalLink,
-  FileText,
-  Folder,
   Sparkles,
 } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getClientHub, type ClientHub } from "@/server/clients";
 import { ScriptHistory } from "./script-history";
+import { FilesBrowser } from "./files-browser";
 import {
   Avatar,
   Badge,
@@ -686,51 +684,7 @@ function KnowledgeTab({ hub }: { hub: ClientHub }) {
 /* ---------------------------- Documenten --------------------------- */
 
 function FilesTab({ hub }: { hub: ClientHub }) {
-  if (hub.files.length === 0)
-    return (
-      <Card>
-        <EmptyState
-          title="Geen bestanden"
-          description="Koppel de Google Drive-map van deze klant bij Koppelingen; de inhoud verschijnt dan hier."
-          icon={<Folder className="size-6" />}
-        />
-      </Card>
-    );
-
-  // Drive-stijl: mappen eerst, dan bestanden — allemaal netjes onder elkaar,
-  // dezelfde indeling als in Google Drive zodat er geen verwarring ontstaat.
-  const items = [...hub.files].sort((a, b) => (a.isFolder === b.isFolder ? 0 : a.isFolder ? -1 : 1));
-
-  return (
-    <Card padded={false}>
-      <div className="flex items-center justify-between gap-2 px-5 py-3 text-xs text-[var(--color-ink-faint)]">
-        <span className="font-semibold uppercase tracking-wide">Documenten</span>
-        <span>{plural(hub.files.length, "item", "items")}</span>
-      </div>
-      <ul className="divide-y divide-[var(--color-line)] border-t border-[var(--color-line)]">
-        {items.map((f) => (
-          <li key={f.id}>
-            <a
-              href={f.externalUrl ?? "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 px-5 py-2.5 hover:bg-[var(--color-surface-sunken)]/60"
-            >
-              {f.isFolder ? (
-                <Folder className="size-5 shrink-0 text-[var(--color-brand-500)]" strokeWidth={1.75} />
-              ) : (
-                <FileText className="size-5 shrink-0 text-[var(--color-ink-faint)]" strokeWidth={1.75} />
-              )}
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">{f.name}</span>
-              {f.category ? <span className="hidden shrink-0 text-xs text-[var(--color-ink-muted)] sm:block">{f.category}</span> : null}
-              <span className="hidden shrink-0 text-xs text-[var(--color-ink-faint)] md:block">{formatDate(f.modifiedAt)}</span>
-              <ArrowUpRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
-            </a>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
+  return <FilesBrowser files={hub.files} />;
 }
 
 /* ----------------------------- Contacten --------------------------- */

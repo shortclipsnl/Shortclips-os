@@ -142,11 +142,20 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
                 {w.days.map((d) => {
                   const isToday = d.date === todayIso;
                   return (
-                    <li key={d.date} className={`flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:gap-3 ${d.items.length === 0 ? "bg-[var(--color-surface-sunken)]/40" : ""}`}>
-                      {/* Daglabel */}
-                      <div className={`shrink-0 pt-0.5 text-xs font-bold capitalize sm:w-36 ${isToday ? "text-[var(--color-brand-700)]" : d.items.length === 0 ? "text-[var(--color-ink-faint)]" : "text-[var(--color-ink)]"}`}>
+                    <li
+                      key={d.date}
+                      className={`flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:gap-3 ${
+                        isToday
+                          ? "bg-[var(--color-brand-50)] shadow-[inset_4px_0_0_var(--color-brand-600)]"
+                          : d.items.length === 0
+                            ? "bg-[var(--color-surface-sunken)]/40"
+                            : ""
+                      }`}
+                    >
+                      {/* Daglabel — vandaag valt extra op met een gevulde pil + gekleurde rij. */}
+                      <div className={`flex shrink-0 items-center gap-1.5 pt-0.5 text-xs font-bold capitalize sm:w-36 ${isToday ? "text-[var(--color-brand-700)]" : d.items.length === 0 ? "text-[var(--color-ink-faint)]" : "text-[var(--color-ink)]"}`}>
                         {dayLabel(d.date)}
-                        {isToday ? <span className="ml-1 rounded bg-[var(--color-brand-600)] px-1 py-0.5 text-[10px] font-bold text-white">vandaag</span> : null}
+                        {isToday ? <span className="rounded-full bg-[var(--color-brand-600)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Vandaag</span> : null}
                       </div>
                       {/* Items van die dag */}
                       <div className="min-w-0 flex-1 space-y-1">
