@@ -5,12 +5,16 @@ import { useRouter } from "next/navigation";
 import { Link2, Upload } from "lucide-react";
 import { Button, Card } from "@/components/ui";
 import { addVideoByUrl } from "@/server/actions/video-intelligence";
+import { canCompress, compressVideo } from "./compress-video";
 
 type ClientOption = { id: string; name: string };
 
 // Maximale uploadgrootte. Supabase Free staat 50 MB per bestand toe; met een
 // betaald plan kan dit omhoog (pas dit dan samen met de opslaglimiet aan).
 const MAX_UPLOAD_MB = 50;
+// Boven deze grootte verkleinen we de video eerst in de browser (720p) zodat hij
+// onder de limiet past. Kleinere bestanden gaan ongewijzigd en dus sneller door.
+const COMPRESS_OVER_MB = 48;
 
 export function AddVideo({ clients }: { clients: ClientOption[] }) {
   const router = useRouter();
@@ -20,6 +24,7 @@ export function AddVideo({ clients }: { clients: ClientOption[] }) {
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
 
@@ -47,15 +52,28 @@ export function AddVideo({ clients }: { clients: ClientOption[] }) {
 
   async function submitUpload() {
     setError(null);
-    const file = fileRef.current?.files?.[0];
+    const original = fileRef.current?.files?.[0];
     if (!clientId) return setError("Kies een klant.");
-    if (!file) return setError("Kies een videobestand.");
-    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
-      const mb = Math.round(file.size / (1024 * 1024));
-      return setError(`Deze video is te groot (${mb} MB). De opslag staat nu maximaal ${MAX_UPLOAD_MB} MB per video toe. Exporteer de video iets kleiner (bijv. 1080p of een kortere clip).`);
-    }
+    if (!original) return setError("Kies een videobestand.");
     setUploading(true);
     try {
+      // 0) Grote video's eerst in de browser verkleinen (720p) zodat ze passen.
+      let file = original;
+      if (original.size > COMPRESS_OVER_MB * 1024 * 1024 && canCompress()) {
+        try {
+          setStatus("Video verkleinen… 0%");
+          file = await compressVideo(original, (pct) => setStatus(`Video verkleinen… ${pct}%`));
+        } catch {
+          file = original; // lukt verkleinen niet, dan proberen we het origineel
+        }
+      }
+      if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+        const mb = Math.round(file.size / (1024 * 1024));
+        setError(`Deze video is te groot (${mb} MB), ook na verkleinen. De opslag staat maximaal ${MAX_UPLOAD_MB} MB per video toe.`);
+        return;
+      }
+      setStatus("Uploaden…");
+
       // 1) Analyse aanmaken + upload-bestemming ophalen.
       const initRes = await fetch("/api/video-intelligence/upload-init", {
         method: "POST",
@@ -92,6 +110,7 @@ export function AddVideo({ clients }: { clients: ClientOption[] }) {
       setError("Upload mislukt.");
     } finally {
       setUploading(false);
+      setStatus(null);
     }
   }
 
@@ -135,8 +154,8 @@ export function AddVideo({ clients }: { clients: ClientOption[] }) {
           <div className="space-y-2">
             <input ref={fileRef} type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska" className="block w-full text-sm" />
             <div className="flex items-center justify-between gap-3">
-              <p className="text-2xs text-[var(--color-ink-faint)]">Max {MAX_UPLOAD_MB} MB per video. mp4/mov/webm/mkv.</p>
-              <Button onClick={submitUpload} disabled={busy}>{uploading ? "Uploaden…" : "Uploaden & analyseren"}</Button>
+              <p className="text-2xs text-[var(--color-ink-faint)]">Grote 4K-video&apos;s worden automatisch verkleind. mp4/mov/webm/mkv.</p>
+              <Button onClick={submitUpload} disabled={busy}>{uploading ? (status ?? "Bezig…") : "Uploaden & analyseren"}</Button>
             </div>
           </div>
         )}
