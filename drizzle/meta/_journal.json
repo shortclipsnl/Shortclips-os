@@ -365,6 +365,13 @@
       "when": 1792609018001,
       "tag": "0051_sloppy_scrambler",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1792611133069,
+      "tag": "0052_lovely_snowbird",
+      "breakpoints": true
     }
   ]
 }

@@ -13,3 +13,4 @@ export * from "./video-intelligence";
 export * from "./kennisbank";
 export * from "./kosten";
 export * from "./goals";
+export * from "./awards";
