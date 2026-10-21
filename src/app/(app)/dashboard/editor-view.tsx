@@ -1,42 +1,59 @@
 import Link from "next/link";
 import { AlertTriangle, FileText, Film, CheckCircle2, Clock } from "lucide-react";
 import { getEditorDashboard } from "@/server/editor-dashboard";
+import { listEditorBoard } from "@/server/editor-board";
 import type { Viewer } from "@/server/auth/context";
 import { Card, CardHeader, ClientLogo, EmptyState, Stat } from "@/components/ui";
 import { pct, plural, relativeDays } from "@/lib/format";
+import { isFirstVersionPending } from "@/lib/edit-deadline";
+import { EDIT_PHASE_META } from "@/lib/statuses";
 
 /**
  * Dashboard voor editors: zo compact mogelijk. Alleen wat ze echt moeten weten —
  * wat komt eraan, hun video's op deadlinevolgorde en hun eigen cijfers. Downloaden
  * en het script openen doen ze op de Editing-pagina.
+ *
+ * Bron is bewust hetzelfde board als de Editing-pagina (`listEditorBoard`), zodat
+ * Vandaag en Editing exact hetzelfde verhaal vertellen. Overal geldt de INTERNE
+ * deadline (eerste versie = opname + 7 werkdagen), niet de ruimere klantdeadline.
  */
 export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
-  const data = await getEditorDashboard(viewer);
+  const [data, board] = await Promise.all([getEditorDashboard(viewer), listEditorBoard(viewer)]);
   const firstName = viewer.fullName.split(" ")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
 
-  const todayList = data.queue.filter(
-    (v) => v.dueOn && v.dueOn <= new Date().toISOString().slice(0, 10),
-  );
+  // Alles wat nog niet is afgerond staat op het bord; op volgorde van de interne
+  // deadline (eerste versie), het meest urgente bovenaan.
+  const active = board
+    .filter((v) => v.phase !== "afgerond")
+    .sort((a, b) => (a.editorDueOn ?? "9999").localeCompare(b.editorDueOn ?? "9999"));
+
+  // Tellers op basis van de INTERNE deadline, alleen voor de eerste versie
+  // (daarna is die versie al opgeleverd en geldt de klant-/revisieklok).
+  const overdue = active.filter((v) => v.editorOverdue).length;
+  const todayOrEarlier = active.filter(
+    (v) => isFirstVersionPending(v.status) && v.editorDueOn && v.editorDueOn <= today,
+  ).length;
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-6">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Hoi {firstName}</h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          {data.queue.length === 0
+          {active.length === 0
             ? "Je hebt op dit moment geen openstaand editwerk."
-            : `${plural(data.queue.length, "video", "video's")} toegewezen${
-                todayList.length > 0 ? `, waarvan ${todayList.length} vandaag of eerder af moeten` : ""
+            : `${plural(active.length, "video", "video's")} op je bord${
+                todayOrEarlier > 0 ? `, waarvan ${todayOrEarlier} vandaag of eerder af moeten (eerste versie)` : ""
               }.`}
         </p>
       </div>
 
-      {data.overdue > 0 ? (
+      {overdue > 0 ? (
         <div className="flex items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--color-bad)]/25 bg-[var(--color-bad-soft)] px-4 py-3">
           <AlertTriangle className="mt-0.5 size-5 shrink-0 text-[var(--color-bad)]" strokeWidth={2} />
           <p className="text-sm text-[#a3271c]">
             <strong className="font-semibold text-[var(--color-ink)]">
-              {plural(data.overdue, "video staat", "video's staan")} over de deadline.
+              {plural(overdue, "eerste versie staat", "eerste versies staan")} over de interne deadline.
             </strong>{" "}
             Lukt het niet op tijd? Geef dat door aan je projectcoördinator.
           </p>
@@ -47,30 +64,31 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
       <div>
         <h2 className="mb-2 text-sm font-bold tracking-tight">Wat komt er aan</h2>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Stat label="Nu op je bord" value={data.queue.length} tone="info" icon={<Film />} emphasis />
-          <Stat label="Vandaag of eerder af" value={todayList.length} tone={todayList.length > 0 ? "warn" : "good"} icon={<Clock />} emphasis={todayList.length > 0} />
-          <Stat label="Over deadline" value={data.overdue} tone={data.overdue > 0 ? "bad" : "good"} icon={<AlertTriangle />} emphasis={data.overdue > 0} />
+          <Stat label="Nu op je bord" value={active.length} tone="info" icon={<Film />} emphasis />
+          <Stat label="Vandaag of eerder af" value={todayOrEarlier} tone={todayOrEarlier > 0 ? "warn" : "good"} icon={<Clock />} emphasis={todayOrEarlier > 0} />
+          <Stat label="Over interne deadline" value={overdue} tone={overdue > 0 ? "bad" : "good"} icon={<AlertTriangle />} emphasis={overdue > 0} />
         </div>
       </div>
 
-      {/* Jouw video's — compact, op deadlinevolgorde. Alleen klant, titel en
-          deadline; downloaden en het script openen doe je op de Editing-pagina. */}
+      {/* Jouw video's — compact, op volgorde van de interne deadline. Zelfde set
+          als de Editing-pagina. Downloaden en het script openen doe je daar. */}
       <Card padded={false}>
         <div className="p-5 pb-3">
           <CardHeader
             title="Jouw video's"
-            subtitle="Op volgorde van deadline. Klik een video aan voor de download en het script."
+            subtitle="Op volgorde van je interne deadline (eerste versie, 7 werkdagen na de opname). Klik een video aan voor de download en het script."
           />
         </div>
-        {data.queue.length === 0 ? (
+        {active.length === 0 ? (
           <EmptyState
-            title="Niets toegewezen"
+            title="Niets op je bord"
             description="Zodra er een video aan je wordt toegewezen, verschijnt die hier."
           />
         ) : (
           <ul className="divide-y divide-[var(--color-line)]">
-            {data.queue.map((v) => {
-              const overdue = v.dueOn && v.dueOn < new Date().toISOString().slice(0, 10);
+            {active.map((v) => {
+              const phaseMeta = EDIT_PHASE_META[v.phase];
+              const needsEditor = phaseMeta.waitOn === "Editor";
               return (
                 <li key={v.id}>
                   <Link href={`/videos/${v.id}`} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-[var(--color-surface-2)]">
@@ -78,14 +96,19 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
                       <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={22} />
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium">{v.title}</span>
-                        <span className="block truncate text-xs text-[var(--color-ink-muted)]">{v.clientName}</span>
+                        <span className="block truncate text-xs text-[var(--color-ink-muted)]">
+                          {v.clientName} · <span style={{ color: phaseMeta.color }} className="font-medium">{phaseMeta.label}</span>
+                        </span>
                       </span>
                     </span>
-                    {v.dueOn ? (
-                      <span className={`shrink-0 text-xs font-semibold ${overdue ? "text-[var(--color-bad)]" : "text-[var(--color-ink-muted)]"}`}>
-                        {relativeDays(v.dueOn)}
-                      </span>
-                    ) : null}
+                    <span className="flex shrink-0 flex-col items-end gap-0.5">
+                      {v.editorDueOn ? (
+                        <span className={`text-xs font-semibold ${v.editorOverdue ? "text-[var(--color-bad)]" : needsEditor ? "text-[var(--color-warn)]" : "text-[var(--color-ink-muted)]"}`}>
+                          {relativeDays(v.editorDueOn)}
+                        </span>
+                      ) : null}
+                      {needsEditor ? <span className="text-2xs font-medium text-[var(--color-ink-faint)]">jouw actie</span> : null}
+                    </span>
                   </Link>
                 </li>
               );

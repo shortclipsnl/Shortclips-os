@@ -17,6 +17,8 @@ import { notify } from "@/server/notifications";
 import { getVrijdagcheck } from "@/server/vrijdagcheck";
 import { CORE_STAFF_EMAILS } from "@/server/core-staff";
 import { addWorkingDays } from "@/lib/workdays";
+import { nlHolidaySet } from "@/lib/holidays";
+import { internalDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
 import { runJob } from "./runner";
 
 const day = (offset: number) => {
@@ -359,42 +361,65 @@ export async function runEditorDeadlineReminders() {
   return runJob("monday", "reminders.editor_deadlines", {}, async (ctx) => {
     const today = day(0);
     const soon = day(2);
-    const editorStages = ["editing", "editor_revision", "awaiting_editor", "internal_review"] as const;
+    const holidays = nlHolidaySet();
+    // Alleen de eerste-versie-fases: hiervoor geldt de INTERNE deadline (opname +
+    // 7 werkdagen). Daarna is de eerste versie al opgeleverd.
+    const firstVersionStages = ["recorded", "footage_upload", "awaiting_editor", "editing", "editor_revision"] as const;
 
     const rows = await db
       .select({
+        id: deliverables.id,
+        title: deliverables.title,
+        status: deliverables.status,
+        shootOn: deliverables.shootOn,
+        dueOn: deliverables.dueOn,
         editorId: deliverables.editorId,
-        editorName: users.fullName,
-        overdue: sql<number>`count(*) filter (where ${deliverables.dueOn} < ${today})`,
-        dueSoon: sql<number>`count(*) filter (where ${deliverables.dueOn} >= ${today} and ${deliverables.dueOn} <= ${soon})`,
+        clientName: clients.name,
       })
       .from(deliverables)
-      .innerJoin(users, eq(users.id, deliverables.editorId))
+      .innerJoin(clients, eq(clients.id, deliverables.clientId))
       .where(
         and(
           isNull(deliverables.deletedAt),
-          inArray(deliverables.status, [...editorStages]),
-          lte(deliverables.dueOn, soon),
+          inArray(deliverables.status, [...firstVersionStages]),
+          sql`${deliverables.editorId} is not null`,
         ),
-      )
-      .groupBy(deliverables.editorId, users.fullName);
+      );
 
+    // Per editor groeperen op basis van de interne deadline (in JS berekend; het
+    // werkdagen-rekenwerk kan niet in SQL).
+    type Proj = { id: string; label: string };
+    const byEditor = new Map<string, { overdue: Proj[]; soon: Proj[] }>();
     for (const r of rows) {
-      const overdue = Number(r.overdue);
-      const dueSoon = Number(r.dueSoon);
-      if (overdue + dueSoon === 0 || !r.editorId) continue;
+      if (!r.editorId || !isFirstVersionPending(r.status)) continue;
+      const internal = internalDeadline(r.shootOn, r.dueOn, holidays);
+      if (!internal) continue;
+      const g = byEditor.get(r.editorId) ?? { overdue: [], soon: [] };
+      const proj: Proj = { id: r.id, label: `${r.clientName} — ${r.title}` };
+      if (internal < today) g.overdue.push(proj);
+      else if (internal <= soon) g.soon.push(proj);
+      byEditor.set(r.editorId, g);
+    }
+
+    for (const [editorId, g] of byEditor) {
+      const total = g.overdue.length + g.soon.length;
+      if (total === 0) continue;
       ctx.counters.processed++;
       const parts: string[] = [];
-      if (overdue > 0) parts.push(`${overdue} te laat`);
-      if (dueSoon > 0) parts.push(`${dueSoon} met deadline binnen 2 dagen`);
+      if (g.overdue.length > 0) parts.push(`${g.overdue.length} over de interne deadline`);
+      if (g.soon.length > 0) parts.push(`${g.soon.length} met interne deadline binnen 2 dagen`);
+      const projects = [...g.overdue, ...g.soon];
+      const namen = projects.slice(0, 4).map((p) => p.label).join(" · ") + (projects.length > 4 ? ` · +${projects.length - 4} meer` : "");
+      // Eén project → direct doorklikbaar; meerdere → naar het eigen editingbord.
+      const href = total === 1 ? `/videos/${projects[0]!.id}` : "/videos";
       await notify({
-        userIds: [r.editorId],
+        userIds: [editorId],
         type: "editor_deadlines",
-        level: overdue > 0 ? "warning" : "info",
-        title: overdue > 0 ? "Je hebt video's over de deadline" : "Deadlines komen eraan",
-        body: `${parts.join(" · ")}. Pak deze met voorrang op.`,
-        href: "/videos?filter=mijn-werk",
-        dedupeKey: `editor_deadlines:${r.editorId}:${today}`,
+        level: g.overdue.length > 0 ? "warning" : "info",
+        title: g.overdue.length > 0 ? "Eerste versie over de interne deadline" : "Interne deadline komt eraan",
+        body: `${parts.join(" · ")}: ${namen}. Pak deze met voorrang op.`,
+        href,
+        dedupeKey: `editor_deadlines:${editorId}:${today}`,
       });
       ctx.counters.updated++;
     }

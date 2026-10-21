@@ -39,13 +39,18 @@ function fmtShort(d: string): string {
   return new Date(y!, (m ?? 1) - 1, day).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
 }
 
-function priority(v: EditorBoardVideo): { label: string; color: string } | null {
-  if (v.phase === "afgerond" || v.workdaysToDeadline === null) return null;
-  // "Dag X van 14" maakt in één oogopslag duidelijk hoeveel werkdagen er nog over
-  // zijn (14 werkdagen van opname tot oplevering).
-  const voortgang = `Dag ${v.elapsedWorkdays} van ${v.totalWorkdays}`;
-  if (v.workdaysToDeadline < 0) return { label: `Te laat · ${Math.abs(v.workdaysToDeadline)} wd`, color: "var(--color-bad)" };
-  if (v.workdaysToDeadline <= 2) return { label: `${voortgang} · bijna deadline`, color: "var(--color-warn)" };
+function priority(v: EditorBoardVideo, editorView = false): { label: string; color: string } | null {
+  // In editorperspectief rekenen we met de interne deadline (opname + 7 wd);
+  // anders met de klantdeadline (14 wd).
+  const wtd = editorView ? v.editorWorkdaysToDeadline : v.workdaysToDeadline;
+  const elapsed = editorView ? v.editorElapsedWorkdays : v.elapsedWorkdays;
+  const total = editorView ? v.editorTotalWorkdays : v.totalWorkdays;
+  if (v.phase === "afgerond" || wtd === null) return null;
+  // "Dag X van N" maakt in één oogopslag duidelijk hoeveel werkdagen er nog over
+  // zijn (editor: 7 werkdagen voor de eerste versie; klant: 14 tot oplevering).
+  const voortgang = `Dag ${elapsed} van ${total}`;
+  if (wtd < 0) return { label: `Te laat · ${Math.abs(wtd)} wd`, color: "var(--color-bad)" };
+  if (wtd <= 2) return { label: `${voortgang} · bijna deadline`, color: "var(--color-warn)" };
   return { label: voortgang, color: "var(--color-info)" };
 }
 
@@ -60,12 +65,15 @@ export function EditorBoardTable({
   canEdit,
   canAssign,
   showTabs = true,
+  editorView = false,
 }: {
   videos: EditorBoardVideo[];
   editors: Editor[];
   canEdit: boolean;
   canAssign: boolean;
   showTabs?: boolean;
+  /** Editorperspectief: toon de interne deadline (opname + 7 wd) i.p.v. de klantdeadline. */
+  editorView?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(["afgerond"]));
   const [editor, setEditor] = useState<string>("alle");
@@ -177,7 +185,7 @@ export function EditorBoardTable({
                 </button>
                 {open ? (
                   list.length > 0 ? (
-                    list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} phaseColor={meta.color} />)
+                    list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} phaseColor={meta.color} editorView={editorView} />)
                   ) : (
                     <p className="border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2.5 text-2xs text-[var(--color-ink-faint)]">Nog geen video&apos;s in deze fase.</p>
                   )
@@ -254,13 +262,15 @@ function TextTab({ active, onClick, children }: { active: boolean; onClick: () =
   );
 }
 
-function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVideo; editors: Editor[]; canEdit: boolean; canAssign: boolean; phaseColor: string }) {
+function Row({ v, editors, canEdit, canAssign, phaseColor, editorView = false }: { v: EditorBoardVideo; editors: Editor[]; canEdit: boolean; canAssign: boolean; phaseColor: string; editorView?: boolean }) {
   const [pending, start] = useTransition();
   const router = useRouter();
   const run = (fn: () => Promise<unknown>) => start(async () => { await fn(); router.refresh(); });
   const ecolor = editorColor(v.editorName ?? "");
-  const prio = priority(v);
-  const pct = Math.min(100, Math.max(6, Math.round((v.elapsedWorkdays / Math.max(1, v.totalWorkdays)) * 100)));
+  const prio = priority(v, editorView);
+  const elapsed = editorView ? v.editorElapsedWorkdays : v.elapsedWorkdays;
+  const total = editorView ? v.editorTotalWorkdays : v.totalWorkdays;
+  const pct = Math.min(100, Math.max(6, Math.round((elapsed / Math.max(1, total)) * 100)));
 
   return (
     <div className="grid items-stretch gap-px border-b border-[var(--color-line)] bg-[var(--color-surface)] text-sm hover:bg-[var(--color-surface-sunken)]/40" style={{ gridTemplateColumns: GRID }}>
@@ -292,7 +302,7 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
       </div>
 
       {/* Deadline — batterij met datumbereik; aanklikken om beide datums (opname + deadline) te wijzigen */}
-      <DeadlineCell v={v} pct={pct} canEdit={canEdit} onSave={(dates) => run(() => setEditingVideoDeadline(v.id, dates))} />
+      <DeadlineCell v={v} pct={pct} canEdit={canEdit} editorView={editorView} onSave={(dates) => run(() => setEditingVideoDeadline(v.id, dates))} />
 
       {/* Fase */}
       <div className="p-0.5">
@@ -342,19 +352,23 @@ function Row({ v, editors, canEdit, canAssign, phaseColor }: { v: EditorBoardVid
 
 /** Deadline-batterij; voor wie mag bewerken: aanklikken opent twee datumvelden
  *  (opnamedatum én opleverdeadline), die los van elkaar aangepast kunnen worden. */
-function DeadlineCell({ v, pct, canEdit, onSave }: { v: EditorBoardVideo; pct: number; canEdit: boolean; onSave: (dates: { shootOn: string | null }) => void }) {
+function DeadlineCell({ v, pct, canEdit, onSave, editorView = false }: { v: EditorBoardVideo; pct: number; canEdit: boolean; onSave: (dates: { shootOn: string | null }) => void; editorView?: boolean }) {
   const [open, setOpen] = useState(false);
   const [shootVal, setShootVal] = useState(v.shootDate ?? "");
   // De deadline is altijd 14 werkdagen na de opname — automatisch, niet apart in
   // te vullen. We tonen 'm alvast ter controle; de server zet 'm bij het opslaan.
   const autoDeadline = shootVal ? addWorkingDays(shootVal, 14, nlHolidaySet()) : "";
 
+  // Editor ziet de interne deadline (opname + 7 wd); de coördinator de klantdeadline.
+  const endDate = editorView ? v.editorDueOn : v.dueOn;
+  const barColor = editorView ? v.editorBatteryColor : v.batteryColor;
+
   const bar =
-    v.dueOn && v.shootDate ? (
+    endDate && v.shootDate ? (
       <div className="relative h-6 w-full overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
-        <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, background: BATTERY_COLOR[v.batteryColor] }} />
+        <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, background: BATTERY_COLOR[barColor] }} />
         <span className="absolute inset-0 grid place-items-center text-2xs font-semibold text-[var(--color-ink)]">
-          {fmtShort(v.shootDate)} – {fmtShort(v.dueOn)}
+          {fmtShort(v.shootDate)} – {fmtShort(endDate)}
         </span>
       </div>
     ) : (

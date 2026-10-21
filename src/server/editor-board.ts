@@ -5,6 +5,7 @@ import { clients, deliverables, users } from "@/db/schema";
 import { scopeToClients, type Viewer } from "@/server/auth/context";
 import { subWorkingDays, workingDaysUntil } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
+import { EDITOR_LEAD_DAYS, internalDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
 import { type EditPhase, type VideoStage } from "@/lib/statuses";
 
 /**
@@ -55,7 +56,7 @@ export type EditorBoardVideo = {
   scriptHref: string | null;
   /** Downloadlink naar het beeldmateriaal (opname-footage of Drive-map). */
   downloadHref: string | null;
-  /** Werkdagen tot de deadline (negatief = te laat). null als er geen deadline is. */
+  /** Werkdagen tot de KLANTdeadline (negatief = te laat). null als er geen deadline is. */
   workdaysToDeadline: number | null;
   overdue: boolean;
   /** Startdatum voor de batterij (opname = deadline − 14 werkdagen). */
@@ -63,6 +64,16 @@ export type EditorBoardVideo = {
   elapsedWorkdays: number;
   totalWorkdays: number;
   batteryColor: "groen" | "blauw" | "oranje" | "rood";
+  /* --- Editorperspectief: de INTERNE deadline (eerste versie = opname + 7
+     werkdagen) i.p.v. de klantdeadline. Zo ziet de editor niet de ruime
+     klantdatum maar zijn eigen, strakke deadline. Voor fases ná de eerste versie
+     valt dit terug op de klantdeadline (de resterende tijd tot oplevering). --- */
+  editorDueOn: string | null;
+  editorWorkdaysToDeadline: number | null;
+  editorElapsedWorkdays: number;
+  editorTotalWorkdays: number;
+  editorOverdue: boolean;
+  editorBatteryColor: "groen" | "blauw" | "oranje" | "rood";
 };
 
 const TOTAL_WORKDAYS = 14; // opname → klantoplevering
@@ -174,6 +185,23 @@ export async function listEditorBoard(
     else if (workdaysToDeadline !== null && workdaysToDeadline <= 2) batteryColor = "oranje";
     else if (atEditor) batteryColor = "blauw";
     else batteryColor = "groen";
+
+    // Editorperspectief: interne deadline (opname + 7 wd) voor de eerste versie;
+    // daarna de klantdeadline als resterende tijd tot oplevering.
+    const firstVersion = isFirstVersionPending(status);
+    const editorDueOn = firstVersion ? internalDeadline(r.shootOn, r.dueOn, holidays) : r.dueOn;
+    const editorTotalWorkdays = firstVersion ? EDITOR_LEAD_DAYS : totalWorkdays;
+    const editorWorkdaysToDeadline = editorDueOn ? workingDaysUntil(today, editorDueOn, holidays) : null;
+    const editorElapsedWorkdays = shootDate
+      ? Math.max(0, Math.min(editorTotalWorkdays, workingDaysUntil(shootDate, today, holidays)))
+      : 0;
+    const editorOverdue = !!editorDueOn && editorDueOn < today && firstVersion;
+    let editorBatteryColor: "groen" | "blauw" | "oranje" | "rood";
+    if (done) editorBatteryColor = "groen";
+    else if (editorWorkdaysToDeadline !== null && editorWorkdaysToDeadline < 0) editorBatteryColor = "rood";
+    else if (editorWorkdaysToDeadline !== null && editorWorkdaysToDeadline <= 2) editorBatteryColor = "oranje";
+    else if (atEditor) editorBatteryColor = "blauw";
+    else editorBatteryColor = "groen";
     // Script: interne scriptpagina > scriptlink van de video (Monday) >
     // geüpload scriptbestand van de opname > externe scriptlink van de opname.
     const scriptHref = r.scriptId
@@ -218,6 +246,12 @@ export async function listEditorBoard(
       elapsedWorkdays,
       totalWorkdays,
       batteryColor,
+      editorDueOn,
+      editorWorkdaysToDeadline,
+      editorElapsedWorkdays,
+      editorTotalWorkdays,
+      editorOverdue,
+      editorBatteryColor,
     };
   });
 }

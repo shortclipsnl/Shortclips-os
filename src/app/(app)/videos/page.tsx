@@ -41,11 +41,11 @@ export default async function VideosPage({
           <p className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)] px-4 py-3 text-sm leading-relaxed text-[var(--color-ink)]">
             Hieronder staan de projecten die <strong>binnenkort beschikbaar</strong> komen en de projecten die nu <strong>in edit</strong> staan.
             Klik op <strong>Download</strong> voor het beeldmateriaal en op <strong>Script</strong> voor het script — die kun je meteen openen.
-            Check goed de <strong>deadlines</strong>, plan ze in je eigen agenda en zorg dat je op tijd oplevert.
+            Check goed je <strong>interne deadline</strong> (de eerste versie, 7 werkdagen na de opname), plan ze in je eigen agenda en zorg dat je op tijd oplevert.
             Vragen of kom je ergens niet uit? Neem contact op met je contactpersoon bij ShortClips.
           </p>
           {videos.length > 0 ? (
-            <EditorBoardTable videos={videos} editors={[]} canEdit={false} canAssign={false} showTabs={false} />
+            <EditorBoardTable videos={videos} editors={[]} canEdit={false} canAssign={false} showTabs={false} editorView />
           ) : (
             <p className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">
               Je hebt op dit moment geen video&apos;s toegewezen gekregen.
