@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { FileText } from "lucide-react";
 import { notFound } from "next/navigation";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -39,7 +40,24 @@ export default async function MeetingDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="mx-auto max-w-[900px]">
       <Link href="/meetings" className="text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">← Teammeetings</Link>
-      <PageHeader title={meeting.title} description={`${timeStr}${meeting.location ? ` · ${meeting.location}` : ""}`} actions={<DeleteMeetingButton id={id} />} />
+      <PageHeader
+        title={meeting.title}
+        description={`${timeStr}${meeting.location ? ` · ${meeting.location}` : ""}`}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {agenda.length > 0 ? (
+              <Link
+                href={`/presentatie/meeting/${id}`}
+                target="_blank"
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90"
+              >
+                <FileText className="size-4" /> Maak PDF van bespreekpunten
+              </Link>
+            ) : null}
+            <DeleteMeetingButton id={id} />
+          </div>
+        }
+      />
 
       {participantRows.length > 0 ? (
         <div className="mb-5 flex flex-wrap items-center gap-2">
