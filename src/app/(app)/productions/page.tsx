@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarCheck } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
-import { getMonthShootStats, getShootOverview, nextShootPerClient, shootsInRange } from "@/server/productions";
+import { getDefaultVideographer, getMonthShootStats, getShootOverview, nextShootPerClient, shootsInRange } from "@/server/productions";
 import { listAssignableUsers } from "@/server/clients";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { Avatar, Badge, Card, ClientLogo, PageHeader, Stat } from "@/components/ui";
@@ -29,12 +29,13 @@ export default async function ProductionsPage() {
   const todayIso = new Date().toLocaleDateString("en-CA");
 
   const canAssign = viewer.permissions.has("productions:write");
-  const [shoots, monthStats, nextPerClient, overview, assignable] = await Promise.all([
+  const [shoots, monthStats, nextPerClient, overview, assignable, defaultVg] = await Promise.all([
     shootsInRange(viewer, startIso, endIso),
     getMonthShootStats(viewer),
     nextShootPerClient(viewer),
     getShootOverview(viewer),
     canAssign ? listAssignableUsers() : Promise.resolve([]),
+    getDefaultVideographer(),
   ]);
 
   // Videograaf is altijd Rutger, Jarno of een freelance videograaf (rol
@@ -56,7 +57,7 @@ export default async function ProductionsPage() {
     clientSlug: x.clientSlug,
     clientColor: x.clientColor,
     clientLogo: x.clientLogo,
-    videographerName: x.videographerName,
+    videographerName: x.videographerName ?? defaultVg?.fullName ?? null,
   }));
 
   const monthLabel = new Date(`${monthStats.month}-01`).toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
@@ -101,16 +102,19 @@ export default async function ProductionsPage() {
           <div className="bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">Volgende opname per klant</div>
           {/* Kolomkoppen: klant · videograaf · datum. Videograaf erbij zodat
               Rutger direct ziet wie welke opname draait. */}
-          <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)] sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1.3fr)_150px_100px]">
+          <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)] sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)]">
             <span>Klant</span>
             <span className="hidden sm:block">Videograaf</span>
             <span className="hidden sm:block">Scripting</span>
             <span className="text-right">Opname</span>
           </div>
           <ul className="divide-y divide-[var(--color-line)]">
-            {nextPerClient.map((n) => (
+            {nextPerClient.map((n) => {
+              const vgId = n.videographerId ?? defaultVg?.id ?? null;
+              const vgName = n.videographerName ?? defaultVg?.fullName ?? null;
+              return (
               <li key={n.clientId}>
-                <Link href={`/clients/${n.clientSlug}?tab=opnames`} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-2)] sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1.3fr)_150px_100px]">
+                <Link href={`/clients/${n.clientSlug}?tab=opnames`} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-surface-2)] sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)]">
                   <span className="flex min-w-0 items-center gap-2.5">
                     <ClientLogo name={n.clientName} logoUrl={n.clientLogo} color={n.clientColor} size={24} />
                     <span className="truncate font-medium">{n.clientName}</span>
@@ -118,13 +122,13 @@ export default async function ProductionsPage() {
                   <span className="order-last col-span-2 flex min-w-0 items-center gap-2 sm:order-none sm:col-span-1">
                     {canAssign && videographerOptions.length > 0 ? (
                       <>
-                        {n.videographerName ? <Avatar name={n.videographerName} size={22} /> : null}
-                        <VideographerCell id={n.id} videographerId={n.videographerId} options={videographerOptions} />
+                        {vgName ? <Avatar name={vgName} size={22} /> : null}
+                        <VideographerCell id={n.id} videographerId={vgId} options={videographerOptions} />
                       </>
-                    ) : n.videographerName ? (
+                    ) : vgName ? (
                       <>
-                        <Avatar name={n.videographerName} size={22} />
-                        <span className="truncate text-sm text-[var(--color-ink)]">{n.videographerName}</span>
+                        <Avatar name={vgName} size={22} />
+                        <span className="truncate text-sm text-[var(--color-ink)]">{vgName}</span>
                       </>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-warn-soft)]/60 px-2 py-0.5 text-xs font-medium text-[#8a5300]">
@@ -145,7 +149,8 @@ export default async function ProductionsPage() {
                   </span>
                 </Link>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </Card>
       ) : null}

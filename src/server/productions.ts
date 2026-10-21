@@ -163,17 +163,28 @@ export async function getShootOverview(viewer: Viewer) {
     .from(productionDays)
     .where(and(isNull(productionDays.deletedAt), gte(productionDays.scheduledOn, day(0)), lte(productionDays.scheduledOn, day(7)), ne(productionDays.status, "cancelled"), scopeToClients(viewer, productionDays.clientId)));
 
-  const perVideographer = await db
-    .select({ name: users.fullName, n: sql<number>`count(*)` })
-    .from(productionDays)
-    .leftJoin(users, eq(users.id, productionDays.videographerId))
-    .where(and(isNull(productionDays.deletedAt), gte(productionDays.scheduledOn, monthStart), ne(productionDays.status, "cancelled"), scopeToClients(viewer, productionDays.clientId)))
-    .groupBy(users.fullName)
-    .orderBy(desc(sql`count(*)`));
+  const [perVideographer, defaultVg] = await Promise.all([
+    db
+      .select({ name: users.fullName, n: sql<number>`count(*)` })
+      .from(productionDays)
+      .leftJoin(users, eq(users.id, productionDays.videographerId))
+      .where(and(isNull(productionDays.deletedAt), gte(productionDays.scheduledOn, monthStart), ne(productionDays.status, "cancelled"), scopeToClients(viewer, productionDays.clientId)))
+      .groupBy(users.fullName)
+      .orderBy(desc(sql`count(*)`)),
+    getDefaultVideographer(),
+  ]);
+
+  // Opnamedagen zonder gekoppelde videograaf tellen bij de standaard-videograaf
+  // (Rutger), zodat deze telling klopt met de tabel die hem ook invult.
+  const merged = new Map<string, number>();
+  for (const p of perVideographer) {
+    const name = p.name ?? defaultVg?.fullName ?? "Niet toegewezen";
+    merged.set(name, (merged.get(name) ?? 0) + Number(p.n));
+  }
 
   return {
     thisWeek: Number(weekRow?.n ?? 0),
-    perVideographer: perVideographer.map((p) => ({ name: p.name ?? "Niet toegewezen", count: Number(p.n) })),
+    perVideographer: [...merged.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
   };
 }
 
@@ -273,6 +284,21 @@ export type ProductionDetail = Awaited<ReturnType<typeof getProductionDay>>;
 
 /** Videografen voor de inline-keuzelijst: expliciete videografen én iedereen
  *  die al eens heeft gefilmd. */
+/**
+ * De standaard-videograaf (Rutger). Vrijwel elke opname draait hij; als een
+ * opnamedag nog geen videograaf gekoppeld heeft, tonen we Rutger als
+ * standaard in plaats van een "nog geen videograaf"-melding. Een expliciet
+ * gekozen andere videograaf blijft uiteraard voorrang houden.
+ */
+export async function getDefaultVideographer(): Promise<{ id: string; fullName: string } | null> {
+  const [r] = await db
+    .select({ id: users.id, fullName: users.fullName })
+    .from(users)
+    .where(and(eq(users.email, "rutger@shortclips.nl"), isNull(users.deletedAt), eq(users.status, "active")))
+    .limit(1);
+  return r ?? null;
+}
+
 export async function listVideographerOptions(): Promise<{ id: string; fullName: string }[]> {
   const res = await db.execute(sql`
     select u.id, u.full_name as "fullName"
