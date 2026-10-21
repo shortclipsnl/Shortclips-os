@@ -38,7 +38,10 @@ export function aiConfigured(): boolean {
 }
 
 export function aiModel(): string {
-  return env.AI_MODEL || "claude-opus-5-5";
+  // Standaard Sonnet: kostenefficiënt en ruim voldoende voor de AI-analyses
+  // (o.a. Video Intelligence). Via AI_MODEL is per omgeving een ander model te
+  // kiezen, bijvoorbeeld een krachtiger model voor specifiek werk.
+  return env.AI_MODEL || "claude-sonnet-5-5";
 }
 
 export async function runPrompt(input: AiRunInput): Promise<AiResult> {
