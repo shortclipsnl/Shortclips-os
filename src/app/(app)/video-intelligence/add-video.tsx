@@ -8,6 +8,10 @@ import { addVideoByUrl } from "@/server/actions/video-intelligence";
 
 type ClientOption = { id: string; name: string };
 
+// Maximale uploadgrootte. Supabase Free staat 50 MB per bestand toe; met een
+// betaald plan kan dit omhoog (pas dit dan samen met de opslaglimiet aan).
+const MAX_UPLOAD_MB = 50;
+
 export function AddVideo({ clients }: { clients: ClientOption[] }) {
   const router = useRouter();
   const [mode, setMode] = useState<"url" | "upload">("url");
@@ -46,6 +50,10 @@ export function AddVideo({ clients }: { clients: ClientOption[] }) {
     const file = fileRef.current?.files?.[0];
     if (!clientId) return setError("Kies een klant.");
     if (!file) return setError("Kies een videobestand.");
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      const mb = Math.round(file.size / (1024 * 1024));
+      return setError(`Deze video is te groot (${mb} MB). De opslag staat nu maximaal ${MAX_UPLOAD_MB} MB per video toe. Exporteer de video iets kleiner (bijv. 1080p of een kortere clip).`);
+    }
     setUploading(true);
     try {
       // 1) Analyse aanmaken + upload-bestemming ophalen.
@@ -127,7 +135,7 @@ export function AddVideo({ clients }: { clients: ClientOption[] }) {
           <div className="space-y-2">
             <input ref={fileRef} type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska" className="block w-full text-sm" />
             <div className="flex items-center justify-between gap-3">
-              <p className="text-2xs text-[var(--color-ink-faint)]">Max 500 MB. mp4/mov/webm/mkv.</p>
+              <p className="text-2xs text-[var(--color-ink-faint)]">Max {MAX_UPLOAD_MB} MB per video. mp4/mov/webm/mkv.</p>
               <Button onClick={submitUpload} disabled={busy}>{uploading ? "Uploaden…" : "Uploaden & analyseren"}</Button>
             </div>
           </div>
