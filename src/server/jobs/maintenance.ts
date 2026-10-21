@@ -569,6 +569,47 @@ export async function runEditorFridayWrapUp() {
 }
 
 /**
+ * Vrijdagherinnering schoonmaak voor Milou & Jiska (de projectcoördinatoren op
+ * kantoor): op vrijdag 15:00 Amsterdam één wegklikbare melding om de keuken voor
+ * het weekend netjes achter te laten. Alleen voor deze twee. De cron draait op
+ * twee UTC-tijden; de lokale-uur-check laat er precies één om 15:xx Amsterdam
+ * doorkomen (zomer- én wintertijd). Dedupe = één melding per persoon per vrijdag.
+ */
+export async function runCleaningFridayReminder() {
+  return runJob("monday", "reminders.cleaning_friday", {}, async (ctx) => {
+    const now = new Date();
+    const weekday = now.toLocaleDateString("en-US", { weekday: "short", timeZone: "Europe/Amsterdam" });
+    const hhmm = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" });
+    const hour = Number(hhmm.slice(0, 2));
+    if (weekday !== "Fri" || hour !== 15) {
+      ctx.log(`Lokaal ${weekday} ${hhmm} (Amsterdam) — niet vrijdag 15:xx, overgeslagen.`);
+      return;
+    }
+
+    const coords = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(isNull(users.deletedAt), eq(users.status, "active"), eq(users.primaryRole, "project_coordinator")));
+
+    const fri = day(0);
+    for (const c of coords) {
+      ctx.counters.processed++;
+      await notify({
+        userIds: [c.id],
+        type: "cleaning_friday_reminder",
+        level: "info",
+        title: "Vrijdag: keuken netjes voor het weekend",
+        body: "Even voor het weekend: zijn de koffiezetapparaten schoongemaakt, is de keuken netjes en staat de vaatwasser aan? Dan is alles fris als we maandag terugkomen.",
+        href: "/dashboard",
+        dedupeKey: `cleaning_friday_reminder:${c.id}:${fri}`,
+      });
+      ctx.counters.updated++;
+    }
+    ctx.log(`${ctx.counters.updated} coördinatoren een vrijdag-schoonmaakherinnering gestuurd`);
+  });
+}
+
+/**
  * Vrijdagcheck als melding (vervangt de losse pagina): controleert of volgende
  * week rond staat en stuurt de uitkomst als één melding naar de coördinator(en)
  * en content creative. Eén melding per week (dedupe). Bedoeld voor een cron op

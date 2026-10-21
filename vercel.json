@@ -11,6 +11,8 @@
     { "path": "/api/jobs/run?job=vrijdagcheck.notify", "schedule": "0 7 * * 5" },
     { "path": "/api/jobs/run?job=reminders.editor_friday_wrapup&slot=zomer", "schedule": "0 7 * * 5" },
     { "path": "/api/jobs/run?job=reminders.editor_friday_wrapup&slot=winter", "schedule": "0 8 * * 5" },
+    { "path": "/api/jobs/run?job=reminders.cleaning_friday&slot=zomer", "schedule": "0 13 * * 5" },
+    { "path": "/api/jobs/run?job=reminders.cleaning_friday&slot=winter", "schedule": "0 14 * * 5" },
     { "path": "/api/jobs/run?job=finance.month_reminder", "schedule": "0 8 28 * *" }
   ]
 }
