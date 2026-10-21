@@ -116,14 +116,19 @@ function officeBlocks(data: DashboardData, myDay: MyDay): Block[] {
   const lateIds = new Set(data.videos.late.map((v) => v.id));
   const stalled = data.videos.stalledAtClient.filter((v) => !lateIds.has(v.id));
   const editing: Line[] = [
-    ...data.videos.late.map((v) => ({
-      key: `late-${v.id}`,
-      href: `/videos/${v.id}`,
-      what: label(v.clientName, v.title),
-      action: `Over de deadline · ${v.editorName ?? "geen editor"} → afmaken`,
-      meta: `${plural(Math.max(1, -daysUntil(v.dueOn)), "dag", "dagen")} te laat`,
-      tone: "bad" as Tone,
-    })),
+    // Al gesorteerd op dueOn (meest te laat eerst). Onderscheid in ernst: licht
+    // over de deadline (1–2 dagen) oranje, langer te laat rood.
+    ...data.videos.late.map((v) => {
+      const dagenTeLaat = Math.max(1, -daysUntil(v.dueOn));
+      return {
+        key: `late-${v.id}`,
+        href: `/videos/${v.id}`,
+        what: label(v.clientName, v.title),
+        action: `Over de deadline · ${v.editorName ?? "geen editor"} → afmaken`,
+        meta: `${plural(dagenTeLaat, "dag", "dagen")} te laat`,
+        tone: (dagenTeLaat >= 3 ? "bad" : "warn") as Tone,
+      };
+    }),
     ...stalled.map((v) => ({
       key: `wait-${v.id}`,
       href: `/videos/${v.id}`,
@@ -136,7 +141,7 @@ function officeBlocks(data: DashboardData, myDay: MyDay): Block[] {
 
   return [
     { key: "todo", title: "Mijn to-do", subtitle: "Jouw taken van de takenpagina.", icon: <ListChecks className="size-5" />, accent: "info", lines: todo.slice(0, 15), empty: "Geen openstaande taken op jouw naam." },
-    { key: "editing", title: "Editing", subtitle: "Te laat en wacht op klantfeedback — pak dit als eerste op.", icon: <AlertTriangle className="size-5" strokeWidth={2.25} />, accent: "bad", lines: editing.slice(0, 15), empty: "Geen editing die nu aandacht vraagt." },
+    { key: "editing", title: "Editing Deadlines", subtitle: "Over de deadline en wacht op klantfeedback — pak dit als eerste op. Live uit het Editing-dashboard.", icon: <AlertTriangle className="size-5" strokeWidth={2.25} />, accent: "bad", lines: editing.slice(0, 15), empty: "Geen editing die nu over de deadline is." },
   ];
 }
 

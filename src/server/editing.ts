@@ -13,6 +13,10 @@ const rows = <T,>(r: unknown): T[] => ((r as { rows?: T[] }).rows ?? (r as T[]))
 const ACTIVE = sql`d.status not in ('published','analysis_available')`;
 const DONE = sql`d.status in ('published','analysis_available')`;
 const FEEDBACK = sql`d.status in ('client_review','client_revision')`;
+// "Te laat" = over de editdeadline én nog echt in bewerking. Ingeplande video's
+// (klaar en gepland om te posten) tellen niet mee — zo is dit exact dezelfde
+// definitie als het "Editing Deadlines"-blok op Vandaag (dashboard.ts).
+const LATE = sql`d.due_on < current_date and d.status not in ('scheduled','published','analysis_available')`;
 
 export type EditorRow = {
   editor_id: string; editor_name: string; avatar_url: string | null; rate: number; capacity: number;
@@ -36,7 +40,7 @@ export async function getEditingDashboard(_viewer: Viewer) {
         coalesce(er.rate_per_video,0)::float rate, coalesce(er.capacity_per_week,0)::int capacity,
         count(*) filter (where ${ACTIVE}) in_production,
         count(*) filter (where ${FEEDBACK}) awaiting_feedback,
-        count(*) filter (where d.due_on < current_date and ${ACTIVE}) late,
+        count(*) filter (where ${LATE}) late,
         count(*) filter (where ${DONE} and d.published_at >= date_trunc('month', now())) done_month,
         count(distinct d.client_id) filter (where ${ACTIVE}) clients_active,
         min(d.due_on) filter (where d.due_on >= current_date and ${ACTIVE}) next_due,
@@ -55,7 +59,7 @@ export async function getEditingDashboard(_viewer: Viewer) {
         count(*) filter (where ${ACTIVE}) in_production,
         count(*) filter (where ${FEEDBACK}) awaiting_feedback,
         count(*) filter (where ${DONE} and d.published_at >= date_trunc('month', now())) done_month,
-        count(*) filter (where d.due_on < current_date and ${ACTIVE}) late,
+        count(*) filter (where ${LATE}) late,
         min(d.due_on) filter (where d.due_on >= current_date and ${ACTIVE}) next_due
       from clients c
       left join deliverables d on d.client_id = c.id and d.deleted_at is null
