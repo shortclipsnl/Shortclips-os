@@ -4,8 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Search } from "lucide-react";
-import { Badge, ClientLogo } from "@/components/ui";
-import { CLIENT_STATUS } from "@/lib/statuses";
+import { ClientLogo } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { setClientStatus } from "@/server/actions/clients";
 
@@ -163,28 +162,10 @@ function ClientCard({ c }: { c: BoardClient }) {
 
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5 hover:shadow-[var(--shadow-raised)]">
-      {/* Klikbare statusindicator: groen = actief, rood = niet-actief. Klik om te wisselen. */}
-      <button
-        type="button"
-        onClick={toggle}
-        disabled={pending}
-        aria-label={stopped ? "Op actief zetten" : "Op niet-actief zetten"}
-        title={stopped ? "Niet-actief — klik om te activeren" : "Actief — klik om op niet-actief te zetten"}
-        className="grid size-6 shrink-0 place-items-center rounded-full transition hover:bg-[var(--color-surface-2)]"
-      >
-        {pending ? (
-          <Loader2 className="size-3 animate-spin text-[var(--color-ink-faint)]" />
-        ) : (
-          <span className="size-2.5 rounded-full ring-2 ring-transparent" style={{ background: stopped ? "var(--color-bad)" : "var(--color-good)" }} />
-        )}
-      </button>
       <Link href={`/clients/${c.slug}`} className="flex min-w-0 flex-1 items-center gap-3">
         <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={52} />
         <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="min-w-0 flex-1 truncate font-medium">{c.name}</span>
-            <Badge tone={CLIENT_STATUS[c.status]?.tone ?? "neutral"}>{CLIENT_STATUS[c.status]?.label ?? c.status}</Badge>
-          </span>
+          <span className="block truncate font-medium">{c.name}</span>
           <span className="mt-1 flex flex-wrap items-center gap-1">
             <Chip tone="blue">{c.shortsPerMonth > 0 ? `${c.shortsPerMonth} shorts/mnd` : "shorts ?"}</Chip>
             {c.inProduction > 0 ? <Chip tone="amber">{c.inProduction} lopend</Chip> : null}
@@ -193,6 +174,26 @@ function ClientCard({ c }: { c: BoardClient }) {
           </span>
         </span>
       </Link>
+      {/* Duidelijke klikbare schakelaar rechts: Actief ↔ Niet actief. */}
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={pending}
+        aria-label={stopped ? "Op actief zetten" : "Op niet-actief zetten"}
+        title={stopped ? "Niet actief — klik om te activeren" : "Actief — klik om op niet-actief te zetten"}
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+          stopped
+            ? "bg-[var(--color-bad-soft)] text-[#a3271c] hover:brightness-95"
+            : "bg-[var(--color-good-soft)] text-[#1d6b4c] hover:brightness-95"
+        }`}
+      >
+        {pending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <span className="size-2 rounded-full" style={{ background: stopped ? "var(--color-bad)" : "var(--color-good)" }} />
+        )}
+        {stopped ? "Niet actief" : "Actief"}
+      </button>
     </div>
   );
 }

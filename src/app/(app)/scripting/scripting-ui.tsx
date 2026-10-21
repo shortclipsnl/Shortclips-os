@@ -302,47 +302,68 @@ function WriterCell({ id, writerId, writerName, writerAvatar, options, canWrite,
 function NoteCell({ id, note, canWrite }: { id: string; note: string | null; canWrite: boolean }) {
   const [pending, start] = useTransition();
   const [val, setVal] = useState(note ?? "");
+  const [open, setOpen] = useState(false);
   const router = useRouter();
 
-  // Alleen-lezen: toon de notitie met icoon, of een rustig streepje.
-  if (!canWrite) {
-    return note ? (
-      <div className="flex max-w-[260px] items-start gap-1.5 text-xs leading-snug text-[var(--color-ink)]">
-        <MessageSquareText className="mt-0.5 size-4 shrink-0 text-[var(--color-brand-600)]" />
-        <span>{note}</span>
-      </div>
-    ) : (
-      <span className="text-xs text-[var(--color-ink-faint)]">—</span>
-    );
-  }
+  // Preview in de cel (ingekort); de volledige tekst zie je in het uitklapvlak.
+  const shownNote = (canWrite ? val : note ?? "").trim();
+  const heeftNotitie = Boolean(shownNote);
 
-  const heeftNotitie = Boolean(val.trim());
   const save = () => {
     const next = val.trim();
-    if (next === (note ?? "").trim()) return;
-    start(async () => { await setScriptingNote(id, next); router.refresh(); });
+    if (next !== (note ?? "").trim()) {
+      start(async () => { await setScriptingNote(id, next); router.refresh(); });
+    }
+    setOpen(false);
   };
 
+  // Alleen-lezen zonder notitie: rustig streepje, niet aanklikbaar.
+  if (!canWrite && !heeftNotitie) return <span className="text-xs text-[var(--color-ink-faint)]">—</span>;
+
   return (
-    <div className="flex items-center gap-1.5">
-      <MessageSquareText
-        className={`size-4 shrink-0 ${heeftNotitie ? "text-[var(--color-brand-600)]" : "text-[var(--color-ink-faint)]"}`}
-      />
-      <input
-        value={val}
-        onChange={(e) => setVal(e.target.value)}
-        onBlur={save}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-        }}
-        maxLength={500}
-        placeholder="Opmerking voor team…"
-        aria-label="Notitie bij scriptingstatus"
-        className={`h-8 w-[220px] rounded-[var(--radius-sm)] border px-2 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:outline-none ${
-          heeftNotitie ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)]" : "border-[var(--color-line)] bg-[var(--color-surface)]"
+    <div className="relative w-[220px]">
+      {/* Compacte knop met een korte preview; klik voor het volledige bericht. */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title={shownNote || "Notitie toevoegen"}
+        className={`flex w-full items-center gap-1.5 rounded-[var(--radius-sm)] border px-2 py-1.5 text-left text-xs ${
+          heeftNotitie ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)] text-[var(--color-ink)]" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-faint)]"
         }`}
-      />
-      {pending ? <Loader2 className="size-3 animate-spin text-[var(--color-ink-faint)]" /> : null}
+      >
+        <MessageSquareText className={`size-4 shrink-0 ${heeftNotitie ? "text-[var(--color-brand-600)]" : "text-[var(--color-ink-faint)]"}`} />
+        <span className="truncate">{shownNote || (canWrite ? "Opmerking voor team…" : "")}</span>
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={save} />
+          <div className="absolute right-0 top-full z-20 mt-1.5 w-72 max-w-[85vw] rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2.5 shadow-[var(--shadow-raised)]">
+            {canWrite ? (
+              <>
+                <textarea
+                  value={val}
+                  onChange={(e) => setVal(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setOpen(false);
+                  }}
+                  maxLength={500}
+                  rows={5}
+                  autoFocus
+                  placeholder="Opmerking voor team…"
+                  aria-label="Notitie bij scriptingstatus"
+                  className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2 py-1.5 text-sm leading-snug text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:outline-none"
+                />
+                <div className="mt-2 flex items-center justify-end gap-2">
+                  {pending ? <Loader2 className="size-3.5 animate-spin text-[var(--color-ink-faint)]" /> : null}
+                  <button type="button" onClick={save} className="rounded-[var(--radius-sm)] bg-[var(--color-ink)] px-3 py-1.5 text-xs font-semibold text-white">Opslaan</button>
+                </div>
+              </>
+            ) : (
+              <p className="whitespace-pre-wrap text-sm leading-snug text-[var(--color-ink)]">{note}</p>
+            )}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
