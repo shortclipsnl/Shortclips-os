@@ -318,6 +318,30 @@ export const tasks = pgTable(
   ],
 );
 
+/**
+ * Overdrachtspunten voor het kantoorteam (Milou & Jiska): korte notities voor de
+ * volgende persoon/dag. Bijv. "Klant X gebeld, moet nog teruggebeld worden." Een
+ * notitie kan op "gedaan" worden gezet zodra de volgende persoon het heeft
+ * opgepakt. Gedeeld zichtbaar voor het interne kernteam.
+ */
+export const handoverNotes = pgTable(
+  "handover_notes",
+  {
+    id: pk(),
+    /** Wie de notitie schreef. */
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    /** Optioneel: voor wie de overdracht bedoeld is (anders: iedereen). */
+    forUserId: uuid("for_user_id").references(() => users.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    /** Gezet wanneer de overdracht is opgepakt/afgehandeld. */
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedById: uuid("resolved_by_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+    ...softDelete,
+  },
+  (t) => [index("handover_notes_open_idx").on(t.resolvedAt, t.createdAt)],
+);
+
 export const taskDependencies = pgTable(
   "task_dependencies",
   {

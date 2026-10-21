@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, tasks, users } from "@/db/schema";
+import { clients, handoverNotes, tasks, users } from "@/db/schema";
 import { requireInternal, scopeToClients } from "@/server/auth/context";
 import { listAssignableUsers } from "@/server/clients";
 import { isCoreStaff, coreStaffRank } from "@/server/core-staff";
 import { Card, EmptyState, PageHeader, TeamAvatar } from "@/components/ui";
 import { QuickTaskLines, TaskItem, type TaskItemData } from "./tasks-ui";
+import { HandoverBoard, type HandoverNote } from "./handover-board";
 
 export const metadata: Metadata = { title: "Taken" };
 export const dynamic = "force-dynamic";
@@ -19,18 +20,36 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const canWrite = viewer.permissions.has("tasks:write");
   const spPersoon = (await searchParams).persoon;
 
-  const [team, allOpen] = await Promise.all([
+  const [team, allOpen, handoverRows] = await Promise.all([
     listAssignableUsers(),
     db
       .select({ id: tasks.id, assigneeId: tasks.assigneeId, dueOn: tasks.dueOn })
       .from(tasks)
       .where(and(isNull(tasks.deletedAt), inArray(tasks.status, [...OPEN]), scopeToClients(viewer, tasks.clientId))),
+    db
+      .select({ id: handoverNotes.id, body: handoverNotes.body, authorId: handoverNotes.authorId, forUserId: handoverNotes.forUserId, resolvedById: handoverNotes.resolvedById, createdAt: handoverNotes.createdAt, resolvedAt: handoverNotes.resolvedAt })
+      .from(handoverNotes)
+      .where(isNull(handoverNotes.deletedAt))
+      .orderBy(asc(handoverNotes.resolvedAt), desc(handoverNotes.createdAt))
+      .limit(50),
   ]);
   // Taken zijn alleen voor het interne kernteam — Jarno, Milou, Jiska en Rutger
   // (vaste lijst op e-mail, los van rol). Editors, videografen en freelancers
   // hebben dit niet nodig, dus die vallen uit de personenrij én de toewijslijst.
   const office = team.filter((u) => isCoreStaff(u.email));
   const userOptions = office.map((u) => ({ id: u.id, fullName: u.fullName }));
+
+  // Overdrachtspunten: namen opzoeken uit het team.
+  const nameById = new Map(team.map((u) => [u.id, u.fullName] as const));
+  const handover: HandoverNote[] = handoverRows.map((h) => ({
+    id: h.id,
+    body: h.body,
+    authorName: h.authorId ? nameById.get(h.authorId) ?? null : null,
+    forUserName: h.forUserId ? nameById.get(h.forUserId) ?? null : null,
+    createdAt: new Date(h.createdAt).toISOString(),
+    resolvedAt: h.resolvedAt ? new Date(h.resolvedAt).toISOString() : null,
+    resolvedByName: h.resolvedById ? nameById.get(h.resolvedById) ?? null : null,
+  }));
 
   // Eerste bezoek (geen ?persoon): meteen je eigen taken tonen i.p.v. "Kies een
   // persoon". De knop "Iedereen" stuurt een lege ?persoon= en houdt het overzicht.
@@ -98,20 +117,15 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     <div className="mx-auto max-w-[1100px]">
       <PageHeader title="Taken" description={selectedLabel ? `Taken van ${selectedLabel}` : "Kies een persoon om direct de taken te zien."} />
 
+      {/* Overdracht: korte punten voor de volgende persoon/dag. */}
+      <HandoverBoard notes={handover} users={userOptions} canWrite={canWrite} />
+
       {/* Personen als primaire navigatie */}
       <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
         {core.map((u) => (
           <PersonCard key={u.id} id={u.id} name={u.fullName} count={openCountFor(u.id)} active={persoon === u.id} />
         ))}
         <PersonCard id="algemeen" name="Algemeen" count={algemeenCount} active={persoon === "algemeen"} generic />
-        <Link
-          href="/tasks?persoon="
-          // Actieve staat heeft een donkere achtergrond, dus tekst wit maken voor leesbaarheid
-          className={`flex flex-col justify-center rounded-[var(--radius-md)] border px-3 py-2.5 text-sm ${!persoon ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-mist)] text-white" : "border-[var(--color-line)] hover:bg-[var(--color-surface-2)]"}`}
-        >
-          <span className="font-medium">Iedereen</span>
-          <span className={`text-xs ${!persoon ? "text-white/70" : "text-[var(--color-ink-muted)]"}`}>overzicht</span>
-        </Link>
       </div>
 
       {canWrite ? (
