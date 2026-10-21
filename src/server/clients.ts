@@ -98,6 +98,7 @@ export async function getClientHub(viewer: Viewer, slug: string) {
       sector: clients.sector,
       website: clients.website,
       logoUrl: clients.logoUrl,
+      description: clients.description,
       color: clients.color,
       status: clients.status,
       riskLevel: clients.riskLevel,
@@ -202,7 +203,7 @@ export async function getClientHub(viewer: Viewer, slug: string) {
     })
       .from(productionDays)
       .where(and(eq(productionDays.clientId, client.id), isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled")))
-      .orderBy(desc(productionDays.scheduledOn)).limit(20),
+      .orderBy(desc(productionDays.scheduledOn)).limit(200),
 
     db.select({
       id: contentCalendar.id, title: contentCalendar.title,
@@ -374,6 +375,7 @@ export async function getClientForEdit(viewer: Viewer, slug: string) {
       sector: clients.sector,
       website: clients.website,
       logoUrl: clients.logoUrl,
+      description: clients.description,
       color: clients.color,
       status: clients.status,
       coordinatorId: clients.coordinatorId,

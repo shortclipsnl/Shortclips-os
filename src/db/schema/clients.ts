@@ -38,6 +38,9 @@ export const clients = pgTable(
     sector: varchar("sector", { length: 120 }),
     website: text("website"),
     logoUrl: text("logo_url"),
+    /** Korte omschrijving van de klant: wat voor bedrijf het is. Toont als tekstje
+     *  onder het logo op het klantdashboard, zodat het team meteen context heeft. */
+    description: text("description"),
     /** Accentkleur voor kaarten/avatars in de UI. */
     color: varchar("color", { length: 9 }),
     status: clientStatusEnum("status").notNull().default("active"),

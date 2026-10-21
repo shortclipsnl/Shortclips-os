@@ -21,6 +21,7 @@ type Draft = {
   website: string;
   legalName: string;
   logoUrl: string;
+  description: string;
   color: string;
   status: string;
   coordinatorId: string;
@@ -69,6 +70,7 @@ export function ClientForm({
       website: draft.website,
       legalName: draft.legalName,
       logoUrl: draft.logoUrl,
+      description: draft.description,
       color: draft.color,
       status: draft.status as ClientInput["status"],
       coordinatorId: draft.coordinatorId || null,
@@ -177,6 +179,10 @@ export function ClientForm({
           </Field>
         </div>
       </fieldset>
+
+      <Field label="Omschrijving" hint="Wat voor bedrijf is dit? Dit tekstje staat onder het logo op het klantdashboard.">
+        <textarea className="sc-input resize-y" rows={3} value={draft.description} onChange={(e) => set("description", e.target.value)} placeholder="Korte omschrijving van de klant / het bedrijf…" />
+      </Field>
 
       <Field label="Interne notities" hint="Niet zichtbaar voor de klant.">
         <textarea className="sc-input resize-y" rows={3} value={draft.notes} onChange={(e) => set("notes", e.target.value)} />

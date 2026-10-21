@@ -17,6 +17,7 @@ import {
   Badge,
   Card,
   CardHeader,
+  ClientLogo,
   EmptyState,
   LinkButton,
   Stat,
@@ -98,7 +99,7 @@ export default async function ClientPage({
 
   // Vaak-lege tabbladen tonen we alleen als er echt data achter zit (#12), zodat
   // de pagina niet volloopt met lege tabs. Kern-tabs (overzicht, video's, scripts,
-  // taken, contacten) blijven altijd staan — die worden verwacht, ook als ze leeg
+  // contactpersoon) blijven altijd staan — die worden verwacht, ook als ze leeg
   // zijn. Een tab die hier wegvalt, kan ook niet geselecteerd worden, dus zijn
   // paneel hieronder rendert dan evenmin.
   const tabs: TabDef[] = [
@@ -111,12 +112,10 @@ export default async function ClientPage({
     ...(hub.reports.length > 0 ? [{ key: "rapportages", label: "Rapportages", count: hub.reports.length }] : []),
     ...(hub.knowledge.length > 0 ? [{ key: "kennis", label: "Klantkennis", count: hub.knowledge.length }] : []),
     ...(hub.files.length > 0 ? [{ key: "documenten", label: "Documenten" }] : []),
-    { key: "taken", label: "Taken", count: hub.tasks.length },
-    { key: "contacten", label: "Contacten", count: hub.contacts.length },
+    { key: "contacten", label: "Contactpersoon", count: hub.contacts.length },
     ...(hub.canSeeFinance ? [{ key: "financieel", label: "Financieel" }, { key: "contract", label: "Contract & facturatie" }] : []),
     ...(hub.insights.length > 0 ? [{ key: "inzichten", label: "AI-inzichten", count: hub.insights.length }] : []),
     ...(hub.integrations.length > 0 ? [{ key: "koppelingen", label: "Koppelingen" }] : []),
-    ...(hub.timeline.length > 0 ? [{ key: "activiteit", label: "Activiteit" }] : []),
   ];
   const active = tabs.some((t) => t.key === tab) ? tab! : "overzicht";
 
@@ -131,14 +130,19 @@ export default async function ClientPage({
           ← Klanten
         </Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Avatar name={c.name} color={c.color} size={52} />
-            <div>
+          <div className="flex items-start gap-4">
+            {/* Het klantlogo (met initialen-fallback als er nog geen logo is). */}
+            <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={60} />
+            <div className="min-w-0">
               <h1 className="text-xl font-semibold tracking-tight">{c.name}</h1>
               <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">
                 {c.sector ?? "—"}
                 {c.startedOn ? ` · klant sinds ${formatDateFull(c.startedOn)}` : ""}
               </p>
+              {/* Korte omschrijving: wat voor bedrijf het is. */}
+              {c.description ? (
+                <p className="mt-1.5 max-w-xl text-sm leading-snug text-[var(--color-ink)]">{c.description}</p>
+              ) : null}
             </div>
           </div>
           <div className="flex items-start gap-4">
@@ -180,13 +184,6 @@ export default async function ClientPage({
                 ) : null}
               </div>
             </div>
-            {/* Klantlogo rechts, voor snelle herkenning. */}
-            {c.logoUrl ? (
-              <div className="grid h-16 w-24 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-1.5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.logoUrl} alt={`${c.name} logo`} className="max-h-full max-w-full object-contain" />
-              </div>
-            ) : null}
           </div>
         </div>
       </div>
@@ -219,13 +216,11 @@ export default async function ClientPage({
       {active === "rapportages" ? <ReportsTab hub={hub} slug={slug} canWrite={viewer.permissions.has("reports:write")} /> : null}
       {active === "kennis" ? <KnowledgeTab hub={hub} /> : null}
       {active === "documenten" ? <FilesTab hub={hub} /> : null}
-      {active === "taken" ? <TasksTab hub={hub} /> : null}
       {active === "contacten" ? <ContactsTab hub={hub} /> : null}
       {active === "financieel" && hub.canSeeFinance ? <FinanceTab hub={hub} /> : null}
       {active === "contract" && hub.canSeeFinance ? <ContractTab hub={hub} /> : null}
       {active === "inzichten" ? <InsightsTab hub={hub} /> : null}
       {active === "koppelingen" ? <IntegrationsTab hub={hub} /> : null}
-      {active === "activiteit" ? <TimelineTab hub={hub} /> : null}
     </div>
   );
 }
@@ -691,9 +686,6 @@ function KnowledgeTab({ hub }: { hub: ClientHub }) {
 /* ---------------------------- Documenten --------------------------- */
 
 function FilesTab({ hub }: { hub: ClientHub }) {
-  const folders = hub.files.filter((f) => f.isFolder);
-  const docs = hub.files.filter((f) => !f.isFolder);
-
   if (hub.files.length === 0)
     return (
       <Card>
@@ -705,83 +697,35 @@ function FilesTab({ hub }: { hub: ClientHub }) {
       </Card>
     );
 
+  // Drive-stijl: mappen eerst, dan bestanden — allemaal netjes onder elkaar,
+  // dezelfde indeling als in Google Drive zodat er geen verwarring ontstaat.
+  const items = [...hub.files].sort((a, b) => (a.isFolder === b.isFolder ? 0 : a.isFolder ? -1 : 1));
+
   return (
-    <div className="space-y-5">
-      {folders.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {folders.map((f) => (
+    <Card padded={false}>
+      <div className="flex items-center justify-between gap-2 px-5 py-3 text-xs text-[var(--color-ink-faint)]">
+        <span className="font-semibold uppercase tracking-wide">Documenten</span>
+        <span>{plural(hub.files.length, "item", "items")}</span>
+      </div>
+      <ul className="divide-y divide-[var(--color-line)] border-t border-[var(--color-line)]">
+        {items.map((f) => (
+          <li key={f.id}>
             <a
-              key={f.id}
               href={f.externalUrl ?? "#"}
               target="_blank"
               rel="noopener noreferrer"
-              className="sc-card flex items-center gap-3 p-4 transition-shadow hover:shadow-[var(--shadow-raised)]"
+              className="flex items-center gap-3 px-5 py-2.5 hover:bg-[var(--color-surface-sunken)]/60"
             >
-              <Folder className="size-5 shrink-0 text-[var(--color-brand-500)]" strokeWidth={1.75} />
+              {f.isFolder ? (
+                <Folder className="size-5 shrink-0 text-[var(--color-brand-500)]" strokeWidth={1.75} />
+              ) : (
+                <FileText className="size-5 shrink-0 text-[var(--color-ink-faint)]" strokeWidth={1.75} />
+              )}
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{f.name}</span>
+              {f.category ? <span className="hidden shrink-0 text-xs text-[var(--color-ink-muted)] sm:block">{f.category}</span> : null}
+              <span className="hidden shrink-0 text-xs text-[var(--color-ink-faint)] md:block">{formatDate(f.modifiedAt)}</span>
               <ArrowUpRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
             </a>
-          ))}
-        </div>
-      ) : null}
-
-      <Card padded={false}>
-        <Table
-          head={
-            <>
-              <th className="sc-th">Bestand</th>
-              <th className="sc-th">Map</th>
-              <th className="sc-th">Bron</th>
-              <th className="sc-th">Gewijzigd</th>
-            </>
-          }
-        >
-          {docs.map((f) => (
-            <tr key={f.id} className="sc-row-link">
-              <td className="sc-td">
-                <a
-                  href={f.externalUrl ?? "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 font-medium hover:underline"
-                >
-                  <FileText className="size-4 text-[var(--color-ink-faint)]" strokeWidth={1.75} />
-                  {f.name}
-                </a>
-              </td>
-              <td className="sc-td text-[var(--color-ink-muted)]">{f.category ?? "—"}</td>
-              <td className="sc-td text-[var(--color-ink-muted)]">
-                {f.source === "google_drive" ? "Google Drive" : f.source}
-              </td>
-              <td className="sc-td text-[var(--color-ink-muted)]">{formatDate(f.modifiedAt)}</td>
-            </tr>
-          ))}
-        </Table>
-      </Card>
-    </div>
-  );
-}
-
-/* ------------------------------- Taken ----------------------------- */
-
-function TasksTab({ hub }: { hub: ClientHub }) {
-  if (hub.tasks.length === 0)
-    return <Card><EmptyState title="Geen openstaande taken" /></Card>;
-  return (
-    <Card padded={false}>
-      <ul className="divide-y divide-[var(--color-line)]">
-        {hub.tasks.map((t) => (
-          <li key={t.id} className="flex items-center gap-3 px-5 py-3">
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium">{t.title}</span>
-              <span className="block text-xs text-[var(--color-ink-muted)]">
-                {t.assigneeName ?? "niet toegewezen"}
-                {t.dueOn ? ` · ${relativeDays(t.dueOn)}` : ""}
-              </span>
-            </span>
-            <Badge tone={TASK_PRIORITY[t.priority]?.tone ?? "neutral"}>
-              {TASK_PRIORITY[t.priority]?.label}
-            </Badge>
           </li>
         ))}
       </ul>
@@ -1146,41 +1090,3 @@ function IntegrationsTab({ hub }: { hub: ClientHub }) {
   );
 }
 
-/* ---------------------------- Activiteit --------------------------- */
-
-function TimelineTab({ hub }: { hub: ClientHub }) {
-  if (hub.timeline.length === 0)
-    return <Card><EmptyState title="Nog geen activiteit" /></Card>;
-
-  return (
-    <Card>
-      <CardHeader
-        title="Tijdlijn"
-        subtitle="Alles wat er bij deze klant is gebeurd, van script tot publicatie."
-      />
-      <ol className="mt-5 space-y-0">
-        {hub.timeline.map((e, i) => (
-          <li key={e.id} className="relative flex gap-4 pb-5 last:pb-0">
-            <div className="flex flex-col items-center">
-              <span className="mt-1.5 size-2 shrink-0 rounded-full bg-[var(--color-brand-500)]" />
-              {i < hub.timeline.length - 1 ? (
-                <span className="w-px flex-1 bg-[var(--color-line)]" />
-              ) : null}
-            </div>
-            <div className="min-w-0 flex-1 pb-1">
-              <p className="text-sm font-medium">{e.title}</p>
-              <p className="text-xs text-[var(--color-ink-muted)]">
-                {formatDateTime(e.occurredAt)}
-                {e.actorName ? ` · ${e.actorName}` : ""}
-                {e.isClientVisible ? " · zichtbaar voor klant" : ""}
-              </p>
-              {e.body ? (
-                <p className="mt-1 text-sm text-[var(--color-ink-muted)]">{e.body}</p>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ol>
-    </Card>
-  );
-}

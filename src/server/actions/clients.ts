@@ -95,6 +95,7 @@ export type ClientInput = {
   sector?: string | null;
   website?: string | null;
   logoUrl?: string | null;
+  description?: string | null;
   color?: string | null;
   status?: ClientStatus;
   coordinatorId?: string | null;
@@ -238,6 +239,7 @@ export async function createClient(input: ClientInput): Promise<ActionResult> {
         sector: clean(input.sector),
         website: clean(input.website),
         logoUrl: clean(input.logoUrl),
+        description: clean(input.description),
         color: clean(input.color),
         status,
         coordinatorId: input.coordinatorId || null,
@@ -327,6 +329,7 @@ export async function updateClient(slug: string, input: ClientInput): Promise<Ac
         sector: clean(input.sector),
         website: clean(input.website),
         logoUrl: clean(input.logoUrl),
+        description: clean(input.description),
         color: clean(input.color),
         status,
         coordinatorId: input.coordinatorId || null,

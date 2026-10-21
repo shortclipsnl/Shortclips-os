@@ -14,6 +14,7 @@ const EMPTY = {
   website: "",
   legalName: "",
   logoUrl: "",
+  description: "",
   color: "",
   status: "active",
   coordinatorId: "",

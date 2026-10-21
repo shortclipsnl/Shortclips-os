@@ -23,7 +23,7 @@ export function ClientTabs({ tabs }: { tabs: TabDef[] }) {
               scroll={false}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+                "flex items-center gap-1.5 border-b-2 px-2.5 py-2 text-[13px] font-medium whitespace-nowrap transition-colors",
                 active
                   ? "border-[var(--color-brand-500)] text-[var(--color-ink)]"
                   : "border-transparent text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]",

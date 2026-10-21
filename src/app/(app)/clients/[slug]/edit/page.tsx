@@ -29,6 +29,7 @@ export default async function EditClientPage({
     website: client.website ?? "",
     legalName: client.legalName ?? "",
     logoUrl: client.logoUrl ?? "",
+    description: client.description ?? "",
     color: client.color ?? "",
     status: client.status,
     coordinatorId: client.coordinatorId ?? "",
