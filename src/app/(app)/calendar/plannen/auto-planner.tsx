@@ -319,7 +319,7 @@ export function AutoPlanner({ clients, aiReady }: { clients: ClientOption[]; aiR
           </div>
 
           <InfoNote>
-            <span className="text-sm">Nieuwe publicaties worden op werkdagen (ma–vr) gepland en slaan dagen over waarop al een upload staat. De startdatum staat standaard ná de laatste al geplande upload. Je kunt elke datum hieronder nog aanpassen.</span>
+            <span className="text-sm">Nieuwe publicaties worden op werkdagen (ma–vr) gepland en slaan dagen over waarop al een upload staat. De startdatum staat standaard ná de laatste al geplande upload. <strong>Pas hieronder gerust de titels én de data aan</strong> voordat je inplant — zo maak je het precies zoals je wilt.</span>
           </InfoNote>
 
           <ul className="mt-3 divide-y divide-[var(--color-line)]">

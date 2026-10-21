@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clients,
+  contentCalendar,
   deliverables,
   notifications,
   productionDays,
@@ -10,6 +11,8 @@ import {
   users,
 } from "@/db/schema";
 import { env } from "@/lib/env";
+import { PLATFORM } from "@/lib/statuses";
+import { cleanVideoTitle } from "@/lib/portal-status";
 import { portalEmailHtml, sendEmail } from "@/server/email";
 
 /**
@@ -29,7 +32,7 @@ import { portalEmailHtml, sendEmail } from "@/server/email";
 
 type NotifyItem = {
   clientId: string;
-  kind: "video_review" | "script_review" | "opname_reminder";
+  kind: "video_review" | "script_review" | "opname_reminder" | "video_published";
   dedupeKey: string;
   title: string;
   body: string;
@@ -128,6 +131,41 @@ export async function runClientNotifications(): Promise<{
     });
   }
 
+  // 4. Video's die gisteren online zijn gezet — "we hebben gisteren geplaatst".
+  // Bron is de publicatiekalender (o.a. gevoed vanuit Google Agenda/Monday):
+  // status 'published' met publicatiedatum = gisteren.
+  const publishedYesterday = await db
+    .select({
+      id: contentCalendar.id,
+      clientId: contentCalendar.clientId,
+      title: contentCalendar.title,
+      platforms: contentCalendar.platforms,
+      deliverableId: contentCalendar.deliverableId,
+      scheduledOn: contentCalendar.scheduledOn,
+    })
+    .from(contentCalendar)
+    .where(
+      and(
+        isNull(contentCalendar.deletedAt),
+        eq(contentCalendar.status, "published"),
+        eq(contentCalendar.scheduledOn, day(-1)),
+      ),
+    );
+
+  for (const p of publishedYesterday) {
+    const labels = ((p.platforms as string[]) ?? []).map((x) => PLATFORM[x]?.label ?? x);
+    const onPlatforms = labels.length ? ` op ${labels.join(", ")}` : "";
+    items.push({
+      clientId: p.clientId,
+      kind: "video_published",
+      dedupeKey: `portal:video_published:${p.id}:${p.scheduledOn}`,
+      title: "We hebben gisteren een nieuwe video geplaatst 🎬",
+      body: `“${cleanVideoTitle(p.title)}” staat sinds gisteren online${onPlatforms}. Al gezien? Leuk om 'm even te bekijken!`,
+      href: p.deliverableId ? `/portal/videos/${p.deliverableId}` : "/portal/videos",
+      ctaLabel: "Bekijk de video",
+    });
+  }
+
   if (items.length === 0) {
     return { ok: true, created: 0, emailed: 0, emailSkipped: 0, byKind: {} };
   }
@@ -182,7 +220,7 @@ export async function runClientNotifications(): Promise<{
           userId: recipient.userId,
           clientId: item.clientId,
           type: item.kind,
-          level: item.kind === "video_review" ? "success" : "info",
+          level: item.kind === "video_review" || item.kind === "video_published" ? "success" : "info",
           title: item.title,
           body: item.body,
           href: item.href,

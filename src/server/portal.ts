@@ -1,6 +1,6 @@
 import "server-only";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   activityEvents,
@@ -271,8 +271,41 @@ export async function getPortalData(viewer: Viewer) {
     }
   }
 
+  // Onlangs online gezet: video's die gisteren of vandaag zijn gepubliceerd
+  // (uit de publicatiekalender, gevoed vanuit o.a. Google Agenda). Hiermee
+  // tonen we op het dashboard een melding "we hebben deze video geplaatst —
+  // leuk om 'm even te bekijken", de ochtend nadat een video online is gezet.
+  const yesterdayIso = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  })();
+  const recentlyPublished = (
+    await db
+      .select({
+        id: contentCalendar.id,
+        title: contentCalendar.title,
+        scheduledOn: contentCalendar.scheduledOn,
+        platforms: contentCalendar.platforms,
+        deliverableId: contentCalendar.deliverableId,
+      })
+      .from(contentCalendar)
+      .where(
+        and(
+          eq(contentCalendar.clientId, clientId),
+          isNull(contentCalendar.deletedAt),
+          eq(contentCalendar.status, "published"),
+          gte(contentCalendar.scheduledOn, yesterdayIso),
+          lte(contentCalendar.scheduledOn, today),
+        ),
+      )
+      .orderBy(desc(contentCalendar.scheduledOn))
+      .limit(6)
+  ).map((r) => ({ ...r, title: cleanVideoTitle(r.title), platforms: (r.platforms as string[]) ?? [] }));
+
   return {
     client,
+    recentlyPublished,
     awaitingApproval: awaitingApproval.map((v) => ({ ...v, title: cleanVideoTitle(v.title) })),
     scriptsToReview,
     inProgress: inProgress.map((v) => ({ ...v, title: cleanVideoTitle(v.title) })),

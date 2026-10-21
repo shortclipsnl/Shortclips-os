@@ -7,6 +7,7 @@ import { buttonClass } from "@/components/ui";
 import { CountUp } from "@/components/portal/count-up";
 import { compact, formatDateFull, num, relativeDays } from "@/lib/format";
 import { clientStatusView, deadlineText, reviewDeadline, statusToneClass } from "@/lib/portal-status";
+import { PLATFORM } from "@/lib/statuses";
 import { videoCover } from "./cover";
 
 export const metadata: Metadata = { title: "Jouw omgeving" };
@@ -98,6 +99,39 @@ export default async function PortalPage() {
           Alles rond de video&apos;s van {data.client.name}, in één studio-omgeving.
         </p>
       </div>
+
+      {/* Nieuw online — melding de ochtend nadat we een video hebben geplaatst. */}
+      {data.recentlyPublished.length > 0 ? (
+        <section className="sc-glass sc-glow p-5" style={{ background: "linear-gradient(180deg, rgba(47,210,122,0.12), rgba(255,255,255,0.03))" }}>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#2fd27a]">Nieuw online</span>
+          <h3 className="mt-1.5 text-[16px] font-semibold">
+            {data.recentlyPublished.length === 1
+              ? "We hebben een nieuwe video van je geplaatst 🎬"
+              : `We hebben ${data.recentlyPublished.length} nieuwe video's van je geplaatst 🎬`}
+          </h3>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+            Al gezien? Leuk om &apos;m even te bekijken — en te delen als je enthousiast bent.
+          </p>
+          <ul className="mt-3 flex flex-col gap-2">
+            {data.recentlyPublished.map((v) => (
+              <li key={v.id}>
+                <Link
+                  href={v.deliverableId ? `/portal/videos/${v.deliverableId}` : "/portal/videos"}
+                  className="flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-[12px] border border-white/10 bg-white/5 px-3.5 py-2.5 transition-colors hover:border-white/25"
+                >
+                  <Play className="size-4 shrink-0 text-[#2fd27a]" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{v.title}</span>
+                  {v.platforms.length > 0 ? (
+                    <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">
+                      op {v.platforms.map((p) => PLATFORM[p]?.label ?? p).join(", ")}
+                    </span>
+                  ) : null}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* Statusoverzicht, één oogopslag: waar staan je video's */}
       <section className="sc-glass p-5">
