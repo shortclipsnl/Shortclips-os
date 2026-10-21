@@ -70,6 +70,15 @@ const schema = z.object({
   // bedrijfsonderzoek (Google Cloud, gratis quota).
   YOUTUBE_API_KEY: z.string().optional(),
 
+  // --- Video Intelligence opslag ---
+  // Zonder deze waarden slaat Video Intelligence bestanden lokaal op schijf op
+  // (ontwikkeling). In productie (Vercel, geen vaste schijf) gebruikt het
+  // Supabase Storage. SUPABASE_URL = de Project URL, SUPABASE_SERVICE_ROLE_KEY =
+  // de service role-sleutel (Project Settings → API). Beide zijn geheim.
+  SUPABASE_URL: z.string().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  SUPABASE_VI_BUCKET: z.string().default("video-intelligence"),
+
   // --- Achtergrondtaken ---
   CRON_SECRET: z.string().optional(),
 

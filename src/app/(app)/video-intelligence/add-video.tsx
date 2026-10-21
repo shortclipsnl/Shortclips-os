@@ -48,17 +48,38 @@ export function AddVideo({ clients }: { clients: ClientOption[] }) {
     if (!file) return setError("Kies een videobestand.");
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.set("file", file);
-      fd.set("clientId", clientId);
-      if (title) fd.set("title", title);
-      const res = await fetch("/api/video-intelligence/upload", { method: "POST", body: fd });
-      const data = (await res.json()) as { id?: string; error?: string };
-      if (res.ok && data.id) {
-        router.push(`/video-intelligence/${data.id}`);
-      } else {
-        setError(data.error ?? "Upload mislukt.");
+      // 1) Analyse aanmaken + upload-bestemming ophalen.
+      const initRes = await fetch("/api/video-intelligence/upload-init", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ clientId, title: title || undefined, filename: file.name, mimeType: file.type, size: file.size }),
+      });
+      const init = (await initRes.json()) as { id?: string; uploadUrl?: string; headers?: Record<string, string>; error?: string };
+      if (!initRes.ok || !init.id || !init.uploadUrl) {
+        setError(init.error ?? "Upload voorbereiden mislukt.");
+        return;
       }
+
+      // 2) Bestand rechtstreeks naar de opslag uploaden.
+      const putRes = await fetch(init.uploadUrl, { method: "PUT", headers: init.headers, body: file });
+      if (!putRes.ok) {
+        setError("Het uploaden van het bestand is mislukt.");
+        return;
+      }
+
+      // 3) Analyse starten.
+      const compRes = await fetch("/api/video-intelligence/upload-complete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: init.id }),
+      });
+      if (!compRes.ok) {
+        const c = (await compRes.json().catch(() => ({}))) as { error?: string };
+        setError(c.error ?? "Het starten van de analyse is mislukt.");
+        return;
+      }
+
+      router.push(`/video-intelligence/${init.id}`);
     } catch {
       setError("Upload mislukt.");
     } finally {

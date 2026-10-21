@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { videoAnalyses } from "@/db/schema";
 import { getViewer, hasClientAccess } from "@/server/auth/context";
 import { fromStoreRelative } from "@/server/video-intelligence/paths";
+import { signedMediaUrl, type MediaStore } from "@/server/video-intelligence/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,12 +24,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!viewer.permissions.has("video_intelligence:read")) return new NextResponse(null, { status: 403 });
 
   const [a] = await db
-    .select({ clientId: videoAnalyses.clientId, mediaPath: videoAnalyses.mediaPath, mimeType: videoAnalyses.mimeType })
+    .select({ clientId: videoAnalyses.clientId, mediaPath: videoAnalyses.mediaPath, mediaStore: videoAnalyses.mediaStore, mimeType: videoAnalyses.mimeType })
     .from(videoAnalyses)
     .where(eq(videoAnalyses.id, id))
     .limit(1);
   if (!a || !a.mediaPath) return new NextResponse(null, { status: 404 });
   if (!hasClientAccess(viewer, a.clientId)) return new NextResponse(null, { status: 403 });
+
+  // Supabase-opslag: stuur de speler door naar een tijdelijke, ondertekende URL.
+  if ((a.mediaStore as MediaStore) === "supabase") {
+    const url = await signedMediaUrl("supabase", a.mediaPath);
+    if (!url) return new NextResponse(null, { status: 404 });
+    return NextResponse.redirect(url, { status: 302 });
+  }
 
   const abs = fromStoreRelative(a.mediaPath);
   let size: number;

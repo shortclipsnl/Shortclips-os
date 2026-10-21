@@ -1,7 +1,7 @@
 import "server-only";
 import path from "node:path";
 import { run, ffmpegBin, ffprobeBin } from "./tools";
-import { framesDir } from "./paths";
+import { workFramesDir } from "./paths";
 
 /**
  * Meetbare video-analyse met ffmpeg/ffprobe — werkt zonder AI-sleutels en levert
@@ -72,7 +72,7 @@ export function shotsFromCuts(cuts: number[], durationMs: number): Shot[] {
 
 /** Pakt één frame op tijdstip t (ms) als JPEG. Geeft het bestandspad terug of null. */
 export async function grabFrame(mediaPath: string, analysisId: string, tMs: number, name: string): Promise<string | null> {
-  const out = path.join(framesDir(analysisId), name);
+  const out = path.join(workFramesDir(analysisId), name);
   const res = await run(ffmpegBin(), [
     "-y", "-ss", (tMs / 1000).toFixed(2), "-i", mediaPath,
     "-frames:v", "1", "-q:v", "3", out,

@@ -2,6 +2,7 @@
 
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { db } from "@/db/client";
 import { videoAnalyses, videoAnalysisSteps, videoHooks, publications } from "@/db/schema";
 import { requirePermission, assertClientAccess, hasClientAccess, ForbiddenError } from "@/server/auth/context";
@@ -65,7 +66,7 @@ export async function addVideoByUrl(input: { clientId: string; url: string; titl
     await auditLog({ viewer, action: "video_intelligence.add", entityType: "video_analysis", entityId: id, clientId: input.clientId });
 
     // Verwerking start in de achtergrond (in-proces).
-    void runPipeline(id).catch(() => {});
+    after(() => runPipeline(id).catch(() => {}));
     revalidatePath("/video-intelligence");
     return { ok: true, data: { id } };
   } catch (e) {
@@ -86,7 +87,7 @@ export async function reprocessAnalysis(id: string): Promise<ActionResult> {
       (["download", "probe", "shots", "editing", "ocr", "transcribe", "vision", "insights"] as const).map((step) => ({ analysisId: id, step })),
     );
     await db.update(videoAnalyses).set({ status: "queued", error: null, updatedAt: new Date() }).where(eq(videoAnalyses.id, id));
-    void runPipeline(id).catch(() => {});
+    after(() => runPipeline(id).catch(() => {}));
     revalidatePath(`/video-intelligence/${id}`);
     return { ok: true };
   } catch (e) {
@@ -112,7 +113,7 @@ export async function reprocessMany(ids: string[]): Promise<ActionResult<{ count
         (["download", "probe", "shots", "editing", "ocr", "transcribe", "vision", "insights"] as const).map((step) => ({ analysisId: r.id, step })),
       );
       await db.update(videoAnalyses).set({ status: "queued", error: null, updatedAt: new Date() }).where(eq(videoAnalyses.id, r.id));
-      void runPipeline(r.id).catch(() => {});
+      after(() => runPipeline(r.id).catch(() => {}));
       count++;
     }
     revalidatePath("/video-intelligence");

@@ -20,12 +20,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "kb:import": "tsx scripts/kennisbank-import.ts",
-  "kosten:seed": "tsx scripts/kosten-seed.ts"
+    "kosten:seed": "tsx scripts/kosten-seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
     "@electric-sql/pglite": "^0.5.5",
     "@sparticuz/chromium": "^131.0.1",
+    "@supabase/supabase-js": "^2.58.0",
     "@tiptap/core": "3.32.0",
     "@tiptap/extension-image": "3.32.0",
     "@tiptap/pm": "3.32.0",

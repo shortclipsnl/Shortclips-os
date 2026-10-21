@@ -1,5 +1,6 @@
 import "server-only";
 import { mkdir } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 /**
@@ -32,4 +33,23 @@ export function toStoreRelative(absPath: string): string {
 /** Zet een in de DB opgeslagen relatief pad terug om naar absoluut. */
 export function fromStoreRelative(rel: string): string {
   return path.join(VI_STORE_ROOT, rel);
+}
+
+/**
+ * Schrijfbare werkmap voor ffmpeg-scratch (frames, audio), altijd onder /tmp.
+ * Werkt zowel lokaal als op Vercel, waar alleen /tmp beschrijfbaar is. De inhoud
+ * is tijdelijk: thumbnails worden na verwerking in de database bewaard.
+ */
+export function workDir(id: string): string {
+  return path.join(os.tmpdir(), "shortclips-vi", id);
+}
+
+export function workFramesDir(id: string): string {
+  return path.join(workDir(id), "frames");
+}
+
+export async function ensureWorkDir(id: string): Promise<string> {
+  const dir = workDir(id);
+  await mkdir(workFramesDir(id), { recursive: true });
+  return dir;
 }

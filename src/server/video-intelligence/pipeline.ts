@@ -15,10 +15,20 @@ import {
 } from "@/db/schema";
 import { aiConfigured, runJsonPrompt } from "@/server/ai/client";
 import { tools, run, ffmpegBin, whisperPython, whisperScript, ocrScript } from "./tools";
-import { confirmUpload, downloadFromUrl } from "./ingest";
+import { downloadFromUrl } from "./ingest";
 import { probe, detectSceneCuts, shotsFromCuts, grabFrame, editingMetrics, type Shot } from "./ffmpeg";
 import { speechStats } from "./metrics";
-import { analysisDir, framesDir, toStoreRelative } from "./paths";
+import { workDir, workFramesDir, ensureWorkDir, toStoreRelative } from "./paths";
+import { activeStore, fetchMediaToTemp, type MediaStore } from "./storage";
+
+/** Leest een JPEG van schijf en geeft het terug als base64 (voor opslag in de DB). */
+async function fileToBase64(p: string): Promise<string | null> {
+  try {
+    return (await readFile(p)).toString("base64");
+  } catch {
+    return null;
+  }
+}
 
 /**
  * De verwerkingspijplijn voor één video-analyse. Draait in-proces (fire-and-
@@ -63,20 +73,24 @@ export async function runPipeline(analysisId: string): Promise<void> {
     if (!a) return;
 
     await db.update(videoAnalyses).set({ status: "processing", error: null, updatedAt: new Date() }).where(eq(videoAnalyses.id, analysisId));
+    await ensureWorkDir(analysisId);
 
-    // 1) DOWNLOAD / bron bevestigen
+    // 1) BRON ophalen naar een lokaal werkpad dat ffmpeg kan lezen.
     await setStep(analysisId, "download", "running");
-    let mediaPath = a.mediaPath ?? "";
+    const ext = (a.mediaPath?.split(".").pop() || "mp4").toLowerCase();
+    let mediaPath = "";
     if (a.sourceType === "platform_url") {
+      // Downloaden met yt-dlp (lokaal). In productie ontbreekt yt-dlp → faalt eerlijk.
       const res = await downloadFromUrl(analysisId, a.sourceUrl ?? "");
       if (!res.ok) {
         await setStep(analysisId, "download", "failed", res.reason);
         await db.update(videoAnalyses).set({ status: "failed", error: res.reason, updatedAt: new Date() }).where(eq(videoAnalyses.id, analysisId));
         return;
       }
-      mediaPath = res.mediaPath;
+      mediaPath = res.mediaPath; // lokaal pad (onder .data)
       await db.update(videoAnalyses).set({
         mediaPath: toStoreRelative(res.mediaPath),
+        mediaStore: "disk",
         caption: a.caption ?? res.caption,
         externalPostId: a.externalPostId ?? res.externalPostId,
         fileSizeBytes: res.fileSizeBytes,
@@ -84,15 +98,17 @@ export async function runPipeline(analysisId: string): Promise<void> {
       }).where(eq(videoAnalyses.id, analysisId));
       await setStep(analysisId, "download", "done");
     } else {
-      // upload: mediaPath staat relatief in de DB
-      const abs = mediaPath ? path.join(analysisDir(analysisId), path.basename(mediaPath)) : "";
-      const res = await confirmUpload(analysisId, abs);
-      if (!res.ok) {
-        await setStep(analysisId, "download", "failed", res.reason);
-        await db.update(videoAnalyses).set({ status: "failed", error: res.reason, updatedAt: new Date() }).where(eq(videoAnalyses.id, analysisId));
+      // upload: het bestand staat al in de opslag (schijf of Supabase). Haal het
+      // op naar een tijdelijk werkpad zodat ffmpeg het kan verwerken.
+      const store = (a.mediaStore as MediaStore) || activeStore();
+      try {
+        mediaPath = await fetchMediaToTemp(store, a.mediaPath ?? "", analysisId, ext);
+      } catch (e) {
+        const reason = "Geüpload bestand niet gevonden in de opslag.";
+        await setStep(analysisId, "download", "failed", `${reason} (${String(e)})`);
+        await db.update(videoAnalyses).set({ status: "failed", error: reason, updatedAt: new Date() }).where(eq(videoAnalyses.id, analysisId));
         return;
       }
-      mediaPath = res.mediaPath;
       await setStep(analysisId, "download", "done");
     }
 
@@ -110,15 +126,15 @@ export async function runPipeline(analysisId: string): Promise<void> {
         await setStep(analysisId, "probe", "failed", "ffprobe kon het bestand niet lezen.");
       } else {
         durationMs = p.durationMs;
-        // hoofd-thumbnail
-        let thumbRel: string | null = null;
+        // hoofd-thumbnail als base64 in de database
+        let thumbData: string | null = null;
         if (haveFfmpeg) {
           const t = await grabFrame(mediaPath, analysisId, Math.min(1000, Math.floor(durationMs / 2)), "thumb.jpg");
-          if (t) thumbRel = toStoreRelative(t);
+          if (t) thumbData = await fileToBase64(t);
         }
         await db.update(videoAnalyses).set({
           durationMs: p.durationMs, width: p.width, height: p.height, fps: p.fps, aspectRatio: p.aspectRatio,
-          ...(thumbRel ? { thumbnailPath: thumbRel } : {}),
+          ...(thumbData ? { thumbnailData: thumbData } : {}),
           updatedAt: new Date(),
         }).where(eq(videoAnalyses.id, analysisId));
         await setStep(analysisId, "probe", "done");
@@ -141,7 +157,7 @@ export async function runPipeline(analysisId: string): Promise<void> {
         const frame = await grabFrame(mediaPath, analysisId, mid, `shot_${s.idx}.jpg`);
         await db.insert(videoShots).values({
           analysisId, idx: s.idx, startMs: s.startMs, endMs: s.endMs,
-          thumbnailPath: frame ? toStoreRelative(frame) : null,
+          thumbnailData: frame ? await fileToBase64(frame) : null,
         });
       }
       await setStep(analysisId, "shots", "done", `${shots.length} shots gedetecteerd`);
@@ -227,7 +243,7 @@ async function finalizeStatus(analysisId: string) {
 
 /* ---------------- Transcriptie (faster-whisper via venv) ---------------- */
 async function transcribe(analysisId: string, mediaPath: string, durationMs: number): Promise<{ status: StepStatus; detail?: string }> {
-  const dir = analysisDir(analysisId);
+  const dir = workDir(analysisId);
   const wav = path.join(dir, "audio.wav");
   const extract = await run(ffmpegBin(), ["-y", "-i", mediaPath, "-vn", "-ac", "1", "-ar", "16000", wav], { timeoutMs: 60000 });
   if (extract.code !== 0) return { status: "failed", detail: "Audio-extractie mislukt." };
@@ -270,9 +286,9 @@ async function transcribe(analysisId: string, mediaPath: string, durationMs: num
 async function ocrShots(analysisId: string, shots: Shot[]): Promise<{ status: StepStatus; detail?: string }> {
   const py = whisperPython();
   if (!py) return { status: "skipped", detail: "OCR-venv ontbreekt." };
-  const fdir = framesDir(analysisId);
+  const fdir = workFramesDir(analysisId);
   const imgs = shots.map((s) => path.join(fdir, `shot_${s.idx}.jpg`));
-  const outJson = path.join(analysisDir(analysisId), "ocr.json");
+  const outJson = path.join(workDir(analysisId), "ocr.json");
   const res = await run(py, [ocrScript(), outJson, ...imgs], { timeoutMs: 300000 });
   if (res.code !== 0) return { status: "failed", detail: "OCR mislukt." };
 
@@ -314,11 +330,8 @@ async function visionAnalyse(analysisId: string): Promise<{ status: StepStatus; 
   const sampled = sample(shots, 8);
   const images: Array<{ base64: string; mediaType: "image/jpeg" }> = [];
   for (const s of sampled) {
-    if (!s.thumbnailPath) continue;
-    try {
-      const buf = await readFile(path.join(framesDir(analysisId), path.basename(s.thumbnailPath)));
-      images.push({ base64: buf.toString("base64"), mediaType: "image/jpeg" });
-    } catch { /* frame ontbreekt */ }
+    if (!s.thumbnailData) continue;
+    images.push({ base64: s.thumbnailData, mediaType: "image/jpeg" });
   }
   if (images.length === 0) return { status: "skipped", detail: "Geen frames beschikbaar om te duiden." };
 

@@ -42,9 +42,13 @@ export const videoAnalyses = pgTable(
     externalPostId: varchar("external_post_id", { length: 200 }),
     caption: text("caption"),
 
-    /** Lokaal pad naar het opgehaalde/geüploade bronbestand en de hoofd-thumbnail. */
+    /** Pad/sleutel naar het bronbestand: lokaal pad (dev) of opslag-sleutel (Supabase in productie). */
     mediaPath: text("media_path"),
+    /** Waar het bronbestand staat: "disk" (lokaal) of "supabase" (objectopslag). */
+    mediaStore: varchar("media_store", { length: 20 }),
     thumbnailPath: text("thumbnail_path"),
+    /** Hoofd-thumbnail als base64-JPEG in de database (werkt ook zonder vaste schijf, bijv. op Vercel). */
+    thumbnailData: text("thumbnail_data"),
     mimeType: varchar("mime_type", { length: 80 }),
     fileSizeBytes: integer("file_size_bytes"),
 
@@ -113,6 +117,8 @@ export const videoShots = pgTable(
     startMs: integer("start_ms").notNull(),
     endMs: integer("end_ms").notNull(),
     thumbnailPath: text("thumbnail_path"),
+    /** Frame als base64-JPEG in de database (werkt ook zonder vaste schijf). */
+    thumbnailData: text("thumbnail_data"),
     /** Door AI gevuld (vision): close_up/wide/talking_head/b_roll/... */
     shotType: varchar("shot_type", { length: 40 }),
     description: text("description"),

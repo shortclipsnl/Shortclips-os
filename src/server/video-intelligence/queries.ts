@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   videoAnalyses,
@@ -34,7 +34,7 @@ export async function listAnalyses(viewer: Viewer, filters: AnalysisFilters = {}
       status: videoAnalyses.status,
       sourceType: videoAnalyses.sourceType,
       durationMs: videoAnalyses.durationMs,
-      thumbnailPath: videoAnalyses.thumbnailPath,
+      hasThumb: sql<boolean>`${videoAnalyses.thumbnailData} is not null`,
       createdAt: videoAnalyses.createdAt,
       clientName: clients.name,
       clientColor: clients.color,
@@ -68,7 +68,23 @@ export async function getAnalysis(viewer: Viewer, id: string) {
 
   const [steps, shots, transcriptRows, editingRows, hookRows, structureRows, insightRows] = await Promise.all([
     db.select().from(videoAnalysisSteps).where(eq(videoAnalysisSteps.analysisId, id)),
-    db.select().from(videoShots).where(eq(videoShots.analysisId, id)).orderBy(videoShots.idx),
+    db
+      .select({
+        id: videoShots.id,
+        idx: videoShots.idx,
+        startMs: videoShots.startMs,
+        endMs: videoShots.endMs,
+        shotType: videoShots.shotType,
+        description: videoShots.description,
+        transition: videoShots.transition,
+        hasSpeech: videoShots.hasSpeech,
+        textOnScreen: videoShots.textOnScreen,
+        motion: videoShots.motion,
+        hasThumb: sql<boolean>`${videoShots.thumbnailData} is not null`,
+      })
+      .from(videoShots)
+      .where(eq(videoShots.analysisId, id))
+      .orderBy(videoShots.idx),
     db.select().from(videoTranscripts).where(eq(videoTranscripts.analysisId, id)).limit(1),
     db.select().from(videoEditingMetrics).where(eq(videoEditingMetrics.analysisId, id)).limit(1),
     db.select().from(videoHooks).where(eq(videoHooks.analysisId, id)).limit(1),

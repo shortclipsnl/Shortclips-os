@@ -38,13 +38,13 @@ export default async function AnalysisPage({ params }: { params: Promise<{ id: s
     aspectRatio: a.aspectRatio,
     error: a.error,
     hasMedia: Boolean(a.mediaPath),
-    hasThumb: Boolean(a.thumbnailPath),
+    hasThumb: Boolean(a.thumbnailData),
     clientName: detail.client?.name ?? "Onbekend",
     steps: detail.steps,
     shots: detail.shots.map((s) => ({
       idx: s.idx, startMs: s.startMs, endMs: s.endMs,
       shotType: s.shotType, description: s.description, transition: s.transition,
-      textOnScreen: s.textOnScreen, motion: s.motion, hasThumb: Boolean(s.thumbnailPath),
+      textOnScreen: s.textOnScreen, motion: s.motion, hasThumb: Boolean(s.hasThumb),
     })),
     transcript: detail.transcript
       ? {
