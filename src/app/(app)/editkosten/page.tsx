@@ -3,7 +3,7 @@ import Link from "next/link";
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { requirePermission } from "@/server/auth/context";
-import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Table } from "@/components/ui";
+import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Table, TeamAvatar } from "@/components/ui";
 import { euro } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Editkosten & winst" };
@@ -105,8 +105,15 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
   });
   const latestPeriod = months.length ? months[months.length - 1]!.period : null;
 
-  // Gekozen maand voor de kerncijfers bovenin (standaard de laatste).
-  const selPeriod = sp.maand && months.some((m) => m.period === sp.maand) ? sp.maand : latestPeriod;
+  // Standaard tonen we de laatste VOLLEDIG afgeronde maand (de vorige maand),
+  // niet de lopende maand — die omzet is nog onvolledig. Elke 1e van de maand
+  // schuift dit vanzelf een maand op. Met ←/→ kun je alsnog elke maand kiezen.
+  const nowPeriod = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" }).slice(0, 7);
+  const completedMonths = months.filter((m) => m.period < nowPeriod);
+  const defaultPeriod = completedMonths.length ? completedMonths[completedMonths.length - 1]!.period : latestPeriod;
+
+  // Gekozen maand voor de kerncijfers bovenin (standaard de laatste afgeronde).
+  const selPeriod = sp.maand && months.some((m) => m.period === sp.maand) ? sp.maand : defaultPeriod;
   const selIdx = months.findIndex((m) => m.period === selPeriod);
   const sel = selIdx >= 0 ? months[selIdx]! : null;
   const prevPeriod = selIdx > 0 ? months[selIdx - 1]!.period : null;
@@ -114,17 +121,35 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
   const selVgInfo = selPeriod ? vgByPeriod.get(selPeriod) : null;
 
   // Netto per klant voor de gekozen maand: omzet − editkosten − videograafkosten.
-  const perClientRes = selPeriod
-    ? await db.execute(sql`
-        select c.id, c.name, c.slug, c.color, c.logo_url,
-          (m.revenue + m.extra_revenue)::float income,
-          -- Editkosten live gekoppeld aan de klant: prijs/video × shorts per maand.
-          (coalesce(c.edit_cost_per_video,0) * coalesce(c.monthly_video_quota,0))::float edit
-        from client_finance_months m
-        join clients c on c.id = m.client_id and c.deleted_at is null
-        where m.period = ${selPeriod}
-      `)
-    : null;
+  // En editkosten per editor: welke editor factureert deze maand hoeveel, voor
+  // hoeveel video's. Effectieve prijs per video = afwijkend tarief op de video
+  // (als gezet), anders het afgesproken tarief van de klant.
+  const [perClientRes, perEditorRes] = selPeriod
+    ? await Promise.all([
+        db.execute(sql`
+          select c.id, c.name, c.slug, c.color, c.logo_url,
+            (m.revenue + m.extra_revenue)::float income,
+            -- Editkosten live gekoppeld aan de klant: prijs/video × shorts per maand.
+            (coalesce(c.edit_cost_per_video,0) * coalesce(c.monthly_video_quota,0))::float edit
+          from client_finance_months m
+          join clients c on c.id = m.client_id and c.deleted_at is null
+          where m.period = ${selPeriod}
+        `),
+        db.execute(sql`
+          select u.id, u.full_name as name, u.avatar_url,
+            count(*)::int videos,
+            coalesce(sum(case when d.edit_cost > 0 then d.edit_cost else coalesce(c.edit_cost_per_video,0) end),0)::float total
+          from deliverables d
+          join users u on u.id = d.editor_id
+          join clients c on c.id = d.client_id and c.deleted_at is null
+          where d.deleted_at is null and d.editor_id is not null
+            and d.status in ('published','approved','scheduled','ready_to_publish','analysis_available')
+            and to_char((coalesce(d.published_at, d.status_changed_at)) at time zone 'Europe/Amsterdam', 'YYYY-MM') = ${selPeriod}
+          group by u.id, u.full_name, u.avatar_url
+          order by total desc, videos desc
+        `),
+      ])
+    : [null, null];
   type PRow = { id: string; name: string; slug: string; color: string | null; logo_url: string | null; income: number; edit: number };
   const perClient = (perClientRes ? rows2<PRow>(perClientRes) : [])
     .map((r) => {
@@ -137,6 +162,17 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
     })
     .sort((a, b) => b.net - a.net);
 
+  // Editkosten per editor voor de gekozen maand (hoogste factuur bovenaan).
+  type ERow = { id: string; name: string; avatar_url: string | null; videos: number; total: number };
+  const perEditor = (perEditorRes ? rows2<ERow>(perEditorRes) : []).map((e) => ({
+    ...e,
+    videos: Number(e.videos),
+    total: Number(e.total),
+    perVideo: Number(e.videos) > 0 ? Number(e.total) / Number(e.videos) : 0,
+  }));
+  const editorTotal = perEditor.reduce((a, e) => a + e.total, 0);
+  const editorVideos = perEditor.reduce((a, e) => a + e.videos, 0);
+
   return (
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
@@ -148,7 +184,10 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
       {sel ? (
         <section className="mb-5">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-bold tracking-tight">Maand: {monthLabel(sel.period)}</h2>
+            <h2 className="text-base font-bold tracking-tight">
+              Maand: {monthLabel(sel.period)}
+              {sel.period === defaultPeriod ? <span className="ml-2 text-xs font-medium text-[var(--color-ink-faint)]">· laatste afgeronde maand</span> : null}
+            </h2>
             <div className="inline-flex items-center gap-1">
               {prevPeriod ? <Link href={`/editkosten?maand=${prevPeriod}`} className="sc-card px-2.5 py-1 text-sm hover:bg-[var(--color-surface-sunken)]">←</Link> : <span className="sc-card px-2.5 py-1 text-sm opacity-40">←</span>}
               {nextPeriod ? <Link href={`/editkosten?maand=${nextPeriod}`} className="sc-card px-2.5 py-1 text-sm hover:bg-[var(--color-surface-sunken)]">→</Link> : <span className="sc-card px-2.5 py-1 text-sm opacity-40">→</span>}
@@ -217,6 +256,33 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
             })}
           </Table>
           <p className="px-5 py-3 text-xs text-[var(--color-ink-muted)]">Editkosten zijn de verwachte editkosten van de maand (afspraak per klant). Videograafkosten zijn berekend uit de opnamedagen van die maand (€16,75/uur, max 8 uur per dag). <span className="text-[var(--color-ink-faint)]">*</span> = geen opnamedag vastgelegd, gerekend als 1 standaard opnamedag (€134).</p>
+        </Card>
+      ) : null}
+
+      {/* Editkosten per editor — wie factureert deze maand hoeveel en voor
+          hoeveel video's; de hoogste factuur bovenaan. */}
+      {perEditor.length > 0 ? (
+        <Card padded={false} className="mb-5">
+          <CardHeader
+            title={`Editkosten per editor${selPeriod ? ` · ${monthLabel(selPeriod)}` : ""}`}
+            subtitle={`Wie factureert deze maand het meest — totaal ${euro(editorTotal)} over ${editorVideos} ${editorVideos === 1 ? "video" : "video's"}, hoogste factuur bovenaan.`}
+            className="p-5 pb-2"
+          />
+          <Table head={<><th className="sc-th">Editor</th><th className="sc-th text-right">Video&apos;s</th><th className="sc-th text-right">Per video (gem.)</th><th className="sc-th text-right">Editkosten</th><th className="sc-th text-right">Aandeel</th></>}>
+            {perEditor.map((e) => {
+              const share = editorTotal > 0 ? Math.round((e.total / editorTotal) * 100) : 0;
+              return (
+                <tr key={e.id}>
+                  <td className="sc-td"><span className="flex items-center gap-2 font-medium"><TeamAvatar name={e.name} avatarUrl={e.avatar_url} size={22} />{e.name}</span></td>
+                  <td className="sc-td text-right tabular-nums">{e.videos}</td>
+                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{euro(e.perVideo)}</td>
+                  <td className="sc-td text-right font-bold tabular-nums">{euro(e.total)}</td>
+                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{share}%</td>
+                </tr>
+              );
+            })}
+          </Table>
+          <p className="px-5 py-3 text-xs text-[var(--color-ink-muted)]">Op basis van de video&apos;s die deze maand zijn opgeleverd (gepubliceerd of goedgekeurd). Prijs per video = een afwijkend tarief op de video indien gezet, anders het afgesproken tarief van de klant.</p>
         </Card>
       ) : null}
     </div>
