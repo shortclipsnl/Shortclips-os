@@ -87,6 +87,10 @@ export const notifications = pgTable(
      */
     dedupeKey: varchar("dedupe_key", { length: 200 }),
     readAt: timestamp("read_at", { withTimezone: true }),
+    /** Tot wanneer de melding is uitgesteld ("herinner me later"): zolang dit in
+     *  de toekomst ligt, popt de melding niet opnieuw op. Verloopt de tijd, dan
+     *  komt de melding nog één keer terug. */
+    snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [

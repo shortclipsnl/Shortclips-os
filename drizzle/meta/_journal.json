@@ -337,6 +337,13 @@
       "when": 1792564531795,
       "tag": "0047_simple_jackal",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1792586009039,
+      "tag": "0048_parched_the_hood",
+      "breakpoints": true
     }
   ]
 }

@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
-import { fetchNewNotifications, markNotificationRead, type PopNotification } from "@/server/actions/notifications";
+import { Clock, X } from "lucide-react";
+import { fetchNewNotifications, markNotificationRead, snoozeNotification, type PopNotification } from "@/server/actions/notifications";
 
 const ACCENT: Record<PopNotification["level"], string> = {
   info: "var(--color-info)",
@@ -86,23 +86,34 @@ export function NotificationPopper({ viewerId }: { viewerId: string }) {
 
   const poll = useCallback(async () => {
     if (typeof document !== "undefined" && document.hidden) return;
-    let fresh: PopNotification[] = [];
+    let res: { items: PopNotification[]; since: string };
     try {
-      fresh = await fetchNewNotifications(sinceRef.current);
+      res = await fetchNewNotifications(sinceRef.current);
     } catch {
       return;
     }
-    if (fresh.length === 0) return;
-    sinceRef.current = fresh[fresh.length - 1]!.createdAt;
-    try {
-      localStorage.setItem(key, sinceRef.current);
-    } catch {
-      /* ignore */
+    // Baseline alleen opschuiven voor écht nieuwe meldingen (server bepaalt dit).
+    if (res.since !== sinceRef.current) {
+      sinceRef.current = res.since;
+      try {
+        localStorage.setItem(key, sinceRef.current);
+      } catch {
+        /* ignore */
+      }
     }
-    playDing();
-    setToasts((t) => [...fresh, ...t].slice(0, 5));
-    for (const n of fresh) setTimeout(() => dismiss(n.id), 9000);
-  }, [dismiss, key]);
+    if (res.items.length === 0) return;
+    // Niet dubbel tonen wat al op het scherm staat (bijv. een verlopen snooze).
+    setToasts((t) => {
+      const shown = new Set(t.map((x) => x.id));
+      const add = res.items.filter((n) => !shown.has(n.id));
+      if (add.length === 0) return t;
+      playDing();
+      return [...add, ...t].slice(0, 5);
+    });
+    // Geen automatische verdwijntijd meer: de melding blijft staan tot je 'm
+    // wegklikt (kruisje) of uitstelt ("herinner me later"), zodat hij niet
+    // ongemerkt verdwijnt en ook niet steeds opnieuw opduikt.
+  }, [key]);
 
   useEffect(() => {
     const first = setTimeout(poll, 4000);
@@ -123,6 +134,19 @@ export function NotificationPopper({ viewerId }: { viewerId: string }) {
     void markNotificationRead(n.id).catch(() => {});
     if (n.href) router.push(n.href);
     router.refresh();
+  }
+
+  // Wegklikken (kruisje): markeer als gelezen — de melding komt niet meer terug.
+  function close(n: PopNotification) {
+    dismiss(n.id);
+    void markNotificationRead(n.id).catch(() => {});
+    router.refresh();
+  }
+
+  // Uitstellen: verberg nu, kom over 30 minuten nog één keer terug.
+  function snooze(n: PopNotification) {
+    dismiss(n.id);
+    void snoozeNotification(n.id, 30).catch(() => {});
   }
 
   if (toasts.length === 0) return null;
@@ -153,10 +177,20 @@ export function NotificationPopper({ viewerId }: { viewerId: string }) {
               </span>
             </div>
           </div>
+          {/* Uitstellen: komt over 30 min nog één keer terug. */}
+          <div className="flex items-center gap-2 border-t border-[var(--color-line)] px-4 py-1.5">
+            <button
+              type="button"
+              onClick={() => snooze(n)}
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]"
+            >
+              <Clock className="size-3" /> Herinner me over 30 min
+            </button>
+          </div>
           <button
             type="button"
-            onClick={() => dismiss(n.id)}
-            aria-label="Melding sluiten"
+            onClick={() => close(n)}
+            aria-label="Melding wegklikken"
             className="absolute right-2 top-2 rounded p-1 text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]"
           >
             <X className="size-3.5" />

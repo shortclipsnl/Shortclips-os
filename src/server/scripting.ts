@@ -1,5 +1,6 @@
 import "server-only";
 import { and, asc, eq, gte, isNull, ne, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import { clients, productionDays, users } from "@/db/schema";
 import { requireInternal, scopeToClients, type Viewer } from "@/server/auth/context";
@@ -53,9 +54,23 @@ export type WriterOption = { id: string; fullName: string; avatarUrl: string | n
  * gewijzigde datum reset de status nooit; vervallen/verwijderde opnames vallen
  * vanzelf weg; nieuwe opnames verschijnen automatisch. Geen dubbele regels.
  */
+export type ClientResponsible = {
+  clientName: string;
+  clientSlug: string;
+  clientColor: string | null;
+  clientLogo: string | null;
+  responsibleName: string | null;
+  responsibleAvatar: string | null;
+};
+
 export async function listScripting(viewer: Viewer) {
   await requireInternal();
   const today = new Date().toISOString().slice(0, 10);
+
+  // Tweede users-join voor de vaste verantwoordelijke per klant (de
+  // coördinator). Die gebruiken we als standaard-scriptschrijver wanneer er nog
+  // niemand expliciet is gekoppeld, zodat dat niet handmatig hoeft.
+  const coord = alias(users, "coord_user");
 
   const rows = await db
     .select({
@@ -70,10 +85,14 @@ export async function listScripting(viewer: Viewer) {
       scriptWriterId: productionDays.scriptWriterId,
       scriptWriterName: users.fullName,
       scriptWriterAvatar: users.avatarUrl,
+      coordinatorId: clients.coordinatorId,
+      coordinatorName: coord.fullName,
+      coordinatorAvatar: coord.avatarUrl,
     })
     .from(productionDays)
     .innerJoin(clients, eq(clients.id, productionDays.clientId))
     .leftJoin(users, eq(users.id, productionDays.scriptWriterId))
+    .leftJoin(coord, eq(coord.id, clients.coordinatorId))
     .where(
       and(
         isNull(productionDays.deletedAt),
@@ -112,9 +131,11 @@ export async function listScripting(viewer: Viewer) {
       note: r.note,
       done,
       flag,
-      scriptWriterId: r.scriptWriterId,
-      scriptWriterName: r.scriptWriterName,
-      scriptWriterAvatar: r.scriptWriterAvatar,
+      // Standaard de vaste verantwoordelijke (coördinator) tonen zolang er nog
+      // niemand expliciet is gekoppeld — scheelt handmatig invullen.
+      scriptWriterId: r.scriptWriterId ?? r.coordinatorId,
+      scriptWriterName: r.scriptWriterName ?? r.coordinatorName,
+      scriptWriterAvatar: r.scriptWriterAvatar ?? r.coordinatorAvatar,
     };
   });
 
@@ -153,5 +174,24 @@ export async function listScripting(viewer: Viewer) {
     .sort((a, b) => coreStaffRank(a.email) - coreStaffRank(b.email))
     .map((u) => ({ id: u.id, fullName: u.fullName, avatarUrl: u.avatarUrl }));
 
-  return { rows: list, stats, clientOptions, writerOptions };
+  // Vaste verantwoordelijke (coördinator) per actieve klant — voor het
+  // overzicht onderaan de scriptingpagina. Zo is in één oogopslag duidelijk
+  // wie standaard verantwoordelijk is voor de scripts van welke klant.
+  const clientResponsibles: ClientResponsible[] = (
+    await db
+      .select({
+        clientName: clients.name,
+        clientSlug: clients.slug,
+        clientColor: clients.color,
+        clientLogo: clients.logoUrl,
+        responsibleName: coord.fullName,
+        responsibleAvatar: coord.avatarUrl,
+      })
+      .from(clients)
+      .leftJoin(coord, eq(coord.id, clients.coordinatorId))
+      .where(and(isNull(clients.deletedAt), eq(clients.status, "active"), scopeToClients(viewer, clients.id)))
+      .orderBy(asc(clients.name))
+  ).map((c) => ({ ...c }));
+
+  return { rows: list, stats, clientOptions, writerOptions, clientResponsibles };
 }
