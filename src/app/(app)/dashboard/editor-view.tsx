@@ -3,7 +3,7 @@ import { AlertTriangle, FileText, Film, CheckCircle2, Clock } from "lucide-react
 import { getEditorDashboard } from "@/server/editor-dashboard";
 import { listEditorBoard, type EditorBoardVideo } from "@/server/editor-board";
 import type { Viewer } from "@/server/auth/context";
-import { Card, CardHeader, ClientLogo, EmptyState, Stat } from "@/components/ui";
+import { Card, CardHeader, ClientLogo, EmptyState, Stat, TeamAvatar } from "@/components/ui";
 import { pct, plural, relativeDays } from "@/lib/format";
 import { isFirstVersionPending } from "@/lib/edit-deadline";
 import { EDIT_PHASE_META } from "@/lib/statuses";
@@ -90,42 +90,45 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
         </div>
       </div>
 
-      {/* Jouw video's — compact, op volgorde van de interne deadline. Zelfde set
-          als de Editing-pagina. Downloaden en het script openen doe je daar. */}
-      <Card padded={false}>
-        <div className="p-5 pb-3">
-          <CardHeader
-            title="Jouw video's"
-            subtitle="Op volgorde van je interne deadline (eerste versie, 7 werkdagen na de opname). Klik een video aan voor de download en het script."
-          />
-        </div>
-        {jouwVideos.length === 0 ? (
-          <EmptyState
-            title="Niets in bewerking"
-            description="Zodra een video klaarstaat om te editen, verschijnt die hier."
-          />
-        ) : (
-          <ul className="divide-y divide-[var(--color-line)]">
-            {jouwVideos.map((v) => <VideoRow key={v.id} v={v} />)}
-          </ul>
-        )}
-      </Card>
+      {/* Jouw video's en Binnenkort beschikbaar naast elkaar: links wat nu
+          klaarstaat, rechts wat eraan komt. Zelfde set als de Editing-pagina. */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card padded={false}>
+          <div className="p-5 pb-3">
+            <CardHeader
+              title="Jouw video's"
+              subtitle="Op volgorde van je interne deadline (eerste versie, 7 werkdagen na de opname). Klik een video aan voor de download en het script."
+            />
+          </div>
+          {jouwVideos.length === 0 ? (
+            <EmptyState
+              title="Niets in bewerking"
+              description="Zodra een video klaarstaat om te editen, verschijnt die hier."
+            />
+          ) : (
+            <ul className="divide-y divide-[var(--color-line)]">
+              {jouwVideos.map((v) => <VideoRow key={v.id} v={v} />)}
+            </ul>
+          )}
+        </Card>
 
-      {/* Binnenkort beschikbaar — komt uit de Editing-pagina (nog in te plannen of
-          wachten op beeld). Zodat de editor vooruit kan plannen. */}
-      {binnenkort.length > 0 ? (
+        {/* Binnenkort beschikbaar — nog in te plannen of wachten op beeld. */}
         <Card padded={false}>
           <div className="p-5 pb-3">
             <CardHeader
               title="Binnenkort beschikbaar"
-              subtitle="Deze video's komen er binnenkort aan (nog in te plannen of wachten op beeld). Houd er vast rekening mee in je planning, zodat alles realistisch en op tijd wordt opgeleverd."
+              subtitle="Deze video's komen er binnenkort aan. Houd er vast rekening mee in je planning, zodat alles realistisch en op tijd wordt opgeleverd."
             />
           </div>
-          <ul className="divide-y divide-[var(--color-line)]">
-            {binnenkort.map((v) => <VideoRow key={v.id} v={v} />)}
-          </ul>
+          {binnenkort.length === 0 ? (
+            <EmptyState title="Niets op de planning" description="Zodra er een nieuwe opname of klus aankomt, zie je die hier." />
+          ) : (
+            <ul className="divide-y divide-[var(--color-line)]">
+              {binnenkort.map((v) => <VideoRow key={v.id} v={v} />)}
+            </ul>
+          )}
         </Card>
-      ) : null}
+      </div>
 
       {/* Maandoverzicht van opgeleverde projecten — zodat duidelijk is wat er
           per maand is afgerond. */}
@@ -160,6 +163,48 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
 
       {/* Beschikbaarheid: zelf aangeven wanneer je niet beschikbaar bent. */}
       <AvailabilityBox note={data.availabilityNote} />
+
+      {/* Contactpersoon bij ShortClips — de projectcoördinatoren (Milou, Jiska).
+          Met foto, zodat de editor bij vragen weet wie ze kunnen bereiken via
+          WhatsApp of telefoon. */}
+      {data.contacts.length > 0 ? (
+        <Card>
+          <CardHeader
+            title="Contactpersoon bij ShortClips"
+            subtitle="Vragen over een video of je planning? Onze projectcoördinatoren helpen je graag — bereik ze via WhatsApp of bel ze gerust."
+          />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {data.contacts.map((c) => {
+              const digits = (c.phone ?? "").replace(/[^\d]/g, "");
+              return (
+                <div key={c.id} className="flex items-center gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3">
+                  <TeamAvatar name={c.fullName} avatarUrl={c.avatarUrl} size={44} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold">{c.fullName}</div>
+                    <div className="text-xs text-[var(--color-ink-muted)]">Projectcoördinator</div>
+                    {c.phone ? (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {digits ? (
+                          <a href={`https://wa.me/${digits}`} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center rounded-full bg-[var(--color-good-soft)] px-2.5 py-1 text-2xs font-semibold text-[#1d6b4c] hover:brightness-95">
+                            WhatsApp
+                          </a>
+                        ) : null}
+                        <a href={`tel:${c.phone.replace(/\s/g, "")}`}
+                          className="inline-flex items-center rounded-full bg-[var(--color-surface)] px-2.5 py-1 text-2xs font-semibold text-[var(--color-ink)] ring-1 ring-[var(--color-line)] hover:brightness-95">
+                          {c.phone}
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="mt-1 text-2xs text-[var(--color-ink-muted)]">Telefoonnummer nog niet bekend</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
 
       {data.branding.length > 0 ? (
         <Card padded={false}>

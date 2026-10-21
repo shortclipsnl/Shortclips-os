@@ -11,7 +11,7 @@ const today = () => new Date().toISOString().slice(0, 10);
  * en hoe doe ik het. Geen klantoverzichten, geen omzet, geen werk van collega's.
  */
 export async function getEditorDashboard(viewer: Viewer) {
-  const [queue, overdue, stats, openTasks, deliveredRows, meRows] = await Promise.all([
+  const [queue, overdue, stats, openTasks, deliveredRows, meRows, contactRows] = await Promise.all([
     db
       .select({
         id: deliverables.id,
@@ -112,6 +112,16 @@ export async function getEditorDashboard(viewer: Viewer) {
     `),
 
     db.select({ note: users.availabilityNote }).from(users).where(eq(users.id, viewer.id)).limit(1),
+
+    // Contactpersonen bij ShortClips voor de editor: de projectcoördinatoren
+    // (Milou, Jiska). Met foto en telefoon, zodat de editor ze makkelijk kan
+    // bereiken via WhatsApp of bellen.
+    db
+      .select({ id: users.id, fullName: users.fullName, avatarUrl: users.avatarUrl, phone: users.phone })
+      .from(users)
+      .where(and(isNull(users.deletedAt), eq(users.status, "active"), eq(users.primaryRole, "project_coordinator")))
+      .orderBy(asc(users.fullName))
+      .limit(4),
   ]);
 
   // Huisstijl & referenties per klant waar de editor werk voor heeft (§5):
@@ -189,6 +199,7 @@ export async function getEditorDashboard(viewer: Viewer) {
     branding,
     deliveredByMonth,
     availabilityNote: meRows[0]?.note ?? null,
+    contacts: contactRows,
     stats: {
       delivered,
       inProgress: Number(row.lopend ?? 0),
