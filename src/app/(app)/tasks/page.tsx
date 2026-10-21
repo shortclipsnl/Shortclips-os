@@ -50,6 +50,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         title: tasks.title,
         status: tasks.status,
         priority: tasks.priority,
+        category: tasks.category,
         dueOn: tasks.dueOn,
         assigneeId: tasks.assigneeId,
         assigneeName: users.fullName,
@@ -80,9 +81,14 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       // Gearchiveerd (automatisch na 7 dagen klaar) — blijft terugvindbaar.
       fetchTasks(and(isNull(tasks.deletedAt), isNotNull(tasks.archivedAt), assigneeCond, scopeToClients(viewer, tasks.clientId))),
     ]);
+    // Openstaande taken groeperen per soort: zo staat scripting apart van
+    // klantcontact en overige taken, in plaats van één lange lijst.
     const o = open as TaskItemData[];
+    const byCat = (cat: string) => o.filter((t) => (t.category || "overig") === cat);
     buckets = [
-      { label: "Openstaand", items: o },
+      { label: "Scripting", items: byCat("scripting") },
+      { label: "Klantcontact", items: byCat("klantcontact") },
+      { label: "Overige taken", items: byCat("overig") },
       { label: "Afgerond", items: (done as TaskItemData[]).slice(0, 20) },
       { label: `Gearchiveerd (${archived.length})`, items: (archived as TaskItemData[]).slice(0, 30) },
     ];

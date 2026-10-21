@@ -76,16 +76,23 @@ export async function setTaskStatus(taskId: string, status: string): Promise<Act
   }
 }
 
+const TASK_CATEGORIES = ["scripting", "klantcontact", "overig"] as const;
+
 const createSchema = z.object({
   title: z.string().trim().min(1, "Geef de taak een titel.").max(240),
   clientId: z.string().uuid().nullish(),
   assigneeId: z.string().uuid().nullish(),
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
+  category: z.enum(TASK_CATEGORIES).default("overig"),
   dueOn: z.string().nullish(),
 });
 
+function cleanCategory(c: string | null | undefined): (typeof TASK_CATEGORIES)[number] {
+  return (TASK_CATEGORIES as readonly string[]).includes(c ?? "") ? (c as (typeof TASK_CATEGORIES)[number]) : "overig";
+}
+
 /** Meerdere taken in één keer: elke tekstregel wordt een taak (snelle invoer). */
-export async function createTasksBulk(input: { lines: string; assigneeId?: string | null }): Promise<ActionResult & { created?: number }> {
+export async function createTasksBulk(input: { lines: string; assigneeId?: string | null; category?: string | null }): Promise<ActionResult & { created?: number }> {
   try {
     const viewer = await requirePermission("tasks:write");
     const titles = input.lines
@@ -96,8 +103,9 @@ export async function createTasksBulk(input: { lines: string; assigneeId?: strin
     if (titles.length === 0) return { ok: false, message: "Typ minstens één taak." };
 
     const assigneeId = input.assigneeId && /^[0-9a-f-]{36}$/i.test(input.assigneeId) ? input.assigneeId : null;
+    const category = cleanCategory(input.category);
     const inserted = await db.insert(tasks).values(
-      titles.map((title) => ({ title: title.slice(0, 240), assigneeId, status: "todo" as const, createdById: viewer.id })),
+      titles.map((title) => ({ title: title.slice(0, 240), assigneeId, category, status: "todo" as const, createdById: viewer.id })),
     ).returning({ id: tasks.id });
 
     // Eén melding voor de hele batch als die aan iemand anders is toegewezen.
@@ -136,6 +144,7 @@ export async function createTask(input: z.input<typeof createSchema>): Promise<A
       clientId: parsed.data.clientId ?? null,
       assigneeId: parsed.data.assigneeId ?? null,
       priority: parsed.data.priority,
+      category: parsed.data.category,
       dueOn: parsed.data.dueOn || null,
       status: "todo",
       createdById: viewer.id,
@@ -156,6 +165,7 @@ const updateSchema = z.object({
   title: z.string().trim().min(1).max(240).optional(),
   assigneeId: z.string().uuid().nullable().optional(),
   priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
+  category: z.enum(TASK_CATEGORIES).optional(),
   dueOn: z.string().nullable().optional(),
 });
 
@@ -180,6 +190,7 @@ export async function updateTask(
     if (parsed.data.title !== undefined) patch.title = parsed.data.title;
     if (parsed.data.assigneeId !== undefined) patch.assigneeId = parsed.data.assigneeId;
     if (parsed.data.priority !== undefined) patch.priority = parsed.data.priority;
+    if (parsed.data.category !== undefined) patch.category = parsed.data.category;
     if (parsed.data.dueOn !== undefined) patch.dueOn = parsed.data.dueOn || null;
 
     await db.update(tasks).set(patch).where(eq(tasks.id, taskId));

@@ -1,0 +1,1 @@
+ALTER TABLE "tasks" ADD COLUMN "category" varchar(24) DEFAULT 'overig' NOT NULL;

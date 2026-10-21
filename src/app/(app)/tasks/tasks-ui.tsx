@@ -48,6 +48,7 @@ export type TaskItemData = {
   title: string;
   status: string;
   priority: string;
+  category: string;
   dueOn: string | null;
   assigneeId: string | null;
   assigneeName: string | null;
@@ -65,6 +66,14 @@ const PRIORITIES = [
   { value: "urgent", label: "Urgent" },
 ];
 
+/** Soort taak — voor de groepering op de takenpagina. */
+export const TASK_CATEGORIES = [
+  { value: "scripting", label: "Scripting" },
+  { value: "klantcontact", label: "Klantcontact" },
+  { value: "overig", label: "Overige taken" },
+];
+export const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(TASK_CATEGORIES.map((c) => [c.value, c.label]));
+
 const prioDot: Record<string, string> = {
   low: "var(--color-ink-faint)",
   normal: "var(--color-info)",
@@ -76,6 +85,7 @@ const prioDot: Record<string, string> = {
 export function QuickTaskLines({ users, defaultAssignee }: { users: UserOption[]; defaultAssignee?: string }) {
   const [lines, setLines] = useState("");
   const [assigneeId, setAssigneeId] = useState(defaultAssignee ?? "");
+  const [category, setCategory] = useState("overig");
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -83,7 +93,7 @@ export function QuickTaskLines({ users, defaultAssignee }: { users: UserOption[]
   function add() {
     if (!lines.trim()) return;
     start(async () => {
-      const res = await createTasksBulk({ lines, assigneeId: assigneeId || null });
+      const res = await createTasksBulk({ lines, assigneeId: assigneeId || null, category });
       if (res.ok) {
         setLines("");
         setErr(null);
@@ -100,7 +110,12 @@ export function QuickTaskLines({ users, defaultAssignee }: { users: UserOption[]
     <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold text-[var(--color-ink-muted)]">Snel toevoegen — typ taken, één per regel:</span>
-        <select className="sc-input ml-auto h-8 w-40 py-0 text-xs" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} aria-label="Toewijzen aan">
+        <select className="sc-input ml-auto h-8 w-36 py-0 text-xs" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Soort taak">
+          {TASK_CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </select>
+        <select className="sc-input h-8 w-40 py-0 text-xs" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} aria-label="Toewijzen aan">
           <option value="">Algemeen / niet toegewezen</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>{u.fullName}</option>
@@ -307,6 +322,18 @@ export function TaskItem({
             <option value="">Algemeen</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>{u.fullName}</option>
+            ))}
+          </select>
+
+          <select
+            className="sc-input h-8 w-32 py-0 text-xs"
+            value={task.category}
+            disabled={pending}
+            onChange={(e) => run(() => updateTask(task.id, { category: e.target.value as "overig" }))}
+            aria-label="Soort taak"
+          >
+            {TASK_CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
 

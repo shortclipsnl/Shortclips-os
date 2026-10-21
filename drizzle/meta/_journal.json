@@ -330,6 +330,13 @@
       "when": 1792562509958,
       "tag": "0046_nervous_killer_shrike",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1792564531795,
+      "tag": "0047_simple_jackal",
+      "breakpoints": true
     }
   ]
 }

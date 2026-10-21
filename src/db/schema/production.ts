@@ -278,6 +278,9 @@ export const tasks = pgTable(
     description: text("description"),
     status: taskStatusEnum("status").notNull().default("todo"),
     priority: taskPriorityEnum("priority").notNull().default("normal"),
+    /** Soort taak voor de groepering op de takenpagina: `scripting`,
+     *  `klantcontact` of `overig`. Zo staat niet alles in één lange lijst. */
+    category: varchar("category", { length: 24 }).notNull().default("overig"),
     assigneeId: uuid("assignee_id").references(() => users.id, {
       onDelete: "set null",
     }),
