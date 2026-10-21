@@ -18,6 +18,9 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
+          // Dwingt de browser om dit domein altijd via HTTPS te benaderen
+          // (voorkomt SSL-stripping). 2 jaar, inclusief subdomeinen.
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
           { key: "Referrer-Policy", value: "same-origin" },
           {
             key: "Permissions-Policy",

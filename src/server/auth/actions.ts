@@ -131,11 +131,16 @@ export async function loginAction(
     entityId: user.id,
   });
 
+  // Alleen een intern, relatief pad toestaan als doorverwijzing. Een
+  // protocol-relatieve URL (`//kwaadaardig.nl`) of backslash-truc begint ook
+  // met "/" maar leidt naar een externe site — die weigeren we (open-redirect).
+  const nextParam = parsed.data.next ?? "";
+  const safeNext = nextParam.startsWith("/") && !nextParam.startsWith("//") && !nextParam.includes("\\");
   const target =
     user.primaryRole === "client"
       ? "/portal"
-      : parsed.data.next && parsed.data.next.startsWith("/")
-        ? parsed.data.next
+      : safeNext
+        ? nextParam
         : "/dashboard";
 
   redirect(target);
