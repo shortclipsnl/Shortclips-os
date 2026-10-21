@@ -6,10 +6,14 @@ import {
   ExternalLink,
   Sparkles,
 } from "lucide-react";
+import { and, eq, isNull } from "drizzle-orm";
+import { db } from "@/db/client";
+import { users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { getClientHub, type ClientHub } from "@/server/clients";
 import { ScriptHistory } from "./script-history";
 import { FilesBrowser } from "./files-browser";
+import { ClientPortalLogin } from "./portal-login";
 import {
   Avatar,
   Badge,
@@ -74,6 +78,18 @@ export default async function ClientPage({
   const { tab } = await searchParams;
   const hub = await getClientHub(viewer, slug);
   const c = hub.client;
+
+  // Portaallogin-status van deze klant (alleen de eigenaar beheert dit).
+  const isOwnerViewer = viewer.primaryRole === "owner";
+  let portalLogin: { email: string; active: boolean } | null = null;
+  if (isOwnerViewer) {
+    const [pu] = await db
+      .select({ email: users.email, status: users.status })
+      .from(users)
+      .where(and(eq(users.clientId, c.id), eq(users.primaryRole, "client"), isNull(users.deletedAt)))
+      .limit(1);
+    if (pu) portalLogin = { email: pu.email, active: pu.status === "active" };
+  }
 
   const activeVideos = hub.videos.filter(
     (v) => !["published", "analysis_available"].includes(v.status),
@@ -204,7 +220,12 @@ export default async function ClientPage({
       </Suspense>
 
       {active === "overzicht" ? (
-        <OverviewTab hub={hub} publishedThisMonth={publishedThisMonth} nextShoot={nextShoot} activeVideos={activeVideos.length} />
+        <div className="space-y-5">
+          {isOwnerViewer ? (
+            <ClientPortalLogin clientId={c.id} hasLogin={Boolean(portalLogin)} loginEmail={portalLogin?.email ?? null} />
+          ) : null}
+          <OverviewTab hub={hub} publishedThisMonth={publishedThisMonth} nextShoot={nextShoot} activeVideos={activeVideos.length} />
+        </div>
       ) : null}
       {active === "videos" ? <VideosTab hub={hub} /> : null}
       {active === "scripts" ? <ScriptsTab hub={hub} canVI={viewer.permissions.has("video_intelligence:read")} /> : null}

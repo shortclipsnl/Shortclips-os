@@ -1,16 +1,116 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientContacts, clientIntegrations, clients, contracts } from "@/db/schema";
+import { clientContacts, clientIntegrations, clients, contracts, roles, userRoles, users } from "@/db/schema";
 import {
   assertClientAccess,
   ForbiddenError,
+  requireOwner,
   requirePermission,
 } from "@/server/auth/context";
+import { hashPassword } from "@/server/auth/password";
+import { revokeAllSessions } from "@/server/auth/session";
 import { auditLog, recordActivity } from "@/server/audit";
 import { enforcePortalAccess } from "@/server/jobs/portal-access";
+
+/** Leesbaar tijdelijk wachtwoord, bijv. "Hk3mn-pQ7rs-2bded". Zonder lastig te
+ *  verwarren tekens (0/O, 1/l/I). */
+function tempPassword(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const bytes = randomBytes(14);
+  let out = "";
+  for (const b of bytes) out += alphabet[b % alphabet.length];
+  return `${out.slice(0, 5)}-${out.slice(5, 10)}-${out.slice(10, 14)}`;
+}
+
+export type PortalLoginResult = {
+  ok: boolean;
+  message?: string;
+  email?: string;
+  password?: string;
+  action?: "aangemaakt" | "nieuw wachtwoord";
+};
+
+/**
+ * Portaallogin voor een klant aanmaken of een nieuw wachtwoord geven. Alleen de
+ * eigenaar. Het wachtwoord wordt hier éénmalig teruggegeven (daarna alleen
+ * versleuteld opgeslagen — ook wij kunnen het niet meer inzien). Veilig: een
+ * e-mailadres dat al bij een teamlid of een andere klant hoort, weigeren we,
+ * zodat er nooit per ongeluk een bestaand account wordt gekaapt.
+ */
+export async function setClientPortalLogin(clientId: string): Promise<PortalLoginResult> {
+  try {
+    const viewer = await requireOwner();
+
+    const [client] = await db
+      .select({ id: clients.id, name: clients.name, slug: clients.slug })
+      .from(clients)
+      .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
+      .limit(1);
+    if (!client) return { ok: false, message: "Klant niet gevonden." };
+
+    const contacts = await db
+      .select({ fullName: clientContacts.fullName, email: clientContacts.email, isPrimary: clientContacts.isPrimary })
+      .from(clientContacts)
+      .where(and(eq(clientContacts.clientId, clientId), isNull(clientContacts.deletedAt)))
+      .orderBy(desc(clientContacts.isPrimary));
+    const contact = contacts.find((c) => c.email) ?? null;
+    if (!contact?.email) {
+      return { ok: false, message: "Vul eerst een contact-e-mail in bij deze klant — dat adres wordt de portaallogin." };
+    }
+    const email = contact.email.trim().toLowerCase();
+
+    const [clientRole] = await db.select({ id: roles.id }).from(roles).where(eq(roles.key, "client")).limit(1);
+    if (!clientRole) return { ok: false, message: "De portaalrol ontbreekt in het systeem — neem contact op met de beheerder." };
+
+    const password = tempPassword();
+    const passwordHash = await hashPassword(password);
+
+    const [existing] = await db
+      .select({ id: users.id, primaryRole: users.primaryRole, clientId: users.clientId })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    let userId: string;
+    let action: PortalLoginResult["action"];
+    if (existing) {
+      if (existing.primaryRole !== "client" && existing.clientId == null) {
+        return { ok: false, message: "Dit e-mailadres hoort al bij een teamaccount. Gebruik een ander e-mailadres voor de klantlogin." };
+      }
+      if (existing.clientId && existing.clientId !== clientId) {
+        return { ok: false, message: "Dit e-mailadres is al gekoppeld aan een andere klant." };
+      }
+      await db
+        .update(users)
+        .set({ passwordHash, fullName: contact.fullName ?? client.name, primaryRole: "client", clientId, status: "active", lockedUntil: null, failedLoginCount: 0, updatedAt: new Date() })
+        .where(eq(users.id, existing.id));
+      userId = existing.id;
+      action = "nieuw wachtwoord";
+      // Lopende sessies van dit account intrekken bij een nieuw wachtwoord.
+      await revokeAllSessions(userId);
+    } else {
+      const [created] = await db
+        .insert(users)
+        .values({ email, fullName: contact.fullName ?? client.name, passwordHash, primaryRole: "client", clientId, status: "active" })
+        .returning({ id: users.id });
+      userId = created!.id;
+      action = "aangemaakt";
+    }
+
+    await db.insert(userRoles).values({ userId, roleId: clientRole.id }).onConflictDoNothing();
+
+    await auditLog({ viewer, action: "client.portal_login_set", entityType: "client", entityId: clientId, clientId });
+    revalidatePath(`/clients/${client.slug}`);
+    return { ok: true, email, password, action };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
 
 export type ActionResult = { ok: boolean; message?: string; slug?: string };
 
