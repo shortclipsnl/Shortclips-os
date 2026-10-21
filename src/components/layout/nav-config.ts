@@ -30,6 +30,7 @@ export const NAVIGATION: NavGroup[] = [
     accent: "var(--color-brand-600)",
     items: [
       { href: "/dashboard", label: "Vandaag", icon: "LayoutDashboard" },
+      { href: "/doelen", label: "Doelen", icon: "Target", match: "/doelen" },
       { href: "/kwaliteit", label: "Kwaliteit & Aandachtspunten", icon: "ShieldCheck", match: "/kwaliteit" },
     ],
   },

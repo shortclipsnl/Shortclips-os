@@ -15,6 +15,7 @@ import { integrationHealth } from "@/server/integrations/registry";
 import { countOpenLinkSuggestions } from "@/server/link-review";
 import { VIDEO_WAITING_ON, type VideoStage } from "@/lib/statuses";
 import { isOwner, scopeToClients, type Viewer } from "@/server/auth/context";
+import { getGoalsOverview } from "@/server/goals/overview";
 
 /**
  * Centrale kwaliteitsbewaking: bundelt alle automatisch gesignaleerde punten tot
@@ -346,6 +347,18 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: c.clientName, detail: `Over ${d} dagen · ${c.autoRenew ? "verlengt automatisch" : "verlengt niet"}`,
       href: `/clients/${c.clientSlug}?tab=contract`, roles: COORD,
     });
+  }
+
+  // Doelen (Q4): achter = Directe actie, risico/niet bijgewerkt = Extra aandacht,
+  // gepland = Vooruit kijken. Niet aan editors tonen.
+  const GOAL_ROLES = ["project_coordinator", "content_creator", "videographer", "finance"];
+  const goalsOverview = await getGoalsOverview(viewer);
+  for (const g of goalsOverview.rows) {
+    if (g.status === "op_koers" || g.status === "gehaald") continue;
+    const severity: QualitySeverity = g.status === "achter" ? "rood" : g.status === "gepland" ? "blauw" : "oranje";
+    const category = g.status === "achter" ? "Doel achter" : g.status === "risico" ? "Doel risico" : g.status === "niet_bijgewerkt" ? "Stand ontbreekt" : "Doel gepland";
+    const detail = g.causeLabels.length > 0 ? `${g.causeLabels.slice(0, 3).join(", ")} → bekijk het doel` : `${g.pillarLabel} → bekijk het doel`;
+    items.push({ id: `goal-${g.id}`, severity, category, title: g.title, detail, href: "/doelen", roles: GOAL_ROLES });
   }
 
   // Ernst-volgorde: rood, oranje, blauw; daarbinnen per categorie gegroepeerd,
