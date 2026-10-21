@@ -5,6 +5,7 @@
     { "path": "/api/jobs/run?job=sync.nightly", "schedule": "0 3 * * *" },
     { "path": "/api/jobs/run?job=reminders.daily_todo&slot=winter", "schedule": "30 12 * * *" },
     { "path": "/api/jobs/run?job=reminders.daily_todo&slot=zomer", "schedule": "30 11 * * *" },
-    { "path": "/api/jobs/run?job=vrijdagcheck.notify", "schedule": "0 7 * * 5" }
+    { "path": "/api/jobs/run?job=vrijdagcheck.notify", "schedule": "0 7 * * 5" },
+    { "path": "/api/jobs/run?job=finance.month_reminder", "schedule": "0 8 28 * *" }
   ]
 }

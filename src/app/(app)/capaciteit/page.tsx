@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import { requireInternal } from "@/server/auth/context";
 import { getCapacityOverview } from "@/server/capacity";
 import { isCoreStaffByName } from "@/server/core-staff";
-import { PageHeader, Card, Stat, Badge, TeamAvatar } from "@/components/ui";
+import { PageHeader, Card, Badge, TeamAvatar } from "@/components/ui";
 import { euro } from "@/lib/format";
-import { GrowthSimulator } from "./simulator";
 
 export const metadata: Metadata = { title: "Teamcapaciteit" };
 export const dynamic = "force-dynamic";
@@ -20,7 +19,7 @@ export default async function CapacityPage() {
   const viewer = await requireInternal();
   const canSeeFinance = viewer.permissions.has("finance:read");
   const overview = await getCapacityOverview();
-  const { params, summary } = overview;
+  const { params } = overview;
 
   // De eigenaar (Jarno/Janno) hoort niet in de capaciteitsverdeling.
   const people = overview.people.filter((p) => {
@@ -28,8 +27,6 @@ export default async function CapacityPage() {
     const r = (p.role ?? "").toLowerCase();
     return !(n.includes("jarno") || n.includes("janno") || r.includes("eigenaar") || r.includes("owner"));
   });
-
-  const paramMap = new Map(params.map((p) => [p.key, p.value ?? 0]));
 
   // Financiële aannames (kosten, omzet, marges) zijn uitsluitend voor de
   // eigenaar — niet voor de rest van het team. finance:read heeft alleen de
@@ -134,33 +131,6 @@ export default async function CapacityPage() {
           )}
         </>
       )}
-
-      {/* Teamsamenvatting — in kleur, zodat je in één oogopslag kunt scannen. */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Actieve klanten" value={String(summary.activeClients)} tone="info" />
-        <Stat label="Shorts per maand" value={String(summary.monthlyShorts)} hint="afname actieve klanten" tone="lime" />
-        <Stat label="Editketen" value={summary.editChainUsedPct !== null ? `${summary.editChainUsedPct}%` : "—"}
-          tone={summary.editChainUsedPct !== null && summary.editChainUsedPct > 90 ? "bad" : summary.editChainUsedPct !== null && summary.editChainUsedPct > 75 ? "warn" : "good"}
-          hint={summary.editChainCapacity ? `max ~${summary.editChainCapacity}/mnd` : undefined} />
-        <Stat label="Actieve editors" value={String(summary.activeEditors)} tone="violet" />
-      </div>
-
-      {/* Groeisimulator */}
-      <GrowthSimulator
-        currentClients={summary.activeClients}
-        canSeeFinance={canSeeFinance}
-        p={{
-          shortsPerClient: paramMap.get("shorts_klant_contract") ?? 5.56,
-          opnPerClient: paramMap.get("opn_klant_contract") ?? 1,
-          editPerEditor: paramMap.get("edit_cap_editor") ?? 24,
-          ccClientsHigh: paramMap.get("cc_klanten_hoog") ?? 26,
-          vgCapacity: paramMap.get("vg_hoog_4w") ?? 16,
-          revenuePerClient: canSeeFinance ? (paramMap.get("omzet_klant") ?? 1978) : 0,
-          costStaff: canSeeFinance ? (paramMap.get("kosten_medewerker") ?? 2775) : 0,
-          editCostShort: canSeeFinance ? (paramMap.get("edit_kosten_short") ?? 48) : 0,
-          costOverig: canSeeFinance ? (paramMap.get("kosten_overig") ?? 480) : 0,
-        }}
-      />
 
       {/* Aannames */}
       <details className="mt-6">

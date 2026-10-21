@@ -566,6 +566,25 @@ export async function runVrijdagcheckNotification() {
   return { week: weekLabel, okCount, open: open.length, sent };
 }
 
+/**
+ * Maandelijkse herinnering aan de eigenaar (Jarno) om de kosten/boekhouding van
+ * de maand toe te voegen, zodat het financieel overzicht actueel blijft. Eén
+ * melding per maand (dedupe). Bedoeld voor een cron tegen het einde van de maand.
+ */
+export async function runFinanceMonthReminder() {
+  const period = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" }).slice(0, 7); // YYYY-MM
+  const sent = await notify({
+    roles: ["owner"],
+    type: "finance_month_reminder",
+    level: "info",
+    title: "Voeg de kosten van deze maand toe aan Financiën",
+    body: "Upload de DigiBoox-/boekhoudexport en vul de maandkosten in, zodat het financieel overzicht actueel blijft.",
+    href: "/financien",
+    dedupeKey: `finance_month_reminder:${period}`,
+  });
+  return { period, sent };
+}
+
 /** Maandag van de huidige week (voor wekelijkse dedupe). */
 function mondayIso(): string {
   const d = new Date();

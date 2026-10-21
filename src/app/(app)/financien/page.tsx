@@ -2,13 +2,21 @@ import type { Metadata } from "next";
 import { Repeat, CalendarClock, Wallet, Receipt } from "lucide-react";
 import { requireOwner } from "@/server/auth/context";
 import { getManagementFinance } from "@/server/management-finance";
+import { getCapacityOverview } from "@/server/capacity";
 import { Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { compact, euro, formatDate } from "@/lib/format";
 import { CompanyMonthRow, DigibooxImport, FixedCostManager, SalesLeadManager, type CompanyMonth } from "./financien-ui";
+import { GrowthSimulator } from "../capaciteit/simulator";
 
 function monthLabel(p: string) {
   const [y, m] = p.split("-").map(Number);
   return new Date(y!, (m ?? 1) - 1, 1).toLocaleDateString("nl-NL", { month: "short", year: "numeric" });
+}
+
+const MN_SHORT = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+function shortMonth(p: string) {
+  const [y, m] = p.split("-").map(Number);
+  return `${MN_SHORT[(m ?? 1) - 1]} '${String(y).slice(2)}`;
 }
 
 export const metadata: Metadata = { title: "Financiën" };
@@ -18,9 +26,14 @@ export default async function FinancienPage() {
   // Financiën is uitsluitend voor de eigenaar — hard afgedwongen op paginaniveau
   // (defense-in-depth), náást de finance:read-check in getManagementFinance.
   await requireOwner();
-  const d = await getManagementFinance();
+  const [d, capacity] = await Promise.all([getManagementFinance(), getCapacityOverview()]);
   const companyByPeriod = new Map(d.companyRows.map((c) => [c.period, c as unknown as CompanyMonth]));
   const monthsDesc = [...d.months].reverse();
+  // Omzetgrafiek: laatste 12 maanden, in volgorde.
+  const chartMonths = d.months.slice(-12);
+  const maxOmzet = Math.max(1, ...chartMonths.map((m) => m.income));
+  // Parameters voor de groeisimulator (verplaatst vanaf Teamcapaciteit).
+  const capParam = new Map(capacity.params.map((p) => [p.key, p.value ?? 0]));
   const fixedByCat = new Map<string, number>();
   for (const f of d.fixedCosts) if (f.isActive) fixedByCat.set(f.category, (fixedByCat.get(f.category) ?? 0) + Number(f.monthlyAmount));
 
@@ -35,6 +48,33 @@ export default async function FinancienPage() {
         <Stat label={`Gerealiseerd ${new Date().getFullYear()}`} value={euro(d.yearRealized)} tone="good" icon={<Wallet />} />
         <Stat label="Vaste lasten / maand" value={euro(d.fixedTotal)} tone="warn" icon={<Receipt />} />
       </div>
+
+      {/* Omzet per maand — als grafiek, zodat de trend in één oogopslag scanbaar is. */}
+      {chartMonths.length > 0 ? (
+        <Card className="mb-6">
+          <CardHeader title="Omzet per maand" subtitle={`Gefactureerde omzet per maand — de laatste ${chartMonths.length} maanden in één oogopslag.`} />
+          <div className="mt-4 flex h-44 items-end gap-1.5 sm:gap-2">
+            {chartMonths.map((m) => {
+              const h = Math.max(2, Math.round((m.income / maxOmzet) * 92));
+              return (
+                <div key={m.period} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
+                  <span className="text-2xs font-semibold tabular-nums text-[var(--color-ink-muted)]">{m.income > 0 ? compact(m.income) : ""}</span>
+                  <div
+                    className="w-full rounded-t-[4px]"
+                    style={{ height: `${h}%`, background: "linear-gradient(180deg, var(--color-brand-400), var(--color-brand-700))" }}
+                    title={`${monthLabel(m.period)}: ${euro(m.income)}`}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-1.5 flex gap-1.5 sm:gap-2">
+            {chartMonths.map((m) => (
+              <span key={m.period} className="min-w-0 flex-1 truncate text-center text-2xs text-[var(--color-ink-faint)]">{shortMonth(m.period)}</span>
+            ))}
+          </div>
+        </Card>
+      ) : null}
 
       {/* Boekhouding (Digiboox) — officiële cijfers */}
       <Card padded={false} className="mb-6 overflow-hidden ring-1 ring-[var(--color-brand-600)]/15">
@@ -147,6 +187,25 @@ export default async function FinancienPage() {
           </div>
           <SalesLeadManager items={d.leads.map((l) => ({ id: l.id, company: l.company, contactName: l.contactName, expectedMonthly: l.expectedMonthly, expectedValue: l.expectedValue, startOn: l.startOn, status: l.status, note: l.note }))} />
         </Card>
+      </div>
+
+      {/* Groeisimulator — verplaatst vanaf Teamcapaciteit; staat nu uitsluitend bij de eigenaar. */}
+      <div className="mt-6">
+        <GrowthSimulator
+          currentClients={capacity.summary.activeClients}
+          canSeeFinance
+          p={{
+            shortsPerClient: capParam.get("shorts_klant_contract") ?? 5.56,
+            opnPerClient: capParam.get("opn_klant_contract") ?? 1,
+            editPerEditor: capParam.get("edit_cap_editor") ?? 24,
+            ccClientsHigh: capParam.get("cc_klanten_hoog") ?? 26,
+            vgCapacity: capParam.get("vg_hoog_4w") ?? 16,
+            revenuePerClient: capParam.get("omzet_klant") ?? 1978,
+            costStaff: capParam.get("kosten_medewerker") ?? 2775,
+            editCostShort: capParam.get("edit_kosten_short") ?? 48,
+            costOverig: capParam.get("kosten_overig") ?? 480,
+          }}
+        />
       </div>
     </div>
   );
