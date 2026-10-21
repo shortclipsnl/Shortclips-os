@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { and, asc, desc, eq, gte, ne } from "drizzle-orm";
-import { CalendarClock, ArrowRightLeft, Clapperboard, Film, Send, Users } from "lucide-react";
+import { CalendarClock, ArrowRightLeft, ChevronRight, Clapperboard, Film, Send, Users } from "lucide-react";
 import { db } from "@/db/client";
 import { leaveRequests, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, TeamAvatar } from "@/components/ui";
 import { formatDate } from "@/lib/format";
+import { workingDaysBetween } from "@/lib/workdays";
 import { getLeaveBalances } from "@/server/leave-balance";
 import { getLeaveHandover, type LeaveHandover, type HandoverItem } from "@/server/leave-handover";
 import { RequestLeaveForm, ReviewButtons, CancelButton, LeaveBalances, SickReportForm } from "./leave-ui";
@@ -88,6 +89,25 @@ export default async function LeavePage() {
     }
   }
 
+  // Alleen voor de eigenaar: per persoon de losse goedgekeurde verlofaanvragen
+  // van dit jaar met de opgenomen uren, zodat Jarno een persoon kan openklikken
+  // en precies ziet wat er is opgenomen (8 u per werkdag; ziek telt niet mee).
+  const leaveByUser = new Map<string, { startOn: string; endOn: string; kind: string; note: string | null; hours: number }[]>();
+  if (canApprove) {
+    const yearStart = `${new Date().getFullYear()}-01-01`;
+    const rows = await db
+      .select({ userId: leaveRequests.userId, startOn: leaveRequests.startOn, endOn: leaveRequests.endOn, kind: leaveRequests.kind, note: leaveRequests.note })
+      .from(leaveRequests)
+      .where(and(eq(leaveRequests.status, "approved"), ne(leaveRequests.kind, "ziek"), gte(leaveRequests.startOn, yearStart)))
+      .orderBy(desc(leaveRequests.startOn));
+    for (const r of rows) {
+      const hours = workingDaysBetween(r.startOn, r.endOn) * 8;
+      const list = leaveByUser.get(r.userId) ?? [];
+      list.push({ startOn: r.startOn, endOn: r.endOn, kind: r.kind, note: r.note, hours });
+      leaveByUser.set(r.userId, list);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-[1100px]">
       <PageHeader title="Vakantieplanning" description="Vraag verlof aan, bekijk goedgekeurde afwezigheid en voorkom dat te veel collega's tegelijk weg zijn." />
@@ -121,6 +141,50 @@ export default async function LeavePage() {
           <Card><p className="text-sm text-[var(--color-ink-muted)]">Voor jou wordt geen vakantiesaldo bijgehouden.</p></Card>
         )}
       </div>
+
+      {/* Opgenomen verlof per persoon — alleen voor de eigenaar. Klik een
+          persoon open om de losse aanvragen en opgenomen uren te zien. */}
+      {canApprove && visibleBalances.length > 0 ? (
+        <Card className="mb-6" padded={false}>
+          <CardHeader title="Opgenomen verlof per persoon" subtitle="Klik een persoon open voor de losse aanvragen en de opgenomen uren dit jaar." className="p-5 pb-2" />
+          <ul className="divide-y divide-[var(--color-line)]">
+            {visibleBalances.map((b) => {
+              const reqs = leaveByUser.get(b.userId) ?? [];
+              return (
+                <li key={b.userId}>
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-3 hover:bg-[var(--color-surface-sunken)]">
+                      <ChevronRight className="size-4 shrink-0 text-[var(--color-ink-faint)] transition-transform group-open:rotate-90" />
+                      <TeamAvatar name={b.name} size={26} />
+                      <span className="min-w-0 flex-1 text-sm font-medium">{b.name}</span>
+                      <span className="text-xs text-[var(--color-ink-muted)]">{reqs.length} {reqs.length === 1 ? "aanvraag" : "aanvragen"}</span>
+                      <span className="w-32 text-right text-sm font-semibold tabular-nums">{b.takenHours} u opgenomen</span>
+                      <span className="w-20 text-right text-xs tabular-nums text-[var(--color-ink-muted)]">{b.remainingHours} u over</span>
+                    </summary>
+                    <div className="px-5 pb-3 pl-12">
+                      {reqs.length > 0 ? (
+                        <ul className="divide-y divide-[var(--color-line)]">
+                          {reqs.map((r, i) => (
+                            <li key={i} className="flex items-center gap-3 py-2 text-sm">
+                              <span className="min-w-0 flex-1">
+                                {formatDate(r.startOn)} t/m {formatDate(r.endOn)}
+                                <span className="text-xs text-[var(--color-ink-muted)]"> · {r.kind}{r.note ? ` · ${r.note}` : ""}</span>
+                              </span>
+                              <span className="shrink-0 font-medium tabular-nums">{r.hours} u</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="py-2 text-sm text-[var(--color-ink-muted)]">Dit jaar nog geen verlof opgenomen.</p>
+                      )}
+                    </div>
+                  </details>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      ) : null}
 
       {canApprove && pending.length > 0 ? (
         <Card className="mb-5" padded={false}>
