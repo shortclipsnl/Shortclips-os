@@ -82,6 +82,11 @@ export default async function CapacityPage() {
         )}
 
         {p.detail ? <p className="mt-2 text-2xs text-[var(--color-ink-muted)]">{p.detail}</p> : null}
+        {p.availabilityNote ? (
+          <p className="mt-2 flex items-start gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-warn-soft)] px-2 py-1.5 text-2xs text-[#8a5300]">
+            <span className="font-semibold">Niet beschikbaar:</span> <span className="min-w-0">{p.availabilityNote}</span>
+          </p>
+        ) : null}
         {canSeeFinance && p.costPerMonth ? (
           <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">kosten {euro(p.costPerMonth)}/mnd</p>
         ) : null}

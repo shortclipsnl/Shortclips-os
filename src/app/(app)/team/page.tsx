@@ -56,6 +56,7 @@ export default async function TeamPage() {
       color: teamMembers.color,
       weeklyVideoCapacity: teamMembers.weeklyVideoCapacity,
       isInternal: teamMembers.isInternal,
+      availabilityNote: users.availabilityNote,
       // Alleen nog nodig voor de beschikbaarheid van editors (ruimte/vol).
       openVideos: sql<number>`(
         select count(*) from deliverables d
@@ -142,6 +143,12 @@ export default async function TeamPage() {
           <div className="mt-2">
             <Badge tone={availability.tone}>{availability.label}</Badge>
           </div>
+        ) : null}
+
+        {p.availabilityNote ? (
+          <p className="mt-2 w-full rounded-[var(--radius-sm)] bg-[var(--color-warn-soft)] px-2.5 py-1.5 text-2xs leading-snug text-[#8a5300]">
+            <span className="font-semibold">Niet beschikbaar:</span> {p.availabilityNote}
+          </p>
         ) : null}
 
         {canWrite ? (

@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "availability_note" text;

@@ -47,6 +47,10 @@ export const users = pgTable(
     failedLoginCount: integer("failed_login_count").notNull().default(0),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
     invitedAt: timestamp("invited_at", { withTimezone: true }),
+    /** Vrije notitie over beschikbaarheid: welke dagen/tijden iemand niet
+     *  beschikbaar is. Door de persoon zelf in te vullen op Vandaag, zodat het
+     *  team er rekening mee kan houden. */
+    availabilityNote: text("availability_note"),
     settings: jsonb("settings").notNull().default(sql`'{}'::jsonb`),
     ...timestamps,
     ...softDelete,

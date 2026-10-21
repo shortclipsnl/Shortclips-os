@@ -7,6 +7,13 @@ import { Card, CardHeader, ClientLogo, EmptyState, Stat } from "@/components/ui"
 import { pct, plural, relativeDays } from "@/lib/format";
 import { isFirstVersionPending } from "@/lib/edit-deadline";
 import { EDIT_PHASE_META } from "@/lib/statuses";
+import { AvailabilityBox } from "./availability-box";
+
+/** "2026-10" → "oktober 2026". */
+function monthLabel(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y!, (m ?? 1) - 1, 1).toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
+}
 
 /**
  * Dashboard voor editors: zo compact mogelijk. Alleen wat ze echt moeten weten —
@@ -116,6 +123,40 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
           </ul>
         )}
       </Card>
+
+      {/* Maandoverzicht van opgeleverde projecten — zodat duidelijk is wat er
+          per maand is afgerond. */}
+      {data.deliveredByMonth.length > 0 ? (
+        <Card padded={false}>
+          <div className="p-5 pb-3">
+            <CardHeader title="Opgeleverd" subtitle="Je afgeronde projecten per maand." />
+          </div>
+          <div className="divide-y divide-[var(--color-line)]">
+            {data.deliveredByMonth.map((m) => (
+              <div key={m.month} className="px-5 py-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-semibold capitalize">{monthLabel(m.month)}</span>
+                  <span className="rounded-full bg-[var(--color-good-soft)] px-2.5 py-0.5 text-2xs font-bold text-[#1d6b4c]">{plural(m.count, "video", "video's")} opgeleverd</span>
+                </div>
+                <ul className="grid gap-1.5">
+                  {m.items.map((it) => (
+                    <li key={it.id}>
+                      <Link href={`/videos/${it.id}`} className="flex items-center gap-2 text-sm hover:underline">
+                        <ClientLogo name={it.clientName} logoUrl={it.clientLogo} color={it.clientColor} size={18} />
+                        <span className="min-w-0 truncate font-medium">{it.title}</span>
+                        <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">{it.clientName}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
+      {/* Beschikbaarheid: zelf aangeven wanneer je niet beschikbaar bent. */}
+      <AvailabilityBox note={data.availabilityNote} />
 
       {data.branding.length > 0 ? (
         <Card padded={false}>

@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, count, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientKnowledge, clients, deliverables, files, tasks } from "@/db/schema";
+import { clientKnowledge, clients, deliverables, files, tasks, users } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -11,7 +11,7 @@ const today = () => new Date().toISOString().slice(0, 10);
  * en hoe doe ik het. Geen klantoverzichten, geen omzet, geen werk van collega's.
  */
 export async function getEditorDashboard(viewer: Viewer) {
-  const [queue, overdue, stats, openTasks] = await Promise.all([
+  const [queue, overdue, stats, openTasks, deliveredRows, meRows] = await Promise.all([
     db
       .select({
         id: deliverables.id,
@@ -93,6 +93,25 @@ export async function getEditorDashboard(viewer: Viewer) {
       )
       .orderBy(asc(tasks.dueOn))
       .limit(10),
+
+    // Maandoverzicht van opgeleverde projecten (deze + vorige 2 maanden), zodat
+    // duidelijk is wat er per maand is afgerond. "Opgeleverd" = de video is
+    // goedgekeurd/ingepland/gepubliceerd; de datum is publicatiedatum of anders
+    // de laatste statuswijziging.
+    db.execute(sql`
+      select to_char((coalesce(d.published_at, d.status_changed_at)) at time zone 'Europe/Amsterdam', 'YYYY-MM') as maand,
+             d.id, d.title, c.name as client_name, c.slug as client_slug, c.color as client_color, c.logo_url as client_logo,
+             coalesce(d.published_at, d.status_changed_at) as op
+      from deliverables d
+      join clients c on c.id = d.client_id
+      where d.editor_id = ${viewer.id} and d.deleted_at is null
+        and d.status in ('approved','ready_to_publish','scheduled','published','analysis_available')
+        and coalesce(d.published_at, d.status_changed_at) >= date_trunc('month', now() at time zone 'Europe/Amsterdam') - interval '2 months'
+      order by op desc
+      limit 200
+    `),
+
+    db.select({ note: users.availabilityNote }).from(users).where(eq(users.id, viewer.id)).limit(1),
   ]);
 
   // Huisstijl & referenties per klant waar de editor werk voor heeft (§5):
@@ -138,11 +157,38 @@ export async function getEditorDashboard(viewer: Viewer) {
   const delivered = Number(row.opgeleverd ?? 0);
   const internCorrected = Number(row.intern_gecorrigeerd ?? 0);
 
+  // Opgeleverde projecten per maand groeperen (meest recente maand eerst).
+  type DeliveredItem = { id: string; title: string; clientName: string; clientSlug: string; clientColor: string | null; clientLogo: string | null; op: string };
+  const deliveredRaw =
+    ((deliveredRows as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
+      (deliveredRows as unknown as Array<Record<string, unknown>>)) ?? [];
+  const monthMap = new Map<string, DeliveredItem[]>();
+  for (const r of deliveredRaw) {
+    const maand = String(r.maand ?? "");
+    if (!maand) continue;
+    const list = monthMap.get(maand) ?? [];
+    list.push({
+      id: String(r.id),
+      title: String(r.title),
+      clientName: String(r.client_name ?? ""),
+      clientSlug: String(r.client_slug ?? ""),
+      clientColor: (r.client_color as string | null) ?? null,
+      clientLogo: (r.client_logo as string | null) ?? null,
+      op: r.op instanceof Date ? r.op.toISOString() : String(r.op ?? ""),
+    });
+    monthMap.set(maand, list);
+  }
+  const deliveredByMonth = [...monthMap.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([month, items]) => ({ month, count: items.length, items }));
+
   return {
     queue,
     overdue: Number(overdue[0]?.total ?? 0),
     tasks: openTasks,
     branding,
+    deliveredByMonth,
+    availabilityNote: meRows[0]?.note ?? null,
     stats: {
       delivered,
       inProgress: Number(row.lopend ?? 0),

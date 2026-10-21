@@ -1,7 +1,7 @@
 import "server-only";
 import { and, between, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { capacityParams, capacityPeople, clients, deliverables, productionDays } from "@/db/schema";
+import { capacityParams, capacityPeople, clients, deliverables, productionDays, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 
 export type CapacityStatus = "gezond" | "hoog" | "kritiek" | "geen_data";
@@ -21,6 +21,8 @@ export type CapacityPerson = {
   status: CapacityStatus;
   costPerMonth: number | null;
   detail: string | null;
+  /** Zelf-ingevulde beschikbaarheidsnotitie (wanneer niet beschikbaar). */
+  availabilityNote: string | null;
 };
 
 export type CapacityParam = { key: string; label: string | null; value: number | null; unit: string | null; confidence: string | null };
@@ -75,10 +77,12 @@ export async function getCapacityOverview(): Promise<{
   const today = new Date().toISOString().slice(0, 10);
   const in28 = new Date(Date.now() + 28 * 86_400_000).toISOString().slice(0, 10);
 
-  const [peopleRows, paramRows] = await Promise.all([
+  const [peopleRows, paramRows, noteRows] = await Promise.all([
     db.select().from(capacityPeople),
     db.select().from(capacityParams),
+    db.select({ id: users.id, note: users.availabilityNote }).from(users).where(isNull(users.deletedAt)),
   ]);
+  const noteMap = new Map(noteRows.filter((u) => u.note).map((u) => [u.id, u.note as string]));
 
   const params: CapacityParam[] = paramRows
     .map((p) => ({ key: p.key, label: p.label, value: n(p.value), unit: p.unit, confidence: p.confidence }))
@@ -153,6 +157,7 @@ export async function getCapacityOverview(): Promise<{
       status,
       costPerMonth: n(row.costPerMonth),
       detail,
+      availabilityNote: row.userId ? noteMap.get(row.userId) ?? null : null,
     });
   }
 
