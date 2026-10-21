@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, FileText, Film, CheckCircle2, Clock } from "lucide-react";
 import { getEditorDashboard } from "@/server/editor-dashboard";
-import { listEditorBoard } from "@/server/editor-board";
+import { listEditorBoard, type EditorBoardVideo } from "@/server/editor-board";
 import type { Viewer } from "@/server/auth/context";
 import { Card, CardHeader, ClientLogo, EmptyState, Stat } from "@/components/ui";
 import { pct, plural, relativeDays } from "@/lib/format";
@@ -42,6 +42,11 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
     (v) => isFirstVersionPending(v.status) && v.editorDueOn && v.editorDueOn <= today,
   ).length;
 
+  // Werk dat nu klaarstaat vs. video's die binnenkort beschikbaar komen (nog te
+  // plannen / wachten op beeld). Zo kan de editor vooruit plannen.
+  const binnenkort = active.filter((v) => v.phase === "te_plannen");
+  const jouwVideos = active.filter((v) => v.phase !== "te_plannen");
+
   return (
     <div className="mx-auto max-w-[1100px] space-y-6">
       <div>
@@ -53,6 +58,14 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
                 todayOrEarlier > 0 ? `, waarvan ${todayOrEarlier} vandaag of eerder af moeten (eerste versie)` : ""
               }.`}
         </p>
+      </div>
+
+      {/* Warm, persoonlijk welkomstbericht met wat uitleg over het board. */}
+      <div className="rounded-[var(--radius-lg)] border border-[var(--color-brand-500)]/25 bg-[var(--color-brand-50)] px-4 py-3 text-sm leading-relaxed text-[var(--color-ink)]">
+        Hé {firstName}, fijn dat je onze editor bent! 🎬 Hieronder zie je je video&apos;s met hun opleverdata en interne
+        deadlines (de eerste versie, 7 werkdagen na de opname). Kijk ook even bij{" "}
+        <strong>Binnenkort beschikbaar</strong> — zo kun je je planning vast afstemmen en weten we zeker dat alles
+        realistisch en op tijd wordt opgeleverd.
       </div>
 
       {overdue > 0 ? (
@@ -86,43 +99,33 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
             subtitle="Op volgorde van je interne deadline (eerste versie, 7 werkdagen na de opname). Klik een video aan voor de download en het script."
           />
         </div>
-        {active.length === 0 ? (
+        {jouwVideos.length === 0 ? (
           <EmptyState
-            title="Niets op je bord"
-            description="Zodra er een video aan je wordt toegewezen, verschijnt die hier."
+            title="Niets in bewerking"
+            description="Zodra een video klaarstaat om te editen, verschijnt die hier."
           />
         ) : (
           <ul className="divide-y divide-[var(--color-line)]">
-            {active.map((v) => {
-              const phaseMeta = EDIT_PHASE_META[v.phase];
-              const needsEditor = phaseMeta.waitOn === "Editor";
-              return (
-                <li key={v.id}>
-                  <Link href={`/videos/${v.id}`} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-[var(--color-surface-2)]">
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={22} />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium">{v.title}</span>
-                        <span className="block truncate text-xs text-[var(--color-ink-muted)]">
-                          {v.clientName} · <span style={{ color: phaseMeta.color }} className="font-medium">{phaseMeta.label}</span>
-                        </span>
-                      </span>
-                    </span>
-                    <span className="flex shrink-0 flex-col items-end gap-0.5">
-                      {v.editorDueOn ? (
-                        <span className={`text-xs font-semibold ${v.editorOverdue ? "text-[var(--color-bad)]" : needsEditor ? "text-[var(--color-warn)]" : "text-[var(--color-ink-muted)]"}`}>
-                          {relativeDays(v.editorDueOn)}
-                        </span>
-                      ) : null}
-                      {needsEditor ? <span className="text-2xs font-medium text-[var(--color-ink-faint)]">jouw actie</span> : null}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
+            {jouwVideos.map((v) => <VideoRow key={v.id} v={v} />)}
           </ul>
         )}
       </Card>
+
+      {/* Binnenkort beschikbaar — komt uit de Editing-pagina (nog in te plannen of
+          wachten op beeld). Zodat de editor vooruit kan plannen. */}
+      {binnenkort.length > 0 ? (
+        <Card padded={false}>
+          <div className="p-5 pb-3">
+            <CardHeader
+              title="Binnenkort beschikbaar"
+              subtitle="Deze video's komen er binnenkort aan (nog in te plannen of wachten op beeld). Houd er vast rekening mee in je planning, zodat alles realistisch en op tijd wordt opgeleverd."
+            />
+          </div>
+          <ul className="divide-y divide-[var(--color-line)]">
+            {binnenkort.map((v) => <VideoRow key={v.id} v={v} />)}
+          </ul>
+        </Card>
+      ) : null}
 
       {/* Maandoverzicht van opgeleverde projecten — zodat duidelijk is wat er
           per maand is afgerond. */}
@@ -213,6 +216,36 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Eén video-regel op het editor-dashboard: klant, titel, fase en de interne
+ *  deadline. Gedeeld door "Jouw video's" en "Binnenkort beschikbaar". */
+function VideoRow({ v }: { v: EditorBoardVideo }) {
+  const phaseMeta = EDIT_PHASE_META[v.phase];
+  const needsEditor = phaseMeta.waitOn === "Editor";
+  return (
+    <li>
+      <Link href={`/videos/${v.id}`} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-[var(--color-surface-2)]">
+        <span className="flex min-w-0 items-center gap-2.5">
+          <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={22} />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-medium">{v.title}</span>
+            <span className="block truncate text-xs text-[var(--color-ink-muted)]">
+              {v.clientName} · <span style={{ color: phaseMeta.color }} className="font-medium">{phaseMeta.label}</span>
+            </span>
+          </span>
+        </span>
+        <span className="flex shrink-0 flex-col items-end gap-0.5">
+          {v.editorDueOn ? (
+            <span className={`text-xs font-semibold ${v.editorOverdue ? "text-[var(--color-bad)]" : needsEditor ? "text-[var(--color-warn)]" : "text-[var(--color-ink-muted)]"}`}>
+              {relativeDays(v.editorDueOn)}
+            </span>
+          ) : null}
+          {needsEditor ? <span className="text-2xs font-medium text-[var(--color-ink-faint)]">jouw actie</span> : null}
+        </span>
+      </Link>
+    </li>
   );
 }
 
