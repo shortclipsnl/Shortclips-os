@@ -62,6 +62,17 @@ const ACTIVE_STAGES: VideoStage[] = [
   "ready_to_publish",
 ];
 
+/**
+ * Statussen die "klaar" betekenen (editing afgerond). Een video met zo'n status
+ * is nooit "over de deadline", ook niet als de einddatum in het verleden ligt.
+ * Dezelfde definitie als DONE_STATUSES in editing.ts (de autoritatieve bron),
+ * zodat Vandaag en de Editing-pagina altijd overeenkomen.
+ */
+const DONE_STAGES = new Set<string>(["approved", "ready_to_publish", "scheduled", "published", "analysis_available"]);
+
+/** Statussen die écht nog onderhanden zijn — gebruikt voor "over de deadline". */
+const LATE_STAGES: VideoStage[] = ACTIVE_STAGES.filter((s) => !DONE_STAGES.has(s));
+
 export type PipelineBucket = {
   status: string;
   total: number;
@@ -141,7 +152,7 @@ export async function getDashboard(viewer: Viewer) {
       .where(
         and(
           isNull(deliverables.deletedAt),
-          inArray(deliverables.status, ACTIVE_STAGES),
+          inArray(deliverables.status, LATE_STAGES),
           lt(deliverables.dueOn, today()),
           deliverableScope,
         ),
@@ -500,13 +511,15 @@ export async function getDashboardTopStats(viewer: Viewer) {
   };
   const today = day(0);
   const active = ["recorded", "footage_upload", "awaiting_editor", "editing", "internal_review", "editor_revision", "client_review", "client_revision", "approved", "ready_to_publish", "scheduled"] as const;
+  // Voor deadline-tellingen tellen afgeronde statussen niet mee (gelijk aan de lijst hierboven).
+  const openForDeadline = active.filter((s) => !DONE_STAGES.has(s));
 
   const [clientsRow, shootsRow, editingRow, dueSoonRow, overRow, tasksRow] = await Promise.all([
     db.select({ n: count() }).from(clients).where(and(isNull(clients.deletedAt), eq(clients.status, "active"), scopeToClients(viewer, clients.id))),
     db.select({ n: count() }).from(productionDays).where(and(isNull(productionDays.deletedAt), gte(productionDays.scheduledOn, today), lte(productionDays.scheduledOn, day(7)), ne(productionDays.status, "cancelled"), scopeToClients(viewer, productionDays.clientId))),
     db.select({ n: count() }).from(deliverables).where(and(isNull(deliverables.deletedAt), eq(deliverables.status, "editing"), scopeToClients(viewer, deliverables.clientId))),
-    db.select({ n: count() }).from(deliverables).where(and(isNull(deliverables.deletedAt), gte(deliverables.dueOn, today), lte(deliverables.dueOn, day(5)), inArray(deliverables.status, [...active]), scopeToClients(viewer, deliverables.clientId))),
-    db.select({ n: count() }).from(deliverables).where(and(isNull(deliverables.deletedAt), lt(deliverables.dueOn, today), inArray(deliverables.status, [...active]), scopeToClients(viewer, deliverables.clientId))),
+    db.select({ n: count() }).from(deliverables).where(and(isNull(deliverables.deletedAt), gte(deliverables.dueOn, today), lte(deliverables.dueOn, day(5)), inArray(deliverables.status, openForDeadline), scopeToClients(viewer, deliverables.clientId))),
+    db.select({ n: count() }).from(deliverables).where(and(isNull(deliverables.deletedAt), lt(deliverables.dueOn, today), inArray(deliverables.status, openForDeadline), scopeToClients(viewer, deliverables.clientId))),
     db.select({ n: count() }).from(tasks).where(and(isNull(tasks.deletedAt), inArray(tasks.status, ["todo", "in_progress", "blocked"]), scopeToClients(viewer, tasks.clientId))),
   ]);
 

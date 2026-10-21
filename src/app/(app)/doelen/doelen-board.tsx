@@ -168,6 +168,7 @@ function PillarBlock({ pillar, isOwner, team }: { pillar: GoalsOverview["pillars
 function GoalRowItem({ g, isOwner, team }: { g: GoalRow; isOwner: boolean; team: TeamMember[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState<string>(g.measured ? String(g.current) : "");
   const [note, setNote] = useState("");
@@ -176,6 +177,15 @@ function GoalRowItem({ g, isOwner, team }: { g: GoalRow; isOwner: boolean; team:
   const pct = g.measured && g.target ? Math.min(100, Math.max(0, (g.current / g.target) * 100)) : 0;
   const markerPct = g.target && g.expected != null ? Math.min(100, Math.max(0, (g.expected / g.target) * 100)) : null;
   const attention = g.status === "achter" || g.status === "risico";
+  const hasBar = g.type !== "milestone" && g.target != null && g.measured;
+  const milePct = g.type === "milestone" && g.target ? Math.min(100, Math.max(0, (g.current / g.target) * 100)) : null;
+
+  // Korte waarde voor de scanbare regel.
+  const compactValue =
+    g.type === "milestone" ? `${g.current}/${g.target ?? 0}`
+    : g.target == null ? null
+    : !g.measured ? "n.n.g."
+    : `${fmt(g.current, g.unit)} / ${fmt(g.target, g.unit)}`;
 
   function save() {
     const n = Number(val.replace(",", "."));
@@ -198,91 +208,97 @@ function GoalRowItem({ g, isOwner, team }: { g: GoalRow; isOwner: boolean; team:
   }
 
   return (
-    <li className="px-5 py-3.5">
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5">
-        <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-bold uppercase tracking-wide text-white" style={{ background: meta.color }}>
-          {g.status === "gehaald" ? <Check className="size-3" /> : null}
-          {meta.label}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-[var(--color-ink)]">{g.title}</div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-[var(--color-ink-muted)]">
-            <span>{g.ownerName ? `Eigenaar: ${g.ownerName}` : <span className="font-medium text-[var(--color-warn)]">Eigenaar ontbreekt</span>}</span>
-            <span>·</span>
-            <span>{g.source === "live" ? `Live uit ${BRON[g.metricKey ?? ""] ?? "systeem"}` : manualSource(g)}</span>
-            {g.visibility === "founders" ? <><span>·</span><span className="font-medium text-[#8b5cf6]">alleen eigenaar</span></> : null}
-          </div>
-        </div>
-        <div className="shrink-0 text-right text-xs">
-          {g.type === "milestone" ? (
-            <span className="font-semibold tabular-nums text-[var(--color-ink)]">{g.current} / {g.target ?? 0}</span>
-          ) : g.target == null ? (
-            <span className="font-medium text-[var(--color-warn)]">Doel nog instellen</span>
-          ) : !g.measured ? (
-            <span className="text-[var(--color-ink-muted)]">Nog niet gemeten</span>
-          ) : (
-            <span className="font-semibold tabular-nums text-[var(--color-ink)]">{fmt(g.current, g.unit)} <span className="font-normal text-[var(--color-ink-muted)]">/ {fmt(g.target, g.unit)}</span></span>
-          )}
-          <div className="text-2xs text-[var(--color-ink-faint)]">t/m {new Date(g.endDate).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}</div>
-        </div>
-      </div>
-
-      {/* Voortgangsbalk met tempostreep */}
-      {g.type !== "milestone" && g.target != null && g.measured ? (
-        <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-[var(--color-surface-2)]">
-          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: meta.color }} />
-          {markerPct != null ? <div className="absolute top-[-2px] h-[12px] w-0.5 bg-[var(--color-ink)] opacity-60" style={{ left: `calc(${markerPct}% - 1px)` }} title="Waar we nu zouden moeten staan" /> : null}
-        </div>
-      ) : null}
-
-      {/* Mijlpaal-checklist */}
-      {g.type === "milestone" && g.milestones.length > 0 ? (
-        <ul className="mt-2 grid gap-1">
-          {g.milestones.map((m) => (
-            <li key={m.id}>
-              <button type="button" disabled={pending} onClick={() => toggle(m.id, !m.done)} className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-[var(--color-surface-sunken)]">
-                <span className={`grid size-4 shrink-0 place-items-center rounded border ${m.done ? "border-[var(--color-good)] bg-[var(--color-good)] text-white" : "border-[var(--color-line-strong)]"}`}>{m.done ? <Check className="size-3" /> : null}</span>
-                <span className={m.done ? "text-[var(--color-ink-muted)] line-through" : ""}>{m.title}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {/* Oorzaak + actieknop bij risico/achter */}
-      {attention && (g.causeLabels.length > 0 || g.causeHref) ? (
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] bg-[var(--color-bad-soft)]/50 px-3 py-2 text-xs">
-          <span className="min-w-0 text-[var(--color-ink)]">
-            {g.causeLabels.length > 0 ? <>Let op: {g.causeLabels.slice(0, 4).join(", ")}{g.causeLabels.length > 4 ? ` en ${g.causeLabels.length - 4} meer` : ""}</> : "Dit doel vraagt aandacht."}
+    <li style={{ boxShadow: `inset 4px 0 0 ${meta.color}` }}>
+      {/* Scanbare regel: titel · status · eigenaar · stand. Klik voor details. */}
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full flex-col gap-1 px-4 py-2.5 text-left hover:bg-[var(--color-surface-sunken)]">
+        <div className="flex items-center gap-3">
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--color-ink)]">{g.title}</span>
+          <span className="shrink-0 text-2xs font-bold uppercase tracking-wide" style={{ color: meta.color }}>
+            {g.status === "gehaald" ? "✓ " : null}{meta.label}
           </span>
-          {g.causeHref ? <Link href={g.causeHref} className="inline-flex shrink-0 items-center gap-1 font-semibold text-[var(--color-brand-600)] hover:underline">Bekijken <ArrowRight className="size-3.5" /></Link> : null}
+          <ChevronDown className={`size-4 shrink-0 text-[var(--color-ink-faint)] transition-transform ${open ? "rotate-180" : ""}`} />
         </div>
-      ) : null}
+        <div className="flex items-center gap-2 text-2xs text-[var(--color-ink-muted)]">
+          <span className="shrink-0">
+            {g.ownerName ? g.ownerName : <span className="font-semibold text-[var(--color-warn)]">Geen eigenaar</span>}
+          </span>
+          {compactValue ? <><span className="text-[var(--color-ink-faint)]">·</span><span className="shrink-0 tabular-nums font-medium text-[var(--color-ink)]">{compactValue}</span></> : <><span className="text-[var(--color-ink-faint)]">·</span><span className="font-medium text-[var(--color-warn)]">doel instellen</span></>}
+          {hasBar || milePct != null ? (
+            <span className="ml-auto h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--color-surface-2)] sm:w-24">
+              <span className="block h-full rounded-full" style={{ width: `${hasBar ? pct : milePct}%`, background: meta.color }} />
+            </span>
+          ) : null}
+        </div>
+      </button>
 
-      {/* Handmatige stand bijwerken */}
-      {g.source === "manual" && g.type !== "milestone" ? (
-        editing ? (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <input autoFocus value={val} onChange={(e) => setVal(e.target.value)} placeholder={`Nieuwe stand${g.unit ? ` (${g.unit})` : ""}`} className="sc-input h-8 w-40 py-0 text-sm" />
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Notitie (optioneel)" className="sc-input h-8 min-w-48 flex-1 py-0 text-sm" />
-            <button type="button" disabled={pending} onClick={save} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60">{pending ? <Loader2 className="size-3.5 animate-spin" /> : null} Opslaan</button>
-            <button type="button" onClick={() => setEditing(false)} className="text-xs text-[var(--color-ink-muted)]">Annuleren</button>
+      {/* Details (ingeklapt tot je erop klikt) */}
+      {open ? (
+        <div className="space-y-2.5 px-4 pb-3.5 pt-0.5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-[var(--color-ink-muted)]">
+            <span>{g.source === "live" ? `Live uit ${BRON[g.metricKey ?? ""] ?? "systeem"}` : manualSource(g)}</span>
+            <span className="text-[var(--color-ink-faint)]">·</span>
+            <span>t/m {new Date(g.endDate).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}</span>
+            {g.visibility === "founders" ? <><span className="text-[var(--color-ink-faint)]">·</span><span className="font-medium text-[#8b5cf6]">alleen eigenaar</span></> : null}
           </div>
-        ) : (
-          <button type="button" onClick={() => setEditing(true)} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[var(--color-brand-600)] hover:underline"><Pencil className="size-3.5" /> Stand bijwerken</button>
-        )
-      ) : null}
 
-      {/* Beheer (alleen eigenaar) */}
-      {isOwner ? (
-        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--color-line)] pt-2 text-2xs">
-          <span className="text-[var(--color-ink-faint)]">Beheer:</span>
-          <select disabled={pending} value={g.ownerId ?? ""} onChange={(e) => assign(e.target.value)} className="sc-input h-7 py-0 text-2xs" aria-label="Eigenaar toewijzen">
-            <option value="">Geen eigenaar</option>
-            {team.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-          {g.type === "weekly" && g.target == null ? <TargetSetter goalId={g.id} unit={g.unit} /> : null}
-          <button type="button" disabled={pending} onClick={doArchive} className="text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]">Archiveren</button>
+          {/* Voortgangsbalk met tempostreep */}
+          {hasBar ? (
+            <div className="relative h-2 overflow-hidden rounded-full bg-[var(--color-surface-2)]">
+              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: meta.color }} />
+              {markerPct != null ? <div className="absolute top-[-2px] h-[12px] w-0.5 bg-[var(--color-ink)] opacity-60" style={{ left: `calc(${markerPct}% - 1px)` }} title="Waar we nu zouden moeten staan" /> : null}
+            </div>
+          ) : null}
+
+          {/* Mijlpaal-checklist */}
+          {g.type === "milestone" && g.milestones.length > 0 ? (
+            <ul className="grid gap-1">
+              {g.milestones.map((m) => (
+                <li key={m.id}>
+                  <button type="button" disabled={pending} onClick={() => toggle(m.id, !m.done)} className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-[var(--color-surface-sunken)]">
+                    <span className={`grid size-4 shrink-0 place-items-center rounded border ${m.done ? "border-[var(--color-good)] bg-[var(--color-good)] text-white" : "border-[var(--color-line-strong)]"}`}>{m.done ? <Check className="size-3" /> : null}</span>
+                    <span className={m.done ? "text-[var(--color-ink-muted)] line-through" : ""}>{m.title}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {/* Oorzaak + actieknop bij risico/achter */}
+          {attention && (g.causeLabels.length > 0 || g.causeHref) ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] bg-[var(--color-bad-soft)]/50 px-3 py-2 text-xs">
+              <span className="min-w-0 text-[var(--color-ink)]">
+                {g.causeLabels.length > 0 ? <>Let op: {g.causeLabels.slice(0, 4).join(", ")}{g.causeLabels.length > 4 ? ` en ${g.causeLabels.length - 4} meer` : ""}</> : "Dit doel vraagt aandacht."}
+              </span>
+              {g.causeHref ? <Link href={g.causeHref} className="inline-flex shrink-0 items-center gap-1 font-semibold text-[var(--color-brand-600)] hover:underline">Bekijken <ArrowRight className="size-3.5" /></Link> : null}
+            </div>
+          ) : null}
+
+          {/* Handmatige stand bijwerken */}
+          {g.source === "manual" && g.type !== "milestone" ? (
+            editing ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <input autoFocus value={val} onChange={(e) => setVal(e.target.value)} placeholder={`Nieuwe stand${g.unit ? ` (${g.unit})` : ""}`} className="sc-input h-8 w-40 py-0 text-sm" />
+                <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Notitie (optioneel)" className="sc-input h-8 min-w-48 flex-1 py-0 text-sm" />
+                <button type="button" disabled={pending} onClick={save} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60">{pending ? <Loader2 className="size-3.5 animate-spin" /> : null} Opslaan</button>
+                <button type="button" onClick={() => setEditing(false)} className="text-xs text-[var(--color-ink-muted)]">Annuleren</button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-brand-600)] hover:underline"><Pencil className="size-3.5" /> Stand bijwerken</button>
+            )
+          ) : null}
+
+          {/* Beheer (alleen eigenaar) */}
+          {isOwner ? (
+            <div className="flex flex-wrap items-center gap-2 border-t border-[var(--color-line)] pt-2 text-2xs">
+              <span className="text-[var(--color-ink-faint)]">Beheer:</span>
+              <select disabled={pending} value={g.ownerId ?? ""} onChange={(e) => assign(e.target.value)} className="sc-input h-7 py-0 text-2xs" aria-label="Eigenaar toewijzen">
+                <option value="">Geen eigenaar</option>
+                {team.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              {g.type === "weekly" && g.target == null ? <TargetSetter goalId={g.id} unit={g.unit} /> : null}
+              <button type="button" disabled={pending} onClick={doArchive} className="text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]">Archiveren</button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </li>
