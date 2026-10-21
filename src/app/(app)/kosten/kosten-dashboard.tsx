@@ -1,10 +1,9 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Search } from "lucide-react";
 import { compact, euro, num } from "@/lib/format";
 import {
-  GORDER,
   GROUPS,
   ibCalc,
   isBedrijfskost,
@@ -162,9 +161,11 @@ export function KostenDashboard({ data: D }: { data: KostenData }) {
         </div>
       </header>
 
-      <Kpis {...{ k, kosten, sumBy, subOf, prevMonth, lastYear, closedUpTo, D }} />
+      <Kpis {...{ k, kosten, sumBy, subOf, prevMonth, lastYear, closedUpTo, rows, v, label, D }} />
 
       <OnderDeStreep {...{ k, closed, rows, subOf, v, D }} />
+
+      <JaarVergelijking {...{ k, closed, kosten }} />
 
       <div className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
         <Categorieen {...{ k, prevMonth, closedUpTo, kosten, label, subRows, v, openCats, setOpenCats, D }} />
@@ -174,7 +175,7 @@ export function KostenDashboard({ data: D }: { data: KostenData }) {
       <Heatmap {...{ k, closedUpTo, subRows, kosten, v, D }} />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <VasteLasten {...{ k, closedUpTo, rows, subOf, v, prevMonth, label, D }} />
+        <VasteLasten {...{ k, closedUpTo, rows, subOf, v, D }} />
         <GeenKosten {...{ k, rows, subOf, D }} />
       </div>
 
@@ -235,6 +236,8 @@ type Shared = {
 };
 
 /* ------------------------------- KPI's ------------------------------- */
+type KpiKey = "maand" | "avg" | "vast" | "variabel" | "eenmalig" | "controle";
+
 function Kpis({
   k,
   kosten,
@@ -243,6 +246,9 @@ function Kpis({
   prevMonth,
   lastYear,
   closedUpTo,
+  rows,
+  v,
+  label,
   D,
 }: {
   k: string;
@@ -252,8 +258,14 @@ function Kpis({
   prevMonth: (key: string) => string;
   lastYear: (key: string) => string;
   closedUpTo: (key: string) => string[];
+  rows: (key: string) => Regel[];
+  v: (e: Regel) => number;
+  label: (key: string) => string;
   D: KostenData;
 }) {
+  // Welke tegel is opengeklikt? Eén tegel tegelijk; nog een keer klikken sluit.
+  const [open, setOpen] = useState<KpiKey | null>(null);
+
   const p = prevMonth(k);
   const ly = lastYear(k);
   const t = kosten(k);
@@ -265,8 +277,7 @@ function Kpis({
 
   const deltaPct = (a: number, b: number) => {
     if (!b) return "";
-    const pc = Math.round((a / b - 1) * 100);
-    return pc;
+    return Math.round((a / b - 1) * 100);
   };
   const dP = deltaPct(t, kosten(p));
   const dY = D.m[ly] ? deltaPct(t, kosten(ly)) : "";
@@ -279,32 +290,69 @@ function Kpis({
       </span>
     );
 
+  const toggle = (key: KpiKey) => setOpen((o) => (o === key ? null : key));
+
+  // Leveranciers in een bepaalde emmer deze maand, grootste eerst.
+  const supList = (pred: (s: [string, string, string]) => boolean) =>
+    rows(k)
+      .filter((e) => pred(subOf(e)))
+      .sort((a, b) => v(b) - v(a));
+
+  const tiles: { key: KpiKey; hero?: boolean; label: string; value: number; hint: React.ReactNode }[] = [
+    {
+      key: "maand",
+      hero: true,
+      label: `Kosten ${MNL[+k.slice(5) - 1]}`,
+      value: t,
+      hint: (
+        <>
+          {pctSpan(dP)} t.o.v. {MN[+p.slice(5) - 1]}
+          {dY !== "" ? (
+            <>
+              {" · "}
+              {pctSpan(dY)} t.o.v. {ly.slice(0, 4)}
+            </>
+          ) : null}
+        </>
+      ),
+    },
+    { key: "avg", label: "Gemiddeld per maand", value: avg, hint: "laatste 12 maanden" },
+    { key: "vast", label: "Vast", value: soort("vast"), hint: "lonen, huur, verzekeringen, software" },
+    { key: "variabel", label: "Variabel", value: soort("variabel"), hint: "editors, freelancers, marketing, auto" },
+    { key: "eenmalig", label: "Eenmalig", value: soort("eenmalig"), hint: "apparatuur en inkopen" },
+    { key: "controle", label: "Nog te beoordelen", value: ctrl, hint: <>niet in de kosten · geen kosten {euro(niet)}</> },
+  ];
+
   return (
-    <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-6">
-      <Tile hero label={`Kosten ${MNL[+k.slice(5) - 1]}`} value={euro(t)}>
-        {pctSpan(dP)} t.o.v. {MN[+p.slice(5) - 1]}
-        {dY !== "" ? (
-          <>
-            {" · "}
-            {pctSpan(dY)} t.o.v. {MN[+k.slice(5) - 1]} {ly.slice(0, 4)}
-          </>
-        ) : null}
-      </Tile>
-      <Tile label="Gemiddeld per maand" value={euro(avg)}>
-        laatste 12 maanden
-      </Tile>
-      <Tile label="Vast" value={euro(soort("vast"))}>
-        lonen, huur, verzekeringen, software
-      </Tile>
-      <Tile label="Variabel" value={euro(soort("variabel"))}>
-        editors, freelancers, marketing, auto
-      </Tile>
-      <Tile label="Eenmalig" value={euro(soort("eenmalig"))}>
-        apparatuur en inkopen
-      </Tile>
-      <Tile label="Nog te beoordelen" value={euro(ctrl)}>
-        niet in de kosten · geen kosten {euro(niet)}
-      </Tile>
+    <div className="grid gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-6">
+        {tiles.map((ti) => (
+          <Tile
+            key={ti.key}
+            hero={ti.hero}
+            active={open === ti.key}
+            label={ti.label}
+            value={euro(ti.value)}
+            onClick={() => toggle(ti.key)}
+          >
+            {ti.hint}
+          </Tile>
+        ))}
+      </div>
+      {open ? (
+        <KpiDetail
+          which={open}
+          k={k}
+          label={label}
+          ms12={ms12}
+          kosten={kosten}
+          supList={supList}
+          soort={soort}
+          subOf={subOf}
+          v={v}
+          D={D}
+        />
+      ) : null}
     </div>
   );
 }
@@ -314,24 +362,151 @@ function Tile({
   value,
   children,
   hero = false,
+  active = false,
+  onClick,
 }: {
   label: string;
   value: string;
   children?: React.ReactNode;
   hero?: boolean;
+  active?: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <div
-      className={`grid content-start gap-0.5 rounded-[var(--radius-md)] border p-3 ${
-        hero
-          ? "border-transparent bg-[var(--color-brand-50)]"
-          : "border-[var(--color-line)] bg-[var(--color-surface)]"
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={active}
+      className={`grid content-start gap-0.5 rounded-[var(--radius-md)] border p-3 text-left transition hover:border-[var(--color-brand-400)] ${
+        active
+          ? "border-[var(--color-brand-600)] ring-1 ring-[var(--color-brand-600)] bg-[var(--color-brand-50)]"
+          : hero
+            ? "border-transparent bg-[var(--color-brand-50)]"
+            : "border-[var(--color-line)] bg-[var(--color-surface)]"
       }`}
     >
-      <span className="text-2xs font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">{label}</span>
+      <span className="flex items-center justify-between gap-1 text-2xs font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">
+        {label}
+        <ChevronRight className={`size-3 shrink-0 transition-transform ${active ? "rotate-90" : ""}`} />
+      </span>
       <span className="text-lg font-bold tabular-nums text-[var(--color-ink)]">{value}</span>
       <span className="text-2xs leading-tight text-[var(--color-ink-muted)]">{children}</span>
-    </div>
+    </button>
+  );
+}
+
+/* Detail onder een aangeklikte KPI-tegel: de leveranciers of de maandreeks
+   die achter dat bedrag zitten, meteen zichtbaar. */
+function KpiDetail({
+  which,
+  k,
+  label,
+  ms12,
+  kosten,
+  supList,
+  soort,
+  subOf,
+  v,
+  D,
+}: {
+  which: KpiKey;
+  k: string;
+  label: (key: string) => string;
+  ms12: string[];
+  kosten: (key: string) => number;
+  supList: (pred: (s: [string, string, string]) => boolean) => Regel[];
+  soort: (s: string) => number;
+  subOf: (e: Regel) => [string, string, string];
+  v: (e: Regel) => number;
+  D: KostenData;
+}) {
+  // "Gemiddeld per maand" → de 12 maanden achter het gemiddelde, als balkjes.
+  if (which === "avg") {
+    const mx = Math.max(1, ...ms12.map((m) => kosten(m)));
+    return (
+      <Card>
+        <h4 className="text-sm font-semibold text-[var(--color-ink)]">Gemiddeld per maand — laatste 12 maanden</h4>
+        <div className="mt-3 grid gap-1.5">
+          {ms12.map((m) => (
+            <div key={m} className="grid grid-cols-[6.5rem_1fr_auto] items-center gap-2.5 text-[13px]">
+              <span className="capitalize text-[var(--color-ink-muted)]">{label(m)}</span>
+              <span className="h-[7px] rounded-full bg-[var(--color-surface-2)]">
+                <span
+                  className="block h-full rounded-full"
+                  style={{
+                    width: `${(kosten(m) / mx) * 100}%`,
+                    background: m === k ? "var(--color-brand-600)" : "var(--color-brand-300)",
+                  }}
+                />
+              </span>
+              <span className="text-right tabular-nums text-[var(--color-ink)]">{euro(kosten(m))}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+    );
+  }
+
+  const titleMap: Record<Exclude<KpiKey, "avg">, string> = {
+    maand: `Alle kosten in ${label(k)}`,
+    vast: "Vaste kosten deze maand",
+    variabel: "Variabele kosten deze maand",
+    eenmalig: "Eenmalige kosten deze maand",
+    controle: "Nog te beoordelen deze maand",
+  };
+  const pred: (s: [string, string, string]) => boolean =
+    which === "maand"
+      ? (s) => isBedrijfskost(s[1])
+      : which === "controle"
+        ? (s) => s[1] === "controle"
+        : (s) => isBedrijfskost(s[1]) && s[2] === which;
+  const list = supList(pred);
+  const mx = Math.max(1, ...list.map((e) => v(e)));
+  const tot = list.reduce((a, e) => a + v(e), 0);
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold text-[var(--color-ink)]">{titleMap[which as Exclude<KpiKey, "avg">]}</h4>
+        <span className="text-sm font-semibold tabular-nums text-[var(--color-ink)]">{euro(tot)}</span>
+      </div>
+      {which === "maand" ? (
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-ink-muted)]">
+          <span>Vast {euro(soort("vast"))}</span>
+          <span>Variabel {euro(soort("variabel"))}</span>
+          <span>Eenmalig {euro(soort("eenmalig"))}</span>
+        </div>
+      ) : null}
+      <div className="mt-3 grid gap-1.5">
+        {list.length ? (
+          list.slice(0, 18).map((e, j) => {
+            const s = subOf(e);
+            const color = GROUPS[s[1]]?.color ?? "#98a3b3";
+            return (
+              <div key={j} className="grid grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-0.5 text-[13px]">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="size-2 shrink-0 rounded-[2px]" style={{ background: color }} />
+                  <span className="truncate text-[var(--color-ink)]">{D.lev[e[0]]}</span>
+                  <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">{s[0]}</span>
+                </span>
+                <span className="text-right tabular-nums text-[var(--color-ink)]">{euro(v(e))}</span>
+                <span className="col-span-full h-[6px] rounded-full bg-[var(--color-surface-2)]">
+                  <span
+                    className="block h-full rounded-full"
+                    style={{ width: `${(v(e) / mx) * 100}%`, background: color }}
+                  />
+                </span>
+              </div>
+            );
+          })
+        ) : (
+          <p className="text-sm text-[var(--color-ink-muted)]">Geen kosten in deze categorie deze maand.</p>
+        )}
+        {list.length > 18 ? (
+          <p className="mt-1 text-xs text-[var(--color-ink-muted)]">+ {list.length - 18} meer leveranciers</p>
+        ) : null}
+      </div>
+    </Card>
   );
 }
 
@@ -426,6 +601,90 @@ function OnderDeStreep({
   );
 }
 
+/* --------------------- Jaarvergelijking per maand --------------------- */
+function JaarVergelijking({
+  k,
+  closed,
+  kosten,
+}: {
+  k: string;
+  closed: string[];
+  kosten: (key: string) => number;
+}) {
+  const yCur = k.slice(0, 4);
+  const yPrev = String(+yCur - 1);
+  const mm = (i: number) => String(i + 1).padStart(2, "0");
+  const cur = (i: number) => (closed.includes(`${yCur}-${mm(i)}`) ? kosten(`${yCur}-${mm(i)}`) : null);
+  const prev = (i: number) => (closed.includes(`${yPrev}-${mm(i)}`) ? kosten(`${yPrev}-${mm(i)}`) : null);
+
+  const all: number[] = [];
+  for (let i = 0; i < 12; i++) {
+    const c = cur(i);
+    const p = prev(i);
+    if (c != null) all.push(c);
+    if (p != null) all.push(p);
+  }
+  // Niets te vergelijken? Dan laten we de grafiek weg (bijv. eerste jaar).
+  if (!all.length) return null;
+
+  const max = Math.max(1, ...all);
+  const curTot = Array.from({ length: 12 }, (_, i) => cur(i) ?? 0).reduce((a, b) => a + b, 0);
+  const prevTot = Array.from({ length: 12 }, (_, i) => prev(i) ?? 0).reduce((a, b) => a + b, 0);
+  const H = 128;
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-base font-semibold text-[var(--color-ink)]">
+          Kosten per maand: {yPrev} vs {yCur}
+        </h3>
+        <div className="flex flex-wrap gap-3 text-xs">
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-[2px]" style={{ background: "var(--color-brand-300)" }} /> {yPrev} ·{" "}
+            {euro(prevTot)}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-[2px]" style={{ background: "var(--color-brand-600)" }} /> {yCur} ·{" "}
+            {euro(curTot)}
+          </span>
+        </div>
+      </div>
+      <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
+        Alleen afgesloten maanden. Zo zie je in één oogopslag of de kosten dit jaar hoger of lager liggen dan vorig jaar.
+      </p>
+      <div className="mt-4 overflow-x-auto">
+        <div className="flex min-w-[560px] items-end gap-1.5" style={{ height: `${H}px` }}>
+          {Array.from({ length: 12 }).map((_, i) => {
+            const c = cur(i);
+            const p = prev(i);
+            return (
+              <div key={i} className="flex flex-1 flex-col items-center justify-end gap-1" style={{ height: `${H}px` }}>
+                <div className="flex w-full items-end justify-center gap-0.5" style={{ height: `${H - 18}px` }}>
+                  {p != null ? (
+                    <span
+                      title={`${MN[i]} ${yPrev}: ${euro(p)}`}
+                      className="w-1/2 max-w-[16px] rounded-t-[2px]"
+                      style={{ height: `${Math.max(2, (p / max) * 100)}%`, background: "var(--color-brand-300)" }}
+                    />
+                  ) : null}
+                  {c != null ? (
+                    <span
+                      title={`${MN[i]} ${yCur}: ${euro(c)}`}
+                      className="w-1/2 max-w-[16px] rounded-t-[2px]"
+                      style={{ height: `${Math.max(2, (c / max) * 100)}%`, background: "var(--color-brand-600)" }}
+                    />
+                  ) : null}
+                </div>
+                <span className="text-2xs text-[var(--color-ink-faint)]">{MN[i]}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 /* ---------------------------- Categorieën ---------------------------- */
 function Categorieen({
   k,
@@ -470,86 +729,79 @@ function Categorieen({
     setOpenCats(next);
   };
 
+  // Alle categorieën als één gerangschikte lijst, grootste post bovenaan —
+  // beter te scannen dan per groep. Balk = deze maand, streepje = 12-mnd-gemiddelde.
+  const items = D.subs
+    .map((s, i) => ({ s, i, a: subSum(k, i), av: avgOf(i) }))
+    .filter(({ s, a, av }) => (isBedrijfskost(s[1]) || s[1] === "controle") && (a > 0 || av > 0))
+    .sort((x, y) => y.a - x.a || y.av - x.av);
+
   return (
     <Card>
       <h3 className="text-base font-semibold text-[var(--color-ink)]">Waar ging het geld naartoe</h3>
       <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
-        {label(k)}: {euro(tot)} aan kosten. Het streepje op elke balk is het gemiddelde van de laatste 12 maanden. Klik
-        op een categorie voor de leveranciers.
+        {label(k)}: {euro(tot)} aan kosten, grootste post bovenaan. Het streepje op elke balk is het gemiddelde van de
+        laatste 12 maanden. Klik op een categorie voor de leveranciers.
       </p>
       <div className="mt-3 grid gap-0.5">
-        {GORDER.map((g) => {
-          const idx = D.subs.map((s, i) => [s, i] as const).filter(([s]) => s[1] === g);
-          const gt = idx.reduce((a, [, i]) => a + subSum(k, i), 0);
-          const anyHist = idx.some(([, i]) => ms12.some((x) => subRows(x, i).length));
-          if (!gt && !anyHist) return null;
-          const color = GROUPS[g]?.color ?? "#98a3b3";
+        {items.map(({ s, i, a, av }) => {
+          const pa = subSum(p, i);
+          const color = GROUPS[s[1]]?.color ?? "#98a3b3";
+          const open = openCats.has(i);
+          const levs = [...subRows(k, i)].sort((x, y) => v(y) - v(x));
           return (
-            <Fragment key={g}>
-              <div className="mt-1.5 flex items-center justify-between border-b border-[var(--color-line)] pb-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
-                <span>{GROUPS[g]?.label ?? g}</span>
-                <span className="tabular-nums text-[var(--color-ink)]">{euro(gt)}</span>
-              </div>
-              {idx.map(([s, i]) => {
-                const a = subSum(k, i);
-                const pa = subSum(p, i);
-                const av = avgOf(i);
-                if (!a && !av) return null;
-                const open = openCats.has(i);
-                const levs = [...subRows(k, i)].sort((x, y) => v(y) - v(x));
-                return (
-                  <div key={i} className="rounded-[var(--radius-sm)]">
-                    <button
-                      type="button"
-                      onClick={() => toggle(i)}
-                      className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-x-2.5 gap-y-1 rounded-[var(--radius-sm)] px-1.5 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
-                    >
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        <ChevronRight
-                          className={`size-3 shrink-0 text-[var(--color-ink-faint)] transition-transform ${open ? "rotate-90" : ""}`}
-                        />
-                        <span className="size-2 shrink-0 rounded-[2px]" style={{ background: color }} />
-                        <span className="truncate text-sm font-medium text-[var(--color-ink)]">{s[0]}</span>
-                      </span>
-                      <span className="whitespace-nowrap text-right text-sm tabular-nums text-[var(--color-ink)]">{euro(a)}</span>
-                      <span className="whitespace-nowrap text-right text-xs tabular-nums">
-                        <Delta d={a - pa} had={Boolean(pa || a)} />
-                      </span>
-                      <span className="col-span-full relative mt-0.5 h-1.5 overflow-hidden rounded-full bg-[var(--color-surface-2)]">
-                        <span
-                          className="block h-full rounded-full"
-                          style={{ width: `${(a / max) * 100}%`, background: color }}
-                        />
-                        <span
-                          className="absolute top-[-2px] h-[10px] w-0.5 bg-[var(--color-ink)] opacity-50"
-                          style={{ left: `calc(${Math.min(100, (av / max) * 100)}% - 1px)` }}
-                          title={`gemiddeld ${euro(av)}`}
-                        />
-                      </span>
-                    </button>
-                    {open ? (
-                      <div className="grid gap-0.5 py-1 pl-6 pr-1.5">
-                        {levs.length ? (
-                          levs.map((e, j) => (
-                            <div key={j} className="grid grid-cols-[1fr_auto_auto] gap-2.5 text-[13px]">
-                              <span className="truncate text-[var(--color-ink)]">{D.lev[e[0]]}</span>
-                              <span className="text-xs text-[var(--color-ink-muted)]">{e[4]}×</span>
-                              <span className="text-right tabular-nums text-[var(--color-ink)]">{euro(v(e))}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-xs text-[var(--color-ink-muted)]">Geen betalingen deze maand</div>
-                        )}
-                        <div className="grid grid-cols-[1fr_auto] gap-2.5 text-[13px]">
-                          <span className="text-xs text-[var(--color-ink-muted)]">Gemiddeld per maand (12 mnd)</span>
-                          <span className="text-right text-xs tabular-nums text-[var(--color-ink-muted)]">{euro(av)}</span>
-                        </div>
+            <div key={i} className="rounded-[var(--radius-sm)]">
+              <button
+                type="button"
+                onClick={() => toggle(i)}
+                className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-x-2.5 gap-y-1 rounded-[var(--radius-sm)] px-1.5 py-1.5 text-left hover:bg-[var(--color-surface-sunken)]"
+              >
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <ChevronRight
+                    className={`size-3 shrink-0 text-[var(--color-ink-faint)] transition-transform ${open ? "rotate-90" : ""}`}
+                  />
+                  <span className="size-2 shrink-0 rounded-[2px]" style={{ background: color }} />
+                  <span className="truncate text-sm font-medium text-[var(--color-ink)]">{s[0]}</span>
+                  <span className="shrink-0 text-2xs uppercase tracking-wide text-[var(--color-ink-faint)]">
+                    {GROUPS[s[1]]?.label ?? s[1]}
+                  </span>
+                </span>
+                <span className="whitespace-nowrap text-right text-sm tabular-nums text-[var(--color-ink)]">{euro(a)}</span>
+                <span className="whitespace-nowrap text-right text-xs tabular-nums">
+                  <Delta d={a - pa} had={Boolean(pa || a)} />
+                </span>
+                <span className="col-span-full relative mt-0.5 h-2 overflow-hidden rounded-full bg-[var(--color-surface-2)]">
+                  <span
+                    className="block h-full rounded-full"
+                    style={{ width: `${(a / max) * 100}%`, background: color }}
+                  />
+                  <span
+                    className="absolute top-[-2px] h-[12px] w-0.5 bg-[var(--color-ink)] opacity-50"
+                    style={{ left: `calc(${Math.min(100, (av / max) * 100)}% - 1px)` }}
+                    title={`gemiddeld ${euro(av)}`}
+                  />
+                </span>
+              </button>
+              {open ? (
+                <div className="grid gap-0.5 py-1 pl-6 pr-1.5">
+                  {levs.length ? (
+                    levs.map((e, j) => (
+                      <div key={j} className="grid grid-cols-[1fr_auto_auto] gap-2.5 text-[13px]">
+                        <span className="truncate text-[var(--color-ink)]">{D.lev[e[0]]}</span>
+                        <span className="text-xs text-[var(--color-ink-muted)]">{e[4]}×</span>
+                        <span className="text-right tabular-nums text-[var(--color-ink)]">{euro(v(e))}</span>
                       </div>
-                    ) : null}
+                    ))
+                  ) : (
+                    <div className="text-xs text-[var(--color-ink-muted)]">Geen betalingen deze maand</div>
+                  )}
+                  <div className="grid grid-cols-[1fr_auto] gap-2.5 text-[13px]">
+                    <span className="text-xs text-[var(--color-ink-muted)]">Gemiddeld per maand (12 mnd)</span>
+                    <span className="text-right text-xs tabular-nums text-[var(--color-ink-muted)]">{euro(av)}</span>
                   </div>
-                );
-              })}
-            </Fragment>
+                </div>
+              ) : null}
+            </div>
           );
         })}
       </div>
@@ -746,8 +998,6 @@ function VasteLasten({
   rows,
   subOf,
   v,
-  prevMonth,
-  label,
   D,
 }: {
   k: string;
@@ -755,82 +1005,81 @@ function VasteLasten({
   rows: (key: string) => Regel[];
   subOf: (e: Regel) => [string, string, string];
   v: (e: Regel) => number;
-  prevMonth: (key: string) => string;
-  label: (key: string) => string;
   D: KostenData;
 }) {
   const ms = closedUpTo(k).slice(-6);
-  const per: Record<string, { c: string; m: Record<string, number> }> = {};
+  const per: Record<string, { c: string; g: string; m: Record<string, number> }> = {};
   for (const m of ms)
     for (const e of rows(m)) {
       const s = subOf(e);
       if (!isBedrijfskost(s[1]) || s[2] !== "vast") continue;
       const n = D.lev[e[0]]!;
-      const o = (per[n] ??= { c: s[0], m: {} });
+      const o = (per[n] ??= { c: s[0], g: s[1], m: {} });
       o.m[m] = (o.m[m] ?? 0) + v(e);
     }
+  // Vaste leveranciers als balkgrafiek: grootste bovenaan, streepje = gemiddelde.
   const list = Object.entries(per)
     .filter(([, o]) => Object.keys(o.m).length >= 3)
-    .sort((a, b) => (b[1].m[k] ?? 0) - (a[1].m[k] ?? 0));
+    .map(([n, o]) => {
+      const vals = Object.values(o.m);
+      return {
+        n,
+        c: o.c,
+        g: o.g,
+        av: vals.reduce((a, b) => a + b, 0) / vals.length,
+        now: o.m[k] ?? null,
+      };
+    })
+    .sort((a, b) => (b.now ?? b.av) - (a.now ?? a.av));
+  const max = Math.max(1, ...list.map((o) => Math.max(o.now ?? 0, o.av)));
 
   return (
     <Card>
       <h3 className="text-base font-semibold text-[var(--color-ink)]">Vaste lasten</h3>
       <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
-        Leveranciers die je bijna elke maand betaalt. Rood betekent: verwacht, maar deze maand niet gezien.
+        Leveranciers die je bijna elke maand betaalt, grootste bovenaan. De balk is {MNL[+k.slice(5) - 1]}; het streepje
+        is het gemiddelde. Rood betekent: verwacht, maar deze maand niet gezien.
       </p>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[420px] text-[13px]">
-          <thead>
-            <tr className="text-2xs uppercase tracking-wide text-[var(--color-ink-faint)]">
-              <th className="py-1.5 text-left font-medium">Leverancier</th>
-              <th className="py-1.5 text-center font-medium">Laatste 6 mnd</th>
-              <th className="py-1.5 pl-3 text-right font-medium">{MN[+k.slice(5) - 1]}</th>
-              <th className="py-1.5 pl-3 text-right font-medium">Gem.</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--color-line)]">
-            {list.map(([n, o]) => {
-              const av = Object.values(o.m).reduce((a, b) => a + b, 0) / Object.keys(o.m).length;
-              return (
-                <tr key={n}>
-                  <td className="py-2 pr-2">
-                    <div className="font-medium text-[var(--color-ink)]">{n}</div>
-                    <div className="text-xs text-[var(--color-ink-muted)]">{o.c}</div>
-                  </td>
-                  <td className="py-2">
-                    <span className="flex justify-center gap-1">
-                      {ms.map((m) => (
-                        <span
-                          key={m}
-                          title={`${label(m)}: ${o.m[m] ? euro(o.m[m]) : "niet gezien"}`}
-                          className="inline-block size-2.5 rounded-full"
-                          style={{
-                            background: o.m[m]
-                              ? "var(--color-good)"
-                              : m === k
-                                ? "var(--color-bad)"
-                                : "var(--color-surface-2)",
-                          }}
-                        />
-                      ))}
+      <div className="mt-3 grid gap-2">
+        {list.length ? (
+          list.map((o) => {
+            const color = GROUPS[o.g]?.color ?? "#98a3b3";
+            const missing = o.now == null;
+            return (
+              <div key={o.n} className="grid grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-0.5 text-[13px]">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="size-2 shrink-0 rounded-[2px]" style={{ background: color }} />
+                  <span className="truncate font-medium text-[var(--color-ink)]">{o.n}</span>
+                  <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">{o.c}</span>
+                </span>
+                <span className="whitespace-nowrap text-right tabular-nums">
+                  {missing ? (
+                    <span className="inline-flex rounded-full bg-[var(--color-bad-soft)] px-2 py-0.5 text-xs font-medium text-[var(--color-bad)]">
+                      niet gezien
                     </span>
-                  </td>
-                  <td className="py-2 pl-3 text-right tabular-nums">
-                    {o.m[k] ? (
-                      euro(o.m[k])
-                    ) : (
-                      <span className="inline-flex rounded-full bg-[var(--color-bad-soft)] px-2 py-0.5 text-xs font-medium text-[var(--color-bad)]">
-                        niet gezien
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2 pl-3 text-right tabular-nums text-[var(--color-ink-muted)]">{euro(av)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  ) : (
+                    <span className="text-[var(--color-ink)]">{euro(o.now!)}</span>
+                  )}
+                </span>
+                <span className="col-span-full relative h-2 overflow-hidden rounded-full bg-[var(--color-surface-2)]">
+                  {!missing ? (
+                    <span
+                      className="block h-full rounded-full"
+                      style={{ width: `${(o.now! / max) * 100}%`, background: color }}
+                    />
+                  ) : null}
+                  <span
+                    className="absolute top-[-2px] h-[12px] w-0.5 bg-[var(--color-ink)] opacity-50"
+                    style={{ left: `calc(${Math.min(100, (o.av / max) * 100)}% - 1px)` }}
+                    title={`gemiddeld ${euro(o.av)}`}
+                  />
+                </span>
+              </div>
+            );
+          })
+        ) : (
+          <p className="text-sm text-[var(--color-ink-muted)]">Nog geen vaste lasten in beeld.</p>
+        )}
       </div>
     </Card>
   );
