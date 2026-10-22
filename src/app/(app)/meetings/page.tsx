@@ -136,17 +136,25 @@ export default async function MeetingsPage() {
 
 function MeetingRow({ m, archived = false }: { m: typeof teamMeetings.$inferSelect; archived?: boolean }) {
   return (
-    <li className={`flex items-center gap-2 px-5 py-3 hover:bg-[var(--color-surface-2)]${archived ? " opacity-75" : ""}`}>
-      <Link href={`/meetings/${m.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3">
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium">{m.title}</span>
-          <span className="block truncate text-xs text-[var(--color-ink-muted)]">
-            {dateTime(new Date(m.scheduledAt))}{m.location ? ` · ${m.location}` : ""} · {m.participantIds.length} deelnemers
+    <li className={`px-5 py-3 hover:bg-[var(--color-surface-2)]${archived ? " opacity-90" : ""}`}>
+      <div className="flex items-center gap-2">
+        <Link href={`/meetings/${m.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3">
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-medium">{m.title}</span>
+            <span className="block truncate text-xs text-[var(--color-ink-muted)]">
+              {dateTime(new Date(m.scheduledAt))}{m.location ? ` · ${m.location}` : ""} · {m.participantIds.length} deelnemers
+            </span>
           </span>
-        </span>
-        <span className="shrink-0 text-xs text-[var(--color-brand-600)]">openen →</span>
-      </Link>
-      {archived ? null : <DeleteMeetingRowButton id={m.id} title={m.title} />}
+          <span className="shrink-0 text-xs text-[var(--color-brand-600)]">openen →</span>
+        </Link>
+        {archived ? null : <DeleteMeetingRowButton id={m.id} title={m.title} />}
+      </div>
+      {archived && m.summary ? (
+        <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-3 py-2">
+          <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Samenvatting van besproken punten</p>
+          <p className="mt-1 whitespace-pre-line text-xs leading-snug text-[var(--color-ink-muted)]">{m.summary}</p>
+        </div>
+      ) : null}
     </li>
   );
 }

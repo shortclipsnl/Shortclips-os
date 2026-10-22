@@ -62,6 +62,8 @@ export const teamMeetings = pgTable(
     isWeekly: boolean("is_weekly").notNull().default(false),
     /** Gezet de dag nadat de meeting is geweest: hij verhuist dan naar "Geweest". */
     archivedAt: timestamp("archived_at", { withTimezone: true }),
+    /** Korte samenvatting van de besproken punten, gezet bij het archiveren. */
+    summary: text("summary"),
     /** Deelnemers als user-id's. */
     participantIds: jsonb("participant_ids").notNull().default(sql`'[]'::jsonb`).$type<string[]>(),
     notes: text("notes"),

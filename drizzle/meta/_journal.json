@@ -379,6 +379,13 @@
       "when": 1792654186805,
       "tag": "0053_wild_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1792684243566,
+      "tag": "0054_cool_shockwave",
+      "breakpoints": true
     }
   ]
 }
