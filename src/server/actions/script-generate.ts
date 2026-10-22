@@ -40,6 +40,21 @@ const QUALITY_RULES = [
   "- Volg strikt de Shortclips scriptstijl uit het handboek. Twijfel je of een zin sterk genoeg is, herschrijf hem.",
 ];
 
+/** Regels voor iteratief aanpassen: alleen verwerken wat gevraagd is, de rest met rust laten. */
+const REVISE_RULES = [
+  "REGELS BIJ AANPASSEN (strikt):",
+  "- Verwerk de feedback alleen op dit specifieke script. Laat alles waar de gebruiker niets over zegt exact staan.",
+  "- Is het script in de basis goed, behoud dan de structuur en opbouw en verbeter uitsluitend de genoemde punten.",
+  "- Neem aangeleverde zinnen, feiten, prijzen, specificaties en scènebeschrijvingen letterlijk en nauwkeurig over. Verzin geen cijfers of specificaties.",
+  "- Hook sterker = pak specifiek de eerste zinnen en de nieuwsgierigheid aan, zonder de clou weg te geven.",
+  "- Meer waarde = voeg relevante, controleerbare informatie, uitleg of een concreet voorbeeld toe.",
+  "- Minder commercieel = verschuif de focus naar de kijker en haal verkooppraat weg.",
+  "- Meer humor = verbeter humor en herkenbaarheid zonder het concept te verliezen.",
+  "- Korter = schrap overbodige tekst, behoud de kern en de sterke zinnen.",
+  "- Voeg geen CTA, beeldsuggesties of opname-uitleg toe als die er niet om gevraagd worden.",
+  "- Houd korte, natuurlijke spreektaal aan die makkelijk te presenteren is.",
+];
+
 type ScriptsPayload = { scripts?: Array<{ onderwerp?: unknown; regels?: unknown; tekst?: unknown }> };
 
 /** Redt complete script-objecten uit het antwoord, ook als het JSON is afgekapt
@@ -223,6 +238,8 @@ export async function reviseScript(input: {
   instruction: string;
   clientId?: string;
   clientName?: string;
+  /** true = volledig nieuw concept met andere invalshoek i.p.v. kleine aanpassingen. */
+  newConcept?: boolean;
 }): Promise<ReviseResult> {
   try {
     const viewer = await requirePermission("ai:read");
@@ -239,14 +256,18 @@ export async function reviseScript(input: {
     }
 
     const user = [
-      `Hieronder staat een bestaand organisch short video script${klantnaam ? ` voor klant "${klantnaam}"` : ""}. Pas het aan volgens de instructie en lever het volledige, aangepaste script terug.`,
-      "Behoud de vaste Shortclips-opmaak en de stijl uit het handboek. Verander alleen wat nodig is.",
+      input.newConcept
+        ? `Hieronder staat een bestaand organisch short video script${klantnaam ? ` voor klant "${klantnaam}"` : ""}. Bedenk een VOLLEDIG NIEUW concept met een andere invalshoek voor hetzelfde onderwerp/thema — geen kleine tekstaanpassing, maar een frisse aanpak. Controleer eerdere scripts om herhaling te voorkomen.`
+        : `Hieronder staat een bestaand organisch short video script${klantnaam ? ` voor klant "${klantnaam}"` : ""}. Pas het aan volgens de instructie en lever het volledige, aangepaste script terug.`,
+      "Behoud de vaste Shortclips-opmaak en de stijl uit het handboek.",
       "",
       `TITEL: ${input.onderwerp || "(geen)"}`,
       "HUIDIG SCRIPT:",
       input.tekst || "(leeg)",
       "",
       `INSTRUCTIE VAN DE GEBRUIKER:\n${instruction.slice(0, 2000)}`,
+      "",
+      ...(input.newConcept ? [] : REVISE_RULES),
       "",
       ...FORMAT_RULES,
       "",

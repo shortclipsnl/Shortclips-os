@@ -1,15 +1,30 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud } from "lucide-react";
+import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw } from "lucide-react";
 import { generateScripts, reviseScript, suggestTopics, type GeneratedScript } from "@/server/actions/script-generate";
 
 type Client = { id: string; name: string; active: boolean };
 type ClientFilter = "actief" | "inactief" | "alle";
 
+type Version = { onderwerp: string; tekst: string; feedback: string; at: number };
+type EditorScript = { id: string; onderwerp: string; tekst: string; versions: Version[] };
+
+const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2));
+
 function todayNl(): string {
   return new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
 }
+
+// Snelle feedback-acties (rule: Hook sterker, Meer waarde, Minder commercieel, Meer humor, Korter, Ander concept).
+const QUICK_ACTIONS: Array<{ label: string; instruction: string; newConcept?: boolean }> = [
+  { label: "Hook sterker", instruction: "Maak de hook sterker: pak de eerste seconden en de nieuwsgierigheid van de kijker aan, zonder de clou weg te geven." },
+  { label: "Meer waarde", instruction: "Geef het script meer waarde: voeg relevante, controleerbare informatie, uitleg of een concreet voorbeeld toe." },
+  { label: "Minder commercieel", instruction: "Maak het minder commercieel: focus op de kijker en haal verkooppraatjes weg." },
+  { label: "Meer humor", instruction: "Maak het grappiger en herkenbaarder, zonder het oorspronkelijke concept te verliezen." },
+  { label: "Korter maken", instruction: "Maak het script korter: schrap overbodige tekst maar behoud de kern en de sterke zinnen." },
+  { label: "Ander concept", instruction: "Bedenk een volledig nieuw concept met een andere invalshoek voor hetzelfde onderwerp.", newConcept: true },
+];
 
 /* ---------------- Spraak-naar-tekst (voice mode) ---------------- */
 
@@ -30,8 +45,6 @@ function speechCtor(): (new () => SpeechRecognitionLike) | null {
   const w = window as SRWindow;
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
-
-type SpeechErrorEvent = { error?: string };
 
 /** Microfoonknop: dicteert in het Nederlands en geeft de herkende tekst door. */
 function MicButton({ onText, onError, title = "Inspreken" }: { onText: (t: string) => void; onError?: (m: string) => void; title?: string }) {
@@ -59,7 +72,7 @@ function MicButton({ onText, onError, title = "Inspreken" }: { onText: (t: strin
         if (t.trim()) onText(t.trim());
       };
       r.onend = () => setListening(false);
-      r.onerror = (ev: SpeechErrorEvent) => {
+      r.onerror = (ev: { error?: string }) => {
         setListening(false);
         const code = ev?.error ?? "";
         const msg =
@@ -113,16 +126,17 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const [topicsBusy, setTopicsBusy] = useState(false);
 
   // Resultaat (bewerkbaar)
-  const [scripts, setScripts] = useState<GeneratedScript[] | null>(null);
+  const [scripts, setScripts] = useState<EditorScript[] | null>(null);
   const [klantnaam, setKlantnaam] = useState("");
   const [opnamedag, setOpnamedag] = useState(todayNl());
   const [genClientId, setGenClientId] = useState<string>("");
   const [genClientName, setGenClientName] = useState<string>("");
 
   // Aanpassen per script
-  const [reviseIdx, setReviseIdx] = useState<number | null>(null);
+  const [reviseId, setReviseId] = useState<string | null>(null);
   const [reviseText, setReviseText] = useState("");
-  const [revisePending, setRevisePending] = useState(false);
+  const [versionsId, setVersionsId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -166,7 +180,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         useDriveScripts: !showOther && !!clientId && useDrive,
       });
       if (res.ok) {
-        setScripts(res.scripts);
+        setScripts(res.scripts.map((s: GeneratedScript) => ({ id: uid(), onderwerp: s.onderwerp, tekst: s.tekst, versions: [] })));
         setKlantnaam(res.klantnaam || effectiveClientName || "");
         setGenClientId(showOther ? "" : clientId);
         setGenClientName(showOther ? otherName.trim() : selectedName);
@@ -196,7 +210,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
     setErr(null);
     try {
       const { downloadScriptPdf } = await import("@/lib/script-pdf");
-      await downloadScriptPdf({ klantnaam, opnamedag, scripts });
+      await downloadScriptPdf({ klantnaam, opnamedag, scripts: scripts.map((s) => ({ onderwerp: s.onderwerp, tekst: s.tekst })) });
     } catch {
       setErr("Het PDF-bestand kon niet worden gemaakt. Probeer het nog eens.");
     } finally {
@@ -204,28 +218,53 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
     }
   };
 
-  const updateScript = (i: number, patch: Partial<GeneratedScript>) =>
-    setScripts((prev) => (prev ? prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)) : prev));
-  const removeScript = (i: number) => setScripts((prev) => (prev ? prev.filter((_, idx) => idx !== i) : prev));
-  const addScript = () => setScripts((prev) => [...(prev ?? []), { onderwerp: "", tekst: "" }]);
+  const updateScript = (id: string, patch: Partial<Pick<EditorScript, "onderwerp" | "tekst">>) =>
+    setScripts((prev) => (prev ? prev.map((s) => (s.id === id ? { ...s, ...patch } : s)) : prev));
+  const removeScript = (id: string) => setScripts((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
+  const addScript = () => setScripts((prev) => [...(prev ?? []), { id: uid(), onderwerp: "", tekst: "", versions: [] }]);
 
-  const runRevise = (i: number) => {
-    const s = scripts?.[i];
-    if (!s || !reviseText.trim()) return;
-    setRevisePending(true);
+  // Eén aanpassing (snelle actie of vrije tekst/spraak). Bewaart de vorige versie met de feedback.
+  const runRevise = (id: string, instruction: string, feedbackLabel: string, newConcept?: boolean) => {
+    const s = scripts?.find((x) => x.id === id);
+    if (!s || !instruction.trim() || busyId) return;
+    setBusyId(id);
     setErr(null);
     (async () => {
       const res = await reviseScript({
         onderwerp: s.onderwerp,
         tekst: s.tekst,
-        instruction: reviseText.trim(),
+        instruction,
+        newConcept,
         clientId: genClientId || undefined,
         clientName: genClientId ? undefined : genClientName || undefined,
       });
-      if (res.ok) { updateScript(i, res.script); setReviseIdx(null); setReviseText(""); }
-      else setErr(res.message);
-      setRevisePending(false);
+      if (res.ok) {
+        setScripts((prev) => prev?.map((x) => x.id === id ? {
+          ...x,
+          onderwerp: res.script.onderwerp,
+          tekst: res.script.tekst,
+          versions: [{ onderwerp: x.onderwerp, tekst: x.tekst, feedback: feedbackLabel, at: Date.now() }, ...x.versions].slice(0, 25),
+        } : x) ?? prev);
+        setReviseId(null);
+        setReviseText("");
+      } else setErr(res.message);
+      setBusyId(null);
     })();
+  };
+
+  const revert = (id: string, idx: number) => {
+    setScripts((prev) => prev?.map((x) => {
+      if (x.id !== id) return x;
+      const v = x.versions[idx];
+      if (!v) return x;
+      const rest = x.versions.filter((_, i) => i !== idx);
+      return {
+        ...x,
+        onderwerp: v.onderwerp,
+        tekst: v.tekst,
+        versions: [{ onderwerp: x.onderwerp, tekst: x.tekst, feedback: "Teruggezet naar eerdere versie", at: Date.now() }, ...rest].slice(0, 25),
+      };
+    }) ?? prev);
   };
 
   if (!aiReady) {
@@ -236,7 +275,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
     );
   }
 
-  // ---------- RESULTAAT ----------
+  // ---------- RESULTAAT (iteratieve editor) ----------
   if (scripts) {
     return (
       <div className="space-y-4">
@@ -257,60 +296,105 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
           </div>
         </div>
 
-        {/* Scripts — bewerkbaar */}
-        {scripts.map((s, i) => (
-          <div key={i} className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--color-brand-600)] text-2xs font-bold text-white">{i + 1}</span>
-              <input
-                value={s.onderwerp}
-                onChange={(e) => updateScript(i, { onderwerp: e.target.value })}
-                placeholder="Onderwerp / videotitel"
-                className="sc-input h-9 flex-1 text-sm font-semibold"
-              />
-              <button type="button" onClick={() => { setReviseIdx(reviseIdx === i ? null : i); setReviseText(""); }} title="Met AI aanpassen" className="shrink-0 rounded-[var(--radius-sm)] p-2 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-brand-600)]">
-                <Wand2 className="size-4" />
-              </button>
-              <button type="button" onClick={() => removeScript(i)} title="Verwijder dit script" className="shrink-0 rounded-[var(--radius-sm)] p-2 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-bad)]">
-                <Trash2 className="size-4" />
-              </button>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <textarea
-                value={s.tekst}
-                onChange={(e) => updateScript(i, { tekst: e.target.value })}
-                rows={14}
-                spellCheck
-                className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface-2)] px-3 py-2 font-mono text-xs leading-relaxed text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
-              />
-              <MicButton onText={(t) => updateScript(i, { tekst: appendText(s.tekst, t) })} onError={setErr} title="Tekst inspreken" />
-            </div>
-
-            {/* AI-aanpassing */}
-            {reviseIdx === i ? (
-              <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--color-brand-200)] bg-[var(--color-brand-50)] p-2.5">
-                <span className="mb-1.5 block text-2xs font-semibold text-[var(--color-brand-700)]">Wat moet er anders? (typen of inspreken)</span>
-                <div className="flex items-start gap-2">
-                  <textarea
-                    value={reviseText}
-                    onChange={(e) => setReviseText(e.target.value)}
-                    rows={2}
-                    placeholder="bijv. maak de hook pakkender en voeg een concreet bedrag toe"
-                    className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
-                  />
-                  <MicButton onText={(t) => setReviseText((p) => appendText(p, t))} onError={setErr} title="Aanpassing inspreken" />
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <button type="button" onClick={() => runRevise(i)} disabled={revisePending || !reviseText.trim()} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40">
-                    {revisePending ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />} Pas aan
+        {/* Scripts — iteratief bewerkbaar */}
+        {scripts.map((s, i) => {
+          const busy = busyId === s.id;
+          return (
+            <div key={s.id} className={`rounded-[var(--radius-lg)] border bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)] ${busy ? "border-[var(--color-brand-400)]" : "border-[var(--color-line)]"}`}>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--color-brand-600)] text-2xs font-bold text-white">{i + 1}</span>
+                <input
+                  value={s.onderwerp}
+                  onChange={(e) => updateScript(s.id, { onderwerp: e.target.value })}
+                  placeholder="Onderwerp / videotitel"
+                  className="sc-input h-9 flex-1 text-sm font-semibold"
+                />
+                {s.versions.length > 0 ? (
+                  <button type="button" onClick={() => setVersionsId(versionsId === s.id ? null : s.id)} title="Versies" className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-sm)] px-2 py-1.5 text-2xs font-medium text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]">
+                    <History className="size-3.5" /> {s.versions.length}
                   </button>
-                  <button type="button" onClick={() => { setReviseIdx(null); setReviseText(""); }} className="text-2xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleer</button>
-                </div>
+                ) : null}
+                <button type="button" onClick={() => { setReviseId(reviseId === s.id ? null : s.id); setReviseText(""); }} title="Eigen feedback geven" className="shrink-0 rounded-[var(--radius-sm)] p-2 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-brand-600)]">
+                  <Wand2 className="size-4" />
+                </button>
+                <button type="button" onClick={() => removeScript(s.id)} title="Verwijder dit script" className="shrink-0 rounded-[var(--radius-sm)] p-2 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-bad)]">
+                  <Trash2 className="size-4" />
+                </button>
               </div>
-            ) : null}
-          </div>
-        ))}
+
+              <div className="flex items-start gap-2">
+                <textarea
+                  value={s.tekst}
+                  onChange={(e) => updateScript(s.id, { tekst: e.target.value })}
+                  rows={14}
+                  spellCheck
+                  disabled={busy}
+                  className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface-2)] px-3 py-2 font-mono text-xs leading-relaxed text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none disabled:opacity-60"
+                />
+                <MicButton onText={(t) => updateScript(s.id, { tekst: appendText(s.tekst, t) })} onError={setErr} title="Tekst inspreken" />
+              </div>
+
+              {/* Snelle feedback-acties */}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {busy ? <span className="inline-flex items-center gap-1.5 text-2xs text-[var(--color-brand-700)]"><Loader2 className="size-3.5 animate-spin" /> Bezig…</span> : null}
+                {QUICK_ACTIONS.map((a) => (
+                  <button
+                    key={a.label}
+                    type="button"
+                    disabled={!!busyId}
+                    onClick={() => runRevise(s.id, a.instruction, a.label, a.newConcept)}
+                    className={`rounded-full border px-2.5 py-1 text-2xs font-medium transition disabled:opacity-40 ${a.newConcept ? "border-[var(--color-violet)] text-[var(--color-violet)] hover:bg-[var(--color-violet-soft,transparent)]" : "border-[var(--color-line-strong)] text-[var(--color-ink)] hover:border-[var(--color-brand-500)]"}`}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Versiegeschiedenis */}
+              {versionsId === s.id && s.versions.length > 0 ? (
+                <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-2.5">
+                  <span className="mb-1.5 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Eerdere versies</span>
+                  <ul className="space-y-1">
+                    {s.versions.map((v, vi) => (
+                      <li key={vi} className="flex items-center gap-2 text-2xs">
+                        <span className="min-w-0 flex-1 truncate text-[var(--color-ink-muted)]">
+                          <span className="text-[var(--color-ink)]">{v.feedback}</span>
+                          <span className="text-[var(--color-ink-faint)]"> · {new Date(v.at).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}</span>
+                        </span>
+                        <button type="button" onClick={() => revert(s.id, vi)} className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-0.5 font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)]">
+                          <RotateCcw className="size-3" /> Herstel
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {/* Eigen feedback (typen of inspreken) */}
+              {reviseId === s.id ? (
+                <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--color-brand-200)] bg-[var(--color-brand-50)] p-2.5">
+                  <span className="mb-1.5 block text-2xs font-semibold text-[var(--color-brand-700)]">Wat moet er anders? (typen of inspreken)</span>
+                  <div className="flex items-start gap-2">
+                    <textarea
+                      value={reviseText}
+                      onChange={(e) => setReviseText(e.target.value)}
+                      rows={2}
+                      placeholder="bijv. maak de hook pakkender en voeg een concreet bedrag toe"
+                      className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
+                    />
+                    <MicButton onText={(t) => setReviseText((p) => appendText(p, t))} onError={setErr} title="Feedback inspreken" />
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <button type="button" onClick={() => runRevise(s.id, reviseText.trim(), "Eigen feedback: " + reviseText.trim().slice(0, 60))} disabled={!!busyId || !reviseText.trim()} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40">
+                      {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />} Pas aan
+                    </button>
+                    <button type="button" onClick={() => { setReviseId(null); setReviseText(""); }} className="text-2xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleer</button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
 
         <button type="button" onClick={addScript} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] px-3 py-2 text-xs font-medium text-[var(--color-ink-muted)] hover:border-[var(--color-brand-500)] hover:text-[var(--color-ink)]">
           <Plus className="size-3.5" /> Leeg script toevoegen
@@ -320,10 +404,10 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
 
         {/* Actiebalk */}
         <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface-2)]/95 p-3 shadow-[var(--shadow-card)] backdrop-blur">
-          <button type="button" onClick={() => { setScripts(null); setErr(null); setReviseIdx(null); }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface)]">
+          <button type="button" onClick={() => { setScripts(null); setErr(null); setReviseId(null); setVersionsId(null); }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface)]">
             <ArrowLeft className="size-4" /> Nieuwe set
           </button>
-          <span className="text-2xs text-[var(--color-ink-faint)]">{scripts.length} script{scripts.length === 1 ? "" : "s"} · pas gerust de tekst aan</span>
+          <span className="text-2xs text-[var(--color-ink-faint)]">{scripts.length} script{scripts.length === 1 ? "" : "s"} · geef feedback tot het klopt</span>
           <button
             type="button"
             onClick={exportPdf}
@@ -468,7 +552,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         {pending ? `${count} script${count === 1 ? "" : "s"} schrijven…` : `Schrijf ${count} script${count === 1 ? "" : "s"}`}
       </button>
       <p className="mt-3 flex items-center gap-1.5 text-2xs text-[var(--color-ink-faint)]">
-        <Sparkles className="size-3" /> Organisch (TikTok/Reels), volgens het Scripthandboek. Daarna kun je alles aanpassen en als PDF downloaden.
+        <Sparkles className="size-3" /> Organisch (TikTok/Reels), volgens het Scripthandboek. Daarna verbeter je met gerichte feedback en download je als PDF.
       </p>
     </div>
   );
