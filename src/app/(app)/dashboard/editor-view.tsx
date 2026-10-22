@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, FileText, Film, CheckCircle2, Clock } from "lucide-react";
+import { AlertTriangle, FileText, Film, CheckCircle2, Clock, Info, MessageCircle, Phone } from "lucide-react";
 import { getEditorDashboard } from "@/server/editor-dashboard";
 import { listEditorBoard, type EditorBoardVideo } from "@/server/editor-board";
 import type { Viewer } from "@/server/auth/context";
@@ -175,32 +175,35 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
           />
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {data.contacts.map((c) => {
+              const first = c.fullName.split(" ")[0];
               const digits = (c.phone ?? "").replace(/[^\d]/g, "");
               return (
-                <div key={c.id} className="flex items-center gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3">
+                <div key={c.id} className="flex items-start gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3">
                   <TeamAvatar name={c.fullName} avatarUrl={c.avatarUrl} size={44} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold">{c.fullName}</div>
-                    <div className="text-xs text-[var(--color-ink-muted)]">Projectcoördinator</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-sm font-semibold">{c.fullName}</span>
+                      <Info className="size-3.5 shrink-0 text-[var(--color-ink-faint)]" />
+                    </div>
+                    <div className="text-xs text-[var(--color-ink-muted)]">Contactpersoon bij ShortClips</div>
                     {c.offDay ? (
                       <div className="mt-0.5 text-2xs font-medium text-[var(--color-warn)]">Werkt niet op {c.offDay}</div>
                     ) : null}
-                    {c.phone ? (
+                    <p className="mt-1.5 text-2xs leading-snug text-[var(--color-ink-muted)]">
+                      Stel je vraag in de <strong className="text-[var(--color-ink)]">WhatsApp-groep</strong>, of bel {first} rechtstreeks.
+                    </p>
+                    {digits ? (
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {digits ? (
-                          <a href={`https://wa.me/${digits}`} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center rounded-full bg-[var(--color-good-soft)] px-2.5 py-1 text-2xs font-semibold text-[#1d6b4c] hover:brightness-95">
-                            WhatsApp
-                          </a>
-                        ) : null}
-                        <a href={`tel:${c.phone.replace(/\s/g, "")}`}
-                          className="inline-flex items-center rounded-full bg-[var(--color-surface)] px-2.5 py-1 text-2xs font-semibold text-[var(--color-ink)] ring-1 ring-[var(--color-line)] hover:brightness-95">
-                          {c.phone}
+                        <a href={`https://wa.me/${digits}`} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-full bg-[var(--color-good-soft)] px-2.5 py-1 text-2xs font-semibold text-[#1d6b4c] hover:brightness-95">
+                          <MessageCircle className="size-3" /> WhatsApp
+                        </a>
+                        <a href={`tel:${c.phone!.replace(/\s/g, "")}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface)] px-2.5 py-1 text-2xs font-semibold text-[var(--color-ink)] ring-1 ring-[var(--color-line)] hover:brightness-95">
+                          <Phone className="size-3" /> Bellen
                         </a>
                       </div>
-                    ) : (
-                      <div className="mt-1 text-2xs text-[var(--color-ink-muted)]">Telefoonnummer nog niet bekend</div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );

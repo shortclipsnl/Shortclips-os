@@ -146,9 +146,14 @@ export default async function TeamPage() {
         ) : null}
 
         {p.availabilityNote ? (
-          <p className="mt-2 w-full rounded-[var(--radius-sm)] bg-[var(--color-warn-soft)] px-2.5 py-1.5 text-2xs leading-snug text-[#8a5300]">
-            <span className="font-semibold">Niet beschikbaar:</span> {p.availabilityNote}
-          </p>
+          <div className="mt-2 w-full rounded-[var(--radius-sm)] bg-[var(--color-warn-soft)] px-2.5 py-1.5 text-left text-2xs leading-snug text-[#8a5300]">
+            <span className="font-semibold">Niet beschikbaar:</span>
+            <ul className="mt-0.5 space-y-0.5">
+              {p.availabilityNote.split("\n").map((s) => s.trim()).filter(Boolean).map((it, i) => (
+                <li key={i} className="flex items-start gap-1.5"><span className="mt-1 size-1 shrink-0 rounded-full bg-[#8a5300]" />{it}</li>
+              ))}
+            </ul>
+          </div>
         ) : null}
 
         {canWrite ? (

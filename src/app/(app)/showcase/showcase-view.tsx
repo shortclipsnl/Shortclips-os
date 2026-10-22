@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Volume2, VolumeX } from "lucide-react";
 import { AWARD_TIERS } from "@/server/awards/config";
@@ -13,6 +13,31 @@ const HEX = "50,1 99,25 99,75 50,99 1,75 1,25";
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
+}
+
+/** Telt het grote getal omhoog wanneer je de pagina opent (beweging). */
+function CountUp({ value }: { value: number }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    // Geen animatie bij reduced-motion of als het tabblad niet zichtbaar is
+    // (dan telt requestAnimationFrame niet en zou het op 0 blijven staan).
+    if (typeof window !== "undefined" && (window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.hidden)) {
+      setN(value);
+      return;
+    }
+    const duration = 900;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setN(Math.round(value * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{n.toLocaleString("nl-NL")}</>;
 }
 
 export function ShowcaseView({
@@ -63,7 +88,7 @@ export function ShowcaseView({
 
       {/* a) Teller */}
       <section className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-6 text-center shadow-[var(--shadow-card)]">
-        <div className="text-5xl font-bold tracking-tight tabular-nums text-[var(--color-ink)]">{count}</div>
+        <div className="text-5xl font-bold tracking-tight tabular-nums text-[var(--color-ink)]"><CountUp value={count} /></div>
         <div className="mt-0.5 text-sm font-medium text-[var(--color-ink-muted)]">shorts opgeleverd</div>
         <p className="mx-auto mt-1 max-w-sm text-2xs text-[var(--color-ink-faint)]">Telt automatisch mee zodra een video is goedgekeurd door de klant.</p>
         <div className="mx-auto mt-4 grid max-w-md grid-cols-3 gap-2">

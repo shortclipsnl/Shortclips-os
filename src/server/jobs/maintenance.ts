@@ -586,10 +586,11 @@ export async function runCleaningFridayReminder() {
       return;
     }
 
+    // Milou en Jiska op e-mail (Jiska is geen projectcoördinator maar hoort er wel bij).
     const coords = await db
       .select({ id: users.id })
       .from(users)
-      .where(and(isNull(users.deletedAt), eq(users.status, "active"), eq(users.primaryRole, "project_coordinator")));
+      .where(and(isNull(users.deletedAt), eq(users.status, "active"), inArray(sql`lower(${users.email})`, ["milou@shortclips.nl", "jiska@shortclips.nl"])));
 
     const fri = day(0);
     for (const c of coords) {

@@ -113,14 +113,13 @@ export async function getEditorDashboard(viewer: Viewer) {
 
     db.select({ note: users.availabilityNote }).from(users).where(eq(users.id, viewer.id)).limit(1),
 
-    // Contactpersonen bij ShortClips voor de editor: de projectcoördinatoren
-    // (Milou, Jiska). Met foto en telefoon, zodat de editor ze makkelijk kan
-    // bereiken via WhatsApp of bellen.
+    // Vaste contactpersonen bij ShortClips voor de editor: Milou en Jiska. Op
+    // e-mail opgehaald (niet op rol), want Jiska is geen projectcoördinator maar
+    // hoort hier wél bij.
     db
       .select({ id: users.id, fullName: users.fullName, email: users.email, avatarUrl: users.avatarUrl, phone: users.phone })
       .from(users)
-      .where(and(isNull(users.deletedAt), eq(users.status, "active"), eq(users.primaryRole, "project_coordinator")))
-      .orderBy(asc(users.fullName))
+      .where(and(isNull(users.deletedAt), eq(users.status, "active"), inArray(sql`lower(${users.email})`, ["milou@shortclips.nl", "jiska@shortclips.nl"])))
       .limit(4),
   ]);
 
