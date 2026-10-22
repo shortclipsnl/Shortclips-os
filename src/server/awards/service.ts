@@ -1,10 +1,10 @@
 import "server-only";
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { deliverables, editorAwards, users } from "@/db/schema";
+import { deliverables, editorAwards, editorPreferences, users } from "@/db/schema";
 import { notify } from "@/server/notifications";
-import { awardByKey } from "./config";
-import { computeEarnedAwards, type Delivery, type EarnedAward } from "./compute";
+import { awardByKey, AWARD_COUNT } from "./config";
+import { computeEarnedAwards, nextAward, type Delivery, type EarnedAward } from "./compute";
 
 /** Statussen die "klantgoedgekeurd of afgerond" betekenen (gelijk aan editing.ts). */
 export const AWARD_DONE_STATUSES = ["approved", "ready_to_publish", "scheduled", "published", "analysis_available"] as const;
@@ -79,6 +79,97 @@ export async function recordAwardsSafe(editorUserId: string | null): Promise<voi
   } catch {
     /* awards mogen een goedkeuring nooit blokkeren; het nachtelijke vangnet herstelt */
   }
+}
+
+export type ShowcaseEarned = { awardKey: string; achievedAt: string };
+export type ShowcaseData = {
+  editorId: string;
+  editorName: string;
+  count: number;
+  thisMonth: number;
+  clientCount: number;
+  earnedCount: number;
+  totalAwards: number;
+  earned: ShowcaseEarned[];
+  awardSound: boolean;
+  /** "december 2026" of null als er te weinig data is of alles behaald is. */
+  projectionMonth: string | null;
+};
+
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth()}`;
+}
+
+/** Verwachte maand voor de volgende award op basis van de laatste 3 maanden. Null bij <2 maanden data of geen tempo. */
+function projectNextAward(count: number, dates: Date[], now: Date): string | null {
+  const next = nextAward(count);
+  if (!next) return null;
+  const distinctMonths = new Set(dates.map(monthKey)).size;
+  if (distinctMonths < 2) return null;
+  const since = new Date(now);
+  since.setDate(since.getDate() - 90);
+  const recent = dates.filter((d) => d >= since).length;
+  const perMonth = recent / 3;
+  if (perMonth <= 0) return null;
+  const remaining = next.threshold - count;
+  const monthsNeeded = Math.ceil(remaining / perMonth);
+  const target = new Date(now);
+  target.setMonth(target.getMonth() + monthsNeeded);
+  return target.toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
+}
+
+/** Alle data voor de Showcase van één editor. */
+export async function getShowcase(editorUserId: string, now = new Date()): Promise<ShowcaseData> {
+  const rows = await db
+    .select({ clientId: deliverables.clientId, approvedAt: deliverables.approvedAt, statusChangedAt: deliverables.statusChangedAt })
+    .from(deliverables)
+    .where(and(eq(deliverables.editorId, editorUserId), isNull(deliverables.deletedAt), inArray(deliverables.status, [...AWARD_DONE_STATUSES])));
+  const dated = rows.map((r) => ({ clientId: r.clientId, date: r.approvedAt ?? r.statusChangedAt }));
+  const count = dated.length;
+  const thisMonth = dated.filter((d) => monthKey(d.date) === monthKey(now)).length;
+  const clientCount = new Set(dated.map((d) => d.clientId)).size;
+
+  const earnedRows = await db.select({ awardKey: editorAwards.awardKey, achievedAt: editorAwards.achievedAt }).from(editorAwards).where(eq(editorAwards.editorId, editorUserId));
+  const earned = earnedRows.map((e) => ({ awardKey: e.awardKey, achievedAt: e.achievedAt.toISOString() }));
+
+  const [editor] = await db.select({ name: users.fullName }).from(users).where(eq(users.id, editorUserId)).limit(1);
+  const [pref] = await db.select({ s: editorPreferences.awardSound }).from(editorPreferences).where(eq(editorPreferences.userId, editorUserId)).limit(1);
+
+  return {
+    editorId: editorUserId,
+    editorName: editor?.name ?? "",
+    count,
+    thisMonth,
+    clientCount,
+    earnedCount: earned.length,
+    totalAwards: AWARD_COUNT,
+    earned,
+    awardSound: pref?.s ?? true,
+    projectionMonth: projectNextAward(count, dated.map((d) => d.date), now),
+  };
+}
+
+/** Editors voor de keuzelijst in de teamweergave. */
+export async function listShowcaseEditors(): Promise<{ id: string; name: string }[]> {
+  const rows = await db
+    .select({ id: users.id, name: users.fullName })
+    .from(users)
+    .where(and(isNull(users.deletedAt), eq(users.status, "active"), eq(users.primaryRole, "editor")))
+    .orderBy(users.fullName);
+  return rows;
+}
+
+/** De nog niet gevierde award met de hoogste drempel (voor de vieringskaart). Null als er niets te vieren is. */
+export async function getPendingCelebration(editorUserId: string): Promise<{ awardKey: string } | null> {
+  const rows = await db.select({ awardKey: editorAwards.awardKey }).from(editorAwards).where(and(eq(editorAwards.editorId, editorUserId), isNull(editorAwards.celebratedAt)));
+  if (rows.length === 0) return null;
+  // hoogste drempel kiezen
+  let best: { awardKey: string; threshold: number } | null = null;
+  for (const r of rows) {
+    const tier = awardByKey(r.awardKey);
+    if (tier && (!best || tier.threshold > best.threshold)) best = { awardKey: r.awardKey, threshold: tier.threshold };
+  }
+  return best ? { awardKey: best.awardKey } : null;
 }
 
 /** Nachtelijk vangnet + backfill: herbereken awards voor elke editor met opgeleverde video's. */

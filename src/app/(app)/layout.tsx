@@ -16,10 +16,10 @@ export default async function AppLayout({
   // Navigatie tonen op basis van rechten: geen menu-items die tot een
   // foutmelding leiden.
   const owner = isOwner(viewer);
-  // Een editor ziet alleen wat hij nodig heeft: Vandaag en Editing (zijn eigen
-  // projecten). Onze klanten en Productieplanning heeft hij niet nodig.
+  // Een editor ziet alleen wat hij nodig heeft: Vandaag, Editing (zijn eigen
+  // projecten) en Showcase (zijn awards). Onze klanten en Productieplanning niet.
   const editorOnly = viewer.primaryRole === "editor";
-  const EDITOR_NAV = new Set(["/dashboard", "/videos"]);
+  const EDITOR_NAV = new Set(["/dashboard", "/videos", "/showcase"]);
   const groups = NAVIGATION.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
