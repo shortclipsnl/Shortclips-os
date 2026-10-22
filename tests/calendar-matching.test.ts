@@ -62,6 +62,18 @@ describe("soort afspraak herkennen", () => {
   it("leidt publicatie af uit de agenda 'Klant Content uploaden'", () => {
     expect(classifyAppointment("Reel 3", "Klant Content uploaden")).toBe("publicatie");
   });
+  it("herkent '<klant> <aantal> shorts' als opname (ook zonder het woord opname)", () => {
+    expect(classifyAppointment("10:00 - 3 Shorts Auto Christiaan")).toBe("opname");
+    expect(classifyAppointment("9:00 - 4 shorts - CB automobielen")).toBe("opname");
+    expect(classifyAppointment("Donkergroen 6 video's")).toBe("opname");
+  });
+  it("ziet een overleg óver shorts niet als opname", () => {
+    // Afstemmings-/overlegafspraken die toevallig een aantal shorts noemen,
+    // zijn geen opnamedag.
+    expect(classifyAppointment("8 shorts - Q4 + afstemmen datums Q1 2027")).toBe("overig");
+    expect(classifyAppointment("Online meeting AI2 X Shortclips - 8 shorts")).toBe("overig");
+    expect(classifyAppointment("3 shorts online zetten")).toBe("publicatie");
+  });
   it("valt terug op 'overig' zonder duidelijke aanwijzing", () => {
     expect(classifyAppointment("Teamoverleg")).toBe("overig");
   });

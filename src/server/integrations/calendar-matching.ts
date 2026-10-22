@@ -133,9 +133,18 @@ const TYPE_RULES: Array<{ kind: AppointmentKind; pattern: RegExp }> = [
   { kind: "publicatie", pattern: /\b(publicatie\w*|online\s*(zetten|gezet)|gaat\s*online|short\s*online|online\s*[>:]|uploaden|geupload|plaatsen|posten|gepost)\b/i },
 ];
 
+// Sommige opnames worden niet "opname" genoemd maar als "<klant> <aantal>
+// shorts" (bijv. "3 Shorts Auto Christiaan", "4 shorts CB automobielen").
+// Een aantal gevolgd door shorts/video's/reels/clips telt daarom ook als opname.
+const SHORTS_COUNT = /\b\d+\s*(shorts?|video'?s?|reels?|clips?)\b/i;
+// ... maar niet als de titel juist een overleg/afstemming of een publicatie is
+// (dan gaat het over shorts, maar is het geen opnamedag).
+const NOT_A_SHOOT = /\b(meeting|overleg|call|bespreking|afstem\w*|strategie|kick\s*-?\s*off|evaluatie|online|upload\w*|geupload|plaatsen|posten|gepost|publicatie\w*)\b/i;
+
 export function classifyAppointment(title?: string | null, calendarSummary?: string | null): AppointmentKind {
   if (calendarSummary && /content\s*uploaden/i.test(calendarSummary)) return "publicatie";
   const text = `${title ?? ""} ${calendarSummary ?? ""}`;
+  if (SHORTS_COUNT.test(text) && !NOT_A_SHOOT.test(text)) return "opname";
   for (const rule of TYPE_RULES) if (rule.pattern.test(text)) return rule.kind;
   return "overig";
 }
