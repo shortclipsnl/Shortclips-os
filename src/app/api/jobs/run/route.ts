@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 import { runCleaningFridayReminder, runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runDailyTeamTodoReminder, runEditorDeadlineReminders, runEditorFridayWrapUp, runFinanceMonthReminder, runHourlySignals, runPostShootTodoReminders, runScriptTodoReminders, runTaskDeadlineReminders, runVrijdagcheckNotification } from "@/server/jobs/maintenance";
 import { runGoalsRecompute, runGoalsSeed } from "@/server/jobs/goals-job";
+import { runAwardsRecompute } from "@/server/jobs/awards-job";
 import {
   inspectFrameProject,
   listFrameProjects,
@@ -65,6 +66,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "reminders.cleaning_friday": runCleaningFridayReminder,
   "goals.recompute": runGoalsRecompute,
   "goals.seed": runGoalsSeed,
+  "awards.recompute": runAwardsRecompute,
   "vrijdagcheck.notify": runVrijdagcheckNotification,
   "finance.month_reminder": runFinanceMonthReminder,
   "signals.hourly": runHourlySignals,

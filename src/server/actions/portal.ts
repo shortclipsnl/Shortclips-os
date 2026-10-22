@@ -9,6 +9,7 @@ import { ForbiddenError, requirePortal } from "@/server/auth/context";
 import { auditLog, recordActivity } from "@/server/audit";
 import { dispatch } from "@/server/automation";
 import { syncContentForDeliverable } from "@/server/content-sync";
+import { recordAwardsSafe } from "@/server/awards/service";
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -25,7 +26,7 @@ export async function approveVideo(videoId: string): Promise<ActionResult> {
     const viewer = await requirePortal();
 
     const [video] = await db
-      .select({ id: deliverables.id, clientId: deliverables.clientId, title: deliverables.title, status: deliverables.status })
+      .select({ id: deliverables.id, clientId: deliverables.clientId, title: deliverables.title, status: deliverables.status, editorId: deliverables.editorId })
       .from(deliverables)
       .where(and(eq(deliverables.id, videoId), eq(deliverables.clientId, viewer.clientId!)))
       .limit(1);
@@ -39,6 +40,9 @@ export async function approveVideo(videoId: string): Promise<ActionResult> {
       .update(deliverables)
       .set({ status: "approved", statusChangedAt: new Date(), approvedAt: new Date() })
       .where(eq(deliverables.id, videoId));
+
+    // Showcase: awards van de editor bijwerken (nooit blokkerend).
+    await recordAwardsSafe(video.editorId);
 
     await db
       .update(approvals)

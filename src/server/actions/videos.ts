@@ -24,6 +24,7 @@ import { syncContentForDeliverable } from "@/server/content-sync";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { VIDEO_STAGES, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
+import { AWARD_DONE_STATUSES, recordAwardsSafe } from "@/server/awards/service";
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -212,6 +213,12 @@ export async function changeVideoStatus(
     if (nextStatus === "published") patch.publishedAt = new Date();
 
     await db.update(deliverables).set(patch).where(eq(deliverables.id, videoId));
+
+    // Showcase: awards van de editor bijwerken zodra de video klantgoedgekeurd of
+    // afgerond is (nooit blokkerend; het nachtelijke vangnet herstelt).
+    if ((AWARD_DONE_STATUSES as readonly string[]).includes(nextStatus)) {
+      await recordAwardsSafe(video.editorId);
+    }
 
     const label = VIDEO_STATUS[nextStatus as VideoStage]?.label ?? nextStatus;
     await Promise.all([
