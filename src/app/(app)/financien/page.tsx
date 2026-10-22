@@ -27,8 +27,14 @@ export default async function FinancienPage() {
   // (defense-in-depth), náást de finance:read-check in getManagementFinance.
   await requireOwner();
   const [d, capacity] = await Promise.all([getManagementFinance(), getCapacityOverview()]);
-  // Omzetgrafiek: laatste 12 maanden, in volgorde.
-  const chartMonths = d.months.slice(-12);
+  // Omzetgrafiek: laatste 12 maanden, in volgorde. Bij voorkeur de echte
+  // gefactureerde omzet uit de boekhouding (Digiboox) — die is per maand gevuld;
+  // alleen als die er nog niet is vallen we terug op de contract-maandstaten.
+  const chartFromBook = d.book.hasData;
+  const chartMonths = (chartFromBook
+    ? d.book.months.map((m) => ({ period: m.period, income: m.revenue }))
+    : d.months.map((m) => ({ period: m.period, income: m.income }))
+  ).slice(-12);
   const maxOmzet = Math.max(1, ...chartMonths.map((m) => m.income));
   // Parameters voor de groeisimulator (verplaatst vanaf Teamcapaciteit).
   const capParam = new Map(capacity.params.map((p) => [p.key, p.value ?? 0]));
@@ -49,7 +55,7 @@ export default async function FinancienPage() {
       {/* Omzet per maand — als grafiek, zodat de trend in één oogopslag scanbaar is. */}
       {chartMonths.length > 0 ? (
         <Card className="mb-6">
-          <CardHeader title="Omzet per maand" subtitle={`Gefactureerde omzet per maand — de laatste ${chartMonths.length} maanden in één oogopslag.`} />
+          <CardHeader title="Omzet per maand" subtitle={`${chartFromBook ? "Gefactureerde omzet uit de boekhouding (Digiboox)" : "Omzet uit de contract-maandstaten"} — de laatste ${chartMonths.length} maanden in één oogopslag.`} />
           <div className="mt-4 flex h-44 items-end gap-2 sm:gap-3">
             {chartMonths.map((m) => {
               const h = Math.max(2, Math.round((m.income / maxOmzet) * 92));

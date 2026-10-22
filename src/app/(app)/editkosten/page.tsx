@@ -138,10 +138,14 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
         db.execute(sql`
           select u.id, u.full_name as name, u.avatar_url,
             count(*)::int videos,
-            coalesce(sum(case when d.edit_cost > 0 then d.edit_cost else coalesce(c.edit_cost_per_video,0) end),0)::float total
+            -- Editkosten = wat we de editor betalen: afwijkend tarief op de video
+            -- indien gezet, anders het eigen tarief van de editor (editor_rates),
+            -- en als laatste terugval het klanttarief.
+            coalesce(sum(coalesce(nullif(d.edit_cost,0), er.rate_per_video, c.edit_cost_per_video, 0)),0)::float total
           from deliverables d
           join users u on u.id = d.editor_id
           join clients c on c.id = d.client_id and c.deleted_at is null
+          left join editor_rates er on er.user_id = d.editor_id
           where d.deleted_at is null and d.editor_id is not null
             and d.status in ('published','approved','scheduled','ready_to_publish','analysis_available')
             and to_char((coalesce(d.published_at, d.status_changed_at)) at time zone 'Europe/Amsterdam', 'YYYY-MM') = ${selPeriod}
@@ -282,7 +286,7 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
               );
             })}
           </Table>
-          <p className="px-5 py-3 text-xs text-[var(--color-ink-muted)]">Op basis van de video&apos;s die deze maand zijn opgeleverd (gepubliceerd of goedgekeurd). Prijs per video = een afwijkend tarief op de video indien gezet, anders het afgesproken tarief van de klant.</p>
+          <p className="px-5 py-3 text-xs text-[var(--color-ink-muted)]">Op basis van de video&apos;s die deze maand zijn opgeleverd (gepubliceerd of goedgekeurd). Prijs per video = afwijkend tarief op de video indien gezet, anders het eigen tarief van de editor (zoals Senna €40), anders het klanttarief.</p>
         </Card>
       ) : null}
     </div>
