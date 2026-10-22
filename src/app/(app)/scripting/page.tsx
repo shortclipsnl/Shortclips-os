@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Sparkles, CalendarClock, FileClock, AlarmClock, AlertTriangle } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { listScripting } from "@/server/scripting";
+import { upcomingScriptAppointments } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { Card, CardHeader, ClientLogo, PageHeader, Stat, TeamAvatar } from "@/components/ui";
 import { ScriptingBoard } from "./scripting-ui";
@@ -17,6 +18,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
   await syncCalendarIfStale();
   const canWrite = viewer.permissions.has("scripts:write");
   const { rows, stats, clientOptions, writerOptions, clientResponsibles } = await listScripting(viewer);
+  const scriptAppts = await upcomingScriptAppointments();
   const filter = (await searchParams).filter;
 
   return (
@@ -38,6 +40,28 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
         <Link href="/video-intelligence" className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-brand-600)] hover:underline">
           <Sparkles className="size-4" /> Video-patronen per klant bekijken (input voor je script)
         </Link>
+      ) : null}
+
+      {/* Script-afspraken uit de Google-agenda (automatisch herkend en gekoppeld). */}
+      {scriptAppts.length > 0 ? (
+        <Card padded={false} className="mb-5">
+          <CardHeader title="Aankomende script-afspraken" subtitle="Uit de agenda herkend en aan de klant gekoppeld. Tot en met eind dit jaar." className="p-5 pb-2" />
+          <ul className="divide-y divide-[var(--color-line)]">
+            {scriptAppts.map((a) => (
+              <li key={a.id} className="flex items-center gap-3 px-5 py-2.5">
+                <ClientLogo name={a.clientName} logoUrl={a.clientLogo} color={a.clientColor} size={22} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{a.title || "Script-afspraak"}</span>
+                  <span className="block truncate text-2xs text-[var(--color-ink-muted)]">{a.clientName}</span>
+                </span>
+                <span className="shrink-0 text-right text-xs tabular-nums text-[var(--color-ink-muted)]">
+                  {new Date(a.startsAt).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" })}
+                  {!a.allDay ? <span className="block text-2xs text-[var(--color-ink-faint)]">{new Date(a.startsAt).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}</span> : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
       ) : null}
 
       {/* key op de actieve filter: zo herstart het board met de juiste filter

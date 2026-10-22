@@ -142,7 +142,11 @@ export type CalendarSyncOptions = {
 export async function runCalendarSync(options: CalendarSyncOptions = {}) {
   const source = options.source ?? (googleCalendar as CalendarSource);
   const back = options.windowDaysBack ?? 30;
-  const forward = options.windowDaysForward ?? 120;
+  // Standaard vooruit tot minstens eind dit jaar (en altijd minimaal ~4 maanden),
+  // zodat afspraken t/m 31 december altijd mee worden genomen — ook als de sync
+  // vroeg in het jaar draait.
+  const daysToEndOfYear = Math.ceil((new Date(new Date().getFullYear(), 11, 31, 23, 59).getTime() - Date.now()) / 86_400_000);
+  const forward = options.windowDaysForward ?? Math.max(120, daysToEndOfYear + 7);
 
   return runJob(
     "google_calendar",

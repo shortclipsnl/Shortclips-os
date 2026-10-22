@@ -1,9 +1,53 @@
 import "server-only";
-import { and, asc, eq, gte, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, lte, ne, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { calendarEvents, clients } from "@/db/schema";
 
 export type Appointment = typeof calendarEvents.$inferSelect;
+
+export type ScriptAppointment = {
+  id: string;
+  title: string | null;
+  startsAt: Date;
+  allDay: boolean;
+  clientName: string;
+  clientSlug: string;
+  clientColor: string | null;
+  clientLogo: string | null;
+};
+
+/**
+ * Aankomende script-afspraken uit de agenda (klantgekoppeld), t/m eind dit jaar.
+ * Voor de Scripting-pagina: zo ziet het team welke scriptbesprekingen eraan komen.
+ */
+export async function upcomingScriptAppointments(limit = 40): Promise<ScriptAppointment[]> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59);
+  return db
+    .select({
+      id: calendarEvents.id,
+      title: calendarEvents.title,
+      startsAt: calendarEvents.startsAt,
+      allDay: calendarEvents.allDay,
+      clientName: clients.name,
+      clientSlug: clients.slug,
+      clientColor: clients.color,
+      clientLogo: clients.logoUrl,
+    })
+    .from(calendarEvents)
+    .innerJoin(clients, eq(clients.id, calendarEvents.clientId))
+    .where(
+      and(
+        eq(calendarEvents.kind, "scriptbespreking"),
+        gte(calendarEvents.startsAt, today),
+        lte(calendarEvents.startsAt, endOfYear),
+        or(isNull(calendarEvents.status), ne(calendarEvents.status, "cancelled")),
+      ),
+    )
+    .orderBy(asc(calendarEvents.startsAt))
+    .limit(limit);
+}
 
 /** Komende afspraken van één klant (voor het portaal en de klantpagina). */
 export async function upcomingAppointmentsForClient(

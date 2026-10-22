@@ -123,9 +123,14 @@ const TYPE_RULES: Array<{ kind: AppointmentKind; pattern: RegExp }> = [
   // opname\w* vangt alle opname-varianten (de oude \bopname\b miste juist
   // "opnamesessie"). "sessie" los wordt ook als opname gelezen.
   { kind: "opname", pattern: /\b(opname\w*|draaidag|shoot ?day|shoot|filmdag|filmen|sessie)\b/i },
-  { kind: "scriptbespreking", pattern: /\b(script(bespreking|overleg)?|conceptbespreking)\b/i },
-  { kind: "evaluatie", pattern: /\b(evaluatie(gesprek)?|voortgangsgesprek|kwartaalgesprek|review ?gesprek)\b/i },
-  { kind: "publicatie", pattern: /\b(publicatie|online zetten|uploaden|plaatsen|posten)\b/i },
+  // script\w* vangt "script", "scripts", "scriptbespreking", "scriptoverleg",
+  // "scripten" — de oude \bscript\b miste juist het meervoud "scripts".
+  { kind: "scriptbespreking", pattern: /\b(script\w*|conceptbespreking)\b/i },
+  { kind: "evaluatie", pattern: /\b(evaluatie\w*|voortgangsgesprek|kwartaalgesprek|review ?gesprek)\b/i },
+  // Publicatie/online: "publicatie", "online zetten/gaat online/short online",
+  // "uploaden", "plaatsen", "posten". Bewust niet het losse "online" (dat zit ook
+  // in "online meeting"); wel "short online" en "... online >" uit de agenda.
+  { kind: "publicatie", pattern: /\b(publicatie\w*|online\s*(zetten|gezet)|gaat\s*online|short\s*online|online\s*[>:]|uploaden|geupload|plaatsen|posten|gepost)\b/i },
 ];
 
 export function classifyAppointment(title?: string | null, calendarSummary?: string | null): AppointmentKind {

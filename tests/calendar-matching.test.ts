@@ -51,6 +51,14 @@ describe("soort afspraak herkennen", () => {
     expect(classifyAppointment("Evaluatiegesprek Q3")).toBe("evaluatie");
     expect(classifyAppointment("Video online zetten")).toBe("publicatie");
   });
+  it("herkent het meervoud 'scripts' als scriptbespreking (was eerder 'overig')", () => {
+    expect(classifyAppointment("Autochristiaan scripts in bestand - 9 november")).toBe("scriptbespreking");
+    expect(classifyAppointment("Scripts schrijven Donkergroen")).toBe("scriptbespreking");
+  });
+  it("herkent 'short online' als publicatie, maar een online meeting niet", () => {
+    expect(classifyAppointment("Marco van beek short online > 16:00")).toBe("publicatie");
+    expect(classifyAppointment("Online meeting met lead")).toBe("overig");
+  });
   it("leidt publicatie af uit de agenda 'Klant Content uploaden'", () => {
     expect(classifyAppointment("Reel 3", "Klant Content uploaden")).toBe("publicatie");
   });
