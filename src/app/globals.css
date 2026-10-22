@@ -427,3 +427,12 @@ body {
   .award-shine, .award-sparkle { animation: none; display: none; }
   .award-badge-wrap.earned { transition: none; }
 }
+
+/* Award-viering: de badge draait tevoorschijn. */
+.award-reveal { display: inline-block; transform-origin: center; animation: award-reveal 600ms ease-out; }
+@keyframes award-reveal {
+  0% { transform: perspective(500px) rotateY(90deg) scale(0.6); opacity: 0; }
+  60% { transform: perspective(500px) rotateY(-12deg) scale(1.08); opacity: 1; }
+  100% { transform: perspective(500px) rotateY(0deg) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) { .award-reveal { animation: none; } }

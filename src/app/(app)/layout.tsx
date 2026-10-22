@@ -5,6 +5,8 @@ import { Topbar } from "@/components/layout/topbar";
 import { AssistantWidget } from "@/components/ai/assistant-widget";
 import { NotificationPopper } from "@/components/notifications/notification-popper";
 import { aiConfigured } from "@/server/ai/client";
+import { getCelebrationContext } from "@/server/awards/service";
+import { CelebrationGate } from "@/app/(app)/showcase/celebration-gate";
 
 export default async function AppLayout({
   children,
@@ -20,6 +22,8 @@ export default async function AppLayout({
   // projecten) en Showcase (zijn awards). Onze klanten en Productieplanning niet.
   const editorOnly = viewer.primaryRole === "editor";
   const EDITOR_NAV = new Set(["/dashboard", "/videos", "/showcase"]);
+  // Vieringskaart bij binnenkomst (alleen editors kunnen awards hebben).
+  const celebration = editorOnly ? await getCelebrationContext(viewer.id) : null;
   const groups = NAVIGATION.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
@@ -61,6 +65,9 @@ export default async function AppLayout({
       {/* Nieuwe meldingen poppen rechtsboven op met een geluidje — voor het hele
           team én editors, zodat ze opvallen. */}
       <NotificationPopper viewerId={viewer.id} />
+
+      {/* Award-viering bij binnenkomst (eenmalig, tot de editor opent). */}
+      <CelebrationGate context={celebration} />
     </div>
   );
 }

@@ -172,6 +172,22 @@ export async function getPendingCelebration(editorUserId: string): Promise<{ awa
   return best ? { awardKey: best.awardKey } : null;
 }
 
+export type CelebrationContext = { awardKey: string; firstName: string; awardSound: boolean; nextRemaining: number | null };
+
+/** Context voor de vieringskaart bij binnenkomst: null als er niets te vieren is. */
+export async function getCelebrationContext(viewerId: string, now = new Date()): Promise<CelebrationContext | null> {
+  const pending = await getPendingCelebration(viewerId);
+  if (!pending) return null;
+  const data = await getShowcase(viewerId, now);
+  const next = nextAward(data.count);
+  return {
+    awardKey: pending.awardKey,
+    firstName: data.editorName.split(" ")[0] || "editor",
+    awardSound: data.awardSound,
+    nextRemaining: next ? next.threshold - data.count : null,
+  };
+}
+
 /** Nachtelijk vangnet + backfill: herbereken awards voor elke editor met opgeleverde video's. */
 export async function recomputeAllAwards(now = new Date()): Promise<{ editors: number; newAwards: number }> {
   const editors = await db

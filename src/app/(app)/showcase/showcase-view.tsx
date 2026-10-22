@@ -7,6 +7,7 @@ import { AWARD_TIERS } from "@/server/awards/config";
 import type { ShowcaseData } from "@/server/awards/service";
 import { setAwardSound } from "@/server/actions/awards";
 import { AwardBadge } from "./award-badge";
+import { Celebration } from "./celebration";
 
 const HEX = "50,1 99,25 99,75 50,99 1,75 1,25";
 
@@ -28,6 +29,7 @@ export function ShowcaseView({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [sound, setSound] = useState(data.awardSound);
+  const [replayKey, setReplayKey] = useState<string | null>(null);
 
   const earnedMap = new Map(data.earned.map((e) => [e.awardKey, e.achievedAt]));
   const count = data.count;
@@ -116,9 +118,15 @@ export function ShowcaseView({
             const alt = earned ? `${tier.name}, behaald ${fmtDate(achievedAt!)}` : `${tier.name}, nog ${tier.threshold - count} shorts`;
             return (
               <li key={tier.key} className="flex flex-col items-center gap-2 text-center">
-                <span role="img" aria-label={alt}>
-                  <AwardBadge tier={tier} earned={earned} delayIndex={i} sparkle={tier.key === "legend"} />
-                </span>
+                {earned ? (
+                  <button type="button" onClick={() => setReplayKey(tier.key)} aria-label={`${alt}. Speel de viering opnieuw af.`} className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-brand-500)]">
+                    <AwardBadge tier={tier} earned delayIndex={i} sparkle={tier.key === "legend"} />
+                  </button>
+                ) : (
+                  <span role="img" aria-label={alt}>
+                    <AwardBadge tier={tier} earned={false} delayIndex={i} />
+                  </span>
+                )}
                 <div>
                   <div className="text-xs font-semibold text-[var(--color-ink)]">{tier.name}</div>
                   <div className="text-2xs text-[var(--color-ink-muted)]">{tier.threshold} shorts</div>
@@ -163,6 +171,18 @@ export function ShowcaseView({
           {sound ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
           Geluid bij awards {sound ? "aan" : "uit"}
         </button>
+      ) : null}
+
+      {/* Viering opnieuw afspelen vanaf een behaalde badge. */}
+      {replayKey ? (
+        <Celebration
+          awardKey={replayKey}
+          firstName={firstName}
+          nextRemaining={nextTier ? nextTier.threshold - count : null}
+          awardSound={sound}
+          mode="replay"
+          onClose={() => setReplayKey(null)}
+        />
       ) : null}
     </div>
   );
