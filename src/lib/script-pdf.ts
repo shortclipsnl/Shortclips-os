@@ -79,8 +79,10 @@ function drawFullPage(page: { drawImage: (img: PDFImage, o: { x: number; y: numb
 
 export async function buildScriptPdfBytes(input: ScriptPdfInput, load: TemplateImageLoader): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
+  // Helvetica is de standaard Arial-vervanger in PDF (vrijwel identieke letter).
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
 
   // Alle sjabloonafbeeldingen die we nodig hebben één keer inbedden.
   const needed = [...FRONT_PAGES, SCRIPT_PAGE, ...BACK_PAGES];
@@ -107,12 +109,12 @@ export async function buildScriptPdfBytes(input: ScriptPdfInput, load: TemplateI
 
   // ---- Scriptpagina's (sjabloonpagina 6 herhaald). ----
   const scriptImg = images.get(SCRIPT_PAGE)!;
-  for (const s of input.scripts) {
+  input.scripts.forEach((s, i) => {
     const page = doc.addPage([PAGE_W, PAGE_H]);
     drawFullPage(page, scriptImg);
 
-    // Onderwerp (wit, vet) op de navy band. Krimpt tot het binnen twee regels past.
-    const title = cleanTitle(s.onderwerp) || "Script";
+    // Genummerde titel (wit, vet) op de navy band: "1. <titel>". Krimpt tot 2 regels.
+    const title = `${i + 1}. ${cleanTitle(s.onderwerp) || "Script"}`;
     let titleSize = 22;
     let titleLines = wrapLine(title, bold, titleSize, SCRIPT_TITLE.maxW);
     while (titleLines.length > 2 && titleSize > 14) {
@@ -125,38 +127,44 @@ export async function buildScriptPdfBytes(input: ScriptPdfInput, load: TemplateI
       ty -= titleSize * 1.15;
     }
 
-    // Scripttekst in de witte body. Koppen in hoofdletters worden navy + vet.
+    // Scripttekst. Koppen (HOOFDLETTERS) worden navy + vet; de tekst onder
+    // SHORTCLIP UITLEG wordt volledig schuingedrukt; de rest staat normaal.
     const rawLines = (s.tekst || "").replace(/\r/g, "").split("\n");
-    const available = (PAGE_H - SCRIPT_BODY.topY) - SCRIPT_BODY.bottomY;
+    // Bepaal per regel het lettertype: koppen vet, uitleg-tekst cursief, rest normaal.
+    let section = "";
+    const styled = rawLines.map((raw) => {
+      const t = raw.trim();
+      if (t === "") return { text: "", f: font, color: BODY, heading: false };
+      if (isHeading(t)) { section = t.toUpperCase(); return { text: t, f: bold, color: NAVY, heading: true }; }
+      const uitleg = section.startsWith("SHORTCLIP UITLEG");
+      return { text: t, f: uitleg ? italic : font, color: BODY, heading: false };
+    });
 
-    // Bepaal lettergrootte zodat alle regels passen (auto-fit, min 8pt).
-    let bodySize = 11;
+    const available = (PAGE_H - SCRIPT_BODY.topY) - SCRIPT_BODY.bottomY;
+    // Lettergrootte zo kiezen dat alles past (auto-fit, min 8pt).
     const fit = (size: number) => {
       const lh = size * 1.32;
       let count = 0;
-      for (const raw of rawLines) {
-        if (raw.trim() === "") { count += 0.6; continue; }
-        const f = isHeading(raw) ? bold : font;
-        count += wrapLine(raw.trim(), f, size, SCRIPT_BODY.maxW).length;
+      for (const l of styled) {
+        if (l.text === "") { count += 0.6; continue; }
+        count += wrapLine(l.text, l.f, size, SCRIPT_BODY.maxW).length;
       }
       return count * lh;
     };
+    let bodySize = 11;
     while (bodySize > 8 && fit(bodySize) > available) bodySize -= 0.5;
     const lh = bodySize * 1.32;
 
     let by = PAGE_H - SCRIPT_BODY.topY - bodySize;
-    for (const raw of rawLines) {
-      if (raw.trim() === "") { by -= lh * 0.6; continue; }
-      const heading = isHeading(raw);
-      const f = heading ? bold : font;
-      const color = heading ? NAVY : BODY;
-      for (const line of wrapLine(raw.trim(), f, bodySize, SCRIPT_BODY.maxW)) {
+    for (const l of styled) {
+      if (l.text === "") { by -= lh * 0.6; continue; }
+      for (const line of wrapLine(l.text, l.f, bodySize, SCRIPT_BODY.maxW)) {
         if (by < SCRIPT_BODY.bottomY) break;
-        page.drawText(line, { x: SCRIPT_BODY.x, y: by, size: bodySize, font: f, color });
+        page.drawText(line, { x: SCRIPT_BODY.x, y: by, size: bodySize, font: l.f, color: l.color });
         by -= lh;
       }
     }
-  }
+  });
 
   // ---- Achterpagina's (7–13). ----
   for (const n of BACK_PAGES) {

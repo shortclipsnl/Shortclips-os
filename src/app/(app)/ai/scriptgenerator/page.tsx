@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requirePermission } from "@/server/auth/context";
-import { listActiveClientsForAi } from "@/server/ai/knowledge";
+import { listClientsForScripts } from "@/server/ai/knowledge";
 import { aiConfigured } from "@/server/ai/client";
 import { PageHeader } from "@/components/ui";
 import { ScriptGeneratorChat } from "./scriptgenerator-ui";
@@ -12,7 +12,7 @@ export const maxDuration = 120;
 
 export default async function ScriptGeneratorPage() {
   const viewer = await requirePermission("ai:read");
-  const clients = await listActiveClientsForAi(viewer);
+  const clients = await listClientsForScripts(viewer);
 
   return (
     <div className="mx-auto max-w-[900px]">

@@ -200,3 +200,14 @@ export async function listActiveClientsForAi(viewer: Viewer) {
     .where(and(isNull(clients.deletedAt), inArray(clients.status, ["active", "onboarding"]), scopeToClients(viewer, clients.id)))
     .orderBy(asc(clients.name));
 }
+
+/** Alle klanten voor de scriptgenerator, met een actief-vlag zodat je kunt
+ *  filteren op actieve en niet-actieve klanten. */
+export async function listClientsForScripts(viewer: Viewer): Promise<Array<{ id: string; name: string; active: boolean }>> {
+  const rows = await db
+    .select({ id: clients.id, name: clients.name, status: clients.status })
+    .from(clients)
+    .where(and(isNull(clients.deletedAt), scopeToClients(viewer, clients.id)))
+    .orderBy(asc(clients.name));
+  return rows.map((r) => ({ id: r.id, name: r.name, active: r.status === "active" || r.status === "onboarding" }));
+}
