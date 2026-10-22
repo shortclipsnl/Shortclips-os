@@ -149,6 +149,20 @@ export async function getShowcase(editorUserId: string, now = new Date()): Promi
   };
 }
 
+/** Hoogste behaalde award per editor (userId -> awardKey), voor de Team-pagina. */
+export async function getEditorHighestAwards(): Promise<Record<string, string>> {
+  const rows = await db.select({ editorId: editorAwards.editorId, awardKey: editorAwards.awardKey }).from(editorAwards);
+  const best: Record<string, { key: string; threshold: number }> = {};
+  for (const r of rows) {
+    const tier = awardByKey(r.awardKey);
+    if (!tier) continue;
+    if (!best[r.editorId] || tier.threshold > best[r.editorId]!.threshold) best[r.editorId] = { key: r.awardKey, threshold: tier.threshold };
+  }
+  const out: Record<string, string> = {};
+  for (const [id, v] of Object.entries(best)) out[id] = v.key;
+  return out;
+}
+
 /** Editors voor de keuzelijst in de teamweergave. */
 export async function listShowcaseEditors(): Promise<{ id: string; name: string }[]> {
   const rows = await db
