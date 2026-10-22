@@ -8,6 +8,7 @@ import {
 } from "@/db/schema";
 import { requirePermission, isOwner } from "@/server/auth/context";
 import { isCoreStaff, coreStaffRank } from "@/server/core-staff";
+import { birthdayLabel } from "@/server/birthdays";
 import { isBoardEditorName } from "@/lib/editors";
 import { TeamLogins } from "./team-logins";
 import {
@@ -138,6 +139,9 @@ export default async function TeamPage() {
         {/* De vaste short-video-editors (Quinn, Noah, Sam, Senna, Fabian) tonen
             we als "Short Video Editor", niet als creative. */}
         <div className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{isBoardEditorName(p.fullName) ? "Short Video Editor" : p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}</div>
+        {birthdayLabel(p.email) ? (
+          <div className="mt-0.5 text-2xs text-[var(--color-ink-faint)]">🎂 jarig op {birthdayLabel(p.email)}</div>
+        ) : null}
 
         {availability ? (
           <div className="mt-2">

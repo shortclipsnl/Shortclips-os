@@ -7,6 +7,8 @@ import { NotificationPopper } from "@/components/notifications/notification-popp
 import { aiConfigured } from "@/server/ai/client";
 import { getCelebrationContext } from "@/server/awards/service";
 import { CelebrationGate } from "@/app/(app)/showcase/celebration-gate";
+import { birthdaysToday } from "@/server/birthdays";
+import { BirthdayBanner } from "@/app/(app)/birthday-banner";
 
 export default async function AppLayout({
   children,
@@ -56,6 +58,8 @@ export default async function AppLayout({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar viewer={viewer} />
+        {/* Verjaardagssfeer: feestelijke balk + confetti op iemands verjaardag. */}
+        <BirthdayBanner names={birthdaysToday().map((b) => b.firstName)} />
         <main className="flex-1 px-5 py-6 lg:px-8">{children}</main>
       </div>
 
