@@ -17,6 +17,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
   // ook hier de Google Agenda op de achtergrond verversen als 'ie >20 min oud is.
   await syncCalendarIfStale();
   const canWrite = viewer.permissions.has("scripts:write");
+  const canGenerate = viewer.permissions.has("scripts:generate");
   const { rows, stats, clientOptions, writerOptions, clientResponsibles } = await listScripting(viewer);
   const scriptAppts = await upcomingScriptAppointments();
   const filter = (await searchParams).filter;
@@ -66,7 +67,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
 
       {/* key op de actieve filter: zo herstart het board met de juiste filter
           zodra je op een blok bovenin klikt (anders blijft de begin-filter staan). */}
-      <ScriptingBoard key={filter ?? "alle"} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} />
+      <ScriptingBoard key={filter ?? "alle"} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} canGenerate={canGenerate} defaultFilter={filter} />
 
       {/* Vaste verantwoordelijke per klant — zodat in één oogopslag duidelijk is
           wie standaard de scripts van welke klant op zich neemt. Deze persoon

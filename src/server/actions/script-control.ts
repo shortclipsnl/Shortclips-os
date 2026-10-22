@@ -61,12 +61,13 @@ export async function controleScript(scriptId: string): Promise<ActionResult<Scr
     let ai: ScriptControlAi | null = null;
     if (aiConfigured()) {
       const profile = await getClientAiProfile(s.clientId);
+      const central = await centralKnowledgeText(["schrijfstijl", "branding", "kwaliteit"]);
       const context = [
         feedback.afspraken ? `Communicatie-afspraken met de klant:\n${feedback.afspraken}` : "",
         feedback.aandachtspunten ? `Editing-aandachtspunten:\n${feedback.aandachtspunten}` : "",
         feedback.recenteKlantopmerkingen.length ? `Recente klant-opmerkingen op eerdere video's:\n- ${feedback.recenteKlantopmerkingen.join("\n- ")}` : "",
         profile ? captionProfileToText(profile.captionProfile as CaptionProfile) : "",
-        centralKnowledgeText(["schrijfstijl", "branding", "kwaliteit"]),
+        central,
         intel.speech?.avgWpm ? `Gemiddelde spreeksnelheid van deze klant uit Video Intelligence: ${intel.speech.avgWpm} wpm.` : "",
       ].filter(Boolean).join("\n\n");
 

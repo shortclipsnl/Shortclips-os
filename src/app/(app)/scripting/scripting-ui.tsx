@@ -3,8 +3,9 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, Loader2, MessageSquareText, UserPlus } from "lucide-react";
+import { ChevronDown, Loader2, MessageSquareText, Sparkles, UserPlus } from "lucide-react";
 import { setScriptingNote, setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
+import { generateScript } from "@/server/actions/script-generator";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS } from "@/lib/statuses";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import type { ScriptingRow, WriterOption } from "@/server/scripting";
@@ -90,7 +91,7 @@ const FLAG_COLOR: Record<string, string> = {
   done: "var(--color-good)",
 };
 
-export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, defaultFilter }: { rows: ScriptingRow[]; clientOptions: string[]; writerOptions: WriterOption[]; canWrite: boolean; defaultFilter?: string }) {
+export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, canGenerate = false, defaultFilter }: { rows: ScriptingRow[]; clientOptions: string[]; writerOptions: WriterOption[]; canWrite: boolean; canGenerate?: boolean; defaultFilter?: string }) {
   const [filter, setFilter] = useState<string>(FILTERS.some((f) => f.key === defaultFilter) ? defaultFilter! : "alle");
   const [status, setStatus] = useState<string>("alle");
   const [client, setClient] = useState<string>("alle");
@@ -149,7 +150,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
       <div className="mb-2 text-xs text-[var(--color-ink-faint)]">{filtered.length} van {rows.length} opnames</div>
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <table className="w-full min-w-[1040px] text-sm">
+        <table className="w-full min-w-[1180px] text-sm">
           <thead>
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] text-left text-xs text-[var(--color-ink-faint)]">
               <th className="px-3 py-2 font-medium">Klant</th>
@@ -159,6 +160,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
               <th className="px-2 py-2 font-medium">Verantwoordelijke</th>
               <th className="px-2 py-2 font-medium">Scriptingstatus</th>
               <th className="px-2 py-2 font-medium">Notitie</th>
+              <th className="px-2 py-2 font-medium">Script</th>
             </tr>
           </thead>
           <tbody>
@@ -167,12 +169,12 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                 {/* Ruimte tussen de weekgroepen, zodat het beter scanbaar is. */}
                 {gi > 0 ? (
                   <tr aria-hidden>
-                    <td colSpan={7} className="h-6 bg-[var(--color-surface)]" />
+                    <td colSpan={8} className="h-6 bg-[var(--color-surface)]" />
                   </tr>
                 ) : null}
                 {/* Week-kop in volle kleur, zodat je van week naar week kunt scannen. */}
                 <tr>
-                  <td colSpan={7} className="p-0">
+                  <td colSpan={8} className="p-0">
                     <div
                       className="flex items-center gap-2 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white"
                       style={{ background: WEEK_COLOR[g.order] ?? "var(--color-ink-muted)" }}
@@ -208,12 +210,15 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                     <td className="px-2 py-2 align-top">
                       <NoteCell id={r.id} note={r.note} canWrite={canWrite} />
                     </td>
+                    <td className="px-2 py-2 align-top">
+                      <GenerateScriptCell productionDayId={r.id} canGenerate={canGenerate} />
+                    </td>
                   </tr>
                 ))}
               </Fragment>
             ))}
             {groups.length === 0 ? (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
             ) : null}
           </tbody>
         </table>
@@ -363,6 +368,103 @@ function NoteCell({ id, note, canWrite }: { id: string; note: string | null; can
               </>
             ) : (
               <p className="whitespace-pre-wrap text-sm leading-snug text-[var(--color-ink)]">{note}</p>
+            )}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+type GenPlatform = "reels" | "tiktok" | "shorts";
+type GenDoel = "awareness" | "leads" | "verkoop";
+
+/**
+ * AI-scriptschrijver per opname: genereert een conceptscript op founder-niveau.
+ * Je geeft een onderwerp (platform/doel optioneel); de generator onderzoekt de
+ * klant, schrijft in de vaste layout en controleert zichzelf (lint + judge) tot
+ * de kwaliteitsgate. Daarna opent het conceptscript in de editor om bij te schaven.
+ */
+function GenerateScriptCell({ productionDayId, canGenerate }: { productionDayId: string; canGenerate: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [onderwerp, setOnderwerp] = useState("");
+  const [platform, setPlatform] = useState<GenPlatform>("reels");
+  const [doel, setDoel] = useState<GenDoel>("awareness");
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+
+  if (!canGenerate) return <span className="text-xs text-[var(--color-ink-faint)]">—</span>;
+
+  const go = () => {
+    const topic = onderwerp.trim();
+    if (!topic) { setErr("Geef eerst een onderwerp op."); return; }
+    setErr(null);
+    start(async () => {
+      const res = await generateScript({ productionDayId, onderwerp: topic, platform, doel });
+      if (res.ok) { setOpen(false); router.push(`/scripts/${res.scriptId}`); }
+      else setErr(res.message);
+    });
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen((o) => !o); setErr(null); }}
+        disabled={pending}
+        title="Genereer een conceptscript met de AI-scriptschrijver"
+        className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-brand-200)] bg-[var(--color-brand-50)] px-2 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] hover:brightness-95 disabled:opacity-60"
+      >
+        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+        {pending ? "Schrijft…" : "Genereer"}
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => { if (!pending) setOpen(false); }} />
+          <div className="absolute right-0 top-full z-20 mt-1.5 w-72 max-w-[85vw] rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3 shadow-[var(--shadow-raised)]">
+            {pending ? (
+              <div className="flex items-start gap-2 py-2 text-sm text-[var(--color-ink-muted)]">
+                <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-[var(--color-brand-600)]" />
+                <span>De schrijver werkt: onderzoekt de klant, schrijft en controleert zichzelf. Dit duurt even…</span>
+              </div>
+            ) : (
+              <>
+                <label className="block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Onderwerp</label>
+                <textarea
+                  value={onderwerp}
+                  onChange={(e) => setOnderwerp(e.target.value)}
+                  rows={2}
+                  autoFocus
+                  placeholder="Waar gaat de video over? Bijv. 'wat vochtmeting voorkomt'"
+                  className="mt-1 w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2 py-1.5 text-sm leading-snug text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:outline-none"
+                />
+                <div className="mt-2 flex gap-2">
+                  <label className="flex-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
+                    Platform
+                    <select value={platform} onChange={(e) => setPlatform(e.target.value as GenPlatform)} className="sc-input mt-1 h-8 w-full py-0 text-xs">
+                      <option value="reels">Reels</option>
+                      <option value="tiktok">TikTok</option>
+                      <option value="shorts">Shorts</option>
+                    </select>
+                  </label>
+                  <label className="flex-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
+                    Doel
+                    <select value={doel} onChange={(e) => setDoel(e.target.value as GenDoel)} className="sc-input mt-1 h-8 w-full py-0 text-xs">
+                      <option value="awareness">Awareness</option>
+                      <option value="leads">Leads</option>
+                      <option value="verkoop">Verkoop</option>
+                    </select>
+                  </label>
+                </div>
+                {err ? <p className="mt-2 text-2xs text-[var(--color-bad)]">{err}</p> : null}
+                <div className="mt-2.5 flex items-center justify-end gap-2">
+                  <button type="button" onClick={() => setOpen(false)} className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleren</button>
+                  <button type="button" onClick={go} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110">
+                    <Sparkles className="size-3.5" /> Genereer script
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </>

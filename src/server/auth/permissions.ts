@@ -20,6 +20,7 @@ export const PERMISSIONS = {
   "scripts:read": "Scripts bekijken",
   "scripts:write": "Scripts schrijven en wijzigen",
   "scripts:approve": "Scripts intern goedkeuren",
+  "scripts:generate": "Scripts automatisch laten genereren (AI-scriptschrijver)",
 
   // Producties
   "productions:read": "Opnamedagen bekijken",
@@ -144,6 +145,7 @@ export const ROLE_DEFINITIONS: Array<{
       "knowledge:write",
       "scripts:write",
       "scripts:approve",
+      "scripts:generate",
       "productions:write",
       "videos:write",
       "videos:assign",
@@ -174,6 +176,7 @@ export const ROLE_DEFINITIONS: Array<{
       "clients:read_all",
       "knowledge:write",
       "scripts:write",
+      "scripts:generate",
       "calendar:write",
       "analytics:read",
       "ai:read",
