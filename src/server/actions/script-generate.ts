@@ -1,15 +1,18 @@
 "use server";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
-import { clients } from "@/db/schema";
+import { clients, scripts, scriptVersions } from "@/db/schema";
 import { requirePermission, assertClientAccess, ForbiddenError } from "@/server/auth/context";
+import { auditLog } from "@/server/audit";
 import { aiConfigured, runPrompt } from "@/server/ai/client";
 import { scriptGeneratorSystem } from "@/server/scripts/scripthandboek";
-import { getClientAiProfile, captionProfileToText, clientLearnedText, type CaptionProfile } from "@/server/ai/knowledge";
+import { getClientAiProfile, captionProfileToText, clientLearnedText, centralKnowledgeText, type CaptionProfile } from "@/server/ai/knowledge";
 import { gatherFeedbackContext } from "@/server/script-control";
 import { getClientWinningPatterns } from "@/server/scripts/winning-patterns";
 import { getClientDriveScriptPdfs } from "@/server/scripts/drive-scripts";
+import { getIntelligenceOverview } from "@/server/video-intelligence/intelligence";
 
 export type GeneratedScript = { onderwerp: string; tekst: string };
 type Result =
@@ -94,21 +97,39 @@ function parseScriptsJson(raw: string): ScriptsPayload | null {
   );
 }
 
-/** Verzamelt de live klantcontext (stijl, afspraken, geleerde voorkeuren, winnende hooks). */
-async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission>>, clientId: string): Promise<{ name: string; extra: string } | null> {
+/**
+ * Verzamelt de volledige live klantcontext voor de schrijver: stijl, afspraken,
+ * geleerde voorkeuren, best presterende hooks (echte cijfers), Video Intelligence,
+ * eerder gebruikte onderwerpen (tegen herhaling) en de algemene Shortclips-richtlijnen.
+ * Dezelfde bron als de scriptcontrole, zodat genereren en controleren gelijk denken.
+ */
+async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission>>, clientId: string): Promise<{ name: string; slug: string; extra: string } | null> {
   const [c] = await db
-    .select({ id: clients.id, name: clients.name })
+    .select({ id: clients.id, name: clients.name, slug: clients.slug })
     .from(clients)
     .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
     .limit(1);
   if (!c) return null;
   assertClientAccess(viewer, c.id);
-  const [profile, learned, feedback, patterns] = await Promise.all([
+  const [profile, learned, feedback, patterns, central, intel, recent] = await Promise.all([
     getClientAiProfile(c.id),
     clientLearnedText(c.id),
     gatherFeedbackContext(c.id),
     getClientWinningPatterns(viewer, c.id).catch(() => null),
+    centralKnowledgeText(["schrijfstijl", "branding", "kwaliteit"]).catch(() => ""),
+    getIntelligenceOverview(viewer, c.slug).catch(() => null),
+    db.select({ title: scripts.title }).from(scripts)
+      .where(and(eq(scripts.clientId, c.id), isNull(scripts.deletedAt)))
+      .orderBy(desc(scripts.createdAt)).limit(15).catch(() => [] as Array<{ title: string }>),
   ]);
+
+  const viLines = intel
+    ? [
+        intel.speech?.avgWpm ? `Gemiddelde spreeksnelheid uit Video Intelligence: ${intel.speech.avgWpm} wpm (houd de lengte hierop af).` : "",
+        intel.hooks?.length ? `Veelgebruikte hooktypes in eerdere video's: ${intel.hooks.slice(0, 5).map((h) => h.key).join(", ")}.` : "",
+      ].filter(Boolean).join("\n")
+    : "";
+
   const extra = [
     `Klant: ${c.name}.`,
     profile ? captionProfileToText(profile.captionProfile as CaptionProfile) : "",
@@ -117,8 +138,11 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
     feedback.recenteKlantopmerkingen.length ? `Recente klantopmerkingen op eerdere video's:\n- ${feedback.recenteKlantopmerkingen.join("\n- ")}` : "",
     learned ? `Geleerde voorkeuren en correcties van deze klant:\n${learned}` : "",
     patterns && patterns.count > 0 ? `Best presterende hooks van deze klant (echte cijfers — spiegelen, niet kopiëren):\n${patterns.top.map((p) => `- "${p.hook}" (${p.views} views)`).join("\n")}` : "",
+    viLines,
+    recent.length ? `Eerder geschreven onderwerpen voor deze klant (voorkom herhaling, tenzij je een sterk format bewust opnieuw gebruikt):\n- ${recent.map((r) => r.title).join("\n- ")}` : "",
+    central ? `Algemene Shortclips-richtlijnen:\n${central}` : "",
   ].filter(Boolean).join("\n\n");
-  return { name: c.name, extra };
+  return { name: c.name, slug: c.slug, extra };
 }
 
 /**
@@ -341,6 +365,90 @@ export async function suggestTopics(input: { clientId?: string; clientName?: str
 
     if (topics.length === 0) return { ok: false, message: "Geen onderwerpen gekregen. Probeer het nog eens." };
     return { ok: true, topics: topics.slice(0, count) };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+/** Splitst de gegenereerde scripttekst in de vaste blokken van de scriptbibliotheek. */
+function parseScriptBlocks(tekst: string): { uitleg: string; hook: string; body: string; cta: string } {
+  const lines = (tekst || "").replace(/\r/g, "").split("\n");
+  const buckets: Record<string, string[]> = { uitleg: [], hook: [], body: [], cta: [] };
+  let section: keyof typeof buckets | null = null;
+  for (const raw of lines) {
+    const t = raw.trim();
+    const upper = t.toUpperCase();
+    if (t && t.length <= 42 && /[A-Z]/.test(t) && t === upper) {
+      if (upper.startsWith("SHORTCLIP UITLEG")) section = "uitleg";
+      else if (upper.startsWith("HOOK")) section = "hook";
+      else if (upper.startsWith("MIDDENSTUK")) section = "body";
+      else if (upper.startsWith("CALL TO ACTION")) section = "cta";
+      else if (upper.startsWith("SOCIAL MEDIA POLL")) section = "cta"; // poll bij de CTA houden
+      // onbekende kop: huidige sectie aanhouden
+      continue;
+    }
+    if (section) buckets[section].push(raw);
+  }
+  const join = (arr: string[]) => arr.join("\n").trim();
+  return { uitleg: join(buckets.uitleg), hook: join(buckets.hook), body: join(buckets.body), cta: join(buckets.cta) };
+}
+
+type SaveResult =
+  | { ok: true; count: number }
+  | { ok: false; message: string };
+
+/** Slaat de (bewerkte) scripts op in de bestaande scriptbibliotheek: een scripts-record
+ *  plus een eerste versie per script, gekoppeld aan de klant. */
+export async function saveScriptsToLibrary(input: {
+  clientId: string;
+  scripts: Array<{ onderwerp: string; tekst: string }>;
+}): Promise<SaveResult> {
+  try {
+    const viewer = await requirePermission("scripts:write");
+    const items = (input.scripts ?? []).filter((s) => (s?.onderwerp?.trim() || s?.tekst?.trim()));
+    if (items.length === 0) return { ok: false, message: "Er zijn geen scripts om op te slaan." };
+
+    const [c] = await db
+      .select({ id: clients.id, name: clients.name })
+      .from(clients)
+      .where(and(eq(clients.id, input.clientId), isNull(clients.deletedAt)))
+      .limit(1);
+    if (!c) return { ok: false, message: "Kies eerst een vastgelegde klant om in op te slaan." };
+    assertClientAccess(viewer, c.id);
+
+    let count = 0;
+    for (const it of items) {
+      const title = (it.onderwerp || "Script").replace(/^\s*\d+\.\s*/, "").trim().slice(0, 240) || "Script";
+      const { uitleg, hook, body, cta } = parseScriptBlocks(it.tekst);
+      const [row] = await db.insert(scripts).values({
+        clientId: c.id,
+        title,
+        status: "concept",
+        format: "Organische short video",
+        hook: hook || null,
+        body: body || it.tekst.trim() || null,
+        cta: cta || null,
+        internalNotes: uitleg ? `Shortclip uitleg:\n${uitleg}` : null,
+        creatorId: viewer.id,
+        currentVersion: 1,
+      }).returning({ id: scripts.id });
+      if (!row) continue;
+      await db.insert(scriptVersions).values({
+        scriptId: row.id,
+        versionNumber: 1,
+        snapshot: { title, uitleg, hook, body, cta } as unknown as Record<string, unknown>,
+        changeSummary: "Aangemaakt met de scriptgenerator",
+        status: "concept",
+        authorId: viewer.id,
+      });
+      await auditLog({ viewer, action: "script.create", entityType: "script", entityId: row.id, clientId: c.id });
+      count++;
+    }
+
+    if (count === 0) return { ok: false, message: "Opslaan lukte niet. Probeer het nog eens." };
+    revalidatePath("/scripts");
+    return { ok: true, count };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw } from "lucide-react";
-import { generateScripts, reviseScript, suggestTopics, type GeneratedScript } from "@/server/actions/script-generate";
+import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save } from "lucide-react";
+import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, type GeneratedScript } from "@/server/actions/script-generate";
 
 type Client = { id: string; name: string; active: boolean };
 type ClientFilter = "actief" | "inactief" | "alle";
@@ -141,6 +141,8 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [exporting, setExporting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
   const visibleClients = clients.filter((c) => (filter === "alle" ? true : filter === "actief" ? c.active : !c.active));
   const selectedName = clientId ? clients.find((c) => c.id === clientId)?.name ?? "" : "";
@@ -202,6 +204,20 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
       else setErr(res.message);
       setTopicsBusy(false);
     })();
+  };
+
+  const saveToLibrary = async () => {
+    if (!scripts || scripts.length === 0 || !genClientId) return;
+    setSaving(true);
+    setErr(null);
+    setSavedMsg(null);
+    try {
+      const res = await saveScriptsToLibrary({ clientId: genClientId, scripts: scripts.map((s) => ({ onderwerp: s.onderwerp, tekst: s.tekst })) });
+      if (res.ok) setSavedMsg(`${res.count} script${res.count === 1 ? "" : "s"} opgeslagen in de scriptbibliotheek.`);
+      else setErr(res.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const exportPdf = async () => {
@@ -401,21 +417,35 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         </button>
 
         {err ? <p className="text-2xs text-[var(--color-bad)]">{err}</p> : null}
+        {savedMsg ? (
+          <p className="text-2xs text-[var(--color-good)]">{savedMsg} <a href="/scripts" className="font-semibold underline">Open de scriptbibliotheek</a></p>
+        ) : null}
 
         {/* Actiebalk */}
         <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface-2)]/95 p-3 shadow-[var(--shadow-card)] backdrop-blur">
-          <button type="button" onClick={() => { setScripts(null); setErr(null); setReviseId(null); setVersionsId(null); }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface)]">
+          <button type="button" onClick={() => { setScripts(null); setErr(null); setSavedMsg(null); setReviseId(null); setVersionsId(null); }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface)]">
             <ArrowLeft className="size-4" /> Nieuwe set
           </button>
           <span className="text-2xs text-[var(--color-ink-faint)]">{scripts.length} script{scripts.length === 1 ? "" : "s"} · geef feedback tot het klopt</span>
-          <button
-            type="button"
-            onClick={exportPdf}
-            disabled={exporting || scripts.length === 0}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40"
-          >
-            {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />} Exporteer als PDF
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={saveToLibrary}
+              disabled={saving || scripts.length === 0 || !genClientId}
+              title={genClientId ? "Opslaan in de scriptbibliotheek" : "Kies een vastgelegde klant om op te kunnen slaan"}
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-40"
+            >
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Opslaan in bibliotheek
+            </button>
+            <button
+              type="button"
+              onClick={exportPdf}
+              disabled={exporting || scripts.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40"
+            >
+              {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />} Exporteer als PDF
+            </button>
+          </div>
         </div>
       </div>
     );
