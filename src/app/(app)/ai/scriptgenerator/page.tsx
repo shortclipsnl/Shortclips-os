@@ -18,7 +18,7 @@ export default async function ScriptGeneratorPage() {
     <div className="mx-auto max-w-[900px]">
       <PageHeader
         title="Scriptgenerator"
-        description="De vaste Shortclips scriptschrijver voor organische short video's (TikTok/Reels). Schrijft volgens het Scripthandboek, leert van wat bij jullie klanten werkt, en levert op in het vaste Shortclips-format. Kies een klant om de stijl en cijfers mee te laden."
+        description="De vaste Shortclips scriptschrijver voor organische short video's (TikTok/Reels). Kies een klant en het aantal scripts — hij schrijft ze direct volgens het Scripthandboek, op basis van wat bij die klant werkt. Daarna pas je alles aan en download je het als scriptbestand (PDF) in de vaste huisstijl."
       />
       <ScriptGeneratorChat clients={clients} aiReady={aiConfigured()} />
     </div>
