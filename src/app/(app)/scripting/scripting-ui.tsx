@@ -22,6 +22,7 @@ const FILTERS = [
 const STATUS_PILL: Record<string, string> = {
   concepting: "bg-[var(--color-info-soft)] text-[#0060a8]",
   scriptmeeting: "bg-[var(--color-warn-soft)] text-[#8a5300]",
+  feedback_jarno: "bg-[var(--color-bad-soft)] text-[#a3271c]",
   afwachting_klant: "bg-[var(--color-violet-soft)] text-[#4a2fb8]",
   scripts_bij_klant: "bg-[var(--color-indigo-soft)] text-[var(--color-indigo-ink)]",
   nog_aanvullen: "bg-[var(--color-lime-soft)] text-[#54700a]",
@@ -32,6 +33,7 @@ const STATUS_PILL: Record<string, string> = {
 const STATUS_ACCENT: Record<string, string> = {
   concepting: "var(--color-info)",
   scriptmeeting: "var(--color-warn)",
+  feedback_jarno: "var(--color-bad)",
   afwachting_klant: "var(--color-violet)",
   scripts_bij_klant: "var(--color-indigo-ink)",
   nog_aanvullen: "var(--color-lime)",
@@ -42,6 +44,7 @@ const STATUS_ACCENT: Record<string, string> = {
 const STATUS_SHORT: Record<string, string> = {
   concepting: "Scripts opstellen",
   scriptmeeting: "Meeting plannen",
+  feedback_jarno: "Feedback Jarno",
   afwachting_klant: "Afwachting klant",
   scripts_bij_klant: "Controle bij klant",
   nog_aanvullen: "Nog aanvullen",
