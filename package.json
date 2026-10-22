@@ -13,6 +13,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "rbac:sync": "tsx scripts/rbac-sync.ts",
     "db:reset": "rm -rf .data/pglite && npm run db:migrate && npm run db:seed",
+    "restore:data": "tsx scripts/restore-data.ts",
     "db:studio": "drizzle-kit studio",
     "google:token": "node scripts/google-refresh-token.mjs",
     "frameio:token": "node scripts/frameio-token.mjs",
