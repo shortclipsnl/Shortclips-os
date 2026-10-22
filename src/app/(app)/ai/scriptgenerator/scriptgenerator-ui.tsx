@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save } from "lucide-react";
-import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, type GeneratedScript } from "@/server/actions/script-generate";
+import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock } from "lucide-react";
+import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, checkScriptQuality, type GeneratedScript, type QualityResult } from "@/server/actions/script-generate";
 
 type Client = { id: string; name: string; active: boolean };
 type ClientFilter = "actief" | "inactief" | "alle";
@@ -110,6 +110,8 @@ function MicButton({ onText, onError, title = "Inspreken" }: { onText: (t: strin
 
 const appendText = (prev: string, add: string) => prev + (prev && !prev.endsWith("\n") && !prev.endsWith(" ") ? " " : "") + add;
 
+const scoreColor = (n: number) => (n >= 7 ? "var(--color-good)" : n >= 4 ? "var(--color-warn)" : "var(--color-bad)");
+
 /* ---------------- component ---------------- */
 
 export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; aiReady: boolean }) {
@@ -137,6 +139,11 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const [reviseText, setReviseText] = useState("");
   const [versionsId, setVersionsId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Kwaliteitscontrole per script
+  const [qualityById, setQualityById] = useState<Record<string, QualityResult>>({});
+  const [qualityBusyId, setQualityBusyId] = useState<string | null>(null);
+  const [qualityOpenId, setQualityOpenId] = useState<string | null>(null);
 
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -268,6 +275,24 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
     })();
   };
 
+  const checkQuality = (id: string) => {
+    const s = scripts?.find((x) => x.id === id);
+    if (!s || qualityBusyId) return;
+    setQualityBusyId(id);
+    setErr(null);
+    (async () => {
+      const res = await checkScriptQuality({
+        onderwerp: s.onderwerp,
+        tekst: s.tekst,
+        clientId: genClientId || undefined,
+        clientName: genClientId ? undefined : genClientName || undefined,
+      });
+      if (res.ok) { setQualityById((m) => ({ ...m, [id]: res.data })); setQualityOpenId(id); }
+      else setErr(res.message);
+      setQualityBusyId(null);
+    })();
+  };
+
   const revert = (id: string, idx: number) => {
     setScripts((prev) => prev?.map((x) => {
       if (x.id !== id) return x;
@@ -365,6 +390,65 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
                   </button>
                 ))}
               </div>
+
+              {/* Kwaliteitscontrole */}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => checkQuality(s.id)} disabled={qualityBusyId === s.id} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] px-2.5 py-1 text-2xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-40">
+                  {qualityBusyId === s.id ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />} Controleer kwaliteit
+                </button>
+                {qualityById[s.id] ? (
+                  <button type="button" onClick={() => setQualityOpenId(qualityOpenId === s.id ? null : s.id)} className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-bold text-white" style={{ background: scoreColor(qualityById[s.id]!.scoreTotaal ?? 0) }}>
+                    {qualityById[s.id]!.scoreTotaal ?? "?"}/10
+                  </button>
+                ) : null}
+              </div>
+
+              {/* Kwaliteitspaneel */}
+              {qualityOpenId === s.id && qualityById[s.id] ? (() => {
+                const q = qualityById[s.id]!;
+                return (
+                  <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3 text-xs">
+                    <div className="mb-2 flex items-start gap-2">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full text-sm font-bold text-white" style={{ background: scoreColor(q.scoreTotaal ?? 0) }}>{q.scoreTotaal ?? "?"}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-[var(--color-ink)]">{q.oordeel || "Beoordeling"}</p>
+                        <p className="mt-0.5 inline-flex items-center gap-1 text-2xs text-[var(--color-ink-muted)]"><Clock className="size-3" /> ~{q.speaking.seconds}s · {q.speaking.words} woorden <span className="text-[var(--color-ink-faint)]">(richtlijn 30–33s / 80–95 woorden)</span></p>
+                      </div>
+                    </div>
+
+                    {q.punten.length ? (
+                      <ul className="mb-2 grid gap-1 sm:grid-cols-2">
+                        {q.punten.map((p, pi) => (
+                          <li key={pi} className="flex items-start gap-1.5">
+                            <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-bold text-white" style={{ background: scoreColor(p.score) }}>{p.score}</span>
+                            <span className="min-w-0"><span className="font-medium text-[var(--color-ink)]">{p.dimensie}.</span> <span className="text-[var(--color-ink-muted)]">{p.waarom}</span></span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+
+                    {q.sterk.length ? <p className="mt-1.5 text-[var(--color-ink-muted)]"><span className="font-semibold text-[var(--color-good)]">Sterk:</span> {q.sterk.join(" · ")}</p> : null}
+                    {q.verbeteren.length ? <p className="mt-1 text-[var(--color-ink-muted)]"><span className="font-semibold text-[var(--color-warn)]">Verbeteren:</span> {q.verbeteren.join(" · ")}</p> : null}
+                    {q.feitenControleren.length ? <p className="mt-1 text-[var(--color-ink-muted)]"><span className="font-semibold text-[var(--color-bad)]">Feiten controleren:</span> {q.feitenControleren.join(" · ")}</p> : null}
+
+                    {q.alternatieveHooks.length ? (
+                      <div className="mt-2">
+                        <span className="mb-1 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Sterkere hooks</span>
+                        <ul className="space-y-1">
+                          {q.alternatieveHooks.map((h, hi) => (
+                            <li key={hi} className="flex items-center gap-2">
+                              <span className="min-w-0 flex-1 text-[var(--color-ink)]">{h}</span>
+                              <button type="button" disabled={!!busyId} onClick={() => runRevise(s.id, `Vervang de hook door: "${h}". Laat de rest van het script staan.`, "Hook vervangen")} className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-0.5 text-2xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-40">
+                                <Wand2 className="size-3" /> Gebruik
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })() : null}
 
               {/* Versiegeschiedenis */}
               {versionsId === s.id && s.versions.length > 0 ? (

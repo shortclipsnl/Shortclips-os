@@ -9,7 +9,7 @@ import { auditLog } from "@/server/audit";
 import { aiConfigured, runPrompt } from "@/server/ai/client";
 import { scriptGeneratorSystem } from "@/server/scripts/scripthandboek";
 import { getClientAiProfile, captionProfileToText, clientLearnedText, centralKnowledgeText, type CaptionProfile } from "@/server/ai/knowledge";
-import { gatherFeedbackContext } from "@/server/script-control";
+import { gatherFeedbackContext, estimateSpeakingTime, DEFAULT_WPM } from "@/server/script-control";
 import { getClientWinningPatterns } from "@/server/scripts/winning-patterns";
 import { getClientDriveScriptPdfs } from "@/server/scripts/drive-scripts";
 import { getIntelligenceOverview } from "@/server/video-intelligence/intelligence";
@@ -103,7 +103,7 @@ function parseScriptsJson(raw: string): ScriptsPayload | null {
  * eerder gebruikte onderwerpen (tegen herhaling) en de algemene Shortclips-richtlijnen.
  * Dezelfde bron als de scriptcontrole, zodat genereren en controleren gelijk denken.
  */
-async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission>>, clientId: string): Promise<{ name: string; slug: string; extra: string } | null> {
+async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission>>, clientId: string): Promise<{ name: string; slug: string; extra: string; wpm: number | null } | null> {
   const [c] = await db
     .select({ id: clients.id, name: clients.name, slug: clients.slug })
     .from(clients)
@@ -142,7 +142,7 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
     recent.length ? `Eerder geschreven onderwerpen voor deze klant (voorkom herhaling, tenzij je een sterk format bewust opnieuw gebruikt):\n- ${recent.map((r) => r.title).join("\n- ")}` : "",
     central ? `Algemene Shortclips-richtlijnen:\n${central}` : "",
   ].filter(Boolean).join("\n\n");
-  return { name: c.name, slug: c.slug, extra };
+  return { name: c.name, slug: c.slug, extra, wpm: intel?.speech?.avgWpm && intel.speech.avgWpm > 60 ? intel.speech.avgWpm : null };
 }
 
 /**
@@ -365,6 +365,108 @@ export async function suggestTopics(input: { clientId?: string; clientName?: str
 
     if (topics.length === 0) return { ok: false, message: "Geen onderwerpen gekregen. Probeer het nog eens." };
     return { ok: true, topics: topics.slice(0, count) };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+export type QualityPoint = { dimensie: string; score: number; waarom: string };
+export type QualityResult = {
+  scoreTotaal: number | null;
+  oordeel: string;
+  punten: QualityPoint[];
+  sterk: string[];
+  verbeteren: string[];
+  feitenControleren: string[];
+  alternatieveHooks: string[];
+  speaking: { seconds: number; words: number; wpm: number };
+};
+type QualityActionResult = { ok: true; data: QualityResult } | { ok: false; message: string };
+
+const QUALITY_SYSTEM = `Je bent script-analist voor Shortclips, een bureau voor organische short video's (TikTok/Reels/Shorts). Beoordeel een script eerlijk en onderbouwd op de interne richtlijnen. Onderbouw elk punt met wat daadwerkelijk in het script staat. Scheid bewezen observatie van creatieve verwachting. Markeer onbevestigde feitelijke claims (prijzen, specificaties, percentages, vergelijkingen) als te controleren; verzin nooit cijfers. Geef uitsluitend geldige JSON terug.`;
+
+/** Beoordeelt de kwaliteit van het HUIDIGE (evt. onopgeslagen) script op 10 punten. */
+export async function checkScriptQuality(input: {
+  onderwerp: string;
+  tekst: string;
+  clientId?: string;
+  clientName?: string;
+}): Promise<QualityActionResult> {
+  try {
+    const viewer = await requirePermission("ai:read");
+    if (!aiConfigured()) return { ok: false, message: "De AI-schrijver staat uit (ANTHROPIC_API_KEY ontbreekt)." };
+    if (!input.tekst?.trim()) return { ok: false, message: "Dit script is nog leeg." };
+
+    const { hook, body, cta } = parseScriptBlocks(input.tekst);
+
+    let extra = "";
+    let klantnaam = (input.clientName ?? "").trim();
+    let wpm = DEFAULT_WPM;
+    if (input.clientId) {
+      const ctx = await clientContext(viewer, input.clientId);
+      if (ctx) { extra = ctx.extra; klantnaam = ctx.name; if (ctx.wpm) wpm = ctx.wpm; }
+    }
+    const speaking = estimateSpeakingTime({ hook, body, cta }, wpm);
+
+    const dims = [
+      "Hook en aandacht in de eerste seconden",
+      "Originaliteit van het concept",
+      "Toegevoegde waarde voor de kijker",
+      "Geschiktheid voor de doelgroep",
+      "Natuurlijk en compact taalgebruik",
+      "Commerciële balans (focus op kijker, niet verkoperig)",
+      "Visuele mogelijkheden en opnamehaalbaarheid",
+      "Overeenkomsten met eerder gemaakte content (herhaling)",
+      "Feitelijke juistheid",
+      "Aansluiting bij de doelstelling van de video",
+    ];
+
+    const user = [
+      `Beoordeel dit organische short video script${klantnaam ? ` voor klant "${klantnaam}"` : ""}.`,
+      `Titel: ${input.onderwerp || "(geen)"}`,
+      `Geschatte spreektijd: ~${speaking.seconds}s (${speaking.words} woorden @ ${wpm} wpm; richtlijn 30–33s en 80–95 woorden).`,
+      "",
+      "SCRIPT",
+      `Hook: ${hook || "(leeg)"}`,
+      `Middenstuk: ${body || "(leeg)"}`,
+      `CTA: ${cta || "(leeg)"}`,
+      "",
+      extra ? `CONTEXT (klantstijl, feedback, wat werkt, eerdere onderwerpen)\n${extra}` : "",
+      "",
+      `Beoordeel op deze 10 punten en geef per punt een score 1–10 en een korte onderbouwing:\n- ${dims.join("\n- ")}`,
+      "",
+      "Houd elke onderbouwing kort (maximaal 15 woorden) en elke lijst beknopt (max 3 items). Geen regeleindes binnen een waarde.",
+      "Geef UITSLUITEND geldige JSON terug in exact dit formaat:",
+      `{"scoreTotaal": <1-10>, "oordeel": "<één zin eindoordeel>", "punten": [{"dimensie": "<naam>", "score": <1-10>, "waarom": "<korte onderbouwing>"}], "sterk": ["..."], "verbeteren": ["..."], "feitenControleren": ["..."], "alternatieveHooks": ["<3 sterkere hooks>"]}`,
+    ].filter(Boolean).join("\n");
+
+    const res = await runPrompt({ system: QUALITY_SYSTEM, user, maxTokens: 6000 });
+    if (!res.ok) return { ok: false, message: "De analyse gaf geen antwoord. Probeer het nog eens." };
+
+    const cleaned = res.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+    let parsed: Partial<QualityResult> | null = null;
+    try {
+      const a = cleaned.indexOf("{"); const b = cleaned.lastIndexOf("}");
+      parsed = JSON.parse(a >= 0 && b > a ? cleaned.slice(a, b + 1) : cleaned) as Partial<QualityResult>;
+    } catch { parsed = null; }
+    if (!parsed) {
+      console.error("[checkScriptQuality] JSON parse mislukt:\n", res.text.slice(0, 1000));
+      return { ok: false, message: "De analyse kon niet worden gelezen. Probeer het nog eens." };
+    }
+
+    const asStrArr = (v: unknown): string[] => Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : [];
+    const data: QualityResult = {
+      scoreTotaal: typeof parsed.scoreTotaal === "number" ? parsed.scoreTotaal : null,
+      oordeel: typeof parsed.oordeel === "string" ? parsed.oordeel : "",
+      punten: Array.isArray(parsed.punten) ? parsed.punten.filter((p): p is QualityPoint => !!p && typeof p.dimensie === "string" && typeof p.score === "number") : [],
+      sterk: asStrArr(parsed.sterk),
+      verbeteren: asStrArr(parsed.verbeteren),
+      feitenControleren: asStrArr(parsed.feitenControleren),
+      alternatieveHooks: asStrArr(parsed.alternatieveHooks),
+      speaking: { seconds: speaking.seconds, words: speaking.words, wpm },
+    };
+    return { ok: true, data };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;
