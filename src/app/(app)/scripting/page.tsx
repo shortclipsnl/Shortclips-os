@@ -5,7 +5,7 @@ import { requireInternal } from "@/server/auth/context";
 import { listScripting } from "@/server/scripting";
 import { upcomingScriptAppointments } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
-import { Card, CardHeader, ClientLogo, PageHeader, Stat, TeamAvatar } from "@/components/ui";
+import { Card, CardHeader, ClientLogo, LinkButton, PageHeader, Stat, TeamAvatar } from "@/components/ui";
 import { ScriptingBoard } from "./scripting-ui";
 
 export const metadata: Metadata = { title: "Scripting" };
@@ -19,7 +19,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
   // ook hier de Google Agenda op de achtergrond verversen als 'ie >20 min oud is.
   await syncCalendarIfStale();
   const canWrite = viewer.permissions.has("scripts:write");
-  const canGenerate = viewer.permissions.has("scripts:generate");
+  const canUseGenerator = viewer.permissions.has("ai:read");
   const { rows, stats, clientOptions, writerOptions, clientResponsibles } = await listScripting(viewer);
   const scriptAppts = await upcomingScriptAppointments();
   const filter = (await searchParams).filter;
@@ -29,6 +29,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
       <PageHeader
         title="Scripting"
         description="Alle aankomende opnames en hun scripting in één overzicht — automatisch gekoppeld aan de opnameplanning. Scripts moeten uiterlijk 7 dagen vóór de opname klaar zijn."
+        actions={canUseGenerator ? <LinkButton href="/ai/scriptgenerator">✍️ Ga script schrijven</LinkButton> : undefined}
       />
 
       {/* Klikbare statusblokken: openen direct de bijbehorende filter hieronder. */}
@@ -69,7 +70,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
 
       {/* key op de actieve filter: zo herstart het board met de juiste filter
           zodra je op een blok bovenin klikt (anders blijft de begin-filter staan). */}
-      <ScriptingBoard key={filter ?? "alle"} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} canGenerate={canGenerate} defaultFilter={filter} />
+      <ScriptingBoard key={filter ?? "alle"} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} />
 
       {/* Vaste verantwoordelijke per klant — zodat in één oogopslag duidelijk is
           wie standaard de scripts van welke klant op zich neemt. Deze persoon

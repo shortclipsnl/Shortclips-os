@@ -76,6 +76,7 @@ export const NAVIGATION: NavGroup[] = [
     title: "AI Tools",
     accent: "var(--color-info)",
     items: [
+      { href: "/ai/scriptgenerator", label: "Scriptgenerator", icon: "PenLine", permissions: ["ai:read"], match: "/ai/scriptgenerator" },
       { href: "/ai/caption", label: "Caption Maker", icon: "Sparkles", permissions: ["ai:read"], match: "/ai/caption" },
       { href: "/ai/briefing", label: "Editor Briefing", icon: "ClipboardList", permissions: ["ai:read"], match: "/ai/briefing" },
       { href: "/ai/bericht", label: "Klantbericht", icon: "MessagesSquare", permissions: ["ai:read"], match: "/ai/bericht" },

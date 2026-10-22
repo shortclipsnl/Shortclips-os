@@ -33,6 +33,8 @@ export type AiResult =
   | { ok: true; text: string; model: string }
   | { ok: false; reason: "no_provider" | "error"; error?: string };
 
+export type ChatMessage = { role: "user" | "assistant"; content: string };
+
 export function aiConfigured(): boolean {
   return Boolean(env.ANTHROPIC_API_KEY);
 }
@@ -84,6 +86,40 @@ export async function runPrompt(input: AiRunInput): Promise<AiResult> {
       .join("\n")
       .trim();
 
+    return { ok: true, text, model };
+  } catch (error) {
+    if (error instanceof Anthropic.APIError) {
+      return { ok: false, reason: "error", error: `${error.status ?? ""} ${error.message}`.trim() };
+    }
+    return { ok: false, reason: "error", error: String(error) };
+  }
+}
+
+/**
+ * Meerbeurts-gesprek (chat) met het model: een system-instructie plus de volledige
+ * gespreksgeschiedenis. Voor de Scriptgenerator, die volgens een vaste werkwijze
+ * vragen stelt en daarna scripts schrijft.
+ */
+export async function runChat(input: { system: string; messages: ChatMessage[]; maxTokens?: number }): Promise<AiResult> {
+  if (!env.ANTHROPIC_API_KEY) return { ok: false, reason: "no_provider" };
+  if (input.messages.length === 0) return { ok: false, reason: "error", error: "Geen bericht." };
+  try {
+    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    const model = aiModel();
+    const response = await client.messages.create({
+      model,
+      max_tokens: input.maxTokens ?? 4000,
+      system: input.system,
+      messages: input.messages.map((m) => ({ role: m.role, content: m.content })),
+    });
+    if (response.stop_reason === "refusal") {
+      return { ok: false, reason: "error", error: "Het model weigerde dit verzoek." };
+    }
+    const text = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("\n")
+      .trim();
     return { ok: true, text, model };
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
