@@ -1,15 +1,16 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Download, FileText, MessageSquare, Pencil } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, FileText, Loader2, MessageSquare, Pencil, Upload, X } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { editorColor, editorDisplayName, firstNameKey } from "@/lib/editors";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase, type VideoStage } from "@/lib/statuses";
-import { askEditorQuestion, assignEditor, changeVideoStatus, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts } from "@/server/actions/videos";
+import { askEditorQuestion, assignEditor, changeVideoStatus, deleteVideoScript, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts, uploadVideoScript } from "@/server/actions/videos";
+import { fileToBase64 } from "../ai/_shared";
 import type { EditorBoardVideo } from "@/server/editor-board";
 
 type Editor = { id: string; fullName: string };
@@ -341,10 +342,9 @@ function Row({ v, editors, canEdit, canAssign, phaseColor, editorView = false }:
           onSave={(u) => run(() => setEditingVideoLinks(v.id, { footageUrl: u }))} />
       </div>
 
-      {/* Script */}
+      {/* Script — altijd een pdf-bestand (slepen of kiezen), geen link meer. */}
       <div className="relative flex items-center justify-center px-1">
-        <LinkCell href={v.scriptHref} canEdit={canEdit} icon={<FileText className="size-3.5" />} label="Script"
-          onSave={(u) => run(() => setEditingVideoLinks(v.id, { scriptUrl: u }))} />
+        <ScriptUploadCell v={v} canEdit={canEdit} run={run} pending={pending} />
       </div>
     </div>
   );
@@ -428,6 +428,80 @@ function ShortsField({ v, canEdit, onSave }: { v: EditorBoardVideo; canEdit: boo
 }
 
 /** Cel met een link: openen als er één is, en (voor wie mag) een link plakken/wijzigen. */
+/** Script-cel: een script is altijd een pdf-bestand. Bestaand script openen
+ *  (en verwijderen als het een geüpload bestand is); nieuw toevoegen kan alleen
+ *  door een pdf te slepen of te kiezen. Het script hoort bij de opname van de
+ *  video, dus alle shorts van dezelfde opname delen het. */
+function ScriptUploadCell({ v, canEdit, run, pending }: { v: EditorBoardVideo; canEdit: boolean; run: (fn: () => Promise<unknown>) => void; pending: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [over, setOver] = useState(false);
+  // Geüpload pdf-bestand heeft voorrang; anders een eventueel bestaand script
+  // (interne scriptpagina of oude link) zodat niets wat er al is verdwijnt.
+  const openHref = v.scriptFileId ? `/api/edit-files/${v.scriptFileId}` : v.scriptHref;
+  const useNextLink = !!openHref && openHref.startsWith("/scripts/");
+
+  async function onFile(file: File | undefined) {
+    if (!file) return;
+    if (!(file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))) return;
+    if (file.size > 10 * 1024 * 1024) return;
+    setBusy(true);
+    try {
+      const base64 = await fileToBase64(file);
+      run(() => uploadVideoScript(v.id, { fileName: file.name, contentType: file.type || "application/pdf", base64 }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const hiddenInput = (
+    <input ref={inputRef} type="file" accept="application/pdf" className="hidden"
+      onChange={(e) => { onFile(e.target.files?.[0]); e.currentTarget.value = ""; }} />
+  );
+
+  if (openHref) {
+    const linkCls = "inline-flex items-center gap-1 rounded-[4px] bg-[var(--color-brand-50)] px-2 py-1 text-2xs font-semibold text-[var(--color-brand-700)] hover:brightness-95";
+    return (
+      <span className="flex items-center gap-1">
+        {useNextLink ? (
+          <Link href={openHref} className={linkCls} title={v.scriptFileName ?? "Script openen"}><FileText className="size-3.5" /> Script</Link>
+        ) : (
+          <a href={openHref} target="_blank" rel="noopener noreferrer" className={linkCls} title={v.scriptFileName ?? "Script openen"}><FileText className="size-3.5" /> Script</a>
+        )}
+        {canEdit && v.scriptFileId ? (
+          <button type="button" onClick={() => run(() => deleteVideoScript(v.id))} title="Scriptbestand verwijderen" className="grid size-6 place-items-center rounded text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]"><X className="size-3.5" /></button>
+        ) : null}
+        {canEdit && !v.scriptFileId && v.hasShoot ? (
+          <>
+            {hiddenInput}
+            <button type="button" onClick={() => inputRef.current?.click()} disabled={busy || pending} title="Vervangen door een pdf-bestand" className="grid size-6 place-items-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]">{busy ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}</button>
+          </>
+        ) : null}
+      </span>
+    );
+  }
+  if (!canEdit) return <span className="text-2xs text-[var(--color-ink-faint)]">—</span>;
+  if (!v.hasShoot) return <span className="text-2xs text-[var(--color-ink-faint)]" title="Geen opname gekoppeld — een script hoort bij een opname">—</span>;
+  return (
+    <>
+      {hiddenInput}
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => { e.preventDefault(); setOver(false); onFile(e.dataTransfer.files?.[0]); }}
+        disabled={busy || pending}
+        title="Scriptbestand (pdf) slepen of kiezen"
+        className={`inline-flex items-center gap-1 rounded-[4px] border border-dashed px-2 py-1 text-2xs font-medium transition ${over ? "border-[var(--color-brand-500)] bg-[var(--color-brand-50)] text-[var(--color-brand-700)]" : "border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+      >
+        {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+        Sleep/upload
+      </button>
+    </>
+  );
+}
+
 function LinkCell({ href, canEdit, icon, label, onSave }: { href: string | null; canEdit: boolean; icon: React.ReactNode; label: string; onSave: (u: string | null) => void }) {
   const [open, setOpen] = useState(false);
   const [val, setVal] = useState(href ?? "");

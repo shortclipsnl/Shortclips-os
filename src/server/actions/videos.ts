@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import {
   clients,
   deliverables,
+  editProjectFiles,
   reviewComments,
   reviewThreads,
   users,
@@ -101,6 +102,77 @@ export async function setEditingVideoLinks(
     if ("scriptUrl" in links) patch.scriptUrl = links.scriptUrl?.trim() || null;
     await db.update(deliverables).set(patch).where(eq(deliverables.id, videoId));
 
+    revalidatePath("/videos");
+    revalidatePath(`/videos/${videoId}`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+const MAX_SCRIPT_BYTES = 10 * 1024 * 1024; // 10 MB — ruim voor een script-pdf
+
+/**
+ * Script-pdf uploaden bij een video. Een script hoort bij de OPNAME(dag): alle
+ * shorts van dezelfde opname delen hetzelfde script. We bewaren het als base64 in
+ * de database (klein bestand, geen externe opslag nodig) en vervangen een
+ * eventueel bestaand script van die opname.
+ */
+export async function uploadVideoScript(
+  videoId: string,
+  file: { fileName: string; contentType: string; base64: string },
+): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const video = await loadVideo(videoId);
+    if (!video) return { ok: false, message: "Video niet gevonden." };
+    assertClientAccess(viewer, video.clientId);
+    if (!video.productionDayId) {
+      return { ok: false, message: "Deze video heeft geen gekoppelde opnamedag. Het script hoort bij een opname." };
+    }
+
+    const isPdf = file.contentType === "application/pdf" || file.fileName.toLowerCase().endsWith(".pdf");
+    if (!isPdf) return { ok: false, message: "Alleen een pdf-bestand kan worden geüpload." };
+    const sizeBytes = Math.floor((file.base64.length * 3) / 4);
+    if (sizeBytes > MAX_SCRIPT_BYTES) return { ok: false, message: "Het bestand is te groot (max 10 MB)." };
+    if (sizeBytes === 0) return { ok: false, message: "Leeg bestand." };
+
+    // Oud script van deze opname vervangen.
+    await db
+      .delete(editProjectFiles)
+      .where(and(eq(editProjectFiles.productionDayId, video.productionDayId), eq(editProjectFiles.kind, "script")));
+    await db.insert(editProjectFiles).values({
+      productionDayId: video.productionDayId,
+      kind: "script",
+      fileName: file.fileName.slice(0, 255),
+      contentType: "application/pdf",
+      sizeBytes,
+      dataBase64: file.base64,
+      uploadedById: viewer.id,
+    });
+
+    revalidatePath("/videos");
+    revalidatePath(`/videos/${videoId}`);
+    return { ok: true, message: "Script geüpload." };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/** Het geüploade script-pdf van de opname van deze video verwijderen. */
+export async function deleteVideoScript(videoId: string): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const video = await loadVideo(videoId);
+    if (!video) return { ok: false, message: "Video niet gevonden." };
+    assertClientAccess(viewer, video.clientId);
+    if (!video.productionDayId) return { ok: true };
+
+    await db
+      .delete(editProjectFiles)
+      .where(and(eq(editProjectFiles.productionDayId, video.productionDayId), eq(editProjectFiles.kind, "script")));
     revalidatePath("/videos");
     revalidatePath(`/videos/${videoId}`);
     return { ok: true };

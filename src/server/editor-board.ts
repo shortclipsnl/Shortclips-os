@@ -54,6 +54,12 @@ export type EditorBoardVideo = {
   openComments: number;
   /** Link naar het script (interne scriptpagina, geüpload bestand of externe link). */
   scriptHref: string | null;
+  /** Id van het geüploade script-pdf (van de opname), of null. */
+  scriptFileId: string | null;
+  /** Bestandsnaam van het geüploade script-pdf, voor de tooltip. */
+  scriptFileName: string | null;
+  /** Heeft deze video een gekoppelde opname(dag)? Zo niet, dan kan er geen script-pdf bij. */
+  hasShoot: boolean;
   /** Downloadlink naar het beeldmateriaal (opname-footage of Drive-map). */
   downloadHref: string | null;
   /** Werkdagen tot de KLANTdeadline (negatief = te laat). null als er geen deadline is. */
@@ -130,6 +136,12 @@ export async function listEditorBoard(
         where f.production_day_id = deliverables.production_day_id and f.kind = 'script'
         order by f.created_at desc limit 1
       )`,
+      dayScriptFileName: sql<string | null>`(
+        select f.file_name from edit_project_files f
+        where f.production_day_id = deliverables.production_day_id and f.kind = 'script'
+        order by f.created_at desc limit 1
+      )`,
+      productionDayId: deliverables.productionDayId,
       openComments: sql<number>`(
         select count(*) from review_threads rt
         where rt.deliverable_id = deliverables.id
@@ -239,6 +251,9 @@ export async function listEditorBoard(
       briefing: r.briefing,
       openComments: Number(r.openComments ?? 0),
       scriptHref,
+      scriptFileId: r.dayScriptFileId,
+      scriptFileName: r.dayScriptFileName,
+      hasShoot: !!r.productionDayId,
       downloadHref,
       workdaysToDeadline,
       overdue: !!r.dueOn && r.dueOn < today,
