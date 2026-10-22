@@ -372,6 +372,13 @@
       "when": 1792611133069,
       "tag": "0052_lovely_snowbird",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1792654186805,
+      "tag": "0053_wild_shocker",
+      "breakpoints": true
     }
   ]
 }

@@ -27,6 +27,8 @@ export default async function AppLayout({
   const groups = NAVIGATION.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
+      // Uitsluitend voor editors (bijv. Showcase): ook de eigenaar/het team niet.
+      if (item.editorsOnly && !editorOnly) return false;
       // Editors: strikte allowlist — alles daarbuiten blijft verborgen.
       if (editorOnly && !EDITOR_NAV.has(item.href)) return false;
       // Eigenaar-only items: alleen voor Janno.

@@ -55,22 +55,48 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
             subtitle="Wie neemt standaard de scripts van welke klant op zich. Deze persoon wordt automatisch voorgesteld bij nieuwe opnames; je kunt per opname hierboven altijd iemand anders kiezen."
             className="p-5 pb-2"
           />
-          <ul className="grid gap-px bg-[var(--color-line)] sm:grid-cols-2 lg:grid-cols-3">
-            {clientResponsibles.map((c) => (
-              <li key={c.clientSlug} className="flex items-center gap-3 bg-[var(--color-surface)] px-4 py-3">
-                <ClientLogo name={c.clientName} logoUrl={c.clientLogo} color={c.clientColor} size={22} />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{c.clientName}</span>
-                {c.responsibleName ? (
-                  <span className="flex shrink-0 items-center gap-1.5">
-                    <TeamAvatar name={c.responsibleName} avatarUrl={c.responsibleAvatar} size={20} />
-                    <span className="text-sm text-[var(--color-ink-muted)]">{c.responsibleName.split(" ")[0]}</span>
-                  </span>
-                ) : (
-                  <span className="shrink-0 text-xs font-medium text-[var(--color-warn)]">nog niet ingesteld</span>
-                )}
-              </li>
-            ))}
-          </ul>
+          {(() => {
+            // Gegroepeerd per verantwoordelijke: in één oogopslag wie welke klanten
+            // doet. Klanten zonder verantwoordelijke staan apart onderaan.
+            const groups = new Map<string, { name: string | null; avatar: string | null; clients: typeof clientResponsibles }>();
+            for (const c of clientResponsibles) {
+              const key = c.responsibleName ?? "__none__";
+              if (!groups.has(key)) groups.set(key, { name: c.responsibleName, avatar: c.responsibleAvatar, clients: [] });
+              groups.get(key)!.clients.push(c);
+            }
+            const ordered = [...groups.values()].sort((a, b) => {
+              if (!a.name) return 1;
+              if (!b.name) return -1;
+              return b.clients.length - a.clients.length || a.name.localeCompare(b.name);
+            });
+            return (
+              <div className="grid gap-3 p-4 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+                {ordered.map((g) => (
+                  <div key={g.name ?? "none"} className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      {g.name ? (
+                        <TeamAvatar name={g.name} avatarUrl={g.avatar} size={28} />
+                      ) : (
+                        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--color-warn-soft)] text-sm font-bold text-[#8a5300]">!</span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-[var(--color-ink)]">{g.name ? g.name.split(" ")[0] : "Nog niet ingesteld"}</span>
+                        <span className="text-2xs text-[var(--color-ink-muted)]">{g.clients.length} klant{g.clients.length === 1 ? "" : "en"}</span>
+                      </span>
+                    </div>
+                    <ul className="flex flex-wrap gap-1.5">
+                      {g.clients.map((c) => (
+                        <li key={c.clientSlug} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1 text-xs">
+                          <ClientLogo name={c.clientName} logoUrl={c.clientLogo} color={c.clientColor} size={16} />
+                          <span className="max-w-[150px] truncate">{c.clientName}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </Card>
       ) : null}
     </div>

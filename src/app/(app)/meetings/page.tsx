@@ -20,7 +20,7 @@ function dateTime(d: Date): string {
 
 export default async function MeetingsPage() {
   await requireInternal();
-  // Zorg dat de vaste woensdag-16:00-meeting bestaat (met carry-over).
+  // Zorg dat de vaste woensdag-16:00-meeting bestaat (start met een lege lijst).
   const weeklyId = await ensureWeeklyMeeting();
   const [members, meetings, weekly, weeklyItems] = await Promise.all([
     listAssignableUsers(),
@@ -39,8 +39,12 @@ export default async function MeetingsPage() {
   const w = weekly[0]!;
   const openItems = weeklyItems.filter((i) => !i.isDone);
   const agendaCount = openItems.length;
-  // De wekelijkse meeting niet dubbel in de "komende" lijst.
-  const upcoming = meetings.filter((m) => m.id !== weeklyId && new Date(m.scheduledAt).getTime() >= now - 2 * 60 * 60 * 1000).reverse();
+  // Komende meetings: niet de vaste meeting, niet gearchiveerd, en nog niet voorbij.
+  const upcoming = meetings
+    .filter((m) => m.id !== weeklyId && !m.archivedAt && new Date(m.scheduledAt).getTime() >= now - 2 * 60 * 60 * 1000)
+    .reverse();
+  // Geweest: gearchiveerde meetings (nieuwste eerst).
+  const past = meetings.filter((m) => Boolean(m.archivedAt)).slice(0, 25);
 
   return (
     <div className="mx-auto max-w-[1000px]">
@@ -52,7 +56,7 @@ export default async function MeetingsPage() {
           <CalendarClock className="size-6 shrink-0 text-[var(--color-brand-400)]" />
           <div className="min-w-0 flex-1">
             <div className="text-base font-bold tracking-tight">Vaste teammeeting · {dateTime(new Date(w.scheduledAt))}</div>
-            <div className="text-xs text-white/70">{agendaCount} bespreekpunt{agendaCount === 1 ? "" : "en"} klaar · niet-behandelde punten gaan automatisch mee naar volgende week.</div>
+            <div className="text-xs text-white/70">{agendaCount} bespreekpunt{agendaCount === 1 ? "" : "en"} klaar · elke week een schone lijst; na de meeting archiveert hij automatisch en staat de volgende klaar.</div>
           </div>
           <span className="shrink-0 text-right">
             <span className="inline-block rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium">Open de meeting →</span>
@@ -116,13 +120,23 @@ export default async function MeetingsPage() {
           </ul>
         )}
       </Card>
+
+      {/* Geweest: automatisch gearchiveerde meetings, de dag na de meeting. */}
+      {past.length > 0 ? (
+        <Card padded={false} className="mt-5">
+          <CardHeader title="Geweest" subtitle="Meetings die al zijn geweest, met hun bespreekpunten." className="p-5 pb-2" />
+          <ul className="divide-y divide-[var(--color-line)]">
+            {past.map((m) => <MeetingRow key={m.id} m={m} archived />)}
+          </ul>
+        </Card>
+      ) : null}
     </div>
   );
 }
 
-function MeetingRow({ m }: { m: typeof teamMeetings.$inferSelect }) {
+function MeetingRow({ m, archived = false }: { m: typeof teamMeetings.$inferSelect; archived?: boolean }) {
   return (
-    <li className="flex items-center gap-2 px-5 py-3 hover:bg-[var(--color-surface-2)]">
+    <li className={`flex items-center gap-2 px-5 py-3 hover:bg-[var(--color-surface-2)]${archived ? " opacity-75" : ""}`}>
       <Link href={`/meetings/${m.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3">
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium">{m.title}</span>
@@ -132,7 +146,7 @@ function MeetingRow({ m }: { m: typeof teamMeetings.$inferSelect }) {
         </span>
         <span className="shrink-0 text-xs text-[var(--color-brand-600)]">openen →</span>
       </Link>
-      <DeleteMeetingRowButton id={m.id} title={m.title} />
+      {archived ? null : <DeleteMeetingRowButton id={m.id} title={m.title} />}
     </li>
   );
 }

@@ -80,28 +80,21 @@ export async function recomputeGoal(goalId: string, now = new Date(), opts: { sn
   return { changed, from, to: status, goal: { ...goal, status, current: String(current) } };
 }
 
-/** Meldingen bij een statuswissel, volgens de routeringsregels. */
+/** Meldingen bij een statuswissel. Doelen hebben geen eigenaar; meldingen gaan
+ *  naar Jarno (eigenaarsrol), die het overzicht bewaakt. Bij "gehaald" ook het team. */
 async function notifyStatusChange(goal: GoalRecord, to: GoalStatus, now: Date): Promise<void> {
-  const [ownerUser] = await db.select({ id: users.id }).from(users).where(eq(users.primaryRole, "owner")).limit(1);
-  const jarnoId = ownerUser?.id ?? null;
   const dayKey = now.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
   const href = "/doelen";
   const title = goal.title;
 
-  if (to === "risico" && goal.ownerId) {
-    await notify({ userIds: [goal.ownerId], type: "goal_risico", level: "warning", title: `Doel loopt risico: ${title}`, body: "Dit doel dreigt achter te lopen. Bekijk de stand en stuur bij.", href, dedupeKey: `goal_risico:${goal.id}:${dayKey}` });
+  if (to === "risico") {
+    await notify({ roles: ["owner"], type: "goal_risico", level: "warning", title: `Doel loopt risico: ${title}`, body: "Dit doel dreigt achter te lopen. Bekijk de stand en stuur bij.", href, dedupeKey: `goal_risico:${goal.id}:${dayKey}` });
   } else if (to === "achter") {
-    const to_ids = [goal.ownerId, jarnoId].filter((x): x is string => Boolean(x));
-    if (to_ids.length) await notify({ userIds: [...new Set(to_ids)], type: "goal_achter", level: "critical", title: `Doel achter: ${title}`, body: "Dit doel loopt achter op schema en vraagt directe actie.", href, dedupeKey: `goal_achter:${goal.id}:${dayKey}` });
-  } else if (to === "niet_bijgewerkt" && goal.ownerId) {
-    await notify({ userIds: [goal.ownerId], type: "goal_stand_ontbreekt", level: "info", title: `Stand ontbreekt: ${title}`, body: "Werk de stand van dit doel even bij.", href, dedupeKey: `goal_stand:${goal.id}:${dayKey}` });
+    await notify({ roles: ["owner"], type: "goal_achter", level: "critical", title: `Doel achter: ${title}`, body: "Dit doel loopt achter op schema en vraagt directe actie.", href, dedupeKey: `goal_achter:${goal.id}:${dayKey}` });
+  } else if (to === "niet_bijgewerkt") {
+    await notify({ roles: ["owner"], type: "goal_stand_ontbreekt", level: "info", title: `Stand ontbreekt: ${title}`, body: "Werk de stand van dit doel even bij.", href, dedupeKey: `goal_stand:${goal.id}:${dayKey}` });
   } else if (to === "gehaald") {
     await notify({ roles: ["owner", "project_coordinator", "content_creator", "videographer"], type: "goal_gehaald", level: "success", title: `Doel gehaald: ${title}`, body: "Dit doel is gehaald. Mooi werk, team.", href, dedupeKey: `goal_gehaald:${goal.id}` });
-  }
-
-  // Eigenaar ontbreekt: altijd een signaal aan Jarno (eenmalig per dag).
-  if (!goal.ownerId && jarnoId) {
-    await notify({ userIds: [jarnoId], type: "goal_geen_eigenaar", level: "info", title: `Doel zonder eigenaar: ${title}`, body: "Wijs een eigenaar toe aan dit doel.", href, dedupeKey: `goal_geen_eigenaar:${goal.id}:${dayKey}` });
   }
 }
 
@@ -126,10 +119,10 @@ export async function recomputeAllGoals(now = new Date()): Promise<{ processed: 
     if (r.changed) {
       changed++;
       await notifyStatusChange(r.goal, r.to, now);
-    } else if (isMonday && r.to === "niet_bijgewerkt" && r.goal.ownerId) {
+    } else if (isMonday && r.to === "niet_bijgewerkt") {
       // Maandagochtend-herinnering (wekelijks, los van een wissel).
       const weekKey = now.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
-      await notify({ userIds: [r.goal.ownerId], type: "goal_stand_ontbreekt", level: "info", title: `Stand ontbreekt: ${r.goal.title}`, body: "Werk de stand van dit doel even bij.", href: "/doelen", dedupeKey: `goal_stand_ma:${r.goal.id}:${weekKey}` });
+      await notify({ roles: ["owner"], type: "goal_stand_ontbreekt", level: "info", title: `Stand ontbreekt: ${r.goal.title}`, body: "Werk de stand van dit doel even bij.", href: "/doelen", dedupeKey: `goal_stand_ma:${r.goal.id}:${weekKey}` });
     }
   }
   return { processed: all.length, changed };

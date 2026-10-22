@@ -15,6 +15,8 @@ export type NavItem = {
   ownerOnly?: boolean;
   /** Náást de eigenaar ook zichtbaar voor deze rollen (rolgebaseerd, geen e-mailuitzonderingen). */
   roles?: UserRole[];
+  /** Uitsluitend voor editors — ook de eigenaar/het team ziet dit niet. */
+  editorsOnly?: boolean;
 };
 
 export type NavGroup = {
@@ -45,7 +47,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/scripting", label: "Scripting", icon: "ScrollText", permissions: ["scripts:read"], match: "/scripting" },
       { href: "/productions", label: "Opnameplanning", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
       { href: "/videos", label: "Editing", icon: "Scissors", permissions: ["videos:read"], match: "/videos" },
-      { href: "/showcase", label: "Showcase", icon: "Trophy", permissions: ["videos:read"], match: "/showcase" },
+      { href: "/showcase", label: "Showcase", icon: "Trophy", permissions: ["videos:read"], match: "/showcase", editorsOnly: true },
     ],
   },
   {

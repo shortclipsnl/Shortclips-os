@@ -9,9 +9,6 @@ import {
 import { requirePermission, isOwner } from "@/server/auth/context";
 import { isCoreStaff, coreStaffRank } from "@/server/core-staff";
 import { isBoardEditorName } from "@/lib/editors";
-import { getEditorHighestAwards } from "@/server/awards/service";
-import { awardByKey } from "@/server/awards/config";
-import { AwardBadge } from "@/app/(app)/showcase/award-badge";
 import { TeamLogins } from "./team-logins";
 import {
   Badge,
@@ -47,7 +44,7 @@ export default async function TeamPage() {
   const canWrite = viewer.permissions.has("team:write");
   const owner = isOwner(viewer);
 
-  const [people, editorStats, highestAwards] = await Promise.all([
+  const [people, editorStats] = await Promise.all([
     db.select({
       id: users.id,
       fullName: users.fullName,
@@ -90,8 +87,6 @@ export default async function TeamPage() {
           order by opgeleverd desc
         `)
       : Promise.resolve([]),
-
-    getEditorHighestAwards(),
   ]);
 
   const stats = ((editorStats as unknown as { rows?: Array<Record<string, unknown>> }).rows ??
@@ -143,17 +138,6 @@ export default async function TeamPage() {
         {/* De vaste short-video-editors (Quinn, Noah, Sam, Senna, Fabian) tonen
             we als "Short Video Editor", niet als creative. */}
         <div className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{isBoardEditorName(p.fullName) ? "Short Video Editor" : p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}</div>
-
-        {/* Hoogste behaalde award (Showcase). */}
-        {(() => {
-          const tier = highestAwards[p.id] ? awardByKey(highestAwards[p.id]!) : null;
-          return tier ? (
-            <div className="mt-2 flex items-center gap-1.5" title={`Hoogste award: ${tier.name}`}>
-              <AwardBadge tier={tier} earned size={26} />
-              <span className="text-2xs font-medium text-[var(--color-ink-muted)]">{tier.name}</span>
-            </div>
-          ) : null;
-        })()}
 
         {availability ? (
           <div className="mt-2">

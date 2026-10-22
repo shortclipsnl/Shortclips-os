@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { isOwner, requireInternal } from "@/server/auth/context";
 import { getGoalsOverview } from "@/server/goals/overview";
-import { listAssignableUsers } from "@/server/clients";
 import { PageHeader } from "@/components/ui";
 import { DoelenBoard } from "./doelen-board";
 
@@ -14,7 +13,7 @@ export default async function DoelenPage() {
   // Editors zien geen doelen.
   if (viewer.isEditorOnly) redirect("/dashboard");
 
-  const [overview, team] = await Promise.all([getGoalsOverview(viewer), listAssignableUsers()]);
+  const overview = await getGoalsOverview(viewer);
   const owner = isOwner(viewer);
 
   return (
@@ -23,12 +22,7 @@ export default async function DoelenPage() {
         title="Doelen"
         description={`Q4 2026 · 1 okt - 31 dec · week ${overview.weekOfQuarter} van ${overview.totalWeeks} · ${overview.quarterPct}% van het kwartaal voorbij`}
       />
-      <DoelenBoard
-        overview={overview}
-        isOwner={owner}
-        viewerId={viewer.id}
-        team={team.map((t) => ({ id: t.id, name: t.fullName }))}
-      />
+      <DoelenBoard overview={overview} isOwner={owner} />
     </div>
   );
 }

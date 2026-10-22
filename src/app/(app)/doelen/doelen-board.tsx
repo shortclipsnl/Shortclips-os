@@ -6,9 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, ChevronDown, Loader2, Pencil } from "lucide-react";
 import type { GoalRow, GoalsOverview } from "@/server/goals/overview";
 import type { GoalStatus } from "@/server/goals/status";
-import { archiveGoal, seedGoalsNow, setGoalOwner, setGoalTarget, toggleGoalMilestone, updateGoalStand } from "@/server/actions/goals";
-
-type TeamMember = { id: string; name: string };
+import { archiveGoal, seedGoalsNow, setGoalTarget, toggleGoalMilestone, updateGoalStand } from "@/server/actions/goals";
 
 const STATUS_META: Record<GoalStatus, { label: string; color: string }> = {
   op_koers: { label: "Op koers", color: "var(--color-good)" },
@@ -77,7 +75,7 @@ function DoelenLegeStaat({ isOwner }: { isOwner: boolean }) {
   );
 }
 
-export function DoelenBoard({ overview, isOwner, viewerId, team }: { overview: GoalsOverview; isOwner: boolean; viewerId: string; team: TeamMember[] }) {
+export function DoelenBoard({ overview, isOwner }: { overview: GoalsOverview; isOwner: boolean }) {
   const [filter, setFilter] = useState<string>("alles");
 
   // Lege staat: de doelen staan nog niet in deze omgeving.
@@ -87,10 +85,9 @@ export function DoelenBoard({ overview, isOwner, viewerId, team }: { overview: G
 
   const rows = useMemo(() => {
     if (filter === "alles") return overview.rows;
-    if (filter === "mijn") return overview.rows.filter((r) => r.ownerId === viewerId);
     if (filter === "aandacht") return overview.rows.filter((r) => ["achter", "risico", "niet_bijgewerkt"].includes(r.status));
     return overview.rows.filter((r) => r.pillar === filter);
-  }, [overview.rows, filter, viewerId]);
+  }, [overview.rows, filter]);
 
   const pillars = useMemo(() => {
     const keys = [...new Set(rows.map((r) => r.pillar))];
@@ -100,7 +97,6 @@ export function DoelenBoard({ overview, isOwner, viewerId, team }: { overview: G
   const FILTERS: { key: string; label: string }[] = [
     { key: "alles", label: "Alles" },
     ...overview.pillars.map((p) => ({ key: p.key, label: p.label })),
-    { key: "mijn", label: "Mijn doelen" },
     { key: "aandacht", label: "Alleen aandacht" },
   ];
 
@@ -131,7 +127,7 @@ export function DoelenBoard({ overview, isOwner, viewerId, team }: { overview: G
       {pillars.length === 0 ? (
         <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-line-strong)] px-4 py-8 text-center text-sm text-[var(--color-ink-muted)]">Geen doelen in deze weergave.</div>
       ) : (
-        pillars.map((p) => <PillarBlock key={p.key} pillar={p} isOwner={isOwner} team={team} />)
+        pillars.map((p) => <PillarBlock key={p.key} pillar={p} isOwner={isOwner} />)
       )}
 
       <MeldingUitleg />
@@ -139,7 +135,7 @@ export function DoelenBoard({ overview, isOwner, viewerId, team }: { overview: G
   );
 }
 
-function PillarBlock({ pillar, isOwner, team }: { pillar: GoalsOverview["pillars"][number]; isOwner: boolean; team: TeamMember[] }) {
+function PillarBlock({ pillar, isOwner }: { pillar: GoalsOverview["pillars"][number]; isOwner: boolean }) {
   const hasRood = pillar.rows.some((r) => r.status === "achter");
   const [open, setOpen] = useState(hasRood);
   const summary = (["op_koers", "risico", "achter", "niet_bijgewerkt", "gepland", "gehaald"] as GoalStatus[])
@@ -158,14 +154,14 @@ function PillarBlock({ pillar, isOwner, team }: { pillar: GoalsOverview["pillars
       </button>
       {open ? (
         <ul className="divide-y divide-[var(--color-line)]">
-          {pillar.rows.map((g) => <GoalRowItem key={g.id} g={g} isOwner={isOwner} team={team} />)}
+          {pillar.rows.map((g) => <GoalRowItem key={g.id} g={g} isOwner={isOwner} />)}
         </ul>
       ) : null}
     </section>
   );
 }
 
-function GoalRowItem({ g, isOwner, team }: { g: GoalRow; isOwner: boolean; team: TeamMember[] }) {
+function GoalRowItem({ g, isOwner }: { g: GoalRow; isOwner: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
@@ -200,9 +196,6 @@ function GoalRowItem({ g, isOwner, team }: { g: GoalRow; isOwner: boolean; team:
   function toggle(mid: string, done: boolean) {
     start(async () => { await toggleGoalMilestone(mid, done); router.refresh(); });
   }
-  function assign(ownerId: string) {
-    start(async () => { await setGoalOwner(g.id, ownerId || null); router.refresh(); });
-  }
   function doArchive() {
     start(async () => { await archiveGoal(g.id); router.refresh(); });
   }
@@ -219,10 +212,7 @@ function GoalRowItem({ g, isOwner, team }: { g: GoalRow; isOwner: boolean; team:
           <ChevronDown className={`size-4 shrink-0 text-[var(--color-ink-faint)] transition-transform ${open ? "rotate-180" : ""}`} />
         </div>
         <div className="flex items-center gap-2 text-2xs text-[var(--color-ink-muted)]">
-          <span className="shrink-0">
-            {g.ownerName ? g.ownerName : <span className="font-semibold text-[var(--color-warn)]">Geen eigenaar</span>}
-          </span>
-          {compactValue ? <><span className="text-[var(--color-ink-faint)]">·</span><span className="shrink-0 tabular-nums font-medium text-[var(--color-ink)]">{compactValue}</span></> : <><span className="text-[var(--color-ink-faint)]">·</span><span className="font-medium text-[var(--color-warn)]">doel instellen</span></>}
+          {compactValue ? <span className="shrink-0 tabular-nums font-medium text-[var(--color-ink)]">{compactValue}</span> : <span className="font-medium text-[var(--color-warn)]">doel instellen</span>}
           {hasBar || milePct != null ? (
             <span className="ml-auto h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--color-surface-2)] sm:w-24">
               <span className="block h-full rounded-full" style={{ width: `${hasBar ? pct : milePct}%`, background: meta.color }} />
@@ -291,10 +281,6 @@ function GoalRowItem({ g, isOwner, team }: { g: GoalRow; isOwner: boolean; team:
           {isOwner ? (
             <div className="flex flex-wrap items-center gap-2 border-t border-[var(--color-line)] pt-2 text-2xs">
               <span className="text-[var(--color-ink-faint)]">Beheer:</span>
-              <select disabled={pending} value={g.ownerId ?? ""} onChange={(e) => assign(e.target.value)} className="sc-input h-7 py-0 text-2xs" aria-label="Eigenaar toewijzen">
-                <option value="">Geen eigenaar</option>
-                {team.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
               {g.type === "weekly" && g.target == null ? <TargetSetter goalId={g.id} unit={g.unit} /> : null}
               <button type="button" disabled={pending} onClick={doArchive} className="text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]">Archiveren</button>
             </div>

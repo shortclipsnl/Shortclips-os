@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { runCleaningFridayReminder, runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runDailyTeamTodoReminder, runEditorDeadlineReminders, runEditorFridayWrapUp, runFinanceMonthReminder, runHourlySignals, runPostShootTodoReminders, runScriptTodoReminders, runTaskDeadlineReminders, runVrijdagcheckNotification } from "@/server/jobs/maintenance";
 import { runGoalsRecompute, runGoalsSeed } from "@/server/jobs/goals-job";
 import { runAwardsRecompute } from "@/server/jobs/awards-job";
+import { runMeetingsRollOver } from "@/server/jobs/meetings-roll-over";
 import {
   inspectFrameProject,
   listFrameProjects,
@@ -67,6 +68,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "goals.recompute": runGoalsRecompute,
   "goals.seed": runGoalsSeed,
   "awards.recompute": runAwardsRecompute,
+  "meetings.roll_over": runMeetingsRollOver,
   "vrijdagcheck.notify": runVrijdagcheckNotification,
   "finance.month_reminder": runFinanceMonthReminder,
   "signals.hourly": runHourlySignals,
