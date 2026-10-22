@@ -10,6 +10,8 @@ import { ScriptingBoard } from "./scripting-ui";
 
 export const metadata: Metadata = { title: "Scripting" };
 export const dynamic = "force-dynamic";
+// De batch-generator (6 concepten) doet meerdere AI-aanroepen; ruim de tijd geven.
+export const maxDuration = 300;
 
 export default async function ScriptingPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const viewer = await requireInternal();

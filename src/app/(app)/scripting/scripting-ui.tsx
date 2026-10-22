@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, Loader2, MessageSquareText, Sparkles, UserPlus } from "lucide-react";
 import { setScriptingNote, setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
-import { generateScript } from "@/server/actions/script-generator";
+import { generateScript, generateScriptBatch } from "@/server/actions/script-generator";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS } from "@/lib/statuses";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import type { ScriptingRow, WriterOption } from "@/server/scripting";
@@ -211,7 +211,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, c
                       <NoteCell id={r.id} note={r.note} canWrite={canWrite} />
                     </td>
                     <td className="px-2 py-2 align-top">
-                      <GenerateScriptCell productionDayId={r.id} canGenerate={canGenerate} />
+                      <GenerateScriptCell productionDayId={r.id} clientSlug={r.clientSlug} canGenerate={canGenerate} />
                     </td>
                   </tr>
                 ))}
@@ -380,30 +380,43 @@ type GenPlatform = "reels" | "tiktok" | "shorts";
 type GenDoel = "awareness" | "leads" | "verkoop";
 
 /**
- * AI-scriptschrijver per opname: genereert een conceptscript op founder-niveau.
- * Je geeft een onderwerp (platform/doel optioneel); de generator onderzoekt de
- * klant, schrijft in de vaste layout en controleert zichzelf (lint + judge) tot
- * de kwaliteitsgate. Daarna opent het conceptscript in de editor om bij te schaven.
+ * AI-scriptschrijver per opname: genereert een conceptscript op founder-niveau,
+ * of in één klik een hele batch van 6 unieke concepten. De generator onderzoekt
+ * de klant, schrijft in de vaste layout en controleert zichzelf (lint + judge).
  */
-function GenerateScriptCell({ productionDayId, canGenerate }: { productionDayId: string; canGenerate: boolean }) {
+function GenerateScriptCell({ productionDayId, clientSlug, canGenerate }: { productionDayId: string; clientSlug: string; canGenerate: boolean }) {
   const [open, setOpen] = useState(false);
   const [onderwerp, setOnderwerp] = useState("");
   const [platform, setPlatform] = useState<GenPlatform>("reels");
   const [doel, setDoel] = useState<GenDoel>("awareness");
   const [err, setErr] = useState<string | null>(null);
+  const [mode, setMode] = useState<"single" | "batch" | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
 
   if (!canGenerate) return <span className="text-xs text-[var(--color-ink-faint)]">—</span>;
 
-  const go = () => {
+  const runSingle = () => {
     const topic = onderwerp.trim();
     if (!topic) { setErr("Geef eerst een onderwerp op."); return; }
-    setErr(null);
+    setErr(null); setMode("single");
     start(async () => {
-      const res = await generateScript({ productionDayId, onderwerp: topic, platform, doel });
-      if (res.ok) { setOpen(false); router.push(`/scripts/${res.scriptId}`); }
-      else setErr(res.message);
+      try {
+        const res = await generateScript({ productionDayId, onderwerp: topic, platform, doel });
+        if (res.ok) { setOpen(false); router.push(`/scripts/${res.scriptId}`); }
+        else { setErr(res.message); setMode(null); }
+      } catch { setErr("Er ging iets mis. Probeer het opnieuw."); setMode(null); }
+    });
+  };
+
+  const runBatch = () => {
+    setErr(null); setMode("batch");
+    start(async () => {
+      try {
+        const res = await generateScriptBatch({ productionDayId, thema: onderwerp.trim() || undefined, aantal: 6, platform, doel });
+        if (res.ok) { setOpen(false); router.push(`/clients/${res.clientSlug}?tab=scripts`); }
+        else { setErr(res.message); setMode(null); }
+      } catch { setErr("Er ging iets mis. Probeer het opnieuw."); setMode(null); }
     });
   };
 
@@ -413,7 +426,7 @@ function GenerateScriptCell({ productionDayId, canGenerate }: { productionDayId:
         type="button"
         onClick={() => { setOpen((o) => !o); setErr(null); }}
         disabled={pending}
-        title="Genereer een conceptscript met de AI-scriptschrijver"
+        title="Genereer een conceptscript (of een batch van 6) met de AI-scriptschrijver"
         className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-brand-200)] bg-[var(--color-brand-50)] px-2 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] hover:brightness-95 disabled:opacity-60"
       >
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
@@ -426,11 +439,13 @@ function GenerateScriptCell({ productionDayId, canGenerate }: { productionDayId:
             {pending ? (
               <div className="flex items-start gap-2 py-2 text-sm text-[var(--color-ink-muted)]">
                 <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-[var(--color-brand-600)]" />
-                <span>De schrijver werkt: onderzoekt de klant, schrijft en controleert zichzelf. Dit duurt even…</span>
+                <span>{mode === "batch"
+                  ? "6 concepten schrijven: onderzoeken, bedenken, schrijven en controleren. Dit duurt enkele minuten — laat dit venster open staan…"
+                  : "De schrijver werkt: onderzoekt de klant, schrijft en controleert zichzelf. Dit duurt even…"}</span>
               </div>
             ) : (
               <>
-                <label className="block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Onderwerp</label>
+                <label className="block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Onderwerp <span className="font-normal normal-case text-[var(--color-ink-faint)]">(of thema voor 6 concepten)</span></label>
                 <textarea
                   value={onderwerp}
                   onChange={(e) => setOnderwerp(e.target.value)}
@@ -458,10 +473,12 @@ function GenerateScriptCell({ productionDayId, canGenerate }: { productionDayId:
                   </label>
                 </div>
                 {err ? <p className="mt-2 text-2xs text-[var(--color-bad)]">{err}</p> : null}
-                <div className="mt-2.5 flex items-center justify-end gap-2">
-                  <button type="button" onClick={() => setOpen(false)} className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleren</button>
-                  <button type="button" onClick={go} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110">
-                    <Sparkles className="size-3.5" /> Genereer script
+                <div className="mt-2.5 flex items-center justify-between gap-2">
+                  <button type="button" onClick={runBatch} title="Genereer 6 unieke concepten voor deze opnamedag" className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-brand-200)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)]">
+                    6 concepten
+                  </button>
+                  <button type="button" onClick={runSingle} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110">
+                    <Sparkles className="size-3.5" /> Genereer 1
                   </button>
                 </div>
               </>
