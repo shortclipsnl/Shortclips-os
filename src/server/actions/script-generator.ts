@@ -15,6 +15,7 @@ import {
   type CaptionProfile,
 } from "@/server/ai/knowledge";
 import { getScriptVideoInsights } from "@/server/video-intelligence/script-insights";
+import { getClientWinningPatterns } from "@/server/scripts/winning-patterns";
 import { gatherFeedbackContext } from "@/server/script-control";
 import { lintScript, lintIssuesText, type ScriptPlatform } from "@/server/scripts/lint";
 
@@ -90,14 +91,21 @@ function scoreOf(j: Judge): { eindscore: number; weakest: AxisKey } {
 }
 
 async function judge(platform: string, g: Generated): Promise<{ score: number; weakest: AxisKey; raw: Judge } | null> {
-  const res = await runJsonPrompt<Judge>({
-    system: JUDGE_SYSTEM,
-    user: `Platform: ${platform}.\n\nSCRIPT\nHook: ${g.hook}\nMiddenstuk: ${g.body}\nCTA: ${g.cta}\n\nScoor elke as 0-10 en benoem de zwakste as + per as één concrete verbetering. Geef JSON:\n{\n "assen": { "hook": 0, "retention": 0, "psychologie": 0, "spreektaal": 0, "originaliteit": 0, "conversie": 0, "platformfit": 0 },\n "zwakste_as": "",\n "verbeteringen": ["concrete ingreep 1", "..."]\n}`,
-    maxTokens: 1200,
-  });
-  if (!res.ok) return null;
-  const { eindscore, weakest } = scoreOf(res.data);
-  return { score: eindscore, weakest, raw: res.data };
+  // Twee pogingen: de judge kan incidenteel niets/onleesbaars teruggeven. Een
+  // mislukte judge mag NOOIT als 0.0 gelden — dan geven we null terug (= niet
+  // beoordeeld) en de generator noteert dat eerlijk.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await runJsonPrompt<Judge>({
+      system: JUDGE_SYSTEM,
+      user: `Platform: ${platform}.\n\nSCRIPT\nHook: ${g.hook}\nMiddenstuk: ${g.body}\nCTA: ${g.cta}\n\nScoor elke as 0-10 en benoem de zwakste as + per as één concrete verbetering. Geef JSON:\n{\n "assen": { "hook": 0, "retention": 0, "psychologie": 0, "spreektaal": 0, "originaliteit": 0, "conversie": 0, "platformfit": 0 },\n "zwakste_as": "",\n "verbeteringen": ["concrete ingreep 1", "..."]\n}`,
+      maxTokens: 1200,
+    });
+    if (res.ok && res.data?.assen && Object.keys(res.data.assen).length > 0) {
+      const { eindscore, weakest } = scoreOf(res.data);
+      return { score: eindscore, weakest, raw: res.data };
+    }
+  }
+  return null;
 }
 
 export async function generateScript(input: GenerateInput): Promise<GenerateResult> {
@@ -119,13 +127,24 @@ export async function generateScript(input: GenerateInput): Promise<GenerateResu
     if (!aiConfigured()) return { ok: false, message: "De AI-schrijver staat uit: ANTHROPIC_API_KEY ontbreekt." };
 
     // --- Context verzamelen (parallel) ---
-    const [profile, learned, central, feedback, insights] = await Promise.all([
+    const [profile, learned, central, feedback, insights, patterns] = await Promise.all([
       getClientAiProfile(pd.clientId),
       clientLearnedText(pd.clientId),
       centralKnowledgeText(["schrijfstijl", "branding", "kwaliteit", "communicatie"]),
       gatherFeedbackContext(pd.clientId),
       getScriptVideoInsights(viewer, pd.clientId, pd.clientSlug).catch(() => null),
+      getClientWinningPatterns(viewer, pd.clientId).catch(() => null),
     ]);
+
+    // Wat werkte ECHT (uit de cijfers): de best presterende hooks als spiegel.
+    let winners = "";
+    if (patterns && patterns.count > 0) {
+      winners = [
+        `Best presterende content van deze klant (echte cijfers — spiegel wat werkt, kopieer niet):`,
+        patterns.avgViews != null ? `- Gemiddeld ~${patterns.avgViews} views per video.` : "",
+        ...patterns.top.map((p) => `- "${p.hook}" (${p.platform}, ${p.views} views${p.completionRate != null ? `, ${Math.round(p.completionRate * 100)}% kijktijd` : ""})`),
+      ].filter(Boolean).join("\n");
+    }
 
     let watWerkt = "";
     if (insights && insights.total > 0) {
@@ -148,6 +167,7 @@ export async function generateScript(input: GenerateInput): Promise<GenerateResu
       feedback.recenteKlantopmerkingen.length ? `Recente klant-opmerkingen op eerdere video's:\n- ${feedback.recenteKlantopmerkingen.join("\n- ")}` : "",
       learned ? `Geleerde voorkeuren en terugkerende correcties van deze klant:\n${learned}` : "",
       central ? `Centrale ShortClips-richtlijnen:\n${central}` : "",
+      winners,
       watWerkt,
     ].filter(Boolean).join("\n\n");
 
@@ -196,9 +216,10 @@ export async function generateScript(input: GenerateInput): Promise<GenerateResu
       }
     }
 
-    const score = bestJudge?.score ?? 0;
+    const score: number | null = bestJudge?.score ?? null;
     const weakest = bestJudge?.weakest ?? "hook";
-    const gateHaald = score >= GATE && lint.ok;
+    const gateHaald = score != null && score >= GATE && lint.ok;
+    const scoreText = score != null ? `${score.toFixed(1)}/10` : "niet beoordeeld";
 
     // --- 4) Opslaan als script + versie 1 ---
     const title = (best.title || onderwerp).slice(0, 240);
@@ -209,7 +230,7 @@ export async function generateScript(input: GenerateInput): Promise<GenerateResu
       best.captionBody ? `• Midden: ${best.captionBody}` : "",
       best.captionCta ? `• CTA: ${best.captionCta}` : "",
       best.factsToVerify && best.factsToVerify.length ? `\nHandmatig controleren (niet verzinnen):\n${best.factsToVerify.map((f) => `• ${f}`).join("\n")}` : "",
-      `\nAutomatisch gegenereerd • platform ${platform} • doel ${doel} • judge ${score.toFixed(1)}/10 (gate ${GATE}${gateHaald ? ", gehaald" : ", nog niet gehaald — zwakste as: " + weakest})`,
+      `\nAutomatisch gegenereerd • platform ${platform} • doel ${doel} • judge ${scoreText}${score != null ? ` (gate ${GATE}${gateHaald ? ", gehaald" : ", nog niet gehaald — zwakste as: " + weakest})` : " — automatische beoordeling niet gelukt, controleer handmatig"}`,
     ].filter(Boolean).join("\n");
 
     const [created] = await db
@@ -234,7 +255,7 @@ export async function generateScript(input: GenerateInput): Promise<GenerateResu
       scriptId,
       versionNumber: 1,
       snapshot: { title, hook: best.hook ?? null, body: best.body ?? null, cta: best.cta ?? null, shotList: null, requirements: null },
-      changeSummary: `Automatisch gegenereerd (judge ${score.toFixed(1)}/10)`,
+      changeSummary: `Automatisch gegenereerd (judge ${scoreText})`,
       status: "concept",
       authorId: viewer.id,
     });
@@ -253,7 +274,7 @@ export async function generateScript(input: GenerateInput): Promise<GenerateResu
       clientId: pd.clientId,
       type: "script.generated",
       title: `Conceptscript gegenereerd: ${title}`,
-      body: `judge ${score.toFixed(1)}/10`,
+      body: `judge ${scoreText}`,
       entityType: "script",
       entityId: scriptId,
       actor: { id: viewer.id, fullName: viewer.fullName },
@@ -261,7 +282,7 @@ export async function generateScript(input: GenerateInput): Promise<GenerateResu
 
     revalidatePath("/scripting");
     revalidatePath(`/scripts/${scriptId}`);
-    return { ok: true, scriptId, score, weakestAxis: weakest, title, gateHaald };
+    return { ok: true, scriptId, score: score ?? 0, weakestAxis: weakest, title, gateHaald };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;

@@ -13,6 +13,7 @@ import {
 import { auditLog, recordActivity } from "@/server/audit";
 import { dispatch } from "@/server/automation";
 import { SCRIPT_STATUS } from "@/lib/statuses";
+import { rememberApprovedScript } from "@/server/scripts/learning";
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -177,6 +178,23 @@ export async function changeScriptStatus(
       entityId: scriptId,
       data: { from: current.status, to: nextStatus, coordinatorId: current.coordinatorId },
     });
+
+    // Leerlus: een goedgekeurd script onthouden als sterk voorbeeld, zodat de
+    // scriptgenerator er voortaan van spiegelt. Nooit blokkerend.
+    if (nextStatus === "approved") {
+      try {
+        await rememberApprovedScript({
+          clientId: current.clientId,
+          scriptId,
+          title: current.title,
+          hook: current.hook,
+          body: current.body,
+          userId: viewer.id,
+        });
+      } catch {
+        /* leren mag goedkeuren nooit tegenhouden */
+      }
+    }
 
     revalidatePath(`/scripts/${scriptId}`);
     revalidatePath("/scripts");
