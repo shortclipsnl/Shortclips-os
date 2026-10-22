@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, FileText, Film, CheckCircle2, Clock, Info, MessageCircle, Phone } from "lucide-react";
+import { AlertTriangle, FileText, Film, CheckCircle2, Clock, Info, MessageCircle, Phone, Trophy, CalendarClock } from "lucide-react";
 import { getEditorDashboard } from "@/server/editor-dashboard";
 import { listEditorBoard, type EditorBoardVideo } from "@/server/editor-board";
 import type { Viewer } from "@/server/auth/context";
@@ -8,6 +8,7 @@ import { pct, plural, relativeDays } from "@/lib/format";
 import { isFirstVersionPending } from "@/lib/edit-deadline";
 import { EDIT_PHASE_META } from "@/lib/statuses";
 import { AvailabilityBox } from "./availability-box";
+import { DeliveredCelebration } from "./delivered-celebration";
 
 /** "2026-10" → "oktober 2026". */
 function monthLabel(ym: string): string {
@@ -28,6 +29,9 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
   const [data, board] = await Promise.all([getEditorDashboard(viewer), listEditorBoard(viewer)]);
   const firstName = viewer.fullName.split(" ")[0];
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  // Opleveringen van deze maand — voor het feestmoment (confetti).
+  const curMonthKey = today.slice(0, 7);
+  const curMonthDelivered = data.deliveredByMonth.find((m) => m.month === curMonthKey)?.count ?? 0;
 
   // Alles wat nog niet is afgerond staat op het bord; op volgorde van de interne
   // deadline (eerste versie), het meest urgente bovenaan.
@@ -112,13 +116,16 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
           )}
         </Card>
 
-        {/* Binnenkort beschikbaar — nog in te plannen of wachten op beeld. */}
-        <Card padded={false}>
-          <div className="p-5 pb-3">
-            <CardHeader
-              title="Binnenkort beschikbaar"
-              subtitle="Deze video's komen er binnenkort aan. Houd er vast rekening mee in je planning, zodat alles realistisch en op tijd wordt opgeleverd."
-            />
+        {/* Binnenkort beschikbaar — nog in te plannen of wachten op beeld. Krijgt
+            een eigen gekleurde kop zodat het duidelijk opvalt naast "Jouw video's". */}
+        <Card padded={false} className="overflow-hidden">
+          <div className="flex items-center gap-2.5 px-5 py-3.5 text-white" style={{ background: "linear-gradient(90deg, var(--color-brand-600), var(--color-info))" }}>
+            <CalendarClock className="size-5 shrink-0" />
+            <div className="min-w-0">
+              <div className="text-base font-bold tracking-tight">Binnenkort beschikbaar</div>
+              <div className="text-2xs text-white/80">Komt eraan — houd er vast rekening mee in je planning.</div>
+            </div>
+            {binnenkort.length > 0 ? <span className="ml-auto shrink-0 rounded-full bg-white/20 px-2.5 py-0.5 text-sm font-bold tabular-nums">{binnenkort.length}</span> : null}
           </div>
           {binnenkort.length === 0 ? (
             <EmptyState title="Niets op de planning" description="Zodra er een nieuwe opname of klus aankomt, zie je die hier." />
@@ -133,21 +140,30 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
       {/* Maandoverzicht van opgeleverde projecten — zodat duidelijk is wat er
           per maand is afgerond. */}
       {data.deliveredByMonth.length > 0 ? (
-        <Card padded={false}>
-          <div className="p-5 pb-3">
-            <CardHeader title="Opgeleverd" subtitle="Je afgeronde projecten per maand." />
+        <Card padded={false} className="overflow-hidden">
+          {/* Confetti bij een nieuwe oplevering deze maand — een klein feestje. */}
+          <DeliveredCelebration monthKey={curMonthKey} count={curMonthDelivered} />
+          {/* Award-kop: opgeleverd werk mag voelen als een overwinning. */}
+          <div className="flex items-center gap-3 px-5 py-4 text-white" style={{ background: "linear-gradient(90deg, #1d6b4c, #2E90FA 70%, #FF6A00)" }}>
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white/20"><Trophy className="size-5" /></span>
+            <div className="min-w-0">
+              <div className="text-base font-bold tracking-tight">Opgeleverd 🎉</div>
+              <div className="text-2xs text-white/85">Jouw afgeronde video&apos;s — dik verdiend, dit staat.</div>
+            </div>
+            <span className="ml-auto shrink-0 rounded-full bg-white/20 px-3 py-1 text-sm font-bold tabular-nums">{data.stats.delivered} totaal</span>
           </div>
           <div className="divide-y divide-[var(--color-line)]">
             {data.deliveredByMonth.map((m) => (
               <div key={m.month} className="px-5 py-3">
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold capitalize">{monthLabel(m.month)}</span>
-                  <span className="rounded-full bg-[var(--color-good-soft)] px-2.5 py-0.5 text-2xs font-bold text-[#1d6b4c]">{plural(m.count, "video", "video's")} opgeleverd</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-good-soft)] px-2.5 py-0.5 text-2xs font-bold text-[#1d6b4c]"><Trophy className="size-3" />{plural(m.count, "video", "video's")} opgeleverd</span>
                 </div>
                 <ul className="grid gap-1.5">
                   {m.items.map((it) => (
                     <li key={it.id}>
                       <Link href={`/videos/${it.id}`} className="flex items-center gap-2 text-sm hover:underline">
+                        <CheckCircle2 className="size-4 shrink-0 text-[var(--color-good)]" />
                         <ClientLogo name={it.clientName} logoUrl={it.clientLogo} color={it.clientColor} size={18} />
                         <span className="min-w-0 truncate font-medium">{it.title}</span>
                         <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">{it.clientName}</span>
@@ -178,11 +194,11 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
               const first = c.fullName.split(" ")[0];
               const digits = (c.phone ?? "").replace(/[^\d]/g, "");
               return (
-                <div key={c.id} className="flex items-start gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3">
-                  <TeamAvatar name={c.fullName} avatarUrl={c.avatarUrl} size={44} />
+                <div key={c.id} className="flex items-start gap-3.5 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3.5">
+                  <TeamAvatar name={c.fullName} avatarUrl={c.avatarUrl} size={72} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="truncate text-sm font-semibold">{c.fullName}</span>
+                      <span className="truncate text-base font-bold">{c.fullName}</span>
                       <Info className="size-3.5 shrink-0 text-[var(--color-ink-faint)]" />
                     </div>
                     <div className="text-xs text-[var(--color-ink-muted)]">Contactpersoon bij ShortClips</div>

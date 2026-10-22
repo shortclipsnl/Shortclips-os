@@ -14,7 +14,7 @@ export function AvailabilityBox({ note }: { note: string | null }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const items = (note ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
-  const [editing, setEditing] = useState(items.length === 0);
+  const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(note ?? "");
 
   const save = () => {
@@ -27,9 +27,15 @@ export function AvailabilityBox({ note }: { note: string | null }) {
 
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-card)]">
-      <div className="mb-1 flex items-center gap-2">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
         <CalendarOff className="size-4 text-[var(--color-warn)]" />
         <h2 className="text-sm font-bold tracking-tight">Mijn beschikbaarheid</h2>
+        {/* Duidelijke status in één oogopslag. */}
+        {items.length > 0 ? (
+          <span className="rounded-full bg-[var(--color-warn-soft)] px-2.5 py-0.5 text-2xs font-bold text-[#8a5300]">{items.length} moment{items.length === 1 ? "" : "en"} niet beschikbaar</span>
+        ) : (
+          <span className="rounded-full bg-[var(--color-good-soft)] px-2.5 py-0.5 text-2xs font-bold text-[#1d6b4c]">Volledig beschikbaar</span>
+        )}
         {!editing ? (
           <button type="button" onClick={() => setEditing(true)} className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-[var(--color-brand-600)] hover:underline">
             <Pencil className="size-3.5" /> Aanpassen
@@ -75,7 +81,7 @@ export function AvailabilityBox({ note }: { note: string | null }) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-[var(--color-ink-muted)]">Nog niets ingevuld.</p>
+        <p className="text-sm text-[var(--color-ink-muted)]">Je staat als <strong className="text-[var(--color-ink)]">volledig beschikbaar</strong>. Geef via &ldquo;Aanpassen&rdquo; door wanneer je er niet bent.</p>
       )}
     </div>
   );
