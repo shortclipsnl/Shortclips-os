@@ -100,15 +100,15 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
               <div className="grid gap-3 p-4 pt-3 sm:grid-cols-2 lg:grid-cols-3">
                 {ordered.map((g) => (
                   <div key={g.name ?? "none"} className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3">
-                    <div className="mb-2 flex items-center gap-2">
+                    <div className="mb-2.5 flex items-center gap-3">
                       {g.name ? (
-                        <TeamAvatar name={g.name} avatarUrl={g.avatar} size={28} />
+                        <TeamAvatar name={g.name} avatarUrl={g.avatar} size={52} />
                       ) : (
-                        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--color-warn-soft)] text-sm font-bold text-[#8a5300]">!</span>
+                        <span className="grid size-14 shrink-0 place-items-center rounded-full bg-[var(--color-warn-soft)] text-lg font-bold text-[#8a5300]">!</span>
                       )}
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-[var(--color-ink)]">{g.name ? g.name.split(" ")[0] : "Nog niet ingesteld"}</span>
-                        <span className="text-2xs text-[var(--color-ink-muted)]">{g.clients.length} klant{g.clients.length === 1 ? "" : "en"}</span>
+                        <span className="block truncate text-base font-bold text-[var(--color-ink)]">{g.name ? g.name.split(" ")[0] : "Nog niet ingesteld"}</span>
+                        <span className="text-xs text-[var(--color-ink-muted)]">{g.clients.length} klant{g.clients.length === 1 ? "" : "en"}</span>
                       </span>
                     </div>
                     <ul className="flex flex-wrap gap-1.5">
