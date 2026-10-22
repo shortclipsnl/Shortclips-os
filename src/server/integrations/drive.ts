@@ -232,6 +232,17 @@ export class DriveService {
     return ((await r.json()) as { id: string }).id;
   }
 
+  /** Download de ruwe inhoud (bytes) van één bestand uit Drive. */
+  async downloadBytes(fileId: string): Promise<Uint8Array> {
+    const token = await this.token();
+    const url = `${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    if (!res.ok) {
+      throw new IntegrationError("google_drive", `Bestand downloaden mislukt (HTTP ${res.status})`, res.status, res.status >= 500);
+    }
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
   /** Upload een bestand (bytes) naar een map. Multipart upload in één request. */
   async uploadBytes(name: string, mimeType: string, bytes: Uint8Array, parentId: string): Promise<{ id: string }> {
     const token = await this.token();

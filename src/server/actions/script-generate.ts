@@ -9,6 +9,7 @@ import { scriptGeneratorSystem } from "@/server/scripts/scripthandboek";
 import { getClientAiProfile, captionProfileToText, clientLearnedText, type CaptionProfile } from "@/server/ai/knowledge";
 import { gatherFeedbackContext } from "@/server/script-control";
 import { getClientWinningPatterns } from "@/server/scripts/winning-patterns";
+import { getClientDriveScriptPdfs } from "@/server/scripts/drive-scripts";
 
 export type GeneratedScript = { onderwerp: string; tekst: string };
 type Result =
@@ -30,9 +31,35 @@ const FORMAT_RULES = [
   "- Geen markdown, geen sterretjes, geen codeblokken.",
 ];
 
+/** Kwaliteits- en datagedreven regels: schrijf wat aantoonbaar werkt, op Jarno-niveau. */
+const QUALITY_RULES = [
+  "KWALITEIT (het doel is scripts op het niveau van de beste scriptschrijver, zodat elk teamlid dit zelfstandig kan):",
+  "- Schrijf niet zomaar iets: kies onderwerpen en invalshoeken die aantoonbaar werken. Spiegel de best presterende hooks en concepten van deze klant (uit de meegeleverde cijfers en eerdere scripts) — kopieer ze niet, maak ze beter.",
+  "- Haal stijl, woordgebruik, scriptlengte en openingsstijl uit de eerdere scripts van deze klant.",
+  "- Zorg dat elk script echt TikTok- en Reels-waardig is: sterke hook in 3 seconden, hoge retentie, concreet en bruikbaar.",
+  "- Volg strikt de Shortclips scriptstijl uit het handboek. Twijfel je of een zin sterk genoeg is, herschrijf hem.",
+];
+
 type ScriptsPayload = { scripts?: Array<{ onderwerp?: unknown; regels?: unknown; tekst?: unknown }> };
 
-/** Leest het JSON-antwoord van het model, ook als er ```-fences of wat tekst omheen staan. */
+/** Redt complete script-objecten uit het antwoord, ook als het JSON is afgekapt
+ *  (bijv. bij de token-limiet): we matchen elk volledig {"onderwerp",...,"regels":[...]}. */
+function salvageScripts(raw: string): ScriptsPayload | null {
+  const re = /\{\s*"onderwerp"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"regels"\s*:\s*(\[(?:[^[\]]|\\.)*\])\s*\}/g;
+  const scripts: Array<{ onderwerp: string; regels: unknown }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(raw))) {
+    try {
+      const onderwerp = JSON.parse(`"${m[1]}"`) as string;
+      const regels = JSON.parse(m[2]!) as unknown;
+      scripts.push({ onderwerp, regels });
+    } catch { /* dit object overslaan */ }
+  }
+  return scripts.length ? { scripts } : null;
+}
+
+/** Leest het JSON-antwoord van het model, ook als er ```-fences of wat tekst omheen staan,
+ *  of als het antwoord is afgekapt (dan redden we de complete scripts). */
 function parseScriptsJson(raw: string): ScriptsPayload | null {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
   const tryParse = (s: string): ScriptsPayload | null => {
@@ -41,11 +68,13 @@ function parseScriptsJson(raw: string): ScriptsPayload | null {
   return (
     tryParse(cleaned) ??
     (() => {
-      // Val terug op het eerste { … } blok (grootste match).
       const start = cleaned.indexOf("{");
       const end = cleaned.lastIndexOf("}");
-      if (start >= 0 && end > start) return tryParse(cleaned.slice(start, end + 1));
-      return null;
+      if (start >= 0 && end > start) {
+        const parsed = tryParse(cleaned.slice(start, end + 1));
+        if (parsed) return parsed;
+      }
+      return salvageScripts(cleaned);
     })()
   );
 }
@@ -88,8 +117,10 @@ export async function generateScripts(input: {
   clientName?: string;
   count: number;
   brief?: string;
-  /** Eerdere scripts als PDF (base64, zonder data:-prefix): basis voor nieuwe scripts. */
-  priorPdfs?: Array<{ base64: string }>;
+  /** Tekst uit handmatig toegevoegde eerdere scripts (in de browser uit PDF gehaald). */
+  priorText?: string;
+  /** Eerdere scripts automatisch uit de Drive-map van de klant halen. */
+  useDriveScripts?: boolean;
 }): Promise<Result> {
   try {
     const viewer = await requirePermission("ai:read");
@@ -105,10 +136,16 @@ export async function generateScripts(input: {
     }
 
     const brief = (input.brief ?? "").trim().slice(0, 4000);
-    const documents = (input.priorPdfs ?? [])
-      .slice(0, MAX_PDFS)
-      .filter((p) => typeof p?.base64 === "string" && p.base64.length > 0)
-      .map((p) => ({ base64: p.base64, mediaType: "application/pdf" as const }));
+    const priorText = (input.priorText ?? "").trim().slice(0, 24000);
+
+    // Eerdere scripts uit Drive (server-side, dus geen upload-limiet).
+    let documents: Array<{ base64: string; mediaType: "application/pdf" }> = [];
+    if (input.useDriveScripts && input.clientId) {
+      try {
+        const drivePdfs = await getClientDriveScriptPdfs(input.clientId, MAX_PDFS);
+        documents = drivePdfs.map((p) => ({ base64: p.base64, mediaType: "application/pdf" as const }));
+      } catch { /* zonder Drive-scripts verdergaan */ }
+    }
 
     const user = [
       `BATCHMODUS. Schrijf nu direct ${count} complete organische short video scripts${klantnaam ? ` voor klant "${klantnaam}"` : ""}.`,
@@ -116,9 +153,12 @@ export async function generateScripts(input: {
       klantnaam
         ? "Gebruik alles wat je over deze klant weet uit de meegeleverde context en eerdere data. Een website heb je niet nodig."
         : "Er is geen vaste klant gekozen. Kies een logisch, concreet onderwerp per script dat past bij het handboek.",
-      documents.length ? "Er zijn eerdere scripts als PDF meegestuurd. Gebruik die als basis en stijlreferentie: neem de tone of voice, opbouw en sterke concepten over, maar schrijf NIEUWE scripts — geen kopie." : "",
+      documents.length ? `Er zijn ${documents.length} eerdere script(s) als PDF meegestuurd uit Drive. Gebruik die als basis en stijlreferentie: neem tone of voice, opbouw en sterke concepten over, maar schrijf NIEUWE scripts — geen kopie.` : "",
+      priorText ? `Eerdere scripts van deze klant (tekst — gebruik als basis en stijlreferentie, schrijf nieuwe scripts):\n${priorText}` : "",
       "Mis je een hard cijfer? Gebruik een realistische range en noem het een gemiddelde. Verzin nooit exacte cijfers, namen of modellen.",
       brief ? `Input van de gebruiker (onderwerpen, hooks of extra wensen — gebruik dit leidend):\n${brief}` : "",
+      "",
+      ...QUALITY_RULES,
       "",
       ...FORMAT_RULES,
       "",
@@ -132,7 +172,7 @@ export async function generateScripts(input: {
       system: scriptGeneratorSystem(extra || undefined),
       user,
       documents: documents.length ? documents : undefined,
-      maxTokens: Math.min(16000, count * 1600 + 2000),
+      maxTokens: Math.min(24000, count * 3000 + 3000),
     });
 
     if (!res.ok) {
@@ -235,6 +275,51 @@ export async function reviseScript(input: {
     if (!tekst) return { ok: false, message: "De aanpassing leverde geen tekst op. Probeer het nog eens." };
 
     return { ok: true, script: { onderwerp: onderwerp || input.onderwerp, tekst } };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+type TopicsResult =
+  | { ok: true; topics: string[] }
+  | { ok: false; message: string };
+
+/** Laat de generator zelf sterke onderwerpen/hooks voorstellen op basis van wat werkt. */
+export async function suggestTopics(input: { clientId?: string; clientName?: string; count?: number }): Promise<TopicsResult> {
+  try {
+    const viewer = await requirePermission("ai:read");
+    if (!aiConfigured()) return { ok: false, message: "De AI-schrijver staat uit (ANTHROPIC_API_KEY ontbreekt)." };
+
+    const count = Math.max(4, Math.min(12, Math.round(input.count || 8)));
+    let extra = "";
+    let klantnaam = (input.clientName ?? "").trim();
+    if (input.clientId) {
+      const ctx = await clientContext(viewer, input.clientId);
+      if (ctx) { extra = ctx.extra; klantnaam = ctx.name; }
+    }
+
+    const user = [
+      `Stel ${count} sterke, concrete onderwerpen voor organische short video's voor${klantnaam ? ` klant "${klantnaam}"` : " een klant"}.`,
+      "Kies onderwerpen die aantoonbaar werken: baseer je op wat goed presteert bij deze klant, veelgestelde vragen, misverstanden en sterke invalshoeken uit het handboek. Geen advertentie-ideeën.",
+      "Elk onderwerp is één korte, pakkende regel (een titel of hook), zonder nummer.",
+      "",
+      "Geef UITSLUITEND geldige JSON terug: {\"onderwerpen\":[\"...\",\"...\"]}",
+    ].join("\n");
+
+    const res = await runPrompt({ system: scriptGeneratorSystem(extra || undefined), user, maxTokens: 1500 });
+    if (!res.ok) return { ok: false, message: "De schrijver gaf geen antwoord. Probeer het nog eens." };
+
+    const cleaned = res.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+    let topics: string[] = [];
+    try {
+      const start = cleaned.indexOf("{"); const end = cleaned.lastIndexOf("}");
+      const obj = JSON.parse(start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned) as { onderwerpen?: unknown };
+      if (Array.isArray(obj.onderwerpen)) topics = obj.onderwerpen.filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim());
+    } catch { /* val terug op niets */ }
+
+    if (topics.length === 0) return { ok: false, message: "Geen onderwerpen gekregen. Probeer het nog eens." };
+    return { ok: true, topics: topics.slice(0, count) };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;

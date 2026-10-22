@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X } from "lucide-react";
-import { generateScripts, reviseScript, type GeneratedScript } from "@/server/actions/script-generate";
+import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud } from "lucide-react";
+import { generateScripts, reviseScript, suggestTopics, type GeneratedScript } from "@/server/actions/script-generate";
 
 type Client = { id: string; name: string; active: boolean };
 type ClientFilter = "actief" | "inactief" | "alle";
@@ -17,7 +17,7 @@ type SpeechResultLike = { isFinal: boolean; 0: { transcript: string } };
 type SpeechEventLike = { resultIndex: number; results: ArrayLike<SpeechResultLike> };
 type SpeechRecognitionLike = {
   lang: string; continuous: boolean; interimResults: boolean;
-  onresult: (e: SpeechEventLike) => void; onend: () => void; onerror: () => void;
+  onresult: (e: SpeechEventLike) => void; onend: () => void; onerror: (e: { error?: string }) => void;
   start: () => void; stop: () => void;
 };
 type SRWindow = Window & {
@@ -31,8 +31,10 @@ function speechCtor(): (new () => SpeechRecognitionLike) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+type SpeechErrorEvent = { error?: string };
+
 /** Microfoonknop: dicteert in het Nederlands en geeft de herkende tekst door. */
-function MicButton({ onText, title = "Inspreken" }: { onText: (t: string) => void; title?: string }) {
+function MicButton({ onText, onError, title = "Inspreken" }: { onText: (t: string) => void; onError?: (m: string) => void; title?: string }) {
   const [listening, setListening] = useState(false);
   const [mounted, setMounted] = useState(false);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
@@ -41,25 +43,42 @@ function MicButton({ onText, title = "Inspreken" }: { onText: (t: string) => voi
   // Pas na mount renderen: zo is de server- en client-render gelijk (geen hydration-mismatch).
   if (!mounted || !Ctor) return null;
 
-  const stop = () => { recRef.current?.stop(); recRef.current = null; setListening(false); };
+  const stop = () => { try { recRef.current?.stop(); } catch { /* al gestopt */ } recRef.current = null; setListening(false); };
   const start = () => {
-    const r = new Ctor();
-    r.lang = "nl-NL";
-    r.continuous = true;
-    r.interimResults = false;
-    r.onresult = (e) => {
-      let t = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const res = e.results[i];
-        if (res?.isFinal) t += res[0].transcript;
-      }
-      if (t.trim()) onText(t.trim());
-    };
-    r.onend = () => setListening(false);
-    r.onerror = () => setListening(false);
-    recRef.current = r;
-    r.start();
-    setListening(true);
+    try {
+      const r = new Ctor();
+      r.lang = "nl-NL";
+      r.continuous = true;
+      r.interimResults = false;
+      r.onresult = (e) => {
+        let t = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const res = e.results[i];
+          if (res?.isFinal) t += res[0].transcript;
+        }
+        if (t.trim()) onText(t.trim());
+      };
+      r.onend = () => setListening(false);
+      r.onerror = (ev: SpeechErrorEvent) => {
+        setListening(false);
+        const code = ev?.error ?? "";
+        const msg =
+          code === "not-allowed" || code === "service-not-allowed"
+            ? "Microfoon is geblokkeerd. Geef deze site toegang tot de microfoon en probeer opnieuw."
+            : code === "no-speech"
+              ? "Geen spraak gehoord. Probeer opnieuw."
+              : code === "audio-capture"
+                ? "Geen microfoon gevonden."
+                : "Inspreken lukt niet in deze browser. Gebruik Chrome, of typ het.";
+        onError?.(msg);
+      };
+      recRef.current = r;
+      r.start();
+      setListening(true);
+    } catch {
+      onError?.("Inspreken kon niet starten. Gebruik Chrome, of typ het.");
+      setListening(false);
+    }
   };
 
   return (
@@ -76,15 +95,6 @@ function MicButton({ onText, title = "Inspreken" }: { onText: (t: string) => voi
 
 /* ---------------- helpers ---------------- */
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => { const s = String(r.result); const i = s.indexOf(","); resolve(i >= 0 ? s.slice(i + 1) : s); };
-    r.onerror = () => reject(new Error("Kon het bestand niet lezen."));
-    r.readAsDataURL(file);
-  });
-}
-
 const appendText = (prev: string, add: string) => prev + (prev && !prev.endsWith("\n") && !prev.endsWith(" ") ? " " : "") + add;
 
 /* ---------------- component ---------------- */
@@ -97,7 +107,10 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const [filter, setFilter] = useState<ClientFilter>("actief");
   const [count, setCount] = useState(3);
   const [brief, setBrief] = useState("");
-  const [pdfs, setPdfs] = useState<Array<{ name: string; base64: string }>>([]);
+  const [priorFiles, setPriorFiles] = useState<Array<{ name: string; text: string }>>([]);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [useDrive, setUseDrive] = useState(true);
+  const [topicsBusy, setTopicsBusy] = useState(false);
 
   // Resultaat (bewerkbaar)
   const [scripts, setScripts] = useState<GeneratedScript[] | null>(null);
@@ -119,18 +132,27 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const selectedName = clientId ? clients.find((c) => c.id === clientId)?.name ?? "" : "";
   const effectiveClientName = showOther ? otherName.trim() : selectedName;
 
-  const addPdfs = async (files: FileList | null) => {
+  const addPdfFiles = async (files: FileList | null) => {
     if (!files) return;
     setErr(null);
-    for (const f of Array.from(files)) {
-      if (f.type !== "application/pdf") { setErr("Alleen PDF-bestanden kunnen erbij."); continue; }
-      if (f.size > 3.5 * 1024 * 1024) { setErr(`"${f.name}" is te groot (max 3,5 MB).`); continue; }
-      try {
-        const base64 = await fileToBase64(f);
-        setPdfs((p) => (p.length >= 3 ? p : [...p, { name: f.name, base64 }]));
-      } catch { setErr(`"${f.name}" kon niet worden gelezen.`); }
+    setPdfBusy(true);
+    try {
+      const { extractPdfText } = await import("@/lib/pdf-text");
+      for (const f of Array.from(files)) {
+        if (!(f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"))) { setErr("Alleen PDF-bestanden kunnen erbij."); continue; }
+        if (priorFiles.length >= 4) break;
+        try {
+          const text = await extractPdfText(f);
+          if (!text) { setErr(`Uit "${f.name}" kwam geen tekst (misschien een scan zonder tekstlaag).`); continue; }
+          setPriorFiles((p) => (p.length >= 4 ? p : [...p, { name: f.name, text }]));
+        } catch { setErr(`"${f.name}" kon niet worden gelezen.`); }
+      }
+    } finally {
+      setPdfBusy(false);
     }
   };
+
+  const priorText = () => priorFiles.map((p) => `--- ${p.name} ---\n${p.text}`).join("\n\n").slice(0, 24000);
 
   const generate = () => {
     setErr(null);
@@ -140,7 +162,8 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         clientName: showOther ? otherName.trim() || undefined : undefined,
         count,
         brief: brief.trim() || undefined,
-        priorPdfs: pdfs.length ? pdfs.map((p) => ({ base64: p.base64 })) : undefined,
+        priorText: priorFiles.length ? priorText() : undefined,
+        useDriveScripts: !showOther && !!clientId && useDrive,
       });
       if (res.ok) {
         setScripts(res.scripts);
@@ -151,6 +174,20 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         setErr(res.message);
       }
     });
+  };
+
+  const fetchTopics = () => {
+    setErr(null);
+    setTopicsBusy(true);
+    (async () => {
+      const res = await suggestTopics({
+        clientId: showOther ? undefined : clientId || undefined,
+        clientName: showOther ? otherName.trim() || undefined : undefined,
+      });
+      if (res.ok) setBrief((prev) => (prev.trim() ? prev.trim() + "\n" : "") + res.topics.join("\n"));
+      else setErr(res.message);
+      setTopicsBusy(false);
+    })();
   };
 
   const exportPdf = async () => {
@@ -247,7 +284,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
                 spellCheck
                 className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface-2)] px-3 py-2 font-mono text-xs leading-relaxed text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
               />
-              <MicButton onText={(t) => updateScript(i, { tekst: appendText(s.tekst, t) })} title="Tekst inspreken" />
+              <MicButton onText={(t) => updateScript(i, { tekst: appendText(s.tekst, t) })} onError={setErr} title="Tekst inspreken" />
             </div>
 
             {/* AI-aanpassing */}
@@ -262,7 +299,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
                     placeholder="bijv. maak de hook pakkender en voeg een concreet bedrag toe"
                     className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
                   />
-                  <MicButton onText={(t) => setReviseText((p) => appendText(p, t))} title="Aanpassing inspreken" />
+                  <MicButton onText={(t) => setReviseText((p) => appendText(p, t))} onError={setErr} title="Aanpassing inspreken" />
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   <button type="button" onClick={() => runRevise(i)} disabled={revisePending || !reviseText.trim()} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40">
@@ -308,11 +345,15 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Voor welke klant?</span>
           <div className="inline-flex rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5 text-2xs">
-            {(["actief", "inactief", "alle"] as const).map((f) => (
-              <button key={f} type="button" onClick={() => setFilter(f)} className={`rounded-full px-2.5 py-1 font-medium capitalize transition ${filter === f ? "bg-[var(--color-brand-600)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>
-                {f === "actief" ? "Actief" : f === "inactief" ? "Niet-actief" : "Alle"}
-              </button>
-            ))}
+            {(["actief", "inactief", "alle"] as const).map((f) => {
+              const sel = filter === f;
+              const selClass = f === "actief" ? "bg-[var(--color-good)] text-white" : f === "inactief" ? "bg-[var(--color-bad)] text-white" : "bg-[var(--color-brand-600)] text-white";
+              return (
+                <button key={f} type="button" onClick={() => setFilter(f)} className={`rounded-full px-2.5 py-1 font-medium transition ${sel ? selClass : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>
+                  {f === "actief" ? "Actief" : f === "inactief" ? "Niet-actief" : "Alle"}
+                </button>
+              );
+            })}
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -323,9 +364,10 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
                 key={c.id}
                 type="button"
                 onClick={() => { setShowOther(false); setClientId(c.id); }}
-                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${active ? "border-[var(--color-brand-600)] bg-[var(--color-brand-600)] text-white" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink)] hover:border-[var(--color-brand-500)]"}`}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${active ? "border-[var(--color-brand-600)] bg-[var(--color-brand-600)] text-white" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink)] hover:border-[var(--color-brand-500)]"}`}
               >
-                {c.name}{!c.active ? <span className="ml-1.5 text-2xs opacity-60">(niet-actief)</span> : null}
+                <span className="inline-block size-2 shrink-0 rounded-full" style={{ background: c.active ? "var(--color-good)" : "var(--color-bad)" }} />
+                {c.name}
               </button>
             );
           })}
@@ -365,29 +407,43 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         </div>
       </div>
 
-      {/* Eerdere scripts als PDF */}
+      {/* Eerdere scripts — automatisch uit Drive + handmatig toevoegen */}
       <div className="mb-5">
-        <span className="mb-2 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Eerdere scripts erbij <span className="font-normal normal-case text-[var(--color-ink-faint)]">— optioneel, PDF</span></span>
-        <label className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-ink-muted)] hover:border-[var(--color-brand-500)]">
-          <Upload className="size-4" /> Sleep of kies PDF('s) met eerdere scripts
-          <input type="file" accept="application/pdf" multiple className="hidden" onChange={(e) => addPdfs(e.target.files)} />
+        <span className="mb-2 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Eerdere scripts als basis <span className="font-normal normal-case text-[var(--color-ink-faint)]">— optioneel</span></span>
+
+        {!showOther && clientId ? (
+          <label className="mb-2 flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-ink)]">
+            <input type="checkbox" checked={useDrive} onChange={(e) => setUseDrive(e.target.checked)} className="size-4 accent-[var(--color-brand-600)]" />
+            <Cloud className="size-4 text-[var(--color-brand-600)]" />
+            <span>Eerdere scripts automatisch uit de Google Drive-map van deze klant halen</span>
+          </label>
+        ) : null}
+
+        <label className={`flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2.5 text-sm hover:border-[var(--color-brand-500)] ${pdfBusy ? "opacity-60" : ""} text-[var(--color-ink-muted)]`}>
+          {pdfBusy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />} {pdfBusy ? "Tekst uitlezen…" : "Zelf PDF('s) met eerdere scripts toevoegen (ook grote bestanden)"}
+          <input type="file" accept="application/pdf" multiple disabled={pdfBusy} className="hidden" onChange={(e) => { addPdfFiles(e.target.files); e.currentTarget.value = ""; }} />
         </label>
-        {pdfs.length > 0 ? (
+        {priorFiles.length > 0 ? (
           <ul className="mt-2 flex flex-wrap gap-1.5">
-            {pdfs.map((p, i) => (
+            {priorFiles.map((p, i) => (
               <li key={i} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1 text-2xs text-[var(--color-ink)]">
                 <FileText className="size-3" /> <span className="max-w-[180px] truncate">{p.name}</span>
-                <button type="button" onClick={() => setPdfs((prev) => prev.filter((_, idx) => idx !== i))} className="text-[var(--color-ink-muted)] hover:text-[var(--color-bad)]"><X className="size-3" /></button>
+                <button type="button" onClick={() => setPriorFiles((prev) => prev.filter((_, idx) => idx !== i))} className="text-[var(--color-ink-muted)] hover:text-[var(--color-bad)]"><X className="size-3" /></button>
               </li>
             ))}
           </ul>
         ) : null}
-        <p className="mt-1.5 text-2xs text-[var(--color-ink-faint)]">Hij gebruikt deze als basis: zelfde stijl en opbouw, maar nieuwe scripts.</p>
+        <p className="mt-1.5 text-2xs text-[var(--color-ink-faint)]">Hij gebruikt deze als basis: zelfde stijl en opbouw, maar nieuwe scripts. Van een PDF wordt alleen de tekst gebruikt, dus grootte maakt niet uit.</p>
       </div>
 
-      {/* Onderwerpen / wensen + voice */}
+      {/* Onderwerpen / wensen + voice + AI-suggesties */}
       <div className="mb-5">
-        <span className="mb-2 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Onderwerpen of hooks <span className="font-normal normal-case text-[var(--color-ink-faint)]">— optioneel, typen of inspreken</span></span>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Onderwerpen of hooks <span className="font-normal normal-case text-[var(--color-ink-faint)]">— optioneel, typen of inspreken</span></span>
+          <button type="button" onClick={fetchTopics} disabled={topicsBusy} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 py-1 text-2xs font-medium text-[var(--color-brand-700)] hover:border-[var(--color-brand-500)] disabled:opacity-50">
+            {topicsBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Lightbulb className="size-3.5" />} Laat de AI onderwerpen kiezen
+          </button>
+        </div>
         <div className="flex items-start gap-2">
           <textarea
             value={brief}
@@ -396,7 +452,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
             placeholder={"Laat leeg om de schrijver zelf onderwerpen te laten kiezen.\nOf geef bv. hooks, producten, acties of een thema."}
             className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:outline-none"
           />
-          <MicButton onText={(t) => setBrief((p) => appendText(p, t))} title="Onderwerpen inspreken" />
+          <MicButton onText={(t) => setBrief((p) => appendText(p, t))} onError={setErr} title="Onderwerpen inspreken" />
         </div>
       </div>
 
