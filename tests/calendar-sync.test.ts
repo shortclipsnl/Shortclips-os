@@ -141,4 +141,52 @@ describe("Google Agenda synchronisatie", () => {
     expect(review.some((a) => a.externalId === "e2")).toBe(true);
     expect(review.some((a) => a.clientId !== null)).toBe(false);
   });
+
+  it("slaat één onbereikbare agenda over en synct de rest gewoon", async () => {
+    // Bootst de echte storing na: één gekoppelde agenda bestaat niet meer en
+    // geeft een fout (zoals Google 404 "Not Found"). De sync mag daardoor niet
+    // in zijn geheel afbreken; de werkende agenda moet gewoon doorlopen.
+    const resilientSource: CalendarSource = {
+      isConfigured: true,
+      configuredCalendarIds: [],
+      async listCalendars() {
+        return [
+          { id: "cal-dood", summary: "Verwijderde agenda" },
+          { id: "cal-goed", summary: "Team Shortclips afspraken" },
+        ];
+      },
+      async listEvents(calendarId: string) {
+        if (calendarId === "cal-dood") {
+          throw new Error("HTTP 404 bij GET /calendars/cal-dood/events");
+        }
+        return [
+          {
+            id: "ev-goed-1",
+            summary: "Nieuwe afspraak uit werkende agenda",
+            start: { dateTime: soon(3) },
+            end: { dateTime: soon(3) },
+            status: "confirmed",
+          },
+        ];
+      },
+    };
+
+    const result = await sync.runCalendarSync({ source: resilientSource });
+    expect(result.ok).toBe(true);
+
+    // De afspraak uit de werkende agenda is opgeslagen ...
+    const good = await db
+      .select()
+      .from(s.calendarEvents)
+      .where(eq(s.calendarEvents.externalId, "ev-goed-1"));
+    expect(good.length).toBe(1);
+    expect(good[0]!.calendarId).toBe("cal-goed");
+
+    // ... en de dode agenda heeft niets achtergelaten.
+    const dead = await db
+      .select()
+      .from(s.calendarEvents)
+      .where(eq(s.calendarEvents.calendarId, "cal-dood"));
+    expect(dead.length).toBe(0);
+  });
 });

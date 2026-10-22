@@ -205,7 +205,19 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
       const toUpsert: (typeof calendarEvents.$inferInsert)[] = [];
 
       for (const cal of calendars) {
-        const events = await source.listEvents(cal.id, { timeMin, timeMax });
+        // Eén onbereikbare agenda (verwijderd, hernoemd of toegang ingetrokken)
+        // mag nooit de hele sync platleggen. We slaan zo'n agenda over met een
+        // waarschuwing en gaan door met de rest. Belangrijk: we voegen hem dan
+        // NIET toe aan seenByCalendar, zodat de opruimstap zijn eerder gesyncte
+        // afspraken niet ten onrechte als geannuleerd markeert.
+        let events: CalendarEvent[];
+        try {
+          events = await source.listEvents(cal.id, { timeMin, timeMax });
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          ctx.log(`Agenda "${cal.summary}" overgeslagen (niet bereikbaar): ${msg}`);
+          continue;
+        }
         ctx.log(`Agenda "${cal.summary}": ${events.length} afspraken`);
         if (!seenByCalendar.has(cal.id)) seenByCalendar.set(cal.id, new Set());
 
