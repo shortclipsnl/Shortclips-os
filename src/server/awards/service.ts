@@ -9,10 +9,18 @@ import { computeEarnedAwards, nextAward, type Delivery, type EarnedAward } from 
 /** Statussen die "klantgoedgekeurd of afgerond" betekenen (gelijk aan editing.ts). */
 export const AWARD_DONE_STATUSES = ["approved", "ready_to_publish", "scheduled", "published", "analysis_available"] as const;
 
-/** De opgeleverde video's van één editor (één rij per video). */
+/** Aantal shorts in één opgeleverde opdracht: één opdracht kan meerdere shorts
+ *  bevatten (bijv. 3 shorts voor één klant). Minimaal 1. */
+function shortsOf(plannedShorts: number | null): number {
+  return Math.max(1, Number(plannedShorts) || 1);
+}
+
+/** De opgeleverde shorts van één editor: één opdracht telt als zoveel shorts als
+ *  het bevat (plannedShorts). Elke short krijgt een eigen sleutel, zodat de
+ *  award-drempels op het echte aantal shorts worden gehaald. */
 async function getEditorDeliveries(editorUserId: string): Promise<Delivery[]> {
   const rows = await db
-    .select({ id: deliverables.id, approvedAt: deliverables.approvedAt, statusChangedAt: deliverables.statusChangedAt })
+    .select({ id: deliverables.id, approvedAt: deliverables.approvedAt, statusChangedAt: deliverables.statusChangedAt, plannedShorts: deliverables.plannedShorts })
     .from(deliverables)
     .where(
       and(
@@ -22,7 +30,13 @@ async function getEditorDeliveries(editorUserId: string): Promise<Delivery[]> {
       ),
     );
   // approvedAt is de goedkeuringsdatum; valt terug op statusChangedAt als die ontbreekt.
-  return rows.map((r) => ({ videoId: r.id, approvedAt: r.approvedAt ?? r.statusChangedAt }));
+  const out: Delivery[] = [];
+  for (const r of rows) {
+    const when = r.approvedAt ?? r.statusChangedAt;
+    const n = shortsOf(r.plannedShorts);
+    for (let i = 0; i < n; i++) out.push({ videoId: `${r.id}#${i}`, approvedAt: when });
+  }
+  return out;
 }
 
 /**
@@ -121,10 +135,15 @@ function projectNextAward(count: number, dates: Date[], now: Date): string | nul
 /** Alle data voor de Showcase van één editor. */
 export async function getShowcase(editorUserId: string, now = new Date()): Promise<ShowcaseData> {
   const rows = await db
-    .select({ clientId: deliverables.clientId, approvedAt: deliverables.approvedAt, statusChangedAt: deliverables.statusChangedAt })
+    .select({ clientId: deliverables.clientId, approvedAt: deliverables.approvedAt, statusChangedAt: deliverables.statusChangedAt, plannedShorts: deliverables.plannedShorts })
     .from(deliverables)
     .where(and(eq(deliverables.editorId, editorUserId), isNull(deliverables.deletedAt), inArray(deliverables.status, [...AWARD_DONE_STATUSES])));
-  const dated = rows.map((r) => ({ clientId: r.clientId, date: r.approvedAt ?? r.statusChangedAt }));
+  // Eén opdracht telt als zoveel shorts als het bevat (plannedShorts, min 1).
+  const dated: { clientId: string; date: Date }[] = [];
+  for (const r of rows) {
+    const when = r.approvedAt ?? r.statusChangedAt;
+    for (let i = 0; i < shortsOf(r.plannedShorts); i++) dated.push({ clientId: r.clientId, date: when });
+  }
   const count = dated.length;
   const thisMonth = dated.filter((d) => monthKey(d.date) === monthKey(now)).length;
   const clientCount = new Set(dated.map((d) => d.clientId)).size;
