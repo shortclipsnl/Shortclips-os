@@ -130,7 +130,14 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
       {canWrite ? (
         <div className="mb-4">
-          <QuickTaskLines users={userOptions} defaultAssignee={selected?.id ?? (office.some((u) => u.id === viewer.id) ? viewer.id : undefined)} />
+          {/* key op de geselecteerde persoon: zo herstart het formulier bij het
+              wisselen van persoon en staat de toewijzing meteen op de juiste
+              persoon (geen extra handeling). "Algemeen" start zonder toewijzing. */}
+          <QuickTaskLines
+            key={`qt-${persoon ?? "none"}`}
+            users={userOptions}
+            defaultAssignee={selected?.id ?? (persoon === "algemeen" ? undefined : office.some((u) => u.id === viewer.id) ? viewer.id : undefined)}
+          />
         </div>
       ) : null}
 
