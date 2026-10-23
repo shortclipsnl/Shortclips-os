@@ -54,6 +54,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   // Eerste bezoek (geen ?persoon): meteen je eigen taken tonen i.p.v. "Kies een
   // persoon". De knop "Iedereen" stuurt een lege ?persoon= en houdt het overzicht.
   const persoon = spPersoon === undefined && office.some((u) => u.id === viewer.id) ? viewer.id : spPersoon;
+  // Open overdrachtspunten (voor het aantal op de kleine "Overdracht"-kaart).
+  const handoverOpen = handover.filter((h) => !h.resolvedAt).length;
 
   const openCountFor = (uid: string) => allOpen.filter((t) => t.assigneeId === uid).length;
   const algemeenCount = allOpen.filter((t) => !t.assigneeId).length;
@@ -87,11 +89,11 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       .limit(400);
   }
 
-  const selected = persoon && persoon !== "algemeen" ? team.find((u) => u.id === persoon) : null;
-  const selectedLabel = selected ? selected.fullName : persoon === "algemeen" ? "Algemene taken" : null;
+  const selected = persoon && persoon !== "algemeen" && persoon !== "overdracht" ? team.find((u) => u.id === persoon) : null;
+  const selectedLabel = selected ? selected.fullName : persoon === "algemeen" ? "Algemene taken" : persoon === "overdracht" ? "Overdracht" : null;
 
   let buckets: { label: string; tone?: "bad" | "warn"; items: TaskItemData[] }[] = [];
-  if (persoon) {
+  if (persoon && persoon !== "overdracht") {
     const assigneeCond = persoon === "algemeen" ? isNull(tasks.assigneeId) : eq(tasks.assigneeId, persoon);
     const [open, done, archived] = await Promise.all([
       fetchTasks(and(isNull(tasks.deletedAt), inArray(tasks.status, [...OPEN]), assigneeCond, scopeToClients(viewer, tasks.clientId))),
@@ -117,18 +119,17 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     <div className="mx-auto max-w-[1100px]">
       <PageHeader title="Taken" description={selectedLabel ? `Taken van ${selectedLabel}` : "Kies een persoon om direct de taken te zien."} />
 
-      {/* Overdracht: korte punten voor de volgende persoon/dag. */}
-      <HandoverBoard notes={handover} users={userOptions} canWrite={canWrite} />
-
-      {/* Personen als primaire navigatie */}
+      {/* Personen als primaire navigatie — eigen taken staan zo meteen bovenaan.
+          Overdracht is een klein tabblad naast "Algemeen" i.p.v. een groot blok. */}
       <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
         {core.map((u) => (
           <PersonCard key={u.id} id={u.id} name={u.fullName} count={openCountFor(u.id)} active={persoon === u.id} />
         ))}
-        <PersonCard id="algemeen" name="Algemeen" count={algemeenCount} active={persoon === "algemeen"} generic />
+        <PersonCard id="algemeen" name="Algemeen" count={algemeenCount} active={persoon === "algemeen"} generic chip="AL" />
+        <PersonCard id="overdracht" name="Overdracht" count={handoverOpen} active={persoon === "overdracht"} generic chip="⇄" countLabel="open" accent="var(--color-violet)" />
       </div>
 
-      {canWrite ? (
+      {canWrite && persoon !== "overdracht" ? (
         <div className="mb-4">
           {/* key op de geselecteerde persoon: zo herstart het formulier bij het
               wisselen van persoon en staat de toewijzing meteen op de juiste
@@ -141,7 +142,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         </div>
       ) : null}
 
-      {!persoon ? (
+      {persoon === "overdracht" ? (
+        <HandoverBoard notes={handover} users={userOptions} canWrite={canWrite} />
+      ) : !persoon ? (
         <Card>
           <EmptyState title="Kies een persoon" description="Klik hierboven op een teamlid of op Algemeen om de taken te zien." />
         </Card>
@@ -171,7 +174,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   );
 }
 
-function PersonCard({ id, name, count, active, generic }: { id: string; name: string; count: number; active: boolean; generic?: boolean }) {
+function PersonCard({ id, name, count, active, generic, chip = "AL", countLabel = "open", accent }: { id: string; name: string; count: number; active: boolean; generic?: boolean; chip?: string; countLabel?: string; accent?: string }) {
   return (
     <Link
       href={`/tasks?persoon=${id}`}
@@ -179,14 +182,19 @@ function PersonCard({ id, name, count, active, generic }: { id: string; name: st
       className={`flex items-center gap-3.5 rounded-[var(--radius-md)] border px-4 py-3.5 ${active ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-mist)] text-white" : "border-[var(--color-line)] hover:bg-[var(--color-surface-2)]"}`}
     >
       {generic ? (
-        // Op de donkere actieve kaart een doorschijnend-witte chip gebruiken zodat 'AL' leesbaar blijft
-        <span className={`grid size-16 shrink-0 place-items-center rounded-full text-base font-semibold ${active ? "bg-white/15 text-white" : "bg-[var(--color-surface-sunken)] text-[var(--color-ink-muted)]"}`}>AL</span>
+        // Op de donkere actieve kaart een doorschijnend-witte chip gebruiken zodat het label leesbaar blijft
+        <span
+          className={`grid size-16 shrink-0 place-items-center rounded-full text-base font-semibold ${active ? "bg-white/15 text-white" : accent ? "text-white" : "bg-[var(--color-surface-sunken)] text-[var(--color-ink-muted)]"}`}
+          style={!active && accent ? { background: accent } : undefined}
+        >
+          {chip}
+        </span>
       ) : (
         <TeamAvatar name={name} size={64} />
       )}
       <span className="min-w-0">
         <span className="block truncate text-lg font-semibold">{name.split(" ")[0]}</span>
-        {/* Open taken krijgen een kleurtje zodat ze opvallen; 0 blijft rustig. */}
+        {/* Open items krijgen een kleurtje zodat ze opvallen; 0 blijft rustig. */}
         <span
           className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${
             active
@@ -196,7 +204,7 @@ function PersonCard({ id, name, count, active, generic }: { id: string; name: st
                 : "bg-[var(--color-surface-2)] text-[var(--color-ink-faint)] font-medium"
           }`}
         >
-          {count} open
+          {count} {countLabel}
         </span>
       </span>
     </Link>
