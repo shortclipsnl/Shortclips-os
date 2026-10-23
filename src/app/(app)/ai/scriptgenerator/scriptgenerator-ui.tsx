@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock } from "lucide-react";
-import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, checkScriptQuality, type GeneratedScript, type QualityResult } from "@/server/actions/script-generate";
+import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, checkScriptQuality, listShootDaysForClient, type GeneratedScript, type QualityResult } from "@/server/actions/script-generate";
+
+type ShootDay = { id: string; scheduledOn: string; title: string };
 
 type Client = { id: string; name: string; active: boolean };
 type ClientFilter = "actief" | "inactief" | "alle";
@@ -14,6 +16,11 @@ const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? cry
 
 function todayNl(): string {
   return new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function isoToNl(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return isNaN(d.getTime()) ? iso : d.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
 }
 
 // Snelle feedback-acties (rule: Hook sterker, Meer waarde, Minder commercieel, Meer humor, Korter, Ander concept).
@@ -134,6 +141,8 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const [opnamedag, setOpnamedag] = useState(todayNl());
   const [genClientId, setGenClientId] = useState<string>("");
   const [genClientName, setGenClientName] = useState<string>("");
+  const [shootDays, setShootDays] = useState<ShootDay[]>([]);
+  const [shootDayId, setShootDayId] = useState<string>("");
 
   // Aanpassen per script
   const [reviseId, setReviseId] = useState<string | null>(null);
@@ -193,8 +202,17 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
       if (res.ok) {
         setScripts(res.scripts.map((s: GeneratedScript) => ({ id: uid(), onderwerp: s.onderwerp, tekst: s.tekst, versions: [] })));
         setKlantnaam(res.klantnaam || effectiveClientName || "");
-        setGenClientId(showOther ? "" : clientId);
+        const gcid = showOther ? "" : clientId;
+        setGenClientId(gcid);
         setGenClientName(showOther ? otherName.trim() : selectedName);
+        // Opnamedagen van deze klant ophalen om direct aan te koppelen.
+        setShootDays([]); setShootDayId("");
+        if (gcid) {
+          listShootDaysForClient(gcid).then((days) => {
+            setShootDays(days);
+            if (days.length > 0) { setShootDayId(days[0]!.id); setOpnamedag(isoToNl(days[0]!.scheduledOn)); }
+          }).catch(() => {});
+        }
       } else {
         setErr(res.message);
       }
@@ -221,7 +239,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
     setErr(null);
     setSavedMsg(null);
     try {
-      const res = await saveScriptsToLibrary({ clientId: genClientId, scripts: scripts.map((s) => ({ onderwerp: s.onderwerp, tekst: s.tekst })) });
+      const res = await saveScriptsToLibrary({ clientId: genClientId, scripts: scripts.map((s) => ({ onderwerp: s.onderwerp, tekst: s.tekst })), productionDayId: shootDayId || undefined });
       if (res.ok) setSavedMsg(`${res.count} script${res.count === 1 ? "" : "s"} opgeslagen in de scriptbibliotheek.`);
       else setErr(res.message);
     } finally {
@@ -334,7 +352,32 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
             </label>
             <label className="block">
               <span className="mb-1 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Opnamedag</span>
-              <input value={opnamedag} onChange={(e) => setOpnamedag(e.target.value)} placeholder="bijv. 9 november 2026" className="sc-input h-9 w-full text-sm" />
+              {shootDays.length > 0 ? (
+                <>
+                  <select
+                    value={shootDayId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setShootDayId(id);
+                      const day = shootDays.find((d) => d.id === id);
+                      if (day) setOpnamedag(isoToNl(day.scheduledOn));
+                    }}
+                    className="sc-input h-9 w-full text-sm"
+                  >
+                    {shootDays.map((d) => (
+                      <option key={d.id} value={d.id}>{isoToNl(d.scheduledOn)} — {d.title}</option>
+                    ))}
+                    <option value="">Andere datum…</option>
+                  </select>
+                  {shootDayId === "" ? (
+                    <input value={opnamedag} onChange={(e) => setOpnamedag(e.target.value)} placeholder="bijv. 9 november 2026" className="sc-input mt-2 h-9 w-full text-sm" />
+                  ) : (
+                    <span className="mt-1 block text-2xs text-[var(--color-good)]">Wordt gekoppeld aan deze opnamedag in de planning.</span>
+                  )}
+                </>
+              ) : (
+                <input value={opnamedag} onChange={(e) => setOpnamedag(e.target.value)} placeholder="bijv. 9 november 2026" className="sc-input h-9 w-full text-sm" />
+              )}
             </label>
           </div>
         </div>
@@ -509,7 +552,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
 
         {/* Actiebalk */}
         <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface-2)]/95 p-3 shadow-[var(--shadow-card)] backdrop-blur">
-          <button type="button" onClick={() => { setScripts(null); setErr(null); setSavedMsg(null); setReviseId(null); setVersionsId(null); }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface)]">
+          <button type="button" onClick={() => { setScripts(null); setErr(null); setSavedMsg(null); setReviseId(null); setVersionsId(null); setShootDays([]); setShootDayId(""); }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface)]">
             <ArrowLeft className="size-4" /> Nieuwe set
           </button>
           <span className="text-2xs text-[var(--color-ink-faint)]">{scripts.length} script{scripts.length === 1 ? "" : "s"} · geef feedback tot het klopt</span>

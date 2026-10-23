@@ -1,9 +1,9 @@
 "use server";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
-import { clients, scripts, scriptVersions } from "@/db/schema";
+import { clients, scripts, scriptVersions, productionDays } from "@/db/schema";
 import { requirePermission, assertClientAccess, ForbiddenError } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { aiConfigured, runPrompt } from "@/server/ai/client";
@@ -506,6 +506,27 @@ function parseScriptBlocks(tekst: string): { uitleg: string; hook: string; body:
   return { uitleg: join(buckets.uitleg), hook: join(buckets.hook), body: join(buckets.body), cta: join(buckets.cta) };
 }
 
+/** Aankomende opnamedagen van een klant, om scripts direct aan te koppelen. */
+export async function listShootDaysForClient(clientId: string): Promise<Array<{ id: string; scheduledOn: string; title: string }>> {
+  const viewer = await requirePermission("ai:read");
+  const [c] = await db.select({ id: clients.id }).from(clients).where(and(eq(clients.id, clientId), isNull(clients.deletedAt))).limit(1);
+  if (!c) return [];
+  assertClientAccess(viewer, c.id);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const rows = await db
+    .select({ id: productionDays.id, scheduledOn: productionDays.scheduledOn, title: productionDays.title })
+    .from(productionDays)
+    .where(and(
+      eq(productionDays.clientId, c.id),
+      isNull(productionDays.deletedAt),
+      ne(productionDays.status, "cancelled"),
+      gte(productionDays.scheduledOn, todayStr),
+    ))
+    .orderBy(asc(productionDays.scheduledOn))
+    .limit(30);
+  return rows.map((r) => ({ id: r.id, scheduledOn: String(r.scheduledOn), title: r.title }));
+}
+
 type SaveResult =
   | { ok: true; count: number }
   | { ok: false; message: string };
@@ -515,6 +536,8 @@ type SaveResult =
 export async function saveScriptsToLibrary(input: {
   clientId: string;
   scripts: Array<{ onderwerp: string; tekst: string }>;
+  /** Optioneel: koppel aan een opnamedag uit de opnameplanning. */
+  productionDayId?: string;
 }): Promise<SaveResult> {
   try {
     const viewer = await requirePermission("scripts:write");
@@ -529,12 +552,22 @@ export async function saveScriptsToLibrary(input: {
     if (!c) return { ok: false, message: "Kies eerst een vastgelegde klant om in op te slaan." };
     assertClientAccess(viewer, c.id);
 
+    // Valideer de opnamedag: moet van deze klant zijn.
+    let productionDayId: string | null = null;
+    if (input.productionDayId) {
+      const [pd] = await db.select({ id: productionDays.id }).from(productionDays)
+        .where(and(eq(productionDays.id, input.productionDayId), eq(productionDays.clientId, c.id), isNull(productionDays.deletedAt)))
+        .limit(1);
+      if (pd) productionDayId = pd.id;
+    }
+
     let count = 0;
     for (const it of items) {
       const title = (it.onderwerp || "Script").replace(/^\s*\d+\.\s*/, "").trim().slice(0, 240) || "Script";
       const { uitleg, hook, body, cta } = parseScriptBlocks(it.tekst);
       const [row] = await db.insert(scripts).values({
         clientId: c.id,
+        productionDayId,
         title,
         status: "concept",
         format: "Organische short video",
