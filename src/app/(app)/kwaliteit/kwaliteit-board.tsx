@@ -45,7 +45,7 @@ export function KwaliteitBoard({ items }: { items: QualityItem[]; counts: Record
   return (
     <div>
       {/* Actiegebied-knoppen: het aantal punten per gebied, met een rode stip als er directe actie nodig is. */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <AreaButton label="Alles" count={items.length} red={items.filter((i) => i.severity === "rood").length} on={area === "alle"} onClick={() => setArea("alle")} icon={LayoutGrid} accent="var(--color-indigo-ink)" />
         {AREAS.map((a) => {
           const list = byGroup.get(a.key)!;

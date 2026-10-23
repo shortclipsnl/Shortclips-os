@@ -85,25 +85,30 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
       </div>
 
       {overview.perVideographer.length > 0 ? (
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Opnames per videograaf:</span>
-          {overview.perVideographer.map((v) => {
-            const active = vgFilter === v.name;
-            return (
-              <Link
-                key={v.name}
-                href={active ? "/productions" : `/productions?videograaf=${encodeURIComponent(v.name)}`}
-                className={`inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-xs font-medium transition ${active ? "bg-[var(--color-brand-600)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"}`}
-                title={active ? "Toon alle opnames" : `Toon alle opnames van ${v.name.split(" ")[0]}`}
-              >
-                <TeamAvatar name={v.name} size={22} />
-                Opnames {v.name.split(" ")[0]} · <strong>{v.count}</strong>
-              </Link>
-            );
-          })}
-          {vgFilter ? (
-            <Link href="/productions" className="rounded-full border border-[var(--color-line-strong)] px-3 py-1 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Toon alle</Link>
-          ) : null}
+        <div className="mb-4">
+          <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Opnames per videograaf</span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {overview.perVideographer.map((v) => {
+              const active = vgFilter === v.name;
+              return (
+                <Link
+                  key={v.name}
+                  href={active ? "/productions" : `/productions?videograaf=${encodeURIComponent(v.name)}`}
+                  className={`inline-flex items-center gap-3 rounded-full border py-1.5 pl-1.5 pr-5 transition ${active ? "border-[var(--color-brand-600)] bg-[var(--color-brand-600)] text-white shadow-[var(--shadow-card)]" : "border-[var(--color-line)] bg-[var(--color-surface-2)] text-[var(--color-ink)] hover:border-[var(--color-brand-500)] hover:bg-[var(--color-surface-sunken)]"}`}
+                  title={active ? "Toon alle opnames" : `Toon alle opnames van ${v.name.split(" ")[0]}`}
+                >
+                  <TeamAvatar name={v.name} avatarUrl={v.avatarUrl} size={44} />
+                  <span className="leading-tight">
+                    <span className="block text-sm font-bold">{v.name.split(" ")[0]}</span>
+                    <span className={`block text-xs ${active ? "text-white/80" : "text-[var(--color-ink-muted)]"}`}>{v.count} opname{v.count === 1 ? "" : "s"}</span>
+                  </span>
+                </Link>
+              );
+            })}
+            {vgFilter ? (
+              <Link href="/productions" className="rounded-full border border-[var(--color-line-strong)] px-4 py-2 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Toon alle</Link>
+            ) : null}
+          </div>
         </div>
       ) : null}
 

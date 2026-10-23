@@ -165,26 +165,28 @@ export async function getShootOverview(viewer: Viewer) {
 
   const [perVideographer, defaultVg] = await Promise.all([
     db
-      .select({ name: users.fullName, n: sql<number>`count(*)` })
+      .select({ name: users.fullName, avatar: users.avatarUrl, n: sql<number>`count(*)` })
       .from(productionDays)
       .leftJoin(users, eq(users.id, productionDays.videographerId))
       .where(and(isNull(productionDays.deletedAt), gte(productionDays.scheduledOn, monthStart), ne(productionDays.status, "cancelled"), scopeToClients(viewer, productionDays.clientId)))
-      .groupBy(users.fullName)
+      .groupBy(users.fullName, users.avatarUrl)
       .orderBy(desc(sql`count(*)`)),
     getDefaultVideographer(),
   ]);
 
   // Opnamedagen zonder gekoppelde videograaf tellen bij de standaard-videograaf
   // (Rutger), zodat deze telling klopt met de tabel die hem ook invult.
-  const merged = new Map<string, number>();
+  const merged = new Map<string, { count: number; avatarUrl: string | null }>();
   for (const p of perVideographer) {
     const name = p.name ?? defaultVg?.fullName ?? "Niet toegewezen";
-    merged.set(name, (merged.get(name) ?? 0) + Number(p.n));
+    const avatarUrl = p.name ? p.avatar : defaultVg?.avatarUrl ?? null;
+    const cur = merged.get(name);
+    merged.set(name, { count: (cur?.count ?? 0) + Number(p.n), avatarUrl: cur?.avatarUrl ?? avatarUrl });
   }
 
   return {
     thisWeek: Number(weekRow?.n ?? 0),
-    perVideographer: [...merged.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+    perVideographer: [...merged.entries()].map(([name, v]) => ({ name, count: v.count, avatarUrl: v.avatarUrl })).sort((a, b) => b.count - a.count),
   };
 }
 
@@ -290,9 +292,9 @@ export type ProductionDetail = Awaited<ReturnType<typeof getProductionDay>>;
  * standaard in plaats van een "nog geen videograaf"-melding. Een expliciet
  * gekozen andere videograaf blijft uiteraard voorrang houden.
  */
-export async function getDefaultVideographer(): Promise<{ id: string; fullName: string } | null> {
+export async function getDefaultVideographer(): Promise<{ id: string; fullName: string; avatarUrl: string | null } | null> {
   const [r] = await db
-    .select({ id: users.id, fullName: users.fullName })
+    .select({ id: users.id, fullName: users.fullName, avatarUrl: users.avatarUrl })
     .from(users)
     .where(and(eq(users.email, "rutger@shortclips.nl"), isNull(users.deletedAt), eq(users.status, "active")))
     .limit(1);
