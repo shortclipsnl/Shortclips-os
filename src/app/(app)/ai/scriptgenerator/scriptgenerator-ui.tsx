@@ -132,6 +132,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const [brief, setBrief] = useState("");
   const [priorFiles, setPriorFiles] = useState<Array<{ name: string; text: string }>>([]);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [useDrive, setUseDrive] = useState(true);
   const [topicsBusy, setTopicsBusy] = useState(false);
 
@@ -672,8 +673,16 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
           </label>
         ) : null}
 
-        <label className={`flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2.5 text-sm hover:border-[var(--color-brand-500)] ${pdfBusy ? "opacity-60" : ""} text-[var(--color-ink-muted)]`}>
-          {pdfBusy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />} {pdfBusy ? "Tekst uitlezen…" : "Zelf PDF('s) met eerdere scripts toevoegen (ook grote bestanden)"}
+        <label
+          onDragOver={(e) => { e.preventDefault(); if (!pdfBusy) setDragOver(true); }}
+          onDragEnter={(e) => { e.preventDefault(); if (!pdfBusy) setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); if (!pdfBusy) addPdfFiles(e.dataTransfer.files); }}
+          className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-[var(--radius-sm)] border-2 border-dashed px-3 py-5 text-center text-sm transition ${dragOver ? "border-[var(--color-brand-500)] bg-[var(--color-brand-50)] text-[var(--color-brand-700)]" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:border-[var(--color-brand-500)]"} ${pdfBusy ? "opacity-60" : ""}`}
+        >
+          {pdfBusy ? <Loader2 className="size-5 animate-spin" /> : <Upload className="size-5" />}
+          <span className="font-medium">{pdfBusy ? "Tekst uitlezen…" : dragOver ? "Laat los om toe te voegen" : "Sleep scriptbestanden hierheen of klik om te kiezen"}</span>
+          <span className="text-2xs text-[var(--color-ink-faint)]">PDF · ook grote bestanden</span>
           <input type="file" accept="application/pdf" multiple disabled={pdfBusy} className="hidden" onChange={(e) => { addPdfFiles(e.target.files); e.currentTarget.value = ""; }} />
         </label>
         {priorFiles.length > 0 ? (
