@@ -9,13 +9,15 @@ import { requirePermission, assertClientAccess, ForbiddenError } from "@/server/
 import { auditLog } from "@/server/audit";
 import { aiConfigured, runPrompt } from "@/server/ai/client";
 import { scriptGeneratorSystem } from "@/server/scripts/scripthandboek";
+import { adScriptGeneratorSystem, adFormatRules, FUNNEL_GUIDE, FUNNEL_LABEL, type Funnel } from "@/server/scripts/advertentiehandboek";
 import { getClientAiProfile, captionProfileToText, clientLearnedText, centralKnowledgeText, type CaptionProfile } from "@/server/ai/knowledge";
 import { gatherFeedbackContext, estimateSpeakingTime, DEFAULT_WPM } from "@/server/script-control";
 import { getClientWinningPatterns } from "@/server/scripts/winning-patterns";
 import { getClientDriveScriptPdfs } from "@/server/scripts/drive-scripts";
 import { getIntelligenceOverview } from "@/server/video-intelligence/intelligence";
 
-export type GeneratedScript = { onderwerp: string; tekst: string };
+export type ContentType = "organisch" | "advertentie";
+export type GeneratedScript = { onderwerp: string; tekst: string; contentType?: ContentType; funnel?: Funnel };
 type Result =
   | { ok: true; scripts: GeneratedScript[]; klantnaam: string }
   | { ok: false; message: string };
@@ -66,7 +68,7 @@ const REVISE_RULES = [
   "- Houd korte, natuurlijke spreektaal aan die makkelijk te presenteren is.",
 ];
 
-type ScriptsPayload = { scripts?: Array<{ onderwerp?: unknown; regels?: unknown; tekst?: unknown }> };
+type ScriptsPayload = { scripts?: Array<{ onderwerp?: unknown; regels?: unknown; tekst?: unknown; funnel?: unknown }> };
 
 /** Redt complete script-objecten uit het antwoord, ook als het JSON is afgekapt
  *  (bijv. bij de token-limiet): we matchen elk volledig {"onderwerp",...,"regels":[...]}. */
@@ -111,7 +113,7 @@ function parseScriptsJson(raw: string): ScriptsPayload | null {
  * eerder gebruikte onderwerpen (tegen herhaling) en de algemene Shortclips-richtlijnen.
  * Dezelfde bron als de scriptcontrole, zodat genereren en controleren gelijk denken.
  */
-async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission>>, clientId: string): Promise<{ name: string; slug: string; extra: string; wpm: number | null } | null> {
+async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission>>, clientId: string, contentType: ContentType = "organisch"): Promise<{ name: string; slug: string; extra: string; wpm: number | null } | null> {
   const [c] = await db
     .select({ id: clients.id, name: clients.name, slug: clients.slug })
     .from(clients)
@@ -119,6 +121,7 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
     .limit(1);
   if (!c) return null;
   assertClientAccess(viewer, c.id);
+  const isAd = contentType === "advertentie";
   const [profile, learned, feedback, patterns, central, intel, recent] = await Promise.all([
     getClientAiProfile(c.id),
     clientLearnedText(c.id),
@@ -126,9 +129,13 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
     getClientWinningPatterns(viewer, c.id).catch(() => null),
     centralKnowledgeText(["schrijfstijl", "branding", "kwaliteit"]).catch(() => ""),
     getIntelligenceOverview(viewer, c.slug).catch(() => null),
-    db.select({ title: scripts.title }).from(scripts)
+    // Eerdere scripts van hetzelfde contenttype (advertentie vs organisch),
+    // zodat de twee werkwijzen niet door elkaar lopen.
+    db.select({ title: scripts.title, format: scripts.format }).from(scripts)
       .where(and(eq(scripts.clientId, c.id), isNull(scripts.deletedAt)))
-      .orderBy(desc(scripts.createdAt)).limit(15).catch(() => [] as Array<{ title: string }>),
+      .orderBy(desc(scripts.createdAt)).limit(40)
+      .then((rows) => rows.filter((r) => (/advertentie/i.test(r.format ?? "") ? isAd : !isAd)).slice(0, 15))
+      .catch(() => [] as Array<{ title: string; format: string | null }>),
   ]);
 
   const viLines = intel
@@ -145,9 +152,10 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
     feedback.aandachtspunten ? `Aandachtspunten: ${feedback.aandachtspunten}` : "",
     feedback.recenteKlantopmerkingen.length ? `Recente klantopmerkingen op eerdere video's:\n- ${feedback.recenteKlantopmerkingen.join("\n- ")}` : "",
     learned ? `Geleerde voorkeuren en correcties van deze klant:\n${learned}` : "",
-    patterns && patterns.count > 0 ? `Best presterende hooks van deze klant (echte cijfers — spiegelen, niet kopiëren):\n${patterns.top.map((p) => `- "${p.hook}" (${p.views} views)`).join("\n")}` : "",
+    patterns && patterns.count > 0 ? `Best presterende hooks van deze klant (echte cijfers${isAd ? " — organisch bereik, GEEN bewijs dat een advertentie converteert; gebruik als inspiratie, niet als resultaat" : " — spiegelen, niet kopiëren"}):\n${patterns.top.map((p) => `- "${p.hook}" (${p.views} views)`).join("\n")}` : "",
     viLines,
-    recent.length ? `Eerder geschreven onderwerpen voor deze klant (voorkom herhaling, tenzij je een sterk format bewust opnieuw gebruikt):\n- ${recent.map((r) => r.title).join("\n- ")}` : "",
+    recent.length ? `Eerder geschreven ${isAd ? "advertentiescripts" : "onderwerpen"} voor deze klant (voorkom herhaling, tenzij je een sterk format bewust opnieuw gebruikt):\n- ${recent.map((r) => r.title).join("\n- ")}` : "",
+    isAd ? "LET OP: dit zijn advertentiescripts. Schrijf vanuit het advertentiedoel en de funnelfase, niet vanuit organisch bereik. Gebruik alleen daadwerkelijk beschikbare commerciële gegevens; verzin geen cijfers, prijzen of claims." : "",
     central ? `Algemene Shortclips-richtlijnen:\n${central}` : "",
   ].filter(Boolean).join("\n\n");
   return { name: c.name, slug: c.slug, extra, wpm: intel?.speech?.avgWpm && intel.speech.avgWpm > 60 ? intel.speech.avgWpm : null };
@@ -168,25 +176,36 @@ export async function generateScripts(input: {
   priorText?: string;
   /** Eerdere scripts automatisch uit de Drive-map van de klant halen. */
   useDriveScripts?: boolean;
-  /** CTA met social media poll (true) of alleen een CTA zonder poll (false). */
+  /** CTA met social media poll (true) of alleen een CTA zonder poll (false). Alleen organisch. */
   withPoll?: boolean;
+  /** Organisch of advertentie — bepaalt het schrijfsysteem (standaard organisch). */
+  contentType?: ContentType;
+  /** Advertenties: de funnelfase per te schrijven script, in volgorde (bijv. ["TOF","TOF","MOF","MOF","BOF","BOF"]). */
+  funnels?: Funnel[];
 }): Promise<Result> {
   try {
     const viewer = await requirePermission("ai:read");
     if (!aiConfigured()) return { ok: false, message: "De AI-schrijver staat uit (ANTHROPIC_API_KEY ontbreekt)." };
 
-    const count = Math.max(1, Math.min(MAX_SCRIPTS, Math.round(input.count || 1)));
+    const contentType: ContentType = input.contentType === "advertentie" ? "advertentie" : "organisch";
+    const isAd = contentType === "advertentie";
+
+    // Advertenties: één script per opgegeven funnelfase. Organisch: gewoon aantal.
+    const funnels: Funnel[] = isAd
+      ? (input.funnels && input.funnels.length ? input.funnels : (["TOF", "TOF", "MOF", "MOF", "BOF", "BOF"] as Funnel[])).slice(0, MAX_SCRIPTS)
+      : [];
+    const count = isAd ? funnels.length : Math.max(1, Math.min(MAX_SCRIPTS, Math.round(input.count || 1)));
 
     let extra = "";
     let klantnaam = (input.clientName ?? "").trim();
     if (input.clientId) {
-      const ctx = await clientContext(viewer, input.clientId);
+      const ctx = await clientContext(viewer, input.clientId, contentType);
       if (ctx) { extra = ctx.extra; klantnaam = ctx.name; }
     }
 
     const brief = (input.brief ?? "").trim().slice(0, 4000);
     const priorText = (input.priorText ?? "").trim().slice(0, 24000);
-    const withPoll = input.withPoll !== false; // standaard mét poll
+    const withPoll = input.withPoll !== false; // standaard mét poll (alleen organisch)
 
     // Eerdere scripts uit Drive (server-side, dus geen upload-limiet).
     let documents: Array<{ base64: string; mediaType: "application/pdf" }> = [];
@@ -197,29 +216,56 @@ export async function generateScripts(input: {
       } catch { /* zonder Drive-scripts verdergaan */ }
     }
 
-    const user = [
-      `BATCHMODUS. Schrijf nu direct ${count} complete organische short video scripts${klantnaam ? ` voor klant "${klantnaam}"` : ""}.`,
-      "Stel GEEN vragen en wacht nergens op. Werk volledig volgens het Shortclips Scripthandboek en de meegeleverde klantcontext.",
-      klantnaam
-        ? "Gebruik alles wat je over deze klant weet uit de meegeleverde context en eerdere data. Een website heb je niet nodig."
-        : "Er is geen vaste klant gekozen. Kies een logisch, concreet onderwerp per script dat past bij het handboek.",
-      documents.length ? `Er zijn ${documents.length} eerdere script(s) als PDF meegestuurd uit Drive. Gebruik die als basis en stijlreferentie: neem tone of voice, opbouw en sterke concepten over, maar schrijf NIEUWE scripts — geen kopie.` : "",
-      priorText ? `Eerdere scripts van deze klant (tekst — gebruik als basis en stijlreferentie, schrijf nieuwe scripts):\n${priorText}` : "",
-      "Mis je een hard cijfer? Gebruik een realistische range en noem het een gemiddelde. Verzin nooit exacte cijfers, namen of modellen.",
-      brief ? `Input van de gebruiker (onderwerpen, hooks of extra wensen — gebruik dit leidend):\n${brief}` : "",
-      "",
-      ...QUALITY_RULES,
-      "",
-      ...formatRules(withPoll),
-      "",
-      "Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder tekst eromheen:",
-      `{"scripts":[{"onderwerp":"<korte videotitel zonder nummer>","regels":["<regel 1>","<regel 2>","..."]}]}`,
-      "- onderwerp: alleen de titel van de video, zonder nummer ervoor.",
-      "- regels: een array met het volledige script, één tekstregel per array-element. Zet NOOIT een regeleinde binnen een element — elke nieuwe regel is een nieuw element. Gebruik een leeg element (\"\") voor een witregel tussen de blokken.",
-    ].filter(Boolean).join("\n");
+    // De funnelverdeling als compacte, genummerde opdrachtregel voor het model.
+    const funnelOrder = funnels.map((f, i) => `  Script ${i + 1}: ${f} (${FUNNEL_LABEL[f]}, richtlijn ${FUNNEL_GUIDE[f].seconds} / ${FUNNEL_GUIDE[f].words}).`).join("\n");
+
+    const user = isAd
+      ? [
+          `BATCHMODUS. Schrijf nu direct ${count} complete advertentie short video scripts voor Meta${klantnaam ? ` voor klant "${klantnaam}"` : ""}.`,
+          "Stel GEEN vragen en wacht nergens op. Werk volledig volgens het Shortclips Advertentiehandboek en de meegeleverde klantcontext.",
+          "Schrijf precies één script per onderstaande funnelfase, in deze volgorde:",
+          funnelOrder,
+          "Twee scripts in dezelfde funnelfase moeten een duidelijk andere invalshoek hebben — niet twee keer dezelfde boodschap.",
+          klantnaam
+            ? "Gebruik alles wat je over deze klant weet uit de meegeleverde context (producten, aanbiedingen, tone of voice, eerdere advertenties, feedback). Een website heb je niet nodig."
+            : "Er is geen vaste klant gekozen. Kies een logisch, concreet product/dienst en campagnedoel per script.",
+          documents.length ? `Er zijn ${documents.length} eerdere script(s) als PDF meegestuurd uit Drive. Gebruik die als stijlreferentie, maar schrijf NIEUWE advertentiescripts.` : "",
+          priorText ? `Eerdere scripts van deze klant (tekst — stijlreferentie):\n${priorText}` : "",
+          brief ? `Input van de gebruiker (campagnedoel, product, doelgroep, actie of thema — leidend):\n${brief}` : "Geen specifiek campagnedoel opgegeven: kies per script een logisch, concreet commercieel doel (aanvragen, leads, verkopen of afspraken) dat bij de klant past.",
+          "Verzin NOOIT prijzen, garanties, resultaten of producteigenschappen. Ontbreekt een hard gegeven, laat de claim weg.",
+          "Controleer elk script vóór je het teruggeeft op de Meta-regels en de kwaliteitscontrole uit het handboek. Lever alleen scripts op die op elk punt voldoen.",
+          "",
+          ...adFormatRules(),
+          "",
+          "Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder tekst eromheen:",
+          `{"scripts":[{"onderwerp":"<korte videotitel zonder nummer>","funnel":"TOF|MOF|BOF","regels":["<regel 1>","<regel 2>","..."]}]}`,
+          "- onderwerp: alleen de titel van de video, zonder nummer ervoor.",
+          "- funnel: exact de funnelfase van dit script (TOF, MOF of BOF), in dezelfde volgorde als hierboven.",
+          "- regels: het volledige script, één tekstregel per array-element (nooit een regeleinde binnen een element; leeg element (\"\") = witregel). Begin de drie hooks met \"A) \", \"B) \" en \"C) \".",
+        ].filter(Boolean).join("\n")
+      : [
+          `BATCHMODUS. Schrijf nu direct ${count} complete organische short video scripts${klantnaam ? ` voor klant "${klantnaam}"` : ""}.`,
+          "Stel GEEN vragen en wacht nergens op. Werk volledig volgens het Shortclips Scripthandboek en de meegeleverde klantcontext.",
+          klantnaam
+            ? "Gebruik alles wat je over deze klant weet uit de meegeleverde context en eerdere data. Een website heb je niet nodig."
+            : "Er is geen vaste klant gekozen. Kies een logisch, concreet onderwerp per script dat past bij het handboek.",
+          documents.length ? `Er zijn ${documents.length} eerdere script(s) als PDF meegestuurd uit Drive. Gebruik die als basis en stijlreferentie: neem tone of voice, opbouw en sterke concepten over, maar schrijf NIEUWE scripts — geen kopie.` : "",
+          priorText ? `Eerdere scripts van deze klant (tekst — gebruik als basis en stijlreferentie, schrijf nieuwe scripts):\n${priorText}` : "",
+          "Mis je een hard cijfer? Gebruik een realistische range en noem het een gemiddelde. Verzin nooit exacte cijfers, namen of modellen.",
+          brief ? `Input van de gebruiker (onderwerpen, hooks of extra wensen — gebruik dit leidend):\n${brief}` : "",
+          "",
+          ...QUALITY_RULES,
+          "",
+          ...formatRules(withPoll),
+          "",
+          "Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder tekst eromheen:",
+          `{"scripts":[{"onderwerp":"<korte videotitel zonder nummer>","regels":["<regel 1>","<regel 2>","..."]}]}`,
+          "- onderwerp: alleen de titel van de video, zonder nummer ervoor.",
+          "- regels: een array met het volledige script, één tekstregel per array-element. Zet NOOIT een regeleinde binnen een element — elke nieuwe regel is een nieuw element. Gebruik een leeg element (\"\") voor een witregel tussen de blokken.",
+        ].filter(Boolean).join("\n");
 
     const res = await runPrompt({
-      system: scriptGeneratorSystem(extra || undefined),
+      system: isAd ? adScriptGeneratorSystem(extra || undefined) : scriptGeneratorSystem(extra || undefined),
       user,
       documents: documents.length ? documents : undefined,
       maxTokens: Math.min(24000, count * 3000 + 3000),
@@ -235,8 +281,9 @@ export async function generateScripts(input: {
       return { ok: false, message: "De schrijver gaf geen bruikbaar antwoord. Probeer het nog eens." };
     }
 
+    const validFunnel = (v: unknown): Funnel | undefined => (v === "TOF" || v === "MOF" || v === "BOF" ? v : undefined);
     const scripts: GeneratedScript[] = (data.scripts ?? [])
-      .map((s) => {
+      .map((s, i) => {
         // Voorkeur: regels-array (voorkomt kapotte JSON door regeleindes). Val
         // terug op een los tekstveld als het model dat toch meestuurt.
         const tekst = Array.isArray(s?.regels)
@@ -244,10 +291,18 @@ export async function generateScripts(input: {
           : typeof s?.tekst === "string"
             ? s.tekst.trim()
             : "";
-        return {
+        const base: GeneratedScript = {
           onderwerp: typeof s?.onderwerp === "string" ? s.onderwerp.trim() : "",
           tekst,
         };
+        if (isAd) {
+          // Funnel uit het antwoord, anders de gevraagde funnel op deze positie.
+          base.contentType = "advertentie";
+          base.funnel = validFunnel(s?.funnel) ?? funnels[i] ?? "TOF";
+        } else {
+          base.contentType = "organisch";
+        }
+        return base;
       })
       .filter((s) => s.onderwerp || s.tekst)
       .slice(0, count);
@@ -275,6 +330,12 @@ export async function reviseScript(input: {
   clientName?: string;
   /** true = volledig nieuw concept met andere invalshoek i.p.v. kleine aanpassingen. */
   newConcept?: boolean;
+  /** Organisch of advertentie — bepaalt het schrijfsysteem en de opmaakregels. */
+  contentType?: ContentType;
+  /** Advertenties: de funnelfase van dit script (behouden bij aanpassen). */
+  funnel?: Funnel;
+  /** Organisch: forceer CTA mét (true) of zonder (false) poll. Niet gezet = uit de huidige tekst afleiden. */
+  withPoll?: boolean;
 }): Promise<ReviseResult> {
   try {
     const viewer = await requirePermission("ai:read");
@@ -283,36 +344,60 @@ export async function reviseScript(input: {
     const instruction = (input.instruction ?? "").trim();
     if (!instruction) return { ok: false, message: "Geef aan wat er moet veranderen." };
 
+    const contentType: ContentType = input.contentType === "advertentie" ? "advertentie" : "organisch";
+    const isAd = contentType === "advertentie";
+    const funnel = input.funnel ?? "TOF";
+
     let extra = "";
     let klantnaam = (input.clientName ?? "").trim();
     if (input.clientId) {
-      const ctx = await clientContext(viewer, input.clientId);
+      const ctx = await clientContext(viewer, input.clientId, contentType);
       if (ctx) { extra = ctx.extra; klantnaam = ctx.name; }
     }
 
-    const user = [
-      input.newConcept
-        ? `Hieronder staat een bestaand organisch short video script${klantnaam ? ` voor klant "${klantnaam}"` : ""}. Bedenk een VOLLEDIG NIEUW concept met een andere invalshoek voor hetzelfde onderwerp/thema — geen kleine tekstaanpassing, maar een frisse aanpak. Controleer eerdere scripts om herhaling te voorkomen.`
-        : `Hieronder staat een bestaand organisch short video script${klantnaam ? ` voor klant "${klantnaam}"` : ""}. Pas het aan volgens de instructie en lever het volledige, aangepaste script terug.`,
-      "Behoud de vaste Shortclips-opmaak en de stijl uit het handboek.",
-      "",
-      `TITEL: ${input.onderwerp || "(geen)"}`,
-      "HUIDIG SCRIPT:",
-      input.tekst || "(leeg)",
-      "",
-      `INSTRUCTIE VAN DE GEBRUIKER:\n${instruction.slice(0, 2000)}`,
-      "",
-      ...(input.newConcept ? [] : REVISE_RULES),
-      "",
-      ...formatRules(/SOCIAL\s*MEDIA\s*POLL/i.test(input.tekst)),
-      "",
-      "Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder tekst eromheen:",
-      `{"scripts":[{"onderwerp":"<titel zonder nummer>","regels":["<regel 1>","<regel 2>","..."]}]}`,
-      "- regels: één tekstregel per array-element, nooit een regeleinde binnen een element; leeg element (\"\") = witregel.",
-    ].join("\n");
+    const user = isAd
+      ? [
+          input.newConcept
+            ? `Hieronder staat een bestaand advertentie short video script (funnelfase ${funnel})${klantnaam ? ` voor klant "${klantnaam}"` : ""}. Bedenk een VOLLEDIG NIEUW advertentieconcept met een andere invalshoek voor dezelfde funnelfase — geen kleine aanpassing, maar een frisse aanpak.`
+            : `Hieronder staat een bestaand advertentie short video script (funnelfase ${funnel})${klantnaam ? ` voor klant "${klantnaam}"` : ""}. Pas het aan volgens de instructie en lever het volledige, aangepaste script terug.`,
+          `Behoud de funnelfase ${funnel} (${FUNNEL_LABEL[funnel]}) en de vaste advertentiestructuur: SHORTCLIP UITLEG, HOOKS (precies drie, A/B/C), PROBLEEM, OPLOSSING / USP, CALL TO ACTION.`,
+          "Verander alleen wat gevraagd wordt; laat de rest staan. Verzin geen prijzen, claims of resultaten. Houd je aan de Meta-regels en gesproken zinnen van max 14 woorden.",
+          "",
+          `TITEL: ${input.onderwerp || "(geen)"}`,
+          "HUIDIG SCRIPT:",
+          input.tekst || "(leeg)",
+          "",
+          `INSTRUCTIE VAN DE GEBRUIKER:\n${instruction.slice(0, 2000)}`,
+          "",
+          ...adFormatRules(),
+          "",
+          "Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder tekst eromheen:",
+          `{"scripts":[{"onderwerp":"<titel zonder nummer>","funnel":"${funnel}","regels":["<regel 1>","<regel 2>","..."]}]}`,
+          "- regels: één tekstregel per array-element, nooit een regeleinde binnen een element; leeg element (\"\") = witregel; hooks beginnen met \"A) \", \"B) \", \"C) \".",
+        ].join("\n")
+      : [
+          input.newConcept
+            ? `Hieronder staat een bestaand organisch short video script${klantnaam ? ` voor klant "${klantnaam}"` : ""}. Bedenk een VOLLEDIG NIEUW concept met een andere invalshoek voor hetzelfde onderwerp/thema — geen kleine tekstaanpassing, maar een frisse aanpak. Controleer eerdere scripts om herhaling te voorkomen.`
+            : `Hieronder staat een bestaand organisch short video script${klantnaam ? ` voor klant "${klantnaam}"` : ""}. Pas het aan volgens de instructie en lever het volledige, aangepaste script terug.`,
+          "Behoud de vaste Shortclips-opmaak en de stijl uit het handboek.",
+          "",
+          `TITEL: ${input.onderwerp || "(geen)"}`,
+          "HUIDIG SCRIPT:",
+          input.tekst || "(leeg)",
+          "",
+          `INSTRUCTIE VAN DE GEBRUIKER:\n${instruction.slice(0, 2000)}`,
+          "",
+          ...(input.newConcept ? [] : REVISE_RULES),
+          "",
+          ...formatRules(typeof input.withPoll === "boolean" ? input.withPoll : /SOCIAL\s*MEDIA\s*POLL/i.test(input.tekst)),
+          "",
+          "Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder tekst eromheen:",
+          `{"scripts":[{"onderwerp":"<titel zonder nummer>","regels":["<regel 1>","<regel 2>","..."]}]}`,
+          "- regels: één tekstregel per array-element, nooit een regeleinde binnen een element; leeg element (\"\") = witregel.",
+        ].join("\n");
 
     const res = await runPrompt({
-      system: scriptGeneratorSystem(extra || undefined),
+      system: isAd ? adScriptGeneratorSystem(extra || undefined) : scriptGeneratorSystem(extra || undefined),
       user,
       maxTokens: 4000,
     });
@@ -330,7 +415,9 @@ export async function reviseScript(input: {
     const onderwerp = typeof s.onderwerp === "string" ? s.onderwerp.trim() : input.onderwerp;
     if (!tekst) return { ok: false, message: "De aanpassing leverde geen tekst op. Probeer het nog eens." };
 
-    return { ok: true, script: { onderwerp: onderwerp || input.onderwerp, tekst } };
+    const out: GeneratedScript = { onderwerp: onderwerp || input.onderwerp, tekst };
+    if (isAd) { out.contentType = "advertentie"; out.funnel = funnel; } else { out.contentType = "organisch"; }
+    return { ok: true, script: out };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;
@@ -397,17 +484,25 @@ type QualityActionResult = { ok: true; data: QualityResult } | { ok: false; mess
 
 const QUALITY_SYSTEM = `Je bent script-analist voor Shortclips, een bureau voor organische short video's (TikTok/Reels/Shorts). Beoordeel een script eerlijk en onderbouwd op de interne richtlijnen. Onderbouw elk punt met wat daadwerkelijk in het script staat. Scheid bewezen observatie van creatieve verwachting. Markeer onbevestigde feitelijke claims (prijzen, specificaties, percentages, vergelijkingen) als te controleren; verzin nooit cijfers. Geef uitsluitend geldige JSON terug.`;
 
+const AD_QUALITY_SYSTEM = `Je bent advertentie-script-analist voor Shortclips. Je beoordeelt direct response short video scripts voor Meta (Facebook/Instagram) op de interne advertentierichtlijnen en de Meta-advertentieregels. Onderbouw elk punt met wat daadwerkelijk in het script staat. Markeer onbevestigde claims (prijzen, garanties, resultaten, specificaties) als te controleren en wijs op mogelijke Meta-overtredingen (ongefundeerde garanties, misleidende resultaten, verzonnen schaarste, gevoelige persoonlijke aannames). Verzin nooit cijfers. Geef uitsluitend geldige JSON terug.`;
+
 /** Beoordeelt de kwaliteit van het HUIDIGE (evt. onopgeslagen) script op 10 punten. */
 export async function checkScriptQuality(input: {
   onderwerp: string;
   tekst: string;
   clientId?: string;
   clientName?: string;
+  contentType?: ContentType;
+  funnel?: Funnel;
 }): Promise<QualityActionResult> {
   try {
     const viewer = await requirePermission("ai:read");
     if (!aiConfigured()) return { ok: false, message: "De AI-schrijver staat uit (ANTHROPIC_API_KEY ontbreekt)." };
     if (!input.tekst?.trim()) return { ok: false, message: "Dit script is nog leeg." };
+
+    const contentType: ContentType = input.contentType === "advertentie" ? "advertentie" : "organisch";
+    const isAd = contentType === "advertentie";
+    const funnel = input.funnel ?? "TOF";
 
     const { hook, body, cta } = parseScriptBlocks(input.tekst);
 
@@ -415,44 +510,78 @@ export async function checkScriptQuality(input: {
     let klantnaam = (input.clientName ?? "").trim();
     let wpm = DEFAULT_WPM;
     if (input.clientId) {
-      const ctx = await clientContext(viewer, input.clientId);
+      const ctx = await clientContext(viewer, input.clientId, contentType);
       if (ctx) { extra = ctx.extra; klantnaam = ctx.name; if (ctx.wpm) wpm = ctx.wpm; }
     }
     const speaking = estimateSpeakingTime({ hook, body, cta }, wpm);
 
-    const dims = [
-      "Hook en aandacht in de eerste seconden",
-      "Originaliteit van het concept",
-      "Toegevoegde waarde voor de kijker",
-      "Geschiktheid voor de doelgroep",
-      "Natuurlijk en compact taalgebruik",
-      "Commerciële balans (focus op kijker, niet verkoperig)",
-      "Visuele mogelijkheden en opnamehaalbaarheid",
-      "Overeenkomsten met eerder gemaakte content (herhaling)",
-      "Feitelijke juistheid",
-      "Aansluiting bij de doelstelling van de video",
-    ];
+    const dims = isAd
+      ? [
+          "Juiste funnelfase (TOF/MOF/BOF) en opbouw",
+          "Precies drie sterke, onderling verschillende hooks",
+          "Hooks sluiten alle drie aan op hetzelfde middenstuk",
+          "Concrete, controleerbare commerciële boodschap",
+          "Minimaal één controleerbaar voordeel genoemd",
+          "Bezwaren behandeld waar relevant",
+          "Call to action past bij de funnelfase en het doel",
+          "Productinformatie en claims kloppen (geen verzonnen cijfers)",
+          "Voldoet aan de Meta-advertentieregels",
+          "Gesproken zinnen max 14 woorden en natuurlijke overgangen",
+        ]
+      : [
+          "Hook en aandacht in de eerste seconden",
+          "Originaliteit van het concept",
+          "Toegevoegde waarde voor de kijker",
+          "Geschiktheid voor de doelgroep",
+          "Natuurlijk en compact taalgebruik",
+          "Commerciële balans (focus op kijker, niet verkoperig)",
+          "Visuele mogelijkheden en opnamehaalbaarheid",
+          "Overeenkomsten met eerder gemaakte content (herhaling)",
+          "Feitelijke juistheid",
+          "Aansluiting bij de doelstelling van de video",
+        ];
 
-    const user = [
-      `Beoordeel dit organische short video script${klantnaam ? ` voor klant "${klantnaam}"` : ""}.`,
-      `Titel: ${input.onderwerp || "(geen)"}`,
-      `Geschatte spreektijd: ~${speaking.seconds}s (${speaking.words} woorden @ ${wpm} wpm; richtlijn 30–33s en 80–95 woorden).`,
-      "",
-      "SCRIPT",
-      `Hook: ${hook || "(leeg)"}`,
-      `Middenstuk: ${body || "(leeg)"}`,
-      `CTA: ${cta || "(leeg)"}`,
-      "",
-      extra ? `CONTEXT (klantstijl, feedback, wat werkt, eerdere onderwerpen)\n${extra}` : "",
-      "",
-      `Beoordeel op deze 10 punten en geef per punt een score 1–10 en een korte onderbouwing:\n- ${dims.join("\n- ")}`,
-      "",
-      "Houd elke onderbouwing kort (maximaal 15 woorden) en elke lijst beknopt (max 3 items). Geen regeleindes binnen een waarde.",
-      "Geef UITSLUITEND geldige JSON terug in exact dit formaat:",
-      `{"scoreTotaal": <1-10>, "oordeel": "<één zin eindoordeel>", "punten": [{"dimensie": "<naam>", "score": <1-10>, "waarom": "<korte onderbouwing>"}], "sterk": ["..."], "verbeteren": ["..."], "feitenControleren": ["..."], "alternatieveHooks": ["<3 sterkere hooks>"]}`,
-    ].filter(Boolean).join("\n");
+    const adGuide = FUNNEL_GUIDE[funnel];
+    const user = isAd
+      ? [
+          `Beoordeel dit advertentie short video script (funnelfase ${funnel} — ${FUNNEL_LABEL[funnel]})${klantnaam ? ` voor klant "${klantnaam}"` : ""}.`,
+          `Titel: ${input.onderwerp || "(geen)"}`,
+          `Geschatte spreektijd: ~${speaking.seconds}s (${speaking.words} woorden @ ${wpm} wpm; richtlijn ${adGuide.seconds} / ${adGuide.words}).`,
+          "",
+          "SCRIPT",
+          `Hooks: ${hook || "(leeg)"}`,
+          `Probleem + oplossing: ${body || "(leeg)"}`,
+          `CTA: ${cta || "(leeg)"}`,
+          "",
+          extra ? `CONTEXT (klantstijl, aanbiedingen, eerdere advertenties, feedback)\n${extra}` : "",
+          "",
+          `Beoordeel op deze 10 punten en geef per punt een score 1–10 en een korte onderbouwing:\n- ${dims.join("\n- ")}`,
+          "",
+          "Zet mogelijke Meta-overtredingen en te controleren claims in 'feitenControleren'. Zet in 'alternatieveHooks' drie sterkere advertentiehooks (max 15 woorden elk, verschillende invalshoeken).",
+          "Houd elke onderbouwing kort (maximaal 15 woorden) en elke lijst beknopt (max 3 items). Geen regeleindes binnen een waarde.",
+          "Geef UITSLUITEND geldige JSON terug in exact dit formaat:",
+          `{"scoreTotaal": <1-10>, "oordeel": "<één zin eindoordeel>", "punten": [{"dimensie": "<naam>", "score": <1-10>, "waarom": "<korte onderbouwing>"}], "sterk": ["..."], "verbeteren": ["..."], "feitenControleren": ["..."], "alternatieveHooks": ["<3 sterkere hooks>"]}`,
+        ].filter(Boolean).join("\n")
+      : [
+          `Beoordeel dit organische short video script${klantnaam ? ` voor klant "${klantnaam}"` : ""}.`,
+          `Titel: ${input.onderwerp || "(geen)"}`,
+          `Geschatte spreektijd: ~${speaking.seconds}s (${speaking.words} woorden @ ${wpm} wpm; richtlijn 30–33s en 80–95 woorden).`,
+          "",
+          "SCRIPT",
+          `Hook: ${hook || "(leeg)"}`,
+          `Middenstuk: ${body || "(leeg)"}`,
+          `CTA: ${cta || "(leeg)"}`,
+          "",
+          extra ? `CONTEXT (klantstijl, feedback, wat werkt, eerdere onderwerpen)\n${extra}` : "",
+          "",
+          `Beoordeel op deze 10 punten en geef per punt een score 1–10 en een korte onderbouwing:\n- ${dims.join("\n- ")}`,
+          "",
+          "Houd elke onderbouwing kort (maximaal 15 woorden) en elke lijst beknopt (max 3 items). Geen regeleindes binnen een waarde.",
+          "Geef UITSLUITEND geldige JSON terug in exact dit formaat:",
+          `{"scoreTotaal": <1-10>, "oordeel": "<één zin eindoordeel>", "punten": [{"dimensie": "<naam>", "score": <1-10>, "waarom": "<korte onderbouwing>"}], "sterk": ["..."], "verbeteren": ["..."], "feitenControleren": ["..."], "alternatieveHooks": ["<3 sterkere hooks>"]}`,
+        ].filter(Boolean).join("\n");
 
-    const res = await runPrompt({ system: QUALITY_SYSTEM, user, maxTokens: 6000 });
+    const res = await runPrompt({ system: isAd ? AD_QUALITY_SYSTEM : QUALITY_SYSTEM, user, maxTokens: 6000 });
     if (!res.ok) return { ok: false, message: "De analyse gaf geen antwoord. Probeer het nog eens." };
 
     const cleaned = res.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
@@ -494,8 +623,10 @@ function parseScriptBlocks(tekst: string): { uitleg: string; hook: string; body:
     const upper = t.toUpperCase();
     if (t && t.length <= 42 && /[A-Z]/.test(t) && t === upper) {
       if (upper.startsWith("SHORTCLIP UITLEG")) section = "uitleg";
-      else if (upper.startsWith("HOOK")) section = "hook";
+      else if (upper.startsWith("HOOK")) section = "hook"; // HOOK én HOOKS (advertentie: 3 hooks)
       else if (upper.startsWith("MIDDENSTUK")) section = "body";
+      else if (upper.startsWith("PROBLEEM")) section = "body"; // advertentie
+      else if (upper.startsWith("OPLOSSING") || upper.startsWith("USP")) section = "body"; // advertentie
       else if (upper.startsWith("CALL TO ACTION")) section = "cta";
       else if (upper.startsWith("SOCIAL MEDIA POLL")) section = "cta"; // poll bij de CTA houden
       // onbekende kop: huidige sectie aanhouden
@@ -607,7 +738,7 @@ type SaveResult =
  *  plus een eerste versie per script, gekoppeld aan de klant. */
 export async function saveScriptsToLibrary(input: {
   clientId: string;
-  scripts: Array<{ onderwerp: string; tekst: string }>;
+  scripts: Array<{ onderwerp: string; tekst: string; contentType?: ContentType; funnel?: Funnel }>;
   /** Optioneel: koppel aan een opnamedag uit de opnameplanning. */
   productionDayId?: string;
 }): Promise<SaveResult> {
@@ -637,12 +768,17 @@ export async function saveScriptsToLibrary(input: {
     for (const it of items) {
       const title = (it.onderwerp || "Script").replace(/^\s*\d+\.\s*/, "").trim().slice(0, 240) || "Script";
       const { uitleg, hook, body, cta } = parseScriptBlocks(it.tekst);
+      // Contenttype serverzijdig vastleggen in het format-veld, zodat het bij
+      // heropenen herkenbaar blijft: "Advertentie TOF/MOF/BOF" of "Organische short video".
+      const format = it.contentType === "advertentie"
+        ? `Advertentie ${it.funnel ?? "TOF"}`
+        : "Organische short video";
       const [row] = await db.insert(scripts).values({
         clientId: c.id,
         productionDayId,
         title,
         status: "concept",
-        format: "Organische short video",
+        format,
         hook: hook || null,
         body: body || it.tekst.trim() || null,
         cta: cta || null,

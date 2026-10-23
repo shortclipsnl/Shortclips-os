@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock } from "lucide-react";
-import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, saveScriptToDrive, checkScriptQuality, listShootDaysForClient, type GeneratedScript, type QualityResult } from "@/server/actions/script-generate";
+import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock, Megaphone, Sprout } from "lucide-react";
+import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, saveScriptToDrive, checkScriptQuality, listShootDaysForClient, type GeneratedScript, type QualityResult, type ContentType } from "@/server/actions/script-generate";
 
 type ShootDay = { id: string; scheduledOn: string; title: string };
+type Funnel = "TOF" | "MOF" | "BOF";
+const FUNNELS: Funnel[] = ["TOF", "MOF", "BOF"];
+const FUNNEL_LABEL: Record<Funnel, string> = { TOF: "Top of funnel", MOF: "Middle of funnel", BOF: "Bottom of funnel" };
 
 type Client = { id: string; name: string; active: boolean };
 type ClientFilter = "actief" | "inactief" | "alle";
 
 type Version = { onderwerp: string; tekst: string; feedback: string; at: number };
-type EditorScript = { id: string; onderwerp: string; tekst: string; versions: Version[] };
+type EditorScript = { id: string; onderwerp: string; tekst: string; versions: Version[]; contentType: ContentType; funnel?: Funnel };
 
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 
@@ -31,6 +34,16 @@ const QUICK_ACTIONS: Array<{ label: string; instruction: string; newConcept?: bo
   { label: "Meer humor", instruction: "Maak het grappiger en herkenbaarder, zonder het oorspronkelijke concept te verliezen." },
   { label: "Korter maken", instruction: "Maak het script korter: schrap overbodige tekst maar behoud de kern en de sterke zinnen." },
   { label: "Ander concept", instruction: "Bedenk een volledig nieuw concept met een andere invalshoek voor hetzelfde onderwerp.", newConcept: true },
+];
+
+// Advertentie-snelacties (rule 2 stap 6): invalshoek, zakelijker, commercieel, hooks, extra info, nieuw concept.
+const AD_QUICK_ACTIONS: Array<{ label: string; instruction: string; newConcept?: boolean }> = [
+  { label: "Hook sterker", instruction: "Maak de drie hooks sterker en scherper, elk met een eigen invalshoek, elk max 15 woorden. Laat ze alle drie op hetzelfde middenstuk aansluiten." },
+  { label: "Andere invalshoek", instruction: "Kies een andere commerciële invalshoek voor dit script, met behoud van de funnelfase en de structuur." },
+  { label: "Zakelijker", instruction: "Maak het zakelijker en concreter: duidelijker product, controleerbare voordelen en een scherpere call to action." },
+  { label: "Minder commercieel", instruction: "Maak het iets minder hard verkopend: meer herkenning en vertrouwen, zonder het advertentiedoel te verliezen." },
+  { label: "Korter maken", instruction: "Maak het script korter en strakker, passend bij de funnelfase, met behoud van de drie hooks en de call to action." },
+  { label: "Ander concept", instruction: "Bedenk een volledig nieuw advertentieconcept met een andere invalshoek voor dezelfde funnelfase.", newConcept: true },
 ];
 
 /* ---------------- Spraak-naar-tekst (voice mode) ---------------- */
@@ -128,7 +141,9 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const [showOther, setShowOther] = useState(false);
   const [filter, setFilter] = useState<ClientFilter>("actief");
   const [count, setCount] = useState(3);
-  const [withPoll, setWithPoll] = useState(true);
+  const [contentType, setContentType] = useState<ContentType>("organisch");
+  // Advertenties: verdeling over de funnel (standaard 2/2/2 = 6 scripts).
+  const [funnelSplit, setFunnelSplit] = useState<Record<Funnel, number>>({ TOF: 2, MOF: 2, BOF: 2 });
   const [brief, setBrief] = useState("");
   const [priorFiles, setPriorFiles] = useState<Array<{ name: string; text: string }>>([]);
   const [pdfBusy, setPdfBusy] = useState(false);
@@ -168,6 +183,11 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const selectedName = clientId ? clients.find((c) => c.id === clientId)?.name ?? "" : "";
   const effectiveClientName = showOther ? otherName.trim() : selectedName;
 
+  const isAd = contentType === "advertentie";
+  const adTotal = funnelSplit.TOF + funnelSplit.MOF + funnelSplit.BOF;
+  const funnelsOrdered = (): Funnel[] => FUNNELS.flatMap((f) => Array.from<Funnel>({ length: funnelSplit[f] }).fill(f));
+  const setFunnel = (f: Funnel, n: number) => setFunnelSplit((s) => ({ ...s, [f]: Math.max(0, Math.min(8, n)) }));
+
   const addPdfFiles = async (files: FileList | null) => {
     if (!files) return;
     setErr(null);
@@ -191,19 +211,22 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const priorText = () => priorFiles.map((p) => `--- ${p.name} ---\n${p.text}`).join("\n\n").slice(0, 24000);
 
   const generate = () => {
+    if (isAd && adTotal === 0) { setErr("Kies minstens één advertentiescript (TOF, MOF of BOF)."); return; }
     setErr(null);
     start(async () => {
       const res = await generateScripts({
         clientId: showOther ? undefined : clientId || undefined,
         clientName: showOther ? otherName.trim() || undefined : undefined,
-        count,
+        count: isAd ? adTotal : count,
         brief: brief.trim() || undefined,
         priorText: priorFiles.length ? priorText() : undefined,
         useDriveScripts: !showOther && !!clientId && useDrive,
-        withPoll,
+        withPoll: true, // organisch: standaard-CTA; de poll-keuze staat nu ná generatie per script
+        contentType,
+        funnels: isAd ? funnelsOrdered() : undefined,
       });
       if (res.ok) {
-        setScripts(res.scripts.map((s: GeneratedScript) => ({ id: uid(), onderwerp: s.onderwerp, tekst: s.tekst, versions: [] })));
+        setScripts(res.scripts.map((s: GeneratedScript) => ({ id: uid(), onderwerp: s.onderwerp, tekst: s.tekst, versions: [], contentType: s.contentType ?? contentType, funnel: s.funnel })));
         setKlantnaam(res.klantnaam || effectiveClientName || "");
         const gcid = showOther ? "" : clientId;
         setGenClientId(gcid);
@@ -242,7 +265,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
     setErr(null);
     setSavedMsg(null);
     try {
-      const res = await saveScriptsToLibrary({ clientId: genClientId, scripts: scripts.map((s) => ({ onderwerp: s.onderwerp, tekst: s.tekst })), productionDayId: shootDayId || undefined });
+      const res = await saveScriptsToLibrary({ clientId: genClientId, scripts: scripts.map((s) => ({ onderwerp: s.onderwerp, tekst: s.tekst, contentType: s.contentType, funnel: s.funnel })), productionDayId: shootDayId || undefined });
       if (res.ok) setSavedMsg(`${res.count} script${res.count === 1 ? "" : "s"} opgeslagen in de scriptbibliotheek.`);
       else setErr(res.message);
     } finally {
@@ -281,10 +304,11 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const updateScript = (id: string, patch: Partial<Pick<EditorScript, "onderwerp" | "tekst">>) =>
     setScripts((prev) => (prev ? prev.map((s) => (s.id === id ? { ...s, ...patch } : s)) : prev));
   const removeScript = (id: string) => setScripts((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
-  const addScript = () => setScripts((prev) => [...(prev ?? []), { id: uid(), onderwerp: "", tekst: "", versions: [] }]);
+  const addScript = () => setScripts((prev) => [...(prev ?? []), { id: uid(), onderwerp: "", tekst: "", versions: [], contentType, funnel: isAd ? "TOF" : undefined }]);
 
   // Eén aanpassing (snelle actie of vrije tekst/spraak). Bewaart de vorige versie met de feedback.
-  const runRevise = (id: string, instruction: string, feedbackLabel: string, newConcept?: boolean) => {
+  // withPoll (optioneel, organisch) forceert de CTA mét/zonder poll ná generatie.
+  const runRevise = (id: string, instruction: string, feedbackLabel: string, newConcept?: boolean, withPoll?: boolean) => {
     const s = scripts?.find((x) => x.id === id);
     if (!s || !instruction.trim() || busyId) return;
     setBusyId(id);
@@ -297,6 +321,9 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         newConcept,
         clientId: genClientId || undefined,
         clientName: genClientId ? undefined : genClientName || undefined,
+        contentType: s.contentType,
+        funnel: s.funnel,
+        withPoll,
       });
       if (res.ok) {
         setScripts((prev) => prev?.map((x) => x.id === id ? {
@@ -323,6 +350,8 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         tekst: s.tekst,
         clientId: genClientId || undefined,
         clientName: genClientId ? undefined : genClientName || undefined,
+        contentType: s.contentType,
+        funnel: s.funnel,
       });
       if (res.ok) { setQualityById((m) => ({ ...m, [id]: res.data })); setQualityOpenId(id); }
       else setErr(res.message);
@@ -406,6 +435,11 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
             <div key={s.id} className={`rounded-[var(--radius-lg)] border bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)] ${busy ? "border-[var(--color-brand-400)]" : "border-[var(--color-line)]"}`}>
               <div className="mb-2 flex items-center gap-2">
                 <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--color-brand-600)] text-2xs font-bold text-white">{i + 1}</span>
+                {s.contentType === "advertentie" && s.funnel ? (
+                  <span title={`Advertentie · ${FUNNEL_LABEL[s.funnel]}`} className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--color-violet)] px-2 py-0.5 text-2xs font-bold text-[var(--color-violet)]">
+                    <Megaphone className="size-3" /> {s.funnel}
+                  </span>
+                ) : null}
                 <input
                   value={s.onderwerp}
                   onChange={(e) => updateScript(s.id, { onderwerp: e.target.value })}
@@ -437,10 +471,10 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
                 <MicButton onText={(t) => updateScript(s.id, { tekst: appendText(s.tekst, t) })} onError={setErr} title="Tekst inspreken" />
               </div>
 
-              {/* Snelle feedback-acties */}
+              {/* Snelle feedback-acties — per contenttype */}
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 {busy ? <span className="inline-flex items-center gap-1.5 text-2xs text-[var(--color-brand-700)]"><Loader2 className="size-3.5 animate-spin" /> Bezig…</span> : null}
-                {QUICK_ACTIONS.map((a) => (
+                {(s.contentType === "advertentie" ? AD_QUICK_ACTIONS : QUICK_ACTIONS).map((a) => (
                   <button
                     key={a.label}
                     type="button"
@@ -452,6 +486,15 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
                   </button>
                 ))}
               </div>
+
+              {/* Call to action: poll-keuze pas ná generatie, per organisch script */}
+              {s.contentType !== "advertentie" ? (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-2xs font-medium text-[var(--color-ink-faint)]">Call to action:</span>
+                  <button type="button" disabled={!!busyId} onClick={() => runRevise(s.id, "Zet de call to action om naar een social media poll: sluit af met de kop SOCIAL MEDIA POLL KEUZES en precies twee korte, verschillende keuzes. Laat de rest van het script staan.", "CTA met poll", false, true)} className="rounded-full border border-[var(--color-line-strong)] px-2.5 py-1 text-2xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-40">+ Poll</button>
+                  <button type="button" disabled={!!busyId} onClick={() => runRevise(s.id, "Haal de social media poll weg en sluit af met één duidelijke call to action (een vraag of oproep) passend bij het onderwerp. Laat de rest van het script staan.", "CTA zonder poll", false, false)} className="rounded-full border border-[var(--color-line-strong)] px-2.5 py-1 text-2xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-40">Zonder poll</button>
+                </div>
+              ) : null}
 
               {/* Kwaliteitscontrole */}
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -612,6 +655,35 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   // ---------- INSTELLINGEN ----------
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-5 shadow-[var(--shadow-card)]">
+      {/* Contenttype: organisch of advertentie */}
+      <div className="mb-5">
+        <span className="mb-2 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Wat voor scripts?</span>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setContentType("organisch")}
+            className={`flex items-start gap-3 rounded-[var(--radius-md)] border p-3 text-left transition ${!isAd ? "border-[var(--color-brand-600)] bg-[var(--color-brand-50)]" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] hover:border-[var(--color-brand-500)]"}`}
+          >
+            <span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-full ${!isAd ? "bg-[var(--color-brand-600)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}><Sprout className="size-4" /></span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-[var(--color-ink)]">Organische scripts</span>
+              <span className="block text-2xs text-[var(--color-ink-muted)]">Bereik, kijkduur, engagement en herkenbaarheid. TikTok, Reels en Shorts.</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setContentType("advertentie")}
+            className={`flex items-start gap-3 rounded-[var(--radius-md)] border p-3 text-left transition ${isAd ? "border-[var(--color-violet)] bg-[var(--color-violet-soft,var(--color-brand-50))]" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] hover:border-[var(--color-brand-500)]"}`}
+          >
+            <span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-full ${isAd ? "bg-[var(--color-violet)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}><Megaphone className="size-4" /></span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-[var(--color-ink)]">Advertentiescripts</span>
+              <span className="block text-2xs text-[var(--color-ink-muted)]">Conversie, leads en verkopen via Meta. Opgebouwd per funnelfase (TOF/MOF/BOF).</span>
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* Klantkeuze + filter */}
       <div className="mb-5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -665,29 +737,44 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         )}
       </div>
 
-      {/* Aantal scripts */}
-      <div className="mb-5">
-        <span className="mb-2 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Hoeveel scripts?</span>
-        <div className="inline-flex items-center gap-3 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-1">
-          <button type="button" onClick={() => setCount((n) => Math.max(1, n - 1))} className="grid size-8 place-items-center rounded-[var(--radius-sm)] text-[var(--color-ink)] hover:bg-[var(--color-surface-2)] disabled:opacity-30" disabled={count <= 1}>
-            <Minus className="size-4" />
-          </button>
-          <span className="w-8 text-center text-lg font-bold tabular-nums text-[var(--color-ink)]">{count}</span>
-          <button type="button" onClick={() => setCount((n) => Math.min(8, n + 1))} className="grid size-8 place-items-center rounded-[var(--radius-sm)] text-[var(--color-ink)] hover:bg-[var(--color-surface-2)] disabled:opacity-30" disabled={count >= 8}>
-            <Plus className="size-4" />
-          </button>
+      {/* Aantal scripts — organisch: vrij aantal; advertentie: verdeling over de funnel */}
+      {!isAd ? (
+        <div className="mb-5">
+          <span className="mb-2 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Hoeveel scripts?</span>
+          <div className="inline-flex items-center gap-3 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-1">
+            <button type="button" onClick={() => setCount((n) => Math.max(1, n - 1))} className="grid size-8 place-items-center rounded-[var(--radius-sm)] text-[var(--color-ink)] hover:bg-[var(--color-surface-2)] disabled:opacity-30" disabled={count <= 1}>
+              <Minus className="size-4" />
+            </button>
+            <span className="w-8 text-center text-lg font-bold tabular-nums text-[var(--color-ink)]">{count}</span>
+            <button type="button" onClick={() => setCount((n) => Math.min(8, n + 1))} className="grid size-8 place-items-center rounded-[var(--radius-sm)] text-[var(--color-ink)] hover:bg-[var(--color-surface-2)] disabled:opacity-30" disabled={count >= 8}>
+              <Plus className="size-4" />
+            </button>
+          </div>
         </div>
-      </div>
-
-      {/* Call to action: met of zonder poll */}
-      <div className="mb-5">
-        <span className="mb-2 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Call to action</span>
-        <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5 text-sm">
-          <button type="button" onClick={() => setWithPoll(true)} className={`rounded-[var(--radius-sm)] px-3 py-1.5 font-medium transition ${withPoll ? "bg-[var(--color-brand-600)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>Met poll</button>
-          <button type="button" onClick={() => setWithPoll(false)} className={`rounded-[var(--radius-sm)] px-3 py-1.5 font-medium transition ${!withPoll ? "bg-[var(--color-brand-600)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>Zonder poll</button>
+      ) : (
+        <div className="mb-5">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Verdeling over de funnel</span>
+            <span className="text-2xs text-[var(--color-ink-faint)]">Totaal <span className="font-bold tabular-nums text-[var(--color-ink)]">{adTotal}</span> script{adTotal === 1 ? "" : "s"} · standaard 2/2/2</span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {FUNNELS.map((f) => (
+              <div key={f} className="rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[var(--color-ink)]">{f}</span>
+                  <span className="text-2xs text-[var(--color-ink-faint)]">{FUNNEL_LABEL[f]}</span>
+                </div>
+                <div className="mt-1.5 inline-flex items-center gap-2">
+                  <button type="button" onClick={() => setFunnel(f, funnelSplit[f] - 1)} className="grid size-7 place-items-center rounded-[var(--radius-sm)] text-[var(--color-ink)] hover:bg-[var(--color-surface-2)] disabled:opacity-30" disabled={funnelSplit[f] <= 0}><Minus className="size-3.5" /></button>
+                  <span className="w-6 text-center text-base font-bold tabular-nums text-[var(--color-ink)]">{funnelSplit[f]}</span>
+                  <button type="button" onClick={() => setFunnel(f, funnelSplit[f] + 1)} className="grid size-7 place-items-center rounded-[var(--radius-sm)] text-[var(--color-ink)] hover:bg-[var(--color-surface-2)] disabled:opacity-30" disabled={adTotal >= 8}><Plus className="size-3.5" /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-1.5 text-2xs text-[var(--color-ink-faint)]">TOF = koud publiek · MOF = vergelijkt oplossingen · BOF = klaar om te kopen. De call to action (incl. poll) stel je per script in ná het genereren.</p>
         </div>
-        <p className="mt-1.5 text-2xs text-[var(--color-ink-faint)]">{withPoll ? "De CTA eindigt met twee pollkeuzes." : "Alleen een call to action, zonder pollkeuzes."}</p>
-      </div>
+      )}
 
       {/* Eerdere scripts — automatisch uit Drive + handmatig toevoegen */}
       <div className="mb-5">
@@ -729,17 +816,21 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
       {/* Onderwerpen / wensen + voice + AI-suggesties */}
       <div className="mb-5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Onderwerpen of hooks <span className="font-normal normal-case text-[var(--color-ink-faint)]">— optioneel, typen of inspreken</span></span>
-          <button type="button" onClick={fetchTopics} disabled={topicsBusy} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 py-1 text-2xs font-medium text-[var(--color-brand-700)] hover:border-[var(--color-brand-500)] disabled:opacity-50">
-            {topicsBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Lightbulb className="size-3.5" />} Laat de AI onderwerpen kiezen
-          </button>
+          <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{isAd ? "Campagnedoel, product of actie" : "Onderwerpen of hooks"} <span className="font-normal normal-case text-[var(--color-ink-faint)]">— optioneel, typen of inspreken</span></span>
+          {!isAd ? (
+            <button type="button" onClick={fetchTopics} disabled={topicsBusy} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 py-1 text-2xs font-medium text-[var(--color-brand-700)] hover:border-[var(--color-brand-500)] disabled:opacity-50">
+              {topicsBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Lightbulb className="size-3.5" />} Laat de AI onderwerpen kiezen
+            </button>
+          ) : null}
         </div>
         <div className="flex items-start gap-2">
           <textarea
             value={brief}
             onChange={(e) => setBrief(e.target.value)}
             rows={4}
-            placeholder={"Laat leeg om de schrijver zelf onderwerpen te laten kiezen.\nOf geef bv. hooks, producten, acties of een thema."}
+            placeholder={isAd
+              ? "Bijv. campagnedoel (leads, aanvragen, verkopen, afspraken), het product/de dienst, de doelgroep of een lopende actie.\nLaat leeg om de schrijver een logisch commercieel doel te laten kiezen."
+              : "Laat leeg om de schrijver zelf onderwerpen te laten kiezen.\nOf geef bv. hooks, producten, acties of een thema."}
             className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:outline-none"
           />
           <MicButton onText={(t) => setBrief((p) => appendText(p, t))} onError={setErr} title="Onderwerpen inspreken" />
@@ -751,14 +842,16 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
       <button
         type="button"
         onClick={generate}
-        disabled={pending}
+        disabled={pending || (isAd && adTotal === 0)}
         className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
       >
-        {pending ? <Loader2 className="size-4 animate-spin" /> : <PenLine className="size-4" />}
-        {pending ? `${count} script${count === 1 ? "" : "s"} schrijven…` : `Schrijf ${count} script${count === 1 ? "" : "s"}`}
+        {pending ? <Loader2 className="size-4 animate-spin" /> : isAd ? <Megaphone className="size-4" /> : <PenLine className="size-4" />}
+        {(() => { const n = isAd ? adTotal : count; const noun = isAd ? `advertentiescript${n === 1 ? "" : "s"}` : `script${n === 1 ? "" : "s"}`; return pending ? `${n} ${noun} schrijven…` : `Schrijf ${n} ${noun}`; })()}
       </button>
       <p className="mt-3 flex items-center gap-1.5 text-2xs text-[var(--color-ink-faint)]">
-        <Sparkles className="size-3" /> Organisch (TikTok/Reels), volgens het Scripthandboek. Daarna verbeter je met gerichte feedback en download je als PDF.
+        <Sparkles className="size-3" /> {isAd
+          ? "Advertenties (Meta), volgens het Advertentiehandboek: per funnelfase, drie hooks per script, Meta-check. Daarna verbeter je per script en download je als PDF."
+          : "Organisch (TikTok/Reels), volgens het Scripthandboek. Daarna verbeter je met gerichte feedback en download je als PDF."}
       </p>
     </div>
   );
