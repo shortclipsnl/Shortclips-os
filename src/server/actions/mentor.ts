@@ -5,7 +5,9 @@ import { db } from "@/db/client";
 import { mentorConversations, mentorMessages, mentorMemories } from "@/db/schema";
 import { requireOwner, ForbiddenError } from "@/server/auth/context";
 import { aiConfigured, runChat, runPrompt, type ChatMessage } from "@/server/ai/client";
-import { MENTOR_SYSTEM, buildMentorContext } from "@/server/mentor";
+import { MENTOR_SYSTEM, buildMentorContext, getMentorDiagnostics } from "@/server/mentor";
+
+export type { MentorDiagnostics } from "@/server/mentor";
 
 type ChatResult = { ok: true; reply: string; conversationId: string; title: string } | { ok: false; message: string };
 const MAX_MESSAGES = 30;
@@ -36,6 +38,7 @@ export async function mentorChat(input: { conversationId?: string; messages: Cha
       system: `${MENTOR_SYSTEM}\n\n==================\nLIVE BEDRIJFSCONTEXT (uit het Shortclips-portaal)\n==================\n${context}`,
       messages,
       maxTokens: 4000,
+      cacheSystem: true,
     });
     if (!res.ok) return { ok: false, message: "De mentor gaf geen antwoord. Probeer het nog eens." };
 
@@ -115,7 +118,7 @@ export async function mentorInsights(): Promise<{ ok: true; insights: CeoInsight
       `Geef UITSLUITEND geldige JSON: {"insights":[{"categorie":"operationeel|leiderschap|financieel|strategisch|sales","titel":"<kort>","detail":"<onderbouwing met de data>","prioriteit":"hoog|midden|laag","jarnoNodig":"hoog|midden|laag","actie":"<concrete eerstvolgende stap>"}]}`,
     ].join("\n");
 
-    const res = await runPrompt({ system: MENTOR_SYSTEM, user, maxTokens: 3000 });
+    const res = await runPrompt({ system: MENTOR_SYSTEM, user, maxTokens: 3000, cacheSystem: true });
     if (!res.ok) return { ok: false, message: "De mentor gaf geen antwoord. Probeer het nog eens." };
 
     const cleaned = res.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
@@ -133,6 +136,36 @@ export async function mentorInsights(): Promise<{ ok: true; insights: CeoInsight
 
     if (insights.length === 0) return { ok: false, message: "Geen inzichten gekregen. Probeer het nog eens." };
     return { ok: true, insights };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+/* ---------------- Diagnose & optimalisatie (Fase 7) ---------------- */
+
+/** Transparante status van de databronnen die de mentor voeden. Owner-only. */
+export async function mentorDiagnostics(): Promise<{ ok: true; diag: Awaited<ReturnType<typeof getMentorDiagnostics>> } | { ok: false; message: string }> {
+  try {
+    const viewer = await requireOwner();
+    const diag = await getMentorDiagnostics(viewer);
+    return { ok: true, diag };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+/** Meet de werkelijke reactietijd van het model met een minimale aanroep. Owner-only. */
+export async function mentorSpeedTest(): Promise<{ ok: true; ms: number; model: string } | { ok: false; message: string }> {
+  try {
+    await requireOwner();
+    if (!aiConfigured()) return { ok: false, message: "De AI-mentor staat uit (ANTHROPIC_API_KEY ontbreekt)." };
+    const t0 = Date.now();
+    const res = await runPrompt({ system: "Antwoord met exact één kort woord.", user: "Zeg 'ok'.", maxTokens: 16, cacheSystem: true });
+    const ms = Date.now() - t0;
+    if (!res.ok) return { ok: false, message: "Geen antwoord van het model." };
+    return { ok: true, ms, model: res.model };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;

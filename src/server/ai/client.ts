@@ -27,7 +27,20 @@ export type AiRunInput = {
   /** Afbeeldingen (bijv. screenshots van WhatsApp/e-mail). */
   images?: AiImage[];
   maxTokens?: number;
+  /**
+   * Markeer de system-prompt als cachebaar (Anthropic prompt caching). Bij
+   * herhaalde aanroepen met dezelfde system-prompt binnen het cachevenster is
+   * het antwoord sneller en goedkoper. Veilig: bij een afwijkende prompt valt
+   * het automatisch terug op een gewone aanroep.
+   */
+  cacheSystem?: boolean;
 };
+
+/** Bouwt de system-parameter; cachebaar als één ephemeral blok wanneer gevraagd. */
+function systemParam(system: string, cache?: boolean): string | Anthropic.TextBlockParam[] {
+  if (!cache) return system;
+  return [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
+}
 
 export type AiResult =
   | { ok: true; text: string; model: string }
@@ -72,7 +85,7 @@ export async function runPrompt(input: AiRunInput): Promise<AiResult> {
     const response = await client.messages.create({
       model,
       max_tokens: input.maxTokens ?? 16000,
-      system: input.system,
+      system: systemParam(input.system, input.cacheSystem),
       messages: [{ role: "user", content }],
     });
 
@@ -100,7 +113,7 @@ export async function runPrompt(input: AiRunInput): Promise<AiResult> {
  * gespreksgeschiedenis. Voor de Scriptgenerator, die volgens een vaste werkwijze
  * vragen stelt en daarna scripts schrijft.
  */
-export async function runChat(input: { system: string; messages: ChatMessage[]; maxTokens?: number }): Promise<AiResult> {
+export async function runChat(input: { system: string; messages: ChatMessage[]; maxTokens?: number; cacheSystem?: boolean }): Promise<AiResult> {
   if (!env.ANTHROPIC_API_KEY) return { ok: false, reason: "no_provider" };
   if (input.messages.length === 0) return { ok: false, reason: "error", error: "Geen bericht." };
   try {
@@ -109,7 +122,7 @@ export async function runChat(input: { system: string; messages: ChatMessage[]; 
     const response = await client.messages.create({
       model,
       max_tokens: input.maxTokens ?? 4000,
-      system: input.system,
+      system: systemParam(input.system, input.cacheSystem),
       messages: input.messages.map((m) => ({ role: m.role, content: m.content })),
     });
     if (response.stop_reason === "refusal") {

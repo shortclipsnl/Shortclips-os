@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Send, Loader2, Mic, MicOff, Copy, Check, Plus, Search, Pin, Pencil, Trash2, Brain, MessageSquare, PanelLeft, BookMarked, Bookmark, X, Lightbulb, CalendarRange, CalendarCheck, MessageSquarePlus } from "lucide-react";
-import { mentorChat, getMentorConversation, renameMentorConversation, pinMentorConversation, deleteMentorConversation, addMentorMemory, updateMentorMemory, deleteMentorMemory, mentorInsights, type MentorMemory, type CeoInsight } from "@/server/actions/mentor";
+import { Send, Loader2, Mic, MicOff, Copy, Check, Plus, Search, Pin, Pencil, Trash2, Brain, MessageSquare, PanelLeft, BookMarked, Bookmark, X, Lightbulb, CalendarRange, CalendarCheck, MessageSquarePlus, Gauge, Zap } from "lucide-react";
+import { mentorChat, getMentorConversation, renameMentorConversation, pinMentorConversation, deleteMentorConversation, addMentorMemory, updateMentorMemory, deleteMentorMemory, mentorInsights, mentorDiagnostics, mentorSpeedTest, type MentorMemory, type CeoInsight, type MentorDiagnostics } from "@/server/actions/mentor";
 import type { ChatMessage } from "@/server/ai/client";
 
 type Conv = { id: string; title: string; pinned: boolean; lastMessageAt: string | null };
@@ -108,6 +108,11 @@ export function MentorChat({ conversations: initial, memories: initialMem, aiRea
   const [insOpen, setInsOpen] = useState(false);
   const [insights, setInsights] = useState<CeoInsight[]>([]);
   const [insBusy, setInsBusy] = useState(false);
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [diag, setDiag] = useState<MentorDiagnostics | null>(null);
+  const [diagBusy, setDiagBusy] = useState(false);
+  const [speed, setSpeed] = useState<number | null>(null);
+  const [speedBusy, setSpeedBusy] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -162,6 +167,18 @@ export function MentorChat({ conversations: initial, memories: initialMem, aiRea
       if (res.ok) { setMessages((m) => [...m, { role: "assistant", content: res.reply }]); setActiveId(res.conversationId); setConvs((c) => [{ id: res.conversationId, title: res.title, pinned: false, lastMessageAt: new Date().toISOString() }, ...c]); }
       else { setErr(res.message); setMessages([]); }
     });
+  };
+
+  // Diagnose + snelheidstest (Fase 7)
+  const loadDiag = () => {
+    if (diagBusy) return;
+    setDiagBusy(true); setErr(null);
+    mentorDiagnostics().then((r) => { if (r.ok) setDiag(r.diag); else setErr(r.message); }).finally(() => setDiagBusy(false));
+  };
+  const runSpeed = () => {
+    if (speedBusy) return;
+    setSpeedBusy(true); setSpeed(null);
+    mentorSpeedTest().then((r) => { if (r.ok) setSpeed(r.ms); else setErr(r.message); }).finally(() => setSpeedBusy(false));
   };
 
   // Geheugen
@@ -242,6 +259,9 @@ export function MentorChat({ conversations: initial, memories: initialMem, aiRea
           <button type="button" onClick={() => review(MONTHLY_REVIEW)} disabled={pending} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-50">
             <CalendarRange className="size-4" /> Maandelijkse review
           </button>
+          <button type="button" onClick={() => { setDiagOpen(true); if (!diag && !diagBusy) loadDiag(); }} title="Welke live data voedt de mentor + reactietijd" className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] hover:border-[var(--color-brand-500)] hover:text-[var(--color-ink)]">
+            <Gauge className="size-4" /> Diagnose
+          </button>
         </div>
 
         {/* CEO-inzichten paneel */}
@@ -279,6 +299,62 @@ export function MentorChat({ conversations: initial, memories: initialMem, aiRea
                     );
                   })}
                 </ul>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Diagnose-paneel (Fase 7) */}
+        {diagOpen ? (
+          <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/30 p-4 sm:p-8" onClick={(e) => { if (e.target === e.currentTarget) setDiagOpen(false); }}>
+            <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
+              <div className="mb-1 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--color-ink)]"><Gauge className="size-4 text-[var(--color-brand-600)]" /> Mentor-diagnose</h2>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={loadDiag} disabled={diagBusy} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-1 text-2xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-50">{diagBusy ? <Loader2 className="size-3.5 animate-spin" /> : null} Ververs</button>
+                  <button type="button" onClick={() => setDiagOpen(false)} className="rounded p-1 text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"><X className="size-4" /></button>
+                </div>
+              </div>
+              <p className="mb-3 text-2xs text-[var(--color-ink-faint)]">Waarop de mentor zich baseert: welke live databronnen geladen zijn, met kerncijfers. Zo is controleerbaar dat adviezen op echte data staan en er niets wordt verzonnen.</p>
+              {diagBusy && !diag ? (
+                <div className="py-10 text-center"><Loader2 className="mx-auto size-5 animate-spin text-[var(--color-brand-600)]" /><p className="mt-2 text-xs text-[var(--color-ink-muted)]">Databronnen controleren…</p></div>
+              ) : !diag ? (
+                <p className="py-6 text-center text-xs text-[var(--color-ink-faint)]">Nog geen diagnose. Klik op &quot;Ververs&quot;.</p>
+              ) : (
+                <>
+                  <ul className="space-y-1.5">
+                    {diag.sources.map((s) => (
+                      <li key={s.key} className="flex items-start gap-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-2.5 py-2">
+                        <span className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded-full ${s.ok ? "bg-[var(--color-good)] text-white" : "bg-[var(--color-ink-faint)] text-white"}`}>{s.ok ? <Check className="size-3" /> : <X className="size-3" />}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-[var(--color-ink)]">{s.label}</p>
+                          <p className="text-2xs text-[var(--color-ink-muted)]">{s.detail}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-2.5 py-2">
+                      <p className="text-2xs text-[var(--color-ink-faint)]">Model</p>
+                      <p className="truncate text-xs font-semibold text-[var(--color-ink)]">{diag.model}</p>
+                    </div>
+                    <div className="rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-2.5 py-2">
+                      <p className="text-2xs text-[var(--color-ink-faint)]">Prompt-caching</p>
+                      <p className="text-xs font-semibold text-[var(--color-ink)]">{diag.promptCaching ? "Aan" : "Uit"}</p>
+                    </div>
+                    <div className="rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-2.5 py-2">
+                      <p className="text-2xs text-[var(--color-ink-faint)]">Context</p>
+                      <p className="text-xs font-semibold text-[var(--color-ink)]">{diag.contextChars.toLocaleString("nl-NL")} tekens</p>
+                    </div>
+                    <div className="rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-2.5 py-2">
+                      <p className="text-2xs text-[var(--color-ink-faint)]">Reactietijd</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-semibold text-[var(--color-ink)]">{speed != null ? `${speed} ms` : "—"}</p>
+                        <button type="button" onClick={runSpeed} disabled={speedBusy} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-1.5 py-0.5 text-2xs font-medium text-[var(--color-ink-muted)] hover:border-[var(--color-brand-500)] hover:text-[var(--color-ink)] disabled:opacity-50">{speedBusy ? <Loader2 className="size-3 animate-spin" /> : <Zap className="size-3" />} Test</button>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>

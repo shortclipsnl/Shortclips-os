@@ -8,6 +8,7 @@ import { getGoalsOverview } from "@/server/goals/overview";
 import { getCapacityOverview } from "@/server/capacity";
 import { getManagementFinance } from "@/server/management-finance";
 import { listLeads } from "@/server/leads";
+import { aiModel } from "@/server/ai/client";
 
 const MEMORY_LABEL: Record<string, string> = {
   voorkeur: "Voorkeuren", feit: "Bedrijfsfeiten", beslissing: "Beslissingen", actie: "Openstaande acties", inzicht: "Inzichten",
@@ -121,4 +122,43 @@ export async function buildMentorContext(viewer: Viewer): Promise<string> {
 
   parts.push("\nGegevens die ontbreken of verouderd zijn, zijn hierboven als zodanig gemarkeerd. Verzin geen cijfers; benoem wat je niet weet.");
   return parts.join("\n");
+}
+
+/* ---------------- Diagnose (Fase 7: optimalisatie) ---------------- */
+
+export type MentorDiagnostics = {
+  model: string;
+  promptCaching: boolean;
+  contextChars: number;
+  sources: { key: string; label: string; ok: boolean; detail: string }[];
+};
+
+/**
+ * Transparante zelfcontrole: welke live databronnen voeden de mentor, met
+ * kerncijfers erbij. Maakt zichtbaar waarop adviezen zijn gebaseerd (en dat er
+ * niets verzonnen wordt). Snel — geen AI-aanroep.
+ */
+export async function getMentorDiagnostics(viewer: Viewer): Promise<MentorDiagnostics> {
+  const [quality, cap, fin, leads, goals, memRows, context] = await Promise.all([
+    getQualityOverview(viewer).catch(() => null),
+    getCapacityOverview().catch(() => null),
+    getManagementFinance().catch(() => null),
+    listLeads().catch(() => null),
+    getGoalsOverview(viewer).catch(() => null),
+    db.select({ id: mentorMemories.id })
+      .from(mentorMemories).where(and(eq(mentorMemories.userId, viewer.id), isNull(mentorMemories.deletedAt)))
+      .then((r) => r as { id: string }[]).catch(() => null),
+    buildMentorContext(viewer).catch(() => ""),
+  ]);
+
+  const sources = [
+    { key: "quality", label: "Aandachtspunten", ok: !!quality, detail: quality ? `${quality.items.length} signalen (${quality.counts.rood} rood, ${quality.counts.oranje} oranje, ${quality.counts.blauw} blauw)` : "niet beschikbaar" },
+    { key: "capacity", label: "Bedrijf & capaciteit", ok: !!cap, detail: cap ? `${cap.summary.activeClients} klanten · ${cap.summary.monthlyShorts} shorts/mnd · ${cap.summary.activeEditors} editors` : "niet beschikbaar" },
+    { key: "finance", label: "Financieel", ok: !!fin, detail: fin ? `MRR ${eur(fin.mrr)} · boekhouding ${fin.book?.hasData ? "geïmporteerd" : "niet geïmporteerd"}` : "niet beschikbaar" },
+    { key: "leads", label: "Sales & leads", ok: !!leads, detail: leads ? `${leads.summary.open} open · ${leads.summary.won} gewonnen · ${leads.summary.total} totaal` : "niet beschikbaar" },
+    { key: "goals", label: "Doelen", ok: !!goals, detail: goals ? (goals.rows.length ? `${goals.rows.length} doelen vastgelegd` : "geen doelen vastgelegd") : "niet beschikbaar" },
+    { key: "memory", label: "Persoonlijk geheugen", ok: memRows !== null, detail: memRows === null ? "niet beschikbaar" : memRows.length ? `${memRows.length} herinneringen` : "nog leeg" },
+  ];
+
+  return { model: aiModel(), promptCaching: true, contextChars: context.length, sources };
 }
