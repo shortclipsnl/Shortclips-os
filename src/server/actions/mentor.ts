@@ -4,7 +4,7 @@ import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { mentorConversations, mentorMessages, mentorMemories } from "@/db/schema";
 import { requireOwner, ForbiddenError } from "@/server/auth/context";
-import { aiConfigured, runChat, type ChatMessage } from "@/server/ai/client";
+import { aiConfigured, runChat, runPrompt, type ChatMessage } from "@/server/ai/client";
 import { MENTOR_SYSTEM, buildMentorContext } from "@/server/mentor";
 
 type ChatResult = { ok: true; reply: string; conversationId: string; title: string } | { ok: false; message: string };
@@ -91,6 +91,52 @@ export async function deleteMentorConversation(id: string): Promise<{ ok: true }
   const viewer = await requireOwner();
   await db.update(mentorConversations).set({ deletedAt: new Date(), updatedAt: new Date() }).where(and(eq(mentorConversations.id, id), eq(mentorConversations.userId, viewer.id)));
   return { ok: true };
+}
+
+/* ---------------- Proactieve CEO-inzichten (Fase 6) ---------------- */
+
+export type CeoInsight = { categorie: string; titel: string; detail: string; prioriteit: string; jarnoNodig: string; actie: string };
+
+/** Laat de mentor zelfstandig de belangrijkste verbeterkansen signaleren uit de actuele data. */
+export async function mentorInsights(): Promise<{ ok: true; insights: CeoInsight[] } | { ok: false; message: string }> {
+  try {
+    const viewer = await requireOwner();
+    if (!aiConfigured()) return { ok: false, message: "De AI-mentor staat uit (ANTHROPIC_API_KEY ontbreekt)." };
+    const context = await buildMentorContext(viewer);
+    const user = [
+      "Analyseer de actuele bedrijfsgegevens van Shortclips hieronder en signaleer zelfstandig de belangrijkste verbeterkansen.",
+      "Trek ALLEEN conclusies die de gegevens daadwerkelijk ondersteunen. Verzin geen cijfers. Sla punten over waarvoor de data ontbreekt.",
+      "Geef MAXIMAAL 5 inzichten — focus boven aantal. Prioriteer op financiële en strategische impact, urgentie, risico en de mate waarin Jarno er zelf bij nodig is.",
+      "Houd elke 'detail' en 'actie' kort (max ~25 woorden).",
+      "",
+      "LIVE BEDRIJFSCONTEXT:",
+      context,
+      "",
+      `Geef UITSLUITEND geldige JSON: {"insights":[{"categorie":"operationeel|leiderschap|financieel|strategisch|sales","titel":"<kort>","detail":"<onderbouwing met de data>","prioriteit":"hoog|midden|laag","jarnoNodig":"hoog|midden|laag","actie":"<concrete eerstvolgende stap>"}]}`,
+    ].join("\n");
+
+    const res = await runPrompt({ system: MENTOR_SYSTEM, user, maxTokens: 3000 });
+    if (!res.ok) return { ok: false, message: "De mentor gaf geen antwoord. Probeer het nog eens." };
+
+    const cleaned = res.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+    let insights: CeoInsight[] = [];
+    try {
+      const a = cleaned.indexOf("{"); const b = cleaned.lastIndexOf("}");
+      const obj = JSON.parse(a >= 0 && b > a ? cleaned.slice(a, b + 1) : cleaned) as { insights?: unknown };
+      if (Array.isArray(obj.insights)) {
+        insights = obj.insights
+          .filter((x): x is Record<string, string> => !!x && typeof (x as Record<string, unknown>).titel === "string")
+          .map((x) => ({ categorie: String(x.categorie ?? "strategisch"), titel: String(x.titel ?? ""), detail: String(x.detail ?? ""), prioriteit: String(x.prioriteit ?? "midden"), jarnoNodig: String(x.jarnoNodig ?? "midden"), actie: String(x.actie ?? "") }))
+          .slice(0, 5);
+      }
+    } catch { /* geen inzichten */ }
+
+    if (insights.length === 0) return { ok: false, message: "Geen inzichten gekregen. Probeer het nog eens." };
+    return { ok: true, insights };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
 }
 
 /* ---------------- Persoonlijk geheugen (Fase 5) ---------------- */

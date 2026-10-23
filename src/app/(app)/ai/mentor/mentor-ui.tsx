@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Send, Loader2, Mic, MicOff, Copy, Check, Plus, Search, Pin, Pencil, Trash2, Brain, MessageSquare, PanelLeft, BookMarked, Bookmark, X } from "lucide-react";
-import { mentorChat, getMentorConversation, renameMentorConversation, pinMentorConversation, deleteMentorConversation, addMentorMemory, updateMentorMemory, deleteMentorMemory, type MentorMemory } from "@/server/actions/mentor";
+import { Send, Loader2, Mic, MicOff, Copy, Check, Plus, Search, Pin, Pencil, Trash2, Brain, MessageSquare, PanelLeft, BookMarked, Bookmark, X, Lightbulb, CalendarRange, CalendarCheck, MessageSquarePlus } from "lucide-react";
+import { mentorChat, getMentorConversation, renameMentorConversation, pinMentorConversation, deleteMentorConversation, addMentorMemory, updateMentorMemory, deleteMentorMemory, mentorInsights, type MentorMemory, type CeoInsight } from "@/server/actions/mentor";
 import type { ChatMessage } from "@/server/ai/client";
 
 type Conv = { id: string; title: string; pinned: boolean; lastMessageAt: string | null };
@@ -14,6 +14,12 @@ const MEM_KINDS: Array<{ key: string; label: string }> = [
   { key: "feit", label: "Bedrijfsfeit" },
 ];
 const memLabel = (k: string) => MEM_KINDS.find((m) => m.key === k)?.label ?? k;
+
+const PRIO_COLOR: Record<string, string> = { hoog: "var(--color-bad)", midden: "var(--color-warn)", laag: "var(--color-info)" };
+const CAT_LABEL: Record<string, string> = { operationeel: "Operationeel", leiderschap: "Leiderschap", financieel: "Financieel", strategisch: "Strategisch", sales: "Sales" };
+
+const WEEKLY_REVIEW = "Stel een WEKELIJKSE CEO-review voor me samen op basis van de actuele data: belangrijkste ontwikkelingen, grootste knelpunten, openstaande acties, financiële aandachtspunten, teamcapaciteit, prioriteiten voor volgende week en de taken die ik moet delegeren. Gebruik alleen beschikbare data en benoem wat ontbreekt.";
+const MONTHLY_REVIEW = "Stel een MAANDELIJKSE CEO-review voor me samen: ontwikkeling van omzet en winst, nieuwe en vertrokken klanten, operationele prestaties, teamontwikkeling, voortgang richting de bedrijfsdoelen en de belangrijkste strategische verbeteringen. Gebruik alleen beschikbare en betrouwbare data en benoem wat ontbreekt.";
 
 const SUGGESTIONS = [
   "Wat moet deze week mijn hoogste prioriteit zijn?",
@@ -99,6 +105,9 @@ export function MentorChat({ conversations: initial, memories: initialMem, aiRea
   const [memKind, setMemKind] = useState("inzicht");
   const [memContent, setMemContent] = useState("");
   const [memBusy, setMemBusy] = useState(false);
+  const [insOpen, setInsOpen] = useState(false);
+  const [insights, setInsights] = useState<CeoInsight[]>([]);
+  const [insBusy, setInsBusy] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -133,6 +142,25 @@ export function MentorChat({ conversations: initial, memories: initialMem, aiRea
         if (!activeId) { setActiveId(res.conversationId); setConvs((c) => [{ id: res.conversationId, title: res.title, pinned: false, lastMessageAt: new Date().toISOString() }, ...c]); }
         else setConvs((c) => c.map((x) => (x.id === res.conversationId ? { ...x, lastMessageAt: new Date().toISOString() } : x)));
       } else { setErr(res.message); setMessages((m) => m.slice(0, -1)); setInput(content); }
+    });
+  };
+
+  // CEO-inzichten + reviews (Fase 6)
+  const genInsights = () => {
+    if (insBusy) return;
+    setInsBusy(true); setErr(null);
+    mentorInsights().then((r) => { if (r.ok) setInsights(r.insights); else setErr(r.message); }).finally(() => setInsBusy(false));
+  };
+  const discussInsight = (ins: CeoInsight) => { setInsOpen(false); send(`Laten we dieper ingaan op dit CEO-inzicht (${CAT_LABEL[ins.categorie] ?? ins.categorie}): "${ins.titel}". ${ins.detail} Wat is je concrete advies en eerste stap?`); };
+  const review = (text: string) => {
+    if (pending) return;
+    setErr(null); setInsOpen(false);
+    const next: ChatMessage[] = [{ role: "user", content: text }];
+    setActiveId(null); setMessages(next);
+    start(async () => {
+      const res = await mentorChat({ messages: next });
+      if (res.ok) { setMessages((m) => [...m, { role: "assistant", content: res.reply }]); setActiveId(res.conversationId); setConvs((c) => [{ id: res.conversationId, title: res.title, pinned: false, lastMessageAt: new Date().toISOString() }, ...c]); }
+      else { setErr(res.message); setMessages([]); }
     });
   };
 
@@ -202,6 +230,59 @@ export function MentorChat({ conversations: initial, memories: initialMem, aiRea
             <BookMarked className="size-4" /> Geheugen{mem.length > 0 ? ` (${mem.length})` : ""}
           </button>
         </div>
+
+        {/* Snelle acties: CEO-inzichten + reviews */}
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button type="button" onClick={() => { setInsOpen(true); if (insights.length === 0 && !insBusy) genInsights(); }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-brand-300)] bg-[var(--color-brand-50)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] hover:brightness-[0.98]">
+            <Lightbulb className="size-4" /> CEO-inzichten
+          </button>
+          <button type="button" onClick={() => review(WEEKLY_REVIEW)} disabled={pending} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-50">
+            <CalendarCheck className="size-4" /> Wekelijkse review
+          </button>
+          <button type="button" onClick={() => review(MONTHLY_REVIEW)} disabled={pending} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-50">
+            <CalendarRange className="size-4" /> Maandelijkse review
+          </button>
+        </div>
+
+        {/* CEO-inzichten paneel */}
+        {insOpen ? (
+          <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/30 p-4 sm:p-8" onClick={(e) => { if (e.target === e.currentTarget) setInsOpen(false); }}>
+            <div className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
+              <div className="mb-1 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--color-ink)]"><Lightbulb className="size-4 text-[var(--color-brand-600)]" /> CEO-inzichten</h2>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={genInsights} disabled={insBusy} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-1 text-2xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-50">{insBusy ? <Loader2 className="size-3.5 animate-spin" /> : null} Ververs</button>
+                  <button type="button" onClick={() => setInsOpen(false)} className="rounded p-1 text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"><X className="size-4" /></button>
+                </div>
+              </div>
+              <p className="mb-3 text-2xs text-[var(--color-ink-faint)]">Automatisch gesignaleerd uit je actuele data — maximaal 5, op prioriteit. Alleen onderbouwde punten.</p>
+              {insBusy && insights.length === 0 ? (
+                <div className="py-10 text-center"><Loader2 className="mx-auto size-5 animate-spin text-[var(--color-brand-600)]" /><p className="mt-2 text-xs text-[var(--color-ink-muted)]">De mentor analyseert je data…</p></div>
+              ) : insights.length === 0 ? (
+                <p className="py-6 text-center text-xs text-[var(--color-ink-faint)]">Nog geen inzichten. Klik op &quot;Ververs&quot;.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {insights.map((ins, i) => {
+                    const color = PRIO_COLOR[ins.prioriteit] ?? "var(--color-info)";
+                    return (
+                      <li key={i} className="rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3" style={{ boxShadow: `inset 3px 0 0 ${color}` }}>
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <span className="rounded-full px-2 py-0.5 text-2xs font-bold text-white" style={{ background: color }}>{ins.prioriteit}</span>
+                          <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{CAT_LABEL[ins.categorie] ?? ins.categorie}</span>
+                          <span className="ml-auto text-2xs text-[var(--color-ink-faint)]">Jarno nodig: {ins.jarnoNodig}</span>
+                        </div>
+                        <p className="text-sm font-semibold text-[var(--color-ink)]">{ins.titel}</p>
+                        {ins.detail ? <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{ins.detail}</p> : null}
+                        {ins.actie ? <p className="mt-1 text-xs text-[var(--color-ink)]"><span className="font-semibold">Actie:</span> {ins.actie}</p> : null}
+                        <button type="button" onClick={() => discussInsight(ins)} className="mt-2 inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2 py-1 text-2xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)]"><MessageSquarePlus className="size-3.5" /> Bespreek met de mentor</button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        ) : null}
 
         {/* Geheugenpaneel */}
         {memOpen ? (
