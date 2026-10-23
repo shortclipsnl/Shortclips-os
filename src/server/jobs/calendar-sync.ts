@@ -347,6 +347,19 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
               .set({ deletedAt: new Date(), updatedAt: new Date() })
               .where(and(eq(deliverables.productionDayId, map.entityId), eq(deliverables.status, "recorded"), isNull(deliverables.deletedAt)));
           }
+          // Verwijderde publicatie-afspraak ("Klant Content uploaden") → ook de
+          // afgeleide contentplanning-post opruimen, tenzij die al gepubliceerd is.
+          const [contentMap] = await db
+            .select({ entityId: mondayMappings.entityId })
+            .from(mondayMappings)
+            .where(and(eq(mondayMappings.entityType, "calendar_content"), eq(mondayMappings.itemId, row.id)))
+            .limit(1);
+          if (contentMap?.entityId) {
+            await db
+              .update(contentCalendar)
+              .set({ deletedAt: new Date(), updatedAt: new Date() })
+              .where(and(eq(contentCalendar.id, contentMap.entityId), ne(contentCalendar.status, "published"), isNull(contentCalendar.deletedAt)));
+          }
           cancelled++;
         }
       }
