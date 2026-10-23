@@ -181,6 +181,11 @@ export const ROLE_DEFINITIONS: Array<{
       "analytics:read",
       "ai:read",
       "video_intelligence:read",
+      // Het contentteam (o.a. Jiska, Rutger) stuurt ook de editing aan: fases,
+      // prioriteit en deadlines wijzigen (videos:write) en editors toewijzen
+      // (videos:assign), net als de projectcoördinator.
+      "videos:write",
+      "videos:assign",
     ],
   },
   {

@@ -342,6 +342,48 @@ export async function changeVideoStatus(
   }
 }
 
+/**
+ * Vult de editor in op alle video's die er nog geen hebben, op basis van de
+ * vaste editor per klant (clients.editorName / "welke editor doet welke klant").
+ * Zo verschijnen die video's meteen op het board van de juiste editor. Reversibel:
+ * per video is de editor altijd nog aan te passen.
+ */
+export async function autofillEditorsFromClients(): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:assign");
+    const { listEditorOptions } = await import("@/server/videos");
+    const { firstNameKey } = await import("@/lib/editors");
+
+    const editorUsers = await listEditorOptions();
+    const byKey = new Map<string, string>();
+    for (const e of editorUsers) { const k = firstNameKey(e.fullName); if (k && !byKey.has(k)) byKey.set(k, e.id); }
+
+    const cls = await db.select({ id: clients.id, editorName: clients.editorName }).from(clients).where(isNull(clients.deletedAt));
+    let count = 0;
+    let unmatched = 0;
+    for (const c of cls) {
+      if (!c.editorName) continue;
+      const uid = byKey.get(firstNameKey(c.editorName));
+      if (!uid) { unmatched++; continue; }
+      const res = await db
+        .update(deliverables)
+        .set({ editorId: uid, updatedAt: new Date() })
+        .where(and(eq(deliverables.clientId, c.id), isNull(deliverables.editorId), isNull(deliverables.deletedAt)))
+        .returning({ id: deliverables.id });
+      count += res.length;
+    }
+    if (count > 0) {
+      await auditLog({ viewer, action: "videos.autofill_editors", entityType: "deliverable", entityId: "bulk", changes: { count } });
+      revalidatePath("/videos");
+    }
+    const extra = unmatched > 0 ? ` (${unmatched} klant${unmatched === 1 ? "" : "en"} zonder herkenbare editor overgeslagen)` : "";
+    return { ok: true, message: count > 0 ? `${count} video${count === 1 ? "" : "'s"} gekoppeld aan de juiste editor${extra}.` : `Alle video's hadden al een editor${extra}.` };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 export async function assignEditor(
   videoId: string,
   editorId: string | null,

@@ -11,6 +11,7 @@ import { listClients } from "@/server/clients";
 import { WorkloadSection } from "../editing/workload-section";
 import { Card, PageHeader } from "@/components/ui";
 import { EditorBoardTable } from "./editor-board-table";
+import { AutofillEditorsButton } from "./autofill-editors";
 
 export const metadata: Metadata = { title: "Editing" };
 export const dynamic = "force-dynamic";
@@ -101,7 +102,10 @@ export default async function VideosPage({
         <section className="mb-6">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
             <h2 className="text-sm font-bold tracking-tight">Alle editing-opdrachten</h2>
-            <span className="text-xs text-white/80">{allEditorVideos.length} video&apos;s · per fase, met editor, deadline, downloadlink en script</span>
+            <div className="flex flex-wrap items-center gap-3">
+              {canAssign ? <AutofillEditorsButton /> : null}
+              <span className="text-xs text-white/80">{allEditorVideos.length} video&apos;s · per fase, met editor, deadline, downloadlink en script</span>
+            </div>
           </div>
           {allEditorVideos.length > 0 ? (
             <EditorBoardTable
