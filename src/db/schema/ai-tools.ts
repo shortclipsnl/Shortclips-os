@@ -92,11 +92,25 @@ export const salesResearch = pgTable(
     facebook: varchar("facebook", { length: 300 }),
     youtube: varchar("youtube", { length: 300 }),
     branche: varchar("branche", { length: 160 }),
+    /** Vestigingsplaats van het bedrijf. */
+    city: varchar("city", { length: 160 }),
+    /** Korte beschrijving van het bedrijf (door salesteam ingevuld, optioneel). */
+    description: text("description"),
+    /** Contactpersoon bij de potentiële klant. */
+    contactName: varchar("contact_name", { length: 160 }),
+    /** Datum van het kennismakingsgesprek (vrije tekst/datum). */
+    meetingDate: varchar("meeting_date", { length: 40 }),
+    /** Belangrijkste doelstelling van de prospect (één hoofddoel). */
+    primaryGoal: varchar("primary_goal", { length: 60 }),
+    /** Gekozen doelstellingen (meerdere), bijv. ["Meer bereik","Meer aanvragen"]. */
+    goals: jsonb("goals").notNull().default(sql`'[]'::jsonb`),
     extra: text("extra"),
     status: varchar("status", { length: 24 }).notNull().default("concept"),
     /** Gestructureerd resultaat (bedrijf, social-analyse, pijnpunten, kansen,
      *  video-ideeën, concurrenten, slide-selectie). */
     result: jsonb("result").notNull().default(sql`'{}'::jsonb`),
+    /** Eerdere versies van het resultaat (undo): [{ at, result }]. */
+    resultVersions: jsonb("result_versions").notNull().default(sql`'[]'::jsonb`),
     /** Bronlinks: [{ label, url, checkedAt }]. */
     sources: jsonb("sources").notNull().default(sql`'[]'::jsonb`),
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),

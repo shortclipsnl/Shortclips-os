@@ -2,26 +2,29 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2 } from "lucide-react";
-import { updateResearchResult, type ResearchResult, type Source } from "@/server/actions/sales-research";
+import { Check, Loader2, Sparkles, RotateCcw } from "lucide-react";
+import { updateResearchResult, refineResearch, restoreResearchVersion, type ResearchResult, type Source } from "@/server/actions/sales-research";
 import { Button, Card, CardHeader, InfoNote } from "@/components/ui";
 
 const SLIDES = [
   { key: "bedrijf", label: "Het bedrijf in beeld" },
   { key: "prestaties", label: "Huidige social media" },
-  { key: "gaatgoed", label: "Wat gaat goed" },
   { key: "kansen", label: "Grootste kansen" },
-  { key: "betekenis", label: "Wat betekent dit" },
-  { key: "shortclips", label: "Hoe Shortclips helpt" },
-  { key: "ideeen", label: "Video-ideeën" },
-  { key: "aanpak", label: "Contentaanpak" },
-  { key: "vervolg", label: "Vervolgstappen" },
+  { key: "ideeen", label: "Zo zouden wij jullie content aanpakken" },
+  { key: "maakkennis", label: "Maak kennis met Shortclips" },
+  { key: "werkwijze", label: "Zo werken wij samen" },
+  { key: "roadmap", label: "Jullie eerste 3 maanden" },
+  { key: "waarom", label: "Waarom Shortclips" },
+  { key: "vervolg", label: "De volgende stap" },
 ];
 
-export function ResearchEditor({ id, initial, sources }: { id: string; initial: ResearchResult; sources: Source[] }) {
+export function ResearchEditor({ id, initial, sources, versions }: { id: string; initial: ResearchResult; sources: Source[]; versions: Array<{ at: string }> }) {
   const [r, setR] = useState<ResearchResult>(initial);
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
+  const [feedback, setFeedback] = useState("");
+  const [refineBusy, setRefineBusy] = useState(false);
+  const [refineErr, setRefineErr] = useState<string | null>(null);
   const router = useRouter();
 
   function save() {
@@ -31,6 +34,23 @@ export function ResearchEditor({ id, initial, sources }: { id: string; initial: 
       setSaved(true);
       router.refresh();
     });
+  }
+
+  function refine() {
+    const f = feedback.trim();
+    if (!f || refineBusy) return;
+    setRefineBusy(true); setRefineErr(null);
+    (async () => {
+      const res = await refineResearch(id, f);
+      if (res.ok) { setFeedback(""); router.refresh(); }
+      else setRefineErr(res.message ?? "Mislukt.");
+      setRefineBusy(false);
+    })();
+  }
+
+  function restore(index: number) {
+    if (!window.confirm("Deze eerdere versie terugzetten? De huidige versie wordt als nieuwe versie bewaard.")) return;
+    start(async () => { await restoreResearchVersion(id, index); router.refresh(); });
   }
 
   const slidesUit = new Set(r.slidesUit ?? []);
@@ -196,6 +216,39 @@ export function ResearchEditor({ id, initial, sources }: { id: string; initial: 
       <Card>
         <CardHeader title="Vervolgstappen" />
         <textarea className="sc-input mt-2 resize-y text-sm" rows={2} value={r.vervolgstappen ?? ""} onChange={(e) => setR({ ...r, vervolgstappen: e.target.value })} />
+      </Card>
+
+      {/* Verbeter met AI */}
+      <Card>
+        <CardHeader title="Verbeter met AI" subtitle="Geef feedback; de AI verfijnt de inhoud (verzint geen cijfers). De vorige versie blijft bewaard." />
+        <div className="mt-3 flex items-start gap-2">
+          <textarea
+            className="sc-input resize-y text-sm"
+            rows={2}
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            placeholder="bijv. 'Maak de kansen commerciëler en benoem concreter welke aanvragen het bedrijf laat liggen.'"
+          />
+          <Button onClick={refine} disabled={refineBusy || !feedback.trim()}>
+            {refineBusy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Verbeter
+          </Button>
+        </div>
+        {refineErr ? <p className="mt-2 text-xs text-[var(--color-bad)]">{refineErr}</p> : null}
+        {versions.length ? (
+          <div className="mt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Eerdere versies</p>
+            <ul className="mt-1 space-y-1">
+              {versions.map((v, i) => (
+                <li key={i} className="flex items-center gap-2 text-xs text-[var(--color-ink-muted)]">
+                  <span className="flex-1">Versie van {new Date(v.at).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                  <button type="button" onClick={() => restore(i)} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-0.5 font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)]">
+                    <RotateCcw className="size-3" /> Herstel
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </Card>
 
       {/* Slides + bronnen */}

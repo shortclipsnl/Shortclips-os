@@ -25,9 +25,13 @@ export default async function PresentatiePage({ params }: { params: Promise<{ id
   const uit = new Set(r.slidesUit ?? []);
   const on = (key: string) => !uit.has(key);
   const company = row.companyName;
+  const goals = Array.isArray(row.goals) ? (row.goals as unknown[]).filter((g): g is string => typeof g === "string") : [];
 
   const pijnpunten = (r.pijnpunten ?? []).filter((p) => !p.uit).slice(0, 5);
-  const ideeen = (r.videoIdeeen ?? []).filter((v) => !v.uit).slice(0, 5);
+  const ideeen = (r.videoIdeeen ?? []).filter((v) => !v.uit).slice(0, 3);
+
+  // Teamfoto's voor de "Maak kennis"-slide (bestaande assets in public/team).
+  const team = ["jarno", "milou", "jeska", "rutger", "max", "nynke"];
 
   return (
     <div className="deck">
@@ -36,13 +40,16 @@ export default async function PresentatiePage({ params }: { params: Promise<{ id
 
       {/* 1 — Cover */}
       <section className="slide cover">
-        <div className="brand">Shortclips</div>
+        <div className="brand"><span className="brand-dot" />Shortclips</div>
         <div className="cover-mid">
-          <div className="eyebrow">Social Media &amp; Video Analyse</div>
-          <h1>{company}</h1>
-          {r.periodeOnderzocht ? <p className="muted">{r.periodeOnderzocht}</p> : null}
+          <div className="eyebrow">Persoonlijke social media analyse &amp; contentstrategie</div>
+          <h1>De contentkansen voor {company}</h1>
+          {goals.length ? <p className="cover-goals">Focus: {goals.slice(0, 3).join(" · ")}</p> : null}
         </div>
-        <div className="cover-foot">Voorbereid door Shortclips</div>
+        <div className="cover-foot">
+          <span>Voorbereid door Shortclips{row.contactName ? ` · voor ${row.contactName}` : ""}</span>
+          {row.meetingDate ? <span>{row.meetingDate}</span> : null}
+        </div>
       </section>
 
       {/* 2 — Het bedrijf */}
@@ -83,47 +90,24 @@ export default async function PresentatiePage({ params }: { params: Promise<{ id
         </Slide>
       ) : null}
 
-      {/* 4 — Wat gaat goed */}
-      {on("gaatgoed") && r.gaatGoed?.length ? (
-        <Slide n="03" title="Wat gaat er al goed?">
-          <ul className="big-list">{r.gaatGoed.slice(0, 5).map((g, i) => <li key={i}>{g}</li>)}</ul>
-        </Slide>
-      ) : null}
-
-      {/* 5 — Grootste kansen */}
+      {/* 4 — Grootste kansen (met de Shortclips-aanbeveling als onderschrift) */}
       {on("kansen") && pijnpunten.length ? (
-        <Slide n="04" title="Waar liggen de grootste kansen?">
+        <Slide n="03" title="Waar liggen de grootste kansen?">
           <div className="cards">
-            {pijnpunten.map((p, i) => (
+            {pijnpunten.slice(0, 4).map((p, i) => (
               <div key={i} className="pcard">
                 <div className="pcard-title">{p.observatie}</div>
-                {p.waaromGemisteKans ? <div className="pcard-body">{p.waaromGemisteKans}</div> : null}
+                {p.shortclipsAanpak ? <div className="hook">Shortclips: {p.shortclipsAanpak}</div> : p.waaromGemisteKans ? <div className="pcard-body">{p.waaromGemisteKans}</div> : null}
               </div>
             ))}
           </div>
+          {r.kansenVoorShortclips?.aanbevolenOplossing ? <p className="note"><strong>Onze aanpak:</strong> {r.kansenVoorShortclips.aanbevolenOplossing}</p> : null}
         </Slide>
       ) : null}
 
-      {/* 6 — Wat betekent dit */}
-      {on("betekenis") && pijnpunten.some((p) => p.impact) ? (
-        <Slide n="05" title="Wat betekent dit voor het bedrijf?">
-          <ul className="big-list">
-            {pijnpunten.filter((p) => p.impact).slice(0, 4).map((p, i) => <li key={i}>{p.impact}</li>)}
-          </ul>
-        </Slide>
-      ) : null}
-
-      {/* 7 — Hoe Shortclips helpt */}
-      {on("shortclips") && r.kansenVoorShortclips ? (
-        <Slide n="06" title="Hoe Shortclips kan helpen">
-          <h2 className="accent">{r.kansenVoorShortclips.aanbevolenOplossing}</h2>
-          {r.kansenVoorShortclips.toelichting ? <p className="lead">{r.kansenVoorShortclips.toelichting}</p> : null}
-        </Slide>
-      ) : null}
-
-      {/* 8 — Video-ideeën */}
+      {/* 5 — Video-ideeën */}
       {on("ideeen") && ideeen.length ? (
-        <Slide n="07" title="Concrete video-ideeën">
+        <Slide n="04" title="Zo zouden wij jullie content aanpakken">
           <div className="cards">
             {ideeen.map((v, i) => (
               <div key={i} className="pcard">
@@ -136,25 +120,98 @@ export default async function PresentatiePage({ params }: { params: Promise<{ id
         </Slide>
       ) : null}
 
-      {/* 9 — Contentaanpak */}
-      {on("aanpak") && (ideeen.length || r.kansenVoorShortclips) ? (
-        <Slide n="08" title="Voorgestelde contentaanpak">
-          <p className="lead">Een eerste samenwerking waarin Shortclips als externe videoafdeling structureel content ontwikkelt, produceert en begeleidt — afgestemd op {company}.</p>
-          {ideeen.length ? (
-            <>
-              <div className="label">Mogelijke contentpijlers</div>
-              <ul>{ideeen.map((v, i) => <li key={i}>{v.titel}</li>)}</ul>
-            </>
-          ) : null}
+      {/* Maak kennis met Shortclips */}
+      {on("maakkennis") ? (
+        <Slide n="05" title="Maak kennis met Shortclips">
+          <p className="lead">Shortclips is jullie externe short video contentafdeling. Wij ontwikkelen structureel resultaatgerichte content en begeleiden het volledige traject — van strategie en concept tot productie, montage, publicatie en optimalisatie.</p>
+          <div className="team">
+            {team.map((t) => (
+              <img key={t} src={`/team/${t}.png`} alt="" className="team-face" />
+            ))}
+          </div>
+          <div className="pills">
+            {["TikTok", "Instagram Reels", "YouTube Shorts", "Facebook Reels", "LinkedIn"].map((p) => <span key={p} className="pill">{p}</span>)}
+          </div>
         </Slide>
       ) : null}
 
-      {/* 10 — Vervolgstappen */}
-      {on("vervolg") ? (
-        <Slide n="09" title="Vervolgstappen">
-          <p className="lead">{r.vervolgstappen || "Laten we samen de beste aanpak bepalen en de eerste contentconcepten verder uitwerken."}</p>
-          <div className="cta">Shortclips · korte videocontent die presteert</div>
+      {/* Zo werken wij samen */}
+      {on("werkwijze") ? (
+        <Slide n="06" title="Zo werken wij samen">
+          <div className="flow">
+            {[
+              ["Strategie", "Bedrijf, doelgroep en doelen"],
+              ["Formats", "Onderwerpen, hooks en scripts"],
+              ["Productie", "Opnames met onze videograaf"],
+              ["Montage", "Jullie controleren via het portaal"],
+              ["Distributie", "Publicatie op de kanalen"],
+              ["Optimalisatie", "Meten, leren, bijsturen"],
+            ].map(([t, d], i) => (
+              <div key={t} className="flow-step">
+                <div className="flow-n">{i + 1}</div>
+                <div className="flow-t">{t}</div>
+                <div className="flow-d">{d}</div>
+              </div>
+            ))}
+          </div>
+          <p className="note">Jullie hoeven niet zelf continu onderwerpen, scripts, opnames en montages te organiseren — wij nemen het contentproces structureel uit handen.</p>
         </Slide>
+      ) : null}
+
+      {/* Jullie eerste 3 maanden */}
+      {on("roadmap") ? (
+        <Slide n="07" title="Jullie eerste drie maanden">
+          <div className="cards3">
+            <div className="rcard">
+              <div className="rcard-m">Maand 1 — Fundament</div>
+              <p>Strategie bepalen, eerste formats ontwikkelen en starten met structurele publicaties.</p>
+              {ideeen[0]?.titel ? <span className="rcard-ex">Bijv. “{ideeen[0].titel}”</span> : null}
+            </div>
+            <div className="rcard">
+              <div className="rcard-m">Maand 2 — Testen &amp; verbeteren</div>
+              <p>Resultaten analyseren, nieuwe invalshoeken testen en succesvolle formats verder ontwikkelen.</p>
+              {ideeen[1]?.titel ? <span className="rcard-ex">Bijv. “{ideeen[1].titel}”</span> : null}
+            </div>
+            <div className="rcard">
+              <div className="rcard-m">Maand 3 — Optimaliseren &amp; opschalen</div>
+              <p>De sterkste formats doorontwikkelen, resultaten evalueren en een vervolgstrategie bepalen.</p>
+              {ideeen[2]?.titel ? <span className="rcard-ex">Bijv. “{ideeen[2].titel}”</span> : null}
+            </div>
+          </div>
+          <p className="note">Een samenwerking duurt minimaal drie maanden — genoeg om formats te testen, resultaten te verzamelen en de aanpak te verbeteren.</p>
+        </Slide>
+      ) : null}
+
+      {/* Waarom Shortclips */}
+      {on("waarom") ? (
+        <Slide n="08" title="Waarom Shortclips?">
+          <div className="cards">
+            {[
+              ["Eén externe contentafdeling", "Strategie, productie, montage, publicatie en optimalisatie — volledig uit handen."],
+              ["Gespecialiseerd team", "Scriptschrijvers, videograaf en editors die dagelijks short video maken."],
+              ["Structureel, niet eenmalig", "Vaste trajecten waarin we testen, meten en de aanpak blijven verbeteren."],
+              ["Eén strategie, meerdere kanalen", "Dezelfde content zichtbaar op TikTok, Reels, Shorts en meer."],
+            ].map(([t, d]) => (
+              <div key={t} className="pcard">
+                <div className="pcard-title">{t}</div>
+                <div className="pcard-body">{d}</div>
+              </div>
+            ))}
+          </div>
+        </Slide>
+      ) : null}
+
+      {/* De volgende stap */}
+      {on("vervolg") ? (
+        <section className="slide cover closing">
+          <div className="brand"><span className="brand-dot" />Shortclips</div>
+          <div className="cover-mid">
+            <h1>Klaar om structureel zichtbaar te worden?</h1>
+            <p className="cover-goals">Wij worden jullie externe contentafdeling.</p>
+            {r.vervolgstappen ? <p className="muted closing-note">{r.vervolgstappen}</p> : null}
+          </div>
+          <div className="cover-foot"><span>Structurele trajecten vanaf drie maanden</span><span>Shortclips</span></div>
+        </section>
       ) : null}
     </div>
   );
@@ -192,7 +249,25 @@ const css = `
 .cover-mid .eyebrow { color:${BLUE}; font-weight:700; text-transform:uppercase; letter-spacing:.08em; font-size:14px; }
 .cover-mid h1 { font-size:52px; line-height:1.05; margin:10px 0 6px; font-weight:800; }
 .cover .muted { color:#c7d2e4; }
-.cover-foot { color:#8ba0c0; font-size:13px; }
+.cover-foot { color:#8ba0c0; font-size:13px; display:flex; justify-content:space-between; gap:12px; }
+.brand { display:flex; align-items:center; gap:9px; }
+.brand-dot { width:16px; height:16px; border-radius:5px; background:linear-gradient(135deg,#5BC5FF,#1B5FE0); display:inline-block; }
+.cover-goals { color:${BLUE}; font-weight:700; margin-top:10px; font-size:17px; }
+.closing-note { font-size:15px; max-width:60ch; margin-top:14px; }
+.team { display:flex; gap:12px; margin-top:22px; }
+.team-face { width:64px; height:64px; border-radius:50%; object-fit:cover; border:2px solid #eef1f6; }
+.pills { display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
+.pill { background:#f4f6fa; color:${NAVY}; border-radius:999px; padding:6px 14px; font-size:13px; font-weight:600; }
+.flow { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; }
+.flow-step { background:#f4f6fa; border-radius:12px; padding:14px 12px; border-top:3px solid ${BLUE}; }
+.flow-n { width:26px; height:26px; border-radius:50%; background:${NAVY}; color:#fff; font-weight:800; font-size:13px; display:grid; place-items:center; margin-bottom:8px; }
+.flow-t { font-weight:800; font-size:15px; }
+.flow-d { font-size:12px; color:#53617a; margin-top:3px; line-height:1.35; }
+.cards3 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+.rcard { background:#f4f6fa; border-radius:12px; padding:18px; border-top:4px solid ${ORANGE}; }
+.rcard-m { font-weight:800; font-size:16px; margin-bottom:8px; }
+.rcard p { font-size:14px; color:#53617a; line-height:1.45; margin:0; }
+.rcard-ex { display:block; margin-top:10px; color:${BLUE}; font-weight:600; font-size:13px; }
 .slide-head { display:flex; align-items:center; gap:14px; border-bottom:2px solid #eef1f6; padding-bottom:14px; }
 .slide-n { color:${ORANGE}; font-weight:800; font-size:18px; }
 .slide-head h2 { font-size:28px; font-weight:800; margin:0; flex:1; }
