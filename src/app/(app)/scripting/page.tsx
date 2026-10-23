@@ -5,7 +5,7 @@ import { requireInternal } from "@/server/auth/context";
 import { listScripting } from "@/server/scripting";
 import { upcomingScriptAppointments } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
-import { Card, CardHeader, ClientLogo, LinkButton, PageHeader, Stat, TeamAvatar } from "@/components/ui";
+import { Card, CardHeader, ClientLogo, PageHeader, Stat, TeamAvatar } from "@/components/ui";
 import { ScriptingBoard } from "./scripting-ui";
 
 export const metadata: Metadata = { title: "Scripting" };
@@ -22,6 +22,9 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
   const canUseGenerator = viewer.permissions.has("ai:read");
   const { rows, stats, clientOptions, writerOptions, clientResponsibles } = await listScripting(viewer);
   const scriptAppts = await upcomingScriptAppointments();
+  // Scriptverantwoordelijke per klant (slug → naam/foto), om bij elke script
+  // meeting automatisch te tonen wie die doet.
+  const respBySlug = new Map((clientResponsibles ?? []).map((c) => [c.clientSlug, { name: c.responsibleName, avatar: c.responsibleAvatar }]));
   const filter = (await searchParams).filter;
 
   return (
@@ -29,7 +32,11 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
       <PageHeader
         title="Scripting"
         description="Alle aankomende opnames en hun scripting in één overzicht — automatisch gekoppeld aan de opnameplanning. Scripts moeten uiterlijk 7 dagen vóór de opname klaar zijn."
-        actions={canUseGenerator ? <LinkButton href="/ai/scriptgenerator">✍️ Ga script schrijven</LinkButton> : undefined}
+        actions={canUseGenerator ? (
+          <Link href="/ai/scriptgenerator" className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-good)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-card)] hover:brightness-110">
+            ✍️ Ga script schrijven
+          </Link>
+        ) : undefined}
       />
 
       {/* Klikbare statusblokken: openen direct de bijbehorende filter hieronder. */}
@@ -49,21 +56,30 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
       {/* Script-afspraken uit de Google-agenda (automatisch herkend en gekoppeld). */}
       {scriptAppts.length > 0 ? (
         <Card padded={false} className="mb-5">
-          <CardHeader title="Aankomende script-afspraken" subtitle="Uit de agenda herkend en aan de klant gekoppeld. Tot en met eind dit jaar." className="p-5 pb-2" />
+          <CardHeader title="Aankomende script meetings" subtitle="Uit de agenda herkend en aan de klant gekoppeld, met de scriptverantwoordelijke. Tot en met eind dit jaar." className="p-5 pb-2" />
           <ul className="divide-y divide-[var(--color-line)]">
-            {scriptAppts.map((a) => (
+            {scriptAppts.map((a) => {
+              const resp = respBySlug.get(a.clientSlug);
+              return (
               <li key={a.id} className="flex items-center gap-3 px-5 py-2.5">
                 <ClientLogo name={a.clientName} logoUrl={a.clientLogo} color={a.clientColor} size={22} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{a.title || "Script-afspraak"}</span>
+                  <span className="block truncate text-sm font-medium">{a.title || "Script meeting"}</span>
                   <span className="block truncate text-2xs text-[var(--color-ink-muted)]">{a.clientName}</span>
                 </span>
+                {resp?.name ? (
+                  <span className="hidden shrink-0 items-center gap-1.5 sm:inline-flex" title={`Scriptverantwoordelijke: ${resp.name}`}>
+                    <TeamAvatar name={resp.name} avatarUrl={resp.avatar} size={22} />
+                    <span className="text-xs text-[var(--color-ink)]">{resp.name.split(" ")[0]}</span>
+                  </span>
+                ) : null}
                 <span className="shrink-0 text-right text-xs tabular-nums text-[var(--color-ink-muted)]">
                   {new Date(a.startsAt).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" })}
                   {!a.allDay ? <span className="block text-2xs text-[var(--color-ink-faint)]">{new Date(a.startsAt).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}</span> : null}
                 </span>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </Card>
       ) : null}
@@ -114,9 +130,11 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
                     </div>
                     <ul className="flex flex-wrap gap-1.5">
                       {g.clients.map((c) => (
-                        <li key={c.clientSlug} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1 text-xs">
-                          <ClientLogo name={c.clientName} logoUrl={c.clientLogo} color={c.clientColor} size={16} />
-                          <span className="max-w-[150px] truncate">{c.clientName}</span>
+                        <li key={c.clientSlug}>
+                          <Link href={`/clients/${c.clientSlug}`} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1 text-xs transition hover:border-[var(--color-brand-500)] hover:bg-[var(--color-surface-2)]" title={`Open ${c.clientName}`}>
+                            <ClientLogo name={c.clientName} logoUrl={c.clientLogo} color={c.clientColor} size={16} />
+                            <span className="max-w-[150px] truncate">{c.clientName}</span>
+                          </Link>
                         </li>
                       ))}
                     </ul>
