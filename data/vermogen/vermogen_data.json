@@ -1,0 +1,574 @@
+{
+ "v/prognose": {
+  "bijgewerkt": "2026-10-11",
+  "bron": "Groeidashboard (Knab DigiBoox t/m 2026-09)",
+  "maanden": {
+   "2025-01": {
+    "kosten": 10589,
+    "omzet": 19294
+   },
+   "2025-02": {
+    "kosten": 10692,
+    "omzet": 20095
+   },
+   "2025-03": {
+    "kosten": 6251,
+    "omzet": 24214
+   },
+   "2025-04": {
+    "kosten": 11170,
+    "omzet": 2223
+   },
+   "2025-05": {
+    "kosten": 7719,
+    "omzet": 32330
+   },
+   "2025-06": {
+    "kosten": 29101,
+    "omzet": 17174
+   },
+   "2025-07": {
+    "kosten": 10706,
+    "omzet": 21625
+   },
+   "2025-08": {
+    "kosten": 13074,
+    "omzet": 14629
+   },
+   "2025-09": {
+    "kosten": 11908,
+    "omzet": 30923
+   },
+   "2025-10": {
+    "kosten": 16677,
+    "omzet": 26820
+   },
+   "2025-11": {
+    "kosten": 17473,
+    "omzet": 36824
+   },
+   "2025-12": {
+    "kosten": 18873,
+    "omzet": 29633
+   },
+   "2026-01": {
+    "kosten": 12366,
+    "omzet": 14437
+   },
+   "2026-02": {
+    "kosten": 13200,
+    "omzet": 20542
+   },
+   "2026-03": {
+    "kosten": 16920,
+    "omzet": 47909
+   },
+   "2026-04": {
+    "kosten": 17888,
+    "omzet": 22484
+   },
+   "2026-05": {
+    "kosten": 19991,
+    "omzet": 0
+   },
+   "2026-06": {
+    "kosten": 16970,
+    "omzet": 82315
+   },
+   "2026-07": {
+    "kosten": 20510,
+    "omzet": 30020
+   },
+   "2026-08": {
+    "kosten": 23789,
+    "omzet": 35527
+   },
+   "2026-09": {
+    "kosten": 19612,
+    "omzet": 18635
+   }
+  }
+ },
+ "v/cfg": {
+  "doelen": [],
+  "rekeningen": [
+   {
+    "bron": "screenshot Knab-app",
+    "iban": "NL60KNAB0606428372",
+    "id": "kz-betaal",
+    "instelling": "Knab Zakelijk",
+    "meetellen": true,
+    "naam": "Rekening onderneming Shortclips",
+    "scope": "zakelijk",
+    "type": "betaal"
+   },
+   {
+    "bron": "screenshot Knab-app",
+    "categorie": "buffer",
+    "id": "kz-buffer",
+    "instelling": "Knab Zakelijk",
+    "meetellen": true,
+    "naam": "Noodbuffer 3 maand zakelijk",
+    "ouder": "kz-betaal",
+    "scope": "zakelijk",
+    "type": "potje"
+   },
+   {
+    "bron": "screenshot Knab-app",
+    "categorie": "btw",
+    "doel": 16000,
+    "gereserveerd": true,
+    "id": "kz-btwq3",
+    "instelling": "Knab Zakelijk",
+    "meetellen": true,
+    "naam": "BTW Q3",
+    "ouder": "kz-betaal",
+    "scope": "zakelijk",
+    "type": "potje"
+   },
+   {
+    "bron": "screenshot Knab-app",
+    "categorie": "belasting",
+    "gereserveerd": true,
+    "id": "kz-ib2025",
+    "instelling": "Knab Zakelijk",
+    "meetellen": true,
+    "naam": "Inkomstenbelasting 2025",
+    "ouder": "kz-betaal",
+    "scope": "zakelijk",
+    "type": "potje"
+   },
+   {
+    "bron": "screenshot Knab-app",
+    "categorie": "belasting",
+    "gereserveerd": true,
+    "id": "kz-ib2026",
+    "instelling": "Knab Zakelijk",
+    "meetellen": true,
+    "naam": "Inkomstenbelasting 2026",
+    "ouder": "kz-betaal",
+    "scope": "zakelijk",
+    "type": "potje"
+   },
+   {
+    "bron": "screenshot Knab-app, staat op de zakelijke rekening",
+    "categorie": "woning",
+    "id": "kz-woning",
+    "instelling": "Knab Zakelijk",
+    "meetellen": true,
+    "naam": "Inrichting + spullen eerste woning",
+    "ouder": "kz-betaal",
+    "scope": "prive",
+    "type": "potje"
+   },
+   {
+    "bron": "screenshot Knab-app, staat op de zakelijke rekening",
+    "categorie": "buffer",
+    "id": "kz-privebuffer",
+    "instelling": "Knab Zakelijk",
+    "meetellen": true,
+    "naam": "Privé noodbuffer",
+    "ouder": "kz-betaal",
+    "scope": "prive",
+    "type": "potje"
+   },
+   {
+    "bron": "DigiBoox, niet meer bijgewerkt sinds maart 2023",
+    "id": "rabo-zak",
+    "instelling": "Rabobank",
+    "meetellen": false,
+    "naam": "Rekening in DigiBoox",
+    "scope": "zakelijk",
+    "type": "betaal"
+   },
+   {
+    "bron": "handmatig",
+    "id": "abn-betaal",
+    "instelling": "ABN AMRO",
+    "meetellen": true,
+    "naam": "Betaalrekening",
+    "scope": "prive",
+    "type": "betaal"
+   },
+   {
+    "bron": "screenshot ABN AMRO-app",
+    "id": "abn-sparen",
+    "instelling": "ABN AMRO",
+    "meetellen": true,
+    "naam": "Direct Sparen",
+    "scope": "prive",
+    "type": "spaar"
+   },
+   {
+    "bron": "handmatig",
+    "id": "kp-betaal",
+    "instelling": "Knab Privé",
+    "meetellen": true,
+    "naam": "Betaalrekening",
+    "scope": "prive",
+    "type": "betaal"
+   },
+   {
+    "bron": "handmatig",
+    "id": "rev-eur",
+    "instelling": "Revolut",
+    "meetellen": true,
+    "naam": "Current EUR",
+    "scope": "prive",
+    "type": "betaal",
+    "valuta": "EUR"
+   },
+   {
+    "bron": "screenshot DEGIRO-app",
+    "id": "dg-normaal",
+    "instelling": "DEGIRO",
+    "meetellen": true,
+    "naam": "Beleggen",
+    "scope": "prive",
+    "type": "belegging"
+   },
+   {
+    "bron": "screenshot DEGIRO-app",
+    "id": "dg-pensioen",
+    "instelling": "DEGIRO",
+    "meetellen": true,
+    "naam": "Pensioen",
+    "scope": "prive",
+    "type": "pensioen"
+   }
+  ],
+  "schulden": []
+ },
+ "v/cfg/saldi/kz-privebuffer_2026-10-17": {
+  "bedrag": 5014.32,
+  "bron": "screenshot Knab-app 17-10-2026 08:50",
+  "datum": "2026-10-17",
+  "eur": 5014.32,
+  "koers": 1,
+  "koersdatum": "2026-10-17",
+  "rek": "kz-privebuffer",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/rev-eur_2026-10-17": {
+  "bedrag": 50,
+  "bron": "handmatig",
+  "datum": "2026-10-17",
+  "eur": 50,
+  "koers": 1,
+  "koersdatum": "2026-10-17",
+  "rek": "rev-eur",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/abn-betaal_2026-10-17": {
+  "bedrag": 50,
+  "bron": "handmatig",
+  "datum": "2026-10-17",
+  "eur": 50,
+  "koers": 1,
+  "koersdatum": "2026-10-17",
+  "rek": "abn-betaal",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/abn-sparen_2026-10-17": {
+  "bedrag": 75127.81,
+  "bron": "screenshot ABN AMRO-app 17-10-2026",
+  "datum": "2026-10-17",
+  "eur": 75127.81,
+  "koers": 1,
+  "koersdatum": "2026-10-17",
+  "rek": "abn-sparen",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/kz-buffer_2026-10-10": {
+  "bedrag": 50146.39,
+  "bron": "DigiBoox (uitgelezen 10-10-2026)",
+  "datum": "2026-10-10",
+  "eur": 50146.39,
+  "koers": 1,
+  "koersdatum": "2026-10-10",
+  "rek": "kz-buffer",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/kz-ib2025_2026-10-17": {
+  "bedrag": 30112.21,
+  "bron": "screenshot Knab-app 17-10-2026 08:50",
+  "datum": "2026-10-17",
+  "eur": 30112.21,
+  "koers": 1,
+  "koersdatum": "2026-10-17",
+  "rek": "kz-ib2025",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/kz-btwq3_2026-10-17": {
+  "bedrag": 7001.02,
+  "bron": "screenshot Knab-app 17-10-2026 08:50",
+  "datum": "2026-10-17",
+  "eur": 7001.02,
+  "koers": 1,
+  "koersdatum": "2026-10-17",
+  "rek": "kz-btwq3",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/kp-betaal_2026-10-17": {
+  "bedrag": 1100,
+  "bron": "handmatig",
+  "datum": "2026-10-17",
+  "eur": 1100,
+  "koers": 1,
+  "koersdatum": "2026-10-17",
+  "rek": "kp-betaal",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/kz-ib2026_2026-10-17": {
+  "bedrag": 0,
+  "bron": "screenshot Knab-app 17-10-2026 08:50",
+  "datum": "2026-10-17",
+  "eur": 0,
+  "koers": 1,
+  "koersdatum": "2026-10-17",
+  "rek": "kz-ib2026",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/rabo-zak_2023-03-01": {
+  "bedrag": 1995.7,
+  "bron": "DigiBoox, laatste mutatie",
+  "datum": "2023-03-01",
+  "eur": 1995.7,
+  "koers": 1,
+  "koersdatum": "2023-03-01",
+  "rek": "rabo-zak",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/kz-woning_2026-10-17": {
+  "bedrag": 6500.94,
+  "bron": "screenshot Knab-app 17-10-2026 08:50",
+  "datum": "2026-10-17",
+  "eur": 6500.94,
+  "koers": 1,
+  "koersdatum": "2026-10-17",
+  "rek": "kz-woning",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/kz-betaal_2026-10-17": {
+  "bedrag": 986.46,
+  "bron": "screenshot Knab-app 17-10-2026 08:50",
+  "datum": "2026-10-17",
+  "eur": 986.46,
+  "koers": 1,
+  "koersdatum": "2026-10-17",
+  "rek": "kz-betaal",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/kz-betaal_2026-10-10": {
+  "bedrag": 976.83,
+  "bron": "DigiBoox (uitgelezen 10-10-2026)",
+  "datum": "2026-10-10",
+  "eur": 976.83,
+  "koers": 1,
+  "koersdatum": "2026-10-10",
+  "rek": "kz-betaal",
+  "valuta": "EUR"
+ },
+ "v/cfg/saldi/kz-buffer_2026-10-17": {
+  "bedrag": 50146.39,
+  "bron": "screenshot Knab-app 17-10-2026 08:50",
+  "datum": "2026-10-17",
+  "eur": 50146.39,
+  "koers": 1,
+  "koersdatum": "2026-10-17",
+  "rek": "kz-buffer",
+  "valuta": "EUR"
+ },
+ "v/cfg/pf/dg-pensioen_2026-10-17": {
+  "bron": "screenshot DEGIRO-app 17-10-2026 (Totaal Account)",
+  "cash": 169.39,
+  "datum": "2026-10-17",
+  "port": "dg-pensioen",
+  "posities": [
+   {
+    "aantal": 17,
+    "isin": "",
+    "koers": 40.99,
+    "koersValuta": "EUR",
+    "product": "ABN Amro Bank NV",
+    "waarde": 696.83
+   },
+   {
+    "aantal": 6,
+    "isin": "",
+    "koers": 46.88,
+    "koersValuta": "EUR",
+    "product": "Shell PLC",
+    "waarde": 281.28
+   },
+   {
+    "aantal": 1,
+    "isin": "",
+    "koers": 735.48,
+    "koersValuta": "EUR",
+    "product": "iShares Core S&P 500 UCITS ETF USD (Acc)",
+    "waarde": 735.48
+   },
+   {
+    "aantal": 23,
+    "isin": "",
+    "koers": 169.24,
+    "koersValuta": "EUR",
+    "product": "Vanguard FTSE All-World UCITS ETF (USD) Accumulating",
+    "waarde": 3892.52
+   }
+  ],
+  "waarde": 5775.5
+ },
+ "v/cfg/pf/dg-normaal_2026-10-17": {
+  "bron": "screenshot DEGIRO-app 17-10-2026 (Totaal Account)",
+  "cash": 90.23,
+  "datum": "2026-10-17",
+  "port": "dg-normaal",
+  "posities": [
+   {
+    "aantal": 2,
+    "isin": "",
+    "koers": 340.74,
+    "koersValuta": "USD",
+    "product": "Alphabet Inc. Class A",
+    "waarde": 606.32
+   },
+   {
+    "aantal": 6,
+    "isin": "",
+    "koers": 250.13,
+    "koersValuta": "USD",
+    "product": "Amazon.com Inc",
+    "waarde": 1335.27
+   },
+   {
+    "aantal": 1,
+    "isin": "",
+    "koers": 343.86,
+    "koersValuta": "USD",
+    "product": "Apple Inc.",
+    "waarde": 305.94
+   },
+   {
+    "aantal": 1,
+    "isin": "",
+    "koers": 709.9,
+    "koersValuta": "USD",
+    "product": "Meta Platforms, Inc. Class A",
+    "waarde": 631.61
+   },
+   {
+    "aantal": 3,
+    "isin": "",
+    "koers": 40.18,
+    "koersValuta": "USD",
+    "product": "MP Materials Corp. Class A",
+    "waarde": 107.25
+   },
+   {
+    "aantal": 2,
+    "isin": "",
+    "koers": 76.46,
+    "koersValuta": "EUR",
+    "product": "NN Group N.V.",
+    "waarde": 152.92
+   },
+   {
+    "aantal": 12,
+    "isin": "",
+    "koers": 46.88,
+    "koersValuta": "EUR",
+    "product": "Shell PLC",
+    "waarde": 562.56
+   },
+   {
+    "aantal": 18,
+    "isin": "",
+    "koers": 16.792,
+    "koersValuta": "EUR",
+    "product": "The Magnum Ice Cream Company N.V.",
+    "waarde": 302.26
+   },
+   {
+    "aantal": 9,
+    "isin": "",
+    "koers": 12.82,
+    "koersValuta": "USD",
+    "product": "UiPath Inc Class A",
+    "waarde": 102.66
+   },
+   {
+    "aantal": 16,
+    "isin": "",
+    "koers": 164.66,
+    "koersValuta": "EUR",
+    "product": "Vanguard FTSE All-World UCITS ETF USD Dis",
+    "waarde": 2634.56
+   },
+   {
+    "aantal": 0.024854,
+    "isin": "",
+    "koers": 72587.93,
+    "koersValuta": "EUR",
+    "product": "Bitcoin (crypto)",
+    "waarde": 1804.1
+   },
+   {
+    "aantal": 785.42,
+    "isin": "",
+    "koers": 0.19929,
+    "koersValuta": "EUR",
+    "product": "Cardano (crypto)",
+    "waarde": 156.53
+   },
+   {
+    "aantal": 4290.99,
+    "isin": "",
+    "koers": 0.071667,
+    "koersValuta": "EUR",
+    "product": "Dogecoin (crypto)",
+    "waarde": 307.52
+   },
+   {
+    "aantal": 0.119041,
+    "isin": "",
+    "koers": 2163.54,
+    "koersValuta": "EUR",
+    "product": "Ethereum (crypto)",
+    "waarde": 257.55
+   },
+   {
+    "aantal": 2.81981,
+    "isin": "",
+    "koers": 93.2865,
+    "koersValuta": "EUR",
+    "product": "Solana (crypto)",
+    "waarde": 263.05
+   },
+   {
+    "aantal": 145.045,
+    "isin": "",
+    "koers": 1.16494,
+    "koersValuta": "EUR",
+    "product": "XRP (crypto)",
+    "waarde": 168.97
+   }
+  ],
+  "waarde": 9789.37
+ },
+ "v/cfg/inleg/dg-pensioen_0000-00": {
+  "bron": "afgeleid: Totaal Account 5.775,50 min Totaal W/V 775,50 op 17-10-2026; wordt vervangen bij import van Account.csv",
+  "opname": 0,
+  "port": "dg-pensioen",
+  "storting": 5000,
+  "ym": "0000-00"
+ },
+ "v/cfg/inleg/dg-normaal_0000-00": {
+  "bron": "afgeleid: Totaal Account 9.789,37 min Totaal W/V 389,36 op 17-10-2026; wordt vervangen bij import van Account.csv",
+  "opname": 0,
+  "port": "dg-normaal",
+  "storting": 9400.01,
+  "ym": "0000-00"
+ }
+}

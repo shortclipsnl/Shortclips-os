@@ -17,6 +17,9 @@ export type NavItem = {
   roles?: UserRole[];
   /** Uitsluitend voor editors — ook de eigenaar/het team ziet dit niet. */
   editorsOnly?: boolean;
+  /** Externe/zelfstandige pagina: open als gewone link in een nieuw tabblad
+   *  (bijv. het schermvullende vermogensdashboard, buiten de portaalschil). */
+  external?: boolean;
 };
 
 export type NavGroup = {
@@ -87,14 +90,23 @@ export const NAVIGATION: NavGroup[] = [
     ],
   },
   {
-    // Beheer, inclusief de uitsluitend voor de eigenaar zichtbare onderdelen.
-    title: "Beheer",
-    accent: "var(--color-ink-muted)",
+    // Alles rondom geld: uitsluitend voor de eigenaar (Janno). Leads, financiën,
+    // kosten, marge/winst en het vermogensdashboard bij elkaar.
+    title: "Financieel",
+    accent: "var(--color-good)",
     items: [
       { href: "/leads", label: "Leads", icon: "Target", ownerOnly: true, match: "/leads" },
       { href: "/financien", label: "Financiën", icon: "Landmark", ownerOnly: true, match: "/financien" },
       { href: "/kosten", label: "Kostenmonitor", icon: "ReceiptEuro", ownerOnly: true, match: "/kosten" },
       { href: "/editkosten", label: "Winst & editkosten", icon: "Euro", ownerOnly: true, match: "/editkosten" },
+      { href: "/dashboard/vermogen", label: "Vermogen", icon: "Wallet", ownerOnly: true, external: true },
+    ],
+  },
+  {
+    // Beheer: koppelingen, agenda's, klantenbeheer en instellingen.
+    title: "Beheer",
+    accent: "var(--color-ink-muted)",
+    items: [
       { href: "/klantenbeheer", label: "Klantenbeheer", icon: "UserCog", roles: ["project_coordinator"], match: "/klantenbeheer" },
       { href: "/koppelingen", label: "Koppeling controleren", icon: "Link2", ownerOnly: true, match: "/koppelingen" },
       { href: "/settings/agendas", label: "Agenda's", icon: "CalendarRange", ownerOnly: true, match: "/settings/agendas" },

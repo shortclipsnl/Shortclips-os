@@ -88,6 +88,13 @@ const schema = z.object({
   // token is het endpoint dicht.
   KOSTEN_IMPORT_TOKEN: z.string().optional(),
 
+  // --- Vermogensdashboard-import ---
+  // Geheim token voor de maandelijkse geplande taak die bank-/DigiBoox-data
+  // naar POST /api/vermogen/import stuurt (header Authorization: Bearer <token>).
+  // Zonder dit token is dat endpoint dicht. De dashboardpagina zelf gebruikt de
+  // sessie (eigenaar), niet dit token.
+  VERMOGEN_IMPORT_TOKEN: z.string().optional(),
+
   // --- Lead-intake webhook (Meta-advertentie / Framer-formulier) ---
   // Gedeeld geheim dat het externe formulier meestuurt (header x-webhook-secret
   // of ?secret=). Zonder deze waarde is het endpoint dicht.

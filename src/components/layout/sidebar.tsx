@@ -44,21 +44,28 @@ export function Sidebar({ groups }: { groups: NavGroup[] }) {
                 const active = item.match
                   ? pathname === item.href || pathname.startsWith(`${item.match}/`)
                   : pathname === item.href;
+                const className = cn(
+                  "flex items-center gap-2.5 rounded-[var(--radius-sm)] px-3 py-2 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-[var(--color-indigo-ink)] text-white"
+                    : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]",
+                );
+                // Externe/zelfstandige pagina's (bijv. het vermogensdashboard)
+                // openen in een nieuw tabblad met een gewone link.
                 return (
                   <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "flex items-center gap-2.5 rounded-[var(--radius-sm)] px-3 py-2 text-sm font-medium transition-colors",
-                        active
-                          ? "bg-[var(--color-indigo-ink)] text-white"
-                          : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]",
-                      )}
-                    >
-                      <Icon name={item.icon} className="size-4 shrink-0" />
-                      {item.label}
-                    </Link>
+                    {item.external ? (
+                      <a href={item.href} target="_blank" rel="noopener noreferrer" className={className}>
+                        <Icon name={item.icon} className="size-4 shrink-0" />
+                        {item.label}
+                        <Icons.ExternalLink className="ml-auto size-3.5 opacity-60" strokeWidth={1.75} />
+                      </a>
+                    ) : (
+                      <Link href={item.href} aria-current={active ? "page" : undefined} className={className}>
+                        <Icon name={item.icon} className="size-4 shrink-0" />
+                        {item.label}
+                      </Link>
+                    )}
                   </li>
                 );
               })}

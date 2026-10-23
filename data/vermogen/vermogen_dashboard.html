@@ -1,0 +1,799 @@
+<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><script src="/vermogen/vermogen-db-shim.js"></script><!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>VERMORGEN DASHBOARD JARNO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: smalle zijnavigatie (boven op mobiel), per scherm een kop met het grote bedrag, kaarten eronder. Donker als standaard. */
+:root{
+  --bg:#070D18; --surface:#0E1828; --raised:#14213A; --ink:#E9EEF7; --muted:#8C9AB3; --line:#1F2D47; --grid:#18243B;
+  --accent:#7EA2F5; --accent-soft:#18284A;
+  --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181; --c6:#9085e9; --c7:#4fb3c4;
+  --ok:#4CC596; --ok-soft:#10301F; --warn:#E9A84A; --warn-soft:#33250F; --bad:#F07A74; --bad-soft:#3A1615;
+  --font-display:"Poppins",system-ui,sans-serif; --font-body:"IBM Plex Sans",system-ui,sans-serif; --font-mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --bg:#F3F5F9; --surface:#FFFFFF; --raised:#F7F9FC; --ink:#0B1F3A; --muted:#5B6B82; --line:#DCE2EC; --grid:#E9EDF4;
+  --accent:#2457D6; --accent-soft:#E3EBFB;
+  --c1:#2a78d6; --c2:#eb6834; --c3:#1baf7a; --c4:#eda100; --c5:#e87ba4; --c6:#6250d6; --c7:#2a9fb2;
+  --ok:#1E7F5C; --ok-soft:#E1F3EB; --warn:#A6620A; --warn-soft:#FBEFD9; --bad:#B4322E; --bad-soft:#F9E2E1; color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#F3F5F9; --surface:#FFFFFF; --raised:#F7F9FC; --ink:#0B1F3A; --muted:#5B6B82; --line:#DCE2EC; --grid:#E9EDF4;
+  --accent:#2457D6; --accent-soft:#E3EBFB;
+  --c1:#2a78d6; --c2:#eb6834; --c3:#1baf7a; --c4:#eda100; --c5:#e87ba4; --c6:#6250d6; --c7:#2a9fb2;
+  --ok:#1E7F5C; --ok-soft:#E1F3EB; --warn:#A6620A; --warn-soft:#FBEFD9; --bad:#B4322E; --bad-soft:#F9E2E1; color-scheme:light}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.5}
+.app{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100%;max-width:1320px;margin:0 auto}
+nav.side{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;padding:24px 14px;display:grid;gap:4px}
+.brand{font-family:var(--font-display);font-weight:700;font-size:18px;padding:0 10px 14px;letter-spacing:-.01em}
+.brand small{display:block;font:500 11px var(--font-body);color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+nav.side a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;color:var(--muted);text-decoration:none;font-weight:500}
+nav.side a[aria-current="page"]{background:var(--raised);color:var(--ink)}
+nav.side a:hover{color:var(--ink)}
+nav.side a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding-inline:24px;padding-block:24px 64px;display:grid;gap:18px;min-width:0;align-content:start}
+@media (max-width:860px){.app{grid-template-columns:minmax(0,1fr)}nav.side{min-width:0;position:sticky;z-index:5;background:var(--bg);display:flex;overflow-x:auto;padding:10px 16px;gap:4px;border-bottom:1px solid var(--line)}.brand{display:none}nav.side a{white-space:nowrap;padding:6px 10px}main{padding-inline:16px}}
+.head{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:flex-end}
+.head h1{font-family:var(--font-display);font-weight:600;font-size:15px;margin:0;color:var(--muted);letter-spacing:.02em}
+.big{font-family:var(--font-display);font-weight:600;font-size:clamp(34px,6vw,52px);line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.sub{font-size:12.5px;color:var(--muted)}
+.delta{font-variant-numeric:tabular-nums;font-weight:500}.delta.up{color:var(--ok)}.delta.down{color:var(--bad)}
+.grid{display:grid;gap:12px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px}
+@media (max-width:600px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.tile .val{font-size:19px}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:4px;min-width:0;align-content:start}
+.tile .lab,.lab{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:500}
+.tile .val{font-family:var(--font-display);font-weight:600;font-size:24px;font-variant-numeric:tabular-nums;line-height:1.2}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:12px;min-width:0;align-content:start}
+.card h2{font-family:var(--font-display);font-weight:600;font-size:16px;margin:0;text-wrap:balance}
+.card h3{font-size:13px;margin:0;font-weight:600}
+.lead{margin:0;color:var(--muted);font-size:12.5px;max-width:90ch}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row.sb{justify-content:space-between}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px;border-bottom:1px solid var(--grid);text-align:right;white-space:nowrap}
+th:first-child,td:first-child,td.l,th.l{text-align:left}
+tr.tot td{font-weight:600;border-top:1px solid var(--line);border-bottom:0}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:1px 9px;font-size:11.5px;font-weight:500;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}.pill.warn{background:var(--warn-soft);color:var(--warn)}.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.info{background:var(--accent-soft);color:var(--accent)}.pill.dim{background:var(--raised);color:var(--muted)}
+button{font:500 13px var(--font-body);border:1px solid var(--line);background:var(--raised);color:var(--ink);border-radius:9px;padding:7px 12px;cursor:pointer}
+button.pri{background:var(--accent);border-color:var(--accent);color:#06101F}
+button.ghost{background:transparent}
+button.danger{color:var(--bad);border-color:var(--bad-soft);background:transparent}
+button:disabled{opacity:.5;cursor:not-allowed}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:2px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:transparent;border-radius:999px;padding:5px 11px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--raised);color:var(--ink)}
+input,select{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:7px 10px;min-width:0;width:100%}
+input[type=checkbox]{width:auto}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:10px;align-items:end}
+.form label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+.chk{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.bar{height:8px;border-radius:4px;background:var(--grid);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:4px;background:var(--accent)}
+.chart{position:relative}
+.chart svg{width:100%;height:auto;display:block;overflow:visible}
+.chart text{font-family:var(--font-body);font-size:11px;fill:var(--muted)}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;border-radius:8px;padding:7px 9px;min-width:170px;z-index:3}
+.tip div{display:flex;justify-content:space-between;gap:12px;font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--muted)}
+.legend label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none}
+.acct{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:10px 0;border-bottom:1px solid var(--grid)}
+.acct:last-child{border-bottom:0}
+.acct .n{font-weight:500;overflow-wrap:anywhere}
+.acct .v{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right}
+.acct .m{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.acct.child{padding-left:16px}
+.empty{padding:22px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px;font-size:13px}
+.msg{font-size:12.5px}
+.msg.ok{color:var(--ok)}.msg.bad{color:var(--bad)}
+.notes{font-size:12px;color:var(--muted);display:grid;gap:6px}.notes p{margin:0;max-width:100ch}
+dialog{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:18px;max-width:min(560px,calc(100vw - 32px));width:100%}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+.mono{font-family:var(--font-mono)}
+.test{color:var(--warn);font-weight:600}
+@media (prefers-reduced-motion:no-preference){.bar i{transition:width .4s ease}}
+</style>
+
+<div class="app">
+  <nav class="side" aria-label="Hoofdnavigatie">
+    <div class="brand">Vermogen<small>Jarno Klijnsma</small></div>
+    <a href="#overzicht" data-p="overzicht">Overzicht</a>
+    <a href="#advies" data-p="advies">Advies</a>
+    <a href="#cashflow" data-p="cashflow">Cashflow privé</a>
+    <a href="#banken" data-p="banken">Bankrekeningen</a>
+    <a href="#potjes" data-p="potjes">Spaarpotjes</a>
+    <a href="#beleggen" data-p="beleggen">Beleggingen</a>
+    <a href="#pensioen" data-p="pensioen">Pensioen</a>
+    <a href="#ontwikkeling" data-p="ontwikkeling">Vermogensontwikkeling</a>
+    <a href="#doelen" data-p="doelen">Financiële doelen</a>
+    <a href="#instellingen" data-p="instellingen">Instellingen en koppelingen</a>
+  </nav>
+  <main id="main"><p class="sub" id="boot">Gegevens laden…</p></main>
+</div>
+
+<dialog id="dlg"><form method="dialog" id="dlgform"></form></dialog>
+
+<script>
+/*PARSERS-START*/
+const P={};
+P.num=s=>{if(s==null)return NaN;if(typeof s==="number")return s;s=String(s).trim().replace(/[€\s"]/g,"");if(!s)return NaN;
+  const neg=/^-|^\(.*\)$/.test(s);s=s.replace(/^[-+(]|\)$/g,"");
+  if(/,\d{1,2}$/.test(s)&&!/\.\d{1,2}$/.test(s))s=s.replace(/\./g,"").replace(",",".");else s=s.replace(/,/g,"");
+  const v=parseFloat(s);return neg?-v:v};
+P.iban=s=>{const m=String(s||"").replace(/\s/g,"").toUpperCase().match(/[A-Z]{2}\d{2}[A-Z]{4}\d{6,24}/);return m?m[0]:null};
+P.date=s=>{s=String(s||"").trim();let m;
+  if(m=s.match(/^(\d{4})-?(\d{2})-?(\d{2})/))return `${m[1]}-${m[2]}-${m[3]}`;
+  if(m=s.match(/^(\d{2})[-\/.](\d{2})[-\/.](\d{4})/))return `${m[3]}-${m[2]}-${m[1]}`;
+  if(m=s.match(/^(\d{2})(\d{2})(\d{2})$/))return `20${m[1]}-${m[2]}-${m[3]}`;
+  return null};
+P.hash=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)};
+P.csvRows=(text,sep)=>{if(!sep){const l=text.split(/\r?\n/).find(x=>x.trim())||"";const c={",":(l.match(/,/g)||[]).length,";":(l.match(/;/g)||[]).length,"\t":(l.match(/\t/g)||[]).length};sep=Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0]}
+  const rows=[];let row=[],f="",q=false;
+  for(let i=0;i<text.length;i++){const ch=text[i];
+    if(q){if(ch==='"'){if(text[i+1]==='"'){f+='"';i++}else q=false}else f+=ch}
+    else if(ch==='"')q=true;else if(ch===sep){row.push(f);f=""}else if(ch==="\n"){row.push(f.replace(/\r$/,""));rows.push(row);row=[];f=""}else f+=ch}
+  if(f||row.length){row.push(f.replace(/\r$/,""));rows.push(row)}
+  return rows.filter(r=>r.some(x=>x.trim()!==""))};
+
+/* Resultaat van elke bankparser:
+   {soort:"bank", formaat, rekeningen:[{iban, valuta, saldo:{datum,bedrag}|null, tx:[{datum,bedrag,tegen,naam,oms}]}]} */
+P.camt=(xml)=>{const doc=new DOMParser().parseFromString(xml,"application/xml");
+  if(doc.getElementsByTagName("parsererror").length)throw new Error("Het XML-bestand is niet leesbaar.");
+  const L=(el,name)=>[...el.getElementsByTagNameNS("*",name)];const T=(el,path)=>{let cur=[el];for(const p of path.split("/")){cur=cur.flatMap(e=>[...e.children].filter(c=>c.localName===p));if(!cur.length)return null}return cur[0].textContent.trim()};
+  const out=[];
+  for(const st of [...L(doc,"Stmt"),...L(doc,"Rpt")]){
+    const iban=T(st,"Acct/Id/IBAN")||P.iban(T(st,"Acct/Id/Othr/Id"));const valuta=T(st,"Acct/Ccy")||null;
+    let saldo=null;
+    for(const b of [...st.children].filter(c=>c.localName==="Bal")){const cd=T(b,"Tp/CdOrPrtry/Cd");if(cd==="CLBD"||cd==="CLAV"&&!saldo){const amt=[...b.children].find(c=>c.localName==="Amt");let v=P.num(amt.textContent);if(T(b,"CdtDbtInd")==="DBIT")v=-v;saldo={datum:P.date(T(b,"Dt/Dt")||T(b,"Dt/DtTm")),bedrag:v,valuta:amt.getAttribute("Ccy")};if(cd==="CLBD")break}}
+    const tx=[];
+    for(const n of [...st.children].filter(c=>c.localName==="Ntry")){const amt=[...n.children].find(c=>c.localName==="Amt");let v=P.num(amt.textContent);const cr=T(n,"CdtDbtInd")==="CRDT";if(!cr)v=-v;
+      const td=L(n,"TxDtls")[0]||n;const tegen=cr?(T(td,"RltdPties/DbtrAcct/Id/IBAN")):(T(td,"RltdPties/CdtrAcct/Id/IBAN"));
+      const naam=cr?(T(td,"RltdPties/Dbtr/Nm")||T(td,"RltdPties/Dbtr/Pty/Nm")):(T(td,"RltdPties/Cdtr/Nm")||T(td,"RltdPties/Cdtr/Pty/Nm"));
+      const oms=T(td,"RmtInf/Ustrd")||T(n,"AddtlNtryInf")||"";
+      tx.push({datum:P.date(T(n,"BookgDt/Dt")||T(n,"BookgDt/DtTm")||T(n,"ValDt/Dt")),bedrag:v,tegen:tegen||P.iban(oms),naam:naam||"",oms})}
+    out.push({iban,valuta:valuta||saldo?.valuta||"EUR",saldo,tx})}
+  if(!out.length)throw new Error("Geen rekeningafschrift gevonden in dit CAMT-bestand.");
+  return {soort:"bank",formaat:"CAMT.053",rekeningen:out}};
+
+P.mt940=(text)=>{const blocks=text.split(/(?=:20:)/).filter(b=>/:25:/.test(b));const map={};
+  for(const b of blocks){const acc=(b.match(/:25:([^\r\n]+)/)||[])[1]||"";const iban=P.iban(acc)||acc.trim();
+    const r=map[iban]=map[iban]||{iban:P.iban(acc),label:acc.trim(),valuta:"EUR",saldo:null,tx:[]};
+    const cl=b.match(/:62F:([CD])(\d{6})([A-Z]{3})([\d,\.]+)/);
+    if(cl){const s={datum:P.date(cl[2]),bedrag:(cl[1]==="D"?-1:1)*P.num(cl[4]),valuta:cl[3]};r.valuta=cl[3];if(!r.saldo||s.datum>=r.saldo.datum)r.saldo=s}
+    const re=/:61:(\d{6})(\d{4})?(R?[CD])([A-Z]?)([\d,]+)([^\r\n]*)[\r\n]+(?::86:([\s\S]*?))?(?=\r?\n:6[12]|\r?\n:62|\r?\n-|\r?\n:20|$)/g;let m;
+    while(m=re.exec(b)){const d=m[3].endsWith("D")?-1:1;const info=(m[7]||"").replace(/\r?\n/g," ").trim();
+      const naam=(info.match(/\/NAME\/([^\/]+)/)||[])[1]||"";
+      r.tx.push({datum:P.date(m[1]),bedrag:d*(m[3].startsWith("R")?-1:1)*P.num(m[5]),tegen:P.iban((info.match(/\/IBAN\/([^\/]+)/)||[])[1])||P.iban(info),naam:naam.trim(),oms:info.slice(0,140)})}}
+  const out=Object.values(map);if(!out.length)throw new Error("Geen MT940-afschrift gevonden.");
+  return {soort:"bank",formaat:"MT940",rekeningen:out}};
+
+P.csvBank=(text)=>{const rows=P.csvRows(text);if(!rows.length)throw new Error("Het bestand is leeg.");
+  const h=rows[0].map(x=>x.trim().toLowerCase());
+  // Revolut
+  if(h.includes("product")&&h.includes("completed date")&&h.includes("balance")){
+    const ix=n=>h.indexOf(n);const byProd={};
+    for(const r of rows.slice(1)){if((r[ix("state")]||"").toUpperCase()!=="COMPLETED")continue;const prod=r[ix("product")]||"Current";const cur=r[ix("currency")]||"EUR";const k=prod+"|"+cur;
+      const o=byProd[k]=byProd[k]||{iban:null,label:`Revolut ${prod} ${cur}`,product:prod,valuta:cur,saldo:null,tx:[]};
+      const datum=P.date(r[ix("completed date")]);const bedrag=P.num(r[ix("amount")])-(P.num(r[ix("fee")])||0);const typ=(r[ix("type")]||"").toUpperCase();
+      o.tx.push({datum,bedrag,tegen:null,naam:r[ix("description")]||"",oms:r[ix("description")]||"",intern:/TOPUP|TRANSFER|EXCHANGE/.test(typ)&&/pocket|savings|vault|spaar|to eur|to usd|exchanged/i.test(r[ix("description")]||"")});
+      const bal=P.num(r[ix("balance")]);if(!isNaN(bal)&&(!o.saldo||datum>=o.saldo.datum))o.saldo={datum,bedrag:bal,valuta:cur}}
+    return {soort:"bank",formaat:"Revolut CSV",rekeningen:Object.values(byProd)}}
+  // ABN AMRO TXT (tab, geen kop): rekening, valuta, transactiedatum, beginsaldo, eindsaldo, rentedatum, bedrag, omschrijving
+  if(rows[0].length>=8&&/^\d{8}$/.test((rows[0][2]||"").trim())&&!isNaN(P.num(rows[0][4]))){
+    const map={};for(const r of rows){const acc=r[0].trim();const o=map[acc]=map[acc]||{iban:P.iban(acc),label:"ABN AMRO "+acc,valuta:r[1]||"EUR",saldo:null,tx:[]};
+      const datum=P.date(r[2]);o.tx.push({datum,bedrag:P.num(r[6]),tegen:P.iban(r[7]),naam:"",oms:(r[7]||"").slice(0,140)});
+      if(!o.saldo||datum>=o.saldo.datum)o.saldo={datum,bedrag:P.num(r[4]),valuta:r[1]||"EUR"}}
+    return {soort:"bank",formaat:"ABN AMRO TXT",rekeningen:Object.values(map)}}
+  // Algemeen (o.a. Knab CSV): kolommen zoeken op naam; eventuele titelregel overslaan
+  let hi=rows.findIndex(r=>r.some(c=>/datum|date/i.test(c))&&r.some(c=>/bedrag|amount/i.test(c)));if(hi<0)throw new Error("Herken de kolommen niet. Gebruik CAMT.053 of MT940 als je bank dat aanbiedt.");
+  const H=rows[hi].map(x=>x.trim().toLowerCase());const f=(...re)=>H.findIndex(c=>re.some(r=>r.test(c)));
+  const cD=f(/^transactiedatum|^boekdatum|^datum|^date/),cB=f(/^bedrag|^amount/),cCD=f(/credit.?debet|af.?bij|debet.?credit/),cT=f(/tegenrekening(nummer)?$|^tegenrekening|counterparty.*(iban|account)/),cN=f(/tegenrekeninghouder|naam|name|counterparty$/),cO=f(/omschrijving|description|mededeling/),cS=f(/saldo na|^saldo|balance/),cR=f(/^rekening|^iban|account$/);
+  const map={};for(const r of rows.slice(hi+1)){const acc=(cR>=0?r[cR]:"")||"onbekend";const o=map[acc]=map[acc]||{iban:P.iban(acc),label:acc,valuta:"EUR",saldo:null,tx:[]};
+    let v=P.num(r[cB]);if(isNaN(v))continue;if(cCD>=0&&/^(d|af|debet)/i.test(r[cCD]||""))v=-Math.abs(v);else if(cCD>=0)v=Math.abs(v);
+    const datum=P.date(r[cD]);o.tx.push({datum,bedrag:v,tegen:cT>=0?P.iban(r[cT]):null,naam:cN>=0?r[cN]:"",oms:cO>=0?(r[cO]||"").slice(0,140):""});
+    if(cS>=0){const s=P.num(r[cS]);if(!isNaN(s)&&(!o.saldo||datum>=o.saldo.datum))o.saldo={datum,bedrag:s,valuta:"EUR"}}}
+  return {soort:"bank",formaat:"CSV",rekeningen:Object.values(map)}};
+
+/* DEGIRO Portfolio.csv -> {soort:"portefeuille", posities:[{product,isin,aantal,koers,waarde}], cash, waarde} */
+P.degiroPortfolio=(text)=>{const rows=P.csvRows(text,",");const h=rows[0].map(x=>x.trim().toLowerCase());
+  const ip=h.findIndex(c=>/^product/.test(c)),ii=h.findIndex(c=>/isin/.test(c)),ia=h.findIndex(c=>/aantal|quantity|anzahl/.test(c)),ik=h.findIndex(c=>/slotkoers|closing|schlusskurs/.test(c)),iw=h.findIndex(c=>/waarde in eur|value in eur|wert in eur/.test(c));
+  if(ip<0||iw<0)throw new Error("Dit lijkt geen DEGIRO Portefeuille-export. Exporteer via Portefeuille, Exporteren, CSV.");
+  const pos=[];let cash=0;
+  for(const r of rows.slice(1)){const w=P.num(r[iw]);if(isNaN(w))continue;const prod=(r[ip]||"").trim();
+    if(/^cash|cash fund|geldmarkt|flatex cash/i.test(prod)&&!(r[ii]||"").trim()){cash+=w;continue}
+    pos.push({product:prod,isin:(r[ii]||"").trim(),aantal:P.num(r[ia]),koers:P.num(r[ik]),waarde:w})}
+  return {soort:"portefeuille",formaat:"DEGIRO Portefeuille",posities:pos,cash:Math.round(cash*100)/100,waarde:Math.round((pos.reduce((s,p)=>s+p.waarde,0)+cash)*100)/100}};
+
+/* DEGIRO Account.csv -> {soort:"inleg", maanden:{YYYY-MM:{storting,opname}}, eerste, laatste} */
+P.degiroAccount=(text)=>{const rows=P.csvRows(text,",");const h=rows[0].map(x=>x.trim().toLowerCase());
+  const id=h.findIndex(c=>/^datum|^date/.test(c)),io=h.findIndex(c=>/omschrijving|description|beschreibung/.test(c)),im=h.findIndex(c=>/^mutatie|^change|^änderung/.test(c));
+  if(id<0||io<0||im<0)throw new Error("Dit lijkt geen DEGIRO Rekeningoverzicht. Exporteer via Inbox, Rekeningoverzicht, CSV.");
+  const m={};let eerste=null,laatste=null;
+  for(const r of rows.slice(1)){const d=P.date(r[id]);if(!d)continue;const o=(r[io]||"").toLowerCase();const cur=(r[im]||"").trim();const v=P.num(r[im+1]);if(isNaN(v)||cur&&cur!=="EUR")continue;
+    const opn=/terugstorting|withdrawal|opname|auszahlung/.test(o), st=!opn&&/storting|deposit|einzahlung/.test(o)&&!/cash fund|geldmarkt|reservation|reservering/.test(o);
+    if(!st&&!opn)continue;const k=d.slice(0,7);const e=m[k]=m[k]||{storting:0,opname:0};if(st)e.storting+=Math.abs(v);else e.opname+=Math.abs(v);
+    if(!eerste||d<eerste)eerste=d;if(!laatste||d>laatste)laatste=d}
+  for(const e of Object.values(m)){e.storting=Math.round(e.storting*100)/100;e.opname=Math.round(e.opname*100)/100}
+  return {soort:"inleg",formaat:"DEGIRO Rekeningoverzicht",maanden:m,eerste,laatste}};
+
+P.detect=(name,text)=>{const t=text.slice(0,4000);
+  if(/<Document[\s>]/.test(t)&&/camt\.05[23]/.test(t))return P.camt(text);
+  if(/:20:/.test(t)&&/:25:/.test(t)&&/:6[01]F?:/.test(t))return P.mt940(text);
+  const first=(t.split(/\r?\n/)[0]||"").toLowerCase();
+  if(/^"?product"?,/.test(first)&&/(waarde|value|wert) in eur/.test(first))return P.degiroPortfolio(text);
+  if(/^"?(datum|date)"?,"?(tijd|time|zeit)"?/.test(first)&&/(mutatie|change)/.test(first))return P.degiroAccount(text);
+  return P.csvBank(text)};
+
+/* Saldoreeks per maandeinde terugrekenen vanaf het eindsaldo met de transacties */
+P.monthEnds=(saldo,tx)=>{if(!saldo||!saldo.datum)return [];const s=[...tx].filter(t=>t.datum&&t.datum<=saldo.datum);const out=[{datum:saldo.datum,bedrag:Math.round(saldo.bedrag*100)/100}];
+  if(!s.length)return out;const first=s.reduce((a,t)=>t.datum<a?t.datum:a,s[0].datum);
+  let [y,m]=saldo.datum.split("-").map(Number);const [fy,fm]=first.split("-").map(Number);
+  for(let i=0;i<120;i++){m-=1;if(m===0){m=12;y-=1}if(y<fy||(y===fy&&m<fm-1)||(fm===1&&y===fy-1&&m<12))break;
+    const end=`${y}-${String(m).padStart(2,"0")}-${String(new Date(y,m,0).getDate()).padStart(2,"0")}`;
+    const after=s.filter(t=>t.datum>end).reduce((a,t)=>a+t.bedrag,0);out.push({datum:end,bedrag:Math.round((saldo.bedrag-after)*100)/100})}
+  return out};
+/*PARSERS-END*/
+
+</script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const eur=(v,d=0)=>v==null||isNaN(v)?"–":(v<0?"−":"")+"€ "+Math.abs(v).toLocaleString("nl-NL",{minimumFractionDigits:d,maximumFractionDigits:d});
+const eurk=v=>Math.abs(v)>=1000?(v<0?"−":"")+"€ "+(Math.abs(v)/1000).toLocaleString("nl-NL",{maximumFractionDigits:1})+"k":eur(v);
+const pct=(v,d=1)=>v==null||!isFinite(v)?"–":(v>0?"+":"")+(v*100).toLocaleString("nl-NL",{maximumFractionDigits:d})+"%";
+const today=()=>new Date().toISOString().slice(0,10);
+const fmtD=d=>d?new Date(d+"T12:00:00").toLocaleDateString("nl-NL",{day:"numeric",month:"short",year:"numeric"}):"–";
+const ymEnd=ym=>{const [y,m]=ym.split("-").map(Number);return `${ym}-${String(new Date(y,m,0).getDate()).padStart(2,"0")}`};
+const addM=(ym,n)=>{let [y,m]=ym.split("-").map(Number);m+=n;while(m<1){m+=12;y--}while(m>12){m-=12;y++}return `${y}-${String(m).padStart(2,"0")}`};
+const mask=iban=>iban?iban.slice(0,4)+" •••• "+iban.slice(-4):"";
+const uid=()=>Math.random().toString(36).slice(2,10);
+const TYPES={betaal:"Betaalrekening",spaar:"Spaarrekening",potje:"Spaarpotje",belegging:"Beleggingsrekening",pensioen:"Pensioenbeleggen"};
+const INST=["ABN AMRO","Knab Zakelijk","Knab Privé","Revolut","DEGIRO"];
+const STALE_DAYS=35;
+
+let PROG=null, db=null, CFG=null, SALDI=[], PF=[], INLEG=[], FLOWS=[], PAGE="overzicht", ready={cfg:false,saldi:false,pf:false,inleg:false,flows:false};
+const UI={cfm:null,dev:{reeks:{totaal:true,prive:true,zakelijk:true,belegd:true,pensioen:true}},verd:"instelling",drill:null,per:"1j",van:null,tot:null};
+
+/* ---------- opslag ---------- */
+const ROOT="v/cfg";
+async function saveCfg(patch){CFG={...CFG,...patch};render();try{await db.doc(ROOT).set(JSON.parse(JSON.stringify(CFG)))}catch(e){toast("Opslaan lukte niet ("+(e.code||"fout")+"). Alleen de eigenaar kan dit dashboard wijzigen.",true)}}
+const col=n=>db.doc(ROOT).collection(n);
+let toastT=null;function toast(t,bad){let el=$("toast");if(!el){el=document.createElement("div");el.id="toast";el.setAttribute("role","status");el.style.cssText="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:10px;font-size:13px;z-index:20;max-width:90vw";document.body.appendChild(el)}el.textContent=t;el.style.background=bad?"var(--bad)":"var(--ink)";el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3800)}
+
+/* ---------- model ---------- */
+const accs=()=>CFG?.rekeningen||[];
+const acc=id=>accs().find(a=>a.id===id);
+const isInv=a=>a.type==="belegging"||a.type==="pensioen";
+function saldoOp(a,d){ // laatste meting op of voor d, in EUR
+  if(isInv(a)){const r=PF.filter(p=>p.port===a.id&&p.datum<=d).sort((x,y)=>y.datum.localeCompare(x.datum))[0];return r?{eur:r.waarde,datum:r.datum,bron:r.bron,test:r.test}:null}
+  const r=SALDI.filter(s=>s.rek===a.id&&s.datum<=d).sort((x,y)=>y.datum.localeCompare(x.datum))[0];return r?{eur:r.eur,datum:r.datum,bron:r.bron,valuta:r.valuta,bedrag:r.bedrag,koers:r.koers,koersdatum:r.koersdatum,test:r.test}:null}
+function status(a){const s=saldoOp(a,today());if(!s)return {k:"bad",t:"Geen gegevens"};const age=(new Date(today())-new Date(s.datum))/864e5;
+  if(a.meetellen===false)return {k:"dim",t:"Telt niet mee"};if(age>STALE_DAYS)return {k:"warn",t:`Verouderd, ${Math.round(age)} dagen`};return {k:"ok",t:"Actueel"}}
+function totals(d,only){const t={totaal:0,banken:0,belegd:0,pensioen:0,zakelijk:0,prive:0,gereserveerd:0,n:0,missing:0,perInst:{},perCat:{betaal:0,spaar:0,potje:0,belegging:0,pensioen:0}};
+  for(const a of accs()){if(a.meetellen===false||only&&!only.has(a.id))continue;const s=saldoOp(a,d);if(!s){t.missing++;continue}const v=s.eur;t.n++;t.totaal+=v;
+    if(a.type==="pensioen")t.pensioen+=v;else if(a.type==="belegging")t.belegd+=v;else t.banken+=v;
+    if(a.scope==="zakelijk")t.zakelijk+=v;else if(a.type!=="pensioen")t.prive+=v;
+    if(a.gereserveerd)t.gereserveerd+=v;
+    t.perInst[a.instelling]=(t.perInst[a.instelling]||0)+v;t.perCat[a.type]=(t.perCat[a.type]||0)+v}
+  const schuld=(CFG?.schulden||[]).reduce((s,x)=>s+(+x.bedrag||0),0);t.schulden=schuld;
+  t.nettoPersoonlijk=t.prive+t.pensioen-schuld;return t}
+function firstDate(){const ok=new Set(accs().filter(a=>a.meetellen!==false).map(a=>a.id));const ds=[...SALDI.filter(s=>ok.has(s.rek)).map(s=>s.datum),...PF.filter(p=>ok.has(p.port)).map(p=>p.datum)].sort();return ds[0]||null}
+function inlegTot(port,d){return INLEG.filter(i=>i.port===port&&ymEnd(i.ym)<=ymEnd(d.slice(0,7))&&(i.ym<d.slice(0,7)||true)).reduce((s,i)=>s+(i.storting||0)-(i.opname||0),0)}
+function inlegTussen(port,van,tot){return INLEG.filter(i=>i.port===port&&i.ym>van.slice(0,7)&&i.ym<=tot.slice(0,7)).reduce((s,i)=>s+(i.storting||0)-(i.opname||0),0)}
+function hasTest(){return SALDI.some(s=>s.test)||PF.some(p=>p.test)||INLEG.some(i=>i.test)||FLOWS.some(f=>f.test)||accs().some(a=>a.test)}
+
+/* ---------- navigatie ---------- */
+function go(){const h=(location.hash||"#overzicht").slice(1);PAGE=["overzicht","advies","cashflow","banken","potjes","beleggen","pensioen","ontwikkeling","doelen","instellingen"].includes(h)?h:"overzicht";
+  document.querySelectorAll("nav.side a").forEach(a=>a.setAttribute("aria-current",a.dataset.p===PAGE?"page":"false"));render()}
+window.addEventListener("hashchange",go);
+
+function render(){
+  if(!db){return}
+  if(!ready.cfg){$("main").innerHTML='<p class="sub">Gegevens laden…</p>';return}
+  if(!CFG){CFG={rekeningen:[],doelen:[],schulden:[]}}
+  const fn={overzicht:pOverzicht,advies:pAdvies,cashflow:pCashflow,banken:pBanken,potjes:pPotjes,beleggen:()=>pInvest("belegging"),pensioen:()=>pInvest("pensioen"),ontwikkeling:pOntwikkeling,doelen:pDoelen,instellingen:pInstellingen}[PAGE];
+  const y=scrollY;$("main").innerHTML=(hasTest()?`<div class="pill warn" style="justify-self:start;white-space:normal;border-radius:10px;padding:4px 10px">Bevat testgegevens. Verwijder ze in Instellingen voordat je echte gegevens gebruikt.</div>`:"")+fn();bind();scrollTo(0,y)}
+
+/* ---------- grafieken ---------- */
+function axis(min,max){const span=Math.max(1,max-min);const raw=span/5;const mag=Math.pow(10,Math.floor(Math.log10(raw)));const step=[1,2,2.5,5,10].map(x=>x*mag).find(x=>span/x<=5.5);const lo=Math.floor(min/step)*step,hi=Math.ceil(max/step)*step;const t=[];for(let v=lo;v<=hi+1e-9;v+=step)t.push(v);return {lo,hi,t}}
+function lineChart(id,series,dates,opts={}){ // series: [{key,label,color,vals:[]}]
+  const W=760,H=opts.h||280,pl=58,pr=10,pt=14,pb=26;const all=series.flatMap(s=>s.vals.filter(v=>v!=null));if(!all.length||dates.length<1)return `<div class="empty">Nog te weinig meetmomenten voor een grafiek.</div>`;
+  const {lo,hi,t}=axis(Math.min(0,...all),Math.max(...all));const n=dates.length;const x=i=>pl+(W-pl-pr)*(n===1?0.5:i/(n-1));const y=v=>pt+(H-pt-pb)*(1-(v-lo)/((hi-lo)||1));
+  let s=t.map(v=>`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${pl-6}" y="${y(v)+4}" text-anchor="end">${eurk(v)}</text>`).join("");
+  const every=Math.max(1,Math.ceil(n/8));dates.forEach((d,i)=>{if(i%every===0||i===n-1)s+=`<text x="${x(i)}" y="${H-7}" text-anchor="middle">${new Date(d+"T12:00:00").toLocaleDateString("nl-NL",{month:"short",year:"2-digit"})}</text>`});
+  series.forEach((se,si)=>{const pts=se.vals.map((v,i)=>v==null?null:[x(i),y(v)]);let dpath="";let pen=false;pts.forEach(p=>{if(!p){pen=false;return}dpath+=(pen?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1);pen=true});
+    if(opts.area&&si===0){const f=pts.filter(Boolean);if(f.length>1)s+=`<path d="${dpath}L${f.at(-1)[0]},${y(Math.max(lo,0))}L${f[0][0]},${y(Math.max(lo,0))}Z" fill="${se.color}" opacity=".12"/>`}
+    s+=`<path d="${dpath}" fill="none" stroke="${se.color}" stroke-width="${se.w||2}" ${se.dash?'stroke-dasharray="5 4"':""} stroke-linejoin="round" stroke-linecap="round"/>`;
+    const lp=pts.filter(Boolean).at(-1);if(lp)s+=`<circle cx="${lp[0]}" cy="${lp[1]}" r="3.5" fill="${se.color}"/>`});
+  dates.forEach((d,i)=>{const w=(W-pl-pr)/Math.max(1,n-1);s+=`<rect class="hit" data-c="${id}" data-i="${i}" x="${x(i)-w/2}" y="${pt}" width="${w}" height="${H-pt-pb}" fill="transparent"/>`});
+  CH[id]={series,dates,W,x,y};
+  return `<div class="chart" id="${id}"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label||"Grafiek")}">${s}</svg></div>`}
+const CH={};
+function bindCharts(){document.querySelectorAll(".chart .hit").forEach(h=>{h.addEventListener("pointerenter",()=>{const c=CH[h.dataset.c];const el=$(h.dataset.c);if(!c||!el)return;const i=+h.dataset.i,sc=el.clientWidth/c.W;
+  const t=el.querySelector(".tip")||Object.assign(document.createElement("div"),{className:"tip"});t.innerHTML=`<b>${fmtD(c.dates[i])}</b>`+c.series.map(s=>`<div><span>${esc(s.label)}</span><span>${s.vals[i]==null?"–":eur(s.vals[i])}</span></div>`).join("");el.appendChild(t);t.hidden=false;const tw=t.offsetWidth;t.style.left=Math.max(0,Math.min(el.clientWidth-tw,c.x(i)*sc-tw/2))+"px";t.style.top="0px"});
+  h.addEventListener("pointerleave",()=>{const t=$(h.dataset.c)?.querySelector(".tip");if(t)t.hidden=true})})}
+function donut(parts,onKey){const tot=parts.reduce((s,p)=>s+Math.max(0,p.v),0);if(!tot)return `<div class="empty">Nog geen saldi om te verdelen.</div>`;const R=80,r=52,cx=100,cy=100;let a0=-Math.PI/2;let s="";
+  parts.filter(p=>p.v>0).forEach(p=>{const a1=a0+p.v/tot*Math.PI*2;const big=a1-a0>Math.PI?1:0;const P=(a,rr)=>[cx+rr*Math.cos(a),cy+rr*Math.sin(a)];const [x0,y0]=P(a0,R),[x1,y1]=P(a1-0.0001,R),[x2,y2]=P(a1-0.0001,r),[x3,y3]=P(a0,r);
+    s+=`<path data-k="${esc(p.k)}" class="seg-${onKey}" d="M${x0},${y0}A${R},${R} 0 ${big} 1 ${x1},${y1}L${x2},${y2}A${r},${r} 0 ${big} 0 ${x3},${y3}Z" fill="${p.c}" stroke="var(--surface)" stroke-width="2" style="cursor:pointer"><title>${esc(p.l)}: ${eur(p.v)} (${(p.v/tot*100).toFixed(1).replace(".",",")}%)</title></path>`;a0=a1});
+  return `<svg viewBox="0 0 200 200" style="width:100%;max-width:220px;height:auto" role="img" aria-label="Verdeling van het vermogen">${s}<text x="100" y="96" text-anchor="middle" style="font:600 15px var(--font-display);fill:var(--ink)">${eurk(tot)}</text><text x="100" y="114" text-anchor="middle" style="font-size:10px;fill:var(--muted)">totaal</text></svg>`}
+const COLORS=["var(--c1)","var(--c2)","var(--c3)","var(--c4)","var(--c5)","var(--c6)","var(--c7)"];
+
+/* ---------- maandreeks ---------- */
+function monthSeries(){const f=firstDate();if(!f)return {dates:[],rows:[]};const last=today();let ym=f.slice(0,7);const dates=[];
+  while(ym<last.slice(0,7)){dates.push(ymEnd(ym));ym=addM(ym,1)}dates.push(last);
+  return {dates,rows:dates.map(d=>totals(d))}}
+function delta(nu,d){const ids=new Set(accs().filter(a=>a.meetellen!==false&&saldoOp(a,d)&&saldoOp(a,today())).map(a=>a.id));if(!ids.size)return null;const a=totals(d,ids),b=totals(today(),ids);return {abs:b.totaal-a.totaal,rel:a.totaal?(b.totaal-a.totaal)/a.totaal:null,van:a.totaal,n:ids.size,alle:ids.size===accs().filter(x=>x.meetellen!==false&&saldoOp(x,today())).length}}
+
+/* ---------- PAGINA: overzicht ---------- */
+function pOverzicht(){const T=totals(today());
+  if(!accs().length)return `<div class="empty">Nog geen rekeningen. Ga naar Instellingen en koppelingen om te beginnen.</div>`;
+  const pm=delta(T,ymEnd(addM(today().slice(0,7),-1))), jan=delta(T,`${today().slice(0,4)}-01-01`)||delta(T,`${+today().slice(0,4)-1}-12-31`);
+  const dl=x=>x?`<span class="delta ${x.abs>=0?"up":"down"}">${x.abs>=0?"+":"−"}${eur(Math.abs(x.abs))} · ${pct(x.rel)}</span>${x.alle?"":` <span class="sub">(${x.n} rekening${x.n>1?"en":""} met meting op beide data)</span>`}`:`<span class="sub">geen meting</span>`;
+  const stale=accs().filter(a=>a.meetellen!==false&&status(a).k!=="ok");
+  const tile=(l,v,s)=>`<div class="tile"><span class="lab">${l}</span><span class="val">${eur(v)}</span><span class="sub">${s}</span></div>`;
+  const parts=INST.concat([...new Set(accs().map(a=>a.instelling))].filter(i=>!INST.includes(i))).map((k,i)=>({k,l:k,v:T.perInst[k]||0,c:COLORS[i%7]}));
+  const cats=[["betaal","Betaalrekeningen"],["spaar","Spaarrekeningen"],["potje","Spaarpotjes"],["belegging","Beleggingen"],["pensioen","Pensioen"]].map(([k,l],i)=>({k,l,v:T.perCat[k]||0,c:COLORS[i]}));
+  const P=UI.verd==="instelling"?parts:cats;const tot=P.reduce((s,p)=>s+Math.max(0,p.v),0);
+  const drill=UI.drill?accs().filter(a=>(UI.verd==="instelling"?a.instelling:a.type)===UI.drill&&a.meetellen!==false):[];
+  return `<div class="head"><div><h1>Totaal vermogen</h1><div class="big">${eur(T.totaal)}</div><div class="sub">Financiële bezittingen, privé en zakelijk samen · ${T.n} rekeningen met een meting${T.missing?`, ${T.missing} zonder gegevens`:""}</div></div>
+    <div class="grid" style="text-align:right"><span class="sub">t.o.v. vorige maand ${dl(pm)}</span><span class="sub">sinds 1 januari ${dl(jan)}</span></div></div>
+  ${stale.length?`<div class="card" style="border-color:var(--warn-soft)"><div class="row"><span class="pill warn">Let op</span><span class="msg">${stale.length} rekening${stale.length>1?"en zijn":" is"} niet actueel: ${stale.map(a=>esc(a.instelling+" "+a.naam)).join(", ")}. Het totaal is daardoor onvolledig.</span></div></div>`:""}
+  <div class="tiles">${tile("Totaal op banken",T.banken,"betaal-, spaarrekeningen en potjes")}${tile("Totaal belegd",T.belegd,"DEGIRO normaal, incl. kassaldo")}${tile("Totaal pensioen",T.pensioen,"apart, niet direct beschikbaar")}${tile("Zakelijk",T.zakelijk,T.gereserveerd?`waarvan ${eur(T.gereserveerd)} gereserveerd`:"rekeningen van Shortclips")}${tile("Privé",T.prive,"privébanken en privébeleggingen")}${tile("Netto persoonlijk vermogen",T.nettoPersoonlijk,`privé plus pensioen${T.schulden?` min ${eur(T.schulden)} schulden`:", nog geen schulden ingevuld"}`)}</div>
+  <div class="two">
+   ${(()=>{try{return splitCard(pAdvies({calc:true}),false)}catch(e){return ""}})()}
+   <section class="card"><div class="row sb"><h2>Waar staat het geld</h2><div class="seg" role="group" aria-label="Verdeling">${[["instelling","Per bank"],["type","Per soort"]].map(([k,l])=>`<button type="button" data-verd="${k}" aria-pressed="${UI.verd===k}">${l}</button>`).join("")}</div></div>
+    <div class="row" style="align-items:center;gap:18px;flex-wrap:wrap">${donut(P,"verd")}<div class="grid" style="flex:1;min-width:200px;gap:6px">${P.map(p=>`<button type="button" class="ghost" data-drill="${esc(p.k)}" style="display:flex;justify-content:space-between;gap:10px;text-align:left;${UI.drill===p.k?"border-color:var(--accent)":""}"><span style="display:flex;gap:8px;align-items:center"><i class="sw" style="background:${p.c}"></i>${esc(p.l)}</span><span class="mono">${eur(p.v)} <span class="sub">${tot?(p.v/tot*100).toFixed(1).replace(".",","):0}%</span></span></button>`).join("")}</div></div>
+    ${UI.drill?`<div class="grid" style="gap:0"><h3>${esc(UI.drill)}</h3>${drill.map(a=>{const s=saldoOp(a,today());return `<div class="acct"><span class="n">${esc(a.instelling)} · ${esc(a.naam)}</span><span class="v">${s?eur(s.eur):"–"}</span></div>`}).join("")||'<p class="sub">Geen rekeningen.</p>'}</div>`:'<p class="sub">Klik op een bank of soort om de rekeningen te zien.</p>'}
+   </section>
+   <section class="card"><h2>Ontwikkeling</h2>${(()=>{const M=monthSeries();return lineChart("cOv",[{key:"t",label:"Totaal",color:"var(--accent)",vals:M.rows.map(r=>r.n?r.totaal:null)}],M.dates,{area:true,h:230,label:"Totaal vermogen per maand"})})()}<p class="sub">Vanaf het eerste meetmoment (${fmtD(firstDate())}). Meer historie komt erbij met bankafschriften en DEGIRO-exports.</p></section>
+  </div>`}
+
+/* ---------- PAGINA: bankrekeningen ---------- */
+function acctRow(a,child){const s=saldoOp(a,today()),st=status(a);
+  const fl=FLOWS.filter(f=>f.rek===a.id).sort((x,y)=>y.ym.localeCompare(x.ym))[0];
+  return `<div class="acct ${child?"child":""}"><span class="n">${esc(a.naam)} ${a.iban?`<span class="sub mono">${mask(a.iban)}</span>`:""}</span><span class="v">${s?eur(s.eur,2):"–"}</span>
+   <span class="m"><span class="pill ${st.k}">${st.t}</span>${s?`<span>stand ${fmtD(s.datum)} · ${esc(s.bron||"")}${s.valuta&&s.valuta!=="EUR"?` · ${s.bedrag.toLocaleString("nl-NL")} ${s.valuta} tegen koers ${s.koers} (${fmtD(s.koersdatum)})`:""}</span>`:"<span>importeer een afschrift of vul een saldo in</span>"}<span>${esc(TYPES[a.type])} · ${a.scope==="zakelijk"?"zakelijk":"privé"}</span>
+   ${fl?`<span>${fl.ym}: in ${eur(fl.in)} · uit ${eur(fl.uit)} · intern ${eur(fl.intern)} (niet meegeteld als groei)</span>`:""}
+   ${a.test?'<span class="test">TEST</span>':""}
+   <span style="margin-left:auto;display:flex;gap:6px"><button type="button" data-act="saldo" data-id="${a.id}">Saldo invullen</button><button type="button" class="ghost" data-act="edit" data-id="${a.id}">Bewerken</button></span></span></div>`}
+function pBanken(){const banks=accs().filter(a=>!isInv(a));const T=totals(today());
+  const groups=[...new Set([...INST.filter(i=>i!=="DEGIRO"),...banks.map(a=>a.instelling)])];
+  return `<div class="head"><div><h1>Totaal op banken</h1><div class="big">${eur(T.banken)}</div><div class="sub">zakelijk ${eur(banks.filter(a=>a.scope==="zakelijk"&&a.meetellen!==false).reduce((s,a)=>s+(saldoOp(a,today())?.eur||0),0))} · privé ${eur(banks.filter(a=>a.scope!=="zakelijk"&&a.meetellen!==false).reduce((s,a)=>s+(saldoOp(a,today())?.eur||0),0))}</div></div>
+   <div class="row"><button type="button" class="pri" data-act="import">Afschrift importeren</button><button type="button" data-act="new">Rekening toevoegen</button></div></div>
+  ${groups.map(g=>{const list=banks.filter(a=>a.instelling===g);const tops=list.filter(a=>!a.ouder||!acc(a.ouder));const sum=list.filter(a=>a.meetellen!==false).reduce((s,a)=>s+(saldoOp(a,today())?.eur||0),0);
+    return `<section class="card"><div class="row sb"><h2>${esc(g)}</h2><span class="mono">${eur(sum,2)}</span></div>${tops.length?tops.map(a=>acctRow(a)+list.filter(c=>c.ouder===a.id).map(c=>acctRow(c,true)).join("")).join(""):`<div class="empty">Nog geen rekening bij ${esc(g)}. Importeer een afschrift (CAMT.053, MT940 of CSV) of voeg de rekening toe.</div>`}</section>`}).join("")}`}
+
+/* ---------- PAGINA: spaarpotjes ---------- */
+function pPotjes(){const pots=accs().filter(a=>a.type==="potje"||a.type==="spaar"||a.doel);
+  const rows=pots.map(a=>{const s=saldoOp(a,today());const v=s?.eur;const d=+a.doel||0;const p=d&&v!=null?v/d:null;return {a,v,d,p,s}});
+  return `<div class="head"><div><h1>Spaarpotjes en spaarrekeningen</h1><div class="big">${eur(rows.reduce((s,r)=>s+(r.a.meetellen===false?0:(r.v||0)),0))}</div><div class="sub">${rows.filter(r=>r.d).length} met een doelbedrag</div></div><div class="row"><button type="button" class="pri" data-act="newpot">Potje toevoegen</button></div></div>
+  ${rows.length?`<section class="card"><div class="tbl"><table><thead><tr><th>Potje</th><th>Rekening</th><th>Categorie</th><th>Saldo</th><th>Doel</th><th class="l" style="min-width:140px">Voortgang</th><th>Ontbreekt</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.a.naam)} ${r.a.gereserveerd?'<span class="pill dim">gereserveerd</span>':""}${r.a.test?' <span class="test">TEST</span>':""}</td><td class="l sub">${esc(r.a.instelling)}${r.a.ouder&&acc(r.a.ouder)?" · "+esc(acc(r.a.ouder).naam):""}</td><td class="l sub">${esc(r.a.categorie||"-")}</td><td>${r.v!=null?eur(r.v,2):"–"}<div class="sub">${r.s?fmtD(r.s.datum):"geen saldo"}</div></td><td>${r.d?eur(r.d):"–"}</td><td class="l">${r.p!=null?`<div class="bar"><i style="width:${Math.min(100,r.p*100)}%;background:var(${r.p>=1?"--ok":"--accent"})"></i></div><span class="sub">${(r.p*100).toFixed(0)}%</span>`:'<span class="sub">geen doel</span>'}</td><td>${r.d&&r.v!=null?eur(Math.max(0,r.d-r.v)):"–"}</td><td><button type="button" class="ghost" data-act="edit" data-id="${r.a.id}">Bewerken</button> <button type="button" class="ghost" data-act="saldo" data-id="${r.a.id}">Saldo</button></td></tr>`).join("")}</tbody></table></div></section>`:`<div class="empty">Nog geen potjes. Voeg je potjes toe met de namen uit je bank-app, of importeer een afschrift.</div>`}
+  <p class="notes">Banken geven potjes niet altijd als aparte rekening door. Wat niet automatisch binnenkomt maak je hier aan met de echte naam uit je bank-app; het saldo vul je in met datum, of het komt binnen via een afschrift van die spaarrekening.</p>`}
+
+/* ---------- PAGINA: beleggingen / pensioen ---------- */
+function pInvest(type){const ports=accs().filter(a=>a.type===type);const label=type==="pensioen"?"Pensioenbeleggen":"Beleggingen";
+  if(!ports.length)return `<div class="head"><div><h1>${label}</h1></div><button type="button" class="pri" data-act="newport" data-type="${type}">Portefeuille toevoegen</button></div><div class="empty">Nog geen ${type==="pensioen"?"pensioenportefeuille":"beleggingsrekening"}.</div>`;
+  UI.port=UI.port&&ports.some(p=>p.id===UI.port)?UI.port:ports[0].id;if(!ports.some(p=>p.id===UI.port))UI.port=ports[0].id;const a=acc(UI.port)||ports[0];
+  const hist=PF.filter(p=>p.port===a.id).sort((x,y)=>x.datum.localeCompare(y.datum));const last=hist.at(-1);
+  const inleg=inlegTot(a.id,today());const hasInleg=INLEG.some(i=>i.port===a.id);
+  const ret=last&&hasInleg?last.waarde-inleg:null;
+  const perMap={"1m":1,"3m":3,"6m":6,"1j":12};const now=today();let van=UI.per==="ytd"?`${now.slice(0,4)}-01-01`:UI.per==="alles"?(hist[0]?.datum||now):`${addM(now.slice(0,7),-perMap[UI.per])}-${now.slice(8)}`;
+  const sel=hist.filter(h=>h.datum>=van);const startPt=[...hist].reverse().find(h=>h.datum<=van);
+  const pts=startPt&&!sel.includes(startPt)?[startPt,...sel]:sel;
+  const begin=pts[0],eind=pts.at(-1);let koers=null,stort=null;
+  if(begin&&eind&&begin!==eind){stort=inlegTussen(a.id,begin.datum,eind.datum);koers=eind.waarde-begin.waarde-stort}
+  return `<div class="head"><div><h1>${label}${ports.length>1?"":" · "+esc(a.naam)}</h1><div class="big">${last?eur(last.waarde):"–"}</div><div class="sub">${last?`stand ${fmtD(last.datum)} · ${esc(last.bron||"")} · geen realtime koersen`:"nog geen portefeuille-export"}</div></div>
+   <div class="row">${ports.length>1?`<div class="seg">${ports.map(p=>`<button type="button" data-port="${p.id}" aria-pressed="${p.id===a.id}">${esc(p.naam)}</button>`).join("")}</div>`:""}<button type="button" class="pri" data-act="import">DEGIRO-export importeren</button></div></div>
+  <div class="tiles"><div class="tile"><span class="lab">Portefeuillewaarde</span><span class="val">${last?eur(last.waarde):"–"}</span><span class="sub">${last?`waarvan kas ${eur(last.cash)}`:"importeer Portfolio.csv"}</span></div>
+   <div class="tile"><span class="lab">Netto inleg</span><span class="val">${hasInleg?eur(inleg):"–"}</span><span class="sub">${hasInleg?"stortingen min opnames":"importeer Account.csv (rekeningoverzicht vanaf de eerste storting)"}</span></div>
+   <div class="tile"><span class="lab">Totaal rendement</span><span class="val" style="color:var(${ret==null?"--ink":ret>=0?"--ok":"--bad"})">${ret==null?"–":eur(ret)}</span><span class="sub">${ret==null?"vraagt waarde en inleg":pct(inleg?ret/inleg:null)+" op de inleg"}</span></div>
+   <div class="tile"><span class="lab">Gerealiseerd rendement</span><span class="val">–</span><span class="sub">niet betrouwbaar te bepalen uit de exports, daarom niet getoond</span></div></div>
+  <section class="card"><div class="row sb"><h2>Waardeontwikkeling</h2><div class="seg" role="group" aria-label="Periode">${[["1m","1 mnd"],["3m","3 mnd"],["6m","6 mnd"],["1j","1 jaar"],["ytd","Dit jaar"],["alles","Alles"]].map(([k,l])=>`<button type="button" data-per="${k}" aria-pressed="${UI.per===k}">${l}</button>`).join("")}</div></div>
+   ${lineChart("cPf",[{label:"Waarde",color:"var(--c1)",vals:pts.map(p=>p.waarde)},...(hasInleg?[{label:"Netto inleg",color:"var(--muted)",dash:true,w:1.5,vals:pts.map(p=>inlegTot(a.id,p.datum))}]:[])],pts.map(p=>p.datum),{area:true,label:"Waarde tegenover inleg"})}
+   ${koers!=null?`<div class="row" style="gap:18px"><span class="sub">Verschil in deze periode: <b class="mono">${eur(eind.waarde-begin.waarde)}</b></span><span class="sub">door stortingen <b class="mono">${eur(stort)}</b></span><span class="sub">door koersontwikkeling <b class="mono" style="color:var(${koers>=0?"--ok":"--bad"})">${eur(koers)}</b></span></div>`:'<p class="sub">Voor de splitsing tussen stortingen en koers zijn minstens twee portefeuille-exports nodig, plus het rekeningoverzicht.</p>'}
+  </section>
+  <section class="card"><h2>Posities</h2>${last&&last.posities.length?`<div class="tbl"><table><thead><tr><th>Product</th><th>ISIN</th><th>Aantal</th><th>Slotkoers</th><th>Waarde</th><th class="l" style="min-width:140px">Aandeel</th></tr></thead><tbody>${[...last.posities].sort((x,y)=>y.waarde-x.waarde).map((p,i)=>`<tr><td>${esc(p.product)}</td><td class="l sub mono">${esc(p.isin)}</td><td>${(p.aantal||0).toLocaleString("nl-NL")}</td><td>${isNaN(p.koers)?"–":p.koers.toLocaleString("nl-NL")}</td><td>${eur(p.waarde,2)}</td><td class="l"><div class="bar"><i style="width:${p.waarde/last.waarde*100}%;background:${COLORS[i%7]}"></i></div><span class="sub">${(p.waarde/last.waarde*100).toFixed(1).replace(".",",")}%</span></td></tr>`).join("")}<tr class="tot"><td>Kassaldo</td><td></td><td></td><td></td><td>${eur(last.cash,2)}</td><td></td></tr></tbody></table></div>`:'<div class="empty">Nog geen posities. Exporteer in DEGIRO je Portefeuille als CSV en importeer het bestand.</div>'}</section>
+  ${type==="pensioen"?'<p class="notes">Dit is pensioenvermogen. Het telt mee in je totale en netto persoonlijke vermogen, maar niet in privé of vrij beschikbaar.</p>':""}`}
+
+/* ---------- PAGINA: ontwikkeling ---------- */
+function pOntwikkeling(){const M=monthSeries();const R=UI.dev.reeks;
+  const defs=[["totaal","Totaal","var(--accent)"],["prive","Privé","var(--c3)"],["zakelijk","Zakelijk","var(--c4)"],["belegd","Beleggingen","var(--c1)"],["pensioen","Pensioen","var(--c6)"]];
+  const series=defs.filter(([k])=>R[k]).map(([k,l,c])=>({key:k,label:l,color:c,vals:M.rows.map(r=>r.n?r[k]:null)}));
+  const van=UI.van||`${today().slice(0,4)}-01-01`, tot=UI.tot||today();const A=totals(van),B=totals(tot);
+  const ports=accs().filter(isInv);const res=ports.map(p=>{const a=saldoOp(p,van),b=saldoOp(p,tot);if(!a||!b)return null;const st=inlegTussen(p.id,a.datum,b.datum);return {p,dw:b.eur-a.eur,st,koers:b.eur-a.eur-st}}).filter(Boolean);
+  const koers=res.reduce((s,r)=>s+r.koers,0);const d=B.totaal-A.totaal;
+  return `<div class="head"><div><h1>Vermogensontwikkeling</h1><div class="big">${eur(totals(today()).totaal)}</div><div class="sub">eerste betrouwbare meetmoment: ${fmtD(firstDate())}</div></div></div>
+  <section class="card"><div class="legend">${defs.map(([k,l,c])=>`<label><input type="checkbox" data-reeks="${k}" ${R[k]?"checked":""}><i class="sw" style="background:${c}"></i>${l}</label>`).join("")}</div>
+  ${lineChart("cDev",series,M.dates,{h:320,label:"Vermogen per maand per categorie"})}<p class="sub">Per maandeinde de laatst bekende stand van elke rekening. Een rekening telt pas mee vanaf haar eerste meting, dus sprongen kunnen ook komen doordat een rekening voor het eerst is ingelezen.</p></section>
+  <section class="card"><h2>Periode vergelijken</h2><div class="form"><label for="pv">Van<input type="date" id="pv" value="${van}"></label><label for="pt">Tot en met<input type="date" id="pt" value="${tot}"></label></div>
+   ${!A.n?`<p class="msg bad">Op ${fmtD(van)} is nog geen enkele meting. Kies een latere startdatum, vanaf ${fmtD(firstDate())}.</p>`:`
+   <div class="tbl"><table><thead><tr><th></th><th>${fmtD(van)}</th><th>${fmtD(tot)}</th><th>Verschil</th></tr></thead><tbody>${[["Totaal vermogen","totaal"],["Privé","prive"],["Zakelijk","zakelijk"],["Beleggingen","belegd"],["Pensioen","pensioen"],["Netto persoonlijk","nettoPersoonlijk"]].map(([l,k])=>`<tr><td>${l}</td><td>${eur(A[k])}</td><td>${eur(B[k])}</td><td class="${B[k]-A[k]<0?"":""}" style="color:var(${B[k]-A[k]>=0?"--ok":"--bad"})">${B[k]-A[k]>=0?"+":"−"}${eur(Math.abs(B[k]-A[k]))}</td></tr>`).join("")}</tbody></table></div>
+   <h3>Waar komt het verschil vandaan</h3>
+   <div class="tiles"><div class="tile"><span class="lab">Beleggingsresultaat</span><span class="val" style="color:var(${koers>=0?"--ok":"--bad"})">${res.length?eur(koers):"–"}</span><span class="sub">${res.length?"waardeverandering min stortingen":"vraagt portefeuille-exports op beide data"}</span></div>
+    <div class="tile"><span class="lab">Sparen en geldstromen</span><span class="val">${eur(d-koers)}</span><span class="sub">wat er netto bij of af ging aan geld, interne overboekingen vallen tegen elkaar weg</span></div>
+    <div class="tile"><span class="lab">waarvan zakelijk</span><span class="val">${eur(B.zakelijk-A.zakelijk)}</span><span class="sub">verandering op de zakelijke rekeningen</span></div></div>
+   ${A.n!==B.n?`<p class="msg bad">Let op: op ${fmtD(van)} hadden ${A.n} rekeningen een meting, op ${fmtD(tot)} ${B.n}. Het verschil bevat dus ook rekeningen die later zijn ingelezen.</p>`:""}`}
+  </section>`}
+
+/* ---------- PAGINA: doelen ---------- */
+const MAAT={prive:"Privé (banken en beleggingen)",spaar:"Privé spaargeld (banken)",belegd:"Belegd vermogen",netto:"Netto persoonlijk vermogen",totaal:"Totaal vermogen",rekening:"Eén rekening of potje"};
+function maatVal(g,d){const T=totals(d);if(g.maat==="rekening"){const a=acc(g.rek);return a?saldoOp(a,d)?.eur??null:null}
+  if(g.maat==="spaar"){return accs().filter(a=>a.meetellen!==false&&a.scope!=="zakelijk"&&!isInv(a)).reduce((s,a)=>s+(saldoOp(a,d)?.eur||0),0)}
+  return {prive:T.prive,belegd:T.belegd,netto:T.nettoPersoonlijk,totaal:T.totaal}[g.maat]}
+function pDoelen(){const G=CFG.doelen||[];
+  return `<div class="head"><div><h1>Financiële doelen</h1><div class="big">${G.length}</div><div class="sub">${G.filter(g=>(maatVal(g,today())||0)>=g.bedrag).length} bereikt</div></div><button type="button" class="pri" data-act="newgoal">Doel toevoegen</button></div>
+  ${G.length?G.map(g=>{const v=maatVal(g,today())||0;const p=g.bedrag?v/g.bedrag:0;
+    const v6=maatVal(g,ymEnd(addM(today().slice(0,7),-6)));const f=firstDate();const months=f?Math.min(6,Math.max(0,(new Date(today())-new Date(f))/2.63e9)):0;
+    const groei=v6!=null&&months>=3?(v-(months>=6?v6:maatVal(g,f)||0))/months:null;const rest=Math.max(0,g.bedrag-v);
+    const eta=rest===0?"bereikt":groei&&groei>0?`schatting: over ongeveer ${Math.ceil(rest/groei)} maanden, als de groei van de afgelopen ${Math.round(months)} maanden doorzet`:"nog geen schatting: te weinig historie of geen groei";
+    return `<section class="card"><div class="row sb"><h2>${esc(g.naam)}</h2><span class="row"><button type="button" class="ghost" data-act="editgoal" data-id="${g.id}">Bewerken</button><button type="button" class="danger" data-act="delgoal" data-id="${g.id}">Verwijderen</button></span></div>
+     <div class="row sb"><span class="sub">${esc(MAAT[g.maat])}${g.maat==="rekening"&&acc(g.rek)?": "+esc(acc(g.rek).naam):""}${g.datum?` · streefdatum ${fmtD(g.datum)}`:""}</span><span class="mono">${eur(v)} van ${eur(g.bedrag)}</span></div>
+     <div class="bar" style="height:12px"><i style="width:${Math.min(100,p*100)}%;background:var(${p>=1?"--ok":"--accent"})"></i></div>
+     <div class="row sb"><span class="sub">${(p*100).toFixed(0)}% bereikt · nog ${eur(rest)} nodig</span><span class="sub">${eta}</span></div></section>`}).join(""):`<div class="empty">Nog geen doelen. Voeg je eigen doelen toe; er staan bewust geen voorbeelden in.</div>`}
+  <p class="notes">Schattingen rekenen met de gemiddelde maandgroei van de gekozen maatstaf. Dat is geen voorspelling of garantie.</p>`}
+
+/* ---------- PAGINA: instellingen ---------- */
+function pInstellingen(){const insts=[...new Set([...INST,...accs().map(a=>a.instelling)])];
+  const kop={"Knab Zakelijk":"Saldi via DigiBoox (alleen lezen, bij de maandelijkse uitlezing). Potjes die DigiBoox niet meer bijwerkt staan als verouderd.","ABN AMRO":"Import van CAMT.053, MT940 of TXT uit Internet Bankieren. Automatisch kan via een PSD2-aanbieder (fase 2).","Knab Privé":"Import van MT940 of CSV uit de Knab-app of website. Automatisch kan via een PSD2-aanbieder (fase 2).","Revolut":"Import van het CSV- of CAMT.053-afschrift per valuta. Automatisch kan via een PSD2-aanbieder (fase 2).","DEGIRO":"Import van Portfolio.csv (posities) en Account.csv (stortingen). DEGIRO heeft geen officiële koppeling voor particulieren."};
+  const sch=CFG.schulden||[];
+  return `<div class="head"><div><h1>Instellingen en koppelingen</h1><div class="big">${accs().length}</div><div class="sub">rekeningen en portefeuilles</div></div><div class="row"><button type="button" class="pri" data-act="import">Bestand importeren</button><button type="button" data-act="new">Rekening toevoegen</button></div></div>
+  <section class="card"><h2>Koppelingen per bank</h2><div class="tbl"><table><thead><tr><th>Bank</th><th class="l">Manier</th><th>Rekeningen</th><th>Laatste stand</th><th>Status</th></tr></thead><tbody>${insts.map(i=>{const L=accs().filter(a=>a.instelling===i);const dates=L.map(a=>saldoOp(a,today())?.datum).filter(Boolean).sort();const bad=L.filter(a=>a.meetellen!==false&&status(a).k!=="ok").length;
+    return `<tr><td>${esc(i)}</td><td class="l" style="white-space:normal;min-width:260px"><span class="sub">${esc(kop[i]||"Import of handmatig saldo")}</span></td><td>${L.length}</td><td>${dates.length?fmtD(dates.at(-1)):"–"}</td><td><span class="pill ${!L.length||!dates.length?"bad":bad?"warn":"ok"}">${!L.length||!dates.length?"Geen gegevens":bad?`${bad} niet actueel`:"Actueel"}</span></td></tr>`}).join("")}</tbody></table></div></section>
+  <section class="card"><h2>Alle rekeningen</h2><div class="tbl"><table><thead><tr><th>Rekening</th><th class="l">Bank</th><th class="l">Soort</th><th class="l">Privé of zakelijk</th><th class="l">Bron</th><th>Telt mee</th><th></th></tr></thead><tbody>${accs().map(a=>`<tr><td>${esc(a.naam)} <span class="sub mono">${mask(a.iban)}</span>${a.test?' <span class="test">TEST</span>':""}</td><td class="l">${esc(a.instelling)}</td><td class="l">${esc(TYPES[a.type])}</td><td class="l">${a.scope==="zakelijk"?"Zakelijk":"Privé"}</td><td class="l sub">${esc(a.bron||"handmatig")}</td><td>${a.meetellen===false?'<span class="pill dim">nee</span>':'<span class="pill ok">ja</span>'}</td><td><button type="button" class="ghost" data-act="edit" data-id="${a.id}">Bewerken</button></td></tr>`).join("")}</tbody></table></div></section>
+  <section class="card"><h2>Schulden en verplichtingen</h2><p class="lead">Voor het netto persoonlijk vermogen. Bijvoorbeeld een lening, studieschuld of nog te betalen inkomstenbelasting.</p>
+   ${sch.length?`<div class="tbl"><table><tbody>${sch.map(s=>`<tr><td>${esc(s.naam)}</td><td class="sub">${fmtD(s.datum)}</td><td>${eur(+s.bedrag)}</td><td><button type="button" class="danger" data-act="delschuld" data-id="${s.id}">Verwijderen</button></td></tr>`).join("")}</tbody></table></div>`:'<p class="sub">Geen schulden ingevuld.</p>'}
+   <div class="form"><label for="sn">Omschrijving<input id="sn"></label><label for="sb">Bedrag<input id="sb" type="number" step="0.01" min="0"></label><button type="button" data-act="addschuld">Toevoegen</button></div></section>
+  <section class="card"><h2>Gegevens</h2><div class="row"><button type="button" class="danger" data-act="deltest" ${hasTest()?"":"disabled"}>Alle testgegevens verwijderen</button></div>
+   <p class="notes">Dit dashboard staat in je eigen claude.ai-account. Alleen jij als eigenaar kunt de gegevens lezen of wijzigen; ook mensen met wie je het artifact deelt zien ze niet. Er worden geen bankwachtwoorden opgeslagen en er kan geen geld worden overgeboekt: het dashboard leest alleen afschriften en saldi die jij aanlevert. IBAN's worden alleen gemaskeerd getoond. Een rekening verwijderen verwijdert ook al haar saldi en stromen.</p></section>
+  <section class="card"><h2>Volgende stap: automatische bankkoppeling</h2><p class="lead">Enable Banking biedt een gratis "restricted" productiemodus waarin je alleen je eigen, zelf gekoppelde rekeningen uitleest, met toestemming per bank tot maximaal 180 dagen. Dat vraagt een kleine server die de sleutel veilig bewaart en dagelijks de saldi ophaalt; een webpagina kan die sleutel niet veilig bevatten. Dit bouw ik pas als jij de aanvraag bij Enable Banking zelf doet en per bank toestemming geeft.</p></section>`}
+
+const MNL=["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"];
+/* ---------- PAGINA: advies ---------- */
+const ADV_DEF={btwNodig:{v:10200,l:"Te betalen btw lopend/vorig kwartaal",b:"Aanname: €17.667 btw volgens DigiBoox min geschatte voorbelasting €7.442 (CEO-dashboard, 10 okt). Check je aangifte."},
+  ibVorigNodig:{v:null,l:"Nog te betalen IB vorig jaar",b:"Onbekend. Vul het bedrag van je (verwachte) aanslag in; leeg = het potje telt als voldoende."},
+  ibJaar:{v:51700,l:"Verwachte IB + Zvw dit jaar",b:"Berekening CEO-dashboard (prognose winst 2026, tarieven 2026). Check met je boekhouder."},
+  ibBetaald:{v:0,l:"Al betaald via voorlopige aanslag dit jaar",b:"Onbekend, staat op 0. Vul in als je maandelijks een voorlopige aanslag betaalt."},
+  lastenZak:{v:19600,l:"Zakelijke kosten per maand",b:"Aanname: gemiddelde maandkosten met btw volgens het CEO-dashboard."},
+  buffZakM:{v:3,l:"Zakelijke buffer in maanden",b:"Startwaarde uit je financieel dossier."},
+  uitgPrive:{v:null,l:"Privé-uitgaven per maand",b:"Onbekend. Nodig voor je privébuffer (blok 4 van de intake)."},
+  buffPriveM:{v:6,l:"Privébuffer in maanden",b:"Startwaarde: 6 maanden, hoger omdat je inkomen uit je eigen bedrijf komt."}};
+function advManual(k){const c=CFG?.advies||{};return c[k]!==undefined&&c[k]!==""&&c[k]!==null}
+function advDef(k){const d=ADV_DEF[k];
+  if(k==="ibJaar"){const p=ibPrognose();if(p)return {v:Math.round(p.J.tax),b:`Prognose uit het groeidashboard (winst ${eur(p.wP)} verwacht, tarieven 2026), bijgewerkt ${fmtD(p.bijgewerkt)}. Rekent elke maand mee met je omzet.`}}
+  if(k==="uitgPrive"){const g=cfGemiddelde();if(g)return {v:g.v,b:`Gemiddelde uit Cashflow privé over ${g.n} volledige maanden.`}}
+  return {v:d.v,b:d.b}}
+function advVal(k){return advManual(k)?CFG.advies[k]:advDef(k).v}
+function potsBy(f){return accs().filter(a=>a.meetellen!==false&&f(a)).map(a=>({a,v:saldoOp(a,today())?.eur||0}))}
+function pAdvies(opts={}){const now=today(),Y=+now.slice(0,4),M=+now.slice(5,7);const sum=l=>l.reduce((s,x)=>s+x.v,0);
+  const btwP=potsBy(a=>a.categorie==="btw"),ibV=potsBy(a=>a.categorie==="belasting"&&new RegExp(String(Y-1)).test(a.naam)),ibN=potsBy(a=>a.categorie==="belasting"&&new RegExp(String(Y)).test(a.naam));
+  const zakBuf=potsBy(a=>a.scope==="zakelijk"&&a.categorie==="buffer"),zakOps=potsBy(a=>a.scope==="zakelijk"&&a.type==="betaal");
+  const zakAll=potsBy(a=>a.scope==="zakelijk"&&!isInv(a));const zakOverig=zakAll.filter(x=>![...btwP,...ibV,...ibN,...zakBuf,...zakOps].some(y=>y.a.id===x.a.id));
+  const prvBuf=potsBy(a=>a.scope!=="zakelijk"&&a.categorie==="buffer"),prvWon=potsBy(a=>a.scope!=="zakelijk"&&a.categorie==="woning");
+  const prvLiq=potsBy(a=>a.scope!=="zakelijk"&&!isInv(a));const prvVrij=prvLiq.filter(x=>![...prvBuf,...prvWon].some(y=>y.a.id===x.a.id));
+  const PR=ibPrognose(),ibHand=advManual("ibJaar")||!PR;const ibJaar=+advVal("ibJaar")||0;
+  const ibNodigNu=Math.max(0,Math.round((ibHand?ibJaar*(M-1)/12:PR.taxYTD)-(+advVal("ibBetaald")||0)));
+  const ibPerMaand=ibHand?ibJaar/12:PR.perMaand;const ibTot=ibHand?MNL[M-2]||"december":MNL[+PR.last.slice(5,7)-1];
+  const ibVN=advVal("ibVorigNodig");const lz=+advVal("lastenZak")||0;const up=advVal("uitgPrive");
+  // stappen in de vaste volgorde
+  const steps=[
+   {n:"Btw-reservering",need:+advVal("btwNodig")||0,have:sum(btwP),pots:btwP,scope:"zakelijk",why:"Dit geld is niet van jou; het gaat binnen enkele weken naar de Belastingdienst."},
+   {n:`Inkomstenbelasting ${Y-1}`,need:ibVN==null?sum(ibV):+ibVN,have:sum(ibV),pots:ibV,scope:"zakelijk",why:ibVN==null?"Aanslagbedrag onbekend: het potje telt nu als voldoende. Vul de aanslag in om dit te toetsen.":"Te betalen op de aanslag over vorig jaar."},
+   {n:`Inkomstenbelasting ${Y}`,need:ibNodigNu,have:sum(ibN),pots:ibN,scope:"zakelijk",why:ibHand?`Het deel over januari t/m ${ibTot} van ${eur(ibJaar)} verwachte IB en Zvw, min wat al betaald is. Daarna elke maand ${eur(ibPerMaand)} bijzetten.`:`Belasting over je werkelijke winst t/m ${ibTot} (${eur(PR.wY)}) tegen het verwachte jaartarief, min wat al betaald is. Daarna elke maand ${eur(ibPerMaand)} bijzetten.`},
+   {n:"Operationele rekening",need:lz,have:sum(zakOps),pots:zakOps,scope:"zakelijk",why:"Eén maand kosten op de betaalrekening, zodat je niet uit potjes hoeft te betalen. Binnenkomende facturen vullen deze rekening ook aan."},
+   {n:"Zakelijke buffer",need:lz*(+advVal("buffZakM")||0),have:sum(zakBuf),pots:zakBuf,scope:"zakelijk",why:`${advVal("buffZakM")} maanden zakelijke kosten voor tegenvallers en een rustige maand.`},
+   {n:"Privébuffer",need:up==null?null:up*(+advVal("buffPriveM")||0),have:sum(prvBuf),pots:prvBuf,scope:"prive",why:up==null?"Vul je privé-uitgaven per maand in om de juiste grootte te bepalen.":`${advVal("buffPriveM")} maanden privé-uitgaven.`},
+   {n:"Woninginrichting",need:prvWon.reduce((s,x)=>s+(+x.a.doel||x.v),0),have:sum(prvWon),pots:prvWon,scope:"prive",why:prvWon.some(x=>x.a.doel)?"Doelbedrag uit je potje.":"Geen doelbedrag ingesteld: het huidige saldo telt als doel. Stel er een in bij Spaarpotjes."}];
+  // geld verdelen: zakelijk geld vult zakelijke stappen in volgorde, privé geld de privéstappen; tekort zakelijk mag uit privé (eenmanszaak)
+  let poolZ=sum(zakAll),poolP=sum(prvLiq);
+  for(const s of steps){const need=s.need==null?s.have:s.need;let take;
+    if(s.scope==="zakelijk"){take=Math.min(need,poolZ);poolZ-=take;const rest=need-take;s.uitPrive=0;if(rest>0&&steps.indexOf(s)<3){const t2=Math.min(rest,poolP);poolP-=t2;s.uitPrive=t2;take+=t2}}
+    else{take=Math.min(need,poolP);poolP-=take}
+    s.gedekt=take;s.tekort=Math.max(0,need-take);s.verschil=need-s.have}
+  const vrijZ=poolZ, vrijP=poolP;const poolStart=sum(zakAll)+sum(prvLiq);
+  ADVC={steps,vrijZ,vrijP,poolStart,PR,ibPerMaand,ibHand};if(opts.calc)return ADVC;
+  // concrete verschuivingen: van potjes met overschot naar potjes met tekort
+  const moves=[];const surplus=[];const zakFrom=[...zakBuf,...zakOverig,...zakOps].map(x=>({...x}));
+  const deficits=steps.filter(s=>s.scope==="zakelijk"&&s.verschil>0&&s.n!=="Operationele rekening"&&s.n!=="Zakelijke buffer");
+  for(const d of deficits){let rest=d.verschil;for(const f of zakFrom){if(rest<=0)break;const isTarget=d.pots.some(p=>p.a.id===f.a.id);if(isTarget)continue;const spare=f.v;if(spare<=0)continue;const amt=Math.min(spare,rest);f.v-=amt;rest-=amt;moves.push({van:f.a,naar:d.pots[0]?.a,naam:d.n,bedrag:amt})}
+    if(rest>0)moves.push({van:prvVrij[0]?.a||null,naar:d.pots[0]?.a,naam:d.n,bedrag:rest,prive:true})}
+  // signalen
+  const sig=[];const belTekort=steps.slice(0,3).reduce((s,x)=>s+Math.max(0,x.verschil),0);
+  if(belTekort>0)sig.push(["bad",`Belastinggeld te laag: er staat ${eur(belTekort)} minder apart dan nodig voor btw en inkomstenbelasting.`]);
+  const vrijeZakCash=sum(zakAll)-steps.slice(0,3).reduce((s,x)=>s+x.need,0);const runway=lz?vrijeZakCash/lz:null;
+  if(runway!=null)sig.push([runway<3?"bad":runway<6?"warn":"ok",`Vrije zakelijke cash na belastingen: ${eur(vrijeZakCash)}, ${runway.toLocaleString("nl-NL",{maximumFractionDigits:1})} maanden kosten.${runway<3?" Onder de grens van 3 maanden.":""}`]);
+  if(up==null)sig.push(["warn","Privébuffer niet te toetsen: je privé-uitgaven per maand ontbreken. Importeer je privé-afschriften bij Cashflow privé of vul het bedrag in."]);
+  else if(steps[5].have<steps[5].need)sig.push(["warn",`Privébuffer ${eur(steps[5].have)} van ${eur(steps[5].need)}.`]);
+  const T=totals(now);const belegd=T.belegd+T.pensioen;const liqP=sum(prvLiq);
+  if(belegd>0&&steps[5].need!=null&&liqP<steps[5].need)sig.push(["warn","Je belegt terwijl je liquide privégeld onder je buffer ligt."]);
+  const pfN=PF.filter(p=>accs().find(a=>a.id===p.port&&a.type==="belegging")).sort((a,b)=>b.datum.localeCompare(a.datum))[0];
+  if(pfN){const cr=pfN.posities.filter(p=>/crypto/i.test(p.product)).reduce((s,p)=>s+p.waarde,0);if(cr)sig.push(["info",`Crypto is ${eur(cr)}, ${(cr/belegd*100).toFixed(0)}% van je beleggingen. Volatiel; houd het bij een vast maximum dat je zelf kiest.`])}
+  const missing=accs().filter(a=>a.meetellen!==false&&!saldoOp(a,now));
+  // privé: wat blijft over
+  const vrijeTekst=vrijP>0?`Na je buffers en potjes blijft er ${eur(vrijP)} privé over${vrijZ>0?` en ${eur(vrijZ)} zakelijk`:""}. Bepaal eerst je doel ermee (bijvoorbeeld een woning en wanneer). Geld dat je 5 jaar of langer niet nodig hebt, komt in aanmerking om te beleggen; korter nodig hoort op een spaarrekening.`:"Er blijft na je potjes nog niets vrij over.";
+  const row=(s,i)=>{const ok=s.need==null?null:s.have>=s.need-1;return `<tr><td class="l"><b>${i+1}. ${esc(s.n)}</b><div class="sub" style="white-space:normal;max-width:52ch">${esc(s.why)}</div></td><td>${s.need==null?"–":eur(s.need)}</td><td>${eur(s.have)}</td><td style="color:var(${ok==null?"--muted":ok?"--ok":"--bad"})">${s.need==null?"–":ok?"op orde":(s.have-s.need<0?"−":"")+eur(Math.abs(s.have-s.need))}</td><td class="l sub" style="white-space:normal">${s.pots.map(p=>esc(p.a.naam)).join(", ")||"geen potje"}</td></tr>`};
+  const f=Object.entries(ADV_DEF).map(([k,d])=>`<label for="adv_${k}">${d.l}<input id="adv_${k}" type="number" step="${k.endsWith("M")?"1":"100"}" min="0" value="${advManual(k)?CFG.advies[k]:""}" placeholder="${advDef(k).v==null?"onbekend":Math.round(advDef(k).v).toLocaleString("nl-NL")}"><span class="sub" style="font-size:11px">${advManual(k)?"Door jou ingevuld. Maak leeg voor de standaard: ":""}${esc(advDef(k).b)}</span></label>`).join("");
+  return `<div class="head"><div><h1>Advies</h1><div class="big">${moves.length?moves.length+" actie"+(moves.length>1?"s":""):"Op orde"}</div><div class="sub">Op basis van je potjes per ${fmtD(now)} en de aannames onderaan. Eerst wat niet van jou is, dan zekerheid, dan doelen, dan vrij geld.</div></div></div>
+  ${splitCard(ADVC,true)}
+  ${missing.length?`<div class="card" style="border-color:var(--warn-soft)"><div class="row"><span class="pill warn">Onvolledig</span><span class="msg">Nog geen gegevens van ${missing.map(a=>esc(a.instelling+" "+a.naam)).join(", ")}. Het advies over privégeld kan daardoor veranderen.</span></div></div>`:""}
+  <section class="card"><h2>Wat ik nu zou doen</h2>${moves.length?`<div class="grid" style="gap:8px">${moves.map((m,i)=>`<div class="acct"><span class="n">${i+1}. Zet ${eur(m.bedrag)} ${m.prive?`van ${m.van?esc(m.van.instelling+" "+m.van.naam):"je privé spaargeld"}`:`van ${esc(m.van.naam)}`} naar ${m.naar?esc(m.naar.naam):esc(m.naam)}</span><span class="v">${eur(m.bedrag)}</span><span class="m">${esc(m.naam)} komt anders tekort${m.prive?". De zakelijke potjes zijn niet genoeg; bij een eenmanszaak mag dit uit privé.":""}</span></div>`).join("")}
+   ${ibPerMaand>0?`<div class="acct"><span class="n">${moves.length+1}. Zet vanaf nu elke maand ${eur(ibPerMaand)} in ${esc(steps[2].pots[0]?.a.naam||"je IB-potje")}</span><span class="v">${eur(ibPerMaand)}</span><span class="m">${ibHand?"Op basis van je eigen jaarbedrag.":"Volgt de winstprognose; het bedrag wordt elke maand opnieuw berekend."}</span></div>`:""}
+   <div class="acct"><span class="n">${moves.length+2}. Laat je boekhouder de btw-aangifte en een eventuele voorlopige aanslag ${Y} bevestigen</span><span class="v"></span><span class="m">De bedragen hierboven rusten deels op schattingen.</span></div></div>`:'<p class="msg ok">Je potjes dekken alle stappen. Zet elke maand het IB-bedrag apart.</p>'}
+   <p class="lead" style="margin-top:6px">${esc(vrijeTekst)}</p></section>
+  ${progCard(PR,advManual("ibJaar"))}
+  <section class="card"><h2>Signalen</h2><div class="grid" style="gap:8px">${sig.map(([k,t])=>`<div class="row" style="align-items:flex-start"><span class="pill ${k}" style="margin-top:2px">${k==="bad"?"Rood":k==="warn"?"Let op":k==="ok"?"Goed":"Info"}</span><span class="msg" style="flex:1;min-width:200px">${esc(t)}</span></div>`).join("")}</div></section>
+  <section class="card"><h2>Potjes in de vaste volgorde</h2><div class="tbl"><table><thead><tr><th class="l">Stap</th><th>Nodig</th><th>Staat erop</th><th>Verschil</th><th class="l">Potje</th></tr></thead><tbody>${steps.map(row).join("")}<tr class="tot"><td class="l">Vrij na alle stappen</td><td></td><td>${eur(vrijZ+vrijP)}</td><td></td><td class="l sub">zakelijk ${eur(vrijZ)} · privé ${eur(vrijP)}</td></tr></tbody></table></div></section>
+  <section class="card"><h2>Uitgangspunten</h2><p class="lead">Pas aan wat je zeker weet; dan rekent het advies direct opnieuw. Ingevulde waarden gelden als feit, de rest is een aanname.</p><div class="form" style="align-items:start">${f}</div><div class="row"><button type="button" class="pri" data-act="savadv">Opslaan</button><button type="button" class="ghost" data-act="resadv">Terug naar aannames</button></div></section>
+  <p class="notes">Dit is geen fiscaal of beleggingsadvies. Belastingbedragen zijn schattingen; laat ze controleren door je boekhouder. Er wordt nooit geld overgeboekt: de acties zet je zelf in je bank-app.</p>`}
+
+let ADVC=null;
+function splitCard(C,full){if(!C||!C.poolStart)return "";const S=C.steps;const g=i=>S[i].gedekt||0;
+  const bel=g(0)+g(1)+g(2),belNodig=S.slice(0,3).reduce((a,x)=>a+(x.need||0),0),tekort=S.slice(0,3).reduce((a,x)=>a+Math.max(0,x.verschil||0),0);
+  const bufNodig=[3,4,5].reduce((t,i)=>t+(S[i].need==null?S[i].have:S[i].need),0);const buf=g(3)+g(4)+g(5),doel=g(6),vrij=C.vrijZ+C.vrijP,tot=C.poolStart;
+  const parts=[["Belastingdienst",bel,"var(--bad)","btw en inkomstenbelasting die je moet betalen"],["Buffers",buf,"var(--c4)",buf<bufNodig-1?`betaalrekening, zakelijke en privébuffer; nodig is ${eur(bufNodig)}, er ontbreekt ${eur(bufNodig-buf)}`:"betaalrekening, zakelijke en privébuffer"],["Doelen",doel,"var(--c6)","woninginrichting"],["Vrij voor jou",vrij,"var(--ok)","sparen, beleggen of uitgeven"]].filter(p=>p[1]>0.5);
+  const bar=`<div style="display:flex;height:22px;border-radius:6px;overflow:hidden;gap:2px;margin:10px 0 8px" role="img" aria-label="Verdeling van je geld">${parts.map(p=>`<div title="${p[0]}: ${eur(p[1])}" style="flex:${p[1]} 1 0;background:${p[2]};min-width:3px"></div>`).join("")}</div>`;
+  const leg=`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${parts.map(p=>`<div><div class="sub" style="display:flex;gap:6px;align-items:center"><i class="sw" style="background:${p[2]}"></i>${p[0]}</div><div class="mono" style="font-size:18px;font-weight:600">${eur(p[1])}</div><div class="sub">${(p[1]/tot*100).toFixed(0)}% · ${p[3]}</div></div>`).join("")}</div>`;
+  const P=C.PR;const jaar=P?`<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--grid)"><h3 style="margin:0 0 4px;font-size:14px">Je winst ${today().slice(0,4)}</h3>
+    <p class="msg">Van je verwachte winst van <b>${eur(P.wP)}</b> gaat <b style="color:var(--bad)">${eur(P.J.tax)}</b> naar belasting (${(P.J.eff*100).toFixed(0)}%). Er blijft <b style="color:var(--ok)">${eur(P.wP-P.J.tax)}</b> voor jou over, gemiddeld <b>${eur((P.wP-P.J.tax)/12)}</b> per maand.</p>
+    <div style="display:flex;height:14px;border-radius:5px;overflow:hidden;gap:2px;margin-top:8px"><div style="flex:${P.J.tax} 1 0;background:var(--bad)"></div><div style="flex:${Math.max(0,P.wP-P.J.tax)} 1 0;background:var(--ok)"></div></div>
+    <p class="sub" style="margin-top:6px">Tot en met nu: winst ${eur(P.wY)}, waarvan ${eur(P.taxYTD)} belasting en ${eur(P.wY-P.taxYTD)} voor jou. Elke maand komt er ongeveer ${eur(C.ibPerMaand)} belasting bij.</p></div>`:"";
+  return `<section class="card"><h2>Wat is van de Belastingdienst en wat is van jou</h2>
+   <p class="lead">Van de <b>${eur(tot)}</b> op je bank- en spaarrekeningen (zakelijk en privé, zonder beleggingen en pensioen) gaat <b style="color:var(--bad)">${eur(belNodig)}</b> naar de Belastingdienst${tekort>0?`. Daarvan staat ${eur(tekort)} nog niet in je belastingpotjes; de acties hieronder lossen dat op`:""}. Na je buffers en doelen is <b style="color:var(--ok)">${eur(vrij)}</b> echt vrij.</p>
+   ${bar}${leg}${full?belTabel(C):""}${full?jaar:`<p class="sub" style="margin-top:10px"><a href="#advies">Bekijk de berekening en acties bij Advies</a></p>`}</section>`}
+
+function eindeMaand(y,m){return new Date(y,m,0)} // m = 1..12
+function belTabel(C){const S=C.steps,now=new Date(today()+"T12:00:00"),Y=now.getFullYear(),M=now.getMonth()+1;
+  const kw=[1,4,7,10].includes(M)?{q:((M-1)/3)||4,y:M===1?Y-1:Y,due:eindeMaand(Y,M)}:{q:Math.ceil(M/3),y:Y,due:eindeMaand(Y,Math.ceil(M/3)*3+1>12?1:Math.ceil(M/3)*3+1)};
+  if(kw.due.getMonth()===0&&M>10)kw.due=eindeMaand(Y+1,1);
+  const dagen=Math.round((kw.due-now)/864e5);const d=x=>x.toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
+  const P=C.PR,ib=S[2];const ratio=!C.ibHand&&P&&P.J.tax?P.J.ibNet/P.J.tax:null;
+  const rows=[
+   {k:"var(--bad)",w:`Btw ${kw.q}e kwartaal ${kw.y}`,o:"Btw die je klanten via je facturen hebt betaald, min de btw op je kosten. Dit geld is nooit van jou geweest.",s:S[0],wan:`Betalen vóór ${d(kw.due)}${dagen>=0?` (nog ${dagen} dag${dagen===1?"":"en"})`:""}`},
+   {k:"#d9534f",w:`Inkomstenbelasting ${Y-1}`,o:S[1].need===S[1].have&&!advManual("ibVorigNodig")?"Belasting en Zvw over je winst van vorig jaar. Het precieze bedrag staat op de aanslag; vul het in bij de uitgangspunten.":"Belasting en Zvw over je winst van vorig jaar, volgens de aanslag.",s:S[1],wan:"Binnen 2 maanden na de datum op de aanslag"},
+   ...(ratio!=null?[
+    {k:"#e8837e",w:`Inkomstenbelasting ${Y}`,o:`Box 1 over je winst t/m nu, na zelfstandigenaftrek, mkb-winstvrijstelling en heffingskortingen.`,v:ib.need*ratio,wan:`Na de aangifte vóór 1 mei ${Y+1}, of eerder via een voorlopige aanslag`},
+    {k:"#f2b0ac",w:`Zvw-bijdrage ${Y}`,o:"Inkomensafhankelijke bijdrage zorgverzekeringswet, 4,85% over je belastbare winst.",v:ib.need*(1-ratio),wan:"Komt mee met de aanslag inkomstenbelasting"}]:
+    [{k:"#e8837e",w:`Inkomstenbelasting en Zvw ${Y}`,o:"Over je winst t/m nu, volgens je eigen jaarbedrag.",v:ib.need,wan:`Na de aangifte vóór 1 mei ${Y+1}, of eerder via een voorlopige aanslag`}])];
+  // per potje: bij IB dit jaar staat het saldo op het potje voor IB+Zvw samen
+  const ibHave=ib.have,ibNeed=ib.need||0;
+  const cell=r=>{if(r.s){const need=r.s.need||0,have=r.s.have,mis=Math.max(0,need-have);return {need,have:Math.min(have,need),mis,pot:r.s.pots.map(p=>p.a.naam).join(", ")||"geen potje"}}
+    const sh=ibNeed?r.v/ibNeed:0;const have=Math.min(ibHave,ibNeed)*sh;return {need:r.v,have,mis:Math.max(0,r.v-have),pot:(ib.pots.map(p=>p.a.naam).join(", ")||"geen potje")+(rows.length>3?" (samen)":"")}};
+  const R=rows.map(r=>({...r,...cell(r)}));const tot=R.reduce((a,r)=>a+r.need,0);
+  const bar=`<div style="display:flex;height:12px;border-radius:5px;overflow:hidden;gap:2px;margin:6px 0 10px">${R.filter(r=>r.need>0.5).map(r=>`<div title="${esc(r.w)}: ${eur(r.need)}" style="flex:${r.need} 1 0;background:${r.k}"></div>`).join("")}</div>`;
+  return `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--grid);min-width:0"><h3 style="margin:0 0 2px;font-size:14px">Waar de ${eur(tot)} voor de Belastingdienst heen gaat</h3>${bar}
+   <div class="tbl"><table><thead><tr><th class="l">Wat</th><th>Bedrag</th><th>Staat apart</th><th>Ontbreekt</th><th class="l">Wanneer</th></tr></thead><tbody>
+   ${R.map(r=>`<tr><td class="l" style="white-space:normal;min-width:220px"><span style="display:flex;gap:6px;align-items:center"><i class="sw" style="background:${r.k}"></i><b>${esc(r.w)}</b></span><div class="sub" style="max-width:46ch">${esc(r.o)}</div><div class="sub">Potje: ${esc(r.pot)}</div></td><td>${eur(r.need)}</td><td>${eur(r.have)}</td><td style="color:var(${r.mis>0.5?"--bad":"--ok"})">${r.mis>0.5?eur(r.mis):"op orde"}</td><td class="l sub" style="white-space:normal;min-width:150px">${esc(r.wan)}</td></tr>`).join("")}
+   <tr class="tot"><td class="l">Totaal</td><td>${eur(tot)}</td><td>${eur(R.reduce((a,r)=>a+r.have,0))}</td><td style="color:var(--bad)">${eur(R.reduce((a,r)=>a+r.mis,0))}</td><td></td></tr></tbody></table></div>
+   ${ratio!=null&&C.ibPerMaand>0?`<p class="sub" style="margin-top:6px">Daarna groeit het bedrag voor ${Y} met ongeveer ${eur(C.ibPerMaand)} per maand, tot de aangifte.</p>`:""}</div>`}
+
+/* ---------- IB-prognose uit het groeidashboard ---------- */
+const IB26={s1:38883,s2:78426,t1:.3575,t2:.3756,t3:.495,za:1200,mkb:.127,ahk:3115,ahkVan:29736,ahkAf:.06398,ak:5685,akVan:45592,akAf:.0651,zvw:.0485,zvwMax:79409};
+function ibCalc(W){const P=IB26;W=Math.max(0,W);const za=Math.min(P.za,W),w1=W-za,mkb=w1*P.mkb,T=w1-mkb;
+  let ib=Math.min(T,P.s1)*P.t1+Math.max(0,Math.min(T,P.s2)-P.s1)*P.t2+Math.max(0,T-P.s2)*P.t3;
+  const D=za+mkb,boven=Math.max(0,W-P.s2);ib+=Math.min(D,boven)*(P.t3-P.t2);
+  const ahk=T>=P.s2?0:Math.max(0,P.ahk-Math.max(0,T-P.ahkVan)*P.ahkAf),ak=Math.max(0,P.ak-Math.max(0,w1-P.akVan)*P.akAf);
+  const ibNet=Math.max(0,ib-ahk-ak),zvw=Math.min(T,P.zvwMax)*P.zvw;return {W,ibNet,zvw,tax:ibNet+zvw,eff:W?(ibNet+zvw)/W:0}}
+/* PROG = doc v/prognose: {bijgewerkt, bron, maanden:{"JJJJ-MM":{omzet,kosten}}} (bedragen zonder btw, afgesloten maanden) */
+function ibPrognose(){if(!PROG?.maanden)return null;const Y=today().slice(0,4);const ks=Object.keys(PROG.maanden).filter(k=>k.startsWith(Y)).sort();const L=ks.length;if(!L)return null;
+  const om=k=>+PROG.maanden[k].omzet||0,ko=k=>+PROG.maanden[k].kosten||0;const l3=ks.slice(-3);
+  const omY=ks.reduce((s,k)=>s+om(k),0),koY=ks.reduce((s,k)=>s+ko(k),0),wY=omY-koY,rest=12-L;
+  const omA=l3.reduce((s,k)=>s+om(k),0)/l3.length,koA=l3.reduce((s,k)=>s+ko(k),0)/l3.length;const wP=wY+rest*(omA-koA);
+  const J=ibCalc(wP);const taxYTD=wY*J.eff;const perMaand=rest>0?Math.max(0,(J.tax-taxYTD)/rest):0;
+  const oud=(new Date(today())-new Date(PROG.bijgewerkt||"2000-01-01"))/864e5>45;
+  return {L,last:ks.at(-1),omY,koY,wY,wP,rest,omA,koA,J,taxYTD,perMaand,oud,bijgewerkt:PROG.bijgewerkt,bron:PROG.bron}}
+function progCard(p,handmatig){if(!p)return `<section class="card"><h2>Belastingprognose</h2><p class="msg">Nog geen winstcijfers uit het groeidashboard. De maandrun van de 1e zet ze hier neer; tot die tijd rekent het advies met de vaste aanname.</p></section>`;
+  const mn=k=>MNL[+k.slice(5,7)-1];
+  return `<section class="card"><h2>Belastingprognose ${today().slice(0,4)}</h2>
+   ${handmatig?'<p class="msg">Je hebt de verwachte IB zelf ingevuld bij de uitgangspunten; het advies gebruikt jouw bedrag. Maak het veld leeg om met deze prognose te rekenen.</p>':""}
+   ${p.oud?`<p class="msg bad">Deze cijfers zijn van ${fmtD(p.bijgewerkt)} en ouder dan 45 dagen. Controleer of de maandrun is gelukt.</p>`:""}
+   <div class="tiles">
+    <div class="tile"><span class="lab">Winst t/m ${mn(p.last)}</span><span class="val">${eur(p.wY)}</span><span class="sub">omzet ${eur(p.omY)} min kosten ${eur(p.koY)}, zonder btw</span></div>
+    <div class="tile"><span class="lab">Verwachte winst heel jaar</span><span class="val">${eur(p.wP)}</span><span class="sub">${p.rest?`plus ${p.rest} maand${p.rest>1?"en":""} met het gemiddelde van de laatste 3 (${eur(p.omA-p.koA)} per maand)`:"jaar is afgesloten"}</span></div>
+    <div class="tile"><span class="lab">Verwachte IB + Zvw</span><span class="val">${eur(p.J.tax)}</span><span class="sub">IB ${eur(p.J.ibNet)} + Zvw ${eur(p.J.zvw)}, effectief ${(p.J.eff*100).toFixed(1).replace(".",",")}%</span></div>
+    <div class="tile"><span class="lab">Nodig in het potje nu</span><span class="val">${eur(p.taxYTD)}</span><span class="sub">belasting over de winst t/m ${mn(p.last)}</span></div>
+    <div class="tile"><span class="lab">Per maand bijzetten</span><span class="val">${eur(p.perMaand)}</span><span class="sub">${p.rest?"tot en met december":"–"}</span></div>
+   </div>
+   <p class="sub" style="margin-top:8px">Bron: ${esc(p.bron||"groeidashboard")}, bijgewerkt ${fmtD(p.bijgewerkt)}. Tarieven 2026: zelfstandigenaftrek € 1.200 (urencriterium aangenomen), mkb-winstvrijstelling 12,7%, box 1 35,75% / 37,56% / 49,5%, algemene heffingskorting, arbeidskorting en Zvw 4,85%. Niet meegenomen: privé-aftrekposten, investeringsaftrek en een winstverdeling met een compagnon. Een sterke maand verhoogt het bedrag direct, een rustige maand verlaagt het.</p></section>`}
+
+/* ---------- Cashflow privé ---------- */
+const CATS=[["zaak","Uit de zaak","in"],["inkomen","Overig inkomen","in"],["wonen","Wonen en energie","uit"],["vast","Vaste lasten en verzekeringen","uit"],["abon","Abonnementen en sport","uit"],["boodsch","Boodschappen en drogist","uit"],["horeca","Uit eten en bezorging","uit"],["vervoer","Auto en vervoer","uit"],["shop","Shopping","uit"],["vrij","Vrije tijd en reizen","uit"],["belasting","Belastingen","uit"],["contant","Geldopname","uit"],["overig","Overig","uit"],["sparen","Sparen en beleggen","spaar"]];
+const CATL=Object.fromEntries(CATS.map(c=>[c[0],c[1]])),CATT=Object.fromEntries(CATS.map(c=>[c[0],c[2]]));
+const CAT_RE=[["zaak",/shortclips|jksocials/],["sparen",/degiro|flatex|trade republic|bitvavo|coinbase|kraken|meesman|brand new day|\bbux\b|saxo|binck|peaks/],["belasting",/belastingdienst/],
+ ["wonen",/huur|hypotheek|\bvve\b|vattenfall|eneco|essent|greenchoice|budget energie|energiedirect|vandebron|tibber|frank energie|pure energie|vitens|waterbedrijf|wetterskip|waterschap|gemeente|ikea|leen bakker|kwantum|gamma|praxis|karwei|hornbach/],
+ ["abon",/spotify|netflix|disney|viaplay|videoland|\bhbo\b|youtube|apple\.com|icloud|amazon prime|chatgpt|openai|whoop|basic.?fit|sportcity|anytime fitness|trainmore|fitness|gym/],
+ ["vast",/verzekering|zilveren kruis|\bcz\b|menzis|\bvgz\b|ditzo|ohra|interpolis|centraal beheer|\bnn\b|aegon|\basr\b|allianz|anwb|odido|\bkpn\b|vodafone|t-mobile|ziggo|youfone|simyo|simpel|lebara|pakketkosten|kosten.*(rekening|betaalpakket)/],
+ ["boodsch",/albert heijn|\bah\b|jumbo|lidl|aldi|\bplus\b|\bdirk\b|vomar|\bcoop\b|\bspar\b|picnic|hoogvliet|\bdeen\b|poiesz|ekoplaza|kruidvat|etos/],
+ ["horeca",/thuisbezorgd|uber.?eats|deliveroo|\bflink\b|restaurant|\bcafe\b|café|brasserie|mcdonald|burger king|\bkfc\b|starbucks|subway|domino|new york pizza|febo|grill|sushi|lunchroom|bakker/],
+ ["vervoer",/shell|esso|\bbp\b|tango|tinq|texaco|\btotal\b|\bavia\b|\bgulf\b|argos|tamoil|fieten|\bns\b|ns groep|ov-chipkaart|translink|arriva|qbuzz|parkeer|parkeren|q-park|parkmobile|yellowbrick|easypark|\buber\b|\bbolt\b|swapfiets|garage|\bapk\b|banden|wasstraat|carwash|tesla|fastned|allego/],
+ ["vrij",/booking|airbnb|\bklm\b|transavia|ryanair|easyjet|\btui\b|corendon|hotel|path[eé]|kinepolis|ticketmaster|eventim|paylogic|ticketswap|efteling|museum/],
+ ["shop",/bol\.com|amazon|zalando|coolblue|mediamarkt|h&m|\bzara\b|primark|\bhema\b|\baction\b|wehkamp|about you|nike|adidas|apple store|douglas|rituals|decathlon|intersport|bijenkorf|rimowa|\betq\b|hugo boss|temu|aliexpress|shein/],
+ ["contant",/geldautomaat|geldopname|\batm\b|cash withdrawal/]];
+function txNaam(t){if(t.naam)return t.naam.trim().slice(0,40);const o=t.oms||"";const m=o.match(/\/NAME\/([^\/]+)/)||o.match(/Betaalpas\s+(.+?)(,PAS|\s{2,}|$)/i)||o.match(/Naam:\s*(.+?)(\s{2,}|Omschrijving|$)/i);return (m?m[1]:o).trim().slice(0,40)}
+function catOf(t,bedrag){const x=((t.naam||"")+" "+(t.oms||"")).toLowerCase();for(const [c,re] of CAT_RE)if(re.test(x))return c;return bedrag>0?"inkomen":"overig"}
+function catRule(naam){const x=(naam||"").toLowerCase();for(const r of CFG?.catRegels||[])if(r.zoek&&x.includes(r.zoek.toLowerCase()))return r.cat;return null}
+function cfAccs(){return accs().filter(a=>a.scope!=="zakelijk"&&!isInv(a)&&a.meetellen!==false)}
+function cfMonths(){const ids=new Set(cfAccs().map(a=>a.id));const by={};
+  for(const f of FLOWS){if(!ids.has(f.rek))continue;const o=by[f.ym]=by[f.ym]||{ym:f.ym,reks:new Set(),cat:{},tx:[]};o.reks.add(f.rek);
+    for(const [h,v] of Object.entries(f.tx||{})){const [bedrag,intern,cat,naam]=v;if(intern===1)continue;const c=catRule(naam)||cat||(bedrag>0?"inkomen":"overig");o.cat[c]=(o.cat[c]||0)+bedrag;o.tx.push({h,rek:f.rek,bedrag,c,naam:naam||""})}}
+  const betaal=cfAccs().filter(a=>a.type==="betaal").map(a=>a.id);
+  return Object.values(by).sort((a,b)=>a.ym.localeCompare(b.ym)).map(o=>{let inn=0,uit=0,spaar=0;
+    for(const [c,v] of Object.entries(o.cat)){const t=CATT[c]||"uit";if(t==="in")inn+=v;else if(t==="spaar")spaar+=-v;else uit+=-v}
+    // geld van privé naar de zaak telt als negatief inkomen uit de zaak
+    return {...o,inn,uit,spaar,over:inn-uit,compleet:betaal.every(id=>o.reks.has(id)),ontbreekt:betaal.filter(id=>!o.reks.has(id))}})}
+function cfGemiddelde(){const cur=today().slice(0,7);const M=cfMonths().filter(m=>m.ym<cur&&m.compleet).slice(-6);return M.length>=3?{v:Math.round(M.reduce((s,m)=>s+m.uit,0)/M.length),n:M.length,van:M[0].ym,tot:M.at(-1).ym}:null}
+function barChart(id,series,dates,opts={}){const W=760,H=opts.h||240,pl=58,pr=10,pt=14,pb=26;const all=series.flatMap(s=>s.vals.filter(v=>v!=null));if(!all.length)return `<div class="empty">Nog geen maanden om te tonen.</div>`;
+  const {lo,hi,t}=axis(Math.min(0,...all),Math.max(...all));const n=dates.length,bw=(W-pl-pr)/n,g=Math.min(16,bw*.3),k=series.length,w=Math.max(3,(bw-g)/k-2);
+  const x=i=>pl+bw*i+bw/2,y=v=>pt+(H-pt-pb)*(1-(v-lo)/((hi-lo)||1));
+  let s=t.map(v=>`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${pl-6}" y="${y(v)+4}" text-anchor="end">${eurk(v)}</text>`).join("");
+  dates.forEach((d,i)=>{s+=`<text x="${x(i)}" y="${H-7}" text-anchor="middle">${new Date(d+"T12:00:00").toLocaleDateString("nl-NL",{month:"short"})}</text>`;
+    series.forEach((se,j)=>{const v=se.vals[i];if(v==null)return;const x0=x(i)-(k*(w+2))/2+j*(w+2),y0=y(Math.max(0,v)),y1=y(Math.min(0,v));s+=`<rect x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(1,y1-y0).toFixed(1)}" rx="2" fill="${se.color}" ${se.dim?.[i]?'opacity=".45"':""}/>`})});
+  dates.forEach((d,i)=>{s+=`<rect class="hit" data-c="${id}" data-i="${i}" x="${pl+bw*i}" y="${pt}" width="${bw}" height="${H-pt-pb}" fill="transparent"/>`});
+  CH[id]={series,dates,W,x,y};
+  return `<div class="row" style="gap:14px;margin-bottom:4px">${series.map(se=>`<span class="sub" style="display:flex;gap:6px;align-items:center"><i class="sw" style="background:${se.color}"></i>${esc(se.label)}</span>`).join("")}</div><div class="chart" id="${id}"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label||"Grafiek")}">${s}</svg></div>`}
+function pCashflow(){const A=cfAccs(),M=cfMonths(),cur=today().slice(0,7);const betaal=A.filter(a=>a.type==="betaal");
+  const exportHulp=`<div class="grid" style="gap:6px;margin-top:6px">
+    <div class="acct"><span class="n">ABN AMRO</span><span class="m">Mijn ABN AMRO (website) &gt; Betalen &gt; Af- en bijschrijvingen downloaden, formaat CAMT.053 of TXT, laatste 12 maanden.</span></div>
+    <div class="acct"><span class="n">Knab Privé</span><span class="m">Knab-website &gt; Rekening &gt; Transacties exporteren als CSV, laatste 12 maanden.</span></div>
+    <div class="acct"><span class="n">Revolut</span><span class="m">App &gt; account &gt; Afschrift &gt; Excel/CSV, periode laatste 12 maanden.</span></div></div>
+    <p class="sub">Importeer ze daarna met de knop Bestand importeren. Het bestand wordt in je browser gelezen; per transactie worden alleen maand, bedrag, categorie en de naam van de tegenpartij bewaard.</p>`;
+  const head=`<div class="head"><div><h1>Cashflow privé</h1><div class="sub">Wat er per maand binnenkomt, wat eruit gaat en hoeveel je overhoudt. Overboekingen tussen je eigen privérekeningen tellen niet mee; geld uit de zaak telt als inkomen.</div></div><div class="row"><button type="button" class="pri" data-act="import">Bestand importeren</button></div></div>`;
+  if(!M.length)return head+`<section class="card"><h2>Nog geen transacties</h2><p class="lead">Deze pagina vult zich met exports van je privérekeningen. Nodig: ${betaal.map(a=>esc(a.instelling+" "+a.naam)).join(", ")||"je privé betaalrekeningen"}.</p>${exportHulp}</section>`;
+  const last12=M.slice(-12);const closed=M.filter(m=>m.ym<cur);const sel=M.find(m=>m.ym===UI.cfm)||closed.at(-1)||M.at(-1);
+  const gem=cfGemiddelde();const ref=closed.filter(m=>m.ym!==sel.ym).slice(-6);
+  const avgCat=c=>ref.length?ref.reduce((s,m)=>s+(-(m.cat[c]||0)),0)/ref.length:null;
+  const mnaam=ym=>MNL[+ym.slice(5,7)-1]+" "+ym.slice(0,4);
+  const kpi=(l,v,sub,col)=>`<div class="tile"><span class="lab">${l}</span><span class="val" ${col?`style="color:var(${col})"`:""}>${v}</span><span class="sub">${sub}</span></div>`;
+  const quote=sel.inn>0?sel.over/sel.inn:null;
+  const uitCats=CATS.filter(c=>c[2]==="uit").map(c=>({c:c[0],l:c[1],v:-(sel.cat[c[0]]||0),a:avgCat(c[0])})).filter(r=>Math.abs(r.v)>0.5||(r.a&&r.a>0.5)).sort((a,b)=>b.v-a.v);
+  const stijgers=uitCats.filter(r=>r.a!=null&&r.v>r.a*1.3&&r.v-r.a>100);
+  const maxV=Math.max(1,...uitCats.map(r=>r.v));
+  const overig=sel.tx.filter(t=>t.c==="overig"||t.c==="inkomen").reduce((o,t)=>{const k=t.naam||"(geen naam)";o[k]=(o[k]||0)+t.bedrag;return o},{});
+  const overigRows=Object.entries(overig).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).slice(0,12);
+  const catOpts=sel2=>CATS.map(c=>`<option value="${c[0]}" ${c[0]===sel2?"selected":""}>${esc(c[1])}</option>`).join("");
+  return head+`
+  ${!sel.compleet?`<div class="card" style="border-color:var(--warn-soft)"><div class="row"><span class="pill warn">Onvolledig</span><span class="msg">${mnaam(sel.ym)} mist nog ${sel.ontbreekt.map(id=>esc(acc(id)?.instelling+" "+acc(id)?.naam)).join(", ")}. De cijfers hieronder zijn daardoor te laag.</span></div></div>`:""}
+  <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">${last12.map(m=>`<button type="button" class="${m.ym===sel.ym?"pri":"ghost"}" data-cfm="${m.ym}">${new Date(m.ym+"-15").toLocaleDateString("nl-NL",{month:"short",year:"2-digit"})}${m.ym===cur?" (lopend)":m.compleet?"":" *"}</button>`).join("")}</div>
+  <div class="tiles">
+   ${kpi("Binnengekomen",eur(sel.inn),`${mnaam(sel.ym)}, waarvan uit de zaak ${eur(sel.cat.zaak||0)}`)}
+   ${kpi("Uitgegeven",eur(sel.uit),ref.length?`gemiddeld ${eur(ref.reduce((s,m)=>s+m.uit,0)/ref.length)} in de ${ref.length} maanden ervoor`:"nog geen eerdere maanden")}
+   ${kpi("Overgehouden",eur(sel.over),sel.spaar?`waarvan ${eur(sel.spaar)} naar sparen en beleggen`:"vóór sparen en beleggen",sel.over>=0?"--ok":"--bad")}
+   ${kpi("Spaarquote",quote==null?"–":(quote*100).toFixed(0)+"%",quote==null?"geen inkomen deze maand":"deel van je inkomen dat je overhoudt",quote!=null&&quote<0.1?"--warn":null)}
+   ${kpi("Gemiddelde uitgaven",gem?eur(gem.v):"–",gem?`over ${gem.n} volledige maanden; gebruikt voor je privébuffer`:"vraagt 3 volledige maanden")}
+  </div>
+  <section class="card"><h2>Per maand</h2>${barChart("cCf",[{label:"Binnen",color:"var(--c3)",vals:last12.map(m=>Math.round(m.inn)),dim:last12.map(m=>!m.compleet||m.ym===cur)},{label:"Uitgegeven",color:"var(--c2)",vals:last12.map(m=>Math.round(m.uit)),dim:last12.map(m=>!m.compleet||m.ym===cur)},{label:"Over",color:"var(--accent)",vals:last12.map(m=>Math.round(m.over)),dim:last12.map(m=>!m.compleet||m.ym===cur)}],last12.map(m=>m.ym+"-15"),{label:"Inkomsten, uitgaven en overgehouden per maand"})}<p class="sub">Lichtere staven zijn de lopende maand of maanden waarin nog een rekening ontbreekt (*).</p></section>
+  ${stijgers.length?`<section class="card"><h2>Signalen</h2><div class="grid" style="gap:8px">${stijgers.map(r=>`<div class="row"><span class="pill warn">Let op</span><span class="msg">${esc(r.l)}: ${eur(r.v)} in ${mnaam(sel.ym)}, ${eur(r.v-r.a)} boven je gemiddelde van ${eur(r.a)}.</span></div>`).join("")}</div></section>`:""}
+  <section class="card"><h2>Uitgaven per categorie, ${mnaam(sel.ym)}</h2><div class="tbl"><table><thead><tr><th class="l">Categorie</th><th>Deze maand</th><th>Gemiddeld</th><th class="l" style="min-width:140px"></th></tr></thead><tbody>
+   ${uitCats.map(r=>`<tr><td class="l">${esc(r.l)}</td><td>${eur(r.v)}</td><td class="sub">${r.a==null?"–":eur(r.a)}</td><td class="l"><div class="bar"><i style="width:${Math.max(0,Math.min(100,r.v/maxV*100))}%;background:var(${r.a!=null&&r.v>r.a*1.3&&r.v-r.a>100?"--warn":"--accent"})"></i></div></td></tr>`).join("")}
+   <tr class="tot"><td class="l">Totaal uitgaven</td><td>${eur(sel.uit)}</td><td class="sub">${ref.length?eur(ref.reduce((s,m)=>s+m.uit,0)/ref.length):"–"}</td><td></td></tr></tbody></table></div></section>
+  ${overigRows.length?`<section class="card"><h2>Nog in te delen</h2><p class="lead">Deze tegenpartijen vallen onder Overig of Overig inkomen. Kies een categorie; dat geldt dan voor alle maanden, ook voor toekomstige imports.</p><div class="tbl"><table><thead><tr><th class="l">Tegenpartij</th><th>Bedrag</th><th class="l">Categorie</th><th></th></tr></thead><tbody>
+   ${overigRows.map(([n,v],i)=>`<tr><td class="l">${esc(n)}</td><td>${eur(v,2)}</td><td class="l"><select id="cr${i}" aria-label="Categorie voor ${esc(n)}">${catOpts(v>0?"inkomen":"overig")}</select></td><td><button type="button" class="ghost" data-act="catrule" data-naam="${esc(n)}" data-i="${i}">Vastleggen</button></td></tr>`).join("")}</tbody></table></div></section>`:""}
+  ${(CFG?.catRegels||[]).length?`<section class="card"><h2>Jouw indelingsregels</h2><div class="grid" style="gap:6px">${CFG.catRegels.map((r,i)=>`<div class="row" style="justify-content:space-between"><span class="msg">Naam bevat “${esc(r.zoek)}” → ${esc(CATL[r.cat]||r.cat)}</span><button type="button" class="ghost" data-act="delrule" data-i="${i}">Verwijderen</button></div>`).join("")}</div></section>`:""}
+  <section class="card"><h2>Welke rekeningen zijn er per maand</h2><div class="tbl"><table><thead><tr><th class="l">Rekening</th>${last12.map(m=>`<th>${new Date(m.ym+"-15").toLocaleDateString("nl-NL",{month:"short"})}</th>`).join("")}</tr></thead><tbody>
+   ${A.map(a=>`<tr><td class="l">${esc(a.instelling+" · "+a.naam)}</td>${last12.map(m=>`<td style="color:var(${m.reks.has(a.id)?"--ok":"--muted"})">${m.reks.has(a.id)?"✓":"–"}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+   ${betaal.some(a=>!M.some(m=>m.reks.has(a.id)))?`<p class="lead" style="margin-top:8px">Nog helemaal geen transacties van ${betaal.filter(a=>!M.some(m=>m.reks.has(a.id))).map(a=>esc(a.instelling+" "+a.naam)).join(", ")}.</p>${exportHulp}`:""}</section>`}
+
+/* ---------- dialogen ---------- */
+function openDlg(html,onSubmit){const f=$("dlgform");f.innerHTML=html+`<div class="row" style="justify-content:flex-end;margin-top:14px"><button type="button" class="ghost" id="dlgx">Annuleren</button><button class="pri" value="ok" id="dlgok">Opslaan</button></div>`;
+  const d=$("dlg");d.showModal();$("dlgx").onclick=()=>d.close();f.onsubmit=async e=>{e.preventDefault();const ok=await onSubmit(new FormData(f),f);if(ok!==false)d.close()}}
+function acctForm(a={}){const parents=accs().filter(x=>!isInv(x)&&x.id!==a.id&&x.type!=="potje");
+  return `<h2 style="margin:0 0 10px;font:600 16px var(--font-display)">${a.id?"Rekening bewerken":"Rekening toevoegen"}</h2><div class="form">
+   <label>Naam<input name="naam" required value="${esc(a.naam||"")}"></label>
+   <label>Bank<input name="instelling" list="instlist" required value="${esc(a.instelling||"")}"><datalist id="instlist">${INST.map(i=>`<option value="${i}">`).join("")}</datalist></label>
+   <label>Soort<select name="type">${Object.entries(TYPES).map(([k,l])=>`<option value="${k}" ${a.type===k?"selected":""}>${l}</option>`).join("")}</select></label>
+   <label>Privé of zakelijk<select name="scope"><option value="prive">Privé</option><option value="zakelijk" ${a.scope==="zakelijk"?"selected":""}>Zakelijk</option></select></label>
+   <label>IBAN (optioneel)<input name="iban" value="${esc(a.iban||"")}" autocomplete="off"></label>
+   <label>Hoort bij rekening<select name="ouder"><option value="">geen</option>${parents.map(p=>`<option value="${p.id}" ${a.ouder===p.id?"selected":""}>${esc(p.instelling+" · "+p.naam)}</option>`).join("")}</select></label>
+   <label>Categorie<input name="categorie" value="${esc(a.categorie||"")}" placeholder="bijv. buffer, belasting"></label>
+   <label>Doelbedrag<input name="doel" type="number" step="1" min="0" value="${a.doel||""}"></label>
+   <label class="chk"><input type="checkbox" name="meetellen" ${a.meetellen===false?"":"checked"}> Telt mee in het vermogen</label>
+   <label class="chk"><input type="checkbox" name="gereserveerd" ${a.gereserveerd?"checked":""}> Gereserveerd (btw, belasting)</label></div>
+   ${a.id?`<div class="row" style="margin-top:12px"><button type="button" class="danger" id="delacc">Rekening en al haar gegevens verwijderen</button><span class="msg bad" id="delconf"></span></div>`:""}`}
+function readAcct(fd,base={}){return {...base,id:base.id||uid(),naam:fd.get("naam").trim(),instelling:fd.get("instelling").trim(),type:fd.get("type"),scope:fd.get("scope"),iban:P.iban(fd.get("iban"))||null,ouder:fd.get("ouder")||null,categorie:fd.get("categorie").trim()||null,doel:+fd.get("doel")||null,meetellen:!!fd.get("meetellen"),gereserveerd:!!fd.get("gereserveerd"),bron:base.bron||"handmatig"}}
+async function delAccount(id){const r=accs().filter(a=>a.id!==id).map(a=>a.ouder===id?{...a,ouder:null}:a);
+  for(const s of SALDI.filter(s=>s.rek===id))await col("saldi").doc(s._id).delete();for(const f of FLOWS.filter(f=>f.rek===id))await col("flows").doc(f._id).delete();
+  for(const p of PF.filter(p=>p.port===id))await col("pf").doc(p._id).delete();for(const i of INLEG.filter(i=>i.port===id))await col("inleg").doc(i._id).delete();
+  await saveCfg({rekeningen:r});toast("Rekening verwijderd")}
+
+function bind(){bindCharts();
+  document.querySelectorAll("[data-verd]").forEach(b=>b.onclick=()=>{UI.verd=b.dataset.verd;UI.drill=null;render()});
+  document.querySelectorAll("[data-drill]").forEach(b=>b.onclick=()=>{UI.drill=UI.drill===b.dataset.drill?null:b.dataset.drill;render()});
+  document.querySelectorAll(".seg-verd").forEach(p=>p.addEventListener("click",()=>{UI.drill=p.dataset.k;render()}));
+  document.querySelectorAll("[data-per]").forEach(b=>b.onclick=()=>{UI.per=b.dataset.per;render()});
+  document.querySelectorAll("[data-port]").forEach(b=>b.onclick=()=>{UI.port=b.dataset.port;render()});
+  document.querySelectorAll("[data-reeks]").forEach(c=>c.onchange=()=>{UI.dev.reeks[c.dataset.reeks]=c.checked;render()});
+  $("pv")?.addEventListener("change",e=>{UI.van=e.target.value;render()});$("pt")?.addEventListener("change",e=>{UI.tot=e.target.value;render()});
+  document.querySelectorAll("[data-cfm]").forEach(b=>b.onclick=()=>{UI.cfm=b.dataset.cfm;render()});
+  document.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>act(b.dataset.act,b.dataset))}
+
+async function act(k,ds){
+  if(k==="new"||k==="newpot"||k==="newport"){const base=k==="newpot"?{type:"potje"}:k==="newport"?{type:ds.type,instelling:"DEGIRO",scope:"prive"}:{};
+    openDlg(acctForm(base),async fd=>{const a=readAcct(fd);await saveCfg({rekeningen:[...accs(),a]});toast("Rekening toegevoegd")});return}
+  if(k==="edit"){const a=acc(ds.id);openDlg(acctForm(a),async fd=>{const n=readAcct(fd,a);await saveCfg({rekeningen:accs().map(x=>x.id===a.id?n:x)});toast("Opgeslagen")});
+    let armed=false;$("delacc").onclick=async()=>{if(!armed){armed=true;$("delconf").textContent="Klik nogmaals om definitief te verwijderen.";return}$("dlg").close();await delAccount(a.id)};return}
+  if(k==="saldo"){const a=acc(ds.id);const s=saldoOp(a,today());
+    openDlg(`<h2 style="margin:0 0 6px;font:600 16px var(--font-display)">Saldo invullen</h2><p class="lead">${esc(a.instelling+" · "+a.naam)}. Neem het bedrag over uit je bank-app; het wordt opgeslagen met datum en de bron "handmatig".</p><div class="form" style="margin-top:10px">
+     <label>Datum<input name="datum" type="date" required value="${today()}"></label><label>Bedrag<input name="bedrag" type="number" step="0.01" required value=""></label>
+     <label>Valuta<input name="valuta" value="${esc(s?.valuta||"EUR")}" maxlength="3"></label><label>Koers naar EUR (bij andere valuta)<input name="koers" type="number" step="0.000001" value=""></label></div>`,
+     async fd=>{const val=(fd.get("valuta")||"EUR").toUpperCase();const bedrag=+fd.get("bedrag");let koers=1;if(val!=="EUR"){koers=+fd.get("koers");if(!koers){toast("Vul de koers naar EUR in met de datum van vandaag.",true);return false}}
+       const d=fd.get("datum");await col("saldi").doc(`${a.id}_${d}`).set({rek:a.id,datum:d,bedrag,valuta:val,koers,koersdatum:d,eur:Math.round(bedrag*koers*100)/100,bron:"handmatig"});toast("Saldo opgeslagen")});return}
+  if(k==="newgoal"||k==="editgoal"){const g=(CFG.doelen||[]).find(x=>x.id===ds.id)||{maat:"prive"};const rek=accs();
+    openDlg(`<h2 style="margin:0 0 10px;font:600 16px var(--font-display)">${g.id?"Doel bewerken":"Doel toevoegen"}</h2><div class="form"><label>Naam<input name="naam" required value="${esc(g.naam||"")}"></label><label>Doelbedrag<input name="bedrag" type="number" min="1" step="1" required value="${g.bedrag||""}"></label>
+     <label>Maatstaf<select name="maat">${Object.entries(MAAT).map(([kk,l])=>`<option value="${kk}" ${g.maat===kk?"selected":""}>${l}</option>`).join("")}</select></label>
+     <label>Rekening (bij maatstaf rekening)<select name="rek"><option value="">-</option>${rek.map(r=>`<option value="${r.id}" ${g.rek===r.id?"selected":""}>${esc(r.instelling+" · "+r.naam)}</option>`).join("")}</select></label><label>Streefdatum (optioneel)<input name="datum" type="date" value="${g.datum||""}"></label></div>`,
+     async fd=>{const n={id:g.id||uid(),naam:fd.get("naam").trim(),bedrag:+fd.get("bedrag"),maat:fd.get("maat"),rek:fd.get("rek")||null,datum:fd.get("datum")||null};const L=CFG.doelen||[];await saveCfg({doelen:g.id?L.map(x=>x.id===g.id?n:x):[...L,n]});toast("Doel opgeslagen")});return}
+  if(k==="delgoal"){const b=document.querySelector(`[data-act="delgoal"][data-id="${ds.id}"]`);if(b.dataset.armed){await saveCfg({doelen:(CFG.doelen||[]).filter(g=>g.id!==ds.id)});toast("Doel verwijderd")}else{b.dataset.armed="1";b.textContent="Zeker weten?"}return}
+  if(k==="addschuld"){const n=$("sn").value.trim(),v=+$("sb").value;if(!n||!v){toast("Vul een omschrijving en bedrag in.",true);return}await saveCfg({schulden:[...(CFG.schulden||[]),{id:uid(),naam:n,bedrag:v,datum:today()}]});return}
+  if(k==="delschuld"){await saveCfg({schulden:(CFG.schulden||[]).filter(s=>s.id!==ds.id)});return}
+  if(k==="deltest"){const b=document.querySelector('[data-act="deltest"]');if(!b.dataset.armed){b.dataset.armed="1";b.textContent="Klik nogmaals: alle testgegevens verwijderen";return}
+    for(const [c,arr] of [["saldi",SALDI],["pf",PF],["inleg",INLEG],["flows",FLOWS]])for(const x of arr.filter(x=>x.test))await col(c).doc(x._id).delete();
+    const keep=accs().filter(a=>!a.test);await saveCfg({rekeningen:keep});toast("Testgegevens verwijderd");return}
+  if(k==="savadv"){const o={};Object.keys(ADV_DEF).forEach(key=>{const el=$("adv_"+key);if(!el)return;const v=el.value.trim().replace(",",".");if(v!==""&&!isNaN(+v))o[key]=+v});await saveCfg({advies:o});toast("Uitgangspunten opgeslagen");return}
+  if(k==="resadv"){await saveCfg({advies:{}});toast("Standaardwaarden hersteld");return}
+  if(k==="catrule"){const cat=$("cr"+ds.i)?.value;if(!cat||!ds.naam)return;const L=(CFG.catRegels||[]).filter(r=>r.zoek.toLowerCase()!==ds.naam.toLowerCase());await saveCfg({catRegels:[...L,{zoek:ds.naam,cat}]});toast("Indeling vastgelegd");return}
+  if(k==="delrule"){await saveCfg({catRegels:(CFG.catRegels||[]).filter((r,i)=>i!==+ds.i)});return}
+  if(k==="import")return importDlg()}
+
+/* ---------- import ---------- */
+function importDlg(){const f=$("dlgform");
+  f.innerHTML=`<h2 style="margin:0 0 6px;font:600 16px var(--font-display)">Bestand importeren</h2><p class="lead">CAMT.053 (.xml), MT940 (.sta, .940, .txt), ABN AMRO TXT, Revolut CSV, Knab CSV, of DEGIRO Portfolio.csv en Account.csv. Het bestand wordt in je browser gelezen; opgeslagen worden saldi, posities en per transactie alleen maand, bedrag, categorie en de naam van de tegenpartij.</p>
+   <input type="file" id="ifile" accept=".xml,.sta,.940,.txt,.csv,.mt940" style="margin-top:10px"><div id="iprev" style="margin-top:12px"></div>
+   <div class="row" style="justify-content:flex-end;margin-top:14px"><button type="button" class="ghost" id="dlgx">Sluiten</button><button type="button" class="pri" id="igo" disabled>Importeren</button></div>`;
+  const d=$("dlg");d.showModal();$("dlgx").onclick=()=>d.close();f.onsubmit=e=>e.preventDefault();
+  let parsed=null,fname="";
+  $("ifile").onchange=async e=>{const file=e.target.files[0];if(!file)return;fname=file.name;const text=await file.text();
+    try{parsed=P.detect(file.name,text)}catch(err){$("iprev").innerHTML=`<p class="msg bad">${esc(err.message)}</p>`;$("igo").disabled=true;return}
+    $("iprev").innerHTML=previewHtml(parsed,file);$("igo").disabled=false};
+  $("igo").onclick=async()=>{$("igo").disabled=true;try{const n=await doImport(parsed,fname);d.close();toast(n)}catch(err){$("igo").disabled=false;$("iprev").insertAdjacentHTML("beforeend",`<p class="msg bad">${esc(err.message)}</p>`)}}}
+function accOptions(sel,filter){return accs().filter(filter).map(a=>`<option value="${a.id}" ${a.id===sel?"selected":""}>${esc(a.instelling+" · "+a.naam)}</option>`).join("")}
+function previewHtml(r,file){const isTest=/test/i.test(file.name)||(r.rekeningen||[]).some(x=>x.tx.some(t=>/\bTEST\b/.test(t.naam+t.oms)))||(r.posities||[]).some(p=>/\bTEST\b/.test(p.product));
+  const t=isTest?`<p class="pill warn">Herkend als testbestand: wordt gemarkeerd als testgegevens</p>`:"";
+  if(r.soort==="bank")return `<p class="sub">Herkend: <b>${r.formaat}</b>, ${r.rekeningen.length} rekening${r.rekeningen.length>1?"en":""}.</p>${t}`+r.rekeningen.map((x,i)=>{const match=accs().find(a=>a.iban&&a.iban===x.iban);
+    return `<div class="card" style="padding:12px;margin-top:8px"><b>${esc(x.label||mask(x.iban)||"Rekening")}</b><span class="sub">${x.tx.length} transacties${x.tx.length?`, ${fmtD(x.tx.map(t=>t.datum).sort()[0])} tot ${fmtD(x.tx.map(t=>t.datum).sort().at(-1))}`:""} · eindsaldo ${x.saldo?eur(x.saldo.bedrag,2)+" "+x.saldo.valuta+" op "+fmtD(x.saldo.datum):"niet in het bestand"}</span>
+     <div class="form" style="margin-top:6px"><label>Koppelen aan<select id="imap${i}"><option value="__new">Nieuwe rekening</option>${accOptions(match?.id,a=>!isInv(a))}</select></label>
+     ${!x.saldo?`<label>Saldo op ${fmtD(x.tx.map(t=>t.datum).sort().at(-1))}<input id="isal${i}" type="number" step="0.01" placeholder="uit je bank-app"></label>`:""}
+     ${(x.saldo?.valuta||x.valuta)!=="EUR"?`<label>Koers ${x.saldo?.valuta||x.valuta} naar EUR<input id="ikrs${i}" type="number" step="0.000001" required></label>`:""}
+     <label>Bank (bij nieuwe rekening)<input id="iinst${i}" value="${esc(/revolut/i.test(r.formaat)?"Revolut":/abn/i.test(r.formaat)||/ABNA/.test(x.iban||"")?"ABN AMRO":/KNAB/.test(x.iban||"")?"Knab Privé":"")}"></label></div></div>`}).join("")+(isTest?'<input type="hidden" id="itest" value="1">':"");
+  if(r.soort==="portefeuille")return `<p class="sub">Herkend: <b>${r.formaat}</b>, ${r.posities.length} posities, totaal ${eur(r.waarde,2)} incl. kas ${eur(r.cash,2)}.</p>${t}<div class="form"><label>Portefeuille<select id="iport">${accOptions(null,isInv)}</select></label><label>Datum van de export<input id="idatum" type="date" value="${new Date(file.lastModified).toISOString().slice(0,10)}"></label></div>${isTest?'<input type="hidden" id="itest" value="1">':""}`;
+  if(r.soort==="inleg"){const st=Object.values(r.maanden).reduce((s,m)=>s+m.storting,0),op=Object.values(r.maanden).reduce((s,m)=>s+m.opname,0);return `<p class="sub">Herkend: <b>${r.formaat}</b>, ${fmtD(r.eerste)} tot ${fmtD(r.laatste)}: stortingen ${eur(st,2)}, opnames ${eur(op,2)}, netto inleg ${eur(st-op,2)}.</p>${t}<p class="sub">Exporteer vanaf de dag vóór je eerste storting, anders mist er inleg.</p><div class="form"><label>Portefeuille<select id="iport">${accOptions(null,isInv)}</select></label></div>${isTest?'<input type="hidden" id="itest" value="1">':""}`}}
+async function doImport(r,fname){const test=!!$("itest");const extra=test?{test:true}:{};
+  if(r.soort==="portefeuille"){const port=$("iport").value;if(!port)throw new Error("Maak eerst een portefeuille aan bij Beleggingen of Pensioen.");const d=$("idatum").value;
+    await col("pf").doc(`${port}_${d}`).set({port,datum:d,posities:r.posities,cash:r.cash,waarde:r.waarde,bron:"DEGIRO export "+fname,...extra});return `Portefeuille van ${fmtD(d)} ingelezen`}
+  if(r.soort==="inleg"){const port=$("iport").value;if(!port)throw new Error("Maak eerst een portefeuille aan.");if(INLEG.some(i=>i._id===`${port}_0000-00`))await col("inleg").doc(`${port}_0000-00`).delete();for(const [ym,m] of Object.entries(r.maanden))await col("inleg").doc(`${port}_${ym}`).set({port,ym,...m,bron:fname,...extra});return `Inleg van ${Object.keys(r.maanden).length} maanden ingelezen`}
+  // bank
+  let rek=[...accs()];const own=()=>new Set(rek.map(a=>a.iban).filter(Boolean));let nS=0;
+  for(let i=0;i<r.rekeningen.length;i++){const x=r.rekeningen[i];let id=$("imap"+i).value;
+    if(id==="__new"){const inst=$("iinst"+i).value.trim()||"Onbekend";const a={id:uid(),naam:x.product?`${x.product} ${x.valuta}`:(x.iban?"Rekening "+x.iban.slice(-4):"Rekening"),instelling:inst,type:/savings|spaar/i.test(x.product||x.label||"")?"spaar":"betaal",scope:/zakelijk/i.test(inst)?"zakelijk":"prive",iban:x.iban,valuta:x.valuta,meetellen:true,bron:"import",...extra};rek.push(a);id=a.id}
+    else if(x.iban&&!acc(id)?.iban){rek=rek.map(a=>a.id===id?{...a,iban:x.iban}:a)}
+    let saldo=x.saldo;if(!saldo){const v=+($("isal"+i)?.value);if(!v&&v!==0)throw new Error("Vul het saldo in voor elke rekening zonder eindsaldo in het bestand.");saldo={datum:x.tx.map(t=>t.datum).sort().at(-1),bedrag:v,valuta:x.valuta}}
+    const val=saldo.valuta||x.valuta||"EUR";let koers=1;if(val!=="EUR"){koers=+($("ikrs"+i)?.value);if(!koers)throw new Error("Vul de wisselkoers naar EUR in.")}
+    for(const p of P.monthEnds(saldo,x.tx)){await col("saldi").doc(`${id}_${p.datum}`).set({rek:id,datum:p.datum,bedrag:p.bedrag,valuta:val,koers,koersdatum:saldo.datum,eur:Math.round(p.bedrag*koers*100)/100,bron:p.datum===saldo.datum?r.formaat+" "+fname:"teruggerekend uit "+r.formaat,...extra});nS++}
+    // maandstromen: intern = tegenrekening is een eigen rekening
+    const me=rek.find(a=>a.id===id);const scopeOf=ib=>rek.find(a=>a.iban===ib)?.scope||null;const ibans=own();if(x.iban)ibans.add(x.iban);const by={};
+    for(const t of x.tx){const ym=t.datum.slice(0,7);const o=by[ym]=by[ym]||{};const eigen=t.tegen&&ibans.has(t.tegen);const zelfdeScope=eigen&&(scopeOf(t.tegen)||me?.scope)===(me?.scope||"prive");
+      // eigen rekening met dezelfde scope = intern; tussen zakelijk en privé = geld uit of naar de zaak
+      const cat=eigen&&!zelfdeScope?"zaak":catOf(t,t.bedrag);o[P.hash(t.datum+"|"+t.bedrag+"|"+t.oms+"|"+(t.tegen||""))]=[t.bedrag,(t.intern||zelfdeScope)?1:0,cat,txNaam(t)]}
+    for(const [ym,txs] of Object.entries(by)){const ref=col("flows").doc(`${id}_${ym}`);const ex=FLOWS.find(f=>f._id===`${id}_${ym}`);const all={...(ex?.tx||{}),...txs};let inn=0,uit=0,intern=0;
+      for(const [v,isI] of Object.values(all)){if(isI===1)intern+=Math.abs(v);else if(v>0)inn+=v;else uit+=-v}
+      await ref.set({rek:id,ym,tx:all,in:Math.round(inn*100)/100,uit:Math.round(uit*100)/100,intern:Math.round(intern*100)/100,...extra})}}
+  await saveCfg({rekeningen:rek});return `${nS} saldo-meetmomenten ingelezen`}
+
+/* ---------- start ---------- */
+(async()=>{
+  db=await window.claude?.use?.("db");
+  if(!db){$("main").innerHTML='<div class="empty">Dit dashboard werkt alleen als je het opent terwijl je bent ingelogd op claude.ai, als eigenaar.</div>';return}
+  const done=k=>()=>{ready[k]=true;render()};
+  db.doc(ROOT).onSnapshot(s=>{CFG=s.exists?s.data():null;ready.cfg=true;render()},e=>{$("main").innerHTML=`<div class="empty">Laden lukte niet (${esc(e.code)}). Alleen de eigenaar kan deze gegevens zien.</div>`});
+  const sub=(name,set)=>col(name).onSnapshot(q=>{set(q.docs.map(d=>({...d.data(),_id:d.id})));ready[name]=true;render()},()=>{});
+  db.doc("v/prognose").onSnapshot(s=>{PROG=s.exists?s.data():null;render()},()=>{});
+  sub("saldi",v=>SALDI=v);sub("pf",v=>PF=v);sub("inleg",v=>INLEG=v);sub("flows",v=>FLOWS=v);
+  go();
+})();
+</script>
+
+</body></html></body></html>

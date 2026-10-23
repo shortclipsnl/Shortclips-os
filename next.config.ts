@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
   // Deze pakketten mogen niet gebundeld worden: pg opent native sockets en
   // PGlite laadt een WASM-bestand vanaf schijf.
   serverExternalPackages: ["pg", "@electric-sql/pglite", "mammoth", "ffmpeg-static", "ffprobe-static", "puppeteer-core", "@sparticuz/chromium"],
+  // Het vermogensdashboard wordt op verzoek als los bestand uitgeleverd (fs),
+  // dus de bestanden moeten mee in de serverless functies op Vercel.
+  outputFileTracingIncludes: {
+    "/dashboard/vermogen": ["./data/vermogen/vermogen_dashboard.html"],
+    "/vermogen/vermogen-db-shim.js": ["./data/vermogen/vermogen-db-shim.js"],
+  },
   experimental: {
     // Server actions krijgen soms grotere payloads (import-wizard, scripts).
     serverActions: { bodySizeLimit: "4mb" },
