@@ -2,9 +2,10 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientContacts, clientIntegrations, clients, contracts, roles, userRoles, users } from "@/db/schema";
+import { clientContacts, clientIntegrations, clients, contracts, deliverables, roles, userRoles, users } from "@/db/schema";
+import { firstNameKey } from "@/lib/editors";
 import {
   assertClientAccess,
   ForbiddenError,
@@ -176,6 +177,23 @@ export async function setClientEditor(clientId: string, editorName: string | nul
     managed.add("editorName");
 
     await db.update(clients).set({ editorName: next, managedFields: [...managed], updatedAt: new Date() }).where(eq(clients.id, existing.id));
+
+    // Automatische koppeling: video's die nog niet in bewerking zijn (opgenomen /
+    // beeld uploaden / wachten op editor) verhuizen mee naar de nieuwe editor,
+    // zodat ze meteen op het juiste editor-board staan. Werk in uitvoering blijft.
+    const UNSTARTED = ["recorded", "footage_upload", "awaiting_editor"] as const;
+    let newEditorId: string | null = null;
+    if (next) {
+      const eds = await db.select({ id: users.id, fullName: users.fullName }).from(users).where(and(eq(users.primaryRole, "editor"), eq(users.status, "active")));
+      const key = firstNameKey(next);
+      newEditorId = eds.find((e) => firstNameKey(e.fullName) === key)?.id ?? null;
+    }
+    if (next === null || newEditorId) {
+      await db.update(deliverables)
+        .set({ editorId: newEditorId, updatedAt: new Date() })
+        .where(and(eq(deliverables.clientId, existing.id), inArray(deliverables.status, [...UNSTARTED]), isNull(deliverables.deletedAt)));
+    }
+
     await auditLog({ viewer, action: "client.set_editor", entityType: "client", entityId: existing.id, clientId: existing.id, changes: { editorName: next } });
     revalidatePath("/videos");
     revalidatePath("/clients");

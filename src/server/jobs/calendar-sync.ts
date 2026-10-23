@@ -17,6 +17,7 @@ import {
 } from "@/db/schema";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
+import { firstNameKey } from "@/lib/editors";
 import {
   GoogleCalendarService,
   googleCalendar,
@@ -394,6 +395,15 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
       const holidays = nlHolidaySet();
       const clientNameById = new Map(matchers.map((m) => [m.id, m.name]));
 
+      // Vaste editor per klant → user-id, zodat nieuwe opnames automatisch bij de
+      // juiste editor op het board komen (op basis van clients.editorName).
+      const editorUsers = await db.select({ id: users.id, fullName: users.fullName }).from(users).where(and(eq(users.primaryRole, "editor"), eq(users.status, "active")));
+      const editorByKey = new Map<string, string>();
+      for (const e of editorUsers) { const k = firstNameKey(e.fullName); if (k && !editorByKey.has(k)) editorByKey.set(k, e.id); }
+      const clientEditorRows = await db.select({ id: clients.id, editorName: clients.editorName }).from(clients).where(isNull(clients.deletedAt));
+      const editorByClient = new Map<string, string>();
+      for (const c of clientEditorRows) { if (c.editorName) { const uid = editorByKey.get(firstNameKey(c.editorName)); if (uid) editorByClient.set(c.id, uid); } }
+
       // Videograaf automatisch koppelen: meestal Rutger, Luxewagen → Jarno.
       const vgRows = await db
         .select({ id: users.id, email: users.email })
@@ -484,6 +494,9 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
               productionDayId: targetPdId,
               title: ev.title?.slice(0, 240) || `${clientNameById.get(ev.clientId) ?? "Opname"} — ${scheduledOn}`,
               status: "recorded",
+              // Automatisch de vaste editor van de klant toewijzen, zodat de opname
+              // meteen op het juiste editor-board komt.
+              editorId: editorByClient.get(ev.clientId) ?? null,
               dueOn: addWorkingDays(scheduledOn, 14, holidays),
               dueOnSource: "auto",
               statusChangedAt: ev.startsAt ?? new Date(),
