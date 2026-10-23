@@ -2,7 +2,7 @@
 
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { mentorConversations, mentorMessages } from "@/db/schema";
+import { mentorConversations, mentorMessages, mentorMemories } from "@/db/schema";
 import { requireOwner, ForbiddenError } from "@/server/auth/context";
 import { aiConfigured, runChat, type ChatMessage } from "@/server/ai/client";
 import { MENTOR_SYSTEM, buildMentorContext } from "@/server/mentor";
@@ -90,5 +90,44 @@ export async function pinMentorConversation(id: string, pinned: boolean): Promis
 export async function deleteMentorConversation(id: string): Promise<{ ok: true }> {
   const viewer = await requireOwner();
   await db.update(mentorConversations).set({ deletedAt: new Date(), updatedAt: new Date() }).where(and(eq(mentorConversations.id, id), eq(mentorConversations.userId, viewer.id)));
+  return { ok: true };
+}
+
+/* ---------------- Persoonlijk geheugen (Fase 5) ---------------- */
+
+export type MentorMemory = { id: string; kind: string; content: string; status: string | null };
+const MEM_KINDS = ["voorkeur", "feit", "beslissing", "actie", "inzicht"];
+
+export async function listMentorMemories(): Promise<MentorMemory[]> {
+  const viewer = await requireOwner();
+  const rows = await db.select({ id: mentorMemories.id, kind: mentorMemories.kind, content: mentorMemories.content, status: mentorMemories.status })
+    .from(mentorMemories).where(and(eq(mentorMemories.userId, viewer.id), isNull(mentorMemories.deletedAt)))
+    .orderBy(desc(mentorMemories.createdAt)).limit(200);
+  return rows;
+}
+
+export async function addMentorMemory(input: { kind: string; content: string }): Promise<{ ok: true; memory: MentorMemory } | { ok: false; message: string }> {
+  const viewer = await requireOwner();
+  const content = (input.content ?? "").trim().slice(0, 2000);
+  if (!content) return { ok: false, message: "Leeg." };
+  const kind = MEM_KINDS.includes(input.kind) ? input.kind : "inzicht";
+  const status = kind === "actie" || kind === "beslissing" ? "open" : null;
+  const [row] = await db.insert(mentorMemories).values({ userId: viewer.id, kind, content, status }).returning({ id: mentorMemories.id });
+  return { ok: true, memory: { id: row!.id, kind, content, status } };
+}
+
+export async function updateMentorMemory(input: { id: string; content?: string; status?: string | null; kind?: string }): Promise<{ ok: true }> {
+  const viewer = await requireOwner();
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  if (typeof input.content === "string") patch.content = input.content.trim().slice(0, 2000);
+  if (input.status === null || input.status === "open" || input.status === "afgerond") patch.status = input.status;
+  if (input.kind && MEM_KINDS.includes(input.kind)) patch.kind = input.kind;
+  await db.update(mentorMemories).set(patch).where(and(eq(mentorMemories.id, input.id), eq(mentorMemories.userId, viewer.id), isNull(mentorMemories.deletedAt)));
+  return { ok: true };
+}
+
+export async function deleteMentorMemory(id: string): Promise<{ ok: true }> {
+  const viewer = await requireOwner();
+  await db.update(mentorMemories).set({ deletedAt: new Date(), updatedAt: new Date() }).where(and(eq(mentorMemories.id, id), eq(mentorMemories.userId, viewer.id)));
   return { ok: true };
 }

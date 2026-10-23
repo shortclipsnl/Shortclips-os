@@ -33,3 +33,23 @@ export const mentorMessages = pgTable(
   },
   (t) => [index("mentor_msg_conv_idx").on(t.conversationId)],
 );
+
+/**
+ * Persoonlijk geheugen van de mentor. De eigenaar bepaalt zelf wat wordt bewaard.
+ * kind: 'voorkeur' (blijvende voorkeur), 'feit' (vastgesteld bedrijfsfeit),
+ * 'beslissing', 'actie' (met status) of 'inzicht' (terugkerend thema).
+ */
+export const mentorMemories = pgTable(
+  "mentor_memories",
+  {
+    id: pk(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    kind: varchar("kind", { length: 20 }).notNull().default("inzicht"),
+    content: text("content").notNull(),
+    /** Voor 'actie'/'beslissing': 'open' of 'afgerond'. */
+    status: varchar("status", { length: 12 }),
+    ...timestamps,
+    ...softDelete,
+  },
+  (t) => [index("mentor_mem_user_idx").on(t.userId)],
+);

@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Send, Loader2, Mic, MicOff, Copy, Check, Plus, Search, Pin, Pencil, Trash2, Brain, MessageSquare, PanelLeft } from "lucide-react";
-import { mentorChat, getMentorConversation, renameMentorConversation, pinMentorConversation, deleteMentorConversation } from "@/server/actions/mentor";
+import { Send, Loader2, Mic, MicOff, Copy, Check, Plus, Search, Pin, Pencil, Trash2, Brain, MessageSquare, PanelLeft, BookMarked, Bookmark, X } from "lucide-react";
+import { mentorChat, getMentorConversation, renameMentorConversation, pinMentorConversation, deleteMentorConversation, addMentorMemory, updateMentorMemory, deleteMentorMemory, type MentorMemory } from "@/server/actions/mentor";
 import type { ChatMessage } from "@/server/ai/client";
 
 type Conv = { id: string; title: string; pinned: boolean; lastMessageAt: string | null };
+const MEM_KINDS: Array<{ key: string; label: string }> = [
+  { key: "inzicht", label: "Inzicht" },
+  { key: "beslissing", label: "Beslissing" },
+  { key: "actie", label: "Actie" },
+  { key: "voorkeur", label: "Voorkeur" },
+  { key: "feit", label: "Bedrijfsfeit" },
+];
+const memLabel = (k: string) => MEM_KINDS.find((m) => m.key === k)?.label ?? k;
 
 const SUGGESTIONS = [
   "Wat moet deze week mijn hoogste prioriteit zijn?",
@@ -58,7 +66,7 @@ function renderText(t: string) {
   });
 }
 
-function Bubble({ m }: { m: ChatMessage }) {
+function Bubble({ m, onRemember }: { m: ChatMessage; onRemember?: (content: string) => void }) {
   const [copied, setCopied] = useState(false);
   const mine = m.role === "user";
   const copy = async () => { try { await navigator.clipboard.writeText(m.content); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* geblokkeerd */ } };
@@ -67,9 +75,16 @@ function Bubble({ m }: { m: ChatMessage }) {
       <div className={`group relative max-w-[88%] rounded-[var(--radius-md)] px-3.5 py-2.5 text-sm ${mine ? "bg-[var(--color-brand-600)] text-white" : "border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)]"}`}>
         {mine ? <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div> : <div>{renderText(m.content)}</div>}
         {!mine ? (
-          <button type="button" onClick={copy} title="Kopieer" className="absolute -right-2 -top-2 hidden rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] p-1 text-[var(--color-ink-muted)] shadow-[var(--shadow-card)] group-hover:block hover:text-[var(--color-ink)]">
-            {copied ? <Check className="size-3.5 text-[var(--color-good)]" /> : <Copy className="size-3.5" />}
-          </button>
+          <span className="absolute -right-2 -top-2 hidden gap-1 group-hover:flex">
+            {onRemember ? (
+              <button type="button" onClick={() => onRemember(m.content)} title="Onthoud dit in je geheugen" className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] p-1 text-[var(--color-ink-muted)] shadow-[var(--shadow-card)] hover:text-[var(--color-brand-600)]">
+                <Bookmark className="size-3.5" />
+              </button>
+            ) : null}
+            <button type="button" onClick={copy} title="Kopieer" className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] p-1 text-[var(--color-ink-muted)] shadow-[var(--shadow-card)] hover:text-[var(--color-ink)]">
+              {copied ? <Check className="size-3.5 text-[var(--color-good)]" /> : <Copy className="size-3.5" />}
+            </button>
+          </span>
         ) : null}
       </div>
     </div>
@@ -77,8 +92,13 @@ function Bubble({ m }: { m: ChatMessage }) {
 }
 
 /* ---------------- hoofdcomponent ---------------- */
-export function MentorChat({ conversations: initial, aiReady, firstName }: { conversations: Conv[]; aiReady: boolean; firstName: string }) {
+export function MentorChat({ conversations: initial, memories: initialMem, aiReady, firstName }: { conversations: Conv[]; memories: MentorMemory[]; aiReady: boolean; firstName: string }) {
   const [convs, setConvs] = useState<Conv[]>(initial);
+  const [mem, setMem] = useState<MentorMemory[]>(initialMem);
+  const [memOpen, setMemOpen] = useState(false);
+  const [memKind, setMemKind] = useState("inzicht");
+  const [memContent, setMemContent] = useState("");
+  const [memBusy, setMemBusy] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -115,6 +135,18 @@ export function MentorChat({ conversations: initial, aiReady, firstName }: { con
       } else { setErr(res.message); setMessages((m) => m.slice(0, -1)); setInput(content); }
     });
   };
+
+  // Geheugen
+  const openRemember = (content: string) => { setMemContent(content.replace(/^#+\s*/gm, "").trim().slice(0, 2000)); setMemKind("inzicht"); setMemOpen(true); };
+  const addMemory = () => {
+    const content = memContent.trim();
+    if (!content || memBusy) return;
+    setMemBusy(true);
+    addMentorMemory({ kind: memKind, content }).then((r) => { if (r.ok) { setMem((m) => [r.memory, ...m]); setMemContent(""); } }).finally(() => setMemBusy(false));
+  };
+  const toggleMemStatus = (m: MentorMemory) => { const next = m.status === "afgerond" ? "open" : "afgerond"; updateMentorMemory({ id: m.id, status: next }); setMem((xs) => xs.map((x) => (x.id === m.id ? { ...x, status: next } : x))); };
+  const editMemory = (m: MentorMemory) => { const t = window.prompt("Herinnering aanpassen", m.content); if (t && t.trim()) { updateMentorMemory({ id: m.id, content: t.trim() }); setMem((xs) => xs.map((x) => (x.id === m.id ? { ...x, content: t.trim() } : x))); } };
+  const delMemory = (m: MentorMemory) => { if (!window.confirm("Deze herinnering verwijderen?")) return; deleteMentorMemory(m.id); setMem((xs) => xs.filter((x) => x.id !== m.id)); };
 
   const rename = (c: Conv) => { const t = window.prompt("Nieuwe naam voor dit gesprek", c.title); if (t && t.trim()) { renameMentorConversation(c.id, t.trim()); setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, title: t.trim() } : x))); } };
   const togglePin = (c: Conv) => { pinMentorConversation(c.id, !c.pinned); setConvs((cs) => cs.map((x) => (x.id === c.id ? { ...x, pinned: !x.pinned } : x))); };
@@ -166,7 +198,59 @@ export function MentorChat({ conversations: initial, aiReady, firstName }: { con
               <p className="text-2xs text-[var(--color-ink-faint)]">Privé · jouw persoonlijke CEO-sparringpartner met live Shortclips-data</p>
             </div>
           </div>
+          <button type="button" onClick={() => setMemOpen(true)} className="ml-auto inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)]">
+            <BookMarked className="size-4" /> Geheugen{mem.length > 0 ? ` (${mem.length})` : ""}
+          </button>
         </div>
+
+        {/* Geheugenpaneel */}
+        {memOpen ? (
+          <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/30 p-4 sm:p-8" onClick={(e) => { if (e.target === e.currentTarget) setMemOpen(false); }}>
+            <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--color-ink)]"><BookMarked className="size-4 text-[var(--color-brand-600)]" /> Persoonlijk geheugen</h2>
+                <button type="button" onClick={() => setMemOpen(false)} className="rounded p-1 text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"><X className="size-4" /></button>
+              </div>
+              <p className="mb-3 text-2xs text-[var(--color-ink-faint)]">Wat de mentor over jou en Shortclips onthoudt — en meeneemt in adviezen. Jij bepaalt wat hier staat; de mentor slaat nooit zelf iets op.</p>
+
+              <div className="mb-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-2.5">
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {MEM_KINDS.map((k) => (
+                    <button key={k.key} type="button" onClick={() => setMemKind(k.key)} className={`rounded-full border px-2 py-0.5 text-2xs font-medium transition ${memKind === k.key ? "border-[var(--color-brand-600)] bg-[var(--color-brand-600)] text-white" : "border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>{k.label}</button>
+                  ))}
+                </div>
+                <textarea value={memContent} onChange={(e) => setMemContent(e.target.value)} rows={2} placeholder="Bijv. 'Delegeer scriptcontrole aan een vaste medewerker' of 'Voorkeur: korte, directe adviezen'" className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 py-1.5 text-sm text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none" />
+                <button type="button" onClick={addMemory} disabled={memBusy || !memContent.trim()} className="mt-2 inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40">{memBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />} Onthoud dit</button>
+              </div>
+
+              {mem.length === 0 ? (
+                <p className="py-6 text-center text-xs text-[var(--color-ink-faint)]">Nog niets opgeslagen.</p>
+              ) : (
+                <div className="space-y-3">
+                  {MEM_KINDS.filter((k) => mem.some((m) => m.kind === k.key)).map((k) => (
+                    <div key={k.key}>
+                      <span className="mb-1 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{k.label}</span>
+                      <ul className="space-y-1">
+                        {mem.filter((m) => m.kind === k.key).map((m) => (
+                          <li key={m.id} className="group flex items-start gap-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-2.5 py-1.5">
+                            {m.kind === "actie" || m.kind === "beslissing" ? (
+                              <button type="button" onClick={() => toggleMemStatus(m)} title={m.status === "afgerond" ? "Afgerond" : "Markeer als afgerond"} className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded border ${m.status === "afgerond" ? "border-[var(--color-good)] bg-[var(--color-good)] text-white" : "border-[var(--color-line-strong)]"}`}>{m.status === "afgerond" ? <Check className="size-3" /> : null}</button>
+                            ) : null}
+                            <span className={`min-w-0 flex-1 text-xs ${m.status === "afgerond" ? "text-[var(--color-ink-faint)] line-through" : "text-[var(--color-ink)]"}`}>{m.content}</span>
+                            <span className="hidden shrink-0 gap-0.5 group-hover:flex">
+                              <button type="button" onClick={() => editMemory(m)} title="Aanpassen" className="rounded p-0.5 text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"><Pencil className="size-3.5" /></button>
+                              <button type="button" onClick={() => delMemory(m)} title="Verwijderen" className="rounded p-0.5 text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]"><Trash2 className="size-3.5" /></button>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
 
         <div className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface-2)] shadow-[var(--shadow-card)]">
           <div className="flex max-h-[62vh] min-h-[360px] flex-col gap-3 overflow-y-auto p-4">
@@ -184,7 +268,7 @@ export function MentorChat({ conversations: initial, aiReady, firstName }: { con
                 </div>
               </div>
             ) : (
-              messages.map((m, i) => <Bubble key={i} m={m} />)
+              messages.map((m, i) => <Bubble key={i} m={m} onRemember={m.role === "assistant" ? openRemember : undefined} />)
             )}
             {pending ? (
               <div className="flex justify-start"><div className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-2.5 text-sm text-[var(--color-ink-muted)]"><Loader2 className="size-4 animate-spin text-[var(--color-brand-600)]" /> De mentor denkt na…</div></div>

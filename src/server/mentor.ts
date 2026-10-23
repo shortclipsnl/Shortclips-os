@@ -1,7 +1,18 @@
 import "server-only";
+import { and, desc, eq, isNull } from "drizzle-orm";
+import { db } from "@/db/client";
+import { mentorMemories } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 import { getQualityOverview, type QualityGroup } from "@/server/quality";
 import { getGoalsOverview } from "@/server/goals/overview";
+import { getCapacityOverview } from "@/server/capacity";
+import { getManagementFinance } from "@/server/management-finance";
+import { listLeads } from "@/server/leads";
+
+const MEMORY_LABEL: Record<string, string> = {
+  voorkeur: "Voorkeuren", feit: "Bedrijfsfeiten", beslissing: "Beslissingen", actie: "Openstaande acties", inzicht: "Inzichten",
+};
+const eur = (n?: number | null) => (n === null || n === undefined || Number.isNaN(n) ? "onbekend" : `€${Math.round(n).toLocaleString("nl-NL")}`);
 
 /**
  * De AI CEO Mentor voor de eigenaar: een kritische, datagedreven sparringpartner.
@@ -27,7 +38,10 @@ WERKWIJZE
 - Gebruik de meegeleverde live bedrijfscontext als feitenbasis. Verzin NOOIT omzet, kosten, aantallen of andere cijfers. Ontbreekt data, zeg dat expliciet in plaats van aannames als feit te presenteren. Vermeld bij een analyse op welke gegevens je je baseert.
 - Scheid duidelijk: (1) advies op basis van ondernemerslessen/principes, (2) je eigen analyse, (3) conclusies uit de bedrijfsgegevens.
 - Stel een gerichte vervraag alleen als essentiële informatie ontbreekt; kom anders zelfstandig tot een bruikbare aanbeveling.
-- Je wijzigt nooit zelf klanten, projecten, prijzen, taken of financiële gegevens. Je adviseert; Jarno beslist.`;
+- Je wijzigt nooit zelf klanten, projecten, prijzen, taken of financiële gegevens. Je adviseert; Jarno beslist.
+
+PERSOONLIJK GEHEUGEN
+Je hebt een geheugen met door Jarno vastgelegde voorkeuren, bedrijfsfeiten, beslissingen en openstaande acties. Gebruik dit actief in je advies. Kom bij relevante gelegenheid terug op openstaande acties en beslissingen — vraag waarom iets nog niet is uitgevoerd, of de prioriteit is veranderd, of een betere aanpak nodig is. Je mag voorstellen iets vast te leggen (bijv. "overweeg dit als beslissing vast te leggen"), maar je slaat NOOIT zelf iets op in het geheugen of in het portaal — dat doet Jarno zelf.`;
 
 const GROUP_LABEL: Record<QualityGroup, string> = {
   scripting: "Scripting",
@@ -39,9 +53,15 @@ const GROUP_LABEL: Record<QualityGroup, string> = {
 
 /** Bouwt een beknopte, actuele bedrijfssnapshot uit de bestaande Hub-data. */
 export async function buildMentorContext(viewer: Viewer): Promise<string> {
-  const [quality, goals] = await Promise.all([
+  const [quality, goals, cap, fin, leads, memories] = await Promise.all([
     getQualityOverview(viewer).catch(() => null),
     getGoalsOverview(viewer).catch(() => null),
+    getCapacityOverview().catch(() => null),
+    getManagementFinance().catch(() => null),
+    listLeads().catch(() => null),
+    db.select({ kind: mentorMemories.kind, content: mentorMemories.content, status: mentorMemories.status })
+      .from(mentorMemories).where(and(eq(mentorMemories.userId, viewer.id), isNull(mentorMemories.deletedAt)))
+      .orderBy(desc(mentorMemories.createdAt)).limit(80).catch(() => []),
   ]);
 
   const parts: string[] = [];
@@ -55,17 +75,50 @@ export async function buildMentorContext(viewer: Viewer): Promise<string> {
       if (!byGroup.has(g)) byGroup.set(g, []);
       byGroup.get(g)!.push(`${it.title} — ${it.detail} [${it.severity}]`);
     }
-    for (const [g, lines] of byGroup) {
-      parts.push(`• ${GROUP_LABEL[g]}: ${lines.slice(0, 8).join(" | ")}`);
-    }
+    for (const [g, lines] of byGroup) parts.push(`• ${GROUP_LABEL[g]}: ${lines.slice(0, 8).join(" | ")}`);
   } else {
     parts.push("\nAandachtspunten: op dit moment niet beschikbaar.");
+  }
+
+  if (cap) {
+    const s = cap.summary;
+    parts.push(`\nBEDRIJF & CAPACITEIT: ${s.activeClients} actieve klanten; ${s.monthlyShorts} shorts per maand; ${s.activeEditors} actieve editors; benutting editketen ${s.editChainUsedPct != null ? s.editChainUsedPct + "%" : "onbekend"}.`);
+  }
+
+  if (fin) {
+    parts.push(`\nFINANCIEEL (uit de Hub): terugkerende omzet (MRR) ${eur(fin.mrr)}; verwacht volgende maand ${eur(fin.expectedNextMonth)}; pipeline ${eur(fin.pipeline?.monthly)}/mnd uit ${fin.pipeline?.count ?? 0} open kansen.`);
+    if (fin.book?.hasData) {
+      parts.push(`Officiële boekhouding (Digiboox) ${new Date().getFullYear()}: omzet ${eur(fin.book.yearRevenue)}, resultaat ${eur(fin.book.yearResult)}${fin.book.lastImportedAt ? ` — geïmporteerd ${new Date(fin.book.lastImportedAt).toLocaleDateString("nl-NL")}` : ""}.`);
+    } else {
+      parts.push("Officiële boekhouding (Digiboox) is nog niet geïmporteerd; gebruik geen harde winstcijfers.");
+    }
+    const last = (fin.months ?? []).slice(-3);
+    if (last.length) parts.push(`Recente maanden (interne staat): ${last.map((m) => `${m.period}: omzet ${eur(m.income)}, resultaat ${eur(m.result)} (marge ${m.margin}%)`).join(" | ")}.`);
+  }
+  if (cap && (cap.summary.monthlyRevenue != null || cap.summary.estimatedProfit != null)) {
+    parts.push(`Schatting uit capaciteit: maandomzet ${eur(cap.summary.monthlyRevenue)}, personeelskosten ${eur(cap.summary.staffCost)}, geschatte winst ${eur(cap.summary.estimatedProfit)} (schatting, geen boekhouding).`);
+  }
+
+  if (leads) {
+    const s = leads.summary;
+    parts.push(`\nSALES/LEADS: ${s.open} open, ${s.won} gewonnen, ${s.lost} verloren${s.overdue ? `, ${s.overdue} met opvolging te laat` : ""} (totaal ${s.total}).`);
   }
 
   if (goals && goals.rows.length > 0) {
     parts.push(`\nDOELEN (status): ${goals.rows.map((g) => `${g.title} — ${g.status}`).join(" | ")}`);
   }
 
-  parts.push("\nDiepere financiële en sales-data worden in een volgende fase gekoppeld; baseer financiële uitspraken niet op schattingen.");
+  if (memories.length > 0) {
+    parts.push("\nPERSOONLIJK GEHEUGEN (door Jarno vastgelegd — gebruik dit actief; openstaande acties/beslissingen mag je opvolgen):");
+    const byKind = new Map<string, string[]>();
+    for (const m of memories) {
+      const k = m.kind || "inzicht";
+      if (!byKind.has(k)) byKind.set(k, []);
+      byKind.get(k)!.push(m.status ? `${m.content} [${m.status}]` : m.content);
+    }
+    for (const [k, lines] of byKind) parts.push(`• ${MEMORY_LABEL[k] ?? k}: ${lines.slice(0, 20).join(" | ")}`);
+  }
+
+  parts.push("\nGegevens die ontbreken of verouderd zijn, zijn hierboven als zodanig gemarkeerd. Verzin geen cijfers; benoem wat je niet weet.");
   return parts.join("\n");
 }
