@@ -232,6 +232,28 @@ export class DriveService {
     return ((await r.json()) as { id: string }).id;
   }
 
+  /** Vind-of-maak een submap met deze naam ONDER een bepaalde map. */
+  async ensureFolderUnder(name: string, parentId: string): Promise<string> {
+    const safe = name.replace(/'/g, "\\'");
+    const res = await this.request<{ files: { id: string }[] }>("/files", {
+      q: `mimeType = '${FOLDER_MIME}' and name = '${safe}' and '${parentId}' in parents and trashed = false`,
+      fields: "files(id)",
+      pageSize: 1,
+    });
+    if (res.files?.[0]?.id) return res.files[0].id;
+
+    const token = await this.token();
+    const r = await fetch(`${API}/files?fields=id&supportsAllDrives=true`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
+    });
+    if (!r.ok) {
+      throw new IntegrationError("google_drive", `Submap aanmaken mislukt (HTTP ${r.status})`, r.status, r.status >= 500);
+    }
+    return ((await r.json()) as { id: string }).id;
+  }
+
   /** Download de ruwe inhoud (bytes) van één bestand uit Drive. */
   async downloadBytes(fileId: string): Promise<Uint8Array> {
     const token = await this.token();

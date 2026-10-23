@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock } from "lucide-react";
-import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, checkScriptQuality, listShootDaysForClient, type GeneratedScript, type QualityResult } from "@/server/actions/script-generate";
+import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, saveScriptToDrive, checkScriptQuality, listShootDaysForClient, type GeneratedScript, type QualityResult } from "@/server/actions/script-generate";
 
 type ShootDay = { id: string; scheduledOn: string; title: string };
 
@@ -161,6 +161,8 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [driveSaving, setDriveSaving] = useState(false);
+  const [driveMsg, setDriveMsg] = useState<{ text: string; link?: string } | null>(null);
 
   const visibleClients = clients.filter((c) => (filter === "alle" ? true : filter === "actief" ? c.active : !c.active));
   const selectedName = clientId ? clients.find((c) => c.id === clientId)?.name ?? "" : "";
@@ -245,6 +247,20 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
       else setErr(res.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveToDrive = async () => {
+    if (!scripts || scripts.length === 0 || !genClientId) return;
+    setDriveSaving(true);
+    setErr(null);
+    setDriveMsg(null);
+    try {
+      const res = await saveScriptToDrive({ clientId: genClientId, klantnaam, opnamedag, scripts: scripts.map((s) => ({ onderwerp: s.onderwerp, tekst: s.tekst })) });
+      if (res.ok) setDriveMsg({ text: `Opgeslagen in de Drive-map "${res.folderName}" van de klant als "${res.fileName}".`, link: res.link });
+      else setErr(res.message);
+    } finally {
+      setDriveSaving(false);
     }
   };
 
@@ -550,10 +566,13 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         {savedMsg ? (
           <p className="text-2xs text-[var(--color-good)]">{savedMsg} <a href="/scripts" className="font-semibold underline">Open de scriptbibliotheek</a></p>
         ) : null}
+        {driveMsg ? (
+          <p className="text-2xs text-[var(--color-good)]">{driveMsg.text}{driveMsg.link ? <> <a href={driveMsg.link} target="_blank" rel="noreferrer" className="font-semibold underline">Open in Drive</a></> : null}</p>
+        ) : null}
 
         {/* Actiebalk */}
         <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface-2)]/95 p-3 shadow-[var(--shadow-card)] backdrop-blur">
-          <button type="button" onClick={() => { setScripts(null); setErr(null); setSavedMsg(null); setReviseId(null); setVersionsId(null); setShootDays([]); setShootDayId(""); }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface)]">
+          <button type="button" onClick={() => { setScripts(null); setErr(null); setSavedMsg(null); setDriveMsg(null); setReviseId(null); setVersionsId(null); setShootDays([]); setShootDayId(""); }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface)]">
             <ArrowLeft className="size-4" /> Nieuwe set
           </button>
           <span className="text-2xs text-[var(--color-ink-faint)]">{scripts.length} script{scripts.length === 1 ? "" : "s"} · geef feedback tot het klopt</span>
@@ -566,6 +585,15 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
               className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-40"
             >
               {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Opslaan in bibliotheek
+            </button>
+            <button
+              type="button"
+              onClick={saveToDrive}
+              disabled={driveSaving || scripts.length === 0 || !genClientId}
+              title={genClientId ? "Opslaan in de Google Drive-map van de klant" : "Kies een vastgelegde klant om op te kunnen slaan"}
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-40"
+            >
+              {driveSaving ? <Loader2 className="size-4 animate-spin" /> : <Cloud className="size-4" />} Opslaan in Drive
             </button>
             <button
               type="button"

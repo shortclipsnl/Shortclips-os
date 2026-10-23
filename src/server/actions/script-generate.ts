@@ -1,9 +1,10 @@
 "use server";
 
-import { and, asc, desc, eq, gte, isNull, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
-import { clients, scripts, scriptVersions, productionDays } from "@/db/schema";
+import { clients, scripts, scriptVersions, productionDays, files, driveMappings } from "@/db/schema";
+import { drive } from "@/server/integrations/drive";
 import { requirePermission, assertClientAccess, ForbiddenError } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { aiConfigured, runPrompt } from "@/server/ai/client";
@@ -504,6 +505,77 @@ function parseScriptBlocks(tekst: string): { uitleg: string; hook: string; body:
   }
   const join = (arr: string[]) => arr.join("\n").trim();
   return { uitleg: join(buckets.uitleg), hook: join(buckets.hook), body: join(buckets.body), cta: join(buckets.cta) };
+}
+
+/** Laadt een sjabloonpagina voor de PDF, serverkant: eerst van schijf, anders via de eigen URL. */
+async function loadTemplateImage(n: number): Promise<Uint8Array> {
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    return new Uint8Array(await fs.readFile(path.join(process.cwd(), "public", "script-template", `slide${n}.png`)));
+  } catch { /* val terug op fetch */ }
+  const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (process.env.APP_URL || "http://localhost:3000");
+  const res = await fetch(`${base}/script-template/slide${n}.png`);
+  if (!res.ok) throw new Error(`Sjabloonpagina ${n} kon niet worden geladen (HTTP ${res.status}).`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+type DriveSaveResult =
+  | { ok: true; fileName: string; folderName: string; link: string }
+  | { ok: false; message: string };
+
+/** Slaat de scripts op als PDF in de "Scripts"-map van de klant in Google Drive. */
+export async function saveScriptToDrive(input: {
+  clientId: string;
+  klantnaam: string;
+  opnamedag: string;
+  scripts: Array<{ onderwerp: string; tekst: string }>;
+}): Promise<DriveSaveResult> {
+  try {
+    const viewer = await requirePermission("scripts:write");
+    if (!drive.isConfigured) return { ok: false, message: "De Google Drive-koppeling staat niet aan." };
+
+    const items = (input.scripts ?? []).filter((s) => (s?.onderwerp?.trim() || s?.tekst?.trim()));
+    if (items.length === 0) return { ok: false, message: "Er zijn geen scripts om op te slaan." };
+
+    const [c] = await db.select({ id: clients.id, name: clients.name }).from(clients)
+      .where(and(eq(clients.id, input.clientId), isNull(clients.deletedAt))).limit(1);
+    if (!c) return { ok: false, message: "Kies eerst een vastgelegde klant." };
+    assertClientAccess(viewer, c.id);
+
+    // De juiste map bepalen: de al gesynchroniseerde "Scripts"-map van de klant.
+    let folderId: string | null = null;
+    const [sf] = await db.select({ externalId: files.externalId }).from(files)
+      .where(and(eq(files.clientId, c.id), eq(files.isFolder, true), isNull(files.deletedAt), sql`lower(${files.name}) = 'scripts'`))
+      .limit(1);
+    if (sf?.externalId) {
+      folderId = sf.externalId;
+    } else {
+      // Fallback: de gekoppelde klant-rootmap, en daarin (vind-of-maak) een "Scripts"-submap.
+      const [dm] = await db.select({ folderId: driveMappings.folderId }).from(driveMappings)
+        .where(and(eq(driveMappings.entityType, "client"), eq(driveMappings.entityId, c.id))).limit(1);
+      if (!dm?.folderId) return { ok: false, message: "Deze klant heeft nog geen gekoppelde Google Drive-map. Koppel die eerst of synchroniseer de Drive." };
+      folderId = await drive.ensureFolderUnder("Scripts", dm.folderId);
+    }
+
+    // PDF serverkant bouwen (exact dezelfde opmaak als de download).
+    const { buildScriptPdfBytes } = await import("@/lib/script-pdf");
+    const bytes = await buildScriptPdfBytes(
+      { klantnaam: input.klantnaam || c.name, opnamedag: input.opnamedag || "", scripts: items.map((s) => ({ onderwerp: s.onderwerp, tekst: s.tekst })) },
+      loadTemplateImage,
+    );
+
+    const safe = (input.klantnaam || c.name).replace(/[^\p{L}\p{N} _-]/gu, "").trim() || c.name;
+    const fileName = `Scripts - ${safe}${input.opnamedag ? ` - ${input.opnamedag}` : ""}.pdf`;
+    const { id } = await drive.uploadBytes(fileName, "application/pdf", bytes, folderId);
+
+    await auditLog({ viewer, action: "script.save_to_drive", entityType: "client", entityId: c.id, clientId: c.id, changes: { fileName } });
+    return { ok: true, fileName, folderName: "Scripts", link: `https://drive.google.com/file/d/${id}/view` };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    const msg = (e as { userMessage?: string })?.userMessage ?? (e as Error)?.message ?? "onbekende fout";
+    return { ok: false, message: `Opslaan in Drive mislukt: ${msg}` };
+  }
 }
 
 /** Aankomende opnamedagen van een klant, om scripts direct aan te koppelen. */
