@@ -6,7 +6,7 @@ import { db } from "@/db/client";
 import { salesResearch } from "@/db/schema";
 import { ForbiddenError, requirePermission, type Viewer } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
-import { runJsonResearch, runJsonPrompt } from "@/server/ai/client";
+import { runResearch as runWebResearch, runJsonPrompt } from "@/server/ai/client";
 import { RESEARCH_STATUSES } from "@/lib/sales-research";
 
 export type ActionResult = { ok: boolean; message?: string; id?: string };
@@ -137,42 +137,73 @@ export async function runResearch(id: string): Promise<ActionResult> {
 
     const goalsArr = Array.isArray(row.goals) ? (row.goals as unknown[]).filter((g): g is string => typeof g === "string") : [];
 
-    const system = `Je bent de sales-onderzoeker van Shortclips, een bureau dat resultaatgerichte korte videocontent maakt voor TikTok, Instagram, YouTube Shorts en Facebook. Je voert ECHT onderzoek uit met de beschikbare web-tools (zoeken en pagina's ophalen). Je doel: een potentiële klant scherp in beeld brengen voor een salesgesprek.
+    const bedrijfBlok = [
+      `Bedrijf: ${row.companyName}`,
+      row.website ? `Website: ${row.website}` : "",
+      row.city ? `Vestigingsplaats: ${row.city}` : "",
+      row.branche ? `Branche: ${row.branche}` : "",
+      row.description ? `Beschrijving (van ons salesteam): ${row.description}` : "",
+      row.instagram ? `Instagram: ${row.instagram}` : "",
+      row.tiktok ? `TikTok: ${row.tiktok}` : "",
+      row.linkedin ? `LinkedIn: ${row.linkedin}` : "",
+      row.facebook ? `Facebook: ${row.facebook}` : "",
+      row.youtube ? `YouTube: ${row.youtube}` : "",
+      row.primaryGoal ? `Belangrijkste doelstelling van de prospect: ${row.primaryGoal}` : "",
+      goalsArr.length ? `Gekozen doelstellingen: ${goalsArr.join(", ")}` : "",
+      row.extra ? `Aanvullende opmerkingen van ons salesteam: ${row.extra}` : "",
+    ].filter(Boolean).join("\n");
+
+    // ───── STAP 1 — Web-onderzoek → BRIEFING in gewone tekst ─────
+    // Bewust geen strikte JSON tijdens het webgedeelte: dat is de grootste bron
+    // van parse-fouten. We laten het model vrij schrijven en structureren daarna.
+    const researchSystem = `Je bent de sales-onderzoeker van Shortclips, een bureau dat resultaatgerichte korte videocontent maakt voor TikTok, Instagram, YouTube Shorts en Facebook. Je voert ECHT web-onderzoek uit (zoeken en pagina's ophalen) en schrijft een grondige BRIEFING in gewone tekst (GEEN JSON).
 
 HARDE REGELS:
-- Gebruik uitsluitend controleerbare, actuele bronnen. Zoek de website op en bekijk die; zoek en verifieer de social-kanalen; bekijk waar mogelijk de daadwerkelijke content, niet alleen de bio.
-- Verzin NOOIT cijfers (volgers, weergaven, bereik, omzet). Zijn ze niet openbaar beschikbaar, zet dan het veld op null en schrijf in 'opmerking' dat het platform die data niet openbaar maakt.
-- Voor YouTube mag je publieke kanaalinfo gebruiken als je die vindt. Voor Instagram/TikTok/Facebook zijn exacte cijfers meestal niet openbaar — meld dat eerlijk.
-- Maak duidelijk onderscheid tussen feiten, inschattingen en aanbevelingen (zet aannames in 'aannames').
-- Analyseer de laatste ~30–90 dagen waar mogelijk en benoem de onderzochte periode.
-- Noem pijnpunten alleen als het onderzoek daar aanleiding toe geeft; elk pijnpunt met concrete observatie + bewijs.
-- Maak het specifiek voor DIT bedrijf — geen algemene marketingadviezen. Onderbouw contentobservaties met concrete voorbeelden (welke video's/pagina's bekeken).
-- Houd rekening met de doelstellingen van de prospect; bepaal ook zelf welke doelstellingen waarschijnlijk relevant zijn, zonder onbevestigde aannames als feit te presenteren.
+- Gebruik uitsluitend controleerbare, actuele bronnen. Bekijk de website (ook relevante dienst-/product-/FAQ-pagina's) en verifieer de social-kanalen; bekijk waar mogelijk de daadwerkelijke content, niet alleen de bio.
+- Verzin NOOIT cijfers (volgers, weergaven, bereik, omzet). Niet openbaar? Schrijf dat expliciet ("niet openbaar").
+- Maak duidelijk onderscheid tussen feiten, inschattingen en aanbevelingen.
+- Onderbouw contentobservaties met concrete voorbeelden (welke video's/pagina's bekeken).
+- Specifiek voor DIT bedrijf, geen algemene marketingadviezen. Stem af op de doelstellingen van de prospect.
 - Vermijd onrealistische garanties over bereik, leads, omzet of viral gaan.
-- Bewaar de bronnen (URLs) die je gebruikt in 'bronnen'.
-- Voer vóór je afrondt een korte eigen kwaliteitscontrole uit en vat die samen in 'kwaliteitscheck'.`;
+- Sluit af met een lijst BRONNEN (titel + URL).`;
 
-    const user = `Onderzoek dit bedrijf grondig en lever een sales-analyse.
+    const researchUser = `Onderzoek dit bedrijf grondig en schrijf een briefing.
+
+${bedrijfBlok}
+
+Zoek zelf ontbrekende social-kanalen op en controleer of ze echt bij dit bedrijf horen. Schrijf een briefing met deze kopjes:
+- HET BEDRIJF: wat ze doen, producten/diensten, regio, doelgroep, positionering, sterke punten, commerciële doelen, en aannames (apart gemarkeerd).
+- HUIDIGE SOCIAL MEDIA (per kanaal): gevonden ja/nee + URL, volgers (of "niet openbaar"), publicatiefrequentie, contenttypes, aandeel video, en observaties met concrete voorbeelden.
+- WAT GAAT GOED.
+- PIJNPUNTEN & GEMISTE KANSEN: per punt observatie + bewijs + waarom het een gemiste kans is + impact + hoe Shortclips dit zou aanpakken.
+- HOE SHORTCLIPS KAN HELPEN: de aanbevolen aanpak + toelichting.
+- 5 CONCRETE VIDEO-IDEEËN: titel, hook, concept, doel.
+- CONCURRENTEN (2–3, optioneel).
+- VERVOLGSTAPPEN.
+- KWALITEITSCONTROLE: korte eigen check.
+- ONDERZOCHTE PERIODE.
+- BRONNEN: titel — URL.`;
+
+    const briefing = await runWebResearch({ system: researchSystem, user: researchUser, maxUses: 12, maxTokens: 12000 });
+    if (!briefing.ok) {
+      await db.update(salesResearch).set({ status: "concept", updatedAt: new Date() }).where(eq(salesResearch.id, id));
+      return briefing.reason === "no_provider"
+        ? { ok: false, message: "Er is nog geen AI-sleutel ingesteld — zet ANTHROPIC_API_KEY in .env.local." }
+        : { ok: false, message: briefing.error ?? "Onderzoek mislukt." };
+    }
+
+    // ───── STAP 2 — BRIEFING → gestructureerde JSON (geen web, volledige ruimte) ─────
+    const structSystem = `Je structureert een bestaande onderzoeksbriefing naar JSON voor een salespresentatie van Shortclips. Gebruik UITSLUITEND informatie uit de briefing. Verzin NIETS en voeg geen cijfers toe die er niet staan; onbekende waarden → null of []. Behoud de scheiding tussen feiten en aannames. Geef UITSLUITEND geldige JSON terug, zonder tekst eromheen.`;
+    const structUser = `Zet onderstaande onderzoeksbriefing om naar JSON.
 
 Bedrijf: ${row.companyName}
-${row.website ? `Website: ${row.website}` : ""}
-${row.city ? `Vestigingsplaats: ${row.city}` : ""}
-${row.branche ? `Branche: ${row.branche}` : ""}
-${row.description ? `Beschrijving (van ons salesteam): ${row.description}` : ""}
-${row.instagram ? `Instagram: ${row.instagram}` : ""}
-${row.tiktok ? `TikTok: ${row.tiktok}` : ""}
-${row.linkedin ? `LinkedIn: ${row.linkedin}` : ""}
-${row.facebook ? `Facebook: ${row.facebook}` : ""}
-${row.youtube ? `YouTube: ${row.youtube}` : ""}
-${row.primaryGoal ? `Belangrijkste doelstelling van de prospect: ${row.primaryGoal}` : ""}
-${goalsArr.length ? `Gekozen doelstellingen: ${goalsArr.join(", ")}` : ""}
-${row.extra ? `Aanvullende opmerkingen van ons salesteam: ${row.extra}` : ""}
 
-Zoek zelf ontbrekende social-kanalen op en controleer of ze echt bij dit bedrijf horen. Analyseer het bedrijf, de huidige social media (idealiter de laatste 15–30 relevante publicaties per platform, mits toegankelijk), of de huidige content aansluit bij de doelstellingen, de pijnpunten/gemiste kansen, en wat Shortclips concreet kan betekenen. Bedenk 5 concrete, specifieke video-ideeën (met titel, hook, concept, doel). Doe optioneel 2–3 concurrenten. Stem alles af op de doelstellingen van de prospect.
+ONDERZOEKSBRIEFING:
+${briefing.text.slice(0, 40000)}
 
-Geef UITSLUITEND geldige JSON terug in exact dit formaat (laat velden leeg/[] als er geen onderbouwing is):
+Geef UITSLUITEND geldige JSON in exact dit formaat (laat velden leeg/[]/null als de briefing geen onderbouwing geeft):
 {
-  "periodeOnderzocht": "bijv. laatste 60 dagen (gecontroleerd op <datum>)",
+  "periodeOnderzocht": "",
   "bedrijf": { "watDoen": "", "productenDiensten": "", "regio": "", "doelgroep": "", "positionering": "", "sterkePunten": [], "commercieleDoelen": [], "aannames": [] },
   "social": [ { "platform": "Instagram", "gevonden": true, "url": "", "volgers": null, "frequentie": "", "contentTypes": "", "videoAandeel": "", "observaties": [], "opmerking": "" } ],
   "gaatGoed": [],
@@ -185,16 +216,15 @@ Geef UITSLUITEND geldige JSON terug in exact dit formaat (laat velden leeg/[] al
   "bronnen": [ { "label": "", "url": "" } ]
 }`;
 
-    const res = await runJsonResearch<ResearchResult & { bronnen?: Source[] }>({ system, user, maxUses: 12, maxTokens: 24000 });
-    if (!res.ok) {
-      // Niet blijven hangen op "bezig": terug naar concept zodat opnieuw proberen kan.
+    // Structureren is een zuivere JSON-taak (betrouwbaar); nog één herkansing bij een parse-fout.
+    let parsed = await runJsonPrompt<ResearchResult & { bronnen?: Source[] }>({ system: structSystem, user: structUser, maxTokens: 20000 });
+    if (!parsed.ok) parsed = await runJsonPrompt<ResearchResult & { bronnen?: Source[] }>({ system: structSystem, user: structUser, maxTokens: 20000 });
+    if (!parsed.ok) {
       await db.update(salesResearch).set({ status: "concept", updatedAt: new Date() }).where(eq(salesResearch.id, id));
-      return res.reason === "no_provider"
-        ? { ok: false, message: "Er is nog geen AI-sleutel ingesteld — zet ANTHROPIC_API_KEY in .env.local." }
-        : { ok: false, message: res.error ?? "Onderzoek mislukt." };
+      return { ok: false, message: parsed.error ?? "Het onderzoek is gelukt, maar kon niet worden gestructureerd. Probeer het nog eens." };
     }
 
-    const { bronnen, ...result } = res.data;
+    const { bronnen, ...result } = parsed.data;
     await db
       .update(salesResearch)
       .set({ result: result as Record<string, unknown>, sources: (bronnen ?? []) as unknown as Record<string, unknown>, status: "onderzoek_afgerond", updatedAt: new Date() })
