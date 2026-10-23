@@ -22,17 +22,23 @@ type Result =
 const MAX_SCRIPTS = 8;
 const MAX_PDFS = 3;
 
-/** Vaste opmaak- en nadrukregels — gedeeld door genereren en aanpassen. */
-const FORMAT_RULES = [
-  "OPMAAK (strikt aanhouden):",
-  "- Blokken in deze vaste volgorde, elk met een lege regel ervoor en erna: SHORTCLIP UITLEG, HOOK, MIDDENSTUK, CALL TO ACTION, SOCIAL MEDIA POLL KEUZES (die laatste alleen als relevant).",
-  "- Elke KOP op een eigen regel, volledig in HOOFDLETTERS. Daarna één lege regel, dan de tekst, dan weer een lege regel.",
-  "- SHORTCLIP UITLEG: precies drie volledige zinnen (wat de kijker ziet, de opbouw, waarom het concept werkt).",
-  "- MIDDENSTUK: elke zin op een eigen regel.",
-  "- Leg nadruk door af en toe een kernwoord in HOOFDLETTERS te zetten en door vraag- of uitroeptekens te gebruiken waar dat natuurlijk is (maximaal twee uitroeptekens per script).",
-  "- Laat de VIDEOTITEL-kop weg; de titel staat al bovenaan de pagina.",
-  "- Geen markdown, geen sterretjes, geen codeblokken.",
-];
+/** Vaste opmaak- en nadrukregels — gedeeld door genereren en aanpassen.
+ *  withPoll bepaalt of de CTA wordt afgesloten met een social media poll. */
+function formatRules(withPoll: boolean): string[] {
+  return [
+    "OPMAAK (strikt aanhouden):",
+    `- Blokken in deze vaste volgorde, elk met een lege regel ervoor en erna: SHORTCLIP UITLEG, HOOK, MIDDENSTUK, CALL TO ACTION${withPoll ? ", SOCIAL MEDIA POLL KEUZES" : ""}.`,
+    "- Elke KOP op een eigen regel, volledig in HOOFDLETTERS. Daarna één lege regel, dan de tekst, dan weer een lege regel.",
+    "- SHORTCLIP UITLEG: precies drie volledige zinnen (wat de kijker ziet, de opbouw, waarom het concept werkt).",
+    "- MIDDENSTUK: elke zin op een eigen regel MET een lege regel (witregel) tussen elke zin — elke zin wordt los opgenomen, dus ze mogen niet aan elkaar vastzitten.",
+    withPoll
+      ? "- SOCIAL MEDIA POLL KEUZES: precies twee korte, duidelijk verschillende keuzes (elk op een eigen regel)."
+      : "- GEEN poll: sluit af met de CALL TO ACTION. Voeg GEEN kop SOCIAL MEDIA POLL KEUZES en geen pollkeuzes toe. De CTA is een duidelijke vraag of oproep passend bij het onderwerp.",
+    "- Leg nadruk door af en toe een kernwoord in HOOFDLETTERS te zetten en door vraag- of uitroeptekens te gebruiken waar dat natuurlijk is (maximaal twee uitroeptekens per script).",
+    "- Laat de VIDEOTITEL-kop weg; de titel staat al bovenaan de pagina.",
+    "- Geen markdown, geen sterretjes, geen codeblokken.",
+  ];
+}
 
 /** Kwaliteits- en datagedreven regels: schrijf wat aantoonbaar werkt, op Jarno-niveau. */
 const QUALITY_RULES = [
@@ -41,6 +47,7 @@ const QUALITY_RULES = [
   "- Haal stijl, woordgebruik, scriptlengte en openingsstijl uit de eerdere scripts van deze klant.",
   "- Zorg dat elk script echt TikTok- en Reels-waardig is: sterke hook in 3 seconden, hoge retentie, concreet en bruikbaar.",
   "- Volg strikt de Shortclips scriptstijl uit het handboek. Twijfel je of een zin sterk genoeg is, herschrijf hem.",
+  "- KWALITEITSDREMPEL: beoordeel elk script vóór je het teruggeeft zelf streng op de 10 punten (hook, originaliteit, waarde, doelgroep, taalgebruik, commerciële balans, opnamehaalbaarheid, herhaling, feitelijke juistheid, aansluiting doel). Herschrijf net zolang tot het op elk belangrijk punt minimaal 8 van de 10 scoort. Lever UITSLUITEND scripts op van minimaal 8/10 — liever 9. Twijfel je, verbeter het dan verder voordat je het teruggeeft.",
 ];
 
 /** Regels voor iteratief aanpassen: alleen verwerken wat gevraagd is, de rest met rust laten. */
@@ -160,6 +167,8 @@ export async function generateScripts(input: {
   priorText?: string;
   /** Eerdere scripts automatisch uit de Drive-map van de klant halen. */
   useDriveScripts?: boolean;
+  /** CTA met social media poll (true) of alleen een CTA zonder poll (false). */
+  withPoll?: boolean;
 }): Promise<Result> {
   try {
     const viewer = await requirePermission("ai:read");
@@ -176,6 +185,7 @@ export async function generateScripts(input: {
 
     const brief = (input.brief ?? "").trim().slice(0, 4000);
     const priorText = (input.priorText ?? "").trim().slice(0, 24000);
+    const withPoll = input.withPoll !== false; // standaard mét poll
 
     // Eerdere scripts uit Drive (server-side, dus geen upload-limiet).
     let documents: Array<{ base64: string; mediaType: "application/pdf" }> = [];
@@ -199,7 +209,7 @@ export async function generateScripts(input: {
       "",
       ...QUALITY_RULES,
       "",
-      ...FORMAT_RULES,
+      ...formatRules(withPoll),
       "",
       "Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder tekst eromheen:",
       `{"scripts":[{"onderwerp":"<korte videotitel zonder nummer>","regels":["<regel 1>","<regel 2>","..."]}]}`,
@@ -293,7 +303,7 @@ export async function reviseScript(input: {
       "",
       ...(input.newConcept ? [] : REVISE_RULES),
       "",
-      ...FORMAT_RULES,
+      ...formatRules(/SOCIAL\s*MEDIA\s*POLL/i.test(input.tekst)),
       "",
       "Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder tekst eromheen:",
       `{"scripts":[{"onderwerp":"<titel zonder nummer>","regels":["<regel 1>","<regel 2>","..."]}]}`,

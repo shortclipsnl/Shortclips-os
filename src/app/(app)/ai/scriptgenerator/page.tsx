@@ -7,8 +7,9 @@ import { ScriptGeneratorChat } from "./scriptgenerator-ui";
 
 export const metadata: Metadata = { title: "Scriptgenerator" };
 export const dynamic = "force-dynamic";
-// Een scriptbeurt kan meerdere seconden duren; ruim de tijd geven.
-export const maxDuration = 120;
+// Een scriptbeurt kan langer duren: het model schrijft én beoordeelt/herschrijft
+// elk script tot minimaal 8/10. Ruim de tijd geven.
+export const maxDuration = 300;
 
 export default async function ScriptGeneratorPage() {
   const viewer = await requirePermission("ai:read");

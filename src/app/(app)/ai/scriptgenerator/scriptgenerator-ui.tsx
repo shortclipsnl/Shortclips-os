@@ -121,6 +121,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const [showOther, setShowOther] = useState(false);
   const [filter, setFilter] = useState<ClientFilter>("actief");
   const [count, setCount] = useState(3);
+  const [withPoll, setWithPoll] = useState(true);
   const [brief, setBrief] = useState("");
   const [priorFiles, setPriorFiles] = useState<Array<{ name: string; text: string }>>([]);
   const [pdfBusy, setPdfBusy] = useState(false);
@@ -187,6 +188,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         brief: brief.trim() || undefined,
         priorText: priorFiles.length ? priorText() : undefined,
         useDriveScripts: !showOther && !!clientId && useDrive,
+        withPoll,
       });
       if (res.ok) {
         setScripts(res.scripts.map((s: GeneratedScript) => ({ id: uid(), onderwerp: s.onderwerp, tekst: s.tekst, versions: [] })));
@@ -603,6 +605,16 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
             <Plus className="size-4" />
           </button>
         </div>
+      </div>
+
+      {/* Call to action: met of zonder poll */}
+      <div className="mb-5">
+        <span className="mb-2 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Call to action</span>
+        <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5 text-sm">
+          <button type="button" onClick={() => setWithPoll(true)} className={`rounded-[var(--radius-sm)] px-3 py-1.5 font-medium transition ${withPoll ? "bg-[var(--color-brand-600)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>Met poll</button>
+          <button type="button" onClick={() => setWithPoll(false)} className={`rounded-[var(--radius-sm)] px-3 py-1.5 font-medium transition ${!withPoll ? "bg-[var(--color-brand-600)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>Zonder poll</button>
+        </div>
+        <p className="mt-1.5 text-2xs text-[var(--color-ink-faint)]">{withPoll ? "De CTA eindigt met twee pollkeuzes." : "Alleen een call to action, zonder pollkeuzes."}</p>
       </div>
 
       {/* Eerdere scripts — automatisch uit Drive + handmatig toevoegen */}

@@ -35,11 +35,14 @@ const NAVY = rgb(0, 0, 59 / 255);
 const WHITE = rgb(1, 1, 1);
 const BODY = rgb(0.1, 0.1, 0.14);
 
-// Posities van de tekstvakken, overgenomen uit het sjabloon (inch → pt).
-const COVER_KLANT = { x: 0.69 * IN, topY: 6.18 * IN };
-const COVER_DATUM = { x: 3.62 * IN, topY: 6.18 * IN };
-const SCRIPT_TITLE = { x: 0.67 * IN, topY: 0.92 * IN, maxW: 5.2 * IN };
-const SCRIPT_BODY = { x: 0.78 * IN, topY: 2.86 * IN, maxW: 6.68 * IN, bottomY: 1.15 * IN };
+// Posities van de tekstvakken. De x-waarden zijn opgemeten op de linkerrand van
+// de ingebakken labels ("KLANT", "OPNAMEDAG", "Script"), zodat de ingevulde
+// tekst exact onder/naast het label uitlijnt (het sjabloon heeft een tekstvak-
+// binnenmarge die we hier meerekenen).
+const COVER_KLANT = { x: 57.4, topY: 6.18 * IN };
+const COVER_DATUM = { x: 268.5, topY: 6.18 * IN };
+const SCRIPT_TITLE = { x: 56.3, topY: 0.92 * IN, maxW: 5.2 * IN };
+const SCRIPT_BODY = { x: 56.3, topY: 2.86 * IN, maxW: 6.68 * IN, bottomY: 1.15 * IN };
 
 /** Splitst een regel in zoveel regels als nodig om binnen maxWidth te passen. */
 function wrapLine(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
