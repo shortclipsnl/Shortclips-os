@@ -266,7 +266,7 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
     setSavedMsg(null);
     try {
       const res = await saveScriptsToLibrary({ clientId: genClientId, scripts: scripts.map((s) => ({ onderwerp: s.onderwerp, tekst: s.tekst, contentType: s.contentType, funnel: s.funnel })), productionDayId: shootDayId || undefined });
-      if (res.ok) setSavedMsg(`${res.count} script${res.count === 1 ? "" : "s"} opgeslagen in de scriptbibliotheek.`);
+      if (res.ok) setSavedMsg(`${res.count} script${res.count === 1 ? "" : "s"} opgeslagen in de scriptbibliotheek${shootDayId ? " en gekoppeld aan de opname (zichtbaar bij Scripting)" : ""}.`);
       else setErr(res.message);
     } finally {
       setSaving(false);

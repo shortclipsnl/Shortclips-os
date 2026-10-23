@@ -3,11 +3,23 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, Loader2, MessageSquareText, UserPlus } from "lucide-react";
+import { ChevronDown, Loader2, MessageSquareText, UserPlus, ScrollText, ExternalLink } from "lucide-react";
 import { setScriptingNote, setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
-import { SCRIPTING_ORDER, SCRIPTING_STATUS } from "@/lib/statuses";
+import { SCRIPTING_ORDER, SCRIPTING_STATUS, SCRIPT_STATUS } from "@/lib/statuses";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
-import type { ScriptingRow, WriterOption } from "@/server/scripting";
+import type { ScriptingRow, WriterOption, LinkedScript } from "@/server/scripting";
+
+/** Toon-kleur per status-tone, voor de kleine statuspillen van gekoppelde scripts. */
+const TONE_COLOR: Record<string, string> = {
+  neutral: "var(--color-ink-muted)",
+  info: "var(--color-info)",
+  lime: "var(--color-lime)",
+  warn: "var(--color-warn)",
+  bad: "var(--color-bad)",
+  good: "var(--color-good)",
+  violet: "var(--color-violet)",
+  ink: "var(--color-ink)",
+};
 
 const FILTERS = [
   { key: "alle", label: "Alle aankomend" },
@@ -149,7 +161,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
       <div className="mb-2 text-xs text-[var(--color-ink-faint)]">{filtered.length} van {rows.length} opnames</div>
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <table className="w-full min-w-[1040px] text-sm">
+        <table className="w-full min-w-[1200px] text-sm">
           <thead>
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] text-left text-xs text-[var(--color-ink-faint)]">
               <th className="px-3 py-2 font-medium">Klant</th>
@@ -158,6 +170,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
               <th className="px-2 py-2 font-medium">Afteller</th>
               <th className="px-2 py-2 font-medium">Verantwoordelijke</th>
               <th className="px-2 py-2 font-medium">Scriptingstatus</th>
+              <th className="px-2 py-2 font-medium">Scripts</th>
               <th className="px-2 py-2 font-medium">Notitie</th>
             </tr>
           </thead>
@@ -167,12 +180,12 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                 {/* Ruimte tussen de weekgroepen, zodat het beter scanbaar is. */}
                 {gi > 0 ? (
                   <tr aria-hidden>
-                    <td colSpan={7} className="h-6 bg-[var(--color-surface)]" />
+                    <td colSpan={8} className="h-6 bg-[var(--color-surface)]" />
                   </tr>
                 ) : null}
                 {/* Week-kop in volle kleur, zodat je van week naar week kunt scannen. */}
                 <tr>
-                  <td colSpan={7} className="p-0">
+                  <td colSpan={8} className="p-0">
                     <div
                       className="flex items-center gap-2 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white"
                       style={{ background: WEEK_COLOR[g.order] ?? "var(--color-ink-muted)" }}
@@ -206,6 +219,9 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                       <StatusPicker id={r.id} status={r.status} canWrite={canWrite} />
                     </td>
                     <td className="px-2 py-2 align-top">
+                      <ScriptsCell scripts={r.scripts} />
+                    </td>
+                    <td className="px-2 py-2 align-top">
                       <NoteCell id={r.id} note={r.note} canWrite={canWrite} />
                     </td>
                   </tr>
@@ -213,11 +229,75 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
               </Fragment>
             ))}
             {groups.length === 0 ? (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
             ) : null}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Aan de opname gekoppelde scripts: een knop met het aantal; klik voor een lijst
+ * met elk script en zijn status, met een doorklik naar het script zelf. Zo zie je
+ * op de scriptingpagina direct wat er al geschreven is en hoe ver het staat.
+ */
+function ScriptsCell({ scripts }: { scripts: LinkedScript[] }) {
+  const [open, setOpen] = useState(false);
+  const n = scripts.length;
+
+  if (n === 0) {
+    return <span className="text-xs text-[var(--color-ink-faint)]" title="Nog geen scripts gekoppeld aan deze opname">— nog geen</span>;
+  }
+
+  // Compacte voortgang: hoeveel scripts al goedgekeurd/klaar voor opname zijn.
+  const klaar = scripts.filter((s) => s.status === "approved" || s.status === "ready_to_shoot").length;
+
+  return (
+    <div className="relative w-[150px]">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title="Bekijk de gekoppelde scripts en hun status"
+        className="flex w-full items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-brand-200)] bg-[var(--color-brand-50)] px-2 py-1.5 text-left text-xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)]"
+      >
+        <ScrollText className="size-4 shrink-0 text-[var(--color-brand-600)]" />
+        <span className="truncate">{n} script{n === 1 ? "" : "s"}{klaar > 0 ? ` · ${klaar} klaar` : ""}</span>
+        <ChevronDown className="ml-auto size-3.5 shrink-0 opacity-60" />
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full z-20 mt-1.5 w-72 max-w-[85vw] rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
+            <span className="mb-1 block px-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Gekoppelde scripts</span>
+            <ul className="space-y-0.5">
+              {scripts.map((s) => {
+                const meta = SCRIPT_STATUS[s.status];
+                const color = TONE_COLOR[meta?.tone ?? "neutral"] ?? "var(--color-ink-muted)";
+                const isAd = /advertentie/i.test(s.format ?? "");
+                return (
+                  <li key={s.id}>
+                    <Link href={`/scripts/${s.id}`} className="flex items-center gap-2 rounded-[var(--radius-sm)] px-1.5 py-1.5 hover:bg-[var(--color-surface-sunken)]">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-[var(--color-ink)]">{s.title}</span>
+                        <span className="mt-0.5 flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-2xs font-semibold" style={{ color, background: "color-mix(in srgb, " + color + " 14%, transparent)" }}>
+                            <span className="size-1.5 rounded-full" style={{ background: color }} />
+                            {meta?.label ?? s.status}
+                          </span>
+                          {isAd ? <span className="text-2xs font-semibold text-[var(--color-violet)]">{s.format}</span> : null}
+                        </span>
+                      </span>
+                      <ExternalLink className="size-3.5 shrink-0 text-[var(--color-ink-faint)]" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

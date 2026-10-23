@@ -1,8 +1,8 @@
 import "server-only";
-import { and, asc, eq, gte, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
-import { clients, productionDays, users } from "@/db/schema";
+import { clients, productionDays, scripts, users } from "@/db/schema";
 import { requireInternal, scopeToClients, type Viewer } from "@/server/auth/context";
 import { CORE_STAFF_EMAILS, coreStaffRank } from "@/server/core-staff";
 import { subWorkingDays } from "@/lib/workdays";
@@ -43,7 +43,12 @@ export type ScriptingRow = {
   scriptWriterId: string | null;
   scriptWriterName: string | null;
   scriptWriterAvatar: string | null;
+  /** Aan deze opname gekoppelde scripts (uit de scriptbibliotheek). */
+  scripts: LinkedScript[];
 };
+
+/** Eén aan de opname gekoppeld script, met zijn status. */
+export type LinkedScript = { id: string; title: string; status: string; format: string | null };
 
 export type WriterOption = { id: string; fullName: string; avatarUrl: string | null };
 
@@ -103,6 +108,24 @@ export async function listScripting(viewer: Viewer) {
     )
     .orderBy(asc(productionDays.scheduledOn));
 
+  // Aan deze opnames gekoppelde scripts uit de bibliotheek (via productionDayId),
+  // zodat elke opname toont welke scripts eraan hangen en in welke status.
+  const dayIds = rows.map((r) => r.id);
+  const scriptRows = dayIds.length
+    ? await db
+        .select({ id: scripts.id, productionDayId: scripts.productionDayId, title: scripts.title, status: scripts.status, format: scripts.format })
+        .from(scripts)
+        .where(and(inArray(scripts.productionDayId, dayIds), isNull(scripts.deletedAt)))
+        .orderBy(asc(scripts.createdAt))
+    : [];
+  const scriptsByDay = new Map<string, LinkedScript[]>();
+  for (const s of scriptRows) {
+    if (!s.productionDayId) continue;
+    const arr = scriptsByDay.get(s.productionDayId) ?? [];
+    arr.push({ id: s.id, title: s.title, status: s.status, format: s.format });
+    scriptsByDay.set(s.productionDayId, arr);
+  }
+
   const holidays = nlHolidaySet();
   const list: ScriptingRow[] = rows.map((r) => {
     // Scriptdeadline = 7 wérkdagen vóór de opname (niet kalenderdagen), conform
@@ -136,6 +159,7 @@ export async function listScripting(viewer: Viewer) {
       scriptWriterId: r.scriptWriterId ?? r.coordinatorId,
       scriptWriterName: r.scriptWriterName ?? r.coordinatorName,
       scriptWriterAvatar: r.scriptWriterAvatar ?? r.coordinatorAvatar,
+      scripts: scriptsByDay.get(r.id) ?? [],
     };
   });
 
