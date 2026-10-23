@@ -21,7 +21,7 @@ export default async function QualityPage() {
     <div className="mx-auto max-w-[1000px]">
       <PageHeader
         title="Kwaliteit & Aandachtspunten"
-        description="Automatisch gesignaleerde punten die aandacht vragen, afgestemd op jouw rol. Klik op een knop: rood vraagt directe actie, oranje extra aandacht, blauw is vooruitkijken."
+        description="Waar het team op stuurt, ingedeeld per actiegebied: zijn de scripts op tijd, loopt de editing achter, moet er iets naar de klant, en welke plekken in de agenda moeten nog gevuld worden. De kleur toont de ernst — rood = directe actie, oranje = extra aandacht, blauw = vooruitkijken."
       />
       <KwaliteitBoard items={items} counts={counts} />
     </div>

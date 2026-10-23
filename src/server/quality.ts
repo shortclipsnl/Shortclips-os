@@ -26,6 +26,8 @@ import { getGoalsOverview } from "@/server/goals/overview";
  */
 
 export type QualitySeverity = "rood" | "oranje" | "blauw";
+/** Actiegebied, zodat het team per soort werk kan sturen. */
+export type QualityGroup = "scripting" | "editing" | "klant" | "planning" | "overig";
 export type QualityItem = {
   id: string;
   severity: QualitySeverity;
@@ -35,7 +37,39 @@ export type QualityItem = {
   href: string;
   /** Rollen waarvoor dit relevant is; eigenaar/admin zien alles. */
   roles: string[];
+  /** Actiegebied (afgeleid van de categorie), voor de indeling op de pagina. */
+  group?: QualityGroup;
 };
+
+/** Welke categorie hoort bij welk actiegebied. */
+const GROUP_OF: Record<string, QualityGroup> = {
+  "Scripts controleren": "scripting",
+  "Deadline in gevaar": "editing",
+  "Video over deadline": "editing",
+  "Eerste versie verwacht": "editing",
+  "Editor moet opleveren": "editing",
+  "Video wacht op controle": "editing",
+  "Feedback niet verwerkt": "editing",
+  "Productiegegevens ontbreken": "editing",
+  "Te laat bij klant": "klant",
+  "Feedback ontbreekt": "klant",
+  "Video klaar maar niet verstuurd": "klant",
+  "Video niet gepubliceerd": "klant",
+  "Klant vraagt aandacht": "klant",
+  "Resultaten vallen terug": "klant",
+  "Opname voorbereiden": "planning",
+  "Geen opname gepland": "planning",
+  "Planning onvoldoende gevuld": "planning",
+  "Achter op afspraak": "planning",
+  "Koppeling werkt niet": "overig",
+  "Koppeling te bevestigen": "overig",
+  "Contract loopt af": "overig",
+  "Doel achter": "overig",
+  "Doel risico": "overig",
+  "Stand ontbreekt": "overig",
+  "Doel gepland": "overig",
+};
+const groupOf = (category: string): QualityGroup => GROUP_OF[category] ?? "overig";
 
 const CC = ["project_coordinator", "content_creator"];
 const EDIT = ["project_coordinator", "editor"];
@@ -409,5 +443,8 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   }
   capped.sort((a, b) => order[a.severity] - order[b.severity] || a.category.localeCompare(b.category));
 
-  return { items: capped, counts };
+  // Actiegebied per item afleiden, zodat de pagina per soort werk kan indelen.
+  const withGroup = capped.map((it) => ({ ...it, group: groupOf(it.category) }));
+
+  return { items: withGroup, counts };
 }
