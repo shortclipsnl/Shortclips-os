@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, Loader2, MessageSquareText, UserPlus, ScrollText, ExternalLink } from "lucide-react";
+import { ChevronDown, Loader2, MessageSquareText, UserPlus, ScrollText, ExternalLink, X } from "lucide-react";
 import { setScriptingNote, setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS, SCRIPT_STATUS } from "@/lib/statuses";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
@@ -219,7 +219,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                       <StatusPicker id={r.id} status={r.status} canWrite={canWrite} />
                     </td>
                     <td className="px-2 py-2 align-top">
-                      <ScriptsCell scripts={r.scripts} />
+                      <ScriptsCell row={r} />
                     </td>
                     <td className="px-2 py-2 align-top">
                       <NoteCell id={r.id} note={r.note} canWrite={canWrite} />
@@ -238,66 +238,133 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
   );
 }
 
+function fmtDateTime(iso: string): string {
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? "" : d.toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+function fmtLong(d: string) {
+  const [y, m, day] = d.split("-").map(Number);
+  return new Date(y!, (m ?? 1) - 1, day).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+}
+
+/** Kleine statuspil voor een script (SCRIPT_STATUS + tone-kleur). */
+function ScriptStatusPill({ status }: { status: string }) {
+  const meta = SCRIPT_STATUS[status];
+  const color = TONE_COLOR[meta?.tone ?? "neutral"] ?? "var(--color-ink-muted)";
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-2xs font-semibold" style={{ color, background: "color-mix(in srgb, " + color + " 14%, transparent)" }}>
+      <span className="size-1.5 rounded-full" style={{ background: color }} />
+      {meta?.label ?? status}
+    </span>
+  );
+}
+
 /**
- * Aan de opname gekoppelde scripts: een knop met het aantal; klik voor een lijst
- * met elk script en zijn status, met een doorklik naar het script zelf. Zo zie je
- * op de scriptingpagina direct wat er al geschreven is en hoe ver het staat.
+ * "Bekijk scripts": een knop bij elke opname die een paneel opent met de volledig
+ * leesbare, aan die opname gekoppelde scripts (titel, Shortclip uitleg, hook,
+ * middenstuk, call to action), hun status en wanneer ze voor het laatst zijn
+ * aangepast — zodat het team niet naar Drive of de generator hoeft. Is er nog
+ * niets gekoppeld, dan toont het paneel een melding met een directe link naar de
+ * Script Generator voor deze opname.
  */
-function ScriptsCell({ scripts }: { scripts: LinkedScript[] }) {
+function ScriptsCell({ row }: { row: ScriptingRow }) {
   const [open, setOpen] = useState(false);
-  const n = scripts.length;
-
-  if (n === 0) {
-    return <span className="text-xs text-[var(--color-ink-faint)]" title="Nog geen scripts gekoppeld aan deze opname">— nog geen</span>;
-  }
-
-  // Compacte voortgang: hoeveel scripts al goedgekeurd/klaar voor opname zijn.
-  const klaar = scripts.filter((s) => s.status === "approved" || s.status === "ready_to_shoot").length;
+  const n = row.scripts.length;
+  const klaar = row.scripts.filter((s) => s.status === "approved" || s.status === "ready_to_shoot").length;
 
   return (
-    <div className="relative w-[150px]">
+    <>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        title="Bekijk de gekoppelde scripts en hun status"
-        className="flex w-full items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-brand-200)] bg-[var(--color-brand-50)] px-2 py-1.5 text-left text-xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)]"
+        onClick={() => setOpen(true)}
+        title="Bekijk de aan deze opname gekoppelde scripts"
+        className={`flex w-[150px] items-center gap-1.5 rounded-[var(--radius-sm)] border px-2 py-1.5 text-left text-xs font-medium hover:border-[var(--color-brand-500)] ${n > 0 ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)] text-[var(--color-ink)]" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)]"}`}
       >
-        <ScrollText className="size-4 shrink-0 text-[var(--color-brand-600)]" />
-        <span className="truncate">{n} script{n === 1 ? "" : "s"}{klaar > 0 ? ` · ${klaar} klaar` : ""}</span>
-        <ChevronDown className="ml-auto size-3.5 shrink-0 opacity-60" />
+        <ScrollText className={`size-4 shrink-0 ${n > 0 ? "text-[var(--color-brand-600)]" : "text-[var(--color-ink-faint)]"}`} />
+        <span className="truncate">{n > 0 ? `${n} script${n === 1 ? "" : "s"}${klaar > 0 ? ` · ${klaar} klaar` : ""}` : "Bekijk scripts"}</span>
       </button>
-      {open ? (
-        <>
-          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-20 mt-1.5 w-72 max-w-[85vw] rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
-            <span className="mb-1 block px-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Gekoppelde scripts</span>
-            <ul className="space-y-0.5">
-              {scripts.map((s) => {
-                const meta = SCRIPT_STATUS[s.status];
-                const color = TONE_COLOR[meta?.tone ?? "neutral"] ?? "var(--color-ink-muted)";
-                const isAd = /advertentie/i.test(s.format ?? "");
-                return (
-                  <li key={s.id}>
-                    <Link href={`/scripts/${s.id}`} className="flex items-center gap-2 rounded-[var(--radius-sm)] px-1.5 py-1.5 hover:bg-[var(--color-surface-sunken)]">
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm text-[var(--color-ink)]">{s.title}</span>
-                        <span className="mt-0.5 flex items-center gap-1.5">
-                          <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-2xs font-semibold" style={{ color, background: "color-mix(in srgb, " + color + " 14%, transparent)" }}>
-                            <span className="size-1.5 rounded-full" style={{ background: color }} />
-                            {meta?.label ?? s.status}
-                          </span>
-                          {isAd ? <span className="text-2xs font-semibold text-[var(--color-violet)]">{s.format}</span> : null}
-                        </span>
-                      </span>
-                      <ExternalLink className="size-3.5 shrink-0 text-[var(--color-ink-faint)]" />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+      {open ? <ScriptsModal row={row} onClose={() => setOpen(false)} /> : null}
+    </>
+  );
+}
+
+/** Volledig, leesbaar overzicht van de gekoppelde scripts van één opname. */
+function ScriptsModal({ row, onClose }: { row: ScriptingRow; onClose: () => void }) {
+  const n = row.scripts.length;
+  const scriptingMeta = SCRIPTING_STATUS[row.status];
+  const scriptingColor = TONE_COLOR[scriptingMeta?.tone ?? "neutral"] ?? "var(--color-ink-muted)";
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/30 p-4 sm:p-8" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]">
+        {/* Kop: klant + opnamedatum + scriptingstatus + aantal */}
+        <div className="sticky top-0 flex items-start gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+          <ClientLogo name={row.clientName} logoUrl={row.clientLogo} color={row.clientColor} size={34} />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-bold text-[var(--color-ink)]">{row.clientName}</h2>
+            <p className="text-xs text-[var(--color-ink-muted)]">Opname: {fmtLong(row.scheduledOn)}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold" style={{ color: scriptingColor, background: "color-mix(in srgb, " + scriptingColor + " 14%, transparent)" }}>
+                <span className="size-1.5 rounded-full" style={{ background: scriptingColor }} />
+                {scriptingMeta?.label ?? row.status}
+              </span>
+              <span className="text-2xs text-[var(--color-ink-faint)]">{n} gekoppeld{n === 1 ? " script" : "e scripts"}</span>
+            </div>
           </div>
-        </>
-      ) : null}
+          <button type="button" onClick={onClose} className="shrink-0 rounded p-1 text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"><X className="size-5" /></button>
+        </div>
+
+        {n === 0 ? (
+          <div className="p-6 text-center">
+            <ScrollText className="mx-auto mb-2 size-7 text-[var(--color-ink-faint)]" />
+            <p className="text-sm text-[var(--color-ink-muted)]">Er zijn nog geen scripts aan deze opname gekoppeld.</p>
+            <Link href={`/ai/scriptgenerator?client=${row.clientId}`} className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-good)] px-4 py-2 text-sm font-semibold text-white hover:brightness-110">
+              ✍️ Open de Script Generator voor deze opname
+            </Link>
+          </div>
+        ) : (
+          <ul className="divide-y divide-[var(--color-line)]">
+            {row.scripts.map((s, i) => {
+              const isAd = /advertentie/i.test(s.format ?? "");
+              return (
+                <li key={s.id} className="p-4">
+                  <div className="mb-2 flex items-start gap-2">
+                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--color-brand-600)] text-2xs font-bold text-white">{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[var(--color-ink)]">{s.title}</p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                        <ScriptStatusPill status={s.status} />
+                        {isAd ? <span className="text-2xs font-semibold text-[var(--color-violet)]">{s.format}</span> : null}
+                        <span className="text-2xs text-[var(--color-ink-faint)]">v{s.version} · bijgewerkt {fmtDateTime(s.updatedAt)}</span>
+                      </div>
+                    </div>
+                    <Link href={`/scripts/${s.id}`} className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-1 text-2xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)]">
+                      Open <ExternalLink className="size-3" />
+                    </Link>
+                  </div>
+                  <div className="space-y-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3 text-xs">
+                    <Block label="Shortclip uitleg" text={s.uitleg} italic />
+                    <Block label={isAd ? "Hooks" : "Hook"} text={s.hook} />
+                    <Block label={isAd ? "Probleem & oplossing" : "Middenstuk"} text={s.body} />
+                    <Block label="Call to action" text={s.cta} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Eén leesbaar tekstblok in het scriptpaneel. */
+function Block({ label, text, italic }: { label: string; text: string | null; italic?: boolean }) {
+  if (!text || !text.trim()) return null;
+  return (
+    <div>
+      <span className="mb-0.5 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{label}</span>
+      <p className={`whitespace-pre-wrap leading-relaxed text-[var(--color-ink)] ${italic ? "italic text-[var(--color-ink-muted)]" : ""}`}>{text}</p>
     </div>
   );
 }

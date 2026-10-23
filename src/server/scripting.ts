@@ -25,6 +25,7 @@ function daysDiff(a: string, b: string): number {
 
 export type ScriptingRow = {
   id: string;
+  clientId: string;
   clientName: string;
   clientSlug: string;
   clientColor: string | null;
@@ -47,8 +48,20 @@ export type ScriptingRow = {
   scripts: LinkedScript[];
 };
 
-/** Eén aan de opname gekoppeld script, met zijn status. */
-export type LinkedScript = { id: string; title: string; status: string; format: string | null };
+/** Eén aan de opname gekoppeld script, met status en volledige inhoud (voor
+ *  "Bekijk scripts", zodat het team niet naar Drive of de generator hoeft). */
+export type LinkedScript = {
+  id: string;
+  title: string;
+  status: string;
+  format: string | null;
+  uitleg: string | null;
+  hook: string | null;
+  body: string | null;
+  cta: string | null;
+  version: number;
+  updatedAt: string;
+};
 
 export type WriterOption = { id: string; fullName: string; avatarUrl: string | null };
 
@@ -83,6 +96,7 @@ export async function listScripting(viewer: Viewer) {
       scheduledOn: productionDays.scheduledOn,
       status: productionDays.scriptingStatus,
       note: productionDays.scriptingNote,
+      clientId: clients.id,
       clientName: clients.name,
       clientSlug: clients.slug,
       clientColor: clients.color,
@@ -113,7 +127,7 @@ export async function listScripting(viewer: Viewer) {
   const dayIds = rows.map((r) => r.id);
   const scriptRows = dayIds.length
     ? await db
-        .select({ id: scripts.id, productionDayId: scripts.productionDayId, title: scripts.title, status: scripts.status, format: scripts.format })
+        .select({ id: scripts.id, productionDayId: scripts.productionDayId, title: scripts.title, status: scripts.status, format: scripts.format, uitleg: scripts.internalNotes, hook: scripts.hook, body: scripts.body, cta: scripts.cta, version: scripts.currentVersion, updatedAt: scripts.updatedAt })
         .from(scripts)
         .where(and(inArray(scripts.productionDayId, dayIds), isNull(scripts.deletedAt)))
         .orderBy(asc(scripts.createdAt))
@@ -122,7 +136,9 @@ export async function listScripting(viewer: Viewer) {
   for (const s of scriptRows) {
     if (!s.productionDayId) continue;
     const arr = scriptsByDay.get(s.productionDayId) ?? [];
-    arr.push({ id: s.id, title: s.title, status: s.status, format: s.format });
+    // De shortclip-uitleg staat in internalNotes met een vast voorvoegsel.
+    const uitleg = s.uitleg ? s.uitleg.replace(/^Shortclip uitleg:\s*/i, "").trim() || null : null;
+    arr.push({ id: s.id, title: s.title, status: s.status, format: s.format, uitleg, hook: s.hook, body: s.body, cta: s.cta, version: s.version, updatedAt: (s.updatedAt instanceof Date ? s.updatedAt : new Date(s.updatedAt as unknown as string)).toISOString() });
     scriptsByDay.set(s.productionDayId, arr);
   }
 
@@ -142,6 +158,7 @@ export async function listScripting(viewer: Viewer) {
           : "green";
     return {
       id: r.id,
+      clientId: r.clientId,
       clientName: r.clientName,
       clientSlug: r.clientSlug,
       clientColor: r.clientColor,

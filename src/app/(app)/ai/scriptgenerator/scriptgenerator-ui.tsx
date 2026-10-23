@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock, Megaphone, Sprout } from "lucide-react";
+import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock, Megaphone, Sprout, Link2, AlertTriangle, ChevronDown } from "lucide-react";
 import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, saveScriptToDrive, checkScriptQuality, listShootDaysForClient, type GeneratedScript, type QualityResult, type ContentType } from "@/server/actions/script-generate";
 
 type ShootDay = { id: string; scheduledOn: string; title: string };
@@ -13,7 +13,7 @@ type Client = { id: string; name: string; active: boolean };
 type ClientFilter = "actief" | "inactief" | "alle";
 
 type Version = { onderwerp: string; tekst: string; feedback: string; at: number };
-type EditorScript = { id: string; onderwerp: string; tekst: string; versions: Version[]; contentType: ContentType; funnel?: Funnel };
+type EditorScript = { id: string; onderwerp: string; tekst: string; versions: Version[]; contentType: ContentType; funnel?: Funnel; scriptId?: string };
 
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 
@@ -134,12 +134,15 @@ const scoreColor = (n: number) => (n >= 7 ? "var(--color-good)" : n >= 4 ? "var(
 
 /* ---------------- component ---------------- */
 
-export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; aiReady: boolean }) {
+export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { clients: Client[]; aiReady: boolean; initialClientId?: string }) {
+  // Vooraf geselecteerde klant (bijv. vanaf de scriptingpagina).
+  const preClient = initialClientId && clients.some((c) => c.id === initialClientId) ? initialClientId : "";
   // Instellingen
-  const [clientId, setClientId] = useState<string>("");
+  const [clientId, setClientId] = useState<string>(preClient);
   const [otherName, setOtherName] = useState<string>("");
   const [showOther, setShowOther] = useState(false);
-  const [filter, setFilter] = useState<ClientFilter>("actief");
+  // Als de voorgeselecteerde klant niet actief is, toon toch alle klanten zodat die zichtbaar is.
+  const [filter, setFilter] = useState<ClientFilter>(preClient && !clients.find((c) => c.id === preClient)?.active ? "alle" : "actief");
   const [count, setCount] = useState(3);
   const [contentType, setContentType] = useState<ContentType>("organisch");
   // Advertenties: verdeling over de funnel (standaard 2/2/2 = 6 scripts).
@@ -178,6 +181,12 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [driveSaving, setDriveSaving] = useState(false);
   const [driveMsg, setDriveMsg] = useState<{ text: string; link?: string } | null>(null);
+  // Koppelen aan opname (4e actie) + waarschuwing bij goedgekeurde scripts.
+  const [coupleOpen, setCoupleOpen] = useState(false);
+  const [coupleBusy, setCoupleBusy] = useState(false);
+  const [coupleMsg, setCoupleMsg] = useState<string | null>(null);
+  const [blockedApproved, setBlockedApproved] = useState<Array<{ index: number; title: string }>>([]);
+  const [lastCoupleDayId, setLastCoupleDayId] = useState<string | undefined>(undefined);
 
   const visibleClients = clients.filter((c) => (filter === "alle" ? true : filter === "actief" ? c.active : !c.active));
   const selectedName = clientId ? clients.find((c) => c.id === clientId)?.name ?? "" : "";
@@ -259,18 +268,58 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
     })();
   };
 
+  /**
+   * Opslaan/bijwerken in de bibliotheek, idempotent: bestaande scripts (met een
+   * eerder bewaard scriptId) worden bijgewerkt i.p.v. gedupliceerd. Koppelt
+   * optioneel aan een opname. Goedgekeurde scripts worden niet overschreven
+   * zonder bevestiging (force).
+   */
+  const persistScripts = async (opts: { productionDayId?: string; force?: boolean }): Promise<{ ok: boolean; blocked: number }> => {
+    if (!scripts || scripts.length === 0 || !genClientId) return { ok: false, blocked: 0 };
+    const res = await saveScriptsToLibrary({
+      clientId: genClientId,
+      scripts: scripts.map((s) => ({ onderwerp: s.onderwerp, tekst: s.tekst, contentType: s.contentType, funnel: s.funnel, scriptId: s.scriptId })),
+      productionDayId: opts.productionDayId,
+      force: opts.force,
+    });
+    if (!res.ok) { setErr(res.message); return { ok: false, blocked: 0 }; }
+    // Bewaar de script-id's op de kaarten, zodat opnieuw opslaan bijwerkt (geen duplicaat).
+    setScripts((prev) => prev ? prev.map((s, i) => { const hit = res.saved.find((x) => x.index === i); return hit ? { ...s, scriptId: hit.scriptId } : s; }) : prev);
+    setBlockedApproved(res.blocked);
+    return { ok: true, blocked: res.blocked.length };
+  };
+
   const saveToLibrary = async () => {
     if (!scripts || scripts.length === 0 || !genClientId) return;
-    setSaving(true);
-    setErr(null);
-    setSavedMsg(null);
+    setSaving(true); setErr(null); setSavedMsg(null); setCoupleMsg(null);
+    setLastCoupleDayId(shootDayId || undefined);
     try {
-      const res = await saveScriptsToLibrary({ clientId: genClientId, scripts: scripts.map((s) => ({ onderwerp: s.onderwerp, tekst: s.tekst, contentType: s.contentType, funnel: s.funnel })), productionDayId: shootDayId || undefined });
-      if (res.ok) setSavedMsg(`${res.count} script${res.count === 1 ? "" : "s"} opgeslagen in de scriptbibliotheek${shootDayId ? " en gekoppeld aan de opname (zichtbaar bij Scripting)" : ""}.`);
-      else setErr(res.message);
-    } finally {
-      setSaving(false);
-    }
+      const r = await persistScripts({ productionDayId: shootDayId || undefined });
+      if (r.ok) setSavedMsg(`${scripts.length - r.blocked} script${scripts.length - r.blocked === 1 ? "" : "s"} opgeslagen in de scriptbibliotheek${shootDayId ? " en gekoppeld aan de opname (zichtbaar bij Scripting)" : ""}.`);
+    } finally { setSaving(false); }
+  };
+
+  // 4e actie: koppelen aan een geplande opname van deze klant.
+  const coupleToShoot = async (dayId: string, dayLabel: string) => {
+    if (!scripts || scripts.length === 0 || !genClientId || coupleBusy) return;
+    setCoupleBusy(true); setErr(null); setSavedMsg(null); setCoupleMsg(null); setCoupleOpen(false);
+    setLastCoupleDayId(dayId);
+    try {
+      const r = await persistScripts({ productionDayId: dayId });
+      if (r.ok) {
+        setShootDayId(dayId);
+        setCoupleMsg(`${scripts.length - r.blocked} script${scripts.length - r.blocked === 1 ? "" : "s"} gekoppeld aan de opname van ${dayLabel}. Te zien bij Scripting.`);
+      }
+    } finally { setCoupleBusy(false); }
+  };
+
+  // "Toch overschrijven" na een waarschuwing over goedgekeurde scripts.
+  const forceOverwrite = async () => {
+    setCoupleBusy(true); setErr(null);
+    try {
+      const r = await persistScripts({ productionDayId: lastCoupleDayId, force: true });
+      if (r.ok) { setCoupleMsg("Alle scripts (inclusief de goedgekeurde) zijn bijgewerkt."); setBlockedApproved([]); }
+    } finally { setCoupleBusy(false); }
   };
 
   const saveToDrive = async () => {
@@ -612,14 +661,64 @@ export function ScriptGeneratorChat({ clients, aiReady }: { clients: Client[]; a
         {driveMsg ? (
           <p className="text-2xs text-[var(--color-good)]">{driveMsg.text}{driveMsg.link ? <> <a href={driveMsg.link} target="_blank" rel="noreferrer" className="font-semibold underline">Open in Drive</a></> : null}</p>
         ) : null}
+        {coupleMsg ? (
+          <p className="text-2xs text-[var(--color-good)]">{coupleMsg} <a href="/scripting" className="font-semibold underline">Open Scripting</a></p>
+        ) : null}
+        {blockedApproved.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-warn)] bg-[var(--color-warn-soft)] px-3 py-2 text-2xs text-[#8a5300]">
+            <AlertTriangle className="size-4 shrink-0" />
+            <span>{blockedApproved.length} al goedgekeurd{blockedApproved.length === 1 ? " script is" : "e scripts zijn"} niet overschreven: {blockedApproved.map((b) => b.title).join(", ")}.</span>
+            <button type="button" onClick={forceOverwrite} disabled={coupleBusy} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[#8a5300] px-2 py-0.5 font-semibold hover:bg-white/40 disabled:opacity-40">
+              {coupleBusy ? <Loader2 className="size-3 animate-spin" /> : null} Toch overschrijven
+            </button>
+          </div>
+        ) : null}
 
         {/* Actiebalk */}
         <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface-2)]/95 p-3 shadow-[var(--shadow-card)] backdrop-blur">
-          <button type="button" onClick={() => { setScripts(null); setErr(null); setSavedMsg(null); setDriveMsg(null); setReviseId(null); setVersionsId(null); setShootDays([]); setShootDayId(""); }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface)]">
+          <button type="button" onClick={() => { setScripts(null); setErr(null); setSavedMsg(null); setDriveMsg(null); setCoupleMsg(null); setBlockedApproved([]); setCoupleOpen(false); setReviseId(null); setVersionsId(null); setShootDays([]); setShootDayId(""); }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-2 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface)]">
             <ArrowLeft className="size-4" /> Nieuwe set
           </button>
           <span className="text-2xs text-[var(--color-ink-faint)]">{scripts.length} script{scripts.length === 1 ? "" : "s"} · geef feedback tot het klopt</span>
           <div className="ml-auto flex items-center gap-2">
+            {/* 4e actie: koppelen aan een geplande opname (alleen opnames van deze klant). */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { if (genClientId) setCoupleOpen((o) => !o); }}
+                disabled={coupleBusy || scripts.length === 0 || !genClientId}
+                title={genClientId ? "Koppel de scripts aan een geplande opname" : "Kies een vastgelegde klant om te kunnen koppelen"}
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-brand-300)] bg-[var(--color-brand-50)] px-3 py-2 text-sm font-medium text-[var(--color-brand-700)] hover:border-[var(--color-brand-500)] disabled:opacity-40"
+              >
+                {coupleBusy ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />} Koppelen aan opname
+                <ChevronDown className="size-3.5 opacity-60" />
+              </button>
+              {coupleOpen ? (
+                <>
+                  <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setCoupleOpen(false)} />
+                  <div className="absolute bottom-full right-0 z-20 mb-1.5 w-72 max-w-[85vw] rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
+                    <span className="mb-1 block px-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Kies de opname</span>
+                    {shootDays.length === 0 ? (
+                      <p className="px-1 py-2 text-2xs text-[var(--color-ink-faint)]">Deze klant heeft geen aankomende opnames in de planning.</p>
+                    ) : (
+                      <ul className="max-h-64 space-y-0.5 overflow-y-auto">
+                        {shootDays.map((d) => (
+                          <li key={d.id}>
+                            <button type="button" onClick={() => coupleToShoot(d.id, isoToNl(d.scheduledOn))} className={`flex w-full items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-left text-sm hover:bg-[var(--color-surface-sunken)] ${shootDayId === d.id ? "font-semibold text-[var(--color-brand-700)]" : "text-[var(--color-ink)]"}`}>
+                              <Clock className="size-4 shrink-0 text-[var(--color-brand-600)]" />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate">{isoToNl(d.scheduledOn)}</span>
+                                <span className="block truncate text-2xs text-[var(--color-ink-faint)]">{d.title}</span>
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
             <button
               type="button"
               onClick={saveToLibrary}

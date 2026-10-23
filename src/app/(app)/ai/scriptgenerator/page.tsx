@@ -11,9 +11,11 @@ export const dynamic = "force-dynamic";
 // elk script tot minimaal 8/10. Ruim de tijd geven.
 export const maxDuration = 300;
 
-export default async function ScriptGeneratorPage() {
+export default async function ScriptGeneratorPage({ searchParams }: { searchParams: Promise<{ client?: string }> }) {
   const viewer = await requirePermission("ai:read");
   const clients = await listClientsForScripts(viewer);
+  // Vanaf de scriptingpagina kan een klant worden voorgeselecteerd (?client=<id>).
+  const initialClientId = (await searchParams).client;
 
   return (
     <div className="mx-auto max-w-[900px]">
@@ -21,7 +23,7 @@ export default async function ScriptGeneratorPage() {
         title="Scriptgenerator"
         description="De vaste Shortclips scriptschrijver voor organische short video's (TikTok/Reels). Kies een klant en het aantal scripts — hij schrijft ze direct volgens het Scripthandboek, op basis van wat bij die klant werkt. Daarna pas je alles aan en download je het als scriptbestand (PDF) in de vaste huisstijl."
       />
-      <ScriptGeneratorChat clients={clients} aiReady={aiConfigured()} />
+      <ScriptGeneratorChat clients={clients} aiReady={aiConfigured()} initialClientId={initialClientId} />
     </div>
   );
 }

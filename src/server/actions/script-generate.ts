@@ -731,20 +731,29 @@ export async function listShootDaysForClient(clientId: string): Promise<Array<{ 
 }
 
 type SaveResult =
-  | { ok: true; count: number }
+  | { ok: true; count: number; saved: Array<{ index: number; scriptId: string }>; blocked: Array<{ index: number; title: string }> }
   | { ok: false; message: string };
 
-/** Slaat de (bewerkte) scripts op in de bestaande scriptbibliotheek: een scripts-record
- *  plus een eerste versie per script, gekoppeld aan de klant. */
+/**
+ * Slaat de (bewerkte) scripts op in de bestaande scriptbibliotheek, idempotent:
+ *  - zonder `scriptId` → nieuw script (status concept, versie 1);
+ *  - mét `scriptId` → het bestaande script bijwerken (nieuwe versie, geen
+ *    duplicaat). Een al GOEDGEKEURD script wordt niet overschreven tenzij
+ *    `force` meegegeven is; het komt dan terug in `blocked` met een waarschuwing.
+ * Optioneel koppelt het de scripts aan een opnamedag (productionDayId), zodat ze
+ * op de scriptingpagina bij die opname verschijnen.
+ */
 export async function saveScriptsToLibrary(input: {
   clientId: string;
-  scripts: Array<{ onderwerp: string; tekst: string; contentType?: ContentType; funnel?: Funnel }>;
+  scripts: Array<{ onderwerp: string; tekst: string; contentType?: ContentType; funnel?: Funnel; scriptId?: string }>;
   /** Optioneel: koppel aan een opnamedag uit de opnameplanning. */
   productionDayId?: string;
+  /** Overschrijf ook goedgekeurde scripts (na bevestiging door de gebruiker). */
+  force?: boolean;
 }): Promise<SaveResult> {
   try {
     const viewer = await requirePermission("scripts:write");
-    const items = (input.scripts ?? []).filter((s) => (s?.onderwerp?.trim() || s?.tekst?.trim()));
+    const items = (input.scripts ?? []).map((s, index) => ({ s, index })).filter(({ s }) => (s?.onderwerp?.trim() || s?.tekst?.trim()));
     if (items.length === 0) return { ok: false, message: "Er zijn geen scripts om op te slaan." };
 
     const [c] = await db
@@ -764,8 +773,10 @@ export async function saveScriptsToLibrary(input: {
       if (pd) productionDayId = pd.id;
     }
 
-    let count = 0;
-    for (const it of items) {
+    const saved: Array<{ index: number; scriptId: string }> = [];
+    const blocked: Array<{ index: number; title: string }> = [];
+
+    for (const { s: it, index } of items) {
       const title = (it.onderwerp || "Script").replace(/^\s*\d+\.\s*/, "").trim().slice(0, 240) || "Script";
       const { uitleg, hook, body, cta } = parseScriptBlocks(it.tekst);
       // Contenttype serverzijdig vastleggen in het format-veld, zodat het bij
@@ -773,6 +784,48 @@ export async function saveScriptsToLibrary(input: {
       const format = it.contentType === "advertentie"
         ? `Advertentie ${it.funnel ?? "TOF"}`
         : "Organische short video";
+      const bodyVal = body || it.tekst.trim() || null;
+      const notesVal = uitleg ? `Shortclip uitleg:\n${uitleg}` : null;
+
+      // Bestaand script bijwerken (geen duplicaat), mits het van deze klant is.
+      if (it.scriptId) {
+        const [existing] = await db.select({ id: scripts.id, status: scripts.status, currentVersion: scripts.currentVersion })
+          .from(scripts)
+          .where(and(eq(scripts.id, it.scriptId), eq(scripts.clientId, c.id), isNull(scripts.deletedAt)))
+          .limit(1);
+        if (existing) {
+          // Goedgekeurde scripts niet zonder bevestiging overschrijven.
+          if (existing.status === "approved" && !input.force) {
+            blocked.push({ index, title });
+            continue;
+          }
+          const nextVersion = (existing.currentVersion ?? 1) + 1;
+          await db.update(scripts).set({
+            title,
+            format,
+            hook: hook || null,
+            body: bodyVal,
+            cta: cta || null,
+            internalNotes: notesVal,
+            currentVersion: nextVersion,
+            updatedAt: new Date(),
+            ...(productionDayId ? { productionDayId } : {}),
+          }).where(eq(scripts.id, existing.id));
+          await db.insert(scriptVersions).values({
+            scriptId: existing.id,
+            versionNumber: nextVersion,
+            snapshot: { title, uitleg, hook, body, cta } as unknown as Record<string, unknown>,
+            changeSummary: "Bijgewerkt met de scriptgenerator",
+            status: existing.status,
+            authorId: viewer.id,
+          });
+          await auditLog({ viewer, action: "script.update", entityType: "script", entityId: existing.id, clientId: c.id });
+          saved.push({ index, scriptId: existing.id });
+          continue;
+        }
+        // scriptId onbekend/verwijderd → val terug op nieuw aanmaken.
+      }
+
       const [row] = await db.insert(scripts).values({
         clientId: c.id,
         productionDayId,
@@ -780,9 +833,9 @@ export async function saveScriptsToLibrary(input: {
         status: "concept",
         format,
         hook: hook || null,
-        body: body || it.tekst.trim() || null,
+        body: bodyVal,
         cta: cta || null,
-        internalNotes: uitleg ? `Shortclip uitleg:\n${uitleg}` : null,
+        internalNotes: notesVal,
         creatorId: viewer.id,
         currentVersion: 1,
       }).returning({ id: scripts.id });
@@ -796,12 +849,13 @@ export async function saveScriptsToLibrary(input: {
         authorId: viewer.id,
       });
       await auditLog({ viewer, action: "script.create", entityType: "script", entityId: row.id, clientId: c.id });
-      count++;
+      saved.push({ index, scriptId: row.id });
     }
 
-    if (count === 0) return { ok: false, message: "Opslaan lukte niet. Probeer het nog eens." };
+    if (saved.length === 0 && blocked.length === 0) return { ok: false, message: "Opslaan lukte niet. Probeer het nog eens." };
     revalidatePath("/scripts");
-    return { ok: true, count };
+    revalidatePath("/scripting");
+    return { ok: true, count: saved.length, saved, blocked };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;
