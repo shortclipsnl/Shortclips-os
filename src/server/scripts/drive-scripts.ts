@@ -1,10 +1,65 @@
 import "server-only";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { files } from "@/db/schema";
 import { drive } from "@/server/integrations/drive";
 
 export type PriorScriptPdf = { name: string; base64: string };
+
+/** Een scriptbestand in Drive met een directe open-link (de webViewLink). */
+export type DriveScriptLink = { name: string; url: string | null; modifiedAt: string | null };
+
+/**
+ * Haalt per klant de scriptbestanden (PDF/doc) uit de al gesynchroniseerde
+ * Drive-map (categorie "Scripts") op als open-links — nieuwste eerst — zodat ze
+ * rechtstreeks op de scriptingpagina getoond kunnen worden. Dit is enkel een
+ * DB-lezing (geen Drive-download), dus snel en veilig om bij het laden van de
+ * pagina voor alle opnames in één keer te doen. Geen Drive gekoppeld → leeg.
+ */
+export async function listClientDriveScriptLinks(
+  clientIds: string[],
+  perClient = 12,
+): Promise<Map<string, DriveScriptLink[]>> {
+  const result = new Map<string, DriveScriptLink[]>();
+  const ids = [...new Set(clientIds.filter(Boolean))];
+  if (ids.length === 0) return result;
+
+  const rows = await db
+    .select({
+      clientId: files.clientId,
+      name: files.name,
+      url: files.externalUrl,
+      mimeType: files.mimeType,
+      modifiedAt: files.modifiedAt,
+    })
+    .from(files)
+    .where(and(
+      inArray(files.clientId, ids),
+      eq(files.isFolder, false),
+      eq(files.category, "Scripts"),
+      isNull(files.deletedAt),
+    ))
+    .orderBy(desc(files.modifiedAt));
+
+  for (const r of rows) {
+    if (!r.clientId) continue;
+    // Alleen echte scriptdocumenten (PDF/Word/Google Doc) — geen losse mappen of
+    // toevallige bestanden in de scriptsmap.
+    const n = r.name.toLowerCase();
+    const isDoc = r.mimeType?.includes("pdf") || r.mimeType?.includes("document")
+      || r.mimeType?.includes("word") || n.endsWith(".pdf") || n.endsWith(".docx") || n.endsWith(".doc");
+    if (!isDoc) continue;
+    const arr = result.get(r.clientId) ?? [];
+    if (arr.length >= perClient) continue;
+    arr.push({
+      name: r.name,
+      url: r.url,
+      modifiedAt: r.modifiedAt ? (r.modifiedAt instanceof Date ? r.modifiedAt.toISOString() : String(r.modifiedAt)) : null,
+    });
+    result.set(r.clientId, arr);
+  }
+  return result;
+}
 
 /**
  * Haalt de recentste scriptbestanden (PDF) van een klant uit de al

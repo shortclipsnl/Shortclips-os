@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import { clients, productionDays, scripts, users } from "@/db/schema";
 import { requireInternal, scopeToClients, type Viewer } from "@/server/auth/context";
 import { CORE_STAFF_EMAILS, coreStaffRank } from "@/server/core-staff";
+import { listClientDriveScriptLinks, type DriveScriptLink } from "@/server/scripts/drive-scripts";
 import { subWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 
@@ -46,6 +47,8 @@ export type ScriptingRow = {
   scriptWriterAvatar: string | null;
   /** Aan deze opname gekoppelde scripts (uit de scriptbibliotheek). */
   scripts: LinkedScript[];
+  /** Scriptbestanden van deze klant in Google Drive (automatisch gelinkt). */
+  driveScripts: DriveScriptLink[];
 };
 
 /** Eén aan de opname gekoppeld script, met status en volledige inhoud (voor
@@ -142,6 +145,11 @@ export async function listScripting(viewer: Viewer) {
     scriptsByDay.set(s.productionDayId, arr);
   }
 
+  // Scriptbestanden uit Google Drive per klant (categorie "Scripts") — in één
+  // batch voor alle opnames, zodat het team de bestaande scripts meteen vanuit
+  // het platform kan openen zonder naar Drive te hoeven.
+  const driveByClient = await listClientDriveScriptLinks([...new Set(rows.map((r) => r.clientId))]);
+
   const holidays = nlHolidaySet();
   const list: ScriptingRow[] = rows.map((r) => {
     // Scriptdeadline = 7 wérkdagen vóór de opname (niet kalenderdagen), conform
@@ -177,6 +185,7 @@ export async function listScripting(viewer: Viewer) {
       scriptWriterName: r.scriptWriterName ?? r.coordinatorName,
       scriptWriterAvatar: r.scriptWriterAvatar ?? r.coordinatorAvatar,
       scripts: scriptsByDay.get(r.id) ?? [],
+      driveScripts: driveByClient.get(r.clientId) ?? [],
     };
   });
 

@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, Loader2, MessageSquareText, UserPlus, ScrollText, ExternalLink, X } from "lucide-react";
+import { ChevronDown, Loader2, MessageSquareText, UserPlus, ScrollText, ExternalLink, ArrowUpRight, FileText, X } from "lucide-react";
 import { setScriptingNote, setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS, SCRIPT_STATUS } from "@/lib/statuses";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
@@ -270,18 +270,26 @@ function ScriptStatusPill({ status }: { status: string }) {
 function ScriptsCell({ row }: { row: ScriptingRow }) {
   const [open, setOpen] = useState(false);
   const n = row.scripts.length;
+  const drive = row.driveScripts.length;
   const klaar = row.scripts.filter((s) => s.status === "approved" || s.status === "ready_to_shoot").length;
+  // De knop is "gevuld" zodra er óf gekoppelde scripts óf Drive-scripts zijn.
+  const heeftIets = n > 0 || drive > 0;
+  const label = n > 0
+    ? `${n} script${n === 1 ? "" : "s"}${klaar > 0 ? ` · ${klaar} klaar` : ""}`
+    : drive > 0
+      ? `${drive} in Drive`
+      : "Bekijk scripts";
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title="Bekijk de aan deze opname gekoppelde scripts"
-        className={`flex w-[150px] items-center gap-1.5 rounded-[var(--radius-sm)] border px-2 py-1.5 text-left text-xs font-medium hover:border-[var(--color-brand-500)] ${n > 0 ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)] text-[var(--color-ink)]" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)]"}`}
+        title="Bekijk de scripts van deze opname (gekoppeld + in Google Drive)"
+        className={`flex w-[150px] items-center gap-1.5 rounded-[var(--radius-sm)] border px-2 py-1.5 text-left text-xs font-medium hover:border-[var(--color-brand-500)] ${heeftIets ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)] text-[var(--color-ink)]" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)]"}`}
       >
-        <ScrollText className={`size-4 shrink-0 ${n > 0 ? "text-[var(--color-brand-600)]" : "text-[var(--color-ink-faint)]"}`} />
-        <span className="truncate">{n > 0 ? `${n} script${n === 1 ? "" : "s"}${klaar > 0 ? ` · ${klaar} klaar` : ""}` : "Bekijk scripts"}</span>
+        <ScrollText className={`size-4 shrink-0 ${heeftIets ? "text-[var(--color-brand-600)]" : "text-[var(--color-ink-faint)]"}`} />
+        <span className="truncate">{label}</span>
       </button>
       {open ? <ScriptsModal row={row} onClose={() => setOpen(false)} /> : null}
     </>
@@ -314,7 +322,7 @@ function ScriptsModal({ row, onClose }: { row: ScriptingRow; onClose: () => void
           <button type="button" onClick={onClose} className="shrink-0 rounded p-1 text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"><X className="size-5" /></button>
         </div>
 
-        {n === 0 ? (
+        {n === 0 && row.driveScripts.length === 0 ? (
           <div className="p-6 text-center">
             <ScrollText className="mx-auto mb-2 size-7 text-[var(--color-ink-faint)]" />
             <p className="text-sm text-[var(--color-ink-muted)]">Er zijn nog geen scripts aan deze opname gekoppeld.</p>
@@ -323,6 +331,8 @@ function ScriptsModal({ row, onClose }: { row: ScriptingRow; onClose: () => void
             </Link>
           </div>
         ) : (
+          <>
+          {n > 0 ? (
           <ul className="divide-y divide-[var(--color-line)]">
             {row.scripts.map((s, i) => {
               const isAd = /advertentie/i.test(s.format ?? "");
@@ -352,8 +362,49 @@ function ScriptsModal({ row, onClose }: { row: ScriptingRow; onClose: () => void
               );
             })}
           </ul>
+          ) : null}
+          {row.driveScripts.length > 0 ? <DriveScriptsSection scripts={row.driveScripts} /> : null}
+          </>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Scriptbestanden die automatisch uit de Google Drive-map van de klant zijn
+ * opgehaald (categorie "Scripts"). Klik opent het bestand direct in Drive, zodat
+ * het team de bestaande scripts meteen vanuit het platform bekijkt.
+ */
+function DriveScriptsSection({ scripts }: { scripts: ScriptingRow["driveScripts"] }) {
+  return (
+    <div className="border-t border-[var(--color-line)] bg-[var(--color-surface-2)]/40 p-4">
+      <p className="mb-2 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
+        <FileText className="size-3.5" /> Scripts in Google Drive
+      </p>
+      <ul className="divide-y divide-[var(--color-line)] overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)]">
+        {scripts.map((f, i) => {
+          const inner = (
+            <>
+              <FileText className="size-4 shrink-0 text-[var(--color-brand-600)]" strokeWidth={1.75} />
+              <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--color-ink)]">{f.name}</span>
+              {f.modifiedAt ? <span className="hidden shrink-0 text-2xs text-[var(--color-ink-faint)] sm:block">{fmtDateTime(f.modifiedAt)}</span> : null}
+              {f.url ? <ArrowUpRight className="size-3.5 shrink-0 text-[var(--color-ink-faint)]" /> : null}
+            </>
+          );
+          return (
+            <li key={`${f.name}-${i}`}>
+              {f.url ? (
+                <a href={f.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--color-surface-sunken)]/60">
+                  {inner}
+                </a>
+              ) : (
+                <span className="flex items-center gap-2.5 px-3 py-2 text-[var(--color-ink-muted)]">{inner}</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

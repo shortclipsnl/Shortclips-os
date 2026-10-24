@@ -404,6 +404,11 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
       const editorByClient = new Map<string, string>();
       for (const c of clientEditorRows) { if (c.editorName) { const uid = editorByKey.get(firstNameKey(c.editorName)); if (uid) editorByClient.set(c.id, uid); } }
 
+      // Backfill: bestaande opnames én opleveringen zonder editor krijgen de vaste
+      // editor van de klant (zie assignMissingEditors, hieronder gedeeld met de
+      // editing-pagina).
+      await assignMissingEditors();
+
       // Videograaf automatisch koppelen: meestal Rutger, Luxewagen → Jarno.
       const vgRows = await db
         .select({ id: users.id, email: users.email })
@@ -644,4 +649,35 @@ export async function syncCalendarIfStale(maxAgeMinutes = 20): Promise<void> {
   } catch {
     /* nooit de pagina breken door een sync-check */
   }
+}
+
+/**
+ * Koppelt opnames én opleveringen zonder editor automatisch aan de vaste editor
+ * van de klant (clients.editorName). Idempotent — raakt alleen rijen waar de
+ * editor ontbreekt, dus al toegewezen of in bewerking zijnde opleveringen van een
+ * ander blijven intact. Gebruikt door de agenda-sync en door de editing-pagina,
+ * zodat elke editor zijn eigen projecten in de planning heeft.
+ */
+export async function assignMissingEditors(): Promise<number> {
+  const editorUsers = await db.select({ id: users.id, fullName: users.fullName }).from(users).where(and(eq(users.primaryRole, "editor"), eq(users.status, "active")));
+  const editorByKey = new Map<string, string>();
+  for (const e of editorUsers) { const k = firstNameKey(e.fullName); if (k && !editorByKey.has(k)) editorByKey.set(k, e.id); }
+  const clientRows = await db.select({ id: clients.id, editorName: clients.editorName }).from(clients).where(isNull(clients.deletedAt));
+
+  let changed = 0;
+  for (const c of clientRows) {
+    if (!c.editorName) continue;
+    const editorId = editorByKey.get(firstNameKey(c.editorName));
+    if (!editorId) continue;
+    const pd = await db.update(productionDays)
+      .set({ editorId, updatedAt: new Date() })
+      .where(and(eq(productionDays.clientId, c.id), isNull(productionDays.editorId), isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled")))
+      .returning({ id: productionDays.id });
+    const dv = await db.update(deliverables)
+      .set({ editorId, updatedAt: new Date() })
+      .where(and(eq(deliverables.clientId, c.id), isNull(deliverables.editorId), isNull(deliverables.deletedAt)))
+      .returning({ id: deliverables.id });
+    changed += pd.length + dv.length;
+  }
+  return changed;
 }
