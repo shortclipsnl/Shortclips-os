@@ -3,10 +3,37 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { integrationConnections, syncJobs } from "@/db/schema";
 import { logError } from "@/server/audit";
+import { notify } from "@/server/notifications";
 import type { Provider } from "@/server/integrations/types";
 import { IntegrationError, MissingCredentialsError } from "@/server/integrations/types";
 
 export type JobLogEntry = { at: string; level: "info" | "warn" | "error"; message: string };
+
+/** Echte externe koppelingen (de rest gebruikt 'monday' als placeholder voor
+ *  interne jobs — die willen we niet als koppelingsfout melden). */
+const EXTERNAL_PROVIDERS = new Set<Provider>(["frameio", "google_drive", "google_calendar", "metricool"]);
+const PROVIDER_LABEL: Record<string, string> = {
+  frameio: "Frame.io",
+  google_drive: "Google Drive",
+  google_calendar: "Google Agenda",
+  metricool: "Metricool",
+};
+
+/** Eén melding per koppeling per dag bij een echte sync-fout (geen configuratie-
+ *  tekort). De verantwoordelijke (eigenaar) ziet het direct en kan het oplossen. */
+async function notifySyncFailure(provider: Provider, message: string): Promise<void> {
+  const label = PROVIDER_LABEL[provider] ?? provider;
+  const dayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  await notify({
+    roles: ["owner"],
+    level: "critical",
+    type: "sync_failed",
+    title: `Koppeling ${label} synchroniseert niet`,
+    body: `De laatste synchronisatie is mislukt: ${message}`.slice(0, 300),
+    href: "/settings/integrations",
+    dedupeKey: `sync_failed:${provider}:${dayKey}`,
+  });
+}
 
 export type JobContext = {
   jobId: string;
@@ -108,6 +135,12 @@ export async function runJob(
       .where(eq(integrationConnections.provider, provider));
 
     await logError({ category: "sync", source: `${provider}:${jobType}`, error });
+
+    // Directe melding aan de verantwoordelijke bij een echte koppelingsfout
+    // (niet bij ontbrekende configuratie — dat is een bewuste keuze, geen storing).
+    if (EXTERNAL_PROVIDERS.has(provider) && !(error instanceof MissingCredentialsError)) {
+      await notifySyncFailure(provider, message).catch(() => {});
+    }
     return { jobId: job!.id, ok: false, error: message };
   }
 }

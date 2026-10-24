@@ -8,6 +8,7 @@ import { runCalendarSync } from "./calendar-sync";
 import { runMonthlyReportDrafts } from "./report-drafts";
 import { runMonthlyInsightTasks } from "./insight-tasks";
 import { generateMonthlyDevelopment, snapshotDevelopmentMetrics } from "@/server/development";
+import { runIntegrationHealthCheck } from "./integration-health";
 import { runDriveSync } from "./drive-sync";
 import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
@@ -78,6 +79,9 @@ export async function runNightlySync() {
   results.push(await step("frameio.pull_deliverables", () => pullFrameDeliverables()));
   results.push(await step("calendar.sync", () => runCalendarSync()));
   results.push(await step("metricool.sync", () => runMetricoolSync()));
+  // Na alle externe syncs: controleer de gezondheid van de koppelingen en meld
+  // proactief verouderde/nooit-geslaagde koppelingen aan de verantwoordelijke.
+  results.push(await step("integrations.health_check", () => runIntegrationHealthCheck()));
   results.push(await step("finance.snapshot_month", () => snapshotFinanceMonth()));
   results.push(await step("signals.daily", () => runDailySignals()));
   results.push(await step("reminders.editor_deadlines", () => runEditorDeadlineReminders()));
