@@ -144,20 +144,22 @@ export default async function AnalyticsPage({
     const d30 = deltaPct(c30, Number(p30[m.key] ?? 0));
     const d7 = deltaPct(c7, Number(p7[m.key] ?? 0));
     const tone30 = m.tone ? deltaTone(c30, Number(p30[m.key] ?? 0)) : undefined;
+    // Donkerblauwe tegel met witte tekst, zodat de totaalcijfers opvallen op het
+    // scherm. Delta-kleuren zijn lichte tinten voor leesbaarheid op de navy.
     const Delta = ({ d, tone }: { d: number | null; tone?: "good" | "bad" }) =>
-      d === null ? <span className="text-[var(--color-ink-faint)]">—</span> : (
-        <span className="font-semibold" style={{ color: tone === "good" ? "var(--color-good)" : tone === "bad" ? "var(--color-bad)" : "var(--color-ink-faint)" }}>{d >= 0 ? "+" : ""}{d}%</span>
+      d === null ? <span className="text-white/40">—</span> : (
+        <span className="font-semibold" style={{ color: tone === "good" ? "#7ee0b0" : tone === "bad" ? "#ffb1a8" : "rgba(255,255,255,0.55)" }}>{d >= 0 ? "+" : ""}{d}%</span>
       );
     return (
-      <div key={m.key} className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-        <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">{m.label}</div>
+      <div key={m.key} className="rounded-[var(--radius-lg)] bg-[var(--color-indigo-ink)] p-4 text-white">
+        <div className="text-xs font-semibold uppercase tracking-wide text-white/60">{m.label}</div>
         <div className="mt-1.5 flex items-baseline gap-2">
-          <span className="text-3xl font-bold tabular-nums leading-none">{m.fmt(c30)}</span>
-          <span className="text-2xs font-medium text-[var(--color-ink-faint)]">30 dagen</span>
+          <span className="text-3xl font-bold tabular-nums leading-none text-white">{m.fmt(c30)}</span>
+          <span className="text-2xs font-medium text-white/50">30 dagen</span>
         </div>
-        <div className="mt-1 text-2xs"><Delta d={d30} tone={tone30} /> <span className="text-[var(--color-ink-faint)]">t.o.v. vorige 30 dagen</span></div>
-        <div className="mt-2 flex items-baseline justify-between border-t border-[var(--color-line)] pt-2 text-xs">
-          <span className="text-[var(--color-ink-muted)]">7 dagen: <span className="font-semibold tabular-nums text-[var(--color-ink)]">{m.fmt(c7)}</span></span>
+        <div className="mt-1 text-2xs"><Delta d={d30} tone={tone30} /> <span className="text-white/50">t.o.v. vorige 30 dagen</span></div>
+        <div className="mt-2 flex items-baseline justify-between border-t border-white/15 pt-2 text-xs">
+          <span className="text-white/60">7 dagen: <span className="font-semibold tabular-nums text-white">{m.fmt(c7)}</span></span>
           <span className="text-2xs"><Delta d={d7} tone={m.tone ? deltaTone(c7, Number(p7[m.key] ?? 0)) : undefined} /></span>
         </div>
       </div>
@@ -276,7 +278,7 @@ export default async function AnalyticsPage({
                   </>
                 }
               >
-                {clientRows.map((c, i) => {
+                {clientRows.filter((c) => Number(c.linked) === 1).map((c, i) => {
                   const fg = Number(c.follower_growth);
                   const linked = Number(c.linked) === 1;
                   return (

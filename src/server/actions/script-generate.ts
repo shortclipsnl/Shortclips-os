@@ -532,7 +532,7 @@ export async function suggestTopics(input: { clientId?: string; clientName?: str
 }
 
 /** Actuele klantenlijst voor de scriptgenerator — voor live verversen in de UI. */
-export async function listScriptClientsAction(): Promise<Array<{ id: string; name: string; active: boolean }>> {
+export async function listScriptClientsAction(): Promise<Array<{ id: string; name: string; active: boolean; logoUrl: string | null; color: string | null }>> {
   const viewer = await requirePermission("ai:read");
   const { listClientsForScripts } = await import("@/server/ai/knowledge");
   return listClientsForScripts(viewer);

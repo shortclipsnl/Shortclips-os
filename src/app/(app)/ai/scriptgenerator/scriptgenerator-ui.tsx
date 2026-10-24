@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock, Megaphone, Sprout, Link2, AlertTriangle, ChevronDown, BookmarkPlus, ShieldAlert, ListChecks } from "lucide-react";
 import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, saveScriptToDrive, checkScriptQuality, listShootDaysForClient, rememberScriptFeedback, refreshMetaRulesAction, getMetaRulesInfo, listScriptClientsAction, getClientDriveScriptInfoAction, generateScriptNeeds, type GeneratedScript, type QualityResult, type ContentType, type FeedbackScope } from "@/server/actions/script-generate";
+import { ClientLogo } from "@/components/ui";
 
 type ShootDay = { id: string; scheduledOn: string; title: string };
 type Funnel = "TOF" | "MOF" | "BOF";
 const FUNNELS: Funnel[] = ["TOF", "MOF", "BOF"];
 const FUNNEL_LABEL: Record<Funnel, string> = { TOF: "Top of funnel", MOF: "Middle of funnel", BOF: "Bottom of funnel" };
 
-type Client = { id: string; name: string; active: boolean };
+type Client = { id: string; name: string; active: boolean; logoUrl: string | null; color: string | null };
 type ClientFilter = "actief" | "inactief" | "alle";
 
 type Version = { onderwerp: string; tekst: string; feedback: string; at: number };
@@ -1005,9 +1006,9 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
                 key={c.id}
                 type="button"
                 onClick={() => { setShowOther(false); setClientId(c.id); }}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${active ? "border-[var(--color-brand-600)] bg-[var(--color-brand-600)] text-white" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink)] hover:border-[var(--color-brand-500)]"}`}
+                className={`inline-flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-sm font-medium transition ${active ? "border-[var(--color-brand-600)] bg-[var(--color-brand-600)] text-white" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink)] hover:border-[var(--color-brand-500)]"}`}
               >
-                <span className="inline-block size-2 shrink-0 rounded-full" style={{ background: c.active ? "var(--color-good)" : "var(--color-bad)" }} />
+                <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={22} />
                 {c.name}
               </button>
             );

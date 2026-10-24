@@ -7,8 +7,9 @@ import { generateBriefing, type EditorBriefing } from "@/server/actions/ai-tools
 import { attachBriefingToProject, listClientEditProjects, notifyEditorOfBriefing } from "@/server/actions/videos";
 import { Button, Card, ErrorNote } from "@/components/ui";
 import { CopyButton, HistoryPanel, NoProviderNote, SaveInsight, ToolHowTo, VoiceButton, fileToBase64, type HistoryEntry } from "../_shared";
+import { ClientPicker } from "../client-picker";
 
-type ClientOption = { id: string; name: string };
+type ClientOption = { id: string; name: string; logoUrl?: string | null; color?: string | null };
 type EditProject = { id: string; title: string; statusLabel: string; hasBriefing: boolean; editorId: string | null; editorName: string | null };
 
 const isDoc = (n: string) => /\.(pdf|docx)$/i.test(n);
@@ -140,12 +141,8 @@ export function BriefingMaker({
           </div>
           <div>
             <label className="sc-label">Klant</label>
-            <select className="sc-input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
-              <option value="">Kies…</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <ClientPicker clients={clients} value={clientId} onChange={setClientId} placeholder="Kies…" />
+
             <p className="mt-2 text-xs text-[var(--color-ink-faint)]">
               De assistent telt zelf hoeveel video&apos;s het zijn en maakt per video een korte, scanbare omschrijving.
             </p>

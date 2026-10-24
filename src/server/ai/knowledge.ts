@@ -192,22 +192,24 @@ export async function listAiOutputs(viewer: Viewer, tool: string, clientId?: str
     .limit(40);
 }
 
-/** Actieve klanten voor de keuzelijsten. */
+/** Actieve klanten voor de keuzelijsten (incl. logo/kleur voor scanbaarheid). */
 export async function listActiveClientsForAi(viewer: Viewer) {
   return db
-    .select({ id: clients.id, name: clients.name })
+    .select({ id: clients.id, name: clients.name, logoUrl: clients.logoUrl, color: clients.color })
     .from(clients)
     .where(and(isNull(clients.deletedAt), inArray(clients.status, ["active", "onboarding"]), scopeToClients(viewer, clients.id)))
     .orderBy(asc(clients.name));
 }
 
 /** Alle klanten voor de scriptgenerator, met een actief-vlag zodat je kunt
- *  filteren op actieve en niet-actieve klanten. */
-export async function listClientsForScripts(viewer: Viewer): Promise<Array<{ id: string; name: string; active: boolean }>> {
+ *  filteren op actieve en niet-actieve klanten (incl. logo/kleur). */
+export async function listClientsForScripts(
+  viewer: Viewer,
+): Promise<Array<{ id: string; name: string; active: boolean; logoUrl: string | null; color: string | null }>> {
   const rows = await db
-    .select({ id: clients.id, name: clients.name, status: clients.status })
+    .select({ id: clients.id, name: clients.name, status: clients.status, logoUrl: clients.logoUrl, color: clients.color })
     .from(clients)
     .where(and(isNull(clients.deletedAt), scopeToClients(viewer, clients.id)))
     .orderBy(asc(clients.name));
-  return rows.map((r) => ({ id: r.id, name: r.name, active: r.status === "active" || r.status === "onboarding" }));
+  return rows.map((r) => ({ id: r.id, name: r.name, active: r.status === "active" || r.status === "onboarding", logoUrl: r.logoUrl, color: r.color }));
 }

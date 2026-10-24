@@ -7,6 +7,7 @@ import { listShootDaysForClient } from "@/server/actions/script-generate";
 import { getCaptionFooter, setCaptionFooter } from "@/server/actions/caption-footer";
 import { Button, Card, ErrorNote } from "@/components/ui";
 import { CopyButton, HistoryPanel, NoProviderNote, SaveInsight, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
+import { ClientPicker } from "../client-picker";
 
 /** Caption + de vaste footer van de klant eronder (de standaard dingetjes). */
 function withFooter(caption: string, footer: string): string {
@@ -15,7 +16,7 @@ function withFooter(caption: string, footer: string): string {
   return f ? `${c}\n\n${f}` : c;
 }
 
-type ClientOption = { id: string; name: string };
+type ClientOption = { id: string; name: string; logoUrl?: string | null; color?: string | null };
 
 const isDoc = (n: string) => /\.(pdf|docx)$/i.test(n);
 const PLATFORMS = "Instagram · TikTok · Facebook · YouTube Shorts";
@@ -186,12 +187,8 @@ export function CaptionMaker({
           </div>
           <div>
             <label className="sc-label">Klant</label>
-            <select className="sc-input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
-              <option value="">Kies een klant…</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <ClientPicker clients={clients} value={clientId} onChange={setClientId} />
+
 
             {/* Taal: Nederlands of Engels — direct schakelbaar, zonder zelf te vertalen. */}
             <label className="sc-label mt-3 flex items-center gap-1.5"><Languages className="size-3.5" /> Taal</label>
