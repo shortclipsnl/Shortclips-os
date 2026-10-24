@@ -7,7 +7,7 @@ import { clients, scripts, scriptVersions, productionDays, files, driveMappings 
 import { drive } from "@/server/integrations/drive";
 import { requirePermission, assertClientAccess, ForbiddenError } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
-import { aiConfigured, runPrompt } from "@/server/ai/client";
+import { aiConfigured, runPrompt, runJsonPrompt } from "@/server/ai/client";
 import { scriptGeneratorSystem } from "@/server/scripts/scripthandboek";
 import { adScriptGeneratorSystem, adFormatRules, FUNNEL_GUIDE, FUNNEL_LABEL, type Funnel } from "@/server/scripts/advertentiehandboek";
 import { getClientAiProfile, captionProfileToText, clientLearnedText, centralKnowledgeText, type CaptionProfile } from "@/server/ai/knowledge";
@@ -52,7 +52,19 @@ const QUALITY_RULES = [
   "- Haal stijl, woordgebruik, scriptlengte en openingsstijl uit de eerdere scripts van deze klant.",
   "- Zorg dat elk script echt TikTok- en Reels-waardig is: sterke hook in 3 seconden, hoge retentie, concreet en bruikbaar.",
   "- Volg strikt de Shortclips scriptstijl uit het handboek. Twijfel je of een zin sterk genoeg is, herschrijf hem.",
+  "- DATAGEDREVEN: gebruik de meegeleverde cijfers als startpunt — de best presterende hooks, onderwerpen en formats van deze klant (wat mensen aanhaken en vasthoudt). Bouw daarop voort in plaats van iets willekeurigs te verzinnen.",
+  "- GEEN HERHAALDE FOUTEN: staan er in de klantcontext terugkerende correcties, aandachtspunten of eerdere feedback? Verwerk die vooraf en maak die fouten dus niet opnieuw.",
   "- KWALITEITSDREMPEL: beoordeel elk script vóór je het teruggeeft zelf streng op de 10 punten (hook, originaliteit, waarde, doelgroep, taalgebruik, commerciële balans, opnamehaalbaarheid, herhaling, feitelijke juistheid, aansluiting doel). Herschrijf net zolang tot het op elk belangrijk punt minimaal 8 van de 10 scoort. Lever UITSLUITEND scripts op van minimaal 8/10 — liever 9. Twijfel je, verbeter het dan verder voordat je het teruggeeft.",
+];
+
+/** Creativiteitsregels: unieke, verrassende concepten — wat het verschil maakt
+ *  tussen gemiddelde en uitzonderlijke scripts. */
+const CREATIVITY_RULES = [
+  "CREATIVITEIT & ORIGINALITEIT (cruciaal — hier zit het verschil met gemiddelde scripts):",
+  "- Durf verrassend en uniek te zijn: bedenk frisse, originele concepten en invalshoeken die je zelden voorbij ziet komen. Geen voor de hand liggende of clichématige video's.",
+  "- Varieer sterk binnen de batch: elk script is een écht ander concept, format of invalshoek (denk aan: een mythe ontkrachten, een verrassende vergelijking, een mini-experiment, een insider-geheim, 'dit vertelt niemand je', een pattern interrupt, een onverwachte stelling). Nooit meerdere varianten van hetzelfde idee.",
+  "- Open met een onverwachte, nieuwsgierig makende hook die direct een patroon doorbreekt; vermijd generieke of vlakke openingen.",
+  "- Combineer die creativiteit met wat aantoonbaar werkt: geef de best presterende hooks en onderwerpen van deze klant een nieuwe, eigen draai in plaats van ze te herhalen.",
 ];
 
 /** Regels voor iteratief aanpassen: alleen verwerken wat gevraagd is, de rest met rust laten. */
@@ -186,6 +198,56 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
  * klantcontext (indien gekozen) wordt meegeladen. Het model werkt uit eerdere
  * data en het handboek — nooit een website nodig.
  */
+/** Minimale kwaliteitslat; scripts eronder worden door de gate herschreven. */
+const GATE = 8.0;
+
+const GATE_SYSTEM = `Je bent een strenge, onafhankelijke scriptbeoordelaar bij Shortclips — NIET de schrijver. Je zorgt dat elke short-videoscript op het niveau van de allerbeste scriptschrijver is, zodat het zonder extra controle live kan.
+
+Beoordeel elk meegeleverd script streng op vijf punten (elk 0-10): hook (pakt het de aandacht in de eerste 3 seconden?), retentie/opbouw (houdt het vast tot het eind?), originaliteit & creativiteit (uniek, verrassend concept — geen cliché), natuurlijke spreektaal (makkelijk te presenteren, geen AI-taal), en aansluiting op de klant en het doel.
+
+Herschrijf ELK script dat op één van deze punten onder de ${GATE} van 10 zit, zó dat het ruim voldoet: behoud wat sterk is en verscherp de rest — maak vooral de hook en het concept opvallender, unieker en creatiever. Laat een script dat al uitstekend is ongewijzigd.
+
+Harde regels:
+- Behoud exact dezelfde opmaak en structuur (dezelfde koppen en blokken, dezelfde volgorde).
+- Verzin NOOIT nieuwe cijfers, prijzen, claims of specificaties.
+- Geef exact hetzelfde aantal scripts terug, in dezelfde volgorde.
+- Antwoord met UITSLUITEND geldige JSON, zonder tekst eromheen en zonder markdown. Gebruik binnen tekstwaarden geen dubbele aanhalingstekens en geen letterlijke regeleinden:
+{"scripts":[{"onderwerp":"<titel>","regels":["<regel 1>","<regel 2>","..."]}]}`;
+
+/**
+ * Automatische kwaliteitsgate: een onafhankelijke, strenge beoordelaar loopt de
+ * net geschreven scripts na en herschrijft de scripts die onder de lat zitten
+ * (sterkere hook, uniekere concepten, betere retentie) — zodat het team scripts
+ * oplevert op het niveau dat anders de handmatige controle van de eigenaar vroeg.
+ * Best-effort: lukt de gate niet, dan blijven de originele scripts staan.
+ */
+async function gateScripts(scripts: GeneratedScript[], context: string): Promise<GeneratedScript[]> {
+  if (scripts.length === 0) return scripts;
+  try {
+    const payload = scripts.map((s, i) => ({ index: i, onderwerp: s.onderwerp, regels: s.tekst.split("\n") }));
+    const res = await runJsonPrompt<ScriptsPayload>({
+      system: context ? `${GATE_SYSTEM}\n\nKLANTCONTEXT (gebruik om de aansluiting te beoordelen en te verscherpen):\n${context}` : GATE_SYSTEM,
+      user: `Beoordeel deze ${scripts.length} scripts streng en herschrijf wat onder de lat zit. Data (JSON):\n${JSON.stringify({ scripts: payload })}`,
+      maxTokens: Math.min(24000, scripts.length * 3000 + 3000),
+    });
+    if (!res.ok || !Array.isArray(res.data?.scripts)) return scripts;
+    return scripts.map((orig, i) => {
+      const g = res.data.scripts?.[i];
+      if (!g) return orig;
+      const tekst = Array.isArray(g.regels)
+        ? g.regels.map((r) => (typeof r === "string" ? r : "")).join("\n").trim()
+        : typeof g.tekst === "string"
+          ? g.tekst.trim()
+          : "";
+      if (!tekst) return orig;
+      const onderwerp = typeof g.onderwerp === "string" && g.onderwerp.trim() ? g.onderwerp.trim() : orig.onderwerp;
+      return { ...orig, onderwerp, tekst };
+    });
+  } catch {
+    return scripts;
+  }
+}
+
 export async function generateScripts(input: {
   clientId?: string;
   clientName?: string;
@@ -294,6 +356,8 @@ export async function generateScripts(input: {
           "",
           ...QUALITY_RULES,
           "",
+          ...CREATIVITY_RULES,
+          "",
           ...formatRules(withPoll),
           "",
           "Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder tekst eromheen:",
@@ -347,7 +411,11 @@ export async function generateScripts(input: {
 
     if (scripts.length === 0) return { ok: false, message: "De schrijver leverde geen scripts op. Probeer het nog eens." };
 
-    return { ok: true, scripts, klantnaam };
+    // Automatische kwaliteitsgate: een onafhankelijke beoordelaar herschrijft
+    // zwakke scripts, zodat de handmatige controle van de eigenaar niet meer nodig is.
+    const gated = await gateScripts(scripts, extra).catch(() => scripts);
+
+    return { ok: true, scripts: gated, klantnaam };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;
