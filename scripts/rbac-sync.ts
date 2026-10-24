@@ -100,6 +100,23 @@ async function main() {
     }
   }
 
+  // 4c. Vaste basis-toekenningen die ALTIJD moeten bestaan, ook als het recht
+  //     niet nieuw is. Nodig wanneer een bestaand recht later aan meer rollen
+  //     toegekend moet worden (stap 4b raakt alleen nieuwe rechten aan). Bewust
+  //     klein houden en alleen voor rechten die het hele interne team hoort te
+  //     hebben. Hier: Video Intelligence werkt voor alle vaste medewerkers.
+  const BASELINE_GRANTS: Array<[string, string]> = [
+    ["content_creator", "video_intelligence:run"],
+    ["videographer", "video_intelligence:read"],
+    ["videographer", "video_intelligence:run"],
+    ["finance", "video_intelligence:run"],
+  ];
+  for (const [roleKey, permKey] of BASELINE_GRANTS) {
+    const roleId = roleByKey.get(roleKey);
+    const permissionId = permByKey.get(permKey);
+    if (roleId && permissionId) links.push({ roleId, permissionId });
+  }
+
   let added = 0;
   if (links.length) {
     const before = await db.select({ id: rolePermissions.roleId }).from(rolePermissions);

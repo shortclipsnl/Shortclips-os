@@ -9,7 +9,7 @@ import {
 } from "@/server/auth/context";
 import { Monitor, MousePointerClick } from "lucide-react";
 import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Table } from "@/components/ui";
-import { compact, formatDate, num } from "@/lib/format";
+import { compact, num } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Resultaten" };
 export const dynamic = "force-dynamic";
@@ -31,8 +31,9 @@ export default async function AnalyticsPage({
   const linkFilter: "gekoppeld" | "niet" | "alle" =
     params.koppeling === "niet" ? "niet" : params.koppeling === "alle" ? "alle" : "gekoppeld";
 
-  // Alleen actieve klanten — gestopte klanten tonen we hier bewust niet.
-  const statusCond = sql`and c.status = 'active'`;
+  // Alleen actieve, échte klanten — gestopte klanten en records die geen klant
+  // van ons zijn (show_in_results = false) tonen we hier bewust niet.
+  const statusCond = sql`and c.status = 'active' and c.show_in_results = true`;
   const klantCond = params.klant ? sql`and c.slug = ${params.klant}` : sql``;
 
   // Kerncijfers voor een venster [fromDays terug .. toDays terug). toDays=null = tot nu.
@@ -51,11 +52,26 @@ export default async function AnalyticsPage({
         ${statusCond} ${klantCond}
     `);
 
-  const [cur7, prev7, cur30, prev30, perClient, topVideos] = await Promise.all([
+  // Aantal gepubliceerde video's (deze periode) over alle getoonde klanten —
+  // als extra kerncijfer bij het totaal.
+  const videosQuery = (fromDays: number, toDays: number | null) =>
+    db.execute(sql`
+      select count(*)::int as videos
+      from deliverables d
+      join clients c on c.id = d.client_id and c.deleted_at is null
+      where d.deleted_at is null and d.status = 'published'
+        and d.published_at >= current_date - ${sql.raw(`interval '${fromDays} days'`)}
+        ${toDays !== null ? sql`and d.published_at < current_date - ${sql.raw(`interval '${toDays} days'`)}` : sql``}
+        ${statusCond} ${klantCond}
+    `);
+
+  const [cur7, prev7, cur30, prev30, vid7, vid30, perClient] = await Promise.all([
     totalsQuery(7, null),
     totalsQuery(14, 7),
     totalsQuery(30, null),
     totalsQuery(60, 30),
+    videosQuery(7, null),
+    videosQuery(30, null),
 
     db.execute(sql`
       select c.id, c.name, c.slug, c.color, c.status, c.logo_url as "logoUrl",
@@ -70,23 +86,6 @@ export default async function AnalyticsPage({
       group by c.id, c.name, c.slug, c.color, c.status, c.logo_url
       order by (exists (select 1 from daily_metrics d2 where d2.client_id = c.id)) desc, views desc
     `),
-
-    db.execute(sql`
-      select d.id, d.title, c.name as client_name, c.slug as client_slug, c.color as client_color,
-        d.published_at,
-        max(sm.views)::int as views,
-        max(sm.likes)::int as likes,
-        max(sm.avg_watch_seconds) as avg_watch
-      from deliverables d
-      join clients c on c.id = d.client_id
-      join publications p on p.deliverable_id = d.id
-      join social_metrics sm on sm.publication_id = p.id
-      where d.deleted_at is null and d.status = 'published'
-        and d.published_at >= current_date - ${sql.raw(`interval '${TABLE_DAYS} days'`)} ${klantCond}
-      group by d.id, d.title, c.name, c.slug, c.color, d.published_at
-      order by views desc
-      limit 15
-    `),
   ]);
 
   const rows = <T,>(r: unknown): T[] =>
@@ -97,7 +96,11 @@ export default async function AnalyticsPage({
   const t30 = rows<Record<string, number>>(cur30)[0] ?? {};
   const p30 = rows<Record<string, number>>(prev30)[0] ?? {};
   const clientRows = rows<Record<string, string | number>>(perClient);
-  const videoRows = rows<Record<string, string | number>>(topVideos);
+  const v7 = Number(rows<Record<string, number>>(vid7)[0]?.videos ?? 0);
+  const v30 = Number(rows<Record<string, number>>(vid30)[0]?.videos ?? 0);
+  // Gepubliceerde video's als kerncijfer meenemen (in dezelfde totaal-objecten).
+  (t7 as Record<string, number>).videos = v7;
+  (t30 as Record<string, number>).videos = v30;
   // Klant-tegels (logo's naast elkaar) komen uit dezelfde lijst: gekoppelde
   // klanten eerst, dan op weergaven.
   const allTiles = clientRows.map((c) => ({
@@ -129,39 +132,41 @@ export default async function AnalyticsPage({
     { key: "reach", label: "Bereik", fmt: (n) => compact(n), tone: true },
     { key: "engagements", label: "Interacties", fmt: (n) => compact(n), tone: true },
     { key: "follower_growth", label: "Volgersgroei", fmt: (n) => `${n >= 0 ? "+" : ""}${num(n)}`, tone: true },
+    { key: "videos", label: "Gepubliceerde video's", fmt: (n) => num(n) },
     { key: "posts", label: "Publicaties", fmt: (n) => num(n) },
   ];
 
-  const period = (t: Record<string, number>, p: Record<string, number>, m: (typeof METRICS)[number], periodLabel: string) => {
-    const cur = Number(t[m.key] ?? 0);
-    const prev = Number(p[m.key] ?? 0);
-    const d = deltaPct(cur, prev);
-    const tone = m.tone ? deltaTone(cur, prev) : undefined;
+  // Eén groot kerncijfer: 30 dagen als hoofdgetal (groot), 7 dagen eronder als
+  // tweede regel. Het verschilpercentage staat bij de periode waarvoor het telt.
+  const bigMetric = (m: (typeof METRICS)[number]) => {
+    const c30 = Number(t30[m.key] ?? 0);
+    const c7 = Number(t7[m.key] ?? 0);
+    const d30 = deltaPct(c30, Number(p30[m.key] ?? 0));
+    const d7 = deltaPct(c7, Number(p7[m.key] ?? 0));
+    const tone30 = m.tone ? deltaTone(c30, Number(p30[m.key] ?? 0)) : undefined;
+    const Delta = ({ d, tone }: { d: number | null; tone?: "good" | "bad" }) =>
+      d === null ? <span className="text-[var(--color-ink-faint)]">—</span> : (
+        <span className="font-semibold" style={{ color: tone === "good" ? "var(--color-good)" : tone === "bad" ? "var(--color-bad)" : "var(--color-ink-faint)" }}>{d >= 0 ? "+" : ""}{d}%</span>
+      );
     return (
-      <div className="min-w-0 flex-1">
-        <div className="text-2xs font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">{periodLabel}</div>
-        <div className="text-xl font-bold tabular-nums leading-tight">{m.fmt(cur)}</div>
-        {d !== null ? (
-          <div className="text-2xs font-semibold" style={{ color: tone === "good" ? "var(--color-good)" : tone === "bad" ? "var(--color-bad)" : "var(--color-ink-faint)" }}>
-            {d >= 0 ? "+" : ""}{d}%
-          </div>
-        ) : <div className="text-2xs text-[var(--color-ink-faint)]">—</div>}
+      <div key={m.key} className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+        <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">{m.label}</div>
+        <div className="mt-1.5 flex items-baseline gap-2">
+          <span className="text-3xl font-bold tabular-nums leading-none">{m.fmt(c30)}</span>
+          <span className="text-2xs font-medium text-[var(--color-ink-faint)]">30 dagen</span>
+        </div>
+        <div className="mt-1 text-2xs"><Delta d={d30} tone={tone30} /> <span className="text-[var(--color-ink-faint)]">t.o.v. vorige 30 dagen</span></div>
+        <div className="mt-2 flex items-baseline justify-between border-t border-[var(--color-line)] pt-2 text-xs">
+          <span className="text-[var(--color-ink-muted)]">7 dagen: <span className="font-semibold tabular-nums text-[var(--color-ink)]">{m.fmt(c7)}</span></span>
+          <span className="text-2xs"><Delta d={d7} tone={m.tone ? deltaTone(c7, Number(p7[m.key] ?? 0)) : undefined} /></span>
+        </div>
       </div>
     );
   };
 
   const kpiCards = (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-      {METRICS.map((m) => (
-        <div key={m.key} className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3.5">
-          <div className="mb-2 text-sm font-semibold">{m.label}</div>
-          <div className="flex gap-3">
-            {period(t7, p7, m, "7 dagen")}
-            <div className="w-px bg-[var(--color-line)]" />
-            {period(t30, p30, m, "30 dagen")}
-          </div>
-        </div>
-      ))}
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {METRICS.map((m) => bigMetric(m))}
     </div>
   );
 
@@ -241,11 +246,19 @@ export default async function AnalyticsPage({
         </Card>
       ) : (
         <>
-          {/* Kerncijfers: per cijfer 7 én 30 dagen naast elkaar — in één oogopslag. */}
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
-            <span className="text-sm font-bold tracking-tight">Kerncijfers</span>
-            <span className="text-xs text-white/70">7 én 30 dagen · {selectedName ?? "alle actieve klanten samen"}</span>
+          {/* Kerncijfers: het totaal, opgeteld over alle getoonde klanten. Per
+              cijfer het grote 30-daagse totaal + 7 dagen eronder. */}
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-3 text-white">
+            <span className="text-base font-bold tracking-tight">Totaal — {selectedName ?? `alle ${allTiles.length} klanten samen`}</span>
+            <span className="text-xs text-white/70">Opgeteld over 7 én 30 dagen</span>
           </div>
+          <p className="mb-3 text-xs leading-relaxed text-[var(--color-ink-muted)]">
+            {selectedName
+              ? "Alle cijfers van deze klant, "
+              : `Alle cijfers van de ${allTiles.length} getoonde klanten bij elkaar opgeteld, `}
+            uit de dagelijkse Metricool-snapshots in de eigen database. Het <strong>grote getal</strong> is de laatste
+            30 dagen; het percentage eronder vergelijkt met de 30 dagen daarvoor. De tweede regel toont dezelfde periode over 7 dagen.
+          </p>
           <div className="mb-6">{kpiCards}</div>
 
           <div className="grid gap-5">
@@ -290,49 +303,6 @@ export default async function AnalyticsPage({
               </Table>
             </Card>
           </div>
-
-          <Card className="mt-5" padded={false}>
-            <div className="p-5 pb-3">
-              <CardHeader title="Best presterende video's" subtitle={`Gepubliceerd in de afgelopen ${TABLE_DAYS} dagen`} />
-            </div>
-            {videoRows.length === 0 ? (
-              <EmptyState title="Nog geen gepubliceerde video's in deze periode" />
-            ) : (
-              <Table
-                head={
-                  <>
-                    <th className="sc-th">Video</th>
-                    <th className="sc-th">Klant</th>
-                    <th className="sc-th">Gepubliceerd</th>
-                    <th className="sc-th text-right">Weergaven</th>
-                    <th className="sc-th text-right">Likes</th>
-                    <th className="sc-th text-right">Gem. kijktijd</th>
-                  </>
-                }
-              >
-                {videoRows.map((v) => (
-                  <tr key={String(v.id)} className="sc-row-link">
-                    <td className="sc-td">
-                      <Link href={`/videos/${v.id}`} className="font-medium hover:underline">
-                        {String(v.title)}
-                      </Link>
-                    </td>
-                    <td className="sc-td text-[var(--color-ink-muted)]">{String(v.client_name)}</td>
-                    <td className="sc-td text-[var(--color-ink-muted)]">
-                      {formatDate(String(v.published_at))}
-                    </td>
-                    <td className="sc-td text-right tabular-nums">{compact(Number(v.views))}</td>
-                    <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">
-                      {compact(Number(v.likes))}
-                    </td>
-                    <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">
-                      {v.avg_watch ? `${Number(v.avg_watch).toFixed(1)}s` : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </Table>
-            )}
-          </Card>
 
           <p className="mt-4 text-xs text-[var(--color-ink-muted)]">
             Cijfers komen uit dagelijkse snapshots in de eigen database. Weergaven en

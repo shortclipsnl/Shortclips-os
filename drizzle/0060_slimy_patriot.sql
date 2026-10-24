@@ -1,0 +1,1 @@
+ALTER TABLE "clients" ADD COLUMN "show_in_results" boolean DEFAULT true NOT NULL;

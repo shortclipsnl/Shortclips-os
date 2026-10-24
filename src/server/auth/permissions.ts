@@ -181,6 +181,9 @@ export const ROLE_DEFINITIONS: Array<{
       "analytics:read",
       "ai:read",
       "video_intelligence:read",
+      // Het contentteam gebruikt Video Intelligence actief (video's toevoegen en
+      // laten analyseren), niet alleen bekijken.
+      "video_intelligence:run",
       // Het contentteam (o.a. Jiska, Rutger) stuurt ook de editing aan: fases,
       // prioriteit en deadlines wijzigen (videos:write) en editors toewijzen
       // (videos:assign), net als de projectcoördinator.
@@ -193,7 +196,9 @@ export const ROLE_DEFINITIONS: Array<{
     name: "Videograaf",
     description: "Draait opnamedagen; ziet scripts en benodigdheden.",
     sortOrder: 50,
-    permissions: [...INTERNAL_BASE, "productions:write"],
+    // Videografen gebruiken Video Intelligence ook: video's toevoegen en analyses
+    // bekijken (begrijpen wáárom een video werkt).
+    permissions: [...INTERNAL_BASE, "productions:write", "video_intelligence:read", "video_intelligence:run"],
   },
   {
     key: "editor",
@@ -224,6 +229,7 @@ export const ROLE_DEFINITIONS: Array<{
       "reports:read",
       "analytics:read",
       "video_intelligence:read",
+      "video_intelligence:run",
     ],
   },
   {

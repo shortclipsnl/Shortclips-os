@@ -22,6 +22,24 @@ async function main() {
   `);
   const n = (res as unknown as { rowCount?: number }).rowCount ?? 0;
   console.log(`[data-fixes] Banscollector-naamcorrectie: ${n} rij(en) bijgewerkt.`);
+
+  // Records die geen echte klant van ons zijn (meegekomen uit Monday/Metricool)
+  // uit de resultatenpagina halen: show_in_results = false. Niet-destructief — ze
+  // blijven elders bestaan en kunnen per klant weer aangezet worden. De WHERE
+  // matcht ná toepassing niet meer, dus herhaald draaien verandert niets. Meer
+  // namen kunnen hier veilig bij; het kantoorteam kan de rest zelf toggelen.
+  const notClients = [
+    "unive%", "univé%", "trif%", "%storiesje%", "%chatgpt%",
+    "%oosteruterke%", "%oosterúterke%", "brita%", "%stitch society%", "%stitch soc%",
+  ];
+  const hide = await db.execute(sql`
+    UPDATE clients
+    SET show_in_results = false, updated_at = now()
+    WHERE show_in_results = true
+      AND name ILIKE ANY (ARRAY[${sql.join(notClients.map((p) => sql`${p}`), sql`, `)}])
+  `);
+  const h = (hide as unknown as { rowCount?: number }).rowCount ?? 0;
+  console.log(`[data-fixes] Niet-klanten verborgen op resultaten: ${h} rij(en) bijgewerkt.`);
 }
 
 main()

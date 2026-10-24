@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FileText, Play } from "lucide-react";
+import { Eye, FileText, Play } from "lucide-react";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients } from "@/db/schema";
@@ -35,7 +35,7 @@ export default async function ClientResultsPage({
   const platform = sp.platform && PLATFORM[sp.platform] ? sp.platform : null;
 
   const [client] = await db
-    .select({ id: clients.id, name: clients.name, color: clients.color, logoUrl: clients.logoUrl, quota: clients.monthlyVideoQuota })
+    .select({ id: clients.id, name: clients.name, color: clients.color, logoUrl: clients.logoUrl, quota: clients.monthlyVideoQuota, description: clients.description })
     .from(clients)
     .where(and(eq(clients.slug, slug), isNull(clients.deletedAt)))
     .limit(1);
@@ -93,7 +93,7 @@ export default async function ClientResultsPage({
         group by d.id, d.title, d.thumbnail_url, d.frame_url, d.duration_seconds, d.published_at
         order by views desc, d.published_at desc nulls last`),
       db.execute(sql`select count(*)::int n from deliverables where client_id = ${cid} and deleted_at is null and status = 'published'`),
-      db.execute(sql`select slug, name, color, status from clients where deleted_at is null order by (status = 'active') desc, name`),
+      db.execute(sql`select slug, name, color, status from clients where deleted_at is null and show_in_results = true order by (status = 'active') desc, name`),
     ]);
 
   const t = rows<Record<string, number>>(totals)[0] ?? {};
@@ -162,6 +162,9 @@ export default async function ClientResultsPage({
   {
     const vD = deltaPct(Number(t.views ?? 0), Number(prev.views ?? 0));
     if (vD !== null) findings.push(`Weergaven zijn met ${Math.abs(vD)}% ${vD >= 0 ? "gestegen" : "gedaald"} ten opzichte van de vorige periode.`);
+    const rD = deltaPct(Number(t.reach ?? 0), Number(prev.reach ?? 0));
+    if (rD !== null) findings.push(`Het bereik is met ${Math.abs(rD)}% ${rD >= 0 ? "gestegen" : "gedaald"} ten opzichte van de vorige periode.`);
+    if (publishedTotal > 0) findings.push(`Er staan in totaal ${num(publishedTotal)} video${publishedTotal === 1 ? "" : "'s"} van deze klant live.`);
     const fg = Number(t.follower_growth ?? 0);
     if (fg !== 0) findings.push(fg > 0 ? `Er kwamen ${num(fg)} nieuwe volgers bij in deze periode.` : `Het volgersaantal daalde met ${num(Math.abs(fg))}.`);
     if (!platform && platforms.length > 0) {
@@ -190,6 +193,11 @@ export default async function ClientResultsPage({
                 </Link>
               ))}
             </div>
+            <Link href={`/analytics/${slug}/klantportaal?periode=${days === 90 ? 90 : 30}`}
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] hover:border-[var(--color-brand-500)]"
+              title="Bekijk hoe deze resultaten er in het klantportaal van de klant uitzien">
+              <Eye className="size-4" /> In klantportaal
+            </Link>
             <a href={`/rapport/${slug}?dagen=${days}`} target="_blank" rel="noopener"
               className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-700)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
               title="Genereer een klantenrapportage (PDF)">
@@ -200,6 +208,16 @@ export default async function ClientResultsPage({
       />
 
       <ClientSelector clients={selectorClients} currentSlug={slug} />
+
+      {/* Kort tekstje over de klant zelf, zodat meteen duidelijk is om wie het
+          gaat. Komt uit de klantomschrijving; staat die er niet, dan tonen we
+          niets (liever geen tekst dan een lege kop). */}
+      {client.description && client.description.trim() ? (
+        <Card className="mb-4">
+          <h3 className="text-sm font-semibold">Over {client.name}</h3>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--color-ink-muted)]">{client.description}</p>
+        </Card>
+      ) : null}
 
       {/* Platformfilter: klik op een platformlogo om alleen die cijfers te zien. */}
       <div className="mb-5 flex flex-wrap items-center gap-2">

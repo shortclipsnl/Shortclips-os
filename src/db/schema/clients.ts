@@ -60,6 +60,10 @@ export const clients = pgTable(
      *  dat zelf (false)? Bij false geen inplannen/publiceren-signalen in
      *  Kwaliteit & Aandachtspunten, en zichtbaar in de contentplanning. */
     weHandlePosting: boolean("we_handle_posting").notNull().default(true),
+    /** Tonen op de resultatenpagina? Standaard true. Op false voor records die
+     *  geen echte klant van ons zijn (bijv. uit Monday/Metricool meegekomen),
+     *  zodat ze niet in de resultaten (overzicht, tegels, lijst) verschijnen. */
+    showInResults: boolean("show_in_results").notNull().default(true),
     monthlyRevenue: numeric("monthly_revenue", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),

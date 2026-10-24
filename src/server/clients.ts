@@ -107,6 +107,7 @@ export async function getClientHub(viewer: Viewer, slug: string) {
       startedOn: clients.startedOn,
       monthlyVideoQuota: clients.monthlyVideoQuota,
       weHandlePosting: clients.weHandlePosting,
+      showInResults: clients.showInResults,
       monthlyRevenue: clients.monthlyRevenue,
       editCostPerVideo: clients.editCostPerVideo,
       contractMonths: clients.contractMonths,

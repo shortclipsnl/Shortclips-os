@@ -180,6 +180,28 @@ export async function setClientPosting(clientId: string, weHandlePosting: boolea
   }
 }
 
+/**
+ * Tonen op de resultatenpagina? Op false voor records die geen echte klant van
+ * ons zijn, zodat ze uit de resultaten (overzicht, tegels, lijst) verdwijnen.
+ * Niet-destructief: de klant blijft elders bestaan.
+ */
+export async function setClientShowInResults(clientId: string, showInResults: boolean): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("clients:write");
+    const [existing] = await db.select({ id: clients.id }).from(clients).where(and(eq(clients.id, clientId), isNull(clients.deletedAt))).limit(1);
+    if (!existing) return { ok: false, message: "Klant niet gevonden." };
+    assertClientAccess(viewer, existing.id);
+    await db.update(clients).set({ showInResults, updatedAt: new Date() }).where(eq(clients.id, existing.id));
+    await auditLog({ viewer, action: "client.set_show_in_results", entityType: "client", entityId: existing.id, clientId: existing.id, changes: { showInResults } });
+    revalidatePath("/clients");
+    revalidatePath("/analytics");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 /** De vaste editor die een klant doet (Monday-veld "Editor"). Handmatig gezet =
  *  vergrendeld, zodat de nachtelijke sync het niet terugzet. */
 export async function setClientEditor(clientId: string, editorName: string | null): Promise<ActionResult> {

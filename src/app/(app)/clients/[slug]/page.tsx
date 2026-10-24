@@ -13,6 +13,7 @@ import { requireInternal } from "@/server/auth/context";
 import { getClientHub, type ClientHub } from "@/server/clients";
 import { listEditingProjects, type EditingProject } from "@/server/editing-board";
 import { PostingToggle } from "./posting-toggle";
+import { ResultsToggle } from "./results-toggle";
 import { ScriptHistory } from "./script-history";
 import { FilesBrowser } from "./files-browser";
 import { ClientPortalLogin } from "./portal-login";
@@ -307,6 +308,7 @@ function OverviewTab({
             <Row label="Pakket" value={hub.package?.name ?? "—"} />
             <Row label="Video's per maand" value={String(c.monthlyVideoQuota)} />
             <Row label="Content plaatsen" value={<PostingToggle clientId={c.id} initial={c.weHandlePosting} canEdit={canEditClient} />} />
+            <Row label="Tonen op resultaten" value={<ResultsToggle clientId={c.id} initial={c.showInResults} canEdit={canEditClient} />} />
             <Row label="Klant sinds" value={c.startedOn ? formatDateFull(c.startedOn) : "—"} />
             <Row
               label="Contract tot"

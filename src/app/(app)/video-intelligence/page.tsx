@@ -43,7 +43,9 @@ export default async function VideoIntelligencePage({
         description="Analyseer organische short video's: shots, hooks, spraak, montage en AI-conclusies. Begrijp wáárom een video werkt."
       />
 
-      <ToolStatusPanel status={toolStatus} isOwner={isOwner(viewer)} />
+      {/* Alleen de eigenaar ziet de technische inrichting ("Analyse-onderdelen
+          instellen"); teamleden hebben hier niets aan en kunnen het niet zelf. */}
+      {isOwner(viewer) ? <ToolStatusPanel status={toolStatus} /> : null}
 
       {canRun ? <AddVideo clients={clients} /> : null}
 
@@ -101,7 +103,7 @@ export default async function VideoIntelligencePage({
 
 type ToolStatus = { ffmpeg: boolean; ffprobe: boolean; ytdlp: boolean; whisper: boolean; ocr: boolean; anthropic: boolean };
 
-function ToolStatusPanel({ status, isOwner }: { status: ToolStatus; isOwner: boolean }) {
+function ToolStatusPanel({ status }: { status: ToolStatus }) {
   const items = [
     { ok: status.ffmpeg && status.ffprobe, label: "ffmpeg / ffprobe", need: "Duur, shotdetectie, thumbnails, montagetempo", fix: "meegeleverd (ffmpeg-static)" },
     { ok: status.ytdlp, label: "yt-dlp", need: "Video's ophalen via platform-URL", fix: "uv tool install yt-dlp" },
@@ -124,12 +126,7 @@ function ToolStatusPanel({ status, isOwner }: { status: ToolStatus; isOwner: boo
               <span className="block text-2xs text-[var(--color-ink-faint)]">{i.need}</span>
             </span>
             {!i.ok ? (
-              // Alleen de eigenaar ziet de technische install-commando's; teamleden zien een neutrale melding.
-              isOwner ? (
-                <code className="rounded bg-[var(--color-surface-sunken)] px-2 py-1 text-2xs">{i.fix}</code>
-              ) : (
-                <span className="text-2xs text-[var(--color-ink-faint)]">Wordt door het team ingericht.</span>
-              )
+              <code className="rounded bg-[var(--color-surface-sunken)] px-2 py-1 text-2xs">{i.fix}</code>
             ) : null}
           </li>
         ))}

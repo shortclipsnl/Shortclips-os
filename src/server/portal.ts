@@ -18,7 +18,7 @@ import {
   scripts,
   users,
 } from "@/db/schema";
-import type { Viewer } from "@/server/auth/context";
+import { assertClientAccess, type Viewer } from "@/server/auth/context";
 import { nextShootForClient, upcomingAppointmentsForClient } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { cleanVideoTitle } from "@/lib/portal-status";
@@ -355,7 +355,21 @@ export type PortalResults = {
 export async function getPortalResults(viewer: Viewer, days = 30): Promise<PortalResults> {
   const clientId = viewer.clientId;
   if (!clientId) notFound();
+  return computePortalResults(clientId, days);
+}
 
+/**
+ * Interne voorbeeldweergave: precies de cijfers die de klant in zijn eigen
+ * portaal ziet, maar opvraagbaar door het kantoorteam voor een specifieke klant
+ * (hard gescoped op klanttoegang). Zo kan het team zien hoe de resultaten er in
+ * het klantportaal uitzien.
+ */
+export async function getPortalResultsForClient(viewer: Viewer, clientId: string, days = 30): Promise<PortalResults> {
+  assertClientAccess(viewer, clientId);
+  return computePortalResults(clientId, days);
+}
+
+async function computePortalResults(clientId: string, days: number): Promise<PortalResults> {
   const res = await db.execute(sql`
     with cur as (
       select coalesce(sum(views),0)::int v, coalesce(sum(reach),0)::int r,
