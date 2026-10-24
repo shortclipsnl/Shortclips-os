@@ -158,6 +158,7 @@ export const integrationProviderEnum = pgEnum("integration_provider", [
   "frameio",
   "google_drive",
   "google_calendar",
+  "gmail",
   "ayrshare",
   "metricool",
 ]);

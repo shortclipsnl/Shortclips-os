@@ -278,8 +278,15 @@ export const salesLeads = pgTable(
     segment: varchar("segment", { length: 24 }),
     /** Ruwe Monday-status, voor volledige getrouwheid naast onze bucket. */
     mondayStatus: varchar("monday_status", { length: 60 }),
+    /** Unieke bron-identificatie (bijv. de e-mail Message-ID) om dubbele import
+     *  te voorkomen. Leeg voor handmatig toegevoegde leads. */
+    externalId: varchar("external_id", { length: 400 }),
     ...timestamps,
     ...softDelete,
   },
-  (t) => [index("sales_leads_status_idx").on(t.status), index("sales_leads_followup_idx").on(t.followUpOn)],
+  (t) => [
+    index("sales_leads_status_idx").on(t.status),
+    index("sales_leads_followup_idx").on(t.followUpOn),
+    unique("sales_leads_external_unique").on(t.externalId),
+  ],
 );

@@ -8,8 +8,24 @@ import { clients, salesLeads } from "@/db/schema";
 import { requireOwner, ForbiddenError } from "@/server/auth/context";
 import { dispatch } from "@/server/automation";
 import { createClient } from "@/server/actions/clients";
+import { gmail } from "@/server/integrations/gmail";
+import { runLeadMailSync } from "@/server/jobs/leads-mail-sync";
 
 export type ActionResult = { ok: boolean; message?: string; slug?: string };
+
+/** "Nu synchroniseren": leest direct de leads-mailmap uit (alleen eigenaar). */
+export async function syncLeadsFromMail(): Promise<ActionResult> {
+  return wrap(async () => {
+    await requireOwner();
+    if (!gmail.isConfigured) {
+      return { ok: false, message: "De Gmail-koppeling is nog niet ingesteld. Zet de Google-sleutels met de scope gmail.readonly (Beheer → Koppelingen)." };
+    }
+    const res = await runLeadMailSync();
+    revalidatePath("/leads");
+    if (!res.ok) return { ok: false, message: res.error ?? "Synchroniseren mislukt. Probeer het later opnieuw." };
+    return { ok: true };
+  });
+}
 
 function wrap<T>(fn: () => Promise<T>) {
   return fn().catch((e) => {

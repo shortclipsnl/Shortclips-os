@@ -5,6 +5,7 @@ export type Provider =
   | "frameio"
   | "google_drive"
   | "google_calendar"
+  | "gmail"
   | "ayrshare"
   | "metricool";
 

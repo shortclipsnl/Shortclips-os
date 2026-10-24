@@ -11,11 +11,12 @@ export type JobLogEntry = { at: string; level: "info" | "warn" | "error"; messag
 
 /** Echte externe koppelingen (de rest gebruikt 'monday' als placeholder voor
  *  interne jobs — die willen we niet als koppelingsfout melden). */
-const EXTERNAL_PROVIDERS = new Set<Provider>(["frameio", "google_drive", "google_calendar", "metricool"]);
+const EXTERNAL_PROVIDERS = new Set<Provider>(["frameio", "google_drive", "google_calendar", "gmail", "metricool"]);
 const PROVIDER_LABEL: Record<string, string> = {
   frameio: "Frame.io",
   google_drive: "Google Drive",
   google_calendar: "Google Agenda",
+  gmail: "Gmail (leads)",
   metricool: "Metricool",
 };
 

@@ -48,6 +48,12 @@ const schema = z.object({
   // Leeg = alle agenda's waar het account toegang toe heeft.
   GOOGLE_CALENDAR_IDS: z.string().optional(),
 
+  // --- Gmail (lead-import) ---
+  // Hergebruikt dezelfde Google-OAuth (CLIENT_ID/SECRET/REFRESH_TOKEN). De
+  // refresh-token moet dan ook de scope gmail.readonly hebben. Het label waaruit
+  // contactformulier-mails worden gelezen (standaard "Leads - Shortclips").
+  GMAIL_LEADS_LABEL: z.string().optional(),
+
   // --- Social statistieken ---
   AYRSHARE_API_KEY: z.string().optional(),
   // Metricool: één user-token (X-Mc-Auth) voor het hele account. De user-id en
