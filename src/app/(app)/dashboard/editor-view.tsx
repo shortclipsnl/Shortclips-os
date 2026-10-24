@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { AlertTriangle, FileText, Film, CheckCircle2, Clock, Info, MessageCircle, Phone, Trophy, CalendarClock, Sprout } from "lucide-react";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -10,6 +11,7 @@ import { Card, CardHeader, ClientLogo, EmptyState, Stat, TeamAvatar } from "@/co
 import { pct, plural, relativeDays } from "@/lib/format";
 import { isFirstVersionPending } from "@/lib/edit-deadline";
 import { EDIT_PHASE_META } from "@/lib/statuses";
+import { buildEditorGreeting } from "@/lib/editor-greeting";
 import { AvailabilityBox } from "./availability-box";
 import { DeliveredCelebration } from "./delivered-celebration";
 
@@ -64,25 +66,42 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
   const binnenkort = active.filter((v) => v.phase === "te_plannen");
   const jouwVideos = active.filter((v) => v.phase !== "te_plannen");
 
+  // --- Persoonlijke dagelijkse begroeting ---
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Amsterdam", hour: "2-digit", hour12: false }).format(new Date()));
+  const daySeed = Math.floor(Date.now() / 86_400_000);
+  // "Taken vandaag": video's die nú op de editor wachten + eigen taken die vandaag/eerder moeten.
+  const videosForYou = active.filter((v) => EDIT_PHASE_META[v.phase]?.waitOn === "Editor").length;
+  const tasksDueToday = data.tasks.filter((t) => t.dueOn && t.dueOn <= today).length;
+  const tasksToday = videosForYou + tasksDueToday;
+  // "Goedgekeurd deze week": opgeleverde video's met opleverdatum vanaf maandag.
+  // Tijdzone-veilig via UTC-parsing van de al in Amsterdam bepaalde datum.
+  const [ty, tm, td] = today.split("-").map(Number);
+  const wd = new Date(Date.UTC(ty!, (tm ?? 1) - 1, td ?? 1));
+  const dow = (wd.getUTCDay() + 6) % 7; // 0 = maandag
+  wd.setUTCDate(wd.getUTCDate() - dow);
+  const weekStartStr = wd.toISOString().slice(0, 10);
+  const approvedThisWeek = data.deliveredByMonth.flatMap((m) => m.items).filter((i) => i.op.slice(0, 10) >= weekStartStr).length;
+  // XP: deterministisch uit de echte records (geen dubbeltelling): 10 per opgeleverde
+  // video + 5 bonus per op tijd opgeleverde video.
+  const onTimeCount = data.stats.onTimeRate != null ? Math.round((data.stats.onTimeRate / 100) * data.stats.withDeadline) : 0;
+  const xp = data.stats.delivered * 10 + onTimeCount * 5;
+  const greet = buildEditorGreeting({ firstName: firstName ?? "", hour, daySeed, videosForYou, approvedThisWeek, onTimeRate: data.stats.onTimeRate, withDeadline: data.stats.withDeadline });
+
   return (
     <div className="mx-auto max-w-[1100px] space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Hoi {firstName}</h1>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          {active.length === 0
-            ? "Je hebt op dit moment geen openstaand editwerk."
-            : `${plural(active.length, "video", "video's")} op je bord${
-                todayOrEarlier > 0 ? `, waarvan ${todayOrEarlier} vandaag of eerder af moeten (eerste versie)` : ""
-              }.`}
-        </p>
-      </div>
-
-      {/* Warm, persoonlijk welkomstbericht met wat uitleg over het board. */}
-      <div className="rounded-[var(--radius-lg)] border border-[var(--color-brand-500)]/25 bg-[var(--color-brand-50)] px-4 py-3 text-sm leading-relaxed text-[var(--color-ink)]">
-        Hé {firstName}, fijn dat je onze editor bent! 🎬 Hieronder zie je je video&apos;s met hun opleverdata en interne
-        deadlines (de eerste versie, 7 werkdagen na de opname). Kijk ook even bij{" "}
-        <strong>Binnenkort beschikbaar</strong> — zo kun je je planning vast afstemmen en weten we zeker dat alles
-        realistisch en op tijd wordt opgeleverd.
+      {/* Persoonlijke, dagelijkse begroeting met je eigen cijfers. */}
+      <div className="overflow-hidden rounded-[var(--radius-lg)] bg-gradient-to-br from-[var(--color-indigo-ink)] to-[var(--color-brand-700)] p-5 text-white sm:p-6">
+        <h1 className="text-2xl font-bold tracking-tight">{greet.greeting}, {firstName}! 👋</h1>
+        <p className="mt-0.5 text-sm font-semibold text-white/60">{greet.headline}</p>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/90">{greet.message}</p>
+        {greet.compliment ? (
+          <p className="mt-2.5 inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">{greet.compliment}</p>
+        ) : null}
+        <div className="mt-4 grid grid-cols-3 gap-2.5 sm:gap-3">
+          <GreetStat label="Taken vandaag" value={tasksToday} icon={<Film className="size-4" />} />
+          <GreetStat label="Goedgekeurd deze week" value={approvedThisWeek} icon={<CheckCircle2 className="size-4" />} />
+          <GreetStat label="XP verdiend" value={xp} icon={<Trophy className="size-4" />} />
+        </div>
       </div>
 
       {overdue > 0 ? (
@@ -316,6 +335,19 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
         </span>
         <span className="text-sm text-[var(--color-ink-faint)]">Bekijken →</span>
       </Link>
+    </div>
+  );
+}
+
+/** Compacte stat-tegel in de begroeting (wit op de navy-gradient). */
+function GreetStat({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
+  return (
+    <div className="rounded-[var(--radius-md)] bg-white/10 px-3 py-2.5">
+      <div className="flex items-center gap-1.5 text-white/60">
+        {icon}
+        <span className="text-2xs font-semibold uppercase tracking-wide">{label}</span>
+      </div>
+      <div className="mt-0.5 text-2xl font-bold tabular-nums">{value}</div>
     </div>
   );
 }
