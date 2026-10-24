@@ -12,6 +12,8 @@ import { compact, formatDate, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
 import { ClientSelector, type SelectorClient } from "../client-selector";
 import { VideoThumb } from "../video-thumb";
+import { getLatestInsights, insightsAvailable } from "@/server/insights";
+import { InsightsPanel } from "./insights-ui";
 
 // Vaste platformvolgorde voor de filterknoppen.
 const PLATFORM_ORDER = ["instagram", "tiktok", "facebook", "youtube", "linkedin"] as const;
@@ -154,6 +156,14 @@ export default async function ClientResultsPage({
   };
 
   const hasData = Number(t.views ?? 0) > 0 || months.length > 0 || videos.length > 0;
+
+  // AI-inzichten & verbeterpunten (gated op de AI-sleutel). Laatste opgeslagen
+  // analyse tonen; genereren/opnieuw kan via het paneel.
+  const aiReady = insightsAvailable();
+  const latestInsights = await getLatestInsights(cid);
+  const insightsGeneratedAt = latestInsights
+    ? latestInsights.createdAt.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })
+    : null;
   const top = videos.slice(0, 5);
   const bottom = videos.filter((v) => Number(v.views) > 0).slice(-5).reverse();
 
@@ -262,7 +272,17 @@ export default async function ClientResultsPage({
             </Card>
           ) : null}
 
-          <div className="mb-5 grid gap-5 xl:grid-cols-2">
+          {/* AI-inzichten & verbeterpunten — concrete analyse + taken voor de
+              volgende opnames (op basis van de echte cijfers, gated op de sleutel). */}
+          <InsightsPanel
+            slug={slug}
+            days={days}
+            available={aiReady}
+            insights={latestInsights?.insights ?? null}
+            generatedAt={insightsGeneratedAt}
+          />
+
+          <div className="mt-5 mb-5 grid gap-5 xl:grid-cols-2">
             {/* Weergaven per maand */}
             <Card padded={false}>
               <CardHeader title="Weergaven per maand" className="p-5 pb-2" />

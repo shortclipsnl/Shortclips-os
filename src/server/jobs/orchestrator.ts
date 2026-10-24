@@ -6,6 +6,7 @@ import { runAutoPublishDueContent } from "./content-publish";
 import { runTaskArchive } from "./task-archive";
 import { runCalendarSync } from "./calendar-sync";
 import { runMonthlyReportDrafts } from "./report-drafts";
+import { runMonthlyInsightTasks } from "./insight-tasks";
 import { runDriveSync } from "./drive-sync";
 import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
@@ -69,6 +70,8 @@ export async function runNightlySync() {
   results.push(await step("content.auto_publish_due", () => runAutoPublishDueContent()));
   results.push(await step("tasks.archive_done", () => runTaskArchive()));
   results.push(await step("reports.generate_drafts", () => runMonthlyReportDrafts()));
+  // Maandelijkse AI-verbeterlus: inzichten → verbeterpunt-taken (idempotent, gated).
+  results.push(await step("insights.monthly_tasks", () => runMonthlyInsightTasks()));
   results.push(await step("drive.sync_all", () => runDriveSync()));
   results.push(await step("frameio.pull_projects", () => pullFrameProjects()));
   results.push(await step("frameio.pull_deliverables", () => pullFrameDeliverables()));

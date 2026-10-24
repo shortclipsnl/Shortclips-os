@@ -237,18 +237,33 @@ export async function runJsonResearch<T>(input: {
 
 function extractJson<T>(text: string): T | null {
   const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-  try {
-    return JSON.parse(cleaned) as T;
-  } catch {
-    // Val terug op het eerste { … } of [ … ] blok.
-    const match = cleaned.match(/[[{][\s\S]*[\]}]/);
-    if (match) {
-      try {
-        return JSON.parse(match[0]) as T;
-      } catch {
-        return null;
-      }
+  // Kandidaten: de hele tekst, en het eerste { … } / [ … ] blok als er
+  // omliggende tekst staat.
+  const block = cleaned.match(/[[{][\s\S]*[\]}]/)?.[0];
+  const candidates = block && block !== cleaned ? [cleaned, block] : [cleaned];
+  for (const c of candidates) {
+    // 1) Direct parsen.
+    try {
+      return JSON.parse(c) as T;
+    } catch {
+      // volgende poging
     }
-    return null;
+    // 2) Modellen zetten soms letterlijke regeleinden/tabs in lange tekstvelden;
+    //    die ruwe control-tekens zijn ongeldig binnen JSON-strings. Vervang runs
+    //    van ruwe control-bytes door één spatie. Al ge-escapete sequenties (\n is
+    //    backslash + n) blijven ongemoeid.
+    const noCtrl = c.replace(/[\u0000-\u001F]+/g, " ");
+    try {
+      return JSON.parse(noCtrl) as T;
+    } catch {
+      // volgende poging
+    }
+    // 3) Verwijder ook eventuele trailing komma's vóór } of ].
+    try {
+      return JSON.parse(noCtrl.replace(/,\s*([}\]])/g, "$1")) as T;
+    } catch {
+      // volgende kandidaat
+    }
   }
+  return null;
 }

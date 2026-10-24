@@ -101,10 +101,12 @@ const EMPTY_AGG = (): DayAgg => ({
 });
 
 /** Metricool-netwerk → ons platform-enum (voor de per-platform uitsplitsing). */
-const NETWORK_PLATFORM: Record<string, "instagram" | "tiktok" | "facebook"> = {
+const NETWORK_PLATFORM: Record<string, "instagram" | "tiktok" | "facebook" | "youtube" | "linkedin"> = {
   Instagram: "instagram",
   Tiktok: "tiktok",
   Facebook: "facebook",
+  Youtube: "youtube",
+  Linkedin: "linkedin",
 };
 
 /**

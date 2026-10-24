@@ -69,10 +69,10 @@ export function InsightsPanel({
         ) : (
           <div className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
-              <FindingList title="Wat werkt" tone="good" items={insights.analysis.watWerkt} />
-              <FindingList title="Wat minder werkt" tone="bad" items={insights.analysis.watMinder} />
+              <FindingList title="Wat werkt" tone="good" items={insights.analysis?.watWerkt ?? []} />
+              <FindingList title="Wat minder werkt" tone="bad" items={insights.analysis?.watMinder ?? []} />
             </div>
-            {insights.analysis.ontwikkelingen?.length ? (
+            {insights.analysis?.ontwikkelingen?.length ? (
               <div>
                 <h3 className="mb-1.5 text-sm font-semibold text-[var(--color-ink)]">Ontwikkelingen</h3>
                 <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--color-ink-muted)]">
@@ -84,7 +84,7 @@ export function InsightsPanel({
             <div>
               <h3 className="mb-2 text-sm font-semibold text-[var(--color-ink)]">Verbeterpunten voor de volgende opnames</h3>
               <div className="space-y-2.5">
-                {insights.verbeterpunten.map((r, i) => <RecCard key={i} slug={slug} rec={r} />)}
+                {(insights.verbeterpunten ?? []).map((r, i) => <RecCard key={i} slug={slug} rec={r} />)}
               </div>
             </div>
           </div>

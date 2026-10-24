@@ -14,8 +14,10 @@ const BASE = "https://app.metricool.com/api/v2";
 export type MetricoolBrand = { id: number; label: string; userId: number };
 export type DailyPoint = { date: string; value: number };
 
-/** De netwerken die we meenemen in de gecombineerde cijfers. */
-export const METRICOOL_NETWORKS = ["Instagram", "Tiktok", "Facebook"] as const;
+/** De netwerken die we meenemen in de gecombineerde cijfers. Niet-gekoppelde
+ *  netwerken of niet-beschikbare metrics leveren een lege reeks op (de sync
+ *  slaat die vanzelf over), dus dit uitbreiden is veilig. */
+export const METRICOOL_NETWORKS = ["Instagram", "Tiktok", "Facebook", "Youtube", "Linkedin"] as const;
 
 export class MetricoolService {
   constructor(private token = env.METRICOOL_USER_TOKEN) {}

@@ -17,8 +17,10 @@ const dayOffset = (n: number) => {
  * data: ontbreekt iets, dan blijft het leeg. De inhoudelijke AI-analyse en
  * verbeterpunten worden apart toegevoegd (vereist ANTHROPIC_API_KEY).
  */
-export async function getClientReport(slug: string, days = 90) {
-  await requireInternal();
+export async function getClientReport(slug: string, days = 90, trusted = false) {
+  // `trusted` alleen voor vertrouwde server-jobs (geen gebruikerssessie, bv. de
+  // nachtelijke AI-verbeterlus). De normale UI-/actiepaden laten dit op false.
+  if (!trusted) await requireInternal();
 
   const [client] = await db
     .select({ id: clients.id, name: clients.name, logoUrl: clients.logoUrl, slug: clients.slug })

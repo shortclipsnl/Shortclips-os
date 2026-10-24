@@ -149,7 +149,9 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
     // Owner-only bronnen.
     owner ? countOpenLinkSuggestions() : Promise.resolve(0),
     owner ? integrationHealth() : Promise.resolve([]),
-    owner ? getScreenData(30).catch(() => null) : Promise.resolve(null),
+    // Achterblijvende klanten (resultaten vallen terug): ook voor coördinatoren,
+    // niet alleen de eigenaar — het is een analysesignaal, geen financiële data.
+    getScreenData(30).catch(() => null),
   ]);
 
   const items: QualityItem[] = [];

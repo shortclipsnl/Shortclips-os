@@ -1,4 +1,5 @@
 import { getClientReport } from "@/server/client-report";
+import { getLatestInsights } from "@/server/insights";
 import { compact } from "@/lib/format";
 import { PrintButton } from "./print-button";
 
@@ -35,6 +36,9 @@ export default async function RapportPage({ params, searchParams }: { params: Pr
   const days = Number((await searchParams).dagen) || 90;
   const r = await getClientReport(slug, days);
   const t = r.totals;
+  // AI-verbeterpunten uit de laatste resultatenanalyse (indien aanwezig).
+  const insights = await getLatestInsights(r.client.id).catch(() => null);
+  const verbeterpunten = insights?.insights.verbeterpunten ?? [];
   const maxMonth = Math.max(1, ...r.months.map((m) => m.views));
 
   return (
@@ -120,6 +124,23 @@ export default async function RapportPage({ params, searchParams }: { params: Pr
             <p style={{ fontSize: 14.5, lineHeight: 1.7 }}>
               In deze periode behaalde {r.client.name} {compact(t.views)} weergaven{t.viewsGrowthPct !== null ? ` (${t.viewsGrowthPct >= 0 ? "+" : ""}${t.viewsGrowthPct}% t.o.v. de vorige periode)` : ""} over {t.posts} gepubliceerde video&apos;s{t.avgPerPost ? `, gemiddeld ${compact(t.avgPerPost)} per video` : ""}. {t.followerGrowth >= 0 ? `De volgersbasis groeide met +${compact(t.followerGrowth)}.` : `De volgersbasis daalde met ${compact(t.followerGrowth)}.`}
             </p>
+
+            {verbeterpunten.length > 0 ? (
+              <>
+                <SectionTitle>Verbeterpunten voor de komende maand</SectionTitle>
+                <ol style={{ fontSize: 14, lineHeight: 1.6, paddingLeft: 20, margin: 0 }}>
+                  {verbeterpunten.map((v, i) => (
+                    <li key={i} style={{ marginBottom: 8 }}>
+                      <strong>{v.titel}.</strong> {v.wat}
+                      <span style={{ color: "#6b7280" }}> (meetbaar aan: {v.hoeMeten})</span>
+                    </li>
+                  ))}
+                </ol>
+                <p style={{ fontSize: 11, color: "#aab0bf", marginTop: 6 }}>
+                  Deze verbeterpunten komen uit de AI-resultatenanalyse op basis van de echte cijfers.
+                </p>
+              </>
+            ) : null}
           </>
         )}
 
