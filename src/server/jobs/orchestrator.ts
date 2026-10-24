@@ -12,6 +12,7 @@ import { runIntegrationHealthCheck } from "./integration-health";
 import { runDriveSync } from "./drive-sync";
 import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
+import { runProfitabilitySignals } from "./profitability-signals";
 import {
   pullFrameComments,
   pullFrameDeliverables,
@@ -84,6 +85,8 @@ export async function runNightlySync() {
   // proactief verouderde/nooit-geslaagde koppelingen aan de verantwoordelijke.
   results.push(await step("integrations.health_check", () => runIntegrationHealthCheck()));
   results.push(await step("finance.snapshot_month", () => snapshotFinanceMonth()));
+  // Na de maand-snapshot: financiële winstgevendheid-signalen voor de eigenaar.
+  results.push(await step("profit.signals", () => runProfitabilitySignals()));
   results.push(await step("signals.daily", () => runDailySignals()));
   results.push(await step("reminders.editor_deadlines", () => runEditorDeadlineReminders()));
   results.push(await step("reminders.task_deadlines", () => runTaskDeadlineReminders()));

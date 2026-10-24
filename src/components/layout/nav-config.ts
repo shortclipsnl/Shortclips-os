@@ -105,6 +105,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/financien", label: "Financiën", icon: "Landmark", ownerOnly: true, match: "/financien" },
       { href: "/kosten", label: "Kostenmonitor", icon: "ReceiptEuro", ownerOnly: true, match: "/kosten" },
       { href: "/editkosten", label: "Winst & editkosten", icon: "Euro", ownerOnly: true, match: "/editkosten" },
+      { href: "/winstgevendheid", label: "Winstgevendheid", icon: "TrendingUp", ownerOnly: true, match: "/winstgevendheid" },
       { href: "/dashboard/vermogen", label: "Vermogen", icon: "Wallet", ownerOnly: true, external: true },
     ],
   },

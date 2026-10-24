@@ -21,6 +21,7 @@ import { generateMonthlyDevelopment, snapshotDevelopmentMetrics } from "@/server
 import { runIntegrationHealthCheck } from "@/server/jobs/integration-health";
 import { runEmergencyExport } from "@/server/jobs/emergency-export";
 import { runLeadMailSync } from "@/server/jobs/leads-mail-sync";
+import { runProfitabilitySignals } from "@/server/jobs/profitability-signals";
 import { runDriveSync } from "@/server/jobs/drive-sync";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, runMetricoolSync } from "@/server/jobs/metricool-sync";
@@ -99,6 +100,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "integrations.health_check": runIntegrationHealthCheck,
   "emergency.export": runEmergencyExport,
   "leads.sync_mailbox": runLeadMailSync,
+  "profit.signals": runProfitabilitySignals,
   "drive.sync_all": runDriveSync,
   "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,
