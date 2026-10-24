@@ -824,8 +824,8 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
   const extra = c.extraRevenue != null ? Number(c.extraRevenue) : null;
   const revPerShort = shorts > 0 ? revenue / shorts : null;
   const totalEditMonth = editPer != null && shorts > 0 ? editPer * shorts : null;
-  // Netto opbrengst = afnameprijs − editkosten. Primair de officiële Monday-waarde
-  // (HOOFDBOARD-formule), met de eigen berekening als terugval.
+  // Netto opbrengst = afnameprijs − editkosten. Primair de overgenomen officiële
+  // waarde, met de eigen berekening als terugval.
   const mondayNet = c.netMonthlyMonday != null ? Number(c.netMonthlyMonday) : null;
   const grossMonth = mondayNet ?? (totalEditMonth != null ? revenue - totalEditMonth : null);
   const marginPct = grossMonth != null && revenue > 0 ? Math.round((grossMonth / revenue) * 100) : null;
@@ -849,17 +849,12 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
   for (const v of hub.videos) if (v.editorName) editorCount.set(v.editorName, (editorCount.get(v.editorName) ?? 0) + 1);
   const topEditor = [...editorCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
-  const monday = hub.integrations.find((i) => i.provider === "monday");
-  const lastSynced = monday?.lastSyncedAt ?? null;
   const unknown = <span className="text-[var(--color-ink-faint)]">onbekend</span>;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-[var(--color-ink-muted)]">Automatisch uit Monday. Alle bedragen exclusief btw.</p>
-        <span className="text-xs text-[var(--color-ink-faint)]">
-          Laatst bijgewerkt: {lastSynced ? formatDateTime(lastSynced) : "nog niet gesynchroniseerd"}
-        </span>
+        <p className="text-sm text-[var(--color-ink-muted)]">Automatisch overgenomen. Alle bedragen exclusief btw.</p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -871,7 +866,7 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
             <FinRow label="Shorts per maand" value={shorts > 0 ? String(shorts) : unknown} />
             <FinRow label="Omzet per short" value={revPerShort != null ? euro(revPerShort) : unknown} />
             <FinRow label="Totale omzet (geschat)" value={totalRevenue != null ? euro(totalRevenue) : unknown} hint={monthsActive != null ? `${monthsActive} maanden × maandbedrag` : undefined} />
-            <FinRow label="Aanvullende omzet (meerwerk)" value={extra != null && extra > 0 ? euro(extra) : <span className="text-[var(--color-ink-faint)]">geen deze maand</span>} hint="uit Monday" />
+            <FinRow label="Aanvullende omzet (meerwerk)" value={extra != null && extra > 0 ? euro(extra) : <span className="text-[var(--color-ink-faint)]">geen deze maand</span>} />
           </dl>
         </Card>
 
@@ -893,7 +888,7 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
             <FinRow label="Editkosten per short" value={editPer != null ? euro(editPer) : unknown} />
             <FinRow label="Totale editkosten per maand" value={totalEditMonth != null ? euro(totalEditMonth) : unknown} hint={editPer != null && shorts > 0 ? `${euro(editPer)} × ${shorts}` : undefined} />
             <FinRow label="Editor" value={topEditor ?? unknown} />
-            <FinRow label="Overige directe kosten" value={<span className="text-[var(--color-ink-faint)]">niet in Monday</span>} hint="opname, strategie, overhead" />
+            <FinRow label="Overige directe kosten" value={<span className="text-[var(--color-ink-faint)]">nog niet ingevuld</span>} hint="opname, strategie, overhead" />
           </dl>
         </Card>
 
@@ -903,7 +898,7 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
           <dl className="divide-y divide-[var(--color-line)]">
             <FinRow label="Omzet per short" value={revPerShort != null ? euro(revPerShort) : unknown} />
             <FinRow label="Editkosten per short" value={editPer != null ? euro(editPer) : unknown} />
-            <FinRow label="Opbrengst na editkosten" value={grossMonth != null ? euro(grossMonth) : unknown} hint="afnameprijs − editkosten (Monday)" strong />
+            <FinRow label="Opbrengst na editkosten" value={grossMonth != null ? euro(grossMonth) : unknown} hint="afnameprijs − editkosten" strong />
             <FinRow label="Brutomarge" value={marginPct != null ? `${marginPct}%` : unknown} />
             <FinRow label="Nettowinst" value={<span className="text-[var(--color-ink-faint)]">onbekend</span>} hint="vereist overige kosten" />
           </dl>
@@ -915,7 +910,7 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
         <div className="flex items-center justify-between gap-2 bg-[var(--color-indigo-ink)] px-5 py-2.5 text-white">
           <div>
             <div className="text-sm font-bold">Maandstaten — echte nettowinst</div>
-            <div className="text-2xs text-white/60">Omzet, meerwerk en editkosten automatisch uit Monday; vul opname-, strategie- en overige kosten in voor de werkelijke nettowinst.</div>
+            <div className="text-2xs text-white/60">Omzet, meerwerk en editkosten worden automatisch overgenomen; vul opname-, strategie- en overige kosten in voor de werkelijke nettowinst.</div>
           </div>
         </div>
         <FinanceMonths
@@ -929,7 +924,7 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
       </Card>
 
       <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-3 text-xs text-[var(--color-ink-muted)]">
-        <strong className="font-semibold text-[var(--color-ink)]">Opbrengst na editkosten</strong> is de afnameprijs minus de editkosten — dezelfde berekening als Monday&apos;s formule &quot;Netto opbrengst per maand&quot; (Monday-formules zijn niet los via de API uitleesbaar, dus we berekenen hem uit dezelfde Monday-invoer; de uitkomst is identiek). Het is winst ná editkosten. Overige kosten zoals opname, strategie en overhead staan niet in Monday en zijn hier <strong>niet</strong> op nul gezet — daarom is de <strong className="font-semibold text-[var(--color-ink)]">echte nettowinst onbekend</strong> tot die kosten beschikbaar zijn.
+        <strong className="font-semibold text-[var(--color-ink)]">Opbrengst na editkosten</strong> is de afnameprijs minus de editkosten. Het is winst ná editkosten. Overige kosten zoals opname, strategie en overhead zijn hier <strong>niet</strong> op nul gezet — daarom is de <strong className="font-semibold text-[var(--color-ink)]">echte nettowinst onbekend</strong> tot die kosten zijn ingevuld.
       </div>
     </div>
   );
@@ -1099,7 +1094,7 @@ function IntegrationsTab({ hub }: { hub: ClientHub }) {
       {hub.integrations.length === 0 ? (
         <EmptyState
           title="Nog niets gekoppeld"
-          description="Koppel het Monday-board, het Frame.io-project en de Drive-map, zodat alles van deze klant hier samenkomt."
+          description="Koppel het Frame.io-project en de Drive-map, zodat alles van deze klant hier samenkomt."
         />
       ) : (
         <Table

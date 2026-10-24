@@ -9,9 +9,7 @@ import {
   clients,
   importCandidates,
   importRuns,
-  mondayMappings,
 } from "@/db/schema";
-import { monday } from "@/server/integrations/monday";
 import { frameio } from "@/server/integrations/frameio";
 import { drive } from "@/server/integrations/drive";
 import { auditLog } from "@/server/audit";
@@ -63,7 +61,7 @@ export type DryRunSummary = {
  * aan de echte data.
  */
 export async function dryRunImport(
-  providers: Array<"monday" | "frameio" | "google_drive">,
+  providers: Array<"frameio" | "google_drive">,
   startedById: string,
 ): Promise<{ runId: string; summary: DryRunSummary[] }> {
   const [run] = await db
@@ -94,43 +92,6 @@ export async function dryRunImport(
     };
 
     try {
-      if (provider === "monday") {
-        if (!monday.isConfigured) {
-          summary.notes.push("Monday is niet ingesteld; MONDAY_API_TOKEN ontbreekt.");
-        } else {
-          const boards = await monday.listBoards(100);
-          summary.found.boards = boards.length;
-
-          for (const board of boards) {
-            const best = bestMatch(board.name, existingClients);
-            summary.suggestions += best ? 1 : 0;
-            if (!best) summary.missingMappings++;
-
-            await db.insert(importCandidates).values({
-              runId: run!.id,
-              entityType: "client",
-              provider: "monday",
-              externalId: board.id,
-              externalName: board.name,
-              payload: {
-                itemsCount: board.items_count,
-                groups: board.groups,
-                columns: board.columns.map((c) => ({ id: c.id, title: c.title, type: c.type })),
-              },
-              suggestedEntityId: best?.id ?? null,
-              suggestedName: best?.name ?? null,
-              matchScore: best?.score ?? 0,
-              conflictReason:
-                best && best.score < 80
-                  ? "Naam lijkt maar deels overeen te komen; controleer dit handmatig."
-                  : null,
-            }).onConflictDoNothing();
-
-            if (best && best.score < 80) summary.conflicts++;
-          }
-        }
-      }
-
       if (provider === "frameio") {
         if (!frameio.isConfigured) {
           summary.notes.push("Frame.io is niet ingesteld; FRAMEIO_TOKEN ontbreekt.");
@@ -289,25 +250,13 @@ export async function commitImport(
       .insert(clientIntegrations)
       .values({
         clientId,
-        provider: candidate.provider as "monday",
+        provider: candidate.provider as "frameio" | "google_drive",
         externalId: candidate.externalId,
         externalName: candidate.externalName,
         config: candidate.payload as Record<string, unknown>,
         isActive: true,
       })
       .onConflictDoNothing();
-
-    if (candidate.provider === "monday") {
-      await db
-        .insert(mondayMappings)
-        .values({
-          entityType: "client",
-          entityId: clientId,
-          boardId: candidate.externalId,
-          direction: "inbound",
-        })
-        .onConflictDoNothing();
-    }
 
     await db
       .update(importCandidates)

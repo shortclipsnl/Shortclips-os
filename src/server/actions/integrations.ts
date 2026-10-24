@@ -15,7 +15,6 @@ import {
   pullFrameProjects,
 } from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
-import { runMondayClientImport } from "@/server/jobs/monday-import";
 import { runDailySignals, runHourlySignals } from "@/server/jobs/maintenance";
 import { commitImport, dryRunImport } from "@/server/import";
 
@@ -49,7 +48,6 @@ const JOBS: Record<string, () => Promise<{ ok: boolean; error?: string }>> = {
   "frameio.pull_deliverables": pullFrameDeliverables,
   "frameio.pull_comments": pullFrameComments,
   "calendar.sync": runCalendarSync,
-  "monday.import_clients": runMondayClientImport,
   "signals.daily": runDailySignals,
   "signals.hourly": runHourlySignals,
 };
@@ -98,7 +96,7 @@ export async function startDryRun(providers: string[]): Promise<ActionResult<{ r
   try {
     const viewer = await requireOwner();
     const result = await dryRunImport(
-      providers as Array<"monday" | "frameio" | "google_drive">,
+      providers as Array<"frameio" | "google_drive">,
       viewer.id,
     );
     revalidatePath("/settings/import");

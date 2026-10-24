@@ -14,7 +14,7 @@ export default async function LeadsPage() {
 
   return (
     <div className="mx-auto max-w-[1300px]">
-      <PageHeader title="Leads" description="Alle leads en offertes — overgenomen uit Monday. Wijzig de status en opvolgdatum direct in de lijst." />
+      <PageHeader title="Leads" description="Alle leads en offertes. Wijzig de status en opvolgdatum direct in de lijst." />
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
         <Stat label="Totaal" value={String(summary.total)} icon={<Users />} />

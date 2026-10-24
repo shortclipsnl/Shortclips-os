@@ -11,13 +11,12 @@ import {
 import { Badge, Button, ErrorNote, InfoNote } from "@/components/ui";
 
 const PROVIDERS = [
-  { key: "monday", label: "Monday.com", detail: "boards → klanten" },
   { key: "frameio", label: "Frame.io", detail: "projecten → klanten" },
   { key: "google_drive", label: "Google Drive", detail: "mappen → klanten" },
 ];
 
 export function DryRunStarter() {
-  const [selected, setSelected] = useState<string[]>(["monday"]);
+  const [selected, setSelected] = useState<string[]>(["frameio"]);
   const [pending, start] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);
   const router = useRouter();

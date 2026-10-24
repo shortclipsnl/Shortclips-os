@@ -3,7 +3,6 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { integrationConnections } from "@/db/schema";
 import { integrationConfig } from "@/lib/env";
-import { monday } from "./monday";
 import { frameio } from "./frameio";
 import { drive } from "./drive";
 import { googleCalendar } from "./google-calendar";
@@ -31,33 +30,6 @@ export type IntegrationSpec = {
 };
 
 export const INTEGRATION_SPECS: IntegrationSpec[] = [
-  {
-    provider: "monday",
-    name: "Monday.com",
-    description:
-      "Bestaande operationele planning. ShortClips OS leest boards, groepen, items en statussen, en kan later ook terugschrijven.",
-    purpose: [
-      "Klanten en projecten importeren",
-      "Taken, deadlines en verantwoordelijken overnemen",
-      "Statuswijzigingen ontvangen via webhooks",
-    ],
-    required: [
-      {
-        key: "MONDAY_API_TOKEN",
-        label: "Persoonlijk API-token",
-        where:
-          "monday.com → klik op je avatar rechtsboven → Developers → My access tokens",
-        scopes: "boards:read, boards:write, users:read, updates:read, webhooks:write",
-      },
-      {
-        key: "MONDAY_WEBHOOK_SECRET",
-        label: "Webhook-secret (optioneel)",
-        where: "Wordt door Monday meegegeven bij het aanmaken van een webhook",
-      },
-    ],
-    webhookPath: "/api/webhooks/monday",
-    test: () => monday.testConnection(),
-  },
   {
     provider: "frameio",
     name: "Frame.io",
@@ -295,4 +267,4 @@ export async function recordTest(provider: Provider, result: ConnectionTest) {
     .where(eq(integrationConnections.provider, provider));
 }
 
-export { monday, frameio, drive, googleCalendar };
+export { frameio, drive, googleCalendar };

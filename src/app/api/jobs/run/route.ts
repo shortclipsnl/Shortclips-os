@@ -15,15 +15,6 @@ import {
 } from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { runFrequentSync, runNightlySync } from "@/server/jobs/orchestrator";
-import { runMondayClientImport } from "@/server/jobs/monday-import";
-import { runMondayEditingImport } from "@/server/jobs/monday-editing";
-import { runMondayContractImport } from "@/server/jobs/monday-contracts";
-import { runMondayPlanningImport } from "@/server/jobs/monday-planning";
-import { runMondayLeaveImport } from "@/server/jobs/monday-leave";
-import { runMondayLeadsImport } from "@/server/jobs/monday-leads";
-import { runMondayTasksImport } from "@/server/jobs/monday-tasks";
-import { runMondayClientDistributionImport } from "@/server/jobs/monday-client-distribution";
-import { runMondayCapacityImport } from "@/server/jobs/monday-capacity";
 import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
 import { runDriveSync } from "@/server/jobs/drive-sync";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
@@ -78,15 +69,6 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "frameio.normalize_imported": normalizeImportedFrameDeliverables,
   "frameio.list_projects": listFrameProjects,
   "calendar.sync": runCalendarSync,
-  "monday.import_clients": runMondayClientImport,
-  "monday.import_editing": runMondayEditingImport,
-  "monday.import_contracts": runMondayContractImport,
-  "monday.import_planning": runMondayPlanningImport,
-  "monday.import_leave": runMondayLeaveImport,
-  "monday.import_leads": runMondayLeadsImport,
-  "monday.import_tasks": runMondayTasksImport,
-  "monday.import_client_distribution": runMondayClientDistributionImport,
-  "monday.import_capacity": runMondayCapacityImport,
   "metricool.link_brands": linkMetricoolBrands,
   "metricool.pull_metrics": pullMetricoolMetrics,
   "metricool.sync": runMetricoolSync,

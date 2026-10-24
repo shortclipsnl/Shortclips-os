@@ -32,12 +32,3 @@ export async function setBoolSetting(
       set: { value: { enabled }, updatedById: opts.updatedById ?? null, updatedAt: new Date() },
     });
 }
-
-export const MONDAY_SYNC_KEY = "monday_sync_enabled";
-
-/** Staat de Monday-synchronisatie aan? Default aan, tot de eigenaar hem uitzet. */
-export async function isMondaySyncEnabled(): Promise<boolean> {
-  // Monday is opgezegd — we werken volledig via het portaal. Standaard uit, zodat
-  // de nachtelijke sync geen (mislukkende) Monday-imports meer probeert.
-  return getBoolSetting(MONDAY_SYNC_KEY, false);
-}

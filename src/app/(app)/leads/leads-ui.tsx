@@ -226,7 +226,6 @@ function LeadRowView({ r, today }: { r: LeadRow; today: string }) {
         <div className="font-medium text-[var(--color-ink)]">{r.company}</div>
         <div className="text-2xs text-[var(--color-ink-faint)]">
           {r.contactName ? `${r.contactName} · ` : ""}{r.segment ?? ""}
-          {r.mondayStatus && r.mondayStatus.toLowerCase() !== status ? ` · Monday: ${r.mondayStatus}` : ""}
         </div>
       </td>
       <td className="px-2 py-2">

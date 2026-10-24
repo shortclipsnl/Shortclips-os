@@ -1,13 +1,9 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, deliverables, mondayMappings, qcChecks } from "@/db/schema";
+import { clients, deliverables, qcChecks } from "@/db/schema";
 import { QC_TEMPLATE } from "@/server/qc";
 import { snapToWorkingDay } from "@/lib/workdays";
-import { monday } from "@/server/integrations/monday";
-
-/* Hetzelfde EDITING DASHBOARD-bord als de import (voor de updated_at-datum). */
-const EDITING_BOARD = "5060995925";
 
 /** Statussen waarbij de video de interne controle voorbij is (bij de klant of
  *  verder) — QC is dan in de praktijk gehaald. */
@@ -29,8 +25,6 @@ const QC_DONE_STATUSES = new Set([
  *     voorgaande vrijdag (een deadline hoort niet op een niet-werkdag).
  *  3. QC: video's die al bij de klant (of verder) staan krijgen de 8 QC-punten
  *     afgevinkt (die controle is dan feitelijk gehaald), i.p.v. "0 van 8".
- *  4. Tijd in fase: statusChangedAt wordt gezet op de echte laatste-wijziging-
- *     datum uit Monday (updated_at), zodat "dagen in fase" klopt i.p.v. 0.
  * Idempotent: een tweede run verandert niets meer.
  */
 export async function cleanupDeliverables(): Promise<{
@@ -38,7 +32,6 @@ export async function cleanupDeliverables(): Promise<{
   titlesFixed: number;
   weekendDeadlinesFixed: number;
   qcSeeded: number;
-  phaseDatesFixed: number;
 }> {
   const rows = await db
     .select({
@@ -92,29 +85,5 @@ export async function cleanupDeliverables(): Promise<{
     }
   }
 
-  // 4) "Dagen in fase" herstellen uit Monday's echte updated_at. Alleen als
-  //    Monday bereikbaar is; anders overslaan (gaat vanzelf goed vanaf nu).
-  let phaseDatesFixed = 0;
-  try {
-    const items = await monday.listItems(EDITING_BOARD, 300);
-    const updatedById = new Map(items.map((i) => [i.id, i.updated_at]));
-    const maps = await db
-      .select({ entityId: mondayMappings.entityId, itemId: mondayMappings.itemId })
-      .from(mondayMappings)
-      .where(eq(mondayMappings.entityType, "editing_item"));
-    for (const m of maps) {
-      const u = m.itemId ? updatedById.get(m.itemId) : undefined;
-      if (u && m.entityId) {
-        const when = new Date(u);
-        if (!Number.isNaN(when.getTime())) {
-          await db.update(deliverables).set({ statusChangedAt: when }).where(eq(deliverables.id, m.entityId));
-          phaseDatesFixed++;
-        }
-      }
-    }
-  } catch {
-    /* Monday niet beschikbaar — sla het statusdatum-herstel over. */
-  }
-
-  return { ok: true, titlesFixed, weekendDeadlinesFixed, qcSeeded, phaseDatesFixed };
+  return { ok: true, titlesFixed, weekendDeadlinesFixed, qcSeeded };
 }

@@ -19,7 +19,7 @@ export function IntegrationToggles({ slug, integrations }: { slug: string; integ
   if (integrations.length === 0) {
     return (
       <p className="text-sm text-[var(--color-ink-muted)]">
-        Nog geen koppelingen. Deze ontstaan automatisch zodra de klant in Monday, Frame.io of Google Drive gematcht is.
+        Nog geen koppelingen. Deze ontstaan automatisch zodra de klant in Frame.io of Google Drive gematcht is.
       </p>
     );
   }

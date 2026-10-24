@@ -48,7 +48,7 @@ export default async function LoginPage({
               {[
                 "Elke klant één pagina met alles wat speelt",
                 "Video's van opname tot publicatie in één pipeline",
-                "Monday, Frame.io en Drive onder de motorkap",
+                "Frame.io en Drive onder de motorkap",
               ].map((line) => (
                 <li key={line} className="flex items-start gap-2.5">
                   <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--color-brand-400)]" />

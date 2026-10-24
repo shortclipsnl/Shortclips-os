@@ -59,7 +59,7 @@ export default async function EditClientPage({
 
       <div className="mt-5">
         <Card>
-          <CardHeader title="Koppelingen" subtitle="Bronnen die aan deze klant hangen (Monday, Frame.io, agenda, …)." />
+          <CardHeader title="Koppelingen" subtitle="Bronnen die aan deze klant hangen (Frame.io, agenda, Drive, …)." />
           <div className="mt-3">
             <IntegrationToggles slug={slug} integrations={integrations} />
           </div>

@@ -59,7 +59,7 @@ export default async function ImportPage({
       <Card className="mb-5">
         <CardHeader
           title="Stap 1 — Dry run"
-          subtitle="Kijk wat er in Monday, Frame.io en Drive staat en welke klanten daarbij horen."
+          subtitle="Kijk wat er in Frame.io en Drive staat en welke klanten daarbij horen."
         />
         <div className="mt-4">
           <DryRunStarter />

@@ -33,7 +33,7 @@ export function FinanceMonths({ clientId, months, canWrite }: { clientId: string
   if (months.length === 0) {
     return (
       <p className="px-5 py-4 text-sm text-[var(--color-ink-muted)]">
-        Nog geen maandstaten. Deze worden elke nacht automatisch aangemaakt voor actieve klanten (omzet, meerwerk en editkosten uit Monday); daarna vul je de directe kosten in.
+        Nog geen maandstaten. Deze worden elke nacht automatisch aangemaakt voor actieve klanten (omzet, meerwerk en editkosten); daarna vul je de directe kosten in.
       </p>
     );
   }

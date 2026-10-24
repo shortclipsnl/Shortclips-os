@@ -19,11 +19,6 @@ const schema = z.object({
   // vaste ontwikkelwaarde zodat je meteen kunt starten.
   SESSION_SECRET: z.string().min(32).optional(),
 
-  // --- Monday.com ---
-  MONDAY_API_TOKEN: z.string().optional(),
-  MONDAY_WEBHOOK_SECRET: z.string().optional(),
-  MONDAY_API_VERSION: z.string().default("2026-07"),
-
   // --- Frame.io (V4 via Adobe IMS) ---
   // Twee manieren om te verbinden:
   //  1. Server-to-Server (Adobe Developer Console): CLIENT_ID + CLIENT_SECRET,
@@ -140,11 +135,6 @@ export function sessionSecret(): string {
 /** Welke integraties zijn technisch geconfigureerd? Voedt de health-pagina. */
 export function integrationConfig() {
   return {
-    monday: {
-      configured: Boolean(env.MONDAY_API_TOKEN),
-      required: ["MONDAY_API_TOKEN"],
-      optional: ["MONDAY_WEBHOOK_SECRET"],
-    },
     frameio: {
       // Web App: client-id + secret + refresh-token. Of een legacy token.
       // (Server-to-Server zou met alleen id+secret kunnen, maar dit account

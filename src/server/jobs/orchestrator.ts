@@ -1,19 +1,10 @@
 import "server-only";
-import { runMondayClientImport } from "./monday-import";
-import { runMondayContractImport } from "./monday-contracts";
-import { runMondayPlanningImport } from "./monday-planning";
-import { runMondayLeaveImport } from "./monday-leave";
-import { runMondayLeadsImport } from "./monday-leads";
-import { runMondayTasksImport } from "./monday-tasks";
-import { runMondayClientDistributionImport } from "./monday-client-distribution";
-import { runMondayCapacityImport } from "./monday-capacity";
 import { runProductionPhaseAdvance } from "./production-phases";
 import { runLinkSuggestions } from "./link-suggestions";
 import { runContentSync } from "./content-sync";
 import { runAutoPublishDueContent } from "./content-publish";
 import { runTaskArchive } from "./task-archive";
 import { runCalendarSync } from "./calendar-sync";
-import { isMondaySyncEnabled } from "@/server/app-settings";
 import { runMonthlyReportDrafts } from "./report-drafts";
 import { runDriveSync } from "./drive-sync";
 import { runMetricoolSync } from "./metricool-sync";
@@ -62,35 +53,16 @@ export async function runFrequentSync() {
 }
 
 /**
- * 's Nachts draaien: de zwaardere, volledige syncs — klanten uit Monday,
- * Frame.io-projecten en -video's, en de dag-signalen.
+ * 's Nachts draaien: de zwaardere, volledige syncs — Frame.io-projecten en
+ * -video's, Drive, Metricool, rapportages en de dag-signalen. Alle data staat nu
+ * in het platform zelf; er is geen Monday-koppeling meer.
  */
 export async function runNightlySync() {
   const results: StepResult[] = [];
 
-  // Monday-synchronisatie kan door de eigenaar worden uitgezet zodra de app de
-  // bron is (Beheer → Monday-migratie). Dan slaan we álle Monday-imports over;
-  // de rest van de nachtelijke sync draait gewoon door — de app is immers
-  // onafhankelijk van Monday.
-  const mondayOn = await isMondaySyncEnabled();
-  if (mondayOn) {
-    results.push(await step("monday.import_clients", () => runMondayClientImport()));
-    // Direct na de klant-import: portaaltoegang gelijktrekken met de nieuwe
-    // samenwerkingsstatussen (gestopte klanten dicht, actieve weer open).
-    results.push(await step("portal.enforce_access", () => enforcePortalAccess()));
-    // Editing-opdrachten komen nu automatisch uit Google Agenda (opname →
-    // deliverable in calendar.sync), niet meer uit Monday.
-    results.push(await step("monday.import_contracts", () => runMondayContractImport()));
-    results.push(await step("monday.import_planning", () => runMondayPlanningImport()));
-    results.push(await step("monday.import_leave", () => runMondayLeaveImport()));
-    results.push(await step("monday.import_leads", () => runMondayLeadsImport()));
-    results.push(await step("monday.import_tasks", () => runMondayTasksImport()));
-    results.push(await step("monday.import_client_distribution", () => runMondayClientDistributionImport()));
-    results.push(await step("monday.import_capacity", () => runMondayCapacityImport()));
-  } else {
-    // Portaaltoegang blijft ook zonder Monday belangrijk.
-    results.push(await step("portal.enforce_access", () => enforcePortalAccess()));
-  }
+  // Portaaltoegang gelijktrekken met de samenwerkingsstatussen (gestopte klanten
+  // dicht, actieve weer open).
+  results.push(await step("portal.enforce_access", () => enforcePortalAccess()));
   results.push(await step("production.advance_phases", () => runProductionPhaseAdvance()));
   results.push(await step("editing.suggest_opname_links", () => runLinkSuggestions()));
   results.push(await step("content.sync_from_videos", () => runContentSync()));

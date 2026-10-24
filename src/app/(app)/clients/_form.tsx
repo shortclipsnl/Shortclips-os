@@ -232,7 +232,7 @@ function DangerZone({
     <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-bad-soft)] p-4">
       <h3 className="text-sm font-semibold text-[var(--color-ink)]">Klant stopzetten of verwijderen</h3>
       <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
-        Een gestopte klant behoudt alle historie (video&apos;s, resultaten, projecten); de portaaltoegang gaat automatisch dicht. Verwijderen haalt de klant overal weg en de Monday-import brengt &apos;m niet terug — de data blijft bewaard en is herstelbaar door een beheerder.
+        Een gestopte klant behoudt alle historie (video&apos;s, resultaten, projecten); de portaaltoegang gaat automatisch dicht. Verwijderen haalt de klant overal weg — de data blijft bewaard en is herstelbaar door een beheerder.
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
