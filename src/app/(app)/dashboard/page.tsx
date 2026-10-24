@@ -15,6 +15,8 @@ import { DoelenStrook } from "./doelen-strook";
 import { TodayView } from "./today-view";
 import { WeekPlanning, type WeekUpload } from "./week-planning";
 import { PostingReminder, type TodayPost } from "./posting-reminder";
+import { getMorningOverview } from "@/server/morning-overview";
+import { MorningOverviewCard } from "./morning-overview";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
@@ -31,13 +33,14 @@ export default async function DashboardPage() {
   contentToD.setDate(contentToD.getDate() + 14);
   const contentTo = contentToD.toISOString().slice(0, 10);
 
-  const [data, myDay, capMap, meetings, contentItems, goals] = await Promise.all([
+  const [data, myDay, capMap, meetings, contentItems, goals, morning] = await Promise.all([
     getDashboard(viewer),
     getMyDay(viewer),
     editorCapacityMap(),
     listUpcomingMeetings(7),
     listCalendar(viewer, { from: contentFrom, to: contentTo }),
     getGoalsOverview(viewer),
+    getMorningOverview(viewer),
   ]);
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
 
@@ -107,6 +110,9 @@ export default async function DashboardPage() {
           </span>
         </Link>
       ) : null}
+
+      {/* Gebundeld ochtendoverzicht: verlopen deadlines, acties en aandachtspunten. */}
+      <MorningOverviewCard data={morning} />
 
       {/* Doelen Q4 — compacte strook met alleen de doelen die aandacht vragen. */}
       {goals.rows.length > 0 ? (

@@ -8,6 +8,7 @@ const SECTIONS = [
   { href: "/settings/users", label: "Gebruikers", permission: "users:read" },
   { href: "/settings/roles", label: "Rollen en rechten", permission: "users:read" },
   { href: "/settings/automations", label: "Automatiseringen", permission: "automations:read" },
+  { href: "/settings/deadlines", label: "Deadline-termijnen", permission: "settings:write" },
   { href: "/settings/statuses", label: "Statussen", permission: "settings:read" },
   { href: "/settings/audit", label: "Audit log", permission: "audit:read" },
   { href: "/settings/health", label: "Systeemstatus", permission: "settings:read" },

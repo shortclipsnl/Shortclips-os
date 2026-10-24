@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -113,6 +114,42 @@ export const notificationPreferences = pgTable(
     ...timestamps,
   },
   (t) => [unique("notification_prefs_unique").on(t.userId, t.type, t.channel)],
+);
+
+/**
+ * Prestatieregistratie van gemiste deadlines. Eén rij per entiteit (video of
+ * taak) die zijn deadline mist; bijgewerkt door de nachtelijke job. `daysLate`
+ * loopt op zolang het openstaat en wordt vastgezet zodra het is afgerond
+ * (`resolved`). Hiermee kun je per editor/medewerker zien hoe vaak en hoeveel
+ * dagen te laat. Historie blijft bewaard, ook nadat het werk is afgerond.
+ */
+export const deadlineMisses = pgTable(
+  "deadline_misses",
+  {
+    id: pk(),
+    /** 'deliverable' (editor-opleverdeadline) of 'task' (taakdeadline). */
+    entityType: varchar("entity_type", { length: 24 }).notNull(),
+    entityId: uuid("entity_id").notNull(),
+    /** De verantwoordelijke (editor of taakhouder). */
+    responsibleUserId: uuid("responsible_user_id"),
+    clientId: uuid("client_id"),
+    title: varchar("title", { length: 300 }),
+    /** De gemiste deadline. */
+    dueOn: date("due_on").notNull(),
+    /** Dag waarop 'te laat' voor het eerst is vastgesteld. */
+    firstLateOn: date("first_late_on").notNull(),
+    /** Dag waarop het alsnog is afgerond (null = nog open/te laat). */
+    resolvedOn: date("resolved_on"),
+    resolved: boolean("resolved").notNull().default(false),
+    /** Aantal kalenderdagen te laat (loopt op tot afronding, dan vastgezet). */
+    daysLate: integer("days_late").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [
+    unique("deadline_misses_entity_unique").on(t.entityType, t.entityId),
+    index("deadline_misses_user_idx").on(t.responsibleUserId),
+    index("deadline_misses_resolved_idx").on(t.resolved),
+  ],
 );
 
 /* ------------------------------------------------------------------ *

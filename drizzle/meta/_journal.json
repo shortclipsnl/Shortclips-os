@@ -435,6 +435,13 @@
       "when": 1792838140336,
       "tag": "0061_brave_sentry",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1792840658229,
+      "tag": "0062_redundant_madripoor",
+      "breakpoints": true
     }
   ]
 }

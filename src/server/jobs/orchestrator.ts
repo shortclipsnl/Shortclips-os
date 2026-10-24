@@ -14,7 +14,7 @@ import {
   pullFrameDeliverables,
   pullFrameProjects,
 } from "./frameio-sync";
-import { runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runEditorDeadlineReminders, runHourlySignals, runPostShootTodoReminders, runScriptTodoReminders, runTaskDeadlineReminders } from "./maintenance";
+import { runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runEditorDeadlineReminders, runEditorEscalations, recordDeadlinePerformance, runHourlySignals, runPostShootTodoReminders, runScriptTodoReminders, runTaskDeadlineReminders } from "./maintenance";
 import { enforcePortalAccess } from "./portal-access";
 import { runClientNotifications } from "./notifications";
 import { runDatabaseBackup } from "./backup";
@@ -78,6 +78,9 @@ export async function runNightlySync() {
   results.push(await step("signals.daily", () => runDailySignals()));
   results.push(await step("reminders.editor_deadlines", () => runEditorDeadlineReminders()));
   results.push(await step("reminders.task_deadlines", () => runTaskDeadlineReminders()));
+  // Escalatie bij uitblijvende opvolging + prestatieregistratie (gemiste deadlines).
+  results.push(await step("escalations.editor_deadlines", () => runEditorEscalations()));
+  results.push(await step("performance.record_deadlines", () => recordDeadlinePerformance()));
   results.push(await step("signals.clients_without_shoot", () => runClientsWithoutShootSignal()));
   results.push(await step("signals.content_gap", () => runContentGapSignal()));
   results.push(await step("reminders.script_todo", () => runScriptTodoReminders()));

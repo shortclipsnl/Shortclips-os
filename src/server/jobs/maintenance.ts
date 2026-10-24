@@ -19,6 +19,8 @@ import { CORE_STAFF_EMAILS } from "@/server/core-staff";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { internalDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
+import { getDeadlineSettings } from "@/server/deadline-settings";
+import { deadlineMisses } from "@/db/schema";
 import { runJob } from "./runner";
 
 const day = (offset: number) => {
@@ -34,6 +36,7 @@ const day = (offset: number) => {
  */
 export async function runDailySignals() {
   return runJob("monday", "signals.daily", {}, async (ctx) => {
+    const settings = await getDeadlineSettings();
     // 1. Contracten die binnen 60 dagen aflopen
     const expiring = await db
       .select({
@@ -124,7 +127,8 @@ export async function runDailySignals() {
     }
     ctx.log(`${tierContracts.length} contracten op een mijlpaal (45/28/7/0 dagen)`);
 
-    // 2. Video's die te lang op klantfeedback wachten
+    // 2. Video's die te lang op klantfeedback wachten (instelbare termijn, default 3 dagen)
+    const clientFeedbackDays = settings["deadline.clientFeedbackDays"];
     const stale = await db
       .select({
         id: deliverables.id,
@@ -138,7 +142,7 @@ export async function runDailySignals() {
         and(
           isNull(deliverables.deletedAt),
           inArray(deliverables.status, ["client_review", "client_revision"]),
-          lt(deliverables.statusChangedAt, sql`now() - interval '5 days'`),
+          lt(deliverables.statusChangedAt, sql`now() - (${clientFeedbackDays} * interval '1 day')`),
         ),
       );
 
@@ -150,16 +154,19 @@ export async function runDailySignals() {
         entityType: "deliverable",
         entityId: video.id,
         data: {
-          awaitingClientDays: 5,
+          // Stabiele marker voor de regels; de exacte termijn is instelbaar.
+          awaitingClientStale: true,
+          awaitingClientDays: clientFeedbackDays,
           title: video.title,
           coordinatorId: video.coordinatorId,
           href: `/videos/${video.id}`,
         },
       });
     }
-    ctx.log(`${stale.length} video's wachten te lang op de klant`);
+    ctx.log(`${stale.length} video's wachten te lang op de klant (>${clientFeedbackDays}d)`);
 
-    // 2b. Scripts die te lang op klantcontrole wachten (>3 dagen)
+    // 2b. Scripts die te lang op klantcontrole wachten (instelbare termijn, default 3 dagen)
+    const scriptFeedbackDays = settings["deadline.scriptFeedbackDays"];
     const staleScripts = await db
       .select({
         id: scripts.id,
@@ -173,7 +180,7 @@ export async function runDailySignals() {
         and(
           isNull(scripts.deletedAt),
           eq(scripts.status, "client_review"),
-          lt(scripts.updatedAt, sql`now() - interval '3 days'`),
+          lt(scripts.updatedAt, sql`now() - (${scriptFeedbackDays} * interval '1 day')`),
         ),
       );
 
@@ -185,14 +192,15 @@ export async function runDailySignals() {
         entityType: "script",
         entityId: script.id,
         data: {
-          awaitingClientScriptDays: 3,
+          awaitingClientScriptStale: true,
+          awaitingClientScriptDays: scriptFeedbackDays,
           title: `Script wacht op klant: ${script.title}`,
           coordinatorId: script.coordinatorId,
           href: `/scripts/${script.id}`,
         },
       });
     }
-    ctx.log(`${staleScripts.length} scripts wachten te lang op de klant`);
+    ctx.log(`${staleScripts.length} scripts wachten te lang op de klant (>${scriptFeedbackDays}d)`);
 
     // 3. Vervallen facturen
     const overdue = await db
@@ -359,8 +367,9 @@ export async function runHourlySignals() {
  */
 export async function runEditorDeadlineReminders() {
   return runJob("monday", "reminders.editor_deadlines", {}, async (ctx) => {
+    const settings = await getDeadlineSettings();
     const today = day(0);
-    const soon = day(2);
+    const soon = day(settings["deadline.editorSoonDays"]);
     const holidays = nlHolidaySet();
     // Alleen de eerste-versie-fases: hiervoor geldt de INTERNE deadline (opname +
     // 7 werkdagen). Daarna is de eerste versie al opgeleverd.
@@ -407,7 +416,7 @@ export async function runEditorDeadlineReminders() {
       ctx.counters.processed++;
       const parts: string[] = [];
       if (g.overdue.length > 0) parts.push(`${g.overdue.length} over de interne deadline`);
-      if (g.soon.length > 0) parts.push(`${g.soon.length} met interne deadline binnen 2 dagen`);
+      if (g.soon.length > 0) parts.push(`${g.soon.length} met interne deadline binnen ${settings["deadline.editorSoonDays"]} dagen`);
       const projects = [...g.overdue, ...g.soon];
       const namen = projects.slice(0, 4).map((p) => p.label).join(" · ") + (projects.length > 4 ? ` · +${projects.length - 4} meer` : "");
       // Eén project → direct doorklikbaar; meerdere → naar het eigen editingbord.
@@ -433,8 +442,9 @@ export async function runEditorDeadlineReminders() {
  */
 export async function runTaskDeadlineReminders() {
   return runJob("monday", "reminders.task_deadlines", {}, async (ctx) => {
+    const settings = await getDeadlineSettings();
     const today = day(0);
-    const soon = day(2);
+    const soon = day(settings["deadline.taskSoonDays"]);
     const rows = await db
       .select({
         assigneeId: tasks.assigneeId,
@@ -459,7 +469,7 @@ export async function runTaskDeadlineReminders() {
       ctx.counters.processed++;
       const parts: string[] = [];
       if (overdue > 0) parts.push(`${overdue} te laat`);
-      if (dueSoon > 0) parts.push(`${dueSoon} binnen 2 dagen`);
+      if (dueSoon > 0) parts.push(`${dueSoon} binnen ${settings["deadline.taskSoonDays"]} dagen`);
       await notify({
         userIds: [r.assigneeId],
         type: "task_deadlines",
@@ -780,6 +790,220 @@ export async function runContentGapSignal() {
       ctx.counters.updated++;
     }
     ctx.log(`${ctx.counters.updated} gebundelde meldingen voor gaten in de contentplanning`);
+  });
+}
+
+/** Eerste-versie-fases (interne editor-deadline geldt). */
+const FV_STAGES = ["recorded", "footage_upload", "awaiting_editor", "editing", "editor_revision"] as const;
+/** Gesigneerd verschil in kalenderdagen (a − b) tussen twee YYYY-MM-DD-datums. */
+const dayDiff = (a: string, b: string) => Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000);
+const toDateStr = (d: Date | string | null): string | null => {
+  if (!d) return null;
+  const dt = d instanceof Date ? d : new Date(d);
+  return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0, 10);
+};
+
+/**
+ * Escalatie bij editor-deadlines: staat een eerste versie een instelbaar aantal
+ * dagen óver de interne deadline, dan wordt de coördinator ingeschakeld; staat
+ * hij nóg langer open, dan ook de eigenaar. De editor krijgt zijn eigen
+ * herinnering via runEditorDeadlineReminders; dit is de opvolging als er niets
+ * gebeurt. Eén gebundelde melding per coördinator/eigenaar per dag (dedupe).
+ */
+export async function runEditorEscalations() {
+  return runJob("monday", "escalations.editor_deadlines", {}, async (ctx) => {
+    const settings = await getDeadlineSettings();
+    const today = day(0);
+    const holidays = nlHolidaySet();
+    const coordDays = settings["deadline.escalateCoordinatorDays"];
+    const ownerDays = settings["deadline.escalateOwnerDays"];
+
+    const rows = await db
+      .select({
+        id: deliverables.id,
+        title: deliverables.title,
+        status: deliverables.status,
+        shootOn: deliverables.shootOn,
+        dueOn: deliverables.dueOn,
+        editorId: deliverables.editorId,
+        clientId: deliverables.clientId,
+        clientName: clients.name,
+        coordinatorId: clients.coordinatorId,
+        editorName: users.fullName,
+      })
+      .from(deliverables)
+      .innerJoin(clients, eq(clients.id, deliverables.clientId))
+      .leftJoin(users, eq(users.id, deliverables.editorId))
+      .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, [...FV_STAGES]), sql`${deliverables.editorId} is not null`));
+
+    type Item = { label: string; daysLate: number };
+    const byCoord = new Map<string, Item[]>();
+    const ownerItems: Item[] = [];
+
+    for (const r of rows) {
+      if (!isFirstVersionPending(r.status)) continue;
+      const internal = internalDeadline(r.shootOn, r.dueOn, holidays);
+      if (!internal) continue;
+      const late = dayDiff(today, internal);
+      if (late < Math.max(coordDays, 0)) continue;
+      ctx.counters.processed++;
+      const who = r.editorName ? `${r.editorName}: ` : "";
+      const item: Item = { label: `${who}${r.clientName} — ${r.title} (${late}d te laat)`, daysLate: late };
+      if (r.coordinatorId) {
+        const list = byCoord.get(r.coordinatorId) ?? [];
+        list.push(item);
+        byCoord.set(r.coordinatorId, list);
+      }
+      if (late >= ownerDays) ownerItems.push(item);
+    }
+
+    for (const [coordId, items] of byCoord) {
+      items.sort((a, b) => b.daysLate - a.daysLate);
+      const names = items.slice(0, 4).map((i) => i.label).join(" · ") + (items.length > 4 ? ` · +${items.length - 4} meer` : "");
+      await notify({
+        userIds: [coordId],
+        type: "editor_deadline_escalation",
+        level: "warning",
+        title: items.length === 1 ? "Editor-deadline te laat — pak dit op" : `${items.length} editor-deadlines te laat`,
+        body: `Deze eerste versies staan over de interne deadline en vragen opvolging: ${names}.`,
+        href: "/videos?filter=te-laat",
+        dedupeKey: `editor_escalation_coord:${coordId}:${today}`,
+      });
+      ctx.counters.updated++;
+    }
+
+    if (ownerItems.length > 0) {
+      ownerItems.sort((a, b) => b.daysLate - a.daysLate);
+      const names = ownerItems.slice(0, 5).map((i) => i.label).join(" · ") + (ownerItems.length > 5 ? ` · +${ownerItems.length - 5} meer` : "");
+      await notify({
+        roles: ["owner"],
+        type: "editor_deadline_escalation_owner",
+        level: "critical",
+        title: `${ownerItems.length} eerste versie(s) fors over de deadline (${ownerDays}+ dagen)`,
+        body: `Vraagt jouw aandacht: ${names}.`,
+        href: "/videos?filter=te-laat",
+        dedupeKey: `editor_escalation_owner:${today}`,
+      });
+      ctx.counters.updated++;
+    }
+    ctx.log(`${byCoord.size} coördinator-escalaties, ${ownerItems.length > 0 ? 1 : 0} eigenaar-escalatie`);
+  });
+}
+
+/**
+ * Prestatieregistratie: legt gemiste deadlines vast in `deadline_misses`, zodat
+ * je per editor/medewerker ziet hoe vaak en hoeveel dagen te laat. Draait
+ * dagelijks. Idempotent: één rij per entiteit, `daysLate` loopt op zolang het
+ * openstaat en wordt vastgezet zodra het is afgerond. Zo blijft de historie
+ * bewaard, ook nadat de video/taak is afgerond en uit de actieve lijsten valt.
+ */
+export async function recordDeadlinePerformance() {
+  return runJob("monday", "performance.record_deadlines", {}, async (ctx) => {
+    const today = day(0);
+    const holidays = nlHolidaySet();
+
+    // Welke deliverable-/taak-missers staan nu nog open?
+    const openDel = await db.select({ entityId: deadlineMisses.entityId }).from(deadlineMisses)
+      .where(and(eq(deadlineMisses.entityType, "deliverable"), eq(deadlineMisses.resolved, false)));
+    const openDelIds = new Set(openDel.map((r) => r.entityId));
+
+    // 1) Deliverables die nu over de interne deadline staan (eerste versie) → vastleggen/bijwerken.
+    const dels = await db
+      .select({
+        id: deliverables.id, status: deliverables.status, shootOn: deliverables.shootOn,
+        dueOn: deliverables.dueOn, editorId: deliverables.editorId, clientId: deliverables.clientId, title: deliverables.title,
+      })
+      .from(deliverables)
+      .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, [...FV_STAGES]), sql`${deliverables.editorId} is not null`));
+
+    for (const d of dels) {
+      const internal = internalDeadline(d.shootOn, d.dueOn, holidays);
+      if (!internal || internal >= today) continue; // nog niet te laat
+      const late = dayDiff(today, internal);
+      ctx.counters.processed++;
+      await db.insert(deadlineMisses).values({
+        entityType: "deliverable", entityId: d.id, responsibleUserId: d.editorId, clientId: d.clientId,
+        title: d.title, dueOn: internal, firstLateOn: today, resolved: false, daysLate: late,
+      }).onConflictDoUpdate({
+        target: [deadlineMisses.entityType, deadlineMisses.entityId],
+        // firstLateOn blijft staan (niet in set); daysLate loopt op.
+        set: { responsibleUserId: d.editorId, clientId: d.clientId, title: d.title, dueOn: internal, daysLate: late, updatedAt: new Date() },
+      });
+      openDelIds.delete(d.id);
+    }
+
+    // 2) Open deliverable-missers die nu NIET meer in de eerste-versie-fase staan → afronden (vastzetten).
+    if (openDelIds.size > 0) {
+      const done = await db
+        .select({ id: deliverables.id, statusChangedAt: deliverables.statusChangedAt, status: deliverables.status })
+        .from(deliverables)
+        .where(and(inArray(deliverables.id, [...openDelIds])));
+      for (const d of done) {
+        if (isFirstVersionPending(d.status)) continue; // nog steeds pending; later afronden
+        const [row] = await db.select({ dueOn: deadlineMisses.dueOn }).from(deadlineMisses)
+          .where(and(eq(deadlineMisses.entityType, "deliverable"), eq(deadlineMisses.entityId, d.id))).limit(1);
+        if (!row) continue;
+        const resolvedRaw = toDateStr(d.statusChangedAt) ?? today;
+        const resolvedOn = resolvedRaw < row.dueOn ? row.dueOn : resolvedRaw;
+        await db.update(deadlineMisses)
+          .set({ resolved: true, resolvedOn, daysLate: Math.max(0, dayDiff(resolvedOn, row.dueOn)), updatedAt: new Date() })
+          .where(and(eq(deadlineMisses.entityType, "deliverable"), eq(deadlineMisses.entityId, d.id), eq(deadlineMisses.resolved, false)));
+        ctx.counters.updated++;
+      }
+    }
+
+    // 3) Taken die over hun deadline staan (open) → vastleggen/bijwerken.
+    const openTask = await db.select({ entityId: deadlineMisses.entityId }).from(deadlineMisses)
+      .where(and(eq(deadlineMisses.entityType, "task"), eq(deadlineMisses.resolved, false)));
+    const openTaskIds = new Set(openTask.map((r) => r.entityId));
+
+    const lateTasks = await db
+      .select({ id: tasks.id, assigneeId: tasks.assigneeId, clientId: tasks.clientId, title: tasks.title, dueOn: tasks.dueOn })
+      .from(tasks)
+      .where(and(
+        isNull(tasks.deletedAt),
+        inArray(tasks.status, ["todo", "in_progress", "blocked"]),
+        lt(tasks.dueOn, today),
+        sql`${tasks.dueOn} is not null`,
+        sql`${tasks.assigneeId} is not null`,
+      ));
+    for (const t of lateTasks) {
+      if (!t.dueOn || !t.assigneeId) continue;
+      const late = dayDiff(today, t.dueOn);
+      ctx.counters.processed++;
+      await db.insert(deadlineMisses).values({
+        entityType: "task", entityId: t.id, responsibleUserId: t.assigneeId, clientId: t.clientId,
+        title: t.title, dueOn: t.dueOn, firstLateOn: today, resolved: false, daysLate: late,
+      }).onConflictDoUpdate({
+        target: [deadlineMisses.entityType, deadlineMisses.entityId],
+        set: { responsibleUserId: t.assigneeId, clientId: t.clientId, title: t.title, dueOn: t.dueOn, daysLate: late, updatedAt: new Date() },
+      });
+      openTaskIds.delete(t.id);
+    }
+
+    // 4) Open taak-missers die nu af (done) of weg zijn → afronden.
+    if (openTaskIds.size > 0) {
+      const taskRows = await db.select({ id: tasks.id, status: tasks.status, updatedAt: tasks.updatedAt, deletedAt: tasks.deletedAt })
+        .from(tasks).where(inArray(tasks.id, [...openTaskIds]));
+      const seen = new Set(taskRows.map((t) => t.id));
+      for (const t of taskRows) {
+        const isClosed = t.status === "done" || t.deletedAt != null;
+        if (!isClosed) continue;
+        const [row] = await db.select({ dueOn: deadlineMisses.dueOn }).from(deadlineMisses)
+          .where(and(eq(deadlineMisses.entityType, "task"), eq(deadlineMisses.entityId, t.id))).limit(1);
+        if (!row) continue;
+        const resolvedRaw = toDateStr(t.updatedAt) ?? today;
+        const resolvedOn = resolvedRaw < row.dueOn ? row.dueOn : resolvedRaw;
+        await db.update(deadlineMisses)
+          .set({ resolved: true, resolvedOn, daysLate: Math.max(0, dayDiff(resolvedOn, row.dueOn)), updatedAt: new Date() })
+          .where(and(eq(deadlineMisses.entityType, "task"), eq(deadlineMisses.entityId, t.id), eq(deadlineMisses.resolved, false)));
+        ctx.counters.updated++;
+      }
+      // Taken die helemaal verdwenen zijn (hard weg): laat de open misser staan zoals hij is.
+      void seen;
+    }
+
+    ctx.log(`prestatie: ${ctx.counters.processed} lopend te laat, ${ctx.counters.updated} afgerond vastgezet`);
   });
 }
 

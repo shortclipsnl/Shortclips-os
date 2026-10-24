@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
-import { runCleaningFridayReminder, runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runDailyTeamTodoReminder, runEditorDeadlineReminders, runEditorFridayWrapUp, runFinanceMonthReminder, runHourlySignals, runPostShootTodoReminders, runScriptTodoReminders, runTaskDeadlineReminders, runVrijdagcheckNotification } from "@/server/jobs/maintenance";
+import { runCleaningFridayReminder, runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runDailyTeamTodoReminder, runEditorDeadlineReminders, runEditorEscalations, recordDeadlinePerformance, runEditorFridayWrapUp, runFinanceMonthReminder, runHourlySignals, runPostShootTodoReminders, runScriptTodoReminders, runTaskDeadlineReminders, runVrijdagcheckNotification } from "@/server/jobs/maintenance";
 import { runGoalsRecompute, runGoalsSeed } from "@/server/jobs/goals-job";
 import { runAwardsRecompute } from "@/server/jobs/awards-job";
 import { runMeetingsRollOver } from "@/server/jobs/meetings-roll-over";
@@ -48,6 +48,8 @@ export const maxDuration = 300;
 const JOBS: Record<string, () => Promise<unknown>> = {
   "signals.daily": runDailySignals,
   "reminders.editor_deadlines": runEditorDeadlineReminders,
+  "escalations.editor_deadlines": runEditorEscalations,
+  "performance.record_deadlines": recordDeadlinePerformance,
   "reminders.task_deadlines": runTaskDeadlineReminders,
   "signals.clients_without_shoot": runClientsWithoutShootSignal,
   "signals.content_gap": runContentGapSignal,

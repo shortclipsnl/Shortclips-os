@@ -40,6 +40,23 @@ async function main() {
   `);
   const h = (hide as unknown as { rowCount?: number }).rowCount ?? 0;
   console.log(`[data-fixes] Niet-klanten verborgen op resultaten: ${h} rij(en) bijgewerkt.`);
+
+  // Deadlinebewaking: de klant/script-feedbackregels matchen nu op een stabiele
+  // marker i.p.v. een vaste "5 dagen", zodat de termijn instelbaar is. De seed
+  // werkt onConflictDoNothing, dus bestaande regels bijwerken we hier (idempotent:
+  // de WHERE matcht niet meer zodra de conditie al klopt).
+  const r1 = await db.execute(sql`
+    UPDATE automation_rules SET conditions = '{"awaitingClientStale": true}'::jsonb
+    WHERE key IN ('client_silent_for_5_days','client_silent_5_days_reminds_client')
+      AND conditions <> '{"awaitingClientStale": true}'::jsonb
+  `);
+  const r2 = await db.execute(sql`
+    UPDATE automation_rules SET conditions = '{"awaitingClientScriptStale": true}'::jsonb
+    WHERE key = 'script_silent_reminds_client'
+      AND conditions <> '{"awaitingClientScriptStale": true}'::jsonb
+  `);
+  const a = ((r1 as unknown as { rowCount?: number }).rowCount ?? 0) + ((r2 as unknown as { rowCount?: number }).rowCount ?? 0);
+  console.log(`[data-fixes] Feedback-automatiseringsregels op instelbare marker gezet: ${a} rij(en).`);
 }
 
 main()

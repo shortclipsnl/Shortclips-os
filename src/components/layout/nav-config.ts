@@ -68,6 +68,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/tasks", label: "Taken", icon: "CircleCheck", permissions: ["tasks:read"], match: "/tasks" },
       { href: "/team", label: "Team", icon: "Users", permissions: ["team:read", "editors:read"], match: "/team" },
       { href: "/capaciteit", label: "Teamcapaciteit", icon: "Gauge", permissions: ["team:read", "editors:read"], match: "/capaciteit" },
+      { href: "/prestaties", label: "Deadlineprestaties", icon: "AlarmClock", permissions: ["editors:read"], match: "/prestaties" },
       { href: "/verlof", label: "Vakantie", icon: "Palmtree", match: "/verlof" },
       { href: "/meetings", label: "Teammeetings", icon: "Presentation", match: "/meetings" },
       // Interne kennisbank (vervanger van Skool): lezen voor iedereen intern,
