@@ -17,3 +17,4 @@ export * from "./awards";
 export * from "./mentor";
 export * from "./vermogen";
 export * from "./development";
+export * from "./client-library";

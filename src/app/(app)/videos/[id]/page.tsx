@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ExternalLink, Film, Lock, Users } from "lucide-react";
+import { BookOpen, ExternalLink, Film, Lock, Users } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getVideo } from "@/server/videos";
 import {
@@ -203,9 +203,15 @@ export default async function VideoPage({
             <CardHeader title="Details" />
             <dl className="mt-4 space-y-3 text-sm">
               <Field label="Klant">
-                <Link href={`/clients/${v.clientSlug}`} className="flex items-center gap-2 hover:underline">
+                <span className="flex items-center gap-2">
                   <Avatar name={v.clientName} color={v.clientColor} size={20} />
                   {v.clientName}
+                </span>
+                <Link
+                  href={`/mijn-klanten/${v.clientSlug}`}
+                  className="mt-1.5 inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2.5 py-1 text-xs font-semibold text-[var(--color-brand-700)] hover:bg-[var(--color-surface-sunken)]"
+                >
+                  <BookOpen className="size-3.5" /> Bekijk klantinformatie
                 </Link>
               </Field>
               <Field label="Script">
