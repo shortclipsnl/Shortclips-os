@@ -7,6 +7,7 @@ import { runTaskArchive } from "./task-archive";
 import { runCalendarSync } from "./calendar-sync";
 import { runMonthlyReportDrafts } from "./report-drafts";
 import { runMonthlyInsightTasks } from "./insight-tasks";
+import { generateMonthlyDevelopment, snapshotDevelopmentMetrics } from "@/server/development";
 import { runDriveSync } from "./drive-sync";
 import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
@@ -84,6 +85,10 @@ export async function runNightlySync() {
   // Escalatie bij uitblijvende opvolging + prestatieregistratie (gemiste deadlines).
   results.push(await step("escalations.editor_deadlines", () => runEditorEscalations()));
   results.push(await step("performance.record_deadlines", () => recordDeadlinePerformance()));
+  // Ontwikkeling: eerst de dagelijkse momentopname (ná deadline-registratie,
+  // zodat missers meegeteld zijn), daarna maandelijks de AI-ontwikkelanalyse.
+  results.push(await step("development.snapshot_metrics", () => snapshotDevelopmentMetrics()));
+  results.push(await step("development.monthly_analysis", () => generateMonthlyDevelopment()));
   results.push(await step("signals.clients_without_shoot", () => runClientsWithoutShootSignal()));
   results.push(await step("signals.content_gap", () => runContentGapSignal()));
   results.push(await step("reminders.script_todo", () => runScriptTodoReminders()));

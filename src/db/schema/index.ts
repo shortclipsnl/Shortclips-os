@@ -16,3 +16,4 @@ export * from "./goals";
 export * from "./awards";
 export * from "./mentor";
 export * from "./vermogen";
+export * from "./development";

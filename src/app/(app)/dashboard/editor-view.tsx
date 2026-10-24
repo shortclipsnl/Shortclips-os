@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { AlertTriangle, FileText, Film, CheckCircle2, Clock, Info, MessageCircle, Phone, Trophy, CalendarClock } from "lucide-react";
+import { AlertTriangle, FileText, Film, CheckCircle2, Clock, Info, MessageCircle, Phone, Trophy, CalendarClock, Sprout } from "lucide-react";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { db } from "@/db/client";
+import { developmentPoints } from "@/db/schema";
 import { getEditorDashboard } from "@/server/editor-dashboard";
 import { listEditorBoard, type EditorBoardVideo } from "@/server/editor-board";
 import type { Viewer } from "@/server/auth/context";
@@ -27,6 +30,16 @@ function monthLabel(ym: string): string {
  */
 export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
   const [data, board] = await Promise.all([getEditorDashboard(viewer), listEditorBoard(viewer)]);
+  // Eigen ontwikkelpunten (open), voor de ontwikkelkaart onderaan.
+  const [dev] = await db
+    .select({
+      open: sql<number>`count(*) filter (where status in ('open','in_progress'))::int`,
+      fouten: sql<number>`count(*) filter (where status in ('open','in_progress') and type = 'fout')::int`,
+    })
+    .from(developmentPoints)
+    .where(and(eq(developmentPoints.userId, viewer.id), isNull(developmentPoints.deletedAt)));
+  const openDev = dev?.open ?? 0;
+  const openDevFouten = dev?.fouten ?? 0;
   const firstName = viewer.fullName.split(" ")[0];
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
   // Opleveringen van deze maand — voor het feestmoment (confetti).
@@ -282,6 +295,27 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
           />
         </div>
       </div>
+
+      {/* Mijn ontwikkeling — persoonlijke groeipunten op basis van je eigen cijfers. */}
+      <Link
+        href="/ontwikkeling"
+        className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 hover:bg-[var(--color-surface-sunken)]"
+      >
+        <span className="flex items-center gap-3">
+          <span className="flex size-9 items-center justify-center rounded-full bg-[var(--color-good-soft)] text-[var(--color-good)]">
+            <Sprout className="size-5" />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-[var(--color-ink)]">Mijn ontwikkeling</span>
+            <span className="block text-xs text-[var(--color-ink-muted)]">
+              {openDev > 0
+                ? `${openDev} open ontwikkelpunt${openDev === 1 ? "" : "en"}${openDevFouten > 0 ? ` · ${openDevFouten} terugkerende fout${openDevFouten === 1 ? "" : "en"}` : ""}`
+                : "Bekijk je groeipunten en gekoppelde trainingen"}
+            </span>
+          </span>
+        </span>
+        <span className="text-sm text-[var(--color-ink-faint)]">Bekijken →</span>
+      </Link>
     </div>
   );
 }

@@ -17,6 +17,7 @@ import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { runFrequentSync, runNightlySync } from "@/server/jobs/orchestrator";
 import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
 import { runMonthlyInsightTasks } from "@/server/jobs/insight-tasks";
+import { generateMonthlyDevelopment, snapshotDevelopmentMetrics } from "@/server/development";
 import { runDriveSync } from "@/server/jobs/drive-sync";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, runMetricoolSync } from "@/server/jobs/metricool-sync";
@@ -90,6 +91,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "tasks.archive_done": runTaskArchive,
   "reports.generate_drafts": runMonthlyReportDrafts,
   "insights.monthly_tasks": runMonthlyInsightTasks,
+  "development.snapshot_metrics": snapshotDevelopmentMetrics,
+  "development.monthly_analysis": generateMonthlyDevelopment,
   "drive.sync_all": runDriveSync,
   "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,
