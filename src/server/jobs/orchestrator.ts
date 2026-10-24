@@ -21,6 +21,7 @@ import { runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, run
 import { enforcePortalAccess } from "./portal-access";
 import { runClientNotifications } from "./notifications";
 import { runDatabaseBackup } from "./backup";
+import { runEmergencyExport } from "./emergency-export";
 
 /**
  * Orkestratie van alle koppelingen, zodat één geplande taak (cron) het hele
@@ -99,5 +100,7 @@ export async function runNightlySync() {
   results.push(await step("reminders.post_shoot_todo", () => runPostShootTodoReminders()));
   // Als laatste: een volledige database-backup naar Google Drive.
   results.push(await step("backup.database", () => runDatabaseBackup()));
+  // Noodprocedure-PDF naar Drive, zodat kritieke info bij portaaluitval beschikbaar blijft.
+  results.push(await step("emergency.export", () => runEmergencyExport()));
   return { ok: results.every((r) => r.ok), results };
 }

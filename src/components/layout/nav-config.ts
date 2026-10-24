@@ -112,6 +112,7 @@ export const NAVIGATION: NavGroup[] = [
     accent: "var(--color-ink-muted)",
     items: [
       { href: "/klantenbeheer", label: "Klantenbeheer", icon: "UserCog", roles: ["project_coordinator"], match: "/klantenbeheer" },
+      { href: "/noodprocedure", label: "Noodprocedure", icon: "LifeBuoy", roles: ["project_coordinator"], match: "/noodprocedure" },
       { href: "/koppelingen", label: "Koppeling controleren", icon: "Link2", ownerOnly: true, match: "/koppelingen" },
       { href: "/settings/agendas", label: "Agenda's", icon: "CalendarRange", ownerOnly: true, match: "/settings/agendas" },
       { href: "/settings/integrations", label: "Koppelingen", icon: "Plug", ownerOnly: true, match: "/settings/integrations" },
