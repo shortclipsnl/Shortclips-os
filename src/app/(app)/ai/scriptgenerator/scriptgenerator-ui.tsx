@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock, Megaphone, Sprout, Link2, AlertTriangle, ChevronDown, BookmarkPlus, ShieldAlert } from "lucide-react";
-import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, saveScriptToDrive, checkScriptQuality, listShootDaysForClient, rememberScriptFeedback, refreshMetaRulesAction, getMetaRulesInfo, type GeneratedScript, type QualityResult, type ContentType, type FeedbackScope } from "@/server/actions/script-generate";
+import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock, Megaphone, Sprout, Link2, AlertTriangle, ChevronDown, BookmarkPlus, ShieldAlert, ListChecks } from "lucide-react";
+import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, saveScriptToDrive, checkScriptQuality, listShootDaysForClient, rememberScriptFeedback, refreshMetaRulesAction, getMetaRulesInfo, listScriptClientsAction, getClientDriveScriptInfoAction, generateScriptNeeds, type GeneratedScript, type QualityResult, type ContentType, type FeedbackScope } from "@/server/actions/script-generate";
 
 type ShootDay = { id: string; scheduledOn: string; title: string };
 type Funnel = "TOF" | "MOF" | "BOF";
@@ -13,7 +13,7 @@ type Client = { id: string; name: string; active: boolean };
 type ClientFilter = "actief" | "inactief" | "alle";
 
 type Version = { onderwerp: string; tekst: string; feedback: string; at: number };
-type EditorScript = { id: string; onderwerp: string; tekst: string; versions: Version[]; contentType: ContentType; funnel?: Funnel; scriptId?: string };
+type EditorScript = { id: string; onderwerp: string; tekst: string; versions: Version[]; contentType: ContentType; funnel?: Funnel; scriptId?: string; benodigdheden?: string[] };
 
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 
@@ -134,9 +134,12 @@ const scoreColor = (n: number) => (n >= 7 ? "var(--color-good)" : n >= 4 ? "var(
 
 /* ---------------- component ---------------- */
 
-export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { clients: Client[]; aiReady: boolean; initialClientId?: string }) {
+export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialClientId }: { clients: Client[]; aiReady: boolean; initialClientId?: string }) {
+  // Klantenlijst in state zodat die live kan verversen (nieuwe klanten verschijnen
+  // zonder de pagina te herladen) — bij openen en zodra het venster weer focus krijgt.
+  const [clients, setClients] = useState<Client[]>(initialClients);
   // Vooraf geselecteerde klant (bijv. vanaf de scriptingpagina).
-  const preClient = initialClientId && clients.some((c) => c.id === initialClientId) ? initialClientId : "";
+  const preClient = initialClientId && initialClients.some((c) => c.id === initialClientId) ? initialClientId : "";
   // Instellingen
   const [clientId, setClientId] = useState<string>(preClient);
   const [otherName, setOtherName] = useState<string>("");
@@ -153,6 +156,14 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
   const [dragOver, setDragOver] = useState(false);
   const [useDrive, setUseDrive] = useState(true);
   const [topicsBusy, setTopicsBusy] = useState(false);
+  // Live Drive-scripts: aantal gevonden PDF's voor de gekozen klant (melding).
+  const [driveInfo, setDriveInfo] = useState<{ count: number } | null>(null);
+  const [driveInfoBusy, setDriveInfoBusy] = useState(false);
+  // Onderwerp-suggesties: onthoud wat al is voorgesteld (voorkom herhaling) + de onderbouwing.
+  const [suggestedTopics, setSuggestedTopics] = useState<string[]>([]);
+  const [topicsBasis, setTopicsBasis] = useState<string | null>(null);
+  // Benodigdheden per script (AI-gegenereerd, bewerkbaar).
+  const [needsBusyId, setNeedsBusyId] = useState<string | null>(null);
 
   // Resultaat (bewerkbaar)
   const [scripts, setScripts] = useState<EditorScript[] | null>(null);
@@ -193,6 +204,33 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
   const [rememberMsg, setRememberMsg] = useState<string | null>(null);
   const [metaUpdatedAt, setMetaUpdatedAt] = useState<string | null>(null);
   const [metaBusy, setMetaBusy] = useState(false);
+
+  // Klantenlijst live verversen: bij openen en zodra het venster weer focus
+  // krijgt (bv. nadat elders een klant is toegevoegd of gewijzigd).
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => { listScriptClientsAction().then((cs) => { if (alive && cs.length) setClients(cs); }).catch(() => {}); };
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => { alive = false; window.removeEventListener("focus", refresh); };
+  }, []);
+
+  // Zodra een klant gekozen wordt: automatisch de script-PDF's uit de Drive-map
+  // tellen (die worden bij genereren als stijlreferentie meegelezen). Ook de
+  // onderwerp-geschiedenis resetten, zodat suggesties per klant vers starten.
+  useEffect(() => {
+    setSuggestedTopics([]);
+    setTopicsBasis(null);
+    if (showOther || !clientId) { setDriveInfo(null); setDriveInfoBusy(false); return; }
+    let alive = true;
+    setDriveInfoBusy(true);
+    setDriveInfo(null);
+    getClientDriveScriptInfoAction(clientId)
+      .then((info) => { if (alive) setDriveInfo(info); })
+      .catch(() => { if (alive) setDriveInfo(null); })
+      .finally(() => { if (alive) setDriveInfoBusy(false); });
+    return () => { alive = false; };
+  }, [clientId, showOther]);
 
   const visibleClients = clients.filter((c) => (filter === "alle" ? true : filter === "actief" ? c.active : !c.active));
   const selectedName = clientId ? clients.find((c) => c.id === clientId)?.name ?? "" : "";
@@ -264,13 +302,41 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
     setErr(null);
     setTopicsBusy(true);
     (async () => {
+      // Eerder voorgestelde onderwerpen + wat al in het veld staat meegeven,
+      // zodat er geen herhaling komt en elke klik nieuwe ideeën oplevert.
+      const inField = brief.split("\n").map((l) => l.trim()).filter(Boolean);
+      const avoid = Array.from(new Set([...suggestedTopics, ...inField]));
       const res = await suggestTopics({
         clientId: showOther ? undefined : clientId || undefined,
         clientName: showOther ? otherName.trim() || undefined : undefined,
+        avoid,
       });
-      if (res.ok) setBrief((prev) => (prev.trim() ? prev.trim() + "\n" : "") + res.topics.join("\n"));
-      else setErr(res.message);
+      if (res.ok) {
+        setBrief((prev) => (prev.trim() ? prev.trim() + "\n" : "") + res.topics.join("\n"));
+        setSuggestedTopics((prev) => Array.from(new Set([...prev, ...res.topics])).slice(-60));
+        setTopicsBasis(res.basis || null);
+      } else setErr(res.message);
       setTopicsBusy(false);
+    })();
+  };
+
+  /** Benodigdheden voor een script door de AI laten bepalen (per video). */
+  const fetchNeeds = (id: string) => {
+    const s = scripts?.find((x) => x.id === id);
+    if (!s) return;
+    setErr(null);
+    setNeedsBusyId(id);
+    (async () => {
+      const res = await generateScriptNeeds({
+        onderwerp: s.onderwerp,
+        tekst: s.tekst,
+        clientId: genClientId || undefined,
+        clientName: genClientName || undefined,
+        contentType: s.contentType,
+      });
+      if (res.ok) updateScript(id, { benodigdheden: res.benodigdheden });
+      else setErr(res.message);
+      setNeedsBusyId(null);
     })();
   };
 
@@ -356,7 +422,7 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
     }
   };
 
-  const updateScript = (id: string, patch: Partial<Pick<EditorScript, "onderwerp" | "tekst">>) =>
+  const updateScript = (id: string, patch: Partial<Pick<EditorScript, "onderwerp" | "tekst" | "benodigdheden">>) =>
     setScripts((prev) => (prev ? prev.map((s) => (s.id === id ? { ...s, ...patch } : s)) : prev));
   const removeScript = (id: string) => setScripts((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
   const addScript = () => setScripts((prev) => [...(prev ?? []), { id: uid(), onderwerp: "", tekst: "", versions: [], contentType, funnel: isAd ? "TOF" : undefined }]);
@@ -506,6 +572,16 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
           </div>
         </div>
 
+        {/* Lichtblauwe uitleg: de scripts zijn een startpunt en volledig
+            handmatig aan te passen. */}
+        <div className="flex items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-info)]/30 bg-[var(--color-info-soft)]/60 px-4 py-2.5 text-sm text-[var(--color-ink)]">
+          <PenLine className="mt-0.5 size-4 shrink-0 text-[var(--color-info)]" strokeWidth={1.75} />
+          <p>
+            Dit zijn startpunten — je kunt elk script hieronder <strong>volledig handmatig aanpassen</strong> (typen of inspreken),
+            of de AI laten verbeteren met de knoppen. Met <strong>Benodigdheden</strong> zet je er de opnamelijst per video bij.
+          </p>
+        </div>
+
         {/* Scripts — iteratief bewerkbaar */}
         {scripts.map((s, i) => {
           const busy = busyId === s.id;
@@ -541,10 +617,10 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
                 <textarea
                   value={s.tekst}
                   onChange={(e) => updateScript(s.id, { tekst: e.target.value })}
-                  rows={14}
+                  rows={22}
                   spellCheck
                   disabled={busy}
-                  className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface-2)] px-3 py-2 font-mono text-xs leading-relaxed text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none disabled:opacity-60"
+                  className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface-2)] px-3.5 py-2.5 font-mono text-sm leading-7 text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none disabled:opacity-60"
                 />
                 <MicButton onText={(t) => updateScript(s.id, { tekst: appendText(s.tekst, t) })} onError={setErr} title="Tekst inspreken" />
               </div>
@@ -573,6 +649,28 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
                   <button type="button" disabled={!!busyId} onClick={() => runRevise(s.id, "Haal de social media poll weg en sluit af met één duidelijke call to action (een vraag of oproep) passend bij het onderwerp. Laat de rest van het script staan.", "CTA zonder poll", false, false)} className="rounded-full border border-[var(--color-line-strong)] px-2.5 py-1 text-2xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-40">Zonder poll</button>
                 </div>
               ) : null}
+
+              {/* Benodigdheden voor de opname — AI bepaalt ze per video op basis
+                  van het script; daarna handmatig aan te passen (één per regel). */}
+              <div className="mt-2">
+                <button type="button" onClick={() => fetchNeeds(s.id)} disabled={needsBusyId === s.id || !s.tekst.trim()} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] px-2.5 py-1 text-2xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-40">
+                  {needsBusyId === s.id ? <Loader2 className="size-3.5 animate-spin" /> : <ListChecks className="size-3.5" />} {s.benodigdheden && s.benodigdheden.length ? "Benodigdheden opnieuw bepalen" : "Benodigdheden voor het script toevoegen"}
+                </button>
+                {s.benodigdheden && s.benodigdheden.length ? (
+                  <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3">
+                    <span className="mb-1.5 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
+                      <ListChecks className="size-3.5 text-[var(--color-brand-600)]" /> Benodigdheden voor deze short
+                    </span>
+                    <textarea
+                      value={s.benodigdheden.join("\n")}
+                      onChange={(e) => updateScript(s.id, { benodigdheden: e.target.value.split("\n") })}
+                      rows={Math.max(3, Math.min(10, s.benodigdheden.length + 1))}
+                      className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm leading-relaxed text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
+                    />
+                    <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">Eén per regel — pas gerust aan. Locatie, props, beeld/b-roll, schermteksten en voorbereiding.</p>
+                  </div>
+                ) : null}
+              </div>
 
               {/* Kwaliteitscontrole */}
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -933,11 +1031,23 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
         <span className="mb-2 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Eerdere scripts als basis <span className="font-normal normal-case text-[var(--color-ink-faint)]">— optioneel</span></span>
 
         {!showOther && clientId ? (
-          <label className="mb-2 flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-ink)]">
-            <input type="checkbox" checked={useDrive} onChange={(e) => setUseDrive(e.target.checked)} className="size-4 accent-[var(--color-brand-600)]" />
-            <Cloud className="size-4 text-[var(--color-brand-600)]" />
-            <span>Eerdere scripts automatisch uit de Google Drive-map van deze klant halen</span>
-          </label>
+          <>
+            <label className="mb-1.5 flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-ink)]">
+              <input type="checkbox" checked={useDrive} onChange={(e) => setUseDrive(e.target.checked)} className="size-4 accent-[var(--color-brand-600)]" />
+              <Cloud className="size-4 text-[var(--color-brand-600)]" />
+              <span>Scripts automatisch uit de Google Drive-map van deze klant halen (ook &ldquo;Short Video Scripts&rdquo;)</span>
+            </label>
+            {/* Live melding: wat er in Drive gevonden is voor deze klant. */}
+            <p className="mb-2 flex items-center gap-1.5 text-2xs">
+              {driveInfoBusy ? (
+                <span className="inline-flex items-center gap-1.5 text-[var(--color-ink-muted)]"><Loader2 className="size-3 animate-spin" /> Scripts zoeken in Drive…</span>
+              ) : driveInfo && driveInfo.count > 0 ? (
+                <span className="inline-flex items-center gap-1.5 font-medium text-[var(--color-good)]"><Cloud className="size-3.5" /> {driveInfo.count} script{driveInfo.count === 1 ? "" : "s"} gevonden in Drive — stijl, opbouw en tone of voice worden meegelezen.</span>
+              ) : driveInfo ? (
+                <span className="text-[var(--color-ink-faint)]">Nog geen script-PDF&apos;s in de Drive-map gevonden voor deze klant.</span>
+              ) : null}
+            </p>
+          </>
         ) : null}
 
         <label
@@ -970,11 +1080,21 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{isAd ? "Campagnedoel, product of actie" : "Onderwerpen of hooks"} <span className="font-normal normal-case text-[var(--color-ink-faint)]">— optioneel, typen of inspreken</span></span>
           {!isAd ? (
-            <button type="button" onClick={fetchTopics} disabled={topicsBusy} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 py-1 text-2xs font-medium text-[var(--color-brand-700)] hover:border-[var(--color-brand-500)] disabled:opacity-50">
-              {topicsBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Lightbulb className="size-3.5" />} Laat de AI onderwerpen kiezen
+            <button type="button" onClick={fetchTopics} disabled={topicsBusy} title="Analyseert eerst de eerdere scripts, best presterende hooks en Video Intelligence-patronen van deze klant en kiest dan nieuwe onderwerpen — elke klik andere ideeën." className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 py-1 text-2xs font-medium text-[var(--color-brand-700)] hover:border-[var(--color-brand-500)] disabled:opacity-50">
+              {topicsBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Lightbulb className="size-3.5" />} {topicsBusy ? "Onderzoekt…" : "Laat de AI onderwerpen kiezen"}
             </button>
           ) : null}
         </div>
+        {topicsBusy && !isAd ? (
+          <p className="mb-2 inline-flex items-center gap-1.5 text-2xs text-[var(--color-ink-muted)]">
+            <Loader2 className="size-3 animate-spin" /> Analyseert eerdere scripts, best presterende hooks en videopatronen van deze klant…
+          </p>
+        ) : topicsBasis && !isAd ? (
+          <div className="mb-2 flex items-start gap-2 rounded-[var(--radius-sm)] border border-[var(--color-info)]/30 bg-[var(--color-info-soft)]/50 px-3 py-2 text-2xs text-[var(--color-ink)]">
+            <Lightbulb className="mt-0.5 size-3.5 shrink-0 text-[var(--color-info)]" />
+            <span><strong>Waarop gebaseerd:</strong> {topicsBasis}</span>
+          </div>
+        ) : null}
         <div className="flex items-start gap-2">
           <textarea
             value={brief}

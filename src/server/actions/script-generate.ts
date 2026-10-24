@@ -25,7 +25,7 @@ type Result =
   | { ok: false; message: string };
 
 const MAX_SCRIPTS = 8;
-const MAX_PDFS = 3;
+const MAX_PDFS = 6;
 
 /** Vaste opmaak- en nadrukregels — gedeeld door genereren en aanpassen.
  *  withPoll bepaalt of de CTA wordt afgesloten met een social media poll. */
@@ -438,11 +438,19 @@ export async function reviseScript(input: {
 }
 
 type TopicsResult =
-  | { ok: true; topics: string[] }
+  | { ok: true; topics: string[]; basis: string }
   | { ok: false; message: string };
 
-/** Laat de generator zelf sterke onderwerpen/hooks voorstellen op basis van wat werkt. */
-export async function suggestTopics(input: { clientId?: string; clientName?: string; count?: number }): Promise<TopicsResult> {
+/**
+ * Laat de generator zelf sterke onderwerpen voorstellen — ná echt onderzoek: hij
+ * analyseert eerst de bestaande scripts, de best presterende hooks en de Video
+ * Intelligence-patronen van deze klant (meegeleverd in de context) en kiest dán
+ * onderwerpen in bewezen richtingen én op gaten die nog niet behandeld zijn.
+ * `avoid` = eerder voorgestelde/gebruikte onderwerpen; die worden vermeden en
+ * samen met een variatiesignaal zorgt dat herhaald klikken nieuwe ideeën geeft.
+ * `basis` legt kort uit waarop de keuze is gebaseerd.
+ */
+export async function suggestTopics(input: { clientId?: string; clientName?: string; count?: number; avoid?: string[] }): Promise<TopicsResult> {
   try {
     const viewer = await requirePermission("ai:read");
     if (!aiConfigured()) return { ok: false, message: "De AI-schrijver staat uit (ANTHROPIC_API_KEY ontbreekt)." };
@@ -455,27 +463,120 @@ export async function suggestTopics(input: { clientId?: string; clientName?: str
       if (ctx) { extra = ctx.extra; klantnaam = ctx.name; }
     }
 
+    const avoid = (input.avoid ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 40);
+    // Variatiesignaal: een willekeurige hoek + nonce, zodat twee keer klikken niet
+    // exact dezelfde lijst oplevert (het model krijgt anders identieke input).
+    const angles = ["een verrassende insteek", "een misverstand ontkrachten", "een how-to", "achter de schermen", "een veelgestelde vraag", "een vergelijking", "een mythe vs. feit", "een concreet resultaat/voorbeeld", "een seizoens- of actualiteitshaak", "een tip die bijna niemand toepast"];
+    const pick = angles.sort(() => Math.random() - 0.5).slice(0, 4);
+    const nonce = Math.random().toString(36).slice(2, 8);
+
     const user = [
       `Stel ${count} sterke, concrete onderwerpen voor organische short video's voor${klantnaam ? ` klant "${klantnaam}"` : " een klant"}.`,
-      "Kies onderwerpen die aantoonbaar werken: baseer je op wat goed presteert bij deze klant, veelgestelde vragen, misverstanden en sterke invalshoeken uit het handboek. Geen advertentie-ideeën.",
+      "WERKWIJZE (belangrijk): onderzoek EERST en kies DAARNA. Analyseer de eerder geschreven scripts, de best presterende hooks (echte cijfers) en de Video Intelligence-patronen van deze klant uit de meegeleverde context: in welke richtingen maken we content, wat werkt, en welke invalshoeken zijn nog NIET gebruikt. Kies onderwerpen die (a) aansluiten op wat aantoonbaar werkt én (b) nieuwe, nog niet behandelde gaten vullen. Geen advertentie-ideeën.",
+      avoid.length ? `Vermijd deze onderwerpen (al eerder voorgesteld of gebruikt) — kom met wezenlijk ANDERE ideeën, niet een herformulering:\n- ${avoid.join("\n- ")}` : "",
+      `Breng variatie aan; leun deze keer onder meer op: ${pick.join(", ")}. (variatiecode ${nonce} — negeer deze code inhoudelijk, hij dient alleen om niet in herhaling te vallen.)`,
       "Elk onderwerp is één korte, pakkende regel (een titel of hook), zonder nummer.",
       "",
-      "Geef UITSLUITEND geldige JSON terug: {\"onderwerpen\":[\"...\",\"...\"]}",
-    ].join("\n");
+      "Geef UITSLUITEND geldige JSON terug in exact dit formaat:",
+      "{\"basis\":\"<1-2 zinnen: waarop je deze keuze baseerde — wat je in de eerdere scripts/cijfers/patronen zag>\",\"onderwerpen\":[\"...\",\"...\"]}",
+    ].filter(Boolean).join("\n");
 
-    const res = await runPrompt({ system: scriptGeneratorSystem(extra || undefined), user, maxTokens: 1500 });
+    const res = await runPrompt({ system: scriptGeneratorSystem(extra || undefined), user, maxTokens: 1800 });
     if (!res.ok) return { ok: false, message: "De schrijver gaf geen antwoord. Probeer het nog eens." };
 
     const cleaned = res.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
     let topics: string[] = [];
+    let basis = "";
     try {
       const start = cleaned.indexOf("{"); const end = cleaned.lastIndexOf("}");
-      const obj = JSON.parse(start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned) as { onderwerpen?: unknown };
+      const obj = JSON.parse(start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned) as { onderwerpen?: unknown; basis?: unknown };
       if (Array.isArray(obj.onderwerpen)) topics = obj.onderwerpen.filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim());
+      if (typeof obj.basis === "string") basis = obj.basis.trim();
     } catch { /* val terug op niets */ }
 
-    if (topics.length === 0) return { ok: false, message: "Geen onderwerpen gekregen. Probeer het nog eens." };
-    return { ok: true, topics: topics.slice(0, count) };
+    // Harde ontdubbeling t.o.v. wat al voorgesteld/gebruikt is.
+    const seen = new Set(avoid.map((t) => t.toLowerCase()));
+    topics = topics.filter((t) => { const k = t.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+
+    if (topics.length === 0) return { ok: false, message: "Geen nieuwe onderwerpen gekregen. Probeer het nog eens." };
+    return { ok: true, topics: topics.slice(0, count), basis };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+/** Actuele klantenlijst voor de scriptgenerator — voor live verversen in de UI. */
+export async function listScriptClientsAction(): Promise<Array<{ id: string; name: string; active: boolean }>> {
+  const viewer = await requirePermission("ai:read");
+  const { listClientsForScripts } = await import("@/server/ai/knowledge");
+  return listClientsForScripts(viewer);
+}
+
+/** Aantal script-PDF's in de Drive-map van een klant — voor de live melding. */
+export async function getClientDriveScriptInfoAction(clientId: string): Promise<{ count: number }> {
+  const viewer = await requirePermission("ai:read");
+  const [c] = await db.select({ id: clients.id }).from(clients).where(and(eq(clients.id, clientId), isNull(clients.deletedAt))).limit(1);
+  if (!c) return { count: 0 };
+  assertClientAccess(viewer, c.id);
+  if (!drive.isConfigured) return { count: 0 };
+  const { getClientDriveScriptInfo } = await import("@/server/scripts/drive-scripts");
+  return getClientDriveScriptInfo(c.id).catch(() => ({ count: 0 }));
+}
+
+type NeedsResult = { ok: true; benodigdheden: string[] } | { ok: false; message: string };
+
+/**
+ * Laat de AI de benodigdheden voor het opnemen van deze short bepalen op basis
+ * van het script: locatie, props/materialen, beeld (b-roll), schermteksten en
+ * eventuele voorbereiding. Concreet en haalbaar — geen verzonnen producten.
+ */
+export async function generateScriptNeeds(input: {
+  onderwerp: string;
+  tekst: string;
+  clientId?: string;
+  clientName?: string;
+  contentType?: ContentType;
+}): Promise<NeedsResult> {
+  try {
+    const viewer = await requirePermission("ai:read");
+    if (!aiConfigured()) return { ok: false, message: "De AI staat uit (ANTHROPIC_API_KEY ontbreekt)." };
+    if (!input.tekst?.trim()) return { ok: false, message: "Dit script is nog leeg." };
+
+    let klantnaam = (input.clientName ?? "").trim();
+    let extra = "";
+    if (input.clientId) {
+      const ctx = await clientContext(viewer, input.clientId, input.contentType === "advertentie" ? "advertentie" : "organisch");
+      if (ctx) { extra = ctx.extra; klantnaam = ctx.name; }
+    }
+
+    const user = [
+      `Bepaal de BENODIGDHEDEN om deze short video op te nemen${klantnaam ? ` voor klant "${klantnaam}"` : ""}.`,
+      "Lees het script en geef een praktische, concrete checklist voor op de opnamedag: locatie(s), personen/rollen voor de camera, props en materialen, beeld/b-roll dat gefilmd moet worden, schermteksten/overlays en eventuele voorbereiding vooraf.",
+      "Baseer je uitsluitend op wat in het script staat. Verzin geen producten, cijfers of locaties die er niet zijn; is iets onduidelijk, benoem het als '(afstemmen)'.",
+      "Houd elk item kort (één regel), concreet en afvinkbaar. Maximaal 10 items.",
+      "",
+      `TITEL: ${input.onderwerp || "(geen)"}`,
+      "SCRIPT:",
+      input.tekst.slice(0, 6000),
+      extra ? `\nCONTEXT (klant):\n${extra.slice(0, 3000)}` : "",
+      "",
+      "Geef UITSLUITEND geldige JSON terug: {\"benodigdheden\":[\"...\",\"...\"]}",
+    ].filter(Boolean).join("\n");
+
+    const res = await runPrompt({ system: scriptGeneratorSystem(extra || undefined), user, maxTokens: 1200 });
+    if (!res.ok) return { ok: false, message: "Geen antwoord gekregen. Probeer het nog eens." };
+
+    const cleaned = res.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+    let benodigdheden: string[] = [];
+    try {
+      const a = cleaned.indexOf("{"); const b = cleaned.lastIndexOf("}");
+      const obj = JSON.parse(a >= 0 && b > a ? cleaned.slice(a, b + 1) : cleaned) as { benodigdheden?: unknown };
+      if (Array.isArray(obj.benodigdheden)) benodigdheden = obj.benodigdheden.filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim());
+    } catch { /* niets */ }
+
+    if (benodigdheden.length === 0) return { ok: false, message: "Geen benodigdheden gekregen. Probeer het nog eens." };
+    return { ok: true, benodigdheden: benodigdheden.slice(0, 10) };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;

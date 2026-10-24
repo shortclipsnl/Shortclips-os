@@ -1,10 +1,29 @@
 import "server-only";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db/client";
 import { files } from "@/db/schema";
 import { drive } from "@/server/integrations/drive";
 
 export type PriorScriptPdf = { name: string; base64: string };
+
+/**
+ * Bestanden die bij de scripts van een klant horen. Pakt niet alleen de map die
+ * exact "Scripts" heet (categorie "Scripts"), maar ook mappen als "Short Video
+ * Scripts" — daar staan de script-PDF's vaak. Match op categorie óf op het pad/
+ * de naam die "script" bevat, zodat geen script-PDF wordt gemist.
+ */
+function scriptFileWhere(clientId: string): SQL {
+  return and(
+    eq(files.clientId, clientId),
+    eq(files.isFolder, false),
+    isNull(files.deletedAt),
+    or(
+      eq(files.category, "Scripts"),
+      sql`lower(${files.path}) like '%script%'`,
+      sql`lower(${files.name}) like '%script%'`,
+    ),
+  )!;
+}
 
 /** Een scriptbestand in Drive met een directe open-link (de webViewLink). */
 export type DriveScriptLink = { name: string; url: string | null; modifiedAt: string | null };
@@ -36,8 +55,12 @@ export async function listClientDriveScriptLinks(
     .where(and(
       inArray(files.clientId, ids),
       eq(files.isFolder, false),
-      eq(files.category, "Scripts"),
       isNull(files.deletedAt),
+      or(
+        eq(files.category, "Scripts"),
+        sql`lower(${files.path}) like '%script%'`,
+        sql`lower(${files.name}) like '%script%'`,
+      ),
     ))
     .orderBy(desc(files.modifiedAt));
 
@@ -67,17 +90,12 @@ export async function listClientDriveScriptLinks(
  * zodat de scriptgenerator ze als basis/stijlreferentie kan meelezen. Zo hoeft
  * het team eerdere scripts niet handmatig te uploaden.
  */
-export async function getClientDriveScriptPdfs(clientId: string, limit = 3): Promise<PriorScriptPdf[]> {
+export async function getClientDriveScriptPdfs(clientId: string, limit = 6): Promise<PriorScriptPdf[]> {
   if (!drive.isConfigured) return [];
   const rows = await db
     .select({ externalId: files.externalId, name: files.name, mimeType: files.mimeType })
     .from(files)
-    .where(and(
-      eq(files.clientId, clientId),
-      eq(files.isFolder, false),
-      eq(files.category, "Scripts"),
-      isNull(files.deletedAt),
-    ))
+    .where(scriptFileWhere(clientId))
     .orderBy(desc(files.modifiedAt))
     .limit(limit * 3);
 
@@ -96,17 +114,23 @@ export async function getClientDriveScriptPdfs(clientId: string, limit = 3): Pro
   return out;
 }
 
+/** Aantal script-PDF's in Drive voor deze klant — voor de live melding in de UI. */
+export async function getClientDriveScriptInfo(clientId: string): Promise<{ count: number }> {
+  const rows = await db
+    .select({ name: files.name, mimeType: files.mimeType })
+    .from(files)
+    .where(scriptFileWhere(clientId))
+    .limit(200);
+  const count = rows.filter((r) => r.mimeType?.includes("pdf") || r.name.toLowerCase().endsWith(".pdf")).length;
+  return { count };
+}
+
 /** Of er überhaupt scriptbestanden in Drive staan voor deze klant (voor de UI-knop). */
 export async function clientHasDriveScripts(clientId: string): Promise<boolean> {
   const [row] = await db
     .select({ id: files.id })
     .from(files)
-    .where(and(
-      eq(files.clientId, clientId),
-      eq(files.isFolder, false),
-      eq(files.category, "Scripts"),
-      isNull(files.deletedAt),
-    ))
+    .where(scriptFileWhere(clientId))
     .limit(1);
   return Boolean(row);
 }

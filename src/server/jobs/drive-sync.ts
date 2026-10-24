@@ -24,7 +24,12 @@ function categoryFromPath(path: string): string | null {
     "Branding", "Contracten", "Overig",
   ];
   const segments = path.split("/").filter(Boolean);
-  return known.find((k) => segments.some((s) => s.toLowerCase() === k.toLowerCase())) ?? null;
+  const exact = known.find((k) => segments.some((s) => s.toLowerCase() === k.toLowerCase()));
+  if (exact) return exact;
+  // Mappen als "Short Video Scripts" tellen ook als Scripts, zodat de
+  // scriptgenerator en de scriptingpagina die PDF's vinden.
+  if (segments.some((s) => s.toLowerCase().includes("script"))) return "Scripts";
+  return null;
 }
 
 /**
