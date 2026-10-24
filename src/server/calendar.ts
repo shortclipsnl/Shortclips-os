@@ -40,6 +40,7 @@ export async function listCalendar(viewer: Viewer, filter: CalendarFilter) {
       clientSlug: clients.slug,
       clientColor: clients.color,
       clientLogo: clients.logoUrl,
+      weHandlePosting: clients.weHandlePosting,
       ownerName: users.fullName,
     })
     .from(contentCalendar)

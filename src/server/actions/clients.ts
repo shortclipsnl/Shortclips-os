@@ -159,6 +159,27 @@ export async function setClientEditEconomics(
   }
 }
 
+/** Plaatst Shortclips de content voor deze klant, of post de klant zelf?
+ *  Bij "klant zelf" vervallen de inplannen/publiceren-signalen in Kwaliteit &
+ *  Aandachtspunten en toont de contentplanning dat de klant zelf plaatst. */
+export async function setClientPosting(clientId: string, weHandlePosting: boolean): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("clients:write");
+    const [existing] = await db.select({ id: clients.id }).from(clients).where(and(eq(clients.id, clientId), isNull(clients.deletedAt))).limit(1);
+    if (!existing) return { ok: false, message: "Klant niet gevonden." };
+    assertClientAccess(viewer, existing.id);
+    await db.update(clients).set({ weHandlePosting, updatedAt: new Date() }).where(eq(clients.id, existing.id));
+    await auditLog({ viewer, action: "client.set_posting", entityType: "client", entityId: existing.id, clientId: existing.id, changes: { weHandlePosting } });
+    revalidatePath("/clients");
+    revalidatePath("/calendar");
+    revalidatePath("/kwaliteit");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 /** De vaste editor die een klant doet (Monday-veld "Editor"). Handmatig gezet =
  *  vergrendeld, zodat de nachtelijke sync het niet terugzet. */
 export async function setClientEditor(clientId: string, editorName: string | null): Promise<ActionResult> {

@@ -51,7 +51,7 @@ export type EditingProject = {
  */
 export async function listEditingProjects(
   viewer: Viewer,
-  opts: { editorId?: string } = {},
+  opts: { editorId?: string; clientId?: string } = {},
 ): Promise<EditingProject[]> {
   const holidays = nlHolidaySet();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
@@ -67,6 +67,9 @@ export async function listEditingProjects(
   // Editors zien alleen hun eigen projecten; anderen kunnen op editor filteren.
   const filterEditor = viewer.isEditorOnly ? viewer.id : opts.editorId;
   if (filterEditor) conds.push(eq(productionDays.editorId, filterEditor));
+  // Optioneel beperken tot één klant (bijv. de klantpagina), zodat die exact
+  // dezelfde editing-deadlines toont als het board.
+  if (opts.clientId) conds.push(eq(productionDays.clientId, opts.clientId));
 
   const rows = await db
     .select({

@@ -11,6 +11,8 @@ import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { getClientHub, type ClientHub } from "@/server/clients";
+import { listEditingProjects, type EditingProject } from "@/server/editing-board";
+import { PostingToggle } from "./posting-toggle";
 import { ScriptHistory } from "./script-history";
 import { FilesBrowser } from "./files-browser";
 import { ClientPortalLogin } from "./portal-login";
@@ -78,6 +80,11 @@ export default async function ClientPage({
   const { tab } = await searchParams;
   const hub = await getClientHub(viewer, slug);
   const c = hub.client;
+  // Editing-deadlines exact zoals op het editing-board — dezelfde bron
+  // (production_days + 14-werkdagenbatterij), zodat wijzigingen op het board
+  // hier automatisch meelopen.
+  const editingProjects = await listEditingProjects(viewer, { clientId: c.id });
+  const canEditClient = viewer.permissions.has("clients:write");
 
   // Portaallogin-status van deze klant (alleen de eigenaar beheert dit).
   const isOwnerViewer = viewer.primaryRole === "owner";
@@ -224,10 +231,10 @@ export default async function ClientPage({
           {isOwnerViewer ? (
             <ClientPortalLogin clientId={c.id} hasLogin={Boolean(portalLogin)} loginEmail={portalLogin?.email ?? null} />
           ) : null}
-          <OverviewTab hub={hub} publishedThisMonth={publishedThisMonth} nextShoot={nextShoot} activeVideos={activeVideos.length} />
+          <OverviewTab hub={hub} publishedThisMonth={publishedThisMonth} nextShoot={nextShoot} activeVideos={activeVideos.length} canEditClient={canEditClient} />
         </div>
       ) : null}
-      {active === "videos" ? <VideosTab hub={hub} /> : null}
+      {active === "videos" ? <VideosTab hub={hub} editingProjects={editingProjects} /> : null}
       {active === "scripts" ? <ScriptsTab hub={hub} canVI={viewer.permissions.has("video_intelligence:read")} /> : null}
       {active === "opnames" ? <ShootsTab hub={hub} /> : null}
       {active === "planning" ? <PlanningTab hub={hub} /> : null}
@@ -251,11 +258,13 @@ function OverviewTab({
   publishedThisMonth,
   nextShoot,
   activeVideos,
+  canEditClient,
 }: {
   hub: ClientHub;
   publishedThisMonth: number;
   nextShoot?: ClientHub["shoots"][number];
   activeVideos: number;
+  canEditClient: boolean;
 }) {
   const c = hub.client;
   const awaitingClient = hub.videos.filter((v) =>
@@ -297,6 +306,7 @@ function OverviewTab({
           <dl className="mt-4 space-y-3 text-sm">
             <Row label="Pakket" value={hub.package?.name ?? "—"} />
             <Row label="Video's per maand" value={String(c.monthlyVideoQuota)} />
+            <Row label="Content plaatsen" value={<PostingToggle clientId={c.id} initial={c.weHandlePosting} canEdit={canEditClient} />} />
             <Row label="Klant sinds" value={c.startedOn ? formatDateFull(c.startedOn) : "—"} />
             <Row
               label="Contract tot"
@@ -392,11 +402,66 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 /* ------------------------------ Video's ---------------------------- */
 
-function VideosTab({ hub }: { hub: ClientHub }) {
-  if (hub.videos.length === 0)
-    return <Card><EmptyState title="Nog geen video's" /></Card>;
+/** Editingfase-labels (zelfde waarden als het editing-board). */
+const EDIT_PHASE_LABEL: Record<string, string> = {
+  te_plannen: "Te plannen", gepland: "Gepland", beelden_binnen: "Beelden binnen", in_edit: "In edit",
+  interne_controle: "Interne controle", bij_klant: "Bij klant",
+  feedback_verwerken: "Feedback verwerken", klaar: "Klaar", afgerond: "Afgerond",
+};
+const BATTERY_COLOR: Record<string, string> = {
+  groen: "var(--color-good)", blauw: "var(--color-brand-600)", oranje: "var(--color-warn)", rood: "var(--color-bad)",
+};
+
+/** Editing-deadlines per opname — exact dezelfde data en berekening als het
+ *  editing-board (production_days + 14-werkdagenbatterij). Wijzigt er iets op
+ *  het board, dan verandert het hier automatisch mee. */
+function EditingDeadlines({ projects }: { projects: EditingProject[] }) {
   return (
     <Card padded={false}>
+      <CardHeader title="Editing-deadlines" subtitle="Live uit het editing-board — per opname, inclusief de 14-werkdagendeadline." className="p-5 pb-2" />
+      <Table
+        head={
+          <>
+            <th className="sc-th">Opname</th>
+            <th className="sc-th">Editor</th>
+            <th className="sc-th">Fase</th>
+            <th className="sc-th">Deadline klant</th>
+            <th className="sc-th">Werkdagen te gaan</th>
+          </>
+        }
+      >
+        {projects.map((p) => {
+          const color = BATTERY_COLOR[p.batteryColor] ?? "var(--color-ink-faint)";
+          return (
+            <tr key={p.id} className="sc-row-link" style={{ boxShadow: `inset 3px 0 0 ${color}` }}>
+              <td className="sc-td">
+                <Link href={`/productions/${p.id}`} className="font-medium hover:underline">
+                  {p.title || "Opname"} <span className="text-2xs text-[var(--color-ink-faint)]">{formatDate(p.shootDate)}</span>
+                </Link>
+              </td>
+              <td className="sc-td text-[var(--color-ink-muted)]">{p.editorName ?? "—"}</td>
+              <td className="sc-td"><Badge tone={p.editStatus === "afgerond" || p.editStatus === "klaar" ? "good" : p.editStatus === "bij_klant" ? "warn" : "info"}>{EDIT_PHASE_LABEL[p.editStatus] ?? p.editStatus}</Badge></td>
+              <td className="sc-td tabular-nums text-[var(--color-ink-muted)]">{formatDate(p.clientDeadline)}</td>
+              <td className="sc-td tabular-nums font-semibold" style={{ color }}>
+                {p.editStatus === "afgerond" ? "—" : p.workdaysToClientDeadline < 0 ? `${Math.abs(p.workdaysToClientDeadline)} te laat` : p.workdaysToClientDeadline}
+              </td>
+            </tr>
+          );
+        })}
+      </Table>
+    </Card>
+  );
+}
+
+function VideosTab({ hub, editingProjects }: { hub: ClientHub; editingProjects: EditingProject[] }) {
+  if (hub.videos.length === 0 && editingProjects.length === 0)
+    return <Card><EmptyState title="Nog geen video's" /></Card>;
+  return (
+    <div className="space-y-4">
+      {editingProjects.length > 0 ? <EditingDeadlines projects={editingProjects} /> : null}
+      {hub.videos.length > 0 ? (
+    <Card padded={false}>
+      <CardHeader title="Video's" subtitle="Alle opleveringen van deze klant." className="p-5 pb-2" />
       <Table
         head={
           <>
@@ -433,6 +498,8 @@ function VideosTab({ hub }: { hub: ClientHub }) {
         ))}
       </Table>
     </Card>
+      ) : null}
+    </div>
   );
 }
 

@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, ListChecks } from "lucide-react";
+import { AlertTriangle, CalendarClock } from "lucide-react";
 import { Card, EmptyState } from "@/components/ui";
 import { daysSince, daysUntil, plural } from "@/lib/format";
 import { type Viewer } from "@/server/auth/context";
 import type { DashboardData } from "@/server/dashboard";
 import type { getMyDay } from "@/server/my-day";
 import { Dagindeling, type ScheduleItem } from "./dagindeling";
+import { TodoCard, type TodoLine } from "./today-todo";
 
 /** Het vaste dagritme van het kantoorteam — loopt live mee: geweest = groen. */
 const DAGINDELING: ScheduleItem[] = [
@@ -74,13 +75,13 @@ const META: Record<Tone, string> = {
 };
 
 export function TodayView({ data, myDay }: { viewer: Viewer; data: DashboardData; myDay: MyDay; capMap: Map<string, number> }) {
-  const blocks = officeBlocks(data, myDay);
+  const todo = todoLines(myDay);
+  const editing = editingBlock(data);
   return (
     // Links de twee werkblokken (Mijn to-do + Editing), rechts de live dagindeling.
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(280px,340px)]">
-      {blocks.map((b) => (
-        <BlockCard key={b.key} block={b} />
-      ))}
+      <TodoCard lines={todo} empty="Geen openstaande taken op jouw naam." />
+      <BlockCard block={editing} />
       <DagindelingCard />
     </div>
   );
@@ -101,18 +102,19 @@ function DagindelingCard() {
   );
 }
 
-function officeBlocks(data: DashboardData, myDay: MyDay): Block[] {
-  // 1) Mijn to-do — de eigen taken van deze medewerker (uit de takenpagina).
-  const todo: Line[] = myDay.tasks.map((t) => ({
-    key: `task-${t.id}`,
-    href: "/tasks",
+/** Mijn to-do — de eigen taken van deze medewerker (uit de takenpagina), afvinkbaar. */
+function todoLines(myDay: MyDay): TodoLine[] {
+  return myDay.tasks.slice(0, 15).map((t) => ({
+    taskId: t.id,
     what: prettyTitle(t.title),
     action: t.clientName ? `${t.clientName} → oppakken` : "Eigen taak → oppakken",
     meta: t.dueOn ? `${dayName(t.dueOn)}${t.overdue ? " · te laat" : ""}` : "",
     tone: (t.overdue ? "bad" : t.priority === "urgent" || t.priority === "high" ? "warn" : "neutral") as Tone,
   }));
+}
 
-  // 2) Editing die aandacht vraagt — te laat en wacht op klant (één regel per video).
+function editingBlock(data: DashboardData): Block {
+  // Editing die aandacht vraagt — te laat en wacht op klant (één regel per video).
   const lateIds = new Set(data.videos.late.map((v) => v.id));
   const stalled = data.videos.stalledAtClient.filter((v) => !lateIds.has(v.id));
   const editing: Line[] = [
@@ -139,10 +141,7 @@ function officeBlocks(data: DashboardData, myDay: MyDay): Block[] {
     })),
   ];
 
-  return [
-    { key: "todo", title: "Mijn to-do", subtitle: "Jouw taken van de takenpagina.", icon: <ListChecks className="size-5" />, accent: "info", lines: todo.slice(0, 15), empty: "Geen openstaande taken op jouw naam." },
-    { key: "editing", title: "Editing Deadlines", subtitle: "Over de deadline en wacht op klantfeedback — pak dit als eerste op. Live uit het Editing-dashboard.", icon: <AlertTriangle className="size-5" strokeWidth={2.25} />, accent: "bad", lines: editing.slice(0, 15), empty: "Geen editing die nu over de deadline is." },
-  ];
+  return { key: "editing", title: "Editing Deadlines", subtitle: "Over de deadline en wacht op klantfeedback — pak dit als eerste op. Live uit het Editing-dashboard.", icon: <AlertTriangle className="size-5" strokeWidth={2.25} />, accent: "bad", lines: editing.slice(0, 15), empty: "Geen editing die nu over de deadline is." };
 }
 
 function BlockCard({ block }: { block: Block }) {

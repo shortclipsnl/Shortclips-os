@@ -134,7 +134,9 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       clientName: clients.name, clientSlug: clients.slug,
     }).from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
-      .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, ["approved", "ready_to_publish"] as VideoStage[]), scopeToClients(viewer, deliverables.clientId)))
+      // Alleen voor klanten waarvoor Shortclips de content plaatst: bij klanten
+      // die zelf posten is inplannen/publiceren niet onze taak.
+      .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, ["approved", "ready_to_publish"] as VideoStage[]), eq(clients.weHandlePosting, true), scopeToClients(viewer, deliverables.clientId)))
       .limit(40),
     // #12 Video niet gepubliceerd: geplande publicatiedatum verstreken, nog niet live.
     db.select({
@@ -142,7 +144,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       deliverableId: contentCalendar.deliverableId, clientName: clients.name, clientSlug: clients.slug,
     }).from(contentCalendar)
       .innerJoin(clients, eq(clients.id, contentCalendar.clientId))
-      .where(and(isNull(contentCalendar.deletedAt), lt(contentCalendar.scheduledOn, today), ne(contentCalendar.status, "published"), scopeToClients(viewer, contentCalendar.clientId)))
+      .where(and(isNull(contentCalendar.deletedAt), lt(contentCalendar.scheduledOn, today), ne(contentCalendar.status, "published"), eq(clients.weHandlePosting, true), scopeToClients(viewer, contentCalendar.clientId)))
       .limit(40),
     // Owner-only bronnen.
     owner ? countOpenLinkSuggestions() : Promise.resolve(0),

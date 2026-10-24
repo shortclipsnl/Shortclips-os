@@ -8,7 +8,7 @@ import { listCalendar } from "@/server/calendar";
 import { activeClientsMissingCoordinator } from "@/server/clients";
 import { editorCapacityMap } from "@/server/metrics";
 import { periodLabel } from "@/lib/format";
-import { LinkButton } from "@/components/ui";
+import { LinkButton, TeamAvatar } from "@/components/ui";
 import { getGoalsOverview } from "@/server/goals/overview";
 import { EditorDashboard } from "./editor-view";
 import { DoelenStrook } from "./doelen-strook";
@@ -72,13 +72,18 @@ export default async function DashboardPage() {
     <div className="mx-auto max-w-[1400px] space-y-6">
       {/* Kop */}
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">
-            {greeting}, {firstName}
-          </h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            {periodLabel(data.period)} · {data.clients.active} actieve klanten · {data.videos.open} video&apos;s in productie
-          </p>
+        <div className="flex items-center gap-3">
+          {/* Eigen profielfoto links van de begroeting — zo is direct duidelijk
+              dat je op je eigen pagina zit. */}
+          <TeamAvatar name={viewer.fullName} avatarUrl={viewer.avatarUrl} size={48} />
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">
+              {greeting}, {firstName}
+            </h1>
+            <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+              {periodLabel(data.period)} · {data.clients.active} actieve klanten · {data.videos.open} video&apos;s in productie
+            </p>
+          </div>
         </div>
         <div className="flex gap-2">
           <LinkButton href="/videos" variant="secondary" size="sm">

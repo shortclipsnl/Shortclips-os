@@ -17,12 +17,12 @@ export const dynamic = "force-dynamic";
 
 const WEEKDAYS = ["ma", "di", "wo", "do", "vr", "za", "zo"];
 
-// Klanten waarvoor we niet op social posten — die horen niet in de
-// contentplanning. Vergelijking op genormaliseerde naam (hoofdletters/spaties
-// maken niet uit).
-const NO_POST = new Set(["365werk", "autofotostudio", "bedrijfskledingonline", "bmtek"]);
+// Of Shortclips voor een klant post, is nu een instelbare vlag per klant
+// (clients.weHandlePosting), niet langer een hardcoded lijst. Klanten die zelf
+// posten horen niet in de contentplanning en krijgen geen inplannen/publiceren-
+// signalen bij Kwaliteit & Aandachtspunten.
+const postsContent = (x?: { weHandlePosting?: boolean } | null) => !x || x.weHandlePosting !== false;
 const normName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-const postsContent = (name?: string | null) => !name || !NO_POST.has(normName(name));
 
 export default async function CalendarPage({
   searchParams,
@@ -78,9 +78,14 @@ export default async function CalendarPage({
     }),
   ]);
   // Klanten waar we niet voor posten eruit filteren.
-  const items = rawItems.filter((i) => postsContent(i.clientName));
-  const clientList = rawClientList.filter((c) => postsContent(c.name));
-  const weekItems = rawWeekItems.filter((i) => postsContent(i.clientName));
+  const items = rawItems.filter((i) => postsContent(i));
+  const clientList = rawClientList.filter((c) => postsContent(c));
+  // Klanten die zelf posten — ter verduidelijking op de planning (ze staan er
+  // bewust niet in; instelbaar per klant op de klantpagina).
+  const selfPostingClients = rawClientList
+    .filter((c) => c.weHandlePosting === false && c.status === "active")
+    .map((c) => c.name);
+  const weekItems = rawWeekItems.filter((i) => postsContent(i));
   const weekByDay = new Map<string, CalendarItem[]>();
   for (const item of weekItems) {
     const list = weekByDay.get(item.scheduledOn) ?? [];
@@ -105,7 +110,7 @@ export default async function CalendarPage({
         clientSlug: params.klant,
       })
     : []
-  ).filter((i) => postsContent(i.clientName));
+  ).filter((i) => postsContent(i));
 
   const byDay = new Map<string, CalendarItem[]>();
   for (const item of items) {
@@ -206,6 +211,15 @@ export default async function CalendarPage({
           </div>
         }
       />
+
+      {/* Klanten die zelf posten: staan bewust niet in de planning. Instelbaar
+          per klant op de klantpagina (Content plaatsen). */}
+      {selfPostingClients.length > 0 ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-3 py-2 text-xs text-[var(--color-ink-muted)]">
+          <span className="rounded-full bg-[var(--color-warn-soft)] px-2 py-0.5 font-semibold text-[#8a5300]">Klant plaatst zelf</span>
+          <span>Niet in de planning (wij posten hier niet): {selfPostingClients.join(", ")}.</span>
+        </div>
+      ) : null}
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">

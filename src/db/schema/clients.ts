@@ -56,6 +56,10 @@ export const clients = pgTable(
     }),
     /** Afspraken uit het contract, gedenormaliseerd voor snelle dashboards. */
     monthlyVideoQuota: integer("monthly_video_quota").notNull().default(0),
+    /** Plaatst Shortclips de content voor deze klant (true), of post de klant
+     *  dat zelf (false)? Bij false geen inplannen/publiceren-signalen in
+     *  Kwaliteit & Aandachtspunten, en zichtbaar in de contentplanning. */
+    weHandlePosting: boolean("we_handle_posting").notNull().default(true),
     monthlyRevenue: numeric("monthly_revenue", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),

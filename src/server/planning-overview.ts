@@ -27,6 +27,18 @@ function mondayOf(d: Date): Date {
   x.setHours(0, 0, 0, 0);
   return x;
 }
+/**
+ * De week waarmee het overzicht begint: op een werkdag deze week, in het
+ * weekend (za/zo) de kómende werkweek — zodat je niet naar een afgelopen week
+ * kijkt maar direct de nieuwe week bovenaan ziet. De afgelopen week valt zo
+ * vanzelf weg zodra die voorbij is.
+ */
+function firstWeekStart(now: Date): Date {
+  const m = mondayOf(now);
+  const dow = (now.getDay() + 6) % 7; // 0 = maandag … 6 = zondag
+  if (dow >= 5) m.setDate(m.getDate() + 7);
+  return m;
+}
 const iso = (d: Date) => d.toLocaleDateString("en-CA");
 
 /** ISO 8601-weeknummer (maandag als eerste dag, week 1 bevat de eerste donderdag). */
@@ -42,7 +54,8 @@ function isoWeekNumber(d: Date): number {
 const CONFLICT_THRESHOLD = 4; // opleveringen door dezelfde editor in één week
 
 export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<PlanWeek[]> {
-  const start = mondayOf(new Date());
+  const todayIso = iso(new Date());
+  const start = firstWeekStart(new Date());
   const end = new Date(start);
   end.setDate(end.getDate() + weeks * 7);
   const startIso = iso(start);
@@ -102,7 +115,8 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
     const weekMeetings = meetings.filter((m) => inWeek(m.date));
 
     const label = wStart.toLocaleDateString("nl-NL", { day: "numeric", month: "short" }) + " – " + wEnd.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
-    result.push({ key: s, label: w === 0 ? `Deze week · ${label}` : label, weekNumber: isoWeekNumber(wStart), startOn: s, endOn: e, opnames, opleveringen, publicaties, meetings: weekMeetings, conflicts, leave });
+    const leadLabel = w === 0 ? (s <= todayIso && todayIso <= e ? `Deze week · ${label}` : `Komende week · ${label}`) : label;
+    result.push({ key: s, label: leadLabel, weekNumber: isoWeekNumber(wStart), startOn: s, endOn: e, opnames, opleveringen, publicaties, meetings: weekMeetings, conflicts, leave });
   }
   return result;
 }
