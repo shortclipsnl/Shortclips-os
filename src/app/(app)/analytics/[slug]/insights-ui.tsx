@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ListPlus, Loader2, Sparkles } from "lucide-react";
+import { Film, Quote, LayoutGrid, TrendingUp, ThumbsDown } from "lucide-react";
 import { generateInsights, recommendationToTask } from "@/server/actions/insights";
-import type { ClientInsights, Finding, Recommendation } from "@/server/insights";
+import type { ClientInsights, Finding, Recommendation, TopVideo, HookInzicht, FormatInzicht, MindereVideo } from "@/server/insights";
 
 const ZEKER: Record<string, { label: string; cls: string }> = {
   bewezen: { label: "Bewezen", cls: "bg-[var(--color-good-soft)] text-[#14633a]" },
@@ -67,22 +68,39 @@ export function InsightsPanel({
         ) : !insights ? (
           <p className="text-sm text-[var(--color-ink-muted)]">Nog geen analyse. Klik op “Analyse genereren”.</p>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-6">
+            {/* 1-2. Top 3 video's + waarom ze werkten */}
+            <TopVideosSection items={insights.topVideos ?? []} />
+
+            {/* 3-4. Beste hooks + beste formats */}
+            {(insights.besteHooks?.length || insights.besteFormats?.length) ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <HookList items={insights.besteHooks ?? []} />
+                <FormatList items={insights.besteFormats ?? []} />
+              </div>
+            ) : null}
+
+            {/* 5. Wat werkt / wat minder werkt */}
             <div className="grid gap-4 md:grid-cols-2">
               <FindingList title="Wat werkt" tone="good" items={insights.analysis?.watWerkt ?? []} />
               <FindingList title="Wat minder werkt" tone="bad" items={insights.analysis?.watMinder ?? []} />
             </div>
-            {insights.analysis?.ontwikkelingen?.length ? (
-              <div>
-                <h3 className="mb-1.5 text-sm font-semibold text-[var(--color-ink)]">Ontwikkelingen</h3>
-                <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--color-ink-muted)]">
-                  {insights.analysis.ontwikkelingen.map((o, i) => <li key={i}>{o}</li>)}
-                </ul>
-              </div>
+
+            {/* Mindere video's + lessen */}
+            <MindereVideosSection items={insights.mindereVideos ?? []} />
+
+            {/* 7. Maandvergelijking */}
+            {insights.maandvergelijking?.length ? (
+              <SimpleList title="Maandvergelijking" icon={<TrendingUp className="size-4" />} items={insights.maandvergelijking} />
             ) : null}
 
+            {insights.analysis?.ontwikkelingen?.length ? (
+              <SimpleList title="Ontwikkelingen" items={insights.analysis.ontwikkelingen} />
+            ) : null}
+
+            {/* 6. Advies voor de volgende opnames */}
             <div>
-              <h3 className="mb-2 text-sm font-semibold text-[var(--color-ink)]">Verbeterpunten voor de volgende opnames</h3>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--color-ink)]">Advies voor de volgende opnames</h3>
               <div className="space-y-2.5">
                 {(insights.verbeterpunten ?? []).map((r, i) => <RecCard key={i} slug={slug} rec={r} />)}
               </div>
@@ -140,6 +158,101 @@ function RecCard({ slug, rec }: { slug: string; rec: Recommendation }) {
           {done ? <><CheckCircle2 className="size-3.5" /> Taak gemaakt</> : pending ? <Loader2 className="size-3.5 animate-spin" /> : <><ListPlus className="size-3.5" /> Naar taken</>}
         </button>
       </div>
+    </div>
+  );
+}
+
+function SimpleList({ title, items, icon }: { title: string; items: string[]; icon?: ReactNode }) {
+  if (!items?.length) return null;
+  return (
+    <div>
+      <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-[var(--color-ink)]">{icon}{title}</h3>
+      <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--color-ink-muted)]">
+        {items.map((o, i) => <li key={i}>{o}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+function TopVideosSection({ items }: { items: TopVideo[] }) {
+  if (!items?.length) return null;
+  return (
+    <div>
+      <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-[var(--color-ink)]"><Film className="size-4" /> Top video&apos;s — wat werkte en waarom</h3>
+      <div className="space-y-2">
+        {items.slice(0, 3).map((v, i) => (
+          <div key={i} className="flex gap-3 rounded-[var(--radius-sm)] border border-[var(--color-line)] p-3">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-brand-500)] text-2xs font-bold text-white">{i + 1}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-[var(--color-ink)]">{v.titel}</span>
+                <Zeker z={v.zekerheid} />
+              </div>
+              {v.cijfers ? <p className="mt-0.5 text-2xs font-semibold text-[var(--color-brand-700)]">{v.cijfers}</p> : null}
+              <p className="mt-1 text-sm text-[var(--color-ink-muted)]">{v.waarom}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HookList({ items }: { items: HookInzicht[] }) {
+  return (
+    <div>
+      <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-[var(--color-ink)]"><Quote className="size-4" /> Beste hooks</h3>
+      {items?.length ? (
+        <ul className="space-y-2">
+          {items.map((h, i) => (
+            <li key={i} className="text-sm">
+              <div className="flex items-start gap-2">
+                <span className="min-w-0 flex-1 font-medium text-[var(--color-ink)]">&ldquo;{h.hook}&rdquo;</span>
+                <Zeker z={h.zekerheid} />
+              </div>
+              {h.waarom ? <p className="text-xs text-[var(--color-ink-muted)]">{h.waarom}</p> : null}
+            </li>
+          ))}
+        </ul>
+      ) : <p className="text-sm text-[var(--color-ink-faint)]">—</p>}
+    </div>
+  );
+}
+
+function FormatList({ items }: { items: FormatInzicht[] }) {
+  return (
+    <div>
+      <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-[var(--color-ink)]"><LayoutGrid className="size-4" /> Beste formats</h3>
+      {items?.length ? (
+        <ul className="space-y-2">
+          {items.map((f, i) => (
+            <li key={i} className="text-sm">
+              <div className="flex items-start gap-2">
+                <span className="min-w-0 flex-1 font-medium text-[var(--color-ink)]">{f.format}</span>
+                <Zeker z={f.zekerheid} />
+              </div>
+              {f.waarom ? <p className="text-xs text-[var(--color-ink-muted)]">{f.waarom}</p> : null}
+            </li>
+          ))}
+        </ul>
+      ) : <p className="text-sm text-[var(--color-ink-faint)]">—</p>}
+    </div>
+  );
+}
+
+function MindereVideosSection({ items }: { items: MindereVideo[] }) {
+  if (!items?.length) return null;
+  return (
+    <div>
+      <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-[var(--color-ink)]"><ThumbsDown className="size-4" /> Minder presterende video&apos;s — wat we eruit leren</h3>
+      <ul className="space-y-1.5">
+        {items.map((m, i) => (
+          <li key={i} className="text-sm">
+            <span className="font-medium text-[var(--color-ink)]">{m.titel}.</span>{" "}
+            <span className="text-[var(--color-ink-muted)]">{m.les}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
