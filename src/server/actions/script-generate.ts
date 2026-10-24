@@ -115,7 +115,7 @@ function parseScriptsJson(raw: string): ScriptsPayload | null {
  * eerder gebruikte onderwerpen (tegen herhaling) en de algemene Shortclips-richtlijnen.
  * Dezelfde bron als de scriptcontrole, zodat genereren en controleren gelijk denken.
  */
-async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission>>, clientId: string, contentType: ContentType = "organisch"): Promise<{ name: string; slug: string; extra: string; wpm: number | null } | null> {
+async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission>>, clientId: string, contentType: ContentType = "organisch"): Promise<{ name: string; slug: string; extra: string; wpm: number | null; location: string | null } | null> {
   const [c] = await db
     .select({ id: clients.id, name: clients.name, slug: clients.slug })
     .from(clients)
@@ -124,7 +124,8 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
   if (!c) return null;
   assertClientAccess(viewer, c.id);
   const isAd = contentType === "advertentie";
-  const [profile, learned, feedback, patterns, central, intel, recent, learnedFb] = await Promise.all([
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [profile, learned, feedback, patterns, central, intel, recent, learnedFb, nextShoot] = await Promise.all([
     getClientAiProfile(c.id),
     clientLearnedText(c.id),
     gatherFeedbackContext(c.id),
@@ -139,7 +140,20 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
       .then((rows) => rows.filter((r) => (/advertentie/i.test(r.format ?? "") ? isAd : !isAd)).slice(0, 15))
       .catch(() => [] as Array<{ title: string; format: string | null }>),
     learnedFeedbackText(c.id, contentType).catch(() => ""),
+    // Eerstvolgende geplande opname: de locatie waar deze scripts opgenomen
+    // worden — zodat elk concept dáár uitvoerbaar is (uitvoerbaarheidscheck).
+    db.select({ locationName: productionDays.locationName, locationAddress: productionDays.locationAddress, scheduledOn: productionDays.scheduledOn })
+      .from(productionDays)
+      .where(and(eq(productionDays.clientId, c.id), isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled"), gte(productionDays.scheduledOn, todayStr)))
+      .orderBy(asc(productionDays.scheduledOn)).limit(1)
+      .then((rows) => rows[0] ?? null)
+      .catch(() => null),
   ]);
+
+  // Opnamelocatie als tekst (naam + adres), voor de context én de kwaliteitscheck.
+  const location = nextShoot && (nextShoot.locationName || nextShoot.locationAddress)
+    ? [nextShoot.locationName, nextShoot.locationAddress].filter(Boolean).join(" — ")
+    : null;
 
   const viLines = intel
     ? [
@@ -159,10 +173,11 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
     viLines,
     recent.length ? `Eerder geschreven ${isAd ? "advertentiescripts" : "onderwerpen"} voor deze klant (voorkom herhaling, tenzij je een sterk format bewust opnieuw gebruikt):\n- ${recent.map((r) => r.title).join("\n- ")}` : "",
     isAd ? "LET OP: dit zijn advertentiescripts. Schrijf vanuit het advertentiedoel en de funnelfase, niet vanuit organisch bereik. Gebruik alleen daadwerkelijk beschikbare commerciële gegevens; verzin geen cijfers, prijzen of claims." : "",
+    location ? `Geplande opnamelocatie: ${location}. Zorg dat elk concept op DEZE locatie opneembaar is — vraag geen beelden, scènes of props die daar niet kunnen. Kan iets alleen elders, kies dan een ander concept of maak het haalbaar op locatie.` : "",
     learnedFb || "",
     central ? `Algemene Shortclips-richtlijnen:\n${central}` : "",
   ].filter(Boolean).join("\n\n");
-  return { name: c.name, slug: c.slug, extra, wpm: intel?.speech?.avgWpm && intel.speech.avgWpm > 60 ? intel.speech.avgWpm : null };
+  return { name: c.name, slug: c.slug, extra, wpm: intel?.speech?.avgWpm && intel.speech.avgWpm > 60 ? intel.speech.avgWpm : null, location };
 }
 
 /**
@@ -217,16 +232,26 @@ export async function generateScripts(input: {
     }
 
     const brief = (input.brief ?? "").trim().slice(0, 4000);
-    const priorText = (input.priorText ?? "").trim().slice(0, 24000);
+    let priorText = (input.priorText ?? "").trim().slice(0, 24000);
     const withPoll = input.withPoll !== false; // standaard mét poll (alleen organisch)
 
-    // Eerdere scripts uit Drive (server-side, dus geen upload-limiet).
+    // Eerdere scripts uit Drive (server-side, dus geen upload-limiet): PDF's als
+    // document, Word/.docx én Google Docs als tekst — zo leest de schrijver alle
+    // bestaande scripts uit de "Short Video Scripts"-map, ongeacht het formaat.
     let documents: Array<{ base64: string; mediaType: "application/pdf" }> = [];
     if (input.useDriveScripts && input.clientId) {
       try {
         const drivePdfs = await getClientDriveScriptPdfs(input.clientId, MAX_PDFS);
         documents = drivePdfs.map((p) => ({ base64: p.base64, mediaType: "application/pdf" as const }));
-      } catch { /* zonder Drive-scripts verdergaan */ }
+      } catch { /* zonder Drive-PDF's verdergaan */ }
+      try {
+        const { getClientDriveScriptTexts } = await import("@/server/scripts/drive-scripts");
+        const driveTexts = await getClientDriveScriptTexts(input.clientId, 4);
+        if (driveTexts.length) {
+          const block = driveTexts.map((d) => `--- ${d.name} (uit Drive) ---\n${d.text}`).join("\n\n");
+          priorText = `${priorText ? priorText + "\n\n" : ""}${block}`.slice(0, 32000);
+        }
+      } catch { /* zonder Drive-teksten verdergaan */ }
     }
 
     // De funnelverdeling als compacte, genummerde opdrachtregel voor het model.
@@ -623,9 +648,10 @@ export async function checkScriptQuality(input: {
     let extra = "";
     let klantnaam = (input.clientName ?? "").trim();
     let wpm = DEFAULT_WPM;
+    let location: string | null = null;
     if (input.clientId) {
       const ctx = await clientContext(viewer, input.clientId, contentType);
-      if (ctx) { extra = ctx.extra; klantnaam = ctx.name; if (ctx.wpm) wpm = ctx.wpm; }
+      if (ctx) { extra = ctx.extra; klantnaam = ctx.name; if (ctx.wpm) wpm = ctx.wpm; location = ctx.location; }
     }
     const speaking = estimateSpeakingTime({ hook, body, cta }, wpm);
 
@@ -644,13 +670,14 @@ export async function checkScriptQuality(input: {
         ]
       : [
           "Hook en aandacht in de eerste seconden",
-          "Originaliteit van het concept",
+          "Originaliteit van het concept (geen herhaling van eerdere content)",
           "Toegevoegde waarde voor de kijker",
+          "Viral potentie en deelbaarheid",
+          "Tone of voice en stijl komen overeen met eerdere scripts van deze klant",
           "Geschiktheid voor de doelgroep",
           "Natuurlijk en compact taalgebruik",
           "Commerciële balans (focus op kijker, niet verkoperig)",
-          "Visuele mogelijkheden en opnamehaalbaarheid",
-          "Overeenkomsten met eerder gemaakte content (herhaling)",
+          location ? `Opnamehaalbaarheid op de geplande locatie (${location})` : "Visuele mogelijkheden en opnamehaalbaarheid",
           "Feitelijke juistheid",
           "Aansluiting bij de doelstelling van de video",
         ];
@@ -686,9 +713,10 @@ export async function checkScriptQuality(input: {
           `Middenstuk: ${body || "(leeg)"}`,
           `CTA: ${cta || "(leeg)"}`,
           "",
+          location ? `Geplande opnamelocatie: ${location}. Beoordeel of dit concept dáár daadwerkelijk opgenomen kan worden.` : "",
           extra ? `CONTEXT (klantstijl, feedback, wat werkt, eerdere onderwerpen)\n${extra}` : "",
           "",
-          `Beoordeel op deze 10 punten en geef per punt een score 1–10 en een korte onderbouwing:\n- ${dims.join("\n- ")}`,
+          `Beoordeel op deze punten en geef per punt een score 1–10 en een korte onderbouwing:\n- ${dims.join("\n- ")}`,
           "",
           "Houd elke onderbouwing kort (maximaal 15 woorden) en elke lijst beknopt (max 3 items). Geen regeleindes binnen een waarde.",
           "Geef UITSLUITEND geldige JSON terug in exact dit formaat:",

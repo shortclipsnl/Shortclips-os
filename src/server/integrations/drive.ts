@@ -265,6 +265,18 @@ export class DriveService {
     return new Uint8Array(await res.arrayBuffer());
   }
 
+  /** Exporteert een Google-document (Docs) als platte tekst. Alleen voor
+   *  Google-native bestanden; gewone bestanden gaan via downloadBytes. */
+  async exportText(fileId: string): Promise<string> {
+    const token = await this.token();
+    const url = `${API}/files/${encodeURIComponent(fileId)}/export?mimeType=text/plain&supportsAllDrives=true`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    if (!res.ok) {
+      throw new IntegrationError("google_drive", `Document exporteren mislukt (HTTP ${res.status})`, res.status, res.status >= 500);
+    }
+    return res.text();
+  }
+
   /** Upload een bestand (bytes) naar een map. Multipart upload in één request. */
   async uploadBytes(name: string, mimeType: string, bytes: Uint8Array, parentId: string): Promise<{ id: string }> {
     const token = await this.token();

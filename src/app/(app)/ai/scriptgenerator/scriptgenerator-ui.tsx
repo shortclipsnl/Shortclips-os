@@ -183,6 +183,9 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
   // Kwaliteitscontrole per script
   const [qualityById, setQualityById] = useState<Record<string, QualityResult>>({});
   const [qualityBusyId, setQualityBusyId] = useState<string | null>(null);
+  // Automatische kwaliteitscontrole: draait direct na het genereren voor elk
+  // script, zodat je meteen ziet wat goedgekeurd is (≥8) en wat aandacht vraagt.
+  const [autoCheckBusy, setAutoCheckBusy] = useState(false);
   const [qualityOpenId, setQualityOpenId] = useState<string | null>(null);
 
   const [err, setErr] = useState<string | null>(null);
@@ -279,7 +282,8 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
         funnels: isAd ? funnelsOrdered() : undefined,
       });
       if (res.ok) {
-        setScripts(res.scripts.map((s: GeneratedScript) => ({ id: uid(), onderwerp: s.onderwerp, tekst: s.tekst, versions: [], contentType: s.contentType ?? contentType, funnel: s.funnel })));
+        const newItems = res.scripts.map((s: GeneratedScript) => ({ id: uid(), onderwerp: s.onderwerp, tekst: s.tekst, versions: [] as Version[], contentType: s.contentType ?? contentType, funnel: s.funnel }));
+        setScripts(newItems);
         setKlantnaam(res.klantnaam || effectiveClientName || "");
         const gcid = showOther ? "" : clientId;
         setGenClientId(gcid);
@@ -292,10 +296,38 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
             if (days.length > 0) { setShootDayId(days[0]!.id); setOpnamedag(isoToNl(days[0]!.scheduledOn)); }
           }).catch(() => {});
         }
+        // Automatische kwaliteitscontrole per script (hook, originaliteit,
+        // kijkerswaarde, viral potentie, tone of voice, uitvoerbaarheid, …).
+        void autoCheckAll(newItems, gcid, showOther ? otherName.trim() : selectedName);
       } else {
         setErr(res.message);
       }
     });
+  };
+
+  /** Draait de kwaliteitscontrole automatisch voor alle zojuist gegenereerde scripts. */
+  const autoCheckAll = async (
+    items: Array<{ id: string; onderwerp: string; tekst: string; contentType: ContentType; funnel?: Funnel }>,
+    gcid: string,
+    naam: string,
+  ) => {
+    setQualityById({});
+    setAutoCheckBusy(true);
+    try {
+      await Promise.all(items.map(async (it) => {
+        const res = await checkScriptQuality({
+          onderwerp: it.onderwerp,
+          tekst: it.tekst,
+          clientId: gcid || undefined,
+          clientName: gcid ? undefined : (naam || undefined),
+          contentType: it.contentType,
+          funnel: it.funnel,
+        });
+        if (res.ok) setQualityById((m) => ({ ...m, [it.id]: res.data }));
+      }));
+    } finally {
+      setAutoCheckBusy(false);
+    }
   };
 
   const fetchTopics = () => {
@@ -581,6 +613,31 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
             of de AI laten verbeteren met de knoppen. Met <strong>Benodigdheden</strong> zet je er de opnamelijst per video bij.
           </p>
         </div>
+
+        {/* Automatische kwaliteitscontrole: loopt direct na het genereren per
+            script (hook, originaliteit, kijkerswaarde, viral potentie, tone of
+            voice, uitvoerbaarheid op locatie, …). */}
+        {(() => {
+          const checked = scripts.filter((s) => qualityById[s.id]).length;
+          const approved = scripts.filter((s) => (qualityById[s.id]?.scoreTotaal ?? 0) >= 8).length;
+          if (autoCheckBusy) {
+            return (
+              <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-4 py-2 text-xs text-[var(--color-ink-muted)]">
+                <Loader2 className="size-3.5 animate-spin" /> Automatische kwaliteitscontrole loopt… {checked}/{scripts.length} gecontroleerd.
+              </div>
+            );
+          }
+          if (checked > 0) {
+            const alla = approved === scripts.length;
+            return (
+              <div className="flex items-center gap-2 rounded-[var(--radius-md)] border px-4 py-2 text-xs" style={{ borderColor: alla ? "color-mix(in srgb, var(--color-good) 35%, var(--color-line))" : "color-mix(in srgb, var(--color-warn) 35%, var(--color-line))", background: alla ? "var(--color-good-soft)" : "var(--color-warn-soft)" }}>
+                <ShieldCheck className={`size-3.5 ${alla ? "text-[var(--color-good)]" : "text-[var(--color-warn)]"}`} />
+                <span>Automatisch gecontroleerd: <strong>{approved}/{scripts.length}</strong> script{scripts.length === 1 ? "" : "s"} goedgekeurd (8/10 of hoger). {approved < scripts.length ? "Bekijk de score per script voor wat nog beter kan." : "Klaar om op te slaan."}</span>
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {/* Scripts — iteratief bewerkbaar */}
         {scripts.map((s, i) => {

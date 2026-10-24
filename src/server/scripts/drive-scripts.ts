@@ -114,6 +114,47 @@ export async function getClientDriveScriptPdfs(clientId: string, limit = 6): Pro
   return out;
 }
 
+/**
+ * Haalt de scripttekst uit NIET-PDF scriptbestanden (Word/.docx en Google Docs)
+ * uit de Drive-scriptsmap van de klant — PDF's worden elders als document
+ * meegestuurd. Zo leest de scriptgenerator ook scripts die niet als PDF zijn
+ * opgeslagen (de meeste klanten gebruiken Word of Google Docs), als stijl- en
+ * inhoudsreferentie. Geen Drive gekoppeld → leeg.
+ */
+export async function getClientDriveScriptTexts(clientId: string, limit = 4): Promise<Array<{ name: string; text: string }>> {
+  if (!drive.isConfigured) return [];
+  const rows = await db
+    .select({ externalId: files.externalId, name: files.name, mimeType: files.mimeType })
+    .from(files)
+    .where(scriptFileWhere(clientId))
+    .orderBy(desc(files.modifiedAt))
+    .limit(limit * 4);
+
+  const out: Array<{ name: string; text: string }> = [];
+  for (const r of rows) {
+    if (out.length >= limit) break;
+    if (!r.externalId) continue;
+    const mime = r.mimeType ?? "";
+    const n = r.name.toLowerCase();
+    const isGoogleDoc = mime.includes("application/vnd.google-apps.document");
+    const isDocx = mime.includes("wordprocessingml") || n.endsWith(".docx");
+    if (!isGoogleDoc && !isDocx) continue; // PDF e.d. worden als document meegestuurd
+    try {
+      let text = "";
+      if (isGoogleDoc) {
+        text = await drive.exportText(r.externalId);
+      } else {
+        const bytes = await drive.downloadBytes(r.externalId);
+        if (bytes.byteLength > 10 * 1024 * 1024) continue;
+        const { extractDocxText } = await import("@/server/ai/docx");
+        text = await extractDocxText(Buffer.from(bytes).toString("base64"));
+      }
+      if (text && text.trim().length > 40) out.push({ name: r.name, text: text.trim().slice(0, 8000) });
+    } catch { /* bestand overslaan als ophalen/omzetten faalt */ }
+  }
+  return out;
+}
+
 /** Aantal script-PDF's in Drive voor deze klant — voor de live melding in de UI. */
 export async function getClientDriveScriptInfo(clientId: string): Promise<{ count: number }> {
   const rows = await db
@@ -121,7 +162,14 @@ export async function getClientDriveScriptInfo(clientId: string): Promise<{ coun
     .from(files)
     .where(scriptFileWhere(clientId))
     .limit(200);
-  const count = rows.filter((r) => r.mimeType?.includes("pdf") || r.name.toLowerCase().endsWith(".pdf")).length;
+  // Tel alle echte scriptdocumenten: PDF, Word (.docx) én Google Docs — die
+  // worden nu allemaal als referentie gebruikt bij het genereren.
+  const count = rows.filter((r) => {
+    const m = r.mimeType ?? ""; const n = r.name.toLowerCase();
+    return m.includes("pdf") || n.endsWith(".pdf")
+      || m.includes("wordprocessingml") || n.endsWith(".docx")
+      || m.includes("application/vnd.google-apps.document");
+  }).length;
   return { count };
 }
 
