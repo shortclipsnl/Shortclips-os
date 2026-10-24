@@ -13,6 +13,7 @@ import { runDriveSync } from "./drive-sync";
 import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
 import { runProfitabilitySignals } from "./profitability-signals";
+import { runContentHealthSignals } from "./content-health-signals";
 import {
   pullFrameComments,
   pullFrameDeliverables,
@@ -99,6 +100,9 @@ export async function runNightlySync() {
   results.push(await step("development.monthly_analysis", () => generateMonthlyDevelopment()));
   results.push(await step("signals.clients_without_shoot", () => runClientsWithoutShootSignal()));
   results.push(await step("signals.content_gap", () => runContentGapSignal()));
+  // Contentgezondheidscheck per klant: urgente aandachtspunten → taken voor de
+  // coördinator + overbelasting-melding voor de eigenaar (na alle signalen hierboven).
+  results.push(await step("content_health.signals", () => runContentHealthSignals()));
   results.push(await step("reminders.script_todo", () => runScriptTodoReminders()));
   results.push(await step("reminders.post_shoot_todo", () => runPostShootTodoReminders()));
   // Als laatste: een volledige database-backup naar Google Drive.
