@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ClipboardList } from "lucide-react";
 import { requireInternal, isOwner } from "@/server/auth/context";
 import { assignMissingEditors } from "@/server/jobs/calendar-sync";
 import { isCoreStaff } from "@/server/core-staff";
@@ -102,6 +102,17 @@ export default async function VideosPage({
       <PageHeader
         title="Editing"
         description={`${editingProjects.length} projecten · ${rows.length} video's in productie`}
+        actions={
+          viewer.permissions.has("ai:read") ? (
+            <Link
+              href="/ai/briefing"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+              title="Maak een editingbriefing voor de editors"
+            >
+              <ClipboardList className="size-4" /> Editing briefing maken
+            </Link>
+          ) : undefined
+        }
       />
 
       {showAllBoard ? (

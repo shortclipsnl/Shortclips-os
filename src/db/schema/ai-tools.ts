@@ -66,6 +66,9 @@ export const aiOutputs = pgTable(
     inputSummary: text("input_summary"),
     /** Het gegenereerde resultaat, toolspecifiek. */
     output: jsonb("output").notNull().default(sql`'{}'::jsonb`),
+    /** Optioneel gekoppelde opnamedag — zo weet je welke captions/briefing bij
+     *  welke opname horen (een opname levert ~6–8 shorts). */
+    productionDayId: uuid("production_day_id"),
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
     ...softDelete,

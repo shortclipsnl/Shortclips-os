@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { CalendarPlus, Check, FileText, Loader2, RefreshCw, Sparkles, Tag, X } from "lucide-react";
-import { addCaptionToPlanning, generateCaptions, regenerateOneCaption, type ShortCaption } from "@/server/actions/ai-tools";
+import { CalendarPlus, Check, FileText, Film, Languages, Loader2, RefreshCw, Sparkles, Tag, X } from "lucide-react";
+import { addCaptionToPlanning, generateCaptions, regenerateOneCaption, getShootVideoSummary, type ShortCaption } from "@/server/actions/ai-tools";
+import { listShootDaysForClient } from "@/server/actions/script-generate";
 import { getCaptionFooter, setCaptionFooter } from "@/server/actions/caption-footer";
 import { Button, Card, ErrorNote } from "@/components/ui";
 import { CopyButton, HistoryPanel, NoProviderNote, SaveInsight, ToolHowTo, fileToBase64, type HistoryEntry } from "../_shared";
@@ -18,6 +19,12 @@ type ClientOption = { id: string; name: string };
 
 const isDoc = (n: string) => /\.(pdf|docx)$/i.test(n);
 const PLATFORMS = "Instagram · TikTok · Facebook · YouTube Shorts";
+
+/** ISO-datum → korte NL-datum (bijv. "9 nov 2026"). */
+function fmtNl(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return isNaN(d.getTime()) ? iso : d.toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" });
+}
 
 export function CaptionMaker({
   clients,
@@ -37,6 +44,14 @@ export function CaptionMaker({
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Taal van de captions: Nederlands (standaard) of Engels — direct schakelbaar.
+  const [language, setLanguage] = useState<"nl" | "en">("nl");
+  // Opname koppelen: zo weet je welke captions bij welke opname horen en hoeveel
+  // video's van die opname uiteindelijk gebruikt/ingezet zijn.
+  const [shootDays, setShootDays] = useState<Array<{ id: string; scheduledOn: string; title: string }>>([]);
+  const [shootDayId, setShootDayId] = useState("");
+  const [shootSummary, setShootSummary] = useState<{ videosTotal: number; videosPublished: number } | null>(null);
 
   // Standaard footer van de gekozen klant (contact + hashtags) — komt
   // automatisch onder elke caption. Laadt bij het kiezen van een klant.
@@ -59,6 +74,24 @@ export function CaptionMaker({
       active = false;
     };
   }, [clientId]);
+
+  // Opnames van de klant laden om aan te kunnen koppelen (opnamedag = sessie).
+  useEffect(() => {
+    setShootDayId("");
+    setShootSummary(null);
+    if (!clientId) { setShootDays([]); return; }
+    let active = true;
+    void listShootDaysForClient(clientId).then((days) => { if (active) setShootDays(days); }).catch(() => { if (active) setShootDays([]); });
+    return () => { active = false; };
+  }, [clientId]);
+
+  // Samenvatting van de gekozen opname: hoeveel video's gekoppeld/ingezet.
+  useEffect(() => {
+    if (!shootDayId) { setShootSummary(null); return; }
+    let active = true;
+    void getShootVideoSummary(shootDayId).then((r) => { if (active) setShootSummary(r.ok ? { videosTotal: r.videosTotal, videosPublished: r.videosPublished } : null); }).catch(() => { if (active) setShootSummary(null); });
+    return () => { active = false; };
+  }, [shootDayId]);
 
   async function onFile(file: File | undefined) {
     if (!file) return;
@@ -101,7 +134,7 @@ export function CaptionMaker({
     }
     setErr(null);
     start(async () => {
-      const res = await generateCaptions({ clientId, pdfBase64: pdfBase64 ?? undefined, docxBase64: docxBase64 ?? undefined });
+      const res = await generateCaptions({ clientId, pdfBase64: pdfBase64 ?? undefined, docxBase64: docxBase64 ?? undefined, language, productionDayId: shootDayId || undefined });
       if (res.ok) setResults(res.data);
       else setErr(res.message);
     });
@@ -159,6 +192,32 @@ export function CaptionMaker({
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
+
+            {/* Taal: Nederlands of Engels — direct schakelbaar, zonder zelf te vertalen. */}
+            <label className="sc-label mt-3 flex items-center gap-1.5"><Languages className="size-3.5" /> Taal</label>
+            <div className="inline-flex w-full rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5 text-sm">
+              <button type="button" onClick={() => setLanguage("nl")} className={`flex-1 rounded-[var(--radius-sm)] px-2 py-1 font-medium transition ${language === "nl" ? "bg-[var(--color-brand-600)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>Nederlands</button>
+              <button type="button" onClick={() => setLanguage("en")} className={`flex-1 rounded-[var(--radius-sm)] px-2 py-1 font-medium transition ${language === "en" ? "bg-[var(--color-brand-600)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>Engels</button>
+            </div>
+
+            {/* Opname koppelen (optioneel): zo weet je welke captions bij welke opname horen. */}
+            {clientId ? (
+              <>
+                <label className="sc-label mt-3 flex items-center gap-1.5"><Film className="size-3.5" /> Opname koppelen <span className="font-normal normal-case text-[var(--color-ink-faint)]">— optioneel</span></label>
+                <select className="sc-input" value={shootDayId} onChange={(e) => setShootDayId(e.target.value)} disabled={shootDays.length === 0}>
+                  <option value="">{shootDays.length === 0 ? "Geen aankomende opnames" : "Geen opname koppelen"}</option>
+                  {shootDays.map((d) => (
+                    <option key={d.id} value={d.id}>{fmtNl(d.scheduledOn)} — {d.title}</option>
+                  ))}
+                </select>
+                {shootDayId && shootSummary ? (
+                  <p className="mt-1.5 text-2xs text-[var(--color-ink-muted)]">
+                    Deze opname: <strong>{shootSummary.videosTotal}</strong> video{shootSummary.videosTotal === 1 ? "" : "'s"} gekoppeld · <strong>{shootSummary.videosPublished}</strong> gepubliceerd (ingezet).
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+
             <p className="mt-2 text-xs text-[var(--color-ink-faint)]">
               Eén caption per short voor {PLATFORMS}, met eventueel toepasbare hashtags.
             </p>
@@ -198,6 +257,8 @@ export function CaptionMaker({
               clientId={clientId}
               footer={footer}
               pdfBase64={pdfBase64}
+              language={language}
+              productionDayId={shootDayId || undefined}
               onChange={(next) => setResults((cur) => cur!.map((s, j) => (j === i ? next : s)))}
             />
           ))}
@@ -220,6 +281,8 @@ function ShortBlock({
   clientId,
   footer,
   pdfBase64,
+  language,
+  productionDayId,
   onChange,
 }: {
   index: number;
@@ -227,6 +290,8 @@ function ShortBlock({
   clientId: string;
   footer: string;
   pdfBase64: string | null;
+  language: "nl" | "en";
+  productionDayId?: string;
   onChange: (s: ShortCaption) => void;
 }) {
   const [pending, start] = useTransition();
@@ -248,6 +313,7 @@ function ShortBlock({
         hook: short.hook,
         pdfBase64: pdfBase64 ?? undefined,
         variant,
+        language,
       });
       if (res.ok) onChange(res.data);
       else setErr(res.message);
@@ -264,7 +330,7 @@ function ShortBlock({
   function toPlanning() {
     setErr(null);
     startPlanning(async () => {
-      const res = await addCaptionToPlanning({ clientId, shortTitle: short.shortTitle, caption: hasFooter ? withFooter(short.caption, footer) : short.caption });
+      const res = await addCaptionToPlanning({ clientId, shortTitle: short.shortTitle, caption: hasFooter ? withFooter(short.caption, footer) : short.caption, productionDayId });
       if (res.ok) setSaved(true);
       else setErr(res.message ?? "Mislukt");
     });

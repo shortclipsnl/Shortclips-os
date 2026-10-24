@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { aiKnowledge, aiOutputs, clientAiProfiles, clients, contentCalendar } from "@/db/schema";
+import { aiKnowledge, aiOutputs, clientAiProfiles, clients, contentCalendar, productionDays, deliverables } from "@/db/schema";
 import { assertClientAccess, ForbiddenError, requirePermission } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { runJsonPrompt, type AiDoc, type AiImage } from "@/server/ai/client";
@@ -52,6 +52,7 @@ async function saveOutput(params: {
   inputSummary: string | null;
   output: unknown;
   userId: string;
+  productionDayId?: string | null;
 }) {
   await db.insert(aiOutputs).values({
     clientId: params.clientId,
@@ -59,6 +60,7 @@ async function saveOutput(params: {
     title: params.title,
     inputSummary: params.inputSummary,
     output: params.output as Record<string, unknown>,
+    productionDayId: params.productionDayId ?? null,
     createdById: params.userId,
   });
 }
@@ -81,6 +83,10 @@ export async function generateCaptions(input: {
   scriptText?: string;
   pdfBase64?: string;
   docxBase64?: string;
+  /** Taal van de captions: Nederlands (standaard) of Engels. */
+  language?: "nl" | "en";
+  /** Optioneel gekoppelde opnamedag. */
+  productionDayId?: string;
 }): Promise<AiActionResult<ShortCaption[]>> {
   try {
     const viewer = await requirePermission("ai:read");
@@ -89,6 +95,7 @@ export async function generateCaptions(input: {
     if (!scriptText.trim() && !input.pdfBase64) {
       return { ok: false, message: "Plak scripttekst of upload een PDF/Word-bestand." };
     }
+    const lang = input.language === "en" ? "en" : "nl";
 
     const name = await clientName(input.clientId);
     const profile = await getClientAiProfile(input.clientId);
@@ -113,7 +120,10 @@ REGELS VOOR DE CAPTIONS:
 - Voeg contactgegevens alleen toe als dat onderdeel is van de captionstijl van de klant, en uitsluitend de gegevens die in het profiel staan. Verzin nooit gegevens.
 - Eén caption per short die werkt op Instagram, TikTok, Facebook én YouTube Shorts (niet per platform verschillend).
 - Zet GEEN hashtags in de caption zelf; die geef je apart als eventueel toepasbare hashtags (relevant voor onderwerp en branche, geen generieke of willekeurige — mag een lege lijst zijn).
-- Zorg dat de captions onderling variëren — niet elke video dezelfde soort opening.`;
+- Zorg dat de captions onderling variëren — niet elke video dezelfde soort opening.
+${lang === "en"
+  ? "- TAAL: schrijf ALLE captions in natuurlijk, vloeiend ENGELS (geen Nederlands), passend bij de tone of voice van deze klant. Ook de hashtags in het Engels waar logisch. shortTitle en hook mag je in het Engels teruggeven."
+  : "- TAAL: schrijf alle captions in natuurlijk Nederlands."}`;
 
     const user = `Hieronder staat een document of tekst met één of meer scripts voor afzonderlijke shorts. Herken automatisch hoeveel losse shorts erin staan. Analyseer per short de hook, het onderwerp, de inhoud en de call to action. Genereer per short ÉÉN caption die bruikbaar is voor Instagram, TikTok, Facebook en YouTube Shorts, plus eventueel toepasbare hashtags.
 
@@ -144,10 +154,11 @@ ${scriptText.trim() ? `De scripts:\n\n${scriptText.trim()}` : "De scripts staan 
     await saveOutput({
       clientId: input.clientId,
       tool: "caption",
-      title: `${data.length} captions`,
+      title: `${data.length} captions${lang === "en" ? " (EN)" : ""}`,
       inputSummary: (scriptText || "PDF-upload").slice(0, 200),
       output: data,
       userId: viewer.id,
+      productionDayId: input.productionDayId ?? null,
     });
     await auditLog({ viewer, action: "ai.captions_generated", entityType: "client", entityId: input.clientId, clientId: input.clientId, changes: { shorts: data.length } });
     return { ok: true, data };
@@ -166,10 +177,13 @@ export async function regenerateOneCaption(input: {
   pdfBase64?: string;
   /** Variant van de nieuwe versie. Leeg = gewoon een frisse variatie. */
   variant?: "variatie" | "met_cta" | "zonder_cta" | "korter" | "langer";
+  /** Taal: Nederlands (standaard) of Engels. */
+  language?: "nl" | "en";
 }): Promise<AiActionResult<ShortCaption>> {
   try {
     const viewer = await requirePermission("ai:read");
     assertClientAccess(viewer, input.clientId);
+    const lang = input.language === "en" ? "en" : "nl";
 
     const name = await clientName(input.clientId);
     const profile = await getClientAiProfile(input.clientId);
@@ -180,7 +194,8 @@ export async function regenerateOneCaption(input: {
 Je maakt captions voor klant "${name}". Houd je aan dit captionprofiel:
 ${caption}
 
-De caption draait volledig om de hoek/hook van de video en spreekt de kijker daar direct op aan — niet het script navertellen. Standaard ZEER kort en pakkend (1 à 2 korte zinnen), zoals het team ze écht schrijft. Eén caption die werkt op Instagram, TikTok, Facebook en YouTube Shorts. Gebruik passende emoji's; zet geen hashtags in de caption maar geef ze apart. Verzin geen contactgegevens.`;
+De caption draait volledig om de hoek/hook van de video en spreekt de kijker daar direct op aan — niet het script navertellen. Standaard ZEER kort en pakkend (1 à 2 korte zinnen), zoals het team ze écht schrijft. Eén caption die werkt op Instagram, TikTok, Facebook en YouTube Shorts. Gebruik passende emoji's; zet geen hashtags in de caption maar geef ze apart. Verzin geen contactgegevens.
+${lang === "en" ? "Schrijf de caption in natuurlijk, vloeiend ENGELS (geen Nederlands)." : "Schrijf de caption in natuurlijk Nederlands."}`;
 
     const variantInstr: Record<NonNullable<typeof input.variant>, string> = {
       variatie: "Kies een andere invalshoek dan voorheen, maar blijf kort en gericht op de hoek van de video.",
@@ -229,6 +244,8 @@ export async function addCaptionToPlanning(input: {
   clientId: string;
   shortTitle: string;
   caption: string;
+  /** Optioneel gekoppelde opnamedag, zodat de caption bij de juiste opname hoort. */
+  productionDayId?: string;
 }): Promise<SimpleResult> {
   try {
     const viewer = await requirePermission("calendar:write");
@@ -245,6 +262,7 @@ export async function addCaptionToPlanning(input: {
         status: "to_prepare",
         platforms: ["instagram", "tiktok"],
         caption: input.caption.trim() || null,
+        productionDayId: input.productionDayId ?? null,
         notes: null,
         ownerId: viewer.id,
       })
@@ -256,6 +274,38 @@ export async function addCaptionToPlanning(input: {
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
+  }
+}
+
+/**
+ * Samenvatting van een opnamedag voor de caption maker: hoeveel video's er aan
+ * deze opname gekoppeld zijn en hoeveel er uiteindelijk gepubliceerd ("ingezet")
+ * zijn. Zo zie je direct welke captions bij welke opname horen en hoeveel er
+ * daadwerkelijk is gebruikt.
+ */
+export async function getShootVideoSummary(productionDayId: string): Promise<
+  { ok: true; date: string; title: string; videosTotal: number; videosPublished: number } | { ok: false }
+> {
+  try {
+    const viewer = await requirePermission("ai:read");
+    const [pd] = await db
+      .select({ id: productionDays.id, clientId: productionDays.clientId, scheduledOn: productionDays.scheduledOn, title: productionDays.title })
+      .from(productionDays)
+      .where(and(eq(productionDays.id, productionDayId), isNull(productionDays.deletedAt)))
+      .limit(1);
+    if (!pd) return { ok: false };
+    assertClientAccess(viewer, pd.clientId);
+    const [agg] = await db
+      .select({
+        total: sql<number>`count(*)::int`,
+        published: sql<number>`(count(*) filter (where ${deliverables.status} = 'published'))::int`,
+      })
+      .from(deliverables)
+      .where(and(eq(deliverables.productionDayId, pd.id), isNull(deliverables.deletedAt)));
+    return { ok: true, date: String(pd.scheduledOn), title: pd.title, videosTotal: Number(agg?.total ?? 0), videosPublished: Number(agg?.published ?? 0) };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false };
+    throw e;
   }
 }
 

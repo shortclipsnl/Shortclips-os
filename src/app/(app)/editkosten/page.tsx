@@ -29,6 +29,34 @@ function KpiTile({ label, value, hint, tone = "neutral", big = false }: { label:
   );
 }
 
+type ExpectedData = { list: Array<{ editor: string; shorts: number; cost: number; clients: string[] }>; totalShorts: number; totalCost: number };
+function ExpectedBlock({ title, badge, data }: { title: string; badge?: string; data: ExpectedData }) {
+  return (
+    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-line)] px-4 py-2.5">
+        <span className="text-sm font-bold">{title}{badge ? <span className="ml-2 text-2xs font-medium text-[var(--color-ink-faint)]">· {badge}</span> : null}</span>
+        <span className="text-xs text-[var(--color-ink-muted)]"><strong className="tabular-nums text-[var(--color-ink)]">{data.totalShorts}</strong> shorts · <strong className="tabular-nums text-[var(--color-ink)]">{euro(data.totalCost)}</strong> verwacht</span>
+      </div>
+      {data.list.length === 0 ? (
+        <p className="px-4 py-5 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames gepland deze maand.</p>
+      ) : (
+        <Table head={<><th className="sc-th">Editor</th><th className="sc-th text-right">Shorts (verwacht)</th><th className="sc-th text-right">Editkosten (verwacht)</th></>}>
+          {data.list.map((e) => (
+            <tr key={e.editor}>
+              <td className="sc-td">
+                <span className="flex items-center gap-2 font-medium"><TeamAvatar name={e.editor} size={22} />{e.editor}</span>
+                <span className="mt-0.5 block pl-[30px] text-2xs text-[var(--color-ink-faint)]">{e.clients.join(" · ")}</span>
+              </td>
+              <td className="sc-td text-right tabular-nums">{e.shorts}</td>
+              <td className="sc-td text-right font-bold tabular-nums">{euro(e.cost)}</td>
+            </tr>
+          ))}
+        </Table>
+      )}
+    </div>
+  );
+}
+
 // Videograafkosten: €16,75 per uur, met maximaal 8 uur filmen per opnamedag.
 // Een klant-maand zonder vastgelegde opnamedag rekenen we als één standaard
 // opnamedag (8 u × €16,75 = €134), zodat er nergens videograafkosten ontbreken.
@@ -177,6 +205,50 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
   const editorTotal = perEditor.reduce((a, e) => a + e.total, 0);
   const editorVideos = perEditor.reduce((a, e) => a + e.videos, 0);
 
+  // Verwachte editkosten per editor op basis van de OPNAMES: welke klanten hebben
+  // deze (en volgende) maand een opname gepland, hoeveel shorts leveren die op
+  // (het maandquotum van de klant), welke vaste editor is eraan verbonden
+  // (clients.editorName) en wat kost dat (prijs/short × shorts). Zo zie je vooraf
+  // de te verwachten editingkosten per editor.
+  const nextPeriod2 = (() => {
+    const [y, m] = nowPeriod.split("-").map(Number);
+    const d = new Date(y!, m!, 1); // m is 1-based → eerste dag volgende maand
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  })();
+  const expectedQuery = (period: string) =>
+    db.execute(sql`
+      select c.name, coalesce(nullif(trim(c.editor_name), ''), '— geen editor') editor,
+        coalesce(c.edit_cost_per_video,0)::float cost_per_video,
+        coalesce(c.monthly_video_quota,0)::int quota
+      from clients c
+      where c.deleted_at is null and c.status = 'active'
+        and exists (
+          select 1 from production_days pd
+          where pd.client_id = c.id and pd.deleted_at is null and pd.status <> 'cancelled'
+            and to_char(pd.scheduled_on, 'YYYY-MM') = ${period}
+        )
+      order by c.editor_name nulls last, c.name
+    `);
+  const [expCurRes, expNextRes] = await Promise.all([expectedQuery(nowPeriod), expectedQuery(nextPeriod2)]);
+  type ExpRow = { name: string; editor: string; cost_per_video: number; quota: number };
+  const buildExpected = (res: unknown) => {
+    const rows = rows2<ExpRow>(res);
+    const byEditor = new Map<string, { editor: string; shorts: number; cost: number; clients: string[] }>();
+    for (const r of rows) {
+      const shorts = Number(r.quota);
+      const cost = shorts * Number(r.cost_per_video);
+      const cur = byEditor.get(r.editor) ?? { editor: r.editor, shorts: 0, cost: 0, clients: [] };
+      cur.shorts += shorts;
+      cur.cost += cost;
+      cur.clients.push(r.name);
+      byEditor.set(r.editor, cur);
+    }
+    const list = [...byEditor.values()].sort((a, b) => b.cost - a.cost);
+    return { list, totalShorts: list.reduce((a, e) => a + e.shorts, 0), totalCost: list.reduce((a, e) => a + e.cost, 0) };
+  };
+  const expCur = buildExpected(expCurRes);
+  const expNext = buildExpected(expNextRes);
+
   return (
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
@@ -205,6 +277,45 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
           </div>
           {sel.hasOverige ? <p className="mt-1.5 text-xs text-[var(--color-ink-muted)]">Winst is ná editkosten, videograafkosten en overige directe kosten (−{euro(sel.overige)} strategie/overig deze maand).</p> : <p className="mt-1.5 text-xs text-[var(--color-ink-muted)]">Winst = omzet − editkosten − videograafkosten. Overige directe kosten (strategie/overig) zijn deze maand nog niet ingevuld.</p>}
         </section>
+      ) : null}
+
+      {/* Editkosten per editor — bovenin: eerst de verwachting (op basis van de
+          geplande opnames) voor deze en volgende maand, dan de werkelijke kosten
+          per editor van de gekozen (afgeronde) maand. */}
+      <section className="mb-5">
+        <h2 className="mb-2 text-base font-bold tracking-tight">Editkosten per editor</h2>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ExpectedBlock title="Verwacht deze maand" badge={monthLabel(nowPeriod)} data={expCur} />
+          <ExpectedBlock title="Verwacht volgende maand" badge={monthLabel(nextPeriod2)} data={expNext} />
+        </div>
+        <p className="mt-1.5 text-xs text-[var(--color-ink-muted)]">
+          Verwachting op basis van de geplande opnames: elke actieve klant met een opname die maand levert zijn maandaantal shorts op, tegen de afgesproken prijs per short, toegekend aan de vaste editor van de klant.
+        </p>
+      </section>
+
+      {perEditor.length > 0 ? (
+        <Card padded={false} className="mb-5">
+          <CardHeader
+            title={`Werkelijk per editor${selPeriod ? ` · ${monthLabel(selPeriod)}` : ""}`}
+            subtitle={`Wat er die maand daadwerkelijk is opgeleverd en gefactureerd — totaal ${euro(editorTotal)} over ${editorVideos} ${editorVideos === 1 ? "video" : "video's"}, hoogste factuur bovenaan.`}
+            className="p-5 pb-2"
+          />
+          <Table head={<><th className="sc-th">Editor</th><th className="sc-th text-right">Video&apos;s</th><th className="sc-th text-right">Per video (gem.)</th><th className="sc-th text-right">Editkosten</th><th className="sc-th text-right">Aandeel</th></>}>
+            {perEditor.map((e) => {
+              const share = editorTotal > 0 ? Math.round((e.total / editorTotal) * 100) : 0;
+              return (
+                <tr key={e.id}>
+                  <td className="sc-td"><span className="flex items-center gap-2 font-medium"><TeamAvatar name={e.name} avatarUrl={e.avatar_url} size={22} />{e.name}</span></td>
+                  <td className="sc-td text-right tabular-nums">{e.videos}</td>
+                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{euro(e.perVideo)}</td>
+                  <td className="sc-td text-right font-bold tabular-nums">{euro(e.total)}</td>
+                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{share}%</td>
+                </tr>
+              );
+            })}
+          </Table>
+          <p className="px-5 py-3 text-xs text-[var(--color-ink-muted)]">Op basis van de video&apos;s die deze maand zijn opgeleverd (gepubliceerd of goedgekeurd). Prijs per video = afwijkend tarief op de video indien gezet, anders het eigen tarief van de editor (zoals Senna €40), anders het klanttarief.</p>
+        </Card>
       ) : null}
 
       {/* Winst per maand — alle klanten samen, bouwt zich op naarmate er maanden bijkomen. */}
@@ -263,32 +374,6 @@ export default async function EditCostsPage({ searchParams }: { searchParams: Pr
         </Card>
       ) : null}
 
-      {/* Editkosten per editor — wie factureert deze maand hoeveel en voor
-          hoeveel video's; de hoogste factuur bovenaan. */}
-      {perEditor.length > 0 ? (
-        <Card padded={false} className="mb-5">
-          <CardHeader
-            title={`Editkosten per editor${selPeriod ? ` · ${monthLabel(selPeriod)}` : ""}`}
-            subtitle={`Wie factureert deze maand het meest — totaal ${euro(editorTotal)} over ${editorVideos} ${editorVideos === 1 ? "video" : "video's"}, hoogste factuur bovenaan.`}
-            className="p-5 pb-2"
-          />
-          <Table head={<><th className="sc-th">Editor</th><th className="sc-th text-right">Video&apos;s</th><th className="sc-th text-right">Per video (gem.)</th><th className="sc-th text-right">Editkosten</th><th className="sc-th text-right">Aandeel</th></>}>
-            {perEditor.map((e) => {
-              const share = editorTotal > 0 ? Math.round((e.total / editorTotal) * 100) : 0;
-              return (
-                <tr key={e.id}>
-                  <td className="sc-td"><span className="flex items-center gap-2 font-medium"><TeamAvatar name={e.name} avatarUrl={e.avatar_url} size={22} />{e.name}</span></td>
-                  <td className="sc-td text-right tabular-nums">{e.videos}</td>
-                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{euro(e.perVideo)}</td>
-                  <td className="sc-td text-right font-bold tabular-nums">{euro(e.total)}</td>
-                  <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{share}%</td>
-                </tr>
-              );
-            })}
-          </Table>
-          <p className="px-5 py-3 text-xs text-[var(--color-ink-muted)]">Op basis van de video&apos;s die deze maand zijn opgeleverd (gepubliceerd of goedgekeurd). Prijs per video = afwijkend tarief op de video indien gezet, anders het eigen tarief van de editor (zoals Senna €40), anders het klanttarief.</p>
-        </Card>
-      ) : null}
     </div>
   );
 }

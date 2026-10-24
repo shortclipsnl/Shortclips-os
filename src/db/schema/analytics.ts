@@ -34,6 +34,8 @@ export const contentCalendar = pgTable(
     deliverableId: uuid("deliverable_id").references(() => deliverables.id, {
       onDelete: "set null",
     }),
+    /** Optioneel gekoppelde opnamedag, zodat een caption bij de juiste opname hoort. */
+    productionDayId: uuid("production_day_id"),
     title: varchar("title", { length: 240 }).notNull(),
     scheduledOn: date("scheduled_on").notNull(),
     scheduledAt: time("scheduled_at"),
