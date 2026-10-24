@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock, Megaphone, Sprout, Link2, AlertTriangle, ChevronDown } from "lucide-react";
-import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, saveScriptToDrive, checkScriptQuality, listShootDaysForClient, type GeneratedScript, type QualityResult, type ContentType } from "@/server/actions/script-generate";
+import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock, Megaphone, Sprout, Link2, AlertTriangle, ChevronDown, BookmarkPlus, ShieldAlert } from "lucide-react";
+import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, saveScriptToDrive, checkScriptQuality, listShootDaysForClient, rememberScriptFeedback, refreshMetaRulesAction, getMetaRulesInfo, type GeneratedScript, type QualityResult, type ContentType, type FeedbackScope } from "@/server/actions/script-generate";
 
 type ShootDay = { id: string; scheduledOn: string; title: string };
 type Funnel = "TOF" | "MOF" | "BOF";
@@ -187,6 +187,12 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
   const [coupleMsg, setCoupleMsg] = useState<string | null>(null);
   const [blockedApproved, setBlockedApproved] = useState<Array<{ index: number; title: string }>>([]);
   const [lastCoupleDayId, setLastCoupleDayId] = useState<string | undefined>(undefined);
+  // Lerende feedback (onthouden als regel) + Meta-regels.
+  const [rememberScope, setRememberScope] = useState<FeedbackScope>("contenttype");
+  const [rememberBusyId, setRememberBusyId] = useState<string | null>(null);
+  const [rememberMsg, setRememberMsg] = useState<string | null>(null);
+  const [metaUpdatedAt, setMetaUpdatedAt] = useState<string | null>(null);
+  const [metaBusy, setMetaBusy] = useState(false);
 
   const visibleClients = clients.filter((c) => (filter === "alle" ? true : filter === "actief" ? c.active : !c.active));
   const selectedName = clientId ? clients.find((c) => c.id === clientId)?.name ?? "" : "";
@@ -406,6 +412,29 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
       else setErr(res.message);
       setQualityBusyId(null);
     })();
+  };
+
+  // Onthoud de huidige feedbacktekst als lerende regel (met gekozen reikwijdte).
+  const remember = (s: EditorScript) => {
+    const text = reviseText.trim();
+    if (!text || rememberBusyId) return;
+    setRememberBusyId(s.id); setRememberMsg(null); setErr(null);
+    rememberScriptFeedback({ clientId: genClientId || undefined, contentType: s.contentType, scope: rememberScope, instruction: text })
+      .then((r) => { if (r.ok) setRememberMsg(r.saved ? "✓ Onthouden als regel voor volgende scripts." : "Niet opgeslagen (eenmalig)."); else setErr(r.message); })
+      .finally(() => setRememberBusyId(null));
+  };
+
+  // Meta-regels: status laden in advertentiemodus; en op verzoek verversen.
+  useEffect(() => {
+    if (!isAd) return;
+    let active = true;
+    getMetaRulesInfo().then((r) => { if (active) setMetaUpdatedAt(r.updatedAt); }).catch(() => {});
+    return () => { active = false; };
+  }, [isAd]);
+  const refreshMeta = () => {
+    if (metaBusy) return;
+    setMetaBusy(true); setErr(null);
+    refreshMetaRulesAction().then((r) => { if (r.ok) setMetaUpdatedAt(r.updatedAt); else setErr(r.message); }).finally(() => setMetaBusy(false));
   };
 
   const revert = (id: string, idx: number) => {
@@ -642,7 +671,21 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
                     <button type="button" onClick={() => runRevise(s.id, reviseText.trim(), "Eigen feedback: " + reviseText.trim().slice(0, 60))} disabled={!!busyId || !reviseText.trim()} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40">
                       {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />} Pas aan
                     </button>
-                    <button type="button" onClick={() => { setReviseId(null); setReviseText(""); }} className="text-2xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleer</button>
+                    <button type="button" onClick={() => { setReviseId(null); setReviseText(""); setRememberMsg(null); }} className="text-2xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleer</button>
+                  </div>
+                  {/* Onthoud deze correctie als lerende regel (gescheiden per contenttype) */}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--color-brand-200)] pt-2">
+                    <span className="text-2xs font-medium text-[var(--color-ink-muted)]">Onthoud als regel:</span>
+                    <select value={rememberScope} onChange={(e) => setRememberScope(e.target.value as FeedbackScope)} className="sc-input h-7 w-auto py-0 text-2xs">
+                      {genClientId ? <option value="klant">Klantspecifiek</option> : null}
+                      <option value="contenttype">{s.contentType === "advertentie" ? "Advertentieregel (alle klanten)" : "Organische regel (alle klanten)"}</option>
+                      <option value="algemeen">Algemene schrijfrichtlijn</option>
+                      <option value="eenmalig">Eenmalig — niet onthouden</option>
+                    </select>
+                    <button type="button" disabled={rememberBusyId === s.id || !reviseText.trim() || rememberScope === "eenmalig"} onClick={() => remember(s)} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-1 text-2xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-40">
+                      {rememberBusyId === s.id ? <Loader2 className="size-3 animate-spin" /> : <BookmarkPlus className="size-3" />} Onthoud
+                    </button>
+                    {rememberMsg ? <span className="text-2xs text-[var(--color-good)]">{rememberMsg}</span> : null}
                   </div>
                 </div>
               ) : null}
@@ -872,6 +915,16 @@ export function ScriptGeneratorChat({ clients, aiReady, initialClientId }: { cli
             ))}
           </div>
           <p className="mt-1.5 text-2xs text-[var(--color-ink-faint)]">TOF = koud publiek · MOF = vergelijkt oplossingen · BOF = klaar om te kopen. De call to action (incl. poll) stel je per script in ná het genereren.</p>
+          {/* Live Meta-advertentieregels: status + verversen */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2">
+            <ShieldAlert className="size-4 shrink-0 text-[var(--color-violet)]" />
+            <span className="text-2xs text-[var(--color-ink-muted)]">
+              Meta-advertentieregels: {metaUpdatedAt ? <>actueel opgehaald op <strong className="text-[var(--color-ink)]">{new Date(metaUpdatedAt).toLocaleDateString("nl-NL")}</strong></> : "nog niet opgehaald (vaste basisregels worden gebruikt)"}
+            </span>
+            <button type="button" onClick={refreshMeta} disabled={metaBusy} className="ml-auto inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-1 text-2xs font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)] disabled:opacity-40">
+              {metaBusy ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />} {metaBusy ? "Ophalen…" : "Ververs Meta-regels"}
+            </button>
+          </div>
         </div>
       )}
 

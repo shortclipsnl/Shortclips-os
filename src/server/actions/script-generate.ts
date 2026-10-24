@@ -15,6 +15,8 @@ import { gatherFeedbackContext, estimateSpeakingTime, DEFAULT_WPM } from "@/serv
 import { getClientWinningPatterns } from "@/server/scripts/winning-patterns";
 import { getClientDriveScriptPdfs } from "@/server/scripts/drive-scripts";
 import { getIntelligenceOverview } from "@/server/video-intelligence/intelligence";
+import { learnedFeedbackText, saveScriptFeedback, listScriptFeedback, deleteScriptFeedback, type FeedbackScope, type LearnedRule } from "@/server/scripts/script-feedback";
+import { getMetaRules, refreshMetaRules } from "@/server/scripts/meta-rules";
 
 export type ContentType = "organisch" | "advertentie";
 export type GeneratedScript = { onderwerp: string; tekst: string; contentType?: ContentType; funnel?: Funnel };
@@ -122,7 +124,7 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
   if (!c) return null;
   assertClientAccess(viewer, c.id);
   const isAd = contentType === "advertentie";
-  const [profile, learned, feedback, patterns, central, intel, recent] = await Promise.all([
+  const [profile, learned, feedback, patterns, central, intel, recent, learnedFb] = await Promise.all([
     getClientAiProfile(c.id),
     clientLearnedText(c.id),
     gatherFeedbackContext(c.id),
@@ -136,6 +138,7 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
       .orderBy(desc(scripts.createdAt)).limit(40)
       .then((rows) => rows.filter((r) => (/advertentie/i.test(r.format ?? "") ? isAd : !isAd)).slice(0, 15))
       .catch(() => [] as Array<{ title: string; format: string | null }>),
+    learnedFeedbackText(c.id, contentType).catch(() => ""),
   ]);
 
   const viLines = intel
@@ -156,6 +159,7 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
     viLines,
     recent.length ? `Eerder geschreven ${isAd ? "advertentiescripts" : "onderwerpen"} voor deze klant (voorkom herhaling, tenzij je een sterk format bewust opnieuw gebruikt):\n- ${recent.map((r) => r.title).join("\n- ")}` : "",
     isAd ? "LET OP: dit zijn advertentiescripts. Schrijf vanuit het advertentiedoel en de funnelfase, niet vanuit organisch bereik. Gebruik alleen daadwerkelijk beschikbare commerciële gegevens; verzin geen cijfers, prijzen of claims." : "",
+    learnedFb || "",
     central ? `Algemene Shortclips-richtlijnen:\n${central}` : "",
   ].filter(Boolean).join("\n\n");
   return { name: c.name, slug: c.slug, extra, wpm: intel?.speech?.avgWpm && intel.speech.avgWpm > 60 ? intel.speech.avgWpm : null };
@@ -201,6 +205,15 @@ export async function generateScripts(input: {
     if (input.clientId) {
       const ctx = await clientContext(viewer, input.clientId, contentType);
       if (ctx) { extra = ctx.extra; klantnaam = ctx.name; }
+    } else {
+      // Zonder vaste klant: toch de centrale geleerde regels voor dit contenttype meenemen.
+      const centralLearned = await learnedFeedbackText(null, contentType).catch(() => "");
+      if (centralLearned) extra = centralLearned;
+    }
+    // Advertenties: de actueel opgehaalde Meta-regels meelezen, náást de vaste basisregels.
+    if (isAd) {
+      const meta = await getMetaRules().catch(() => null);
+      if (meta?.body) extra = `${extra ? extra + "\n\n" : ""}ACTUELE META-ADVERTENTIEREGELS (leidend, náást de vaste regels — gecontroleerd ${new Date(meta.updatedAt).toLocaleDateString("nl-NL")}):\n${meta.body}`;
     }
 
     const brief = (input.brief ?? "").trim().slice(0, 4000);
@@ -707,6 +720,64 @@ export async function saveScriptToDrive(input: {
     const msg = (e as { userMessage?: string })?.userMessage ?? (e as Error)?.message ?? "onbekende fout";
     return { ok: false, message: `Opslaan in Drive mislukt: ${msg}` };
   }
+}
+
+/* ---------------- Lerende feedback (advertentie vs organisch) ---------------- */
+
+export type { FeedbackScope, LearnedRule } from "@/server/scripts/script-feedback";
+
+/** Onthoud een correctie als regel (met gekozen reikwijdte); eenmalig = niets opslaan. */
+export async function rememberScriptFeedback(input: {
+  clientId?: string;
+  contentType?: ContentType;
+  scope: FeedbackScope;
+  instruction: string;
+}): Promise<{ ok: true; saved: boolean } | { ok: false; message: string }> {
+  try {
+    const viewer = await requirePermission("scripts:write");
+    const contentType: ContentType = input.contentType === "advertentie" ? "advertentie" : "organisch";
+    if (input.clientId) assertClientAccess(viewer, input.clientId);
+    const res = await saveScriptFeedback({ clientId: input.clientId ?? null, contentType, scope: input.scope, instruction: input.instruction, viewerId: viewer.id });
+    return res;
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+/** Geleerde regels voor dit contenttype (centraal + klantspecifiek). */
+export async function getLearnedRules(input: { clientId?: string; contentType?: ContentType }): Promise<LearnedRule[]> {
+  await requirePermission("ai:read");
+  const contentType: ContentType = input.contentType === "advertentie" ? "advertentie" : "organisch";
+  return listScriptFeedback(input.clientId ?? null, contentType);
+}
+
+export async function removeLearnedRule(id: string, scope: "klant" | "centraal"): Promise<{ ok: true }> {
+  await requirePermission("scripts:write");
+  await deleteScriptFeedback(id, scope);
+  return { ok: true };
+}
+
+/* ---------------- Live Meta-advertentieregels ---------------- */
+
+/** Haalt de actuele Meta-advertentieregels op (web) en cachet ze centraal. */
+export async function refreshMetaRulesAction(): Promise<{ ok: true; updatedAt: string } | { ok: false; message: string }> {
+  try {
+    await requirePermission("scripts:write");
+    if (!aiConfigured()) return { ok: false, message: "De AI staat uit (ANTHROPIC_API_KEY ontbreekt)." };
+    const res = await refreshMetaRules();
+    return res.ok ? { ok: true, updatedAt: res.updatedAt.toISOString() } : res;
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+/** Status van de gecachete Meta-regels (voor de UI). */
+export async function getMetaRulesInfo(): Promise<{ updatedAt: string | null }> {
+  await requirePermission("ai:read");
+  const meta = await getMetaRules().catch(() => null);
+  return { updatedAt: meta ? meta.updatedAt.toISOString() : null };
 }
 
 /** Aankomende opnamedagen van een klant, om scripts direct aan te koppelen. */
