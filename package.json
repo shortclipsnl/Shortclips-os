@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "vercel-build": "npm run db:migrate && (npm run rbac:sync || echo \"[rbac-sync] mislukt, zie log hierboven\") && (npm run kb:import || echo \"[kennisbank-import] mislukt, zie log hierboven\") && (npm run kosten:seed || echo \"[kosten-seed] mislukt, zie log hierboven\") && (npm run vermogen:seed || echo \"[vermogen-seed] mislukt, zie log hierboven\") && next build",
+    "vercel-build": "npm run db:migrate && (npm run rbac:sync || echo \"[rbac-sync] mislukt, zie log hierboven\") && (npm run kb:import || echo \"[kennisbank-import] mislukt, zie log hierboven\") && (npm run kosten:seed || echo \"[kosten-seed] mislukt, zie log hierboven\") && (npm run vermogen:seed || echo \"[vermogen-seed] mislukt, zie log hierboven\") && (npm run data:fixes || echo \"[data-fixes] mislukt, zie log hierboven\") && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
@@ -22,7 +22,8 @@
     "test:watch": "vitest",
     "kb:import": "tsx scripts/kennisbank-import.ts",
     "kosten:seed": "tsx scripts/kosten-seed.ts",
-    "vermogen:seed": "tsx scripts/vermogen-seed.ts"
+    "vermogen:seed": "tsx scripts/vermogen-seed.ts",
+    "data:fixes": "tsx scripts/data-fixes.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",

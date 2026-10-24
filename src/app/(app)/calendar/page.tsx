@@ -22,7 +22,6 @@ const WEEKDAYS = ["ma", "di", "wo", "do", "vr", "za", "zo"];
 // posten horen niet in de contentplanning en krijgen geen inplannen/publiceren-
 // signalen bij Kwaliteit & Aandachtspunten.
 const postsContent = (x?: { weHandlePosting?: boolean } | null) => !x || x.weHandlePosting !== false;
-const normName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 export default async function CalendarPage({
   searchParams,
@@ -93,11 +92,11 @@ export default async function CalendarPage({
     weekByDay.set(item.scheduledOn, list);
   }
 
-  // Vaste set klant-filters bovenaan, in deze volgorde.
-  const CHIP_KEYS = ["autochristiaan", "benzcollector", "cbautomobielen", "campernet", "koopschalets", "marcovanbeek", "luxewagen", "nahv"];
-  const chipClients = CHIP_KEYS
-    .map((k) => clientList.find((c) => normName(c.name).includes(k)))
-    .filter((c): c is (typeof clientList)[number] => !!c);
+  // Alle klanten waarvoor we posten als filter — op naam gesorteerd, zodat er
+  // nooit klanten ontbreken (niet langer een handmatige lijst).
+  const chipClients = clientList
+    .filter((c) => c.status === "active")
+    .sort((a, b) => a.name.localeCompare(b.name, "nl"));
 
   const canWrite = viewer.permissions.has("calendar:write");
   const asPlanner = params.weergave === "planner";
@@ -221,8 +220,9 @@ export default async function CalendarPage({
         </div>
       ) : null}
 
-      {/* Filters */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      {/* Filters — klanten op een eigen rij, platforms eronder met een label. */}
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Klant</span>
         <Link href={withParam("klant", undefined)} className={chip(!params.klant)}>
           Alle klanten
         </Link>
@@ -232,7 +232,10 @@ export default async function CalendarPage({
             {c.name}
           </Link>
         ))}
-        <span className="mx-1 h-4 w-px bg-[var(--color-line-strong)]" />
+      </div>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Filter per platform</span>
+        <Link href={withParam("platform", undefined)} className={chip(!params.platform)}>Alle platformen</Link>
         {Object.entries(PLATFORM).map(([key, p]) => (
           <Link key={key} href={withParam("platform", params.platform === key ? undefined : key)} className={chip(params.platform === key)}>
             <span className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: p.color }} />
