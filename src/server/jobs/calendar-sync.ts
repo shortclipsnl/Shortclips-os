@@ -18,6 +18,7 @@ import {
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { firstNameKey } from "@/lib/editors";
+import { notify } from "@/server/notifications";
 import {
   GoogleCalendarService,
   googleCalendar,
@@ -448,7 +449,51 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         const alreadyCounted = seenShoot.has(dedupKey);
 
         if (targetPdId) {
+          // Oude waarden vóór de update, om een verplaatsing te herkennen.
+          const [before] = await db
+            .select({ scheduledOn: productionDays.scheduledOn, startTime: productionDays.startTime, videographerId: productionDays.videographerId, coordinatorId: clients.coordinatorId })
+            .from(productionDays)
+            .innerJoin(clients, eq(clients.id, productionDays.clientId))
+            .where(eq(productionDays.id, targetPdId))
+            .limit(1);
           await db.update(productionDays).set(base).where(eq(productionDays.id, targetPdId));
+
+          // Verplaatsing herkend (datum of starttijd gewijzigd) → betrokken
+          // medewerkers melden én de auto-deadlines van gekoppelde video's
+          // herberekenen (opname + 14 werkdagen). Eén melding per verzetting.
+          if (before && (before.scheduledOn !== scheduledOn || (before.startTime ?? null) !== (startTime ?? null))) {
+            const dateChanged = before.scheduledOn !== scheduledOn;
+            if (dateChanged) {
+              const newDue = addWorkingDays(scheduledOn, 14, holidays);
+              await db.update(deliverables)
+                .set({ dueOn: newDue, updatedAt: new Date() })
+                .where(and(eq(deliverables.productionDayId, targetPdId), isNull(deliverables.deletedAt), eq(deliverables.dueOnSource, "auto")));
+            }
+            const edRows = await db.select({ editorId: deliverables.editorId }).from(deliverables)
+              .where(and(eq(deliverables.productionDayId, targetPdId), isNull(deliverables.deletedAt)));
+            const recipients = new Set<string>();
+            if (before.coordinatorId) recipients.add(before.coordinatorId);
+            if (before.videographerId) recipients.add(before.videographerId);
+            for (const e of edRows) if (e.editorId) recipients.add(e.editorId);
+            if (recipients.size > 0) {
+              const cname = clientNameById.get(ev.clientId) ?? "de klant";
+              const when = dateChanged
+                ? `verzet van ${before.scheduledOn} naar ${scheduledOn}`
+                : `qua tijd gewijzigd op ${scheduledOn}`;
+              await notify({
+                userIds: [...recipients],
+                clientId: ev.clientId,
+                type: "shoot_moved",
+                level: "warning",
+                title: `Opname verplaatst: ${cname}`,
+                body: `De opname "${base.title}" is ${when}.${dateChanged ? " De interne deadlines zijn automatisch bijgewerkt." : ""}`,
+                href: `/productions/${targetPdId}`,
+                entityType: "production_day",
+                entityId: targetPdId,
+                dedupeKey: `shoot_moved:${targetPdId}:${scheduledOn}:${startTime ?? "allday"}`,
+              });
+            }
+          }
         } else {
           const [created] = await db.insert(productionDays).values(base).returning({ id: productionDays.id });
           targetPdId = created!.id;

@@ -114,6 +114,23 @@ export function reviewDeadline(from: Date | string | null | undefined): Date | n
   return d;
 }
 
+/** Hoeveel KALENDERDAGEN iets al op de klant wacht (vanaf 'since' tot vandaag). */
+export function daysWaiting(since: Date | string | null | undefined): number {
+  if (!since) return 0;
+  const d = new Date(since);
+  if (Number.isNaN(d.getTime())) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.round((today.getTime() - d.getTime()) / 86_400_000));
+}
+
+/** Korte tekst "wacht al X dagen op jou" (of "sinds vandaag"). */
+export function waitingText(since: Date | string | null | undefined): string {
+  const n = daysWaiting(since);
+  return n <= 0 ? "sinds vandaag bij jou" : n === 1 ? "wacht al 1 dag op jou" : `wacht al ${n} dagen op jou`;
+}
+
 const DATE_FMT = new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "short" });
 
 /** Korte deadline-tekst + of 't urgent is. */

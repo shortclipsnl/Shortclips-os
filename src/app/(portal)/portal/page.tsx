@@ -6,7 +6,7 @@ import { getPortalContact, getPortalData } from "@/server/portal";
 import { buttonClass } from "@/components/ui";
 import { CountUp } from "@/components/portal/count-up";
 import { compact, formatDateFull, num, relativeDays } from "@/lib/format";
-import { clientStatusView, deadlineText, reviewDeadline, statusToneClass } from "@/lib/portal-status";
+import { clientStatusView, deadlineText, reviewDeadline, statusToneClass, waitingText } from "@/lib/portal-status";
 import { PLATFORM } from "@/lib/statuses";
 import { videoCover } from "./cover";
 
@@ -58,7 +58,9 @@ export default async function PortalPage() {
     getPortalContact(viewer),
   ]);
 
-  const openActions = data.awaitingApproval.length;
+  // Alle openstaande klant­acties: video's te beoordelen + scripts goed te keuren.
+  const scriptsToReview = data.scriptsToReview ?? [];
+  const openActions = data.awaitingApproval.length + scriptsToReview.length;
   const firstName = viewer.fullName.split(" ")[0];
   const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 
@@ -174,8 +176,32 @@ export default async function PortalPage() {
               <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Actie nodig</span>
             ) : null}
           </div>
-          {data.awaitingApproval.length > 0 ? (
+          {openActions > 0 ? (
             <div className="mt-4 flex flex-col gap-3">
+              {/* Scripts die op jouw akkoord wachten */}
+              {scriptsToReview.slice(0, 3).map((s) => (
+                <div key={s.id} className="rounded-[14px] border border-white/10 bg-white/[0.04] p-3">
+                  <div className="flex items-start gap-3.5">
+                    <span className="grid h-[58px] w-[44px] shrink-0 place-items-center rounded-[9px] bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]">
+                      <FileText className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <Link href="/portal/scripts" className="block truncate text-sm font-semibold hover:text-[#9fdcff]">{s.title}</Link>
+                      <div className="mt-0.5 text-[12.5px] text-[var(--color-ink-muted)]">Script — wacht op jouw akkoord</div>
+                      <div className="mt-1 flex items-center gap-1 text-[12px] text-[var(--color-ink-faint)]">
+                        <Clock className="size-3.5" /> {waitingText(s.updatedAt)}
+                      </div>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-[rgba(25,168,255,0.14)] px-2.5 py-1 text-[11px] font-semibold text-[#4bc4ff]">Jouw akkoord</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link href="/portal/scripts" className={buttonClass({ variant: "accent", size: "sm" })}>
+                      <FileText className="size-3.5" /> Bekijk en keur goed
+                    </Link>
+                  </div>
+                </div>
+              ))}
+              {/* Video's die op jouw beoordeling wachten */}
               {data.awaitingApproval.slice(0, 4).map((v) => {
                 const dl = deadlineText(reviewDeadline(v.statusChangedAt));
                 const reviewUrl = v.frameUrl ?? `/portal/videos/${v.id}`;
@@ -193,7 +219,7 @@ export default async function PortalPage() {
                       )}
                       <div className="min-w-0 flex-1">
                         <Link href={`/portal/videos/${v.id}`} className="block truncate text-sm font-semibold hover:text-[#9fdcff]">{v.title}</Link>
-                        <div className="mt-0.5 text-[12.5px] text-[var(--color-ink-muted)]">Klaar om te bekijken</div>
+                        <div className="mt-0.5 text-[12.5px] text-[var(--color-ink-muted)]">Klaar om te bekijken · {waitingText(v.statusChangedAt)}</div>
                         {dl ? (
                           <div className={`mt-1 flex items-center gap-1 text-[12px] ${dl.urgent ? "text-[#ffb020]" : "text-[var(--color-ink-faint)]"}`}>
                             <Clock className="size-3.5" /> {dl.text}

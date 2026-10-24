@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, deliverables, tasks, deadlineMisses } from "@/db/schema";
+import { clients, deliverables, scripts, tasks, deadlineMisses } from "@/db/schema";
 import { scopeToClients, type Viewer } from "@/server/auth/context";
 import { nlHolidaySet } from "@/lib/holidays";
 import { internalDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
@@ -17,6 +17,8 @@ export type MorningOverview = {
   myOpenTasks: number;
   currentlyLate: number;
   topOverdue: Array<{ id: string; label: string; daysLate: number }>;
+  /** Klanten die nog moeten reageren (video's/scripts), met dagen-wachtend. */
+  clientsWaiting: Array<{ id: string; kind: "video" | "script"; clientName: string; title: string; days: number; href: string }>;
 };
 
 /**
@@ -75,11 +77,28 @@ export async function getMorningOverview(viewer: Viewer): Promise<MorningOvervie
     .from(deadlineMisses)
     .where(eq(deadlineMisses.resolved, false));
 
+  // Welke klanten moeten nog reageren: video's én scripts die bij de klant
+  // liggen (client_review), met hoeveel dagen ze er al liggen.
+  const [waitVideos, waitScripts] = await Promise.all([
+    db.select({ id: deliverables.id, title: deliverables.title, since: deliverables.statusChangedAt, clientName: clients.name })
+      .from(deliverables).innerJoin(clients, eq(clients.id, deliverables.clientId))
+      .where(and(isNull(deliverables.deletedAt), eq(deliverables.status, "client_review"), scopeToClients(viewer, deliverables.clientId) ?? undefined)),
+    db.select({ id: scripts.id, title: scripts.title, since: scripts.updatedAt, clientName: clients.name })
+      .from(scripts).innerJoin(clients, eq(clients.id, scripts.clientId))
+      .where(and(isNull(scripts.deletedAt), eq(scripts.status, "client_review"), scopeToClients(viewer, scripts.clientId) ?? undefined)),
+  ]);
+  const toDay = (d: Date | string | null): string => (d ? (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10) : t);
+  const clientsWaiting = [
+    ...waitVideos.map((v) => ({ id: v.id, kind: "video" as const, clientName: v.clientName, title: v.title, days: Math.max(0, dayDiff(t, toDay(v.since))), href: `/videos/${v.id}` })),
+    ...waitScripts.map((s) => ({ id: s.id, kind: "script" as const, clientName: s.clientName, title: s.title, days: Math.max(0, dayDiff(t, toDay(s.since))), href: `/scripts/${s.id}` })),
+  ].sort((a, b) => b.days - a.days);
+
   return {
     overdueVideos: overdue.length,
     atClient: Number(atClientRow?.n ?? 0),
     myOpenTasks: Number(myTasksRow?.n ?? 0),
     currentlyLate: Number(lateRow?.n ?? 0),
     topOverdue: overdue.slice(0, 4),
+    clientsWaiting: clientsWaiting.slice(0, 8),
   };
 }

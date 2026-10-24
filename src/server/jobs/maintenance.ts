@@ -157,6 +157,11 @@ export async function runDailySignals() {
           // Stabiele marker voor de regels; de exacte termijn is instelbaar.
           awaitingClientStale: true,
           awaitingClientDays: clientFeedbackDays,
+          // Dag-gebaseerde sleutel voor de klantmelding: elke dag dat het blijft
+          // openstaan krijgt de klant opnieuw een herinnering (stopt zodra hij
+          // reageert). `to` stuurt de notify-dedup; de opvolgtaak van de
+          // coördinator blijft eenmalig (die leest `to` niet).
+          to: day(0),
           title: video.title,
           coordinatorId: video.coordinatorId,
           href: `/videos/${video.id}`,
@@ -194,6 +199,8 @@ export async function runDailySignals() {
         data: {
           awaitingClientScriptStale: true,
           awaitingClientScriptDays: scriptFeedbackDays,
+          // Dag-gebaseerde klantmelding (zie toelichting bij de video-variant).
+          to: day(0),
           title: `Script wacht op klant: ${script.title}`,
           coordinatorId: script.coordinatorId,
           href: `/scripts/${script.id}`,
