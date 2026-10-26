@@ -8,6 +8,8 @@ import type { ReplyDraft } from "@/server/actions/ai-tools";
 
 export const metadata: Metadata = { title: "Klantbericht Assistent" };
 export const dynamic = "force-dynamic";
+// Langere functie-timeout voor AI-generatie (anders kapt Vercel het af).
+export const maxDuration = 300;
 
 export default async function BerichtPage() {
   const viewer = await requirePermission("ai:read");

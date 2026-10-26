@@ -8,6 +8,8 @@ import type { EditorBriefing } from "@/server/actions/ai-tools";
 
 export const metadata: Metadata = { title: "Editor Briefing" };
 export const dynamic = "force-dynamic";
+// Langere functie-timeout voor AI-generatie (anders kapt Vercel het af).
+export const maxDuration = 300;
 
 export default async function BriefingPage() {
   const viewer = await requirePermission("ai:read");

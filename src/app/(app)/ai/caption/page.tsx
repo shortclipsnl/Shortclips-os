@@ -8,6 +8,10 @@ import type { ShortCaption } from "@/server/actions/ai-tools";
 
 export const metadata: Metadata = { title: "Caption Maker" };
 export const dynamic = "force-dynamic";
+// AI-generatie kan (bij meerdere shorts / een grote PDF) tientallen seconden duren.
+// Zonder deze langere functie-timeout wordt de generatie op Vercel afgekapt →
+// foutmelding. Gelijk aan de scriptgenerator.
+export const maxDuration = 300;
 
 export default async function CaptionPage() {
   const viewer = await requirePermission("ai:read");

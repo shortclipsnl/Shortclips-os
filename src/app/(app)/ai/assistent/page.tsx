@@ -6,6 +6,8 @@ import { AssistantConsole } from "./assistant-ui";
 
 export const metadata: Metadata = { title: "AI Assistent" };
 export const dynamic = "force-dynamic";
+// Langere functie-timeout voor de AI-antwoorden (anders kapt Vercel het af).
+export const maxDuration = 300;
 
 export default async function AssistentPage() {
   const viewer = await requirePermission("ai:read");

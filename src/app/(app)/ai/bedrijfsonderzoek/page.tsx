@@ -10,6 +10,9 @@ import { ResearchForm } from "./research-form";
 
 export const metadata: Metadata = { title: "AI Sales Research" };
 export const dynamic = "force-dynamic";
+// Bedrijfsonderzoek doet web-research met het model — dit kan lang duren.
+// Langere functie-timeout, anders kapt Vercel de generatie af.
+export const maxDuration = 300;
 
 function statusTone(s: string): "good" | "warn" | "info" | "neutral" {
   if (s === "klant_geworden") return "good";
