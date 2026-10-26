@@ -144,13 +144,9 @@ export default async function PortalPage() {
       <section className="flex items-start gap-4 px-0.5 pt-1">
         <ClientLogo name={companyName} logoUrl={data.client.logoUrl} color={data.client.color} size={56} />
         <div className="min-w-0">
-          <h1 className="text-[30px] font-bold tracking-tight">
-            Welkom bij ShortClips, {companyName}
-          </h1>
-          <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
-            Dit is je persoonlijke omgeving. Hier zie je in één oogopslag wanneer de volgende opname is,
-            of er een scriptmeeting gepland staat, waar je je video&apos;s bekijkt en welke resultaten we voor je behalen.
-          </p>
+          <p className="text-[13px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Welkom bij ShortClips</p>
+          <h1 className="text-[30px] font-bold tracking-tight">{companyName}</h1>
+          <p className="mt-1.5 text-[14px] text-[var(--color-ink-muted)]">Je persoonlijke omgeving — hieronder zie je in één oogopslag wat er speelt.</p>
         </div>
       </section>
 

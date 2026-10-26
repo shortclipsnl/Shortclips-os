@@ -24,32 +24,41 @@ export default async function PortalLayout({
   const viewer = await requirePortal();
 
   return (
-    <div className="portal-studio min-h-screen text-[var(--color-ink)]">
+    <div className="portal-studio flex min-h-screen text-[var(--color-ink)]">
       <script dangerouslySetInnerHTML={{ __html: PORTAL_THEME_INIT }} />
-      <header className="sticky top-0 z-20 border-b border-[var(--sc-line)] bg-[var(--sc-header-bg)] backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between gap-4 px-5">
-          <Link href="/portal" aria-label="Naar je dashboard" className="inline-flex">
-            <Logo size={30} onDark className="pl-dark" />
-            <Logo size={30} className="pl-light" />
+
+      {/* Sidebar — flush links, volle hoogte (zelfde uitlijning als het interne platform) */}
+      <aside className="hidden w-56 shrink-0 border-r border-[var(--sc-line)] bg-[var(--color-surface)] lg:block">
+        <div className="sticky top-0 flex h-screen flex-col">
+          <div className="flex h-16 shrink-0 items-center border-b border-[var(--sc-line)] px-5">
+            <Link href="/portal" aria-label="Naar je dashboard" className="inline-flex">
+              <Logo size={28} onDark className="pl-dark" />
+              <Logo size={28} className="pl-light" />
+            </Link>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            <PortalNav />
+          </div>
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-[var(--sc-line)] bg-[var(--sc-header-bg)] px-5 backdrop-blur-md">
+          {/* Mobiel: logo links (op desktop staat die in de sidebar) */}
+          <Link href="/portal" aria-label="Naar je dashboard" className="mr-auto inline-flex lg:hidden">
+            <Logo size={28} onDark className="pl-dark" />
+            <Logo size={28} className="pl-light" />
           </Link>
-          <div className="flex items-center gap-2">
-            <span className="hidden text-sm text-[var(--color-ink-muted)] sm:block">
-              {viewer.fullName}
-            </span>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="hidden text-sm text-[var(--color-ink-muted)] sm:block">{viewer.fullName}</span>
             <PortalThemeToggle />
             <UserMenu name={viewer.fullName} email={viewer.email} role="client">
               <Avatar name={viewer.fullName} size={32} />
             </UserMenu>
           </div>
-        </div>
-      </header>
-      <div className="mx-auto flex max-w-[1240px] flex-col gap-6 px-5 py-6 lg:flex-row lg:gap-8 lg:py-8">
-        <aside className="hidden lg:block lg:w-52 lg:shrink-0">
-          <div className="lg:sticky lg:top-[88px]">
-            <PortalNav />
-          </div>
-        </aside>
-        <main className="min-w-0 flex-1 pb-24 lg:pb-0">
+        </header>
+
+        <main className="flex-1 px-5 py-6 pb-24 lg:px-8 lg:pb-8">
           {children}
           <footer className="mt-10 text-xs text-[var(--color-ink-faint)]">
             Deze omgeving is van jou. Vragen? Neem contact op met je vaste
