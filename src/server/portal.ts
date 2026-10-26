@@ -728,8 +728,12 @@ export async function getPortalVideos(viewer: Viewer) {
       publishedAt: deliverables.publishedAt,
       plannedPublishOn: deliverables.plannedPublishOn,
       statusChangedAt: deliverables.statusChangedAt,
+      productionDayId: deliverables.productionDayId,
+      sessionDate: productionDays.scheduledOn,
+      sessionTitle: productionDays.title,
     })
     .from(deliverables)
+    .leftJoin(productionDays, eq(productionDays.id, deliverables.productionDayId))
     .where(and(eq(deliverables.clientId, clientId), isNull(deliverables.deletedAt)))
     .orderBy(desc(deliverables.publishedAt), desc(deliverables.statusChangedAt))
     .limit(1000);

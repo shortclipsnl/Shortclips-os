@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Check, ExternalLink, MessageSquareText, Play, Video as VideoIcon } from "lucide-react";
+import { Check, ExternalLink, MessageSquareText, Play, Video as VideoIcon } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalVideos } from "@/server/portal";
 import { getPortalSettingsForClient } from "@/server/portal-settings";
 import { CoverImage } from "@/components/portal/cover-image";
 import { VideoProces } from "@/components/portal/video-proces";
 import { buttonClass } from "@/components/ui";
+import { formatDateFull } from "@/lib/format";
 import { clientStatusView, statusToneClass } from "@/lib/portal-status";
 import { videoCover } from "../cover";
 
@@ -22,7 +23,26 @@ type Row = {
   thumbnailUrl: string | null;
   publishedAt: Date | null;
   statusChangedAt: Date | null;
+  productionDayId: string | null;
+  sessionDate: string | null;
+  sessionTitle: string | null;
 };
+
+type SessionGroup = { key: string; date: string | null; title: string | null; videos: Row[]; frameUrl: string | null };
+
+/** Video's groeperen per opnamesessie, zodat de klant per sessie (6–8 video's)
+ *  in één keer in Frame kan beoordelen i.p.v. per losse video te klikken. */
+function groupBySession(rows: Row[]): SessionGroup[] {
+  const map = new Map<string, SessionGroup>();
+  for (const v of rows) {
+    const key = v.productionDayId ?? "los";
+    let g = map.get(key);
+    if (!g) { g = { key, date: v.sessionDate, title: v.sessionTitle, videos: [], frameUrl: null }; map.set(key, g); }
+    g.videos.push(v);
+    if (!g.frameUrl && v.frameUrl) g.frameUrl = v.frameUrl;
+  }
+  return [...map.values()].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+}
 
 function Tile({ v }: { v: Row }) {
   const view = clientStatusView(v.status);
@@ -43,30 +63,25 @@ function Tile({ v }: { v: Row }) {
   );
 }
 
-/** Eén video die op beoordeling wacht — met een directe link naar de Frame-post. */
-function ReviewRow({ v }: { v: Row }) {
-  const cover = v.frameAssetId ? `/api/frame/thumb/${v.id}` : null;
+/** Eén opnamesessie met al z'n te beoordelen video's en één Frame-link. */
+function SessionCard({ g }: { g: SessionGroup }) {
+  const header = g.date ? `Opname ${formatDateFull(g.date)}` : g.title ?? "Losse video's";
   return (
-    <div className="sc-glass flex items-center gap-4 p-3.5">
-      <Link href={`/portal/videos/${v.id}`} className="block w-16 shrink-0">
-        <span className="sc-short block" style={{ background: videoCover(v.title) }}>
-          {cover ? <CoverImage src={cover} /> : null}
-          <span className="sc-play"><Play className="size-3.5 translate-x-0.5" fill="currentColor" /></span>
-        </span>
-      </Link>
-      <div className="min-w-0 flex-1">
-        <Link href={`/portal/videos/${v.id}`} className="line-clamp-2 text-[14px] font-semibold leading-snug hover:text-[var(--sc-accent)]">{v.title}</Link>
-        <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-muted)]">Wacht op jouw akkoord of feedback</p>
+    <div className="sc-glass p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-[15px] font-semibold">{header}</h3>
+          <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-muted)]">{g.videos.length} video&apos;s wachten op je akkoord</p>
+        </div>
+        {g.frameUrl ? (
+          <a href={g.frameUrl} target="_blank" rel="noreferrer" className={`${buttonClass({ variant: "accent", size: "sm" })} shrink-0`}>
+            Beoordeel deze sessie in Frame <ExternalLink className="size-3.5" />
+          </a>
+        ) : null}
       </div>
-      {v.frameUrl ? (
-        <a href={v.frameUrl} target="_blank" rel="noreferrer" className={`${buttonClass({ variant: "accent", size: "sm" })} shrink-0`}>
-          Beoordeel in Frame <ExternalLink className="size-3.5" />
-        </a>
-      ) : (
-        <Link href={`/portal/videos/${v.id}`} className={`${buttonClass({ variant: "accent", size: "sm" })} shrink-0`}>
-          Beoordelen <ArrowRight className="size-3.5" />
-        </Link>
-      )}
+      <div className="mt-4 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
+        {g.videos.map((v) => <Tile key={v.id} v={v} />)}
+      </div>
     </div>
   );
 }
@@ -123,16 +138,16 @@ export default async function PortalVideosPage() {
               </div>
             ) : (
               <>
-                {/* Zo geef je feedback — kort en duidelijk, gericht op Frame */}
+                {/* Zo geef je feedback — per sessie in één keer in Frame */}
                 <div className="sc-glass mb-3 flex items-start gap-3 p-4" style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.07), rgba(255,255,255,0.02))" }}>
                   <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><MessageSquareText className="size-[18px]" /></span>
                   <p className="text-[13.5px] leading-relaxed text-[var(--color-ink-muted)]">
-                    Open de video in <strong className="text-[var(--color-ink)]">Frame</strong> en geef je feedback <strong className="text-[var(--color-ink)]">rechtstreeks in de video, met tijdcode</strong> —
-                    zo komt elke opmerking op het juiste moment en kunnen we die verwerken. Bundel je opmerkingen per video, dan pakken we ze in één keer op. Alles klopt? Keur de video goed.
+                    Je video&apos;s staan per <strong className="text-[var(--color-ink)]">opnamesessie</strong> bij elkaar. Open de sessie in <strong className="text-[var(--color-ink)]">Frame</strong> en bekijk en
+                    beoordeel alle video&apos;s van die opname <strong className="text-[var(--color-ink)]">in één keer</strong> — geef je feedback rechtstreeks in de video met tijdcode. Alles klopt? Keur ze goed.
                   </p>
                 </div>
-                <div className="flex flex-col gap-2.5">
-                  {data.actieNodig.map((v) => <ReviewRow key={v.id} v={v} />)}
+                <div className="flex flex-col gap-4">
+                  {groupBySession(data.actieNodig).map((g) => <SessionCard key={g.key} g={g} />)}
                 </div>
               </>
             )}
