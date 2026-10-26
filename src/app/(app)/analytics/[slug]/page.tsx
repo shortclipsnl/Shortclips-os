@@ -14,6 +14,8 @@ import { ClientSelector, type SelectorClient } from "../client-selector";
 import { VideoThumb } from "../video-thumb";
 import { getLatestInsights, insightsAvailable } from "@/server/insights";
 import { InsightsPanel } from "./insights-ui";
+import { currentPeriod, EMPTY_IMPROVEMENT, getImprovementPlan } from "@/server/improvements";
+import { ImprovementEditor } from "./improvement-editor";
 
 // Vaste platformvolgorde voor de filterknoppen.
 const PLATFORM_ORDER = ["instagram", "tiktok", "facebook", "youtube", "linkedin"] as const;
@@ -161,6 +163,7 @@ export default async function ClientResultsPage({
   // analyse tonen; genereren/opnieuw kan via het paneel.
   const aiReady = insightsAvailable();
   const latestInsights = await getLatestInsights(cid);
+  const improvement = await getImprovementPlan(client.id, currentPeriod());
   const insightsGeneratedAt = latestInsights
     ? latestInsights.createdAt.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })
     : null;
@@ -281,6 +284,20 @@ export default async function ClientResultsPage({
             insights={latestInsights?.insights ?? null}
             generatedAt={insightsGeneratedAt}
           />
+
+          {/* "Wat gaan we verbeteren?" — verbeterplan voor op de klant-resultatenpagina.
+              Concept blijft intern tot de content creative het goedkeurt en deelt. */}
+          <Card padded={false} className="mt-5">
+            <CardHeader title="Wat gaan we verbeteren? (voor de klant)" subtitle="Concrete verbeteracties die op de resultatenpagina van de klant komen — pas na jouw goedkeuring zichtbaar." className="p-5 pb-3" />
+            <div className="px-5 pb-5">
+              <ImprovementEditor
+                clientId={client.id}
+                initial={improvement?.content ?? EMPTY_IMPROVEMENT}
+                status={improvement?.status ?? null}
+                approvedByName={improvement?.approvedByName ?? null}
+              />
+            </div>
+          </Card>
 
           <div className="mt-5 mb-5 grid gap-5 xl:grid-cols-2">
             {/* Weergaven per maand */}

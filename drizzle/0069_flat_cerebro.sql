@@ -1,0 +1,18 @@
+CREATE TABLE "client_improvements" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"client_id" uuid NOT NULL,
+	"period" varchar(7) NOT NULL,
+	"content" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"status" varchar(12) DEFAULT 'concept' NOT NULL,
+	"approved_at" timestamp with time zone,
+	"approved_by_id" uuid,
+	"created_by_id" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone,
+	CONSTRAINT "client_improvements_period_unique" UNIQUE("client_id","period")
+);
+--> statement-breakpoint
+ALTER TABLE "client_improvements" ADD CONSTRAINT "client_improvements_client_id_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_improvements" ADD CONSTRAINT "client_improvements_approved_by_id_users_id_fk" FOREIGN KEY ("approved_by_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_improvements" ADD CONSTRAINT "client_improvements_created_by_id_users_id_fk" FOREIGN KEY ("created_by_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;

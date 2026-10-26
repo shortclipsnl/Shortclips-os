@@ -21,6 +21,36 @@ import { users } from "./identity";
 import { deliverables } from "./video";
 
 /* ------------------------------------------------------------------ *
+ * Verbeteracties voor de klant ("Wat gaan we verbeteren?")
+ * ------------------------------------------------------------------ */
+
+/**
+ * Per klant per maand een verbeterplan dat op de resultatenpagina van de klant
+ * verschijnt — gebaseerd op de statistieken/AI-inzichten. Wordt eerst als concept
+ * opgesteld (AI of handmatig) en pas na goedkeuring door de content creative
+ * zichtbaar voor de klant.
+ */
+export const clientImprovements = pgTable(
+  "client_improvements",
+  {
+    id: pk(),
+    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    /** Periode (YYYY-MM) waar het verbeterplan bij hoort. */
+    period: varchar("period", { length: 7 }).notNull(),
+    /** { watWerkt[], watMinder[], volgendeWeek[], volgendeMaand[], formats[], optimalisaties[] } */
+    content: jsonb("content").notNull().default(sql`'{}'::jsonb`),
+    /** concept = intern; approved = gedeeld met de klant. */
+    status: varchar("status", { length: 12 }).notNull().default("concept"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    approvedById: uuid("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+    ...softDelete,
+  },
+  (t) => [unique("client_improvements_period_unique").on(t.clientId, t.period)],
+);
+
+/* ------------------------------------------------------------------ *
  * Contentplanning
  * ------------------------------------------------------------------ */
 
