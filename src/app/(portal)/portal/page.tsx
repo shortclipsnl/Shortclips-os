@@ -4,7 +4,7 @@ import { ArrowRight, Bell, CalendarRange, Camera, Clock, Eye, FileText, Film, Ma
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalData } from "@/server/portal";
 import { CLIENT_ACTION_STATUSES, listPortalScriptReviews } from "@/server/script-review";
-import { Avatar, buttonClass } from "@/components/ui";
+import { Avatar, buttonClass, ClientLogo } from "@/components/ui";
 import { compact, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
 
@@ -141,14 +141,17 @@ export default async function PortalPage() {
   return (
     <div className="flex flex-col gap-[22px]">
       {/* 1 — Persoonlijke welkomstsectie */}
-      <section className="px-0.5 pt-1">
-        <h1 className="text-[30px] font-bold tracking-tight">
-          Welkom bij ShortClips, {companyName}
-        </h1>
-        <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
-          Dit is je persoonlijke omgeving. Hier zie je in één oogopslag wanneer de volgende opname is,
-          of er een scriptmeeting gepland staat, waar je je video&apos;s bekijkt en welke resultaten we voor je behalen.
-        </p>
+      <section className="flex items-start gap-4 px-0.5 pt-1">
+        <ClientLogo name={companyName} logoUrl={data.client.logoUrl} color={data.client.color} size={56} />
+        <div className="min-w-0">
+          <h1 className="text-[30px] font-bold tracking-tight">
+            Welkom bij ShortClips, {companyName}
+          </h1>
+          <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-[var(--color-ink-muted)]">
+            Dit is je persoonlijke omgeving. Hier zie je in één oogopslag wanneer de volgende opname is,
+            of er een scriptmeeting gepland staat, waar je je video&apos;s bekijkt en welke resultaten we voor je behalen.
+          </p>
+        </div>
       </section>
 
       {/* Actie nodig — alleen tonen als er echt iets van de klant wordt verwacht */}
