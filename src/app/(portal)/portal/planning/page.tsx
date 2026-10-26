@@ -70,9 +70,9 @@ function ScriptsButton({ o, variant = "secondary" }: { o: PortalOpname; variant?
   return <span className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--color-ink-faint)]"><Clock className="size-3.5" /> Scripts volgen</span>;
 }
 
-function OpnameCard({ o, hero = false }: { o: PortalOpname; hero?: boolean }) {
+function OpnameCard({ o, hero = false, id }: { o: PortalOpname; hero?: boolean; id?: string }) {
   return (
-    <div className={`sc-glass ${hero ? "p-6" : "p-5"}`} style={hero ? { background: "linear-gradient(180deg, rgba(25,168,255,0.08), rgba(255,255,255,0.02))" } : undefined}>
+    <div id={id} className={`sc-glass scroll-mt-24 ${hero ? "p-6" : "p-5"}`} style={hero ? { background: "linear-gradient(180deg, rgba(25,168,255,0.08), rgba(255,255,255,0.02))" } : undefined}>
       <div className="flex items-start gap-4">
         <DateBadge date={o.date} large={hero} />
         <div className="min-w-0 flex-1">
@@ -104,12 +104,12 @@ function OpnameCard({ o, hero = false }: { o: PortalOpname; hero?: boolean }) {
   );
 }
 
-function ScriptMeetingCard({ m }: { m: PortalScriptMeeting }) {
+function ScriptMeetingCard({ m, id }: { m: PortalScriptMeeting; id?: string }) {
   const d = new Date(m.startsAt);
   const dateStr = d.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
   const time = m.allDay ? null : d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" });
   return (
-    <div className="sc-glass flex items-start gap-4 p-5">
+    <div id={id} className="sc-glass scroll-mt-24 flex items-start gap-4 p-5">
       <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[rgba(155,120,255,0.16)] text-[#b79bff]"><MessageSquareText className="size-5" /></span>
       <div className="min-w-0 flex-1">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(155,120,255,0.16)] px-2.5 py-0.5 text-[11px] font-semibold text-[#b79bff]">Scriptmeeting</span>
@@ -128,11 +128,79 @@ function ScriptMeetingCard({ m }: { m: PortalScriptMeeting }) {
   );
 }
 
+const WEEKDAYS = ["ma", "di", "wo", "do", "vr", "za", "zo"];
+
+type DayMark = { type: "opname" | "meeting" | "both"; href: string };
+
+/** Compacte maandkalender (maandag-start) met gemarkeerde opname-/meetingdagen. */
+function MonthCalendar({ year, month, marks }: { year: number; month: number; marks: Map<number, DayMark> }) {
+  const startWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // ma = 0
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  const isThisMonth = today.getFullYear() === year && today.getMonth() === month;
+  const cells: Array<number | null> = [...Array<null>(startWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+
+  return (
+    <div className="sc-glass p-4">
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
+        {WEEKDAYS.map((w) => <div key={w}>{w}</div>)}
+      </div>
+      <div className="mt-1.5 grid grid-cols-7 gap-1">
+        {cells.map((d, i) => {
+          if (d === null) return <div key={i} />;
+          const mark = marks.get(d);
+          const isToday = isThisMonth && d === today.getDate();
+          const base = "grid aspect-square place-items-center rounded-lg text-[12.5px] tabular-nums";
+          if (mark) {
+            const col = mark.type === "meeting" ? "bg-[rgba(155,120,255,0.18)] text-[#b79bff]" : "bg-[rgba(25,168,255,0.18)] text-[var(--sc-accent)]";
+            return <a key={i} href={mark.href} title="Bekijk afspraak" className={`${base} ${col} font-bold ring-1 ring-inset ring-[var(--sc-line)] transition-[filter] hover:brightness-110`}>{d}</a>;
+          }
+          return <div key={i} className={`${base} text-[var(--color-ink-muted)] ${isToday ? "font-semibold text-[var(--color-ink)] ring-1 ring-inset ring-[var(--sc-accent)]" : ""}`}>{d}</div>;
+        })}
+      </div>
+    </div>
+  );
+}
+
+const MONTH_NAMES = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
+
 export default async function PortalPlanningPage() {
   const viewer = await requirePortal();
   const [p, settings] = await Promise.all([getPortalPlanning(viewer), getPortalSettings()]);
 
   const hasAny = p.nextOpname || p.scriptMeetings.length > 0 || p.laterOpnames.length > 0;
+
+  // Agenda per maand opbouwen: alle toekomstige opnames + scriptmeetings bij hun maand.
+  const futureOpnames = [p.nextOpname, ...p.laterOpnames].filter((o): o is PortalOpname => o !== null);
+  const months = new Map<string, { year: number; month: number; opnames: PortalOpname[]; meetings: PortalScriptMeeting[] }>();
+  const ensureMonth = (y: number, m: number) => {
+    const key = `${y}-${m}`;
+    if (!months.has(key)) months.set(key, { year: y, month: m, opnames: [], meetings: [] });
+    return months.get(key)!;
+  };
+  for (const o of futureOpnames) { const d = new Date(`${o.date}T12:00:00`); ensureMonth(d.getFullYear(), d.getMonth()).opnames.push(o); }
+  for (const m of p.scriptMeetings) { const d = new Date(m.startsAt); ensureMonth(d.getFullYear(), d.getMonth()).meetings.push(m); }
+
+  // Minstens de komende 3 maanden tonen, tot en met de laatste maand met een afspraak.
+  const now = new Date();
+  let span = 3;
+  for (const v of months.values()) { const diff = (v.year - now.getFullYear()) * 12 + (v.month - now.getMonth()); if (diff + 1 > span) span = diff + 1; }
+  span = Math.min(span, 12);
+  const agenda = Array.from({ length: span }, (_, i) => {
+    const y = now.getFullYear() + Math.floor((now.getMonth() + i) / 12);
+    const m = (now.getMonth() + i) % 12;
+    const bucket = months.get(`${y}-${m}`) ?? { year: y, month: m, opnames: [], meetings: [] };
+    // Dag-markeringen voor de kalender.
+    const marks = new Map<number, DayMark>();
+    for (const o of bucket.opnames) { const day = new Date(`${o.date}T12:00:00`).getDate(); const ex = marks.get(day); marks.set(day, { type: ex && ex.type === "meeting" ? "both" : "opname", href: `#item-op-${o.id}` }); }
+    for (const mt of bucket.meetings) { const day = new Date(mt.startsAt).getDate(); const ex = marks.get(day); marks.set(day, { type: ex ? "both" : "meeting", href: ex ? ex.href : `#item-mt-${mt.id}` }); }
+    // Detailkaarten chronologisch.
+    const items = [
+      ...bucket.opnames.map((o) => ({ date: o.date, node: <OpnameCard key={`op-${o.id}`} id={`item-op-${o.id}`} o={o} /> })),
+      ...bucket.meetings.map((mt) => ({ date: mt.startsAt.slice(0, 10), node: <ScriptMeetingCard key={`mt-${mt.id}`} id={`item-mt-${mt.id}`} m={mt} /> })),
+    ].sort((a, b) => a.date.localeCompare(b.date));
+    return { year: y, month: m, marks, items };
+  });
 
   return (
     <div className="flex flex-col gap-7">
@@ -154,7 +222,7 @@ export default async function PortalPlanningPage() {
         </div>
       ) : (
         <>
-          {/* Eerstvolgende opname */}
+          {/* Eerstvolgende opname — snelle blik */}
           {p.nextOpname ? (
             <section>
               <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--color-ink-faint)]"><CalendarClock className="size-4 text-[var(--sc-accent)]" /> JE EERSTVOLGENDE OPNAME</h2>
@@ -162,25 +230,33 @@ export default async function PortalPlanningPage() {
             </section>
           ) : null}
 
-          {/* Volgende opnames */}
-          {p.laterOpnames.length > 0 ? (
-            <section>
-              <h2 className="mb-3 text-base font-semibold">Volgende opnames</h2>
-              <div className="flex flex-col gap-3">
-                {p.laterOpnames.map((o) => <OpnameCard key={o.id} o={o} />)}
+          {/* Agenda — per maand, meerdere maanden onder elkaar */}
+          <section>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-semibold">Agenda</h2>
+              <div className="flex items-center gap-3 text-[11.5px] text-[var(--color-ink-muted)]">
+                <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[4px] bg-[rgba(25,168,255,0.5)]" /> Opname</span>
+                <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[4px] bg-[rgba(155,120,255,0.5)]" /> Scriptmeeting</span>
               </div>
-            </section>
-          ) : null}
-
-          {/* Scriptmeetings */}
-          {p.scriptMeetings.length > 0 ? (
-            <section>
-              <h2 className="mb-3 text-base font-semibold">Scriptmeetings</h2>
-              <div className="flex flex-col gap-3">
-                {p.scriptMeetings.map((m) => <ScriptMeetingCard key={m.id} m={m} />)}
-              </div>
-            </section>
-          ) : null}
+            </div>
+            <div className="flex flex-col gap-6">
+              {agenda.map((mo) => (
+                <div key={`${mo.year}-${mo.month}`}>
+                  <h3 className="mb-2.5 text-[15px] font-semibold capitalize">{MONTH_NAMES[mo.month]} {mo.year}</h3>
+                  <div className="grid gap-3 lg:grid-cols-[minmax(260px,320px)_1fr] lg:items-start">
+                    <MonthCalendar year={mo.year} month={mo.month} marks={mo.marks} />
+                    {mo.items.length > 0 ? (
+                      <div className="flex flex-col gap-3">
+                        {mo.items.map((it) => it.node)}
+                      </div>
+                    ) : (
+                      <div className="sc-glass flex items-center px-5 py-4 text-[13.5px] text-[var(--color-ink-faint)]">Nog niets gepland deze maand.</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         </>
       )}
 
