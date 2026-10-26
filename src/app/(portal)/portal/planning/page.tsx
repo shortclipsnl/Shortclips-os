@@ -6,7 +6,7 @@ import { getPortalPlanning, type PortalOpname, type PortalScriptMeeting, type Po
 import { getPortalSettingsForClient } from "@/server/portal-settings";
 import { Avatar, buttonClass } from "@/components/ui";
 import { formatDateFull } from "@/lib/format";
-import { VoorbereidingChecklist } from "@/components/portal/voorbereiding-checklist";
+import { VoorbereidingOverzicht } from "@/components/portal/voorbereiding-overzicht";
 import { OpnamedagContent } from "../samenwerking/_content";
 
 export const metadata: Metadata = { title: "Planning" };
@@ -235,22 +235,7 @@ export default async function PortalPlanningPage() {
             </section>
           ) : null}
 
-          {/* Voorbereiding op de opname — checklist (document) + dagindeling */}
-          {p.nextOpname || p.laterOpnames.length > 0 ? (
-            <section id="voorbereiding" className="scroll-mt-24">
-              <h2 className="mb-1 flex items-center gap-2 text-base font-semibold"><ClipboardCheck className="size-4 text-[var(--sc-accent)]" /> Voorbereiding op je opname</h2>
-              <p className="mb-3 text-[13px] text-[var(--color-ink-muted)]">Vink af wat geregeld is. We onthouden je voortgang in deze browser.</p>
-              <div className="sc-glass p-5 sm:p-6">
-                <VoorbereidingChecklist storageKey={p.nextOpname?.id ?? "algemeen"} />
-              </div>
-              <details className="sc-glass mt-3 p-5 [&_summary]:cursor-pointer">
-                <summary className="flex items-center gap-2 text-base font-semibold"><CalendarClock className="size-4 text-[var(--sc-accent)]" /> Zo ziet de opnamedag eruit</summary>
-                <div className="mt-4"><OpnamedagContent /></div>
-              </details>
-            </section>
-          ) : null}
-
-          {/* Agenda — per maand, meerdere maanden onder elkaar */}
+          {/* Agenda — per maand, meerdere maanden duidelijk onder elkaar */}
           <section>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-base font-semibold">Agenda</h2>
@@ -259,24 +244,46 @@ export default async function PortalPlanningPage() {
                 <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[4px] bg-[rgba(155,120,255,0.5)]" /> Scriptmeeting</span>
               </div>
             </div>
-            <div className="flex flex-col gap-6">
-              {agenda.map((mo) => (
-                <div key={`${mo.year}-${mo.month}`}>
-                  <h3 className="mb-2.5 text-[15px] font-semibold capitalize">{MONTH_NAMES[mo.month]} {mo.year}</h3>
-                  <div className="grid gap-3 lg:grid-cols-[minmax(260px,320px)_1fr] lg:items-start">
-                    <MonthCalendar year={mo.year} month={mo.month} marks={mo.marks} />
-                    {mo.items.length > 0 ? (
-                      <div className="flex flex-col gap-3">
-                        {mo.items.map((it) => it.node)}
-                      </div>
-                    ) : (
-                      <div className="sc-glass flex items-center px-5 py-4 text-[13.5px] text-[var(--color-ink-faint)]">Nog niets gepland deze maand.</div>
-                    )}
+            <div className="flex flex-col gap-7">
+              {agenda.map((mo) => {
+                const count = mo.items.length;
+                return (
+                  <div key={`${mo.year}-${mo.month}`}>
+                    {/* Duidelijke maandkop in volle kleur, zodat je per maand kunt scannen. */}
+                    <div className="mb-3 flex items-center justify-between gap-2 rounded-[12px] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+                      <h3 className="text-[15px] font-bold capitalize tracking-tight">{MONTH_NAMES[mo.month]} {mo.year}</h3>
+                      <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11.5px] font-semibold">{count > 0 ? `${count} ${count === 1 ? "afspraak" : "afspraken"}` : "niets gepland"}</span>
+                    </div>
+                    <div className="grid gap-3 lg:grid-cols-[minmax(260px,320px)_1fr] lg:items-start">
+                      <MonthCalendar year={mo.year} month={mo.month} marks={mo.marks} />
+                      {count > 0 ? (
+                        <div className="flex flex-col gap-3">
+                          {mo.items.map((it) => it.node)}
+                        </div>
+                      ) : (
+                        <div className="sc-glass flex items-center px-5 py-4 text-[13.5px] text-[var(--color-ink-faint)]">Nog niets gepland deze maand.</div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
+
+          {/* Voorbereiding op de opname — overzicht (minder belangrijk, daarom lager) */}
+          {p.nextOpname || p.laterOpnames.length > 0 ? (
+            <section id="voorbereiding" className="scroll-mt-24">
+              <h2 className="mb-1 flex items-center gap-2 text-base font-semibold"><ClipboardCheck className="size-4 text-[var(--sc-accent)]" /> Voorbereiding op je opname</h2>
+              <p className="mb-3 text-[13px] text-[var(--color-ink-muted)]">Een overzicht van wat er vóór de opnamedag geregeld moet zijn.</p>
+              <div className="sc-glass p-5 sm:p-6">
+                <VoorbereidingOverzicht />
+              </div>
+              <details className="sc-glass mt-3 p-5 [&_summary]:cursor-pointer">
+                <summary className="flex items-center gap-2 text-base font-semibold"><CalendarClock className="size-4 text-[var(--sc-accent)]" /> Zo ziet de opnamedag eruit</summary>
+                <div className="mt-4"><OpnamedagContent /></div>
+              </details>
+            </section>
+          ) : null}
         </>
       )}
 
@@ -301,18 +308,26 @@ export default async function PortalPlanningPage() {
         </details>
       ) : null}
 
-      {/* Afspraak wijzigen of annuleren — de geldende voorwaarden (intern instelbaar) */}
-      <section className="sc-glass p-5 sm:p-6">
-        <div className="flex items-center gap-2">
-          <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><CalendarClock className="size-4" /></span>
-          <h2 className="text-base font-semibold">Opname wijzigen of annuleren</h2>
+      {/* Opname wijzigen of annuleren — belangrijk, dus duidelijk en opvallend */}
+      <section className="overflow-hidden rounded-[16px] border border-[#ffb020]/35 bg-[rgba(255,176,32,0.05)]">
+        <div className="flex items-center gap-2 border-b border-[#ffb020]/25 bg-[rgba(255,176,32,0.1)] px-5 py-3">
+          <span className="grid size-7 place-items-center rounded-lg bg-[rgba(255,176,32,0.18)] text-[#e08900]"><CalendarClock className="size-4" /></span>
+          <h2 className="text-[15px] font-bold">Opname wijzigen of annuleren</h2>
         </div>
-        <ul className="mt-3 flex flex-col gap-2 text-[13.5px] text-[var(--color-ink-muted)]">
-          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[var(--sc-accent)]" /> Wil je een opname verplaatsen of annuleren? Laat het je vaste contactpersoon zo snel mogelijk weten.</li>
-          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[var(--sc-accent)]" /> Kosteloos verplaatsen of annuleren kan tot <strong className="text-[var(--color-ink)]">{settings.cancelNoticeDays} werkdagen</strong> voor de opnamedag.</li>
-          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[#ffb020]" /> Bij annulering binnen {settings.cancelNoticeDays} werkdagen wordt <strong className="text-[var(--color-ink)]">{settings.cancelFee}</strong> in rekening gebracht. {settings.cancelLateNote}</li>
-          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[var(--sc-accent)]" /> Een nieuwe datum plannen we direct met je in, afhankelijk van de beschikbaarheid.</li>
-        </ul>
+        <div className="grid gap-3 p-5 sm:grid-cols-2">
+          <div className="rounded-[12px] border border-[#2fd27a]/30 bg-[rgba(47,210,122,0.06)] p-4">
+            <div className="text-[13px] font-semibold text-[#2fd27a]">Kosteloos</div>
+            <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Verplaatsen of annuleren kan gratis tot <strong className="text-[var(--color-ink)]">{settings.cancelNoticeDays} werkdagen</strong> vóór de opnamedag.</p>
+          </div>
+          <div className="rounded-[12px] border border-[#ffb020]/35 bg-[rgba(255,176,32,0.08)] p-4">
+            <div className="text-[13px] font-semibold text-[#e08900]">Binnen {settings.cancelNoticeDays} werkdagen</div>
+            <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Dan wordt <strong className="text-[var(--color-ink)]">{settings.cancelFee}</strong> in rekening gebracht. {settings.cancelLateNote}</p>
+          </div>
+          <div className="sm:col-span-2 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-[13px] text-[var(--color-ink-muted)]">
+            <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-[var(--sc-accent)]" /> Laat het je vaste contactpersoon zo snel mogelijk weten.</span>
+            <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-[var(--sc-accent)]" /> Een nieuwe datum plannen we direct met je in, afhankelijk van de beschikbaarheid.</span>
+          </div>
+        </div>
       </section>
     </div>
   );
