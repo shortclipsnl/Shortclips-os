@@ -48,7 +48,6 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/planning", label: "Productieplanning", icon: "CalendarRange", permissions: ["productions:read", "videos:read"], match: "/planning" },
       { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },
       { href: "/scripting", label: "Scripting", icon: "ScrollText", permissions: ["scripts:read"], match: "/scripting" },
-      { href: "/scriptcontrole", label: "Scriptcontrole", icon: "ClipboardCheck", permissions: ["scripts:write"], match: "/scriptcontrole" },
       { href: "/productions", label: "Opnameplanning", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
       { href: "/videos", label: "Editing", icon: "Scissors", permissions: ["videos:read"], match: "/videos" },
       // Persoonlijke klantenbibliotheek voor editors (eigen klanten + Editing Guide).

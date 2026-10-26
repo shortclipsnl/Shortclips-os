@@ -8,6 +8,7 @@ import { setScriptingNote, setScriptingStatus, setScriptWriter } from "@/server/
 import { SCRIPTING_ORDER, SCRIPTING_STATUS, SCRIPT_STATUS } from "@/lib/statuses";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import type { ScriptingRow, WriterOption, LinkedScript } from "@/server/scripting";
+import { PortalSendCell } from "./portal-send";
 
 /** Toon-kleur per status-tone, voor de kleine statuspillen van gekoppelde scripts. */
 const TONE_COLOR: Record<string, string> = {
@@ -164,7 +165,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
       <div className="mb-2 text-xs text-[var(--color-ink-faint)]">{filtered.length} van {rows.length} opnames</div>
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <table className="w-full min-w-[1200px] text-sm">
+        <table className="w-full min-w-[1360px] text-sm">
           <thead>
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] text-left text-xs text-[var(--color-ink-faint)]">
               <th className="px-3 py-2 font-medium">Klant</th>
@@ -175,6 +176,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
               <th className="px-2 py-2 font-medium">Scriptingstatus</th>
               <th className="px-2 py-2 font-medium">Scripts</th>
               <th className="px-2 py-2 font-medium">Notitie</th>
+              <th className="px-2 py-2 font-medium">Klantportaal</th>
             </tr>
           </thead>
           <tbody>
@@ -183,12 +185,12 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                 {/* Ruimte tussen de weekgroepen, zodat het beter scanbaar is. */}
                 {gi > 0 ? (
                   <tr aria-hidden>
-                    <td colSpan={8} className="h-6 bg-[var(--color-surface)]" />
+                    <td colSpan={9} className="h-6 bg-[var(--color-surface)]" />
                   </tr>
                 ) : null}
                 {/* Week-kop in volle kleur, zodat je van week naar week kunt scannen. */}
                 <tr>
-                  <td colSpan={8} className="p-0">
+                  <td colSpan={9} className="p-0">
                     <div
                       className="flex items-center gap-2 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white"
                       style={{ background: WEEK_COLOR[g.order] ?? "var(--color-ink-muted)" }}
@@ -227,12 +229,15 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                     <td className="px-2 py-2 align-top">
                       <NoteCell id={r.id} note={r.note} canWrite={canWrite} />
                     </td>
+                    <td className="px-2 py-2 align-top">
+                      <PortalSendCell row={r} canWrite={canWrite} />
+                    </td>
                   </tr>
                 ))}
               </Fragment>
             ))}
             {groups.length === 0 ? (
-              <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
+              <tr><td colSpan={9} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
             ) : null}
           </tbody>
         </table>

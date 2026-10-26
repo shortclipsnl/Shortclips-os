@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
-import { clients, productionDays, scripts, users } from "@/db/schema";
+import { clients, productionDays, scriptReviews, scripts, users } from "@/db/schema";
 import { requireInternal, scopeToClients, type Viewer } from "@/server/auth/context";
 import { CORE_STAFF_EMAILS, coreStaffRank } from "@/server/core-staff";
 import { listClientDriveScriptLinks, type DriveScriptLink } from "@/server/scripts/drive-scripts";
@@ -49,6 +49,9 @@ export type ScriptingRow = {
   scripts: LinkedScript[];
   /** Scriptbestanden van deze klant in Google Drive (automatisch gelinkt). */
   driveScripts: DriveScriptLink[];
+  /** Script-PDF ter controle in het klantportaal (als er al één verstuurd is). */
+  reviewId: string | null;
+  reviewStatus: string | null;
 };
 
 /** Eén aan de opname gekoppeld script, met status en volledige inhoud (voor
@@ -150,6 +153,15 @@ export async function listScripting(viewer: Viewer) {
   // het platform kan openen zonder naar Drive te hoeven.
   const driveByClient = await listClientDriveScriptLinks([...new Set(rows.map((r) => r.clientId))]);
 
+  // Script-PDF's die al ter controle in het klantportaal staan (per opname).
+  const reviewRows = dayIds.length
+    ? await db
+        .select({ id: scriptReviews.id, productionDayId: scriptReviews.productionDayId, status: scriptReviews.status })
+        .from(scriptReviews)
+        .where(and(inArray(scriptReviews.productionDayId, dayIds), isNull(scriptReviews.deletedAt)))
+    : [];
+  const reviewByDay = new Map(reviewRows.map((r) => [r.productionDayId, { id: r.id, status: r.status as string }]));
+
   const holidays = nlHolidaySet();
   const list: ScriptingRow[] = rows.map((r) => {
     // Scriptdeadline = 7 wérkdagen vóór de opname (niet kalenderdagen), conform
@@ -186,6 +198,8 @@ export async function listScripting(viewer: Viewer) {
       scriptWriterAvatar: r.scriptWriterAvatar ?? r.coordinatorAvatar,
       scripts: scriptsByDay.get(r.id) ?? [],
       driveScripts: driveByClient.get(r.clientId) ?? [],
+      reviewId: reviewByDay.get(r.id)?.id ?? null,
+      reviewStatus: reviewByDay.get(r.id)?.status ?? null,
     };
   });
 

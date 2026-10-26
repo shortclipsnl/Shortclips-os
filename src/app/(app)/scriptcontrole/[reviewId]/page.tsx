@@ -31,8 +31,8 @@ export default async function InternalScriptReviewPage({ params }: { params: Pro
 
   return (
     <div className="mx-auto max-w-[1100px]">
-      <Link href="/scriptcontrole" className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-brand-600)] hover:underline">
-        <ArrowLeft className="size-4" /> Terug naar scriptcontrole
+      <Link href="/scripting" className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-brand-600)] hover:underline">
+        <ArrowLeft className="size-4" /> Terug naar scripting
       </Link>
       <PageHeader
         title={review.title}
