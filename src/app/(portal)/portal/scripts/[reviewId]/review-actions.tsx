@@ -29,6 +29,21 @@ export function ScriptReviewActions({
   const [pending, start] = useTransition();
   const router = useRouter();
 
+  if (sent) {
+    return (
+      <div className="flex items-start gap-2.5 rounded-[16px] border border-[rgba(46,144,250,0.35)] bg-[rgba(25,168,255,0.08)] p-5 text-[14px]">
+        <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[var(--sc-accent)]" />
+        <div>
+          <p className="font-semibold">Je feedback is doorgestuurd</p>
+          <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">
+            Je vaste contactpersoon bij Shortclips heeft bericht gekregen en verwerkt je opmerkingen. Zodra de bijgewerkte versie
+            klaar is, zetten we die hier terug en krijg je een melding om opnieuw te kijken.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (approved) {
     const when = approvedAt ? new Date(approvedAt).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" }) : null;
     return (
