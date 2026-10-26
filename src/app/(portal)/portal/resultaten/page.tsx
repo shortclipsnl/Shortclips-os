@@ -3,6 +3,7 @@ import { ArrowUpRight, Check, Sparkles, Target, ThumbsUp, TrendingUp, Wand2 } fr
 import { requirePortal } from "@/server/auth/context";
 import { getPortalResults } from "@/server/portal";
 import { getApprovedImprovementForClient, type ImprovementContent } from "@/server/improvements";
+import { parsePortalPeriod, portalPeriodQuery } from "@/lib/portal-periods";
 import { PortalResultsView } from "./results-view";
 
 export const metadata: Metadata = { title: "Resultaten" };
@@ -20,18 +21,20 @@ const SECTIONS: Array<{ k: keyof ImprovementContent; label: string; icon: typeof
 export default async function PortalResultatenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periode?: string }>;
+  searchParams: Promise<{ periode?: string; van?: string; tot?: string }>;
 }) {
   const viewer = await requirePortal();
-  const { periode } = await searchParams;
-  const days = periode === "90" ? 90 : 30;
-  const [r, improvement] = await Promise.all([getPortalResults(viewer, days), getApprovedImprovementForClient(viewer)]);
+  const period = parsePortalPeriod(await searchParams);
+  const [r, improvement] = await Promise.all([
+    getPortalResults(viewer, { days: period.days, from: period.from, to: period.to, periodKey: period.key }),
+    getApprovedImprovementForClient(viewer),
+  ]);
 
   const visible = improvement ? SECTIONS.filter((s) => improvement.content[s.k].length > 0) : [];
 
   return (
     <div className="flex flex-col gap-7">
-      <PortalResultsView r={r} days={days} hrefForDays={(d) => `/portal/resultaten?periode=${d}`} />
+      <PortalResultsView r={r} basePath="/portal/resultaten" reportHref={`/resultatenrapport?${portalPeriodQuery(period)}`} />
 
       {visible.length > 0 ? (
         <section className="sc-glass p-6 sm:p-7" style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.07), rgba(255,255,255,0.02))" }}>

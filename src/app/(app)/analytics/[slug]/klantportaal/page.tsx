@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { clients } from "@/db/schema";
 import { requirePermission } from "@/server/auth/context";
 import { getPortalResultsForClient } from "@/server/portal";
+import { parsePortalPeriod, portalPeriodQuery } from "@/lib/portal-periods";
 import { Logo } from "@/components/logo";
 import { PortalResultsView } from "@/app/(portal)/portal/resultaten/results-view";
 
@@ -24,12 +25,11 @@ export default async function KlantportaalVoorbeeldPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ periode?: string }>;
+  searchParams: Promise<{ periode?: string; van?: string; tot?: string }>;
 }) {
   const viewer = await requirePermission("analytics:read");
   const { slug } = await params;
-  const { periode } = await searchParams;
-  const days = periode === "90" ? 90 : 30;
+  const period = parsePortalPeriod(await searchParams);
 
   const [client] = await db
     .select({ id: clients.id, name: clients.name })
@@ -38,7 +38,7 @@ export default async function KlantportaalVoorbeeldPage({
     .limit(1);
   if (!client) notFound();
 
-  const r = await getPortalResultsForClient(viewer, client.id, days);
+  const r = await getPortalResultsForClient(viewer, client.id, { days: period.days, from: period.from, to: period.to, periodKey: period.key });
 
   return (
     <div className="mx-auto max-w-[1100px]">
@@ -61,7 +61,7 @@ export default async function KlantportaalVoorbeeldPage({
           <span className="text-sm text-white/70">{client.name}</span>
         </div>
         <div className="p-5 sm:p-7">
-          <PortalResultsView r={r} days={days} hrefForDays={(d) => `/analytics/${slug}/klantportaal?periode=${d}`} />
+          <PortalResultsView r={r} basePath={`/analytics/${slug}/klantportaal`} reportHref={`/resultatenrapport/${slug}?${portalPeriodQuery(period)}`} />
         </div>
       </div>
     </div>
