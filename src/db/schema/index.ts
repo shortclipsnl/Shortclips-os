@@ -18,3 +18,4 @@ export * from "./mentor";
 export * from "./vermogen";
 export * from "./development";
 export * from "./client-library";
+export * from "./script-review";

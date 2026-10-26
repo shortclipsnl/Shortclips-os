@@ -282,3 +282,12 @@ export const matchDecisionEnum = pgEnum("match_decision", [
   "created",
   "skipped",
 ]);
+
+/** Status van een script-PDF-review in het klantportaal (Adobe-vervanger). */
+export const scriptReviewStatusEnum = pgEnum("script_review_status", [
+  "klaar_controle",   // Klaar voor controle — ligt bij de klant
+  "feedback_gegeven", // Klant heeft opmerkingen geplaatst
+  "wordt_aangepast",  // Shortclips verwerkt de feedback
+  "opnieuw_controle", // Nieuwe versie klaar — opnieuw bij de klant
+  "goedgekeurd",      // Definitief goedgekeurd
+]);

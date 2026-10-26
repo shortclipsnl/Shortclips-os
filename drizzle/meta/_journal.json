@@ -470,6 +470,13 @@
       "when": 1792867099048,
       "tag": "0066_wet_living_tribunal",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1793013991581,
+      "tag": "0067_chemical_whiplash",
+      "breakpoints": true
     }
   ]
 }
