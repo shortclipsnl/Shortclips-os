@@ -4,6 +4,7 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } fro
 import { db } from "@/db/client";
 import {
   activityEvents,
+  clientContacts,
   clientIntegrations,
   clientPackages,
   clientReports,
@@ -666,6 +667,76 @@ export async function getPortalCollaboration(viewer: Viewer): Promise<{
     contract: contract ?? null,
     platforms: [...platformSet],
     upcomingShoots: Number(shootCount ?? 0),
+  };
+}
+
+export type PortalProfile = {
+  company: { name: string; legalName: string | null; logoUrl: string | null; color: string | null; sector: string | null; website: string | null; description: string | null };
+  startedOn: string | null;
+  daysTogether: number | null;
+  monthsTogether: number | null;
+  monthlyQuota: number;
+  packageName: string | null;
+  shootDaysPerMonth: number;
+  platforms: string[];
+  upcomingShoots: number;
+  contract: { startsOn: string; endsOn: string | null; noticePeriodDays: number } | null;
+  stats: { shortsProduced: number; opnamesDone: number };
+  clientContacts: Array<{ name: string; role: string | null; email: string | null; phone: string | null; isPrimary: boolean }>;
+};
+
+/**
+ * Alles voor de samenwerkingspagina (het "klantprofiel"): bedrijfsgegevens, de
+ * afspraken (hergebruikt getPortalCollaboration), de contactpersonen van de klant,
+ * en een paar samenwerkingsstatistieken. Volledig klant-gescoped; ontbrekende
+ * velden komen als null terug (niet verzinnen).
+ */
+export async function getPortalProfile(viewer: Viewer): Promise<PortalProfile> {
+  const clientId = viewer.clientId;
+  if (!clientId) notFound();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const collab = await getPortalCollaboration(viewer);
+
+  const [client] = await db
+    .select({ name: clients.name, legalName: clients.legalName, logoUrl: clients.logoUrl, color: clients.color, sector: clients.sector, website: clients.website, description: clients.description })
+    .from(clients)
+    .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
+    .limit(1);
+  if (!client) notFound();
+
+  const [[producedRow], [opnamesRow], contacts] = await Promise.all([
+    db.select({ n: sql<number>`count(*)` }).from(deliverables).where(and(eq(deliverables.clientId, clientId), isNull(deliverables.deletedAt), eq(deliverables.status, "published"))),
+    db.select({ n: sql<number>`count(*)` }).from(productionDays).where(and(eq(productionDays.clientId, clientId), isNull(productionDays.deletedAt), sql`${productionDays.status} <> 'cancelled'`, sql`${productionDays.scheduledOn} < ${today}`)),
+    db.select({ name: clientContacts.fullName, role: clientContacts.role, email: clientContacts.email, phone: clientContacts.phone, isPrimary: clientContacts.isPrimary })
+      .from(clientContacts)
+      .where(and(eq(clientContacts.clientId, clientId), isNull(clientContacts.deletedAt)))
+      .orderBy(desc(clientContacts.isPrimary)),
+  ]);
+
+  const startIso = collab.contract?.startsOn ?? collab.startedOn ?? null;
+  let daysTogether: number | null = null;
+  let monthsTogether: number | null = null;
+  if (startIso) {
+    const start = new Date(`${startIso}T12:00:00`);
+    const now = new Date();
+    daysTogether = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 86_400_000));
+    monthsTogether = Math.max(0, (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()));
+  }
+
+  return {
+    company: client,
+    startedOn: collab.startedOn,
+    daysTogether,
+    monthsTogether,
+    monthlyQuota: collab.monthlyQuota,
+    packageName: collab.packageName,
+    shootDaysPerMonth: collab.shootDaysPerMonth,
+    platforms: collab.platforms,
+    upcomingShoots: collab.upcomingShoots,
+    contract: collab.contract,
+    stats: { shortsProduced: Number(producedRow?.n ?? 0), opnamesDone: Number(opnamesRow?.n ?? 0) },
+    clientContacts: contacts.map((c) => ({ name: c.name, role: c.role ?? null, email: c.email ?? null, phone: c.phone ?? null, isPrimary: c.isPrimary })),
   };
 }
 
