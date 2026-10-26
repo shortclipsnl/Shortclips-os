@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { clientFinanceMonths, clients, companyFinanceMonths, fixedCosts } from "@/db/schema";
 import { requirePermission } from "@/server/auth/context";
 import { getProfitSettings, marginColor, type ProfitSettings } from "@/server/profit-settings";
+import { VG_DAY, VG_MAX_HOURS, VG_RATE } from "@/lib/videographer-cost";
 
 /**
  * Winstgevendheid per klant. Bouwt voort op de bestaande per-klant maandstaten
@@ -38,6 +39,8 @@ export type ClientProfit = {
   shootCost: number;
   strategyCost: number;
   otherCost: number;
+  /** Berekende videograafkosten (opnamedagen × uren × uurtarief). */
+  videographerCost: number;
   directeKosten: number;
   brutowinst: number;
   brutomarge: number | null;
@@ -102,6 +105,28 @@ async function overheadPool(period: string): Promise<{ pool: number; heeftData: 
   return { pool, heeftData: fixedTotal > 0 || staff > 0 || other > 0 };
 }
 
+/**
+ * Videograafkosten per klant voor een maand: opnamedagen × gefilmde uren
+ * (max 8/dag) × het uurtarief. Zelfde berekening als op de editkosten-pagina.
+ * De terugval (geen vastgelegde opnamedag = 1 standaarddag) past de aanroeper
+ * toe, zodat er nergens videograafkosten ontbreken.
+ */
+async function videographerHoursByClient(period: string): Promise<Map<string, number>> {
+  const res = await db.execute(sql`
+    select client_id as "clientId",
+      coalesce(sum(least(${VG_MAX_HOURS}::numeric,
+        case when start_time is not null and end_time is not null and end_time > start_time
+          then extract(epoch from (end_time - start_time))/3600.0
+          else ${VG_MAX_HOURS}::numeric end)),0)::float hours
+    from production_days
+    where deleted_at is null and status <> 'cancelled'
+      and to_char(scheduled_on, 'YYYY-MM') = ${period}
+    group by client_id
+  `);
+  const rows = ((res as { rows?: unknown[] }).rows ?? (res as unknown as unknown[])) as Array<{ clientId: string; hours: number }>;
+  return new Map(rows.map((r) => [r.clientId, Number(r.hours)]));
+}
+
 /** Werkelijk opgeleverde shorts per klant in een maand. */
 async function shortsByClient(period: string): Promise<Map<string, number>> {
   const res = await db.execute(sql`
@@ -122,7 +147,14 @@ export async function getClientProfitability(period: string, trusted = false): P
   const settings = await getProfitSettings();
   const prev = prevPeriod(period);
 
-  const [cur, prevRows, oh, shorts] = await Promise.all([loadMonth(period), loadMonth(prev), overheadPool(period), shortsByClient(period)]);
+  const [cur, prevRows, oh, shorts, vgHours, prevVgHours] = await Promise.all([
+    loadMonth(period), loadMonth(prev), overheadPool(period), shortsByClient(period), videographerHoursByClient(period), videographerHoursByClient(prev),
+  ]);
+  // Videograafkosten per klant: uren × tarief; geen vastgelegde opnamedag = 1 standaarddag.
+  const vgCost = (clientId: string, hoursMap: Map<string, number>) => {
+    const hours = hoursMap.get(clientId);
+    return hours && hours > 0 ? hours * VG_RATE : VG_DAY;
+  };
 
   const prevByClient = new Map(prevRows.map((r) => [r.clientId, r]));
   const totalOmzet = cur.reduce((s, r) => s + n(r.revenue) + n(r.extraRevenue), 0);
@@ -134,7 +166,8 @@ export async function getClientProfitability(period: string, trusted = false): P
     const shootCost = n(r.shootCost);
     const strategyCost = n(r.strategyCost);
     const otherCost = n(r.otherCost);
-    const directeKosten = editCost + shootCost + strategyCost + otherCost;
+    const videographerCost = Math.round(vgCost(r.clientId, vgHours) * 100) / 100;
+    const directeKosten = editCost + shootCost + strategyCost + otherCost + videographerCost;
     const brutowinst = omzet - directeKosten;
     const brutomarge = pct(brutowinst, omzet);
     // Overhead naar rato van omzetaandeel (geschat).
@@ -144,11 +177,11 @@ export async function getClientProfitability(period: string, trusted = false): P
 
     const p = prevByClient.get(r.clientId);
     const prevOmzet = p ? n(p.revenue) + n(p.extraRevenue) : null;
-    const prevBruto = p ? (n(p.revenue) + n(p.extraRevenue)) - (n(p.editCost) + n(p.shootCost) + n(p.strategyCost) + n(p.otherCost)) : null;
+    const prevBruto = p ? (n(p.revenue) + n(p.extraRevenue)) - (n(p.editCost) + n(p.shootCost) + n(p.strategyCost) + n(p.otherCost) + vgCost(p.clientId, prevVgHours)) : null;
 
     return {
       clientId: r.clientId, name: r.name, slug: r.slug, logoUrl: r.logoUrl, color: r.color,
-      omzet, editCost, shootCost, strategyCost, otherCost, directeKosten, brutowinst, brutomarge,
+      omzet, editCost, shootCost, strategyCost, otherCost, videographerCost, directeKosten, brutowinst, brutomarge,
       shorts: sh, gemOmzetPerShort: sh > 0 ? Math.round(omzet / sh) : null,
       overhead, nettoGeschat, nettoMarge: pct(nettoGeschat, omzet),
       kleur: marginColor(brutomarge, settings),
@@ -177,11 +210,22 @@ export async function getClientProfitability(period: string, trusted = false): P
 export async function getProfitabilityMonthly(months = 6): Promise<Array<{ period: string; omzet: number; directeKosten: number; brutowinst: number; brutomarge: number | null }>> {
   await requirePermission("finance:read");
   const res = await db.execute(sql`
+    with vg as (
+      select to_char(scheduled_on,'YYYY-MM') period, client_id,
+        coalesce(sum(least(${VG_MAX_HOURS}::numeric,
+          case when start_time is not null and end_time is not null and end_time > start_time
+            then extract(epoch from (end_time - start_time))/3600.0
+            else ${VG_MAX_HOURS}::numeric end)),0)::float hours
+      from production_days where deleted_at is null and status <> 'cancelled'
+      group by 1, 2
+    )
     select cfm.period as period,
            coalesce(sum(cfm.revenue + cfm.extra_revenue),0)::numeric as omzet,
-           coalesce(sum(cfm.edit_cost + cfm.shoot_cost + cfm.strategy_cost + cfm.other_cost),0)::numeric as kosten
+           coalesce(sum(cfm.edit_cost + cfm.shoot_cost + cfm.strategy_cost + cfm.other_cost
+             + case when coalesce(vg.hours,0) > 0 then vg.hours * ${VG_RATE} else ${VG_DAY} end),0)::numeric as kosten
     from client_finance_months cfm
     join clients c on c.id = cfm.client_id and c.deleted_at is null and c.status <> 'churned'
+    left join vg on vg.period = cfm.period and vg.client_id = cfm.client_id
     group by cfm.period
     order by cfm.period desc
     limit ${months}

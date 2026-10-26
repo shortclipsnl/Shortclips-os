@@ -111,7 +111,7 @@ export default async function WinstgevendheidPage({ searchParams }: { searchPara
                 </td>
                 <td className="sc-td text-right tabular-nums">{eur(r.omzet)}</td>
                 <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{r.shorts}{r.gemOmzetPerShort ? <span className="block text-2xs text-[var(--color-ink-faint)]">{eur(r.gemOmzetPerShort)}/short</span> : null}</td>
-                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]" title={`Edit ${eur(r.editCost)} · Opname ${eur(r.shootCost)} · Strategie ${eur(r.strategyCost)} · Overig ${eur(r.otherCost)}`}>{eur(r.directeKosten)}</td>
+                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]" title={`Edit ${eur(r.editCost)} · Videograaf ${eur(r.videographerCost)} · Opname ${eur(r.shootCost)} · Strategie ${eur(r.strategyCost)} · Overig ${eur(r.otherCost)}`}>{eur(r.directeKosten)}</td>
                 <td className="sc-td text-right font-semibold tabular-nums" style={{ color: r.brutowinst >= 0 ? "var(--color-ink)" : "var(--color-bad)" }}>{eur(r.brutowinst)}</td>
                 <td className="sc-td text-right font-semibold tabular-nums" style={{ color: DOT[r.kleur] }}>{r.brutomarge != null ? `${r.brutomarge}%` : "—"}</td>
                 <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{eur(r.nettoGeschat)}<span className="block text-2xs text-[var(--color-ink-faint)]">na overhead</span></td>
@@ -152,7 +152,7 @@ export default async function WinstgevendheidPage({ searchParams }: { searchPara
           </Table>
         )}
         <p className="px-5 py-3 text-xs text-[var(--color-ink-muted)]">
-          De directe kosten (edit, opname, strategie, overig) komen uit de geregistreerde maandstaten per klant. De toegerekende overhead en de nettowinst daarna zijn een schatting — niet de definitieve boekhoudkundige winst.
+          De directe kosten (edit, videograaf, opname, strategie, overig) komen uit de geregistreerde maandstaten per klant; de videograafkosten worden automatisch berekend uit de opnamedagen (uren × uurtarief). De toegerekende overhead en de nettowinst daarna zijn een schatting — niet de definitieve boekhoudkundige winst.
         </p>
       </Card>
     </div>

@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import { requirePermission } from "@/server/auth/context";
 import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Table, TeamAvatar } from "@/components/ui";
 import { euro } from "@/lib/format";
+import { VG_DAY, VG_MAX_HOURS, VG_RATE } from "@/lib/videographer-cost";
 
 export const metadata: Metadata = { title: "Editkosten & winst" };
 export const dynamic = "force-dynamic";
@@ -65,12 +66,8 @@ function ExpectedBlock({ title, badge, data }: { title: string; badge?: string; 
   );
 }
 
-// Videograafkosten: €16,75 per uur, met maximaal 8 uur filmen per opnamedag.
-// Een klant-maand zonder vastgelegde opnamedag rekenen we als één standaard
-// opnamedag (8 u × €16,75 = €134), zodat er nergens videograafkosten ontbreken.
-const VG_RATE = 16.75;
-const VG_MAX_HOURS = 8;
-const VG_DAY = VG_RATE * VG_MAX_HOURS; // €134 — één standaard opnamedag.
+// Videograafkosten (uurtarief, max uren/dag, standaarddag) uit één gedeelde bron,
+// zodat editkosten en winstgevendheid exact dezelfde cijfers gebruiken.
 
 export default async function EditCostsPage({ searchParams }: { searchParams: Promise<{ maand?: string }> }) {
   await requirePermission("finance:read");
