@@ -1,6 +1,6 @@
 import "server-only";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   activityEvents,
@@ -188,6 +188,8 @@ export async function getPortalData(viewer: Viewer) {
           isNull(contentCalendar.deletedAt),
           gte(contentCalendar.scheduledOn, today),
           inArray(contentCalendar.status, ["scheduled", "ready", "published"]),
+          // Alleen goedgekeurde-en-gedeelde planning (of al online) is zichtbaar.
+          or(eq(contentCalendar.clientApproved, true), eq(contentCalendar.status, "published")),
         ),
       )
       .orderBy(asc(contentCalendar.scheduledOn))

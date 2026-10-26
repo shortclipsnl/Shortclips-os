@@ -49,6 +49,12 @@ export const contentCalendar = pgTable(
     contentType: varchar("content_type", { length: 80 }),
     ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
     notes: text("notes"),
+    /** Goedgekeurd en gedeeld met de klant: pas dan zichtbaar in het klantportaal.
+     *  Zo blijven interne conceptplanningen onzichtbaar tot een medewerker ze
+     *  expliciet goedkeurt en deelt. */
+    clientApproved: boolean("client_approved").notNull().default(false),
+    clientApprovedAt: timestamp("client_approved_at", { withTimezone: true }),
+    clientApprovedById: uuid("client_approved_by_id").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
     ...softDelete,
   },

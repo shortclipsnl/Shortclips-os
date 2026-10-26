@@ -83,14 +83,50 @@ export default async function PortalPlanningPage() {
   }
   items.sort((x, y) => x.date.getTime() - y.date.getTime());
 
+  // Productie vs. publicatie — overzicht van de verwachtingen.
+  const inVoorbereiding = data.inProgress.length;
+  const wachtFeedback = data.awaitingApproval.length;
+  const now = new Date();
+  const weekEnd = new Date(now); weekEnd.setDate(now.getDate() + 7);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const pubDates = data.calendar.map((c) => new Date(`${c.scheduledOn}T12:00:00`));
+  const pubDezeWeek = pubDates.filter((d) => d >= now && d <= weekEnd).length;
+  const pubDezeMaand = pubDates.filter((d) => d >= now && d <= monthEnd).length;
+  const eerstePub = data.calendar[0] ?? null;
+
+  const summary = [
+    { label: "In voorbereiding", value: inVoorbereiding, hint: "wij werken eraan", color: "#4bc4ff" },
+    { label: "Wacht op jouw feedback", value: wachtFeedback, hint: "actie van jou", color: "#ffb020" },
+    { label: "Online deze week", value: pubDezeWeek, hint: "gaat live", color: "#2fd27a" },
+    { label: "Gepland deze maand", value: pubDezeMaand, hint: "publicaties", color: "#9fdcff" },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-[25px] font-bold tracking-tight">Planning</h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Je opnamedagen, besprekingen en publicaties, overzichtelijk op één tijdlijn.
+          Van productie tot publicatie — overzichtelijk op één tijdlijn.
         </p>
       </div>
+
+      {/* Productie vs publicatie — verwachtingen in één oogopslag */}
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[14px] border border-white/10 bg-white/5 sm:grid-cols-4">
+        {summary.map((s) => (
+          <div key={s.label} className="bg-[rgba(10,12,38,0.6)] p-4">
+            <div className="text-[22px] font-bold tabular-nums leading-none" style={{ color: s.color }}>{s.value}</div>
+            <div className="mt-1.5 text-[12px] font-medium">{s.label}</div>
+            <div className="text-[11px] text-[var(--color-ink-faint)]">{s.hint}</div>
+          </div>
+        ))}
+      </div>
+      {eerstePub ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[#2fd27a]/25 bg-[rgba(47,210,122,0.06)] px-4 py-2.5 text-[13px]">
+          <Send className="size-4 text-[#2fd27a]" />
+          <span className="font-semibold">Eerstvolgende publicatie:</span>
+          <span className="text-[var(--color-ink-muted)]">{eerstePub.title} · {formatDateFull(new Date(`${eerstePub.scheduledOn}T12:00:00`))}</span>
+        </div>
+      ) : null}
 
       {items.length === 0 ? (
         <EmptyState

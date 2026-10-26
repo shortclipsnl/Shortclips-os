@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { db } from "@/db/client";
+import { contentCalendar } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { listCalendar, monthGrid, type CalendarItem } from "@/server/calendar";
 import { listClients } from "@/server/clients";
+import { SharePlanningButton } from "./share-planning";
 import { Badge, Card, ClientLogo, EmptyState, PageHeader } from "@/components/ui";
 import { formatDateFull, periodLabel } from "@/lib/format";
 import { PLATFORM, PUBLICATION_STATUS } from "@/lib/statuses";
@@ -100,6 +104,19 @@ export default async function CalendarPage({
     .sort((a, b) => a.name.localeCompare(b.name, "nl"));
 
   const canWrite = viewer.permissions.has("calendar:write");
+
+  // Geselecteerde klant → "Goedkeuren en delen met klant": tel de nog niet
+  // gedeelde conceptitems, zodat de medewerker de planning kan vrijgeven.
+  const selectedClient = params.klant ? clientList.find((c) => c.slug === params.klant) ?? null : null;
+  let unsharedCount = 0;
+  if (selectedClient && canWrite) {
+    const [row] = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(contentCalendar)
+      .where(and(eq(contentCalendar.clientId, selectedClient.id), isNull(contentCalendar.deletedAt), eq(contentCalendar.clientApproved, false), inArray(contentCalendar.status, ["ready", "scheduled"])));
+    unsharedCount = Number(row?.n ?? 0);
+  }
+
   const asPlanner = params.weergave === "planner";
   const plannerTo = new Date();
   plannerTo.setDate(plannerTo.getDate() + 120);
@@ -242,6 +259,11 @@ export default async function CalendarPage({
           </Link>
         ))}
       </div>
+
+      {/* Goedkeuren en delen met de klant (alleen als er één klant gefilterd is). */}
+      {selectedClient && canWrite ? (
+        <SharePlanningButton clientId={selectedClient.id} clientName={selectedClient.name} unshared={unsharedCount} />
+      ) : null}
 
       {/* Vaste postmomenten. */}
       <div className="mb-4 inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-info-soft)]/60 px-3 py-1.5 text-xs text-[var(--color-ink)]">
