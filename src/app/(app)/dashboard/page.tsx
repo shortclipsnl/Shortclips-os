@@ -17,8 +17,6 @@ import { WeekPlanning, type WeekUpload } from "./week-planning";
 import { PostingReminder, type TodayPost } from "./posting-reminder";
 import { getMorningOverview } from "@/server/morning-overview";
 import { MorningOverviewCard } from "./morning-overview";
-import { getContentHealth } from "@/server/content-health";
-import { ClientLogo } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
@@ -45,14 +43,6 @@ export default async function DashboardPage() {
     getMorningOverview(viewer),
   ]);
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
-
-  // Contentgezondheid: mijn klanten die aandacht vragen (coördinator = eigen
-  // klanten; eigenaar ziet alle klanten die aandacht nodig hebben).
-  const health = await getContentHealth();
-  const myAttention = health.rows
-    .filter((r) => r.status !== "groen")
-    .filter((r) => isOwner(viewer) || r.coordinatorId === viewer.id)
-    .slice(0, 6);
 
   // Opnames binnen de komende 7 dagen voor de weekplanning.
   const weekEnd = new Date();
@@ -123,36 +113,6 @@ export default async function DashboardPage() {
 
       {/* Gebundeld ochtendoverzicht: verlopen deadlines, acties en aandachtspunten. */}
       <MorningOverviewCard data={morning} />
-
-      {/* Contentgezondheid: klanten die aandacht vragen (eigen klanten / alle). */}
-      {myAttention.length > 0 ? (
-        <div className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold">{isOwner(viewer) ? "Klanten die aandacht vragen" : "Mijn klanten die aandacht vragen"}</h2>
-            <Link href="/contentgezondheid" className="text-xs text-[var(--color-brand-600)] hover:underline">Contentgezondheid →</Link>
-          </div>
-          <ul className="space-y-2">
-            {myAttention.map((c) => (
-              <li key={c.clientId}>
-                <Link
-                  href={`/clients/${c.slug}`}
-                  className="flex items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-3 text-sm hover:border-[var(--color-line-strong)]"
-                  style={{ boxShadow: `inset 3px 0 0 ${c.status === "rood" ? "var(--color-bad)" : "var(--color-warn)"}` }}
-                >
-                  <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={22} />
-                  <div className="min-w-0 flex-1">
-                    <span className="font-medium">{c.name}</span>
-                    <span className="ml-2 text-2xs uppercase tracking-wide" style={{ color: c.status === "rood" ? "var(--color-bad)" : "var(--color-warn)" }}>
-                      {c.status === "rood" ? "Actie nodig" : "Aandacht"}
-                    </span>
-                    <p className="mt-0.5 text-[var(--color-ink-muted)]">{c.factors[0]?.titel}{c.factors.length > 1 ? ` +${c.factors.length - 1}` : ""} — {c.factors[0]?.oorzaak}</p>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
 
       {/* Doelen Q4 — compacte strook met alleen de doelen die aandacht vragen. */}
       {goals.rows.length > 0 ? (

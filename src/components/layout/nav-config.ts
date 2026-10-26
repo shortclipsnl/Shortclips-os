@@ -37,9 +37,6 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/dashboard", label: "Vandaag", icon: "LayoutDashboard" },
       { href: "/doelen", label: "Doelen", icon: "Target", match: "/doelen" },
       { href: "/kwaliteit", label: "Kwaliteit & Aandachtspunten", icon: "ShieldCheck", match: "/kwaliteit" },
-      // Contentgezondheidscheck per klant (groen/oranje/rood). Voor de eigenaar en
-      // de projectcoördinatoren die klanten beheren.
-      { href: "/contentgezondheid", label: "Contentgezondheid", icon: "HeartPulse", roles: ["project_coordinator"], match: "/contentgezondheid" },
     ],
   },
   {

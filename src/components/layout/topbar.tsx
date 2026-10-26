@@ -1,24 +1,48 @@
-import Link from "next/link";
-import { Bell } from "lucide-react";
-import {
-  and,
-  eq,
-  isNull,
-} from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { notifications } from "@/db/schema";
+import { clients, notifications } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 import { Avatar } from "@/components/ui";
 import { GlobalSearch } from "./global-search";
 import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
+import { NotificationBell, type BellNotification } from "./notification-bell";
 
 export async function Topbar({ viewer }: { viewer: Viewer }) {
+  // Recente meldingen voor de bel-dropdown (klikbaar → direct naar de melding).
+  const rows = await db
+    .select({
+      id: notifications.id,
+      title: notifications.title,
+      body: notifications.body,
+      href: notifications.href,
+      level: notifications.level,
+      readAt: notifications.readAt,
+      createdAt: notifications.createdAt,
+      clientName: clients.name,
+    })
+    .from(notifications)
+    .leftJoin(clients, eq(clients.id, notifications.clientId))
+    .where(eq(notifications.userId, viewer.id))
+    .orderBy(desc(notifications.createdAt))
+    .limit(12);
+
+  const items: BellNotification[] = rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    body: r.body,
+    href: r.href,
+    level: r.level as BellNotification["level"],
+    read: r.readAt != null,
+    createdAt: (r.createdAt as Date).toISOString(),
+    clientName: r.clientName ?? null,
+  }));
   const unread = await db
     .select({ id: notifications.id })
     .from(notifications)
     .where(and(eq(notifications.userId, viewer.id), isNull(notifications.readAt)))
     .limit(50);
+  const unreadCount = unread.length;
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-[var(--color-line)] bg-[var(--color-canvas)]/85 px-5 backdrop-blur">
@@ -28,18 +52,7 @@ export async function Topbar({ viewer }: { viewer: Viewer }) {
 
       <ThemeToggle />
 
-      <Link
-        href="/notifications"
-        className="relative rounded-[var(--radius-sm)] p-2 text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-        aria-label={`Meldingen${unread.length ? ` (${unread.length} ongelezen)` : ""}`}
-      >
-        <Bell className="size-5" strokeWidth={1.75} />
-        {unread.length > 0 ? (
-          <span className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-[var(--color-bad)] text-[9px] font-bold text-white">
-            {unread.length > 9 ? "9+" : unread.length}
-          </span>
-        ) : null}
-      </Link>
+      <NotificationBell items={items} unreadCount={unreadCount} />
 
       <UserMenu
         name={viewer.fullName}
