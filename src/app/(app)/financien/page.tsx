@@ -41,13 +41,22 @@ export default async function FinancienPage() {
 
   return (
     <div className="mx-auto max-w-[1300px]">
-      <PageHeader title="Financiën" description="Managementoverzicht — uitsluitend voor de eigenaar. Omzet uit de contracten en maandstaten; kosten deels automatisch, deels handmatig tot de boekhoudkoppeling (digibtw) live is." />
+      <PageHeader title="Financiën" description="Managementoverzicht — uitsluitend voor de eigenaar. Terugkerende omzet op basis van de werkelijk gefactureerde omzet uit de boekhouding (digibtw) zodra die is ingelezen; anders uit de actieve contracten." />
 
       {/* Kerncijfers — groot en duidelijk bovenaan, zodat ze meteen opvallen. */}
       <h2 className="mb-2 text-base font-bold tracking-tight text-[var(--color-ink)]">Kerncijfers</h2>
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat emphasis label="Terugkerende omzet (MRR)" value={euro(d.mrr)} hint="actieve contracten/maand" tone="good" icon={<Repeat />} />
-        <Stat emphasis label="Verwacht volgende maand" value={euro(d.expectedNextMonth)} hint={`incl. ${euro(d.pipeline.monthly)} pipeline`} tone="info" icon={<CalendarClock />} />
+        <Stat
+          emphasis
+          label="Terugkerende omzet"
+          value={euro(d.recurring)}
+          hint={d.recurringSource === "boekhouding"
+            ? `gefactureerd/maand (boekhouding, gem. ${d.invoicedMonths} mnd) · contracten ${euro(d.mrr)}`
+            : "actieve contracten/maand"}
+          tone="good"
+          icon={<Repeat />}
+        />
+        <Stat emphasis label="Verwacht volgende maand" value={euro(d.expectedNextMonth)} hint={`${d.recurringSource === "boekhouding" ? "gefactureerd" : "contracten"} + ${euro(d.pipeline.monthly)} pipeline`} tone="info" icon={<CalendarClock />} />
         <Stat emphasis label={`Gerealiseerd ${new Date().getFullYear()}`} value={euro(d.yearRealized)} tone="good" icon={<Wallet />} />
         <Stat emphasis label="Vaste lasten / maand" value={euro(d.fixedTotal)} tone="warn" icon={<Receipt />} />
       </div>

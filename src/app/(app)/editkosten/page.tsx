@@ -33,25 +33,33 @@ type ExpectedData = { list: Array<{ editor: string; shorts: number; cost: number
 function ExpectedBlock({ title, badge, data }: { title: string; badge?: string; data: ExpectedData }) {
   return (
     <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--color-line)] px-4 py-2.5">
-        <span className="text-sm font-bold">{title}{badge ? <span className="ml-2 text-2xs font-medium text-[var(--color-ink-faint)]">· {badge}</span> : null}</span>
-        <span className="text-xs text-[var(--color-ink-muted)]"><strong className="tabular-nums text-[var(--color-ink)]">{data.totalShorts}</strong> shorts · <strong className="tabular-nums text-[var(--color-ink)]">{euro(data.totalCost)}</strong> verwacht</span>
+      {/* Donkerblauwe kop met witte tekst — totaal aantal shorts + editkosten
+          meteen in het oog, per editor eronder uitgesplitst. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--color-indigo-ink)] px-4 py-3 text-white">
+        <span className="text-sm font-bold tracking-tight">{title}{badge ? <span className="ml-2 text-2xs font-medium text-white/60">· {badge}</span> : null}</span>
+        <span className="flex items-center gap-4 text-right">
+          <span><span className="block text-lg font-bold tabular-nums leading-none">{data.totalShorts}</span><span className="text-2xs text-white/60">shorts</span></span>
+          <span><span className="block text-lg font-bold tabular-nums leading-none">{euro(data.totalCost)}</span><span className="text-2xs text-white/60">editkosten</span></span>
+        </span>
       </div>
       {data.list.length === 0 ? (
         <p className="px-4 py-5 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames gepland deze maand.</p>
       ) : (
-        <Table head={<><th className="sc-th">Editor</th><th className="sc-th text-right">Shorts (verwacht)</th><th className="sc-th text-right">Editkosten (verwacht)</th></>}>
+        <ul className="divide-y divide-[var(--color-line)]">
           {data.list.map((e) => (
-            <tr key={e.editor}>
-              <td className="sc-td">
-                <span className="flex items-center gap-2 font-medium"><TeamAvatar name={e.editor} size={22} />{e.editor}</span>
-                <span className="mt-0.5 block pl-[30px] text-2xs text-[var(--color-ink-faint)]">{e.clients.join(" · ")}</span>
-              </td>
-              <td className="sc-td text-right tabular-nums">{e.shorts}</td>
-              <td className="sc-td text-right font-bold tabular-nums">{euro(e.cost)}</td>
-            </tr>
+            <li key={e.editor} className="flex items-center gap-3 px-4 py-2.5">
+              <TeamAvatar name={e.editor} size={30} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">{e.editor}</span>
+                <span className="block truncate text-2xs text-[var(--color-ink-faint)]">{e.clients.join(" · ")}</span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className="block text-base font-bold tabular-nums leading-none">{euro(e.cost)}</span>
+                <span className="text-2xs text-[var(--color-ink-faint)]">{e.shorts} shorts</span>
+              </span>
+            </li>
           ))}
-        </Table>
+        </ul>
       )}
     </div>
   );

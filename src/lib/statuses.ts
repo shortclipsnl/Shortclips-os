@@ -169,8 +169,8 @@ export const SCRIPT_STATUS: Record<string, { label: string; tone: Tone }> = {
 export const SCRIPTING_STATUS: Record<string, { label: string; tone: Tone; done?: boolean }> = {
   concepting: { label: "Scripts nog opstellen", tone: "info" },
   scriptmeeting: { label: "Script meeting plannen", tone: "warn" },
-  controle_jarno: { label: "Jarno controleren", tone: "warn" },
-  feedback_jarno: { label: "Feedback Jarno verwerken", tone: "bad" },
+  controle_jarno: { label: "Controle Jarno", tone: "warn" },
+  feedback_jarno: { label: "Feedback verwerken", tone: "bad" },
   afwachting_klant: { label: "Afwachting van klant", tone: "violet" },
   scripts_bij_klant: { label: "Controle bij klant", tone: "ink" },
   nog_aanvullen: { label: "Nog aanvullen met info", tone: "lime" },

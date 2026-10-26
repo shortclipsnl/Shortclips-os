@@ -8,14 +8,21 @@ import { requireInternal } from "@/server/auth/context";
 import { listAssignableUsers } from "@/server/clients";
 import { ensureWeeklyMeeting } from "@/server/meetings";
 import { Avatar, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
-import { formatDate } from "@/lib/format";
 import { AddItemForm, DeleteMeetingRowButton, NewMeetingForm } from "./meetings-ui";
 
 export const metadata: Metadata = { title: "Teammeetings" };
 export const dynamic = "force-dynamic";
 
+/** Volledige datum mét weekdag, bijv. "woensdag 21 oktober 2026" (Amsterdam). */
+function weekdayDate(d: Date): string {
+  const s = new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(d);
+  return s.charAt(0).toUpperCase() + s.slice(1); // weekdag met hoofdletter
+}
+function timeOf(d: Date): string {
+  return new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", hour: "2-digit", minute: "2-digit" }).format(d);
+}
 function dateTime(d: Date): string {
-  return `${formatDate(d)} · ${new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", hour: "2-digit", minute: "2-digit" }).format(d)}`;
+  return `${weekdayDate(d)} · ${timeOf(d)}`;
 }
 
 export default async function MeetingsPage() {
@@ -140,9 +147,14 @@ function MeetingRow({ m, archived = false }: { m: typeof teamMeetings.$inferSele
       <div className="flex items-center gap-2">
         <Link href={`/meetings/${m.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3">
           <span className="min-w-0">
+            {/* Geweest: de dag + datum vooraan en in het oog springend, zodat je
+                direct ziet wanneer de meeting was (bijv. "Woensdag 21 oktober 2026"). */}
+            {archived ? (
+              <span className="mb-0.5 block text-xs font-bold text-[var(--color-brand-600)]">{weekdayDate(new Date(m.scheduledAt))}</span>
+            ) : null}
             <span className="block truncate text-sm font-medium">{m.title}</span>
             <span className="block truncate text-xs text-[var(--color-ink-muted)]">
-              {dateTime(new Date(m.scheduledAt))}{m.location ? ` · ${m.location}` : ""} · {m.participantIds.length} deelnemers
+              {archived ? timeOf(new Date(m.scheduledAt)) : dateTime(new Date(m.scheduledAt))}{m.location ? ` · ${m.location}` : ""} · {m.participantIds.length} deelnemers
             </span>
           </span>
           <span className="shrink-0 text-xs text-[var(--color-brand-600)]">openen →</span>

@@ -78,6 +78,14 @@ export async function getManagementFinance() {
       return { period: c.period, revenue, cost, financeIncome, result: revenue + financeIncome - cost, importedAt: c.bookImportedAt };
     })
     .sort((a, b) => a.period.localeCompare(b.period));
+  // Werkelijk gefactureerde omzet per maand uit de boekhouding (digibtw/Digiboox):
+  // het gemiddelde van de laatste (max. 3) geboekte maanden. Dit is actueler dan
+  // de som van de actieve contracten en volgt de echte facturen/offertes.
+  const recentBook = bookMonths.slice(-3);
+  const invoicedMonthly = recentBook.length > 0 ? Math.round(recentBook.reduce((a, m) => a + m.revenue, 0) / recentBook.length) : null;
+  // Basis voor terugkerende omzet: gefactureerd indien beschikbaar, anders contracten.
+  const recurringBase = invoicedMonthly ?? mrr;
+
   const bookThisYear = bookMonths.filter((m) => m.period.startsWith(year));
   const book = {
     hasData: bookMonths.length > 0,
@@ -92,7 +100,12 @@ export async function getManagementFinance() {
   return {
     book,
     mrr,
-    expectedNextMonth: mrr + pipelineMonthly,
+    // Gefactureerd per maand (boekhouding) + hoeveel maanden het gemiddelde beslaat.
+    invoicedMonthly,
+    invoicedMonths: recentBook.length,
+    recurring: recurringBase,
+    recurringSource: invoicedMonthly != null ? ("boekhouding" as const) : ("contracten" as const),
+    expectedNextMonth: recurringBase + pipelineMonthly,
     yearRealized,
     fixedTotal,
     months,
