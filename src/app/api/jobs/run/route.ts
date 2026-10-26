@@ -17,7 +17,6 @@ import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { runFrequentSync, runNightlySync } from "@/server/jobs/orchestrator";
 import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
 import { runMonthlyInsightTasks } from "@/server/jobs/insight-tasks";
-import { generateMonthlyDevelopment, snapshotDevelopmentMetrics } from "@/server/development";
 import { runIntegrationHealthCheck } from "@/server/jobs/integration-health";
 import { runEmergencyExport } from "@/server/jobs/emergency-export";
 import { runLeadMailSync } from "@/server/jobs/leads-mail-sync";
@@ -96,8 +95,6 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "tasks.archive_done": runTaskArchive,
   "reports.generate_drafts": runMonthlyReportDrafts,
   "insights.monthly_tasks": runMonthlyInsightTasks,
-  "development.snapshot_metrics": snapshotDevelopmentMetrics,
-  "development.monthly_analysis": generateMonthlyDevelopment,
   "integrations.health_check": runIntegrationHealthCheck,
   "emergency.export": runEmergencyExport,
   "leads.sync_mailbox": runLeadMailSync,

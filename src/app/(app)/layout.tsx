@@ -23,7 +23,7 @@ export default async function AppLayout({
   // Een editor ziet alleen wat hij nodig heeft: Vandaag, Editing (zijn eigen
   // projecten) en Showcase (zijn awards). Onze klanten en Productieplanning niet.
   const editorOnly = viewer.primaryRole === "editor";
-  const EDITOR_NAV = new Set(["/dashboard", "/videos", "/showcase", "/ontwikkeling", "/mijn-klanten"]);
+  const EDITOR_NAV = new Set(["/dashboard", "/videos", "/showcase", "/mijn-klanten"]);
   // Vieringskaart bij binnenkomst (alleen editors kunnen awards hebben).
   const celebration = editorOnly ? await getCelebrationContext(viewer.id) : null;
   const groups = NAVIGATION.map((group) => ({

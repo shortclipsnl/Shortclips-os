@@ -105,28 +105,42 @@ type ToolStatus = { ffmpeg: boolean; ffprobe: boolean; ytdlp: boolean; whisper: 
 
 function ToolStatusPanel({ status }: { status: ToolStatus }) {
   const items = [
-    { ok: status.ffmpeg && status.ffprobe, label: "ffmpeg / ffprobe", need: "Duur, shotdetectie, thumbnails, montagetempo", fix: "meegeleverd (ffmpeg-static)" },
-    { ok: status.ytdlp, label: "yt-dlp", need: "Video's ophalen via platform-URL", fix: "uv tool install yt-dlp" },
-    { ok: status.whisper, label: "Whisper (transcriptie)", need: "Transcriptie met woordtijden", fix: "uv pip install -p .venv-vi/bin/python faster-whisper" },
-    { ok: status.ocr, label: "OCR (teksten in beeld)", need: "Herkent tekst/ondertiteling in beeld", fix: "uv pip install -p .venv-vi/bin/python rapidocr-onnxruntime" },
-    { ok: status.anthropic, label: "Anthropic-sleutel", need: "Visuele duiding + AI-conclusies", fix: "ANTHROPIC_API_KEY in .env.local" },
+    { ok: status.anthropic, label: "AI-duiding (Anthropic-sleutel)", groep: "ai" as const, need: "Visuele duiding + AI-conclusies (hooktype, waarom het werkt)", fix: "ANTHROPIC_API_KEY instellen" },
+    { ok: status.ffmpeg && status.ffprobe, label: "ffmpeg / ffprobe", groep: "verwerking" as const, need: "Duur, shotdetectie, thumbnails, montagetempo", fix: "meegeleverd (ffmpeg-static)" },
+    { ok: status.ytdlp, label: "yt-dlp", groep: "verwerking" as const, need: "Video's ophalen via een platform-URL", fix: "uv tool install yt-dlp" },
+    { ok: status.whisper, label: "Whisper (transcriptie)", groep: "verwerking" as const, need: "Transcriptie met woordtijden", fix: "uv pip install -p .venv-vi/bin/python faster-whisper" },
+    { ok: status.ocr, label: "OCR (teksten in beeld)", groep: "verwerking" as const, need: "Herkent tekst/ondertiteling in beeld", fix: "uv pip install -p .venv-vi/bin/python rapidocr-onnxruntime" },
   ];
   if (items.every((i) => i.ok)) return null;
+
+  const aiOk = status.anthropic;
+  const verwerkingOntbreekt = items.some((i) => i.groep === "verwerking" && !i.ok);
+
   return (
     <Card padded={false} className="mb-5 border-[var(--color-warn)]/30">
       <div className="p-4 pb-2">
-        <CardHeader title="Analyse-onderdelen instellen" subtitle="De module werkt; deze stappen draaien zodra de bijbehorende tool/sleutel beschikbaar is. Tot die tijd worden ze eerlijk als 'nog niet beschikbaar' gemarkeerd." />
+        <CardHeader title="Analyse-onderdelen" subtitle="De module is niet kapot — dit toont alleen welke onderdelen beschikbaar zijn in deze omgeving. Ontbrekende onderdelen worden eerlijk overgeslagen in plaats van nepdata te tonen." />
+      </div>
+      {/* Plain-language uitleg: de twee soorten onderdelen en waar ze draaien. */}
+      <div className="mx-4 mb-3 rounded-[var(--radius-md)] bg-[var(--color-surface-sunken)] p-3 text-xs text-[var(--color-ink-muted)]">
+        <p>
+          <strong className="text-[var(--color-ink)]">AI-duiding</strong> (de conclusies: waarom werkt een video, hooktype) draait overal zodra de Anthropic-sleutel is ingesteld — ook op de online server.
+          {aiOk ? " Die staat aan." : " Die staat nu niet aan."}
+        </p>
+        <p className="mt-1.5">
+          <strong className="text-[var(--color-ink)]">Videobewerking</strong> (video ophalen, transcriptie, tekst-in-beeld, montage-analyse) heeft losse programma&apos;s nodig op de machine. Die draaien <strong className="text-[var(--color-ink)]">lokaal</strong> wel, maar <strong className="text-[var(--color-ink)]">niet op de online (Vercel-)server</strong>. {verwerkingOntbreekt ? "Analyseer video's daarom op een computer waar deze tools geïnstalleerd zijn (of via een aparte verwerk-server)." : ""}
+        </p>
       </div>
       <ul className="divide-y divide-[var(--color-line)]">
         {items.map((i) => (
           <li key={i.label} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
-            <Badge tone={i.ok ? "good" : "warn"}>{i.ok ? "gevonden" : "ontbreekt"}</Badge>
+            <Badge tone={i.ok ? "good" : "warn"}>{i.ok ? "beschikbaar" : "niet hier"}</Badge>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium">{i.label}</span>
+              <span className="block text-sm font-medium">{i.label} <span className="text-2xs font-normal text-[var(--color-ink-faint)]">· {i.groep === "ai" ? "AI-duiding" : "videobewerking"}</span></span>
               <span className="block text-2xs text-[var(--color-ink-faint)]">{i.need}</span>
             </span>
             {!i.ok ? (
-              <code className="rounded bg-[var(--color-surface-sunken)] px-2 py-1 text-2xs">{i.fix}</code>
+              <code className="rounded bg-[var(--color-surface-sunken)] px-2 py-1 text-2xs" title="Installatie op de verwerk-machine (voor de beheerder)">{i.fix}</code>
             ) : null}
           </li>
         ))}

@@ -11,6 +11,7 @@ import { cn } from "@/lib/cn";
 import { Planner } from "./planner";
 import { CalDateCell, CalStatusCell } from "./calendar-cells";
 import { ContentChip, CaptionToggle } from "./content-items";
+import { CalendarClientFilter } from "./client-filter";
 
 export const metadata: Metadata = { title: "Contentplanning" };
 export const dynamic = "force-dynamic";
@@ -220,19 +221,17 @@ export default async function CalendarPage({
         </div>
       ) : null}
 
-      {/* Filters — klanten op een eigen rij, platforms eronder met een label. */}
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Klant</span>
-        <Link href={withParam("klant", undefined)} className={chip(!params.klant)}>
-          Alle klanten
-        </Link>
-        {chipClients.map((c) => (
-          <Link key={c.id} href={withParam("klant", c.slug)} className={chip(params.klant === c.slug)}>
-            <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={18} />
-            {c.name}
-          </Link>
-        ))}
-      </div>
+      {/* Filters — klant achter een knop (standaard ingeklapt → overzichtelijk),
+          platforms eronder met een label. */}
+      <CalendarClientFilter
+        allHref={withParam("klant", undefined)}
+        allActive={!params.klant}
+        clients={chipClients.map((c) => ({ slug: c.slug, name: c.name, logoUrl: c.logoUrl, color: c.color, href: withParam("klant", c.slug), active: params.klant === c.slug }))}
+        selected={(() => {
+          const c = chipClients.find((x) => x.slug === params.klant);
+          return c ? { slug: c.slug, name: c.name, logoUrl: c.logoUrl, color: c.color, href: withParam("klant", c.slug), active: true } : null;
+        })()}
+      />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="mr-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Filter per platform</span>
         <Link href={withParam("platform", undefined)} className={chip(!params.platform)}>Alle platformen</Link>

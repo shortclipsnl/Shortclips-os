@@ -2,17 +2,31 @@ import Link from "next/link";
 import { AlertTriangle, Clock, FileText, ListChecks, Play, Sunrise, Users } from "lucide-react";
 import type { MorningOverview } from "@/server/morning-overview";
 
-function Tile({ href, label, value, tone, icon }: { href: string; label: string; value: number; tone: "bad" | "warn" | "info" | "neutral"; icon: React.ReactNode }) {
+function Tile({ href, label, value, tone, icon }: { href?: string; label: string; value: number; tone: "bad" | "warn" | "info" | "neutral"; icon: React.ReactNode }) {
   const color = value > 0
     ? (tone === "bad" ? "var(--color-bad)" : tone === "warn" ? "var(--color-warn)" : tone === "info" ? "var(--color-info)" : "var(--color-ink)")
     : "var(--color-ink-muted)";
-  return (
-    <Link href={href} className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-3 transition hover:border-[var(--color-brand-500)]" style={value > 0 ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined}>
+  const inner = (
+    <>
       <span className="grid size-9 shrink-0 place-items-center rounded-full" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}>{icon}</span>
       <span className="min-w-0">
         <span className="block text-2xl font-bold tabular-nums leading-none" style={{ color }}>{value}</span>
         <span className="mt-0.5 block text-2xs text-[var(--color-ink-muted)]">{label}</span>
       </span>
+    </>
+  );
+  const boxStyle = value > 0 ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined;
+  // Zonder bestemming een gewone (niet-klikbare) tegel — de telling blijft zichtbaar.
+  if (!href) {
+    return (
+      <div className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-3" style={boxStyle}>
+        {inner}
+      </div>
+    );
+  }
+  return (
+    <Link href={href} className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-3 transition hover:border-[var(--color-brand-500)]" style={boxStyle}>
+      {inner}
     </Link>
   );
 }
@@ -39,7 +53,7 @@ export function MorningOverviewCard({ data }: { data: MorningOverview }) {
         <Tile href="/videos?filter=te-laat" label="Video's over de interne deadline" value={data.overdueVideos} tone="bad" icon={<AlertTriangle className="size-4" />} />
         <Tile href="/videos?filter=bij-klant" label="Wacht op klantfeedback" value={data.atClient} tone="warn" icon={<Clock className="size-4" />} />
         <Tile href="/tasks" label="Jouw acties (vandaag / te laat)" value={data.myOpenTasks} tone="info" icon={<ListChecks className="size-4" />} />
-        <Tile href="/prestaties" label="Nu te laat (per persoon)" value={data.currentlyLate} tone="bad" icon={<Users className="size-4" />} />
+        <Tile label="Nu te laat (per persoon)" value={data.currentlyLate} tone="bad" icon={<Users className="size-4" />} />
       </div>
 
       {data.topOverdue.length > 0 ? (

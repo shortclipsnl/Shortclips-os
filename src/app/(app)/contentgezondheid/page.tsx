@@ -16,6 +16,25 @@ const PILLAR_ICON: Record<PillarKey, typeof CalendarRange> = {
   variatie: Film,
   productie: Scissors,
 };
+const PILLARS: PillarKey[] = ["planning", "resultaten", "variatie", "productie"];
+const PILLAR_SHORT: Record<PillarKey, string> = { planning: "Planning", resultaten: "Resultaten", variatie: "Variatie", productie: "Productie" };
+
+type PillarState = "groen" | "oranje" | "rood" | "nvt";
+const PILLAR_DOT: Record<PillarState, string> = {
+  groen: "var(--color-good)",
+  oranje: "var(--color-warn)",
+  rood: "var(--color-bad)",
+  nvt: "var(--color-line-strong)",
+};
+
+/** Status van één pijler voor een klant: geen factor = groen; geen data = nvt. */
+function pillarState(c: { factors: { pijler: PillarKey; level: "let_op" | "actie" }[]; metrics: { planningWeken: number | null; groeiPct: number | null; variatieAandeel: number | null } }, pijler: PillarKey): PillarState {
+  if (pijler === "planning" && c.metrics.planningWeken === null) return "nvt";
+  if (pijler === "resultaten" && c.metrics.groeiPct === null) return "nvt";
+  if (pijler === "variatie" && c.metrics.variatieAandeel === null) return "nvt";
+  const f = c.factors.find((x) => x.pijler === pijler);
+  return f ? (f.level === "actie" ? "rood" : "oranje") : "groen";
+}
 
 export default async function ContentgezondheidPage() {
   await requireInternal();
@@ -36,6 +55,52 @@ export default async function ContentgezondheidPage() {
         <Stat label="Aandacht" value={String(counts.oranje)} tone="warn" />
         <Stat label="Actie nodig" value={String(counts.rood)} tone="bad" />
       </div>
+
+      {/* Alle klanten in één oogopslag: per klant het logo, de totaalstatus en
+          vier stoplichtjes voor de pijlers. Zo herken je elke klant direct. */}
+      <Card padded={false} className="mb-5">
+        <CardHeader title="Alle klanten in één oogopslag" subtitle="Per klant: totaalstatus + de vier pijlers (planning, resultaten, variatie, productie). Klik een klant aan voor details." className="p-5 pb-3" />
+        {rows.length === 0 ? (
+          <EmptyState title="Geen actieve klanten" description="" />
+        ) : (
+          <div className="grid gap-2 px-5 pb-5 sm:grid-cols-2 lg:grid-cols-3">
+            {rows.map((c) => (
+              <Link
+                key={c.clientId}
+                href={`/clients/${c.slug}`}
+                className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-3 transition hover:border-[var(--color-line-strong)]"
+                style={{ boxShadow: `inset 3px 0 0 ${DOT[c.status]}` }}
+              >
+                <div className="flex items-center gap-2">
+                  <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={26} />
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{c.name}</span>
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold" style={{ background: `color-mix(in srgb, ${DOT[c.status]} 14%, transparent)`, color: DOT[c.status] }}>
+                    <span className="size-1.5 rounded-full" style={{ background: DOT[c.status] }} />
+                    {LABEL[c.status]}
+                  </span>
+                </div>
+                <div className="mt-2.5 flex items-center gap-3">
+                  {PILLARS.map((p) => {
+                    const st = pillarState(c, p);
+                    return (
+                      <span key={p} className="inline-flex items-center gap-1" title={`${PILLAR_SHORT[p]}: ${st === "nvt" ? "geen data" : st}`}>
+                        <span className="size-2.5 rounded-full" style={{ background: PILLAR_DOT[st] }} />
+                        <span className="text-2xs text-[var(--color-ink-faint)]">{PILLAR_SHORT[p]}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-4 border-t border-[var(--color-line)] px-5 py-2.5 text-2xs text-[var(--color-ink-muted)]">
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-[var(--color-good)]" /> Op orde</span>
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-[var(--color-warn)]" /> Aandacht</span>
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-[var(--color-bad)]" /> Actie nodig</span>
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-[var(--color-line-strong)]" /> Geen data</span>
+        </div>
+      </Card>
 
       {/* Klanten die aandacht vragen (worst-first); gezonde klanten onderaan compact. */}
       <Card padded={false} className="mb-5">
