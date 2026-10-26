@@ -59,11 +59,15 @@ export default async function PortalLayout({
         </header>
 
         <main className="flex-1 px-5 py-6 pb-24 lg:px-8 lg:pb-8">
-          {children}
-          <footer className="mt-10 text-xs text-[var(--color-ink-faint)]">
-            Deze omgeving is van jou. Vragen? Neem contact op met je vaste
-            contactpersoon bij Shortclips.
-          </footer>
+          {/* Links uitgelijnd (flush met de sidebar), maar op heel brede schermen
+              begrensd zodat dashboards en tekst comfortabel leesbaar blijven. */}
+          <div className="max-w-[1500px]">
+            {children}
+            <footer className="mt-10 text-xs text-[var(--color-ink-faint)]">
+              Deze omgeving is van jou. Vragen? Neem contact op met je vaste
+              contactpersoon bij Shortclips.
+            </footer>
+          </div>
         </main>
       </div>
 
