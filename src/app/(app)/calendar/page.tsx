@@ -37,6 +37,7 @@ export default async function CalendarPage({
     status?: string;
     platform?: string;
     weergave?: string;
+    zelf?: string;
   }>;
 }) {
   const viewer = await requireInternal();
@@ -81,15 +82,17 @@ export default async function CalendarPage({
       platform: params.platform,
     }),
   ]);
-  // Klanten waar we niet voor posten eruit filteren.
-  const items = rawItems.filter((i) => postsContent(i));
-  const clientList = rawClientList.filter((c) => postsContent(c));
-  // Klanten die zelf posten — ter verduidelijking op de planning (ze staan er
-  // bewust niet in; instelbaar per klant op de klantpagina).
+  // Twee weergaven: onze planning (wij posten) of "klant plaatst zelf".
+  const showSelf = params.zelf === "1";
+  const inMode = (x?: { weHandlePosting?: boolean } | null) => (showSelf ? x?.weHandlePosting === false : postsContent(x));
+  const items = rawItems.filter((i) => inMode(i));
+  const clientList = rawClientList.filter((c) => inMode(c));
+  // Klanten die zelf posten — ter verduidelijking op de planning (ze staan
+  // bewust niet in onze planning; instelbaar per klant op de klantpagina).
   const selfPostingClients = rawClientList
     .filter((c) => c.weHandlePosting === false && c.status === "active")
     .map((c) => c.name);
-  const weekItems = rawWeekItems.filter((i) => postsContent(i));
+  const weekItems = rawWeekItems.filter((i) => inMode(i));
   const weekByDay = new Map<string, CalendarItem[]>();
   for (const item of weekItems) {
     const list = weekByDay.get(item.scheduledOn) ?? [];
@@ -127,7 +130,7 @@ export default async function CalendarPage({
         clientSlug: params.klant,
       })
     : []
-  ).filter((i) => postsContent(i));
+  ).filter((i) => inMode(i));
 
   const byDay = new Map<string, CalendarItem[]>();
   for (const item of items) {
@@ -147,6 +150,7 @@ export default async function CalendarPage({
     if (params.status) qs.set("status", params.status);
     if (params.platform) qs.set("platform", params.platform);
     if (params.weergave) qs.set("weergave", params.weergave);
+    if (params.zelf) qs.set("zelf", params.zelf);
     if (value) qs.set(key, value);
     else qs.delete(key);
     return qs.toString() ? `/calendar?${qs}` : "/calendar";
@@ -229,13 +233,20 @@ export default async function CalendarPage({
         }
       />
 
-      {/* Klanten die zelf posten: staan bewust niet in de planning. Instelbaar
-          per klant op de klantpagina (Content plaatsen). */}
-      {selfPostingClients.length > 0 ? (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-3 py-2 text-xs text-[var(--color-ink-muted)]">
-          <span className="rounded-full bg-[var(--color-warn-soft)] px-2 py-0.5 font-semibold text-[#8a5300]">Klant plaatst zelf</span>
-          <span>Niet in de planning (wij posten hier niet): {selfPostingClients.join(", ")}.</span>
-        </div>
+      {/* Schakelen tussen onze planning en wat klanten zelf plaatsen.
+          'Content plaatsen' is per klant instelbaar op de klantpagina. */}
+      <div className="mb-4 inline-flex items-center gap-1 rounded-full border border-[var(--color-line)] bg-[var(--color-surface-2)] p-1 text-xs">
+        <Link href={withParam("zelf", undefined)} className={`rounded-full px-3 py-1 font-medium transition-colors ${!showSelf ? "bg-[var(--color-indigo-ink)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>
+          Onze planning
+        </Link>
+        <Link href={withParam("zelf", "1")} className={`rounded-full px-3 py-1 font-medium transition-colors ${showSelf ? "bg-[#8a5300] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>
+          Klant plaatst zelf{selfPostingClients.length > 0 ? ` (${selfPostingClients.length})` : ""}
+        </Link>
+      </div>
+      {showSelf ? (
+        <p className="mb-4 text-xs text-[var(--color-ink-muted)]">
+          Dit zijn de klanten die hun content zelf plaatsen. Wij verzorgen de content; het plaatsen doen zij.{selfPostingClients.length > 0 ? ` (${selfPostingClients.join(", ")})` : ""}
+        </p>
       ) : null}
 
       {/* Filters — klant achter een knop (standaard ingeklapt → overzichtelijk),
