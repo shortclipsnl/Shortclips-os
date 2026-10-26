@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Camera, Clock, Eye, Film, MapPin, MessagesSquare, Play, Radio, Sparkles, Users } from "lucide-react";
+import { ArrowRight, Bell, CalendarRange, Camera, Clock, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalData } from "@/server/portal";
-import { buttonClass } from "@/components/ui";
+import { getPortalContact, getPortalData } from "@/server/portal";
+import { CLIENT_ACTION_STATUSES, listPortalScriptReviews } from "@/server/script-review";
+import { Avatar, buttonClass } from "@/components/ui";
 import { compact, num } from "@/lib/format";
+import { PLATFORM } from "@/lib/statuses";
+
+/** +31 6 ... → 316... voor wa.me. */
+function waNumber(phone: string): string {
+  return phone.replace(/[^\d]/g, "").replace(/^0/, "31");
+}
 
 export const metadata: Metadata = { title: "Jouw omgeving" };
 export const dynamic = "force-dynamic";
@@ -95,9 +102,22 @@ function ResultTile({ icon, label, value, sub }: { icon: React.ReactNode; label:
 
 export default async function PortalPage() {
   const viewer = await requirePortal();
-  const data = await getPortalData(viewer);
+  const [data, contact, scriptReviews] = await Promise.all([
+    getPortalData(viewer),
+    getPortalContact(viewer),
+    listPortalScriptReviews(viewer),
+  ]);
 
   const companyName = data.client.name;
+
+  // Openstaande acties: scripts ter controle + video's ter beoordeling.
+  const scriptActions = scriptReviews.filter((r) => CLIENT_ACTION_STATUSES.includes(r.status)).length;
+  const videoActions = data.awaitingApproval.length;
+  const openActions = scriptActions + videoActions;
+
+  // Eerstvolgende geplande publicatie (uit de goedgekeurde contentplanning).
+  const nextPub = data.calendar[0] ?? null;
+  const coordinator = contact.coordinator;
 
   // 2 — Planning. Volgende opnamedag uit de bestaande klantplanning.
   const shoot = data.upcomingShoot;
@@ -130,6 +150,33 @@ export default async function PortalPage() {
           of er een scriptmeeting gepland staat, waar je je video&apos;s bekijkt en welke resultaten we voor je behalen.
         </p>
       </section>
+
+      {/* Actie nodig — alleen tonen als er echt iets van de klant wordt verwacht */}
+      {openActions > 0 ? (
+        <section className="sc-glass sc-glow p-5" style={{ background: "linear-gradient(180deg, rgba(255,176,32,0.12), rgba(255,255,255,0.03))" }}>
+          <div className="flex items-center gap-2">
+            <span className="grid size-7 place-items-center rounded-lg bg-[rgba(255,176,32,0.18)] text-[#ffb020]"><Bell className="size-4" /></span>
+            <h2 className="text-[15px] font-bold">Actie nodig</h2>
+            <span className="rounded-full bg-[rgba(255,176,32,0.18)] px-2 py-0.5 text-2xs font-bold text-[#ffb020]">{openActions}</span>
+          </div>
+          <div className="mt-3 flex flex-col gap-2">
+            {scriptActions > 0 ? (
+              <Link href="/portal/scripts" className="flex items-center gap-3 rounded-[12px] border border-white/10 bg-white/[0.04] px-4 py-3 transition-colors hover:border-white/25">
+                <FileText className="size-4 shrink-0 text-[#4bc4ff]" />
+                <span className="min-w-0 flex-1 text-sm font-medium">{scriptActions} script{scriptActions === 1 ? "" : "s"} wacht op jouw controle</span>
+                <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
+              </Link>
+            ) : null}
+            {videoActions > 0 ? (
+              <Link href="/portal/videos" className="flex items-center gap-3 rounded-[12px] border border-white/10 bg-white/[0.04] px-4 py-3 transition-colors hover:border-white/25">
+                <Play className="size-4 shrink-0 text-[#4bc4ff]" fill="currentColor" />
+                <span className="min-w-0 flex-1 text-sm font-medium">{videoActions} video{videoActions === 1 ? "" : "'s"} wacht op jouw beoordeling</span>
+                <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
+              </Link>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       {/* 2 — Volgende opnamedag en scriptmeeting, naast elkaar */}
       <div className="grid gap-[18px] sm:grid-cols-2">
@@ -177,6 +224,37 @@ export default async function PortalPage() {
         </span>
       </Link>
 
+      {/* Eerstvolgende publicatie + snelkoppeling naar de volledige contentplanning */}
+      <div className="grid gap-[18px] sm:grid-cols-2">
+        <section className="sc-glass flex flex-col p-5">
+          <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
+            <CalendarRange className="size-4 text-[#4bc4ff]" /> Eerstvolgende publicatie
+          </span>
+          {nextPub ? (
+            <div className="mt-4 flex items-start gap-3.5">
+              <DateChip date={dateFromIso(nextPub.scheduledOn)} />
+              <div className="min-w-0">
+                <div className="truncate text-[15px] font-semibold">{nextPub.title}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] text-[var(--color-ink-muted)]">
+                  <span>{fullDate(dateFromIso(nextPub.scheduledOn))}</span>
+                  {((nextPub.platforms as string[]) ?? []).map((p) => <span key={p} className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]">{PLATFORM[p]?.label ?? p}</span>)}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-4 flex flex-1 items-center text-sm text-[var(--color-ink-muted)]">Nog geen publicatie ingepland.</p>
+          )}
+        </section>
+        <Link href="/portal/planning" className="sc-glass group flex items-center gap-4 p-5 transition-colors hover:border-white/25">
+          <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]"><CalendarRange className="size-6" strokeWidth={1.8} /></span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[16px] font-semibold">Jouw contentplanning</h2>
+            <p className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">Bekijk wanneer welke video online komt.</p>
+          </div>
+          <ArrowRight className="size-5 shrink-0 text-[var(--color-ink-faint)] transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
+
       {/* 4 — Resultatenoverzicht */}
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
@@ -205,6 +283,29 @@ export default async function PortalPage() {
           </div>
         )}
       </section>
+
+      {/* Vaste contactpersoon — compact, met directe knoppen */}
+      {coordinator ? (
+        <section className="sc-glass flex flex-wrap items-center gap-4 p-5">
+          <Avatar name={coordinator.name} size={48} src={coordinator.avatarUrl} />
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Je vaste contactpersoon</div>
+            <div className="mt-0.5 text-[15px] font-semibold">{coordinator.name}</div>
+            <div className="text-[13px] text-[var(--color-ink-muted)]">{coordinator.role}</div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {coordinator.phone ? (
+              <a href={`https://wa.me/${waNumber(coordinator.phone)}`} target="_blank" rel="noreferrer" className={buttonClass({ variant: "accent", size: "sm" })}><MessageCircle className="size-4" /> WhatsApp</a>
+            ) : null}
+            {coordinator.phone ? (
+              <a href={`tel:${coordinator.phone}`} className={buttonClass({ variant: "secondary", size: "sm" })}><Phone className="size-4" /> Bellen</a>
+            ) : null}
+            {coordinator.email ? (
+              <a href={`mailto:${coordinator.email}`} className={buttonClass({ variant: "secondary", size: "sm" })}><Mail className="size-4" /> E-mail</a>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

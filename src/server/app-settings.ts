@@ -42,6 +42,27 @@ export async function setNumberSetting(
     });
 }
 
+/** Tekst-app-instelling lezen (default als de sleutel ontbreekt). */
+export async function getStringSetting(key: string, fallback: string): Promise<string> {
+  const [row] = await db.select({ value: appSettings.value }).from(appSettings).where(eq(appSettings.key, key)).limit(1);
+  if (!row) return fallback;
+  const v = row.value as { value?: unknown } | string;
+  if (typeof v === "string") return v;
+  return typeof v?.value === "string" ? v.value : fallback;
+}
+
+/** Tekst-app-instelling zetten. */
+export async function setStringSetting(
+  key: string,
+  value: string,
+  opts: { category?: string; description?: string; updatedById?: string } = {},
+): Promise<void> {
+  await db
+    .insert(appSettings)
+    .values({ key, value: { value }, category: opts.category ?? "general", description: opts.description ?? null, updatedById: opts.updatedById ?? null })
+    .onConflictDoUpdate({ target: appSettings.key, set: { value: { value }, updatedById: opts.updatedById ?? null, updatedAt: new Date() } });
+}
+
 /** Booleaanse app-instelling zetten. */
 export async function setBoolSetting(
   key: string,

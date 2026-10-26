@@ -172,7 +172,7 @@ export function TeamContent({
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
         {coordinator ? (
-          <ContactCard person={coordinator} focus="Voor planning, scripts, feedback, resultaten en alles rond de samenwerking." />
+          <ContactCard person={coordinator} focus="Voor planning, scripts, feedback, resultaten en alles rond de samenwerking." showWhatsApp />
         ) : (
           <ContactCard person={{ name: "Shortclips", role: "Je team", email: "info@shortclips.nl", phone: null, avatarUrl: null }} focus="Voor planning, scripts, feedback, resultaten en alles rond de samenwerking." />
         )}

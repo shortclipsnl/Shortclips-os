@@ -603,15 +603,33 @@ export async function getPortalCollaboration(viewer: Viewer): Promise<{
   shootDaysPerMonth: number;
   startedOn: string | null;
   contract: { startsOn: string; endsOn: string | null; noticePeriodDays: number } | null;
+  platforms: string[];
+  upcomingShoots: number;
 }> {
   const clientId = viewer.clientId;
   if (!clientId) notFound();
+  const today = new Date().toISOString().slice(0, 10);
 
   const [client] = await db
     .select({ quota: clients.monthlyVideoQuota, startedOn: clients.startedOn })
     .from(clients)
     .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
     .limit(1);
+
+  // Platforms waarop we voor deze klant publiceren — afgeleid uit de contentplanning.
+  const platformRows = await db
+    .select({ platforms: contentCalendar.platforms })
+    .from(contentCalendar)
+    .where(and(eq(contentCalendar.clientId, clientId), isNull(contentCalendar.deletedAt)))
+    .limit(500);
+  const platformSet = new Set<string>();
+  for (const r of platformRows) for (const p of ((r.platforms as string[]) ?? [])) if (p) platformSet.add(p);
+
+  // Aantal toekomstige, geplande opnamedagen.
+  const [{ n: shootCount } = { n: 0 }] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(productionDays)
+    .where(and(eq(productionDays.clientId, clientId), isNull(productionDays.deletedAt), gte(productionDays.scheduledOn, today), sql`${productionDays.status} <> 'cancelled'`));
 
   // Afgesproken pakket: als het quota-veld leeg is, val terug op het actieve pakket.
   const [pkg] = await db
@@ -644,6 +662,8 @@ export async function getPortalCollaboration(viewer: Viewer): Promise<{
     shootDaysPerMonth: pkg?.shootDays ?? 0,
     startedOn: client?.startedOn ?? null,
     contract: contract ?? null,
+    platforms: [...platformSet],
+    upcomingShoots: Number(shootCount ?? 0),
   };
 }
 
