@@ -1,186 +1,215 @@
 import type { Metadata } from "next";
-import { CalendarClock, CalendarDays, Film, MapPin, Send, Users } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, CalendarClock, CalendarDays, Clock, ExternalLink, FileText, Film, MapPin, MessageSquareText, Users, Video } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalData } from "@/server/portal";
+import { getPortalPlanning, type PortalOpname, type PortalScriptMeeting, type PortalScriptState } from "@/server/portal-planning";
 import { getPortalSettings } from "@/server/portal-settings";
-import { EmptyState } from "@/components/ui";
-import { formatDateFull, relativeDays } from "@/lib/format";
-import { PLATFORM } from "@/lib/statuses";
+import { Avatar, buttonClass } from "@/components/ui";
+import { formatDateFull } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Planning" };
 export const dynamic = "force-dynamic";
 
-const KIND_LABEL: Record<string, string> = {
-  opname: "Opnamedag",
-  scriptbespreking: "Scriptbespreking",
-  evaluatie: "Evaluatiegesprek",
-  publicatie: "Publicatie",
-  overig: "Afspraak",
+const TONE_CLS: Record<PortalScriptState["tone"], string> = {
+  warn: "bg-[rgba(255,176,32,0.14)] text-[#ffb020]",
+  info: "bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]",
+  good: "bg-[rgba(47,210,122,0.14)] text-[#2fd27a]",
+  neutral: "bg-white/10 text-[var(--color-ink-muted)]",
 };
 
-const INTERNAL_RE = /(shortclips\.nl|teamshortclips@gmail\.com|jarnoklijnsma9@gmail\.com)/i;
-
-function shortclipsPeople(attendees: unknown): string[] {
-  if (!Array.isArray(attendees)) return [];
-  const names = new Set<string>();
-  for (const a of attendees as Array<{ email?: string | null; displayName?: string | null }>) {
-    if (!a?.email || !INTERNAL_RE.test(a.email)) continue;
-    const name = (a.displayName ?? a.email.split("@")[0] ?? "").replace(/\s*-?\s*shortclips.*/i, "").trim();
-    if (name) names.add(name);
-  }
-  return [...names];
+function dayLabel(date: string): string {
+  const d = new Date(`${date}T12:00:00`);
+  return d.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
 }
 
-type Item = {
-  key: string;
-  date: Date;
-  type: "afspraak" | "publicatie" | "oplevering";
-  title: string;
-  time?: string | null;
-  location?: string | null;
-  people?: string[];
-  platforms?: string[];
-};
+function relativeLabel(date: string): string {
+  const d = new Date(`${date}T12:00:00`);
+  const now = new Date(); now.setHours(12, 0, 0, 0);
+  const diff = Math.round((d.getTime() - now.getTime()) / 86_400_000);
+  if (diff <= 0) return "vandaag";
+  if (diff === 1) return "morgen";
+  if (diff < 7) return `over ${diff} dagen`;
+  if (diff < 14) return "volgende week";
+  return `over ${Math.round(diff / 7)} weken`;
+}
 
-const TYPE_STYLE: Record<Item["type"], { label: string; cls: string }> = {
-  afspraak: { label: "Afspraak", cls: "bg-[rgba(25,168,255,0.12)] text-[#4bc4ff]" },
-  publicatie: { label: "Publicatie", cls: "bg-[rgba(47,210,122,0.12)] text-[#2fd27a]" },
-  oplevering: { label: "Verwachte oplevering", cls: "bg-[rgba(255,176,32,0.12)] text-[#ffb020]" },
-};
-
-export default async function PortalPlanningPage() {
-  const viewer = await requirePortal();
-  const [data, settings] = await Promise.all([getPortalData(viewer), getPortalSettings()]);
-
-  const items: Item[] = [];
-  for (const a of data.appointments) {
-    items.push({
-      key: `a-${a.id}`,
-      date: new Date(a.startsAt),
-      type: "afspraak",
-      title: KIND_LABEL[a.kind] ?? "Afspraak",
-      time: a.allDay ? null : new Date(a.startsAt).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" }),
-      location: a.location,
-      people: shortclipsPeople(a.attendees),
-    });
-  }
-  for (const c of data.calendar) {
-    items.push({
-      key: `c-${c.id}`,
-      date: new Date(c.scheduledOn),
-      type: "publicatie",
-      title: c.title,
-      platforms: (c.platforms as string[] | null) ?? [],
-    });
-  }
-  // Verwachte opleveringen van video's die nu in productie zijn.
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  for (const v of data.inProgress) {
-    if (!v.plannedPublishOn) continue;
-    const d = new Date(v.plannedPublishOn);
-    if (Number.isNaN(d.getTime()) || d < startOfToday) continue;
-    items.push({ key: `o-${v.id}`, date: d, type: "oplevering", title: v.title });
-  }
-  items.sort((x, y) => x.date.getTime() - y.date.getTime());
-
-  // Productie vs. publicatie — overzicht van de verwachtingen.
-  const inVoorbereiding = data.inProgress.length;
-  const wachtFeedback = data.awaitingApproval.length;
-  const now = new Date();
-  const weekEnd = new Date(now); weekEnd.setDate(now.getDate() + 7);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const pubDates = data.calendar.map((c) => new Date(`${c.scheduledOn}T12:00:00`));
-  const pubDezeWeek = pubDates.filter((d) => d >= now && d <= weekEnd).length;
-  const pubDezeMaand = pubDates.filter((d) => d >= now && d <= monthEnd).length;
-  const eerstePub = data.calendar[0] ?? null;
-
-  const summary = [
-    { label: "In voorbereiding", value: inVoorbereiding, hint: "wij werken eraan", color: "#4bc4ff" },
-    { label: "Wacht op jouw feedback", value: wachtFeedback, hint: "actie van jou", color: "#ffb020" },
-    { label: "Online deze week", value: pubDezeWeek, hint: "gaat live", color: "#2fd27a" },
-    { label: "Gepland deze maand", value: pubDezeMaand, hint: "publicaties", color: "#9fdcff" },
-  ];
-
+function DateBadge({ date, large = false }: { date: string; large?: boolean }) {
+  const d = new Date(`${date}T12:00:00`);
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-[25px] font-bold tracking-tight">Planning</h1>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Van productie tot publicatie — overzichtelijk op één tijdlijn.
-        </p>
+    <div className={`flex shrink-0 flex-col items-center justify-center rounded-[14px] border border-white/10 bg-white/[0.05] ${large ? "size-[62px]" : "size-12"}`}>
+      <span className={`font-bold leading-none tabular-nums ${large ? "text-[22px]" : "text-[17px]"}`}>{d.getDate()}</span>
+      <span className={`mt-0.5 uppercase tracking-wide text-[var(--color-ink-muted)] ${large ? "text-[11px]" : "text-[10px]"}`}>{d.toLocaleDateString("nl-NL", { month: "short" })}</span>
+    </div>
+  );
+}
+
+function ScriptPill({ s }: { s: PortalScriptState }) {
+  return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${TONE_CLS[s.tone]}`}><FileText className="size-3" /> {s.label}</span>;
+}
+
+function PersonRow({ label, person }: { label: string; person: NonNullable<PortalOpname["contentCreative"]> }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Avatar name={person.name} size={28} src={person.avatarUrl} />
+      <div className="leading-tight">
+        <div className="text-[13px] font-semibold">{person.name}</div>
+        <div className="text-[11px] text-[var(--color-ink-faint)]">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function ScriptsButton({ o, variant = "secondary" }: { o: PortalOpname; variant?: "accent" | "secondary" }) {
+  if (o.reviewId) {
+    return (
+      <Link href={`/portal/scripts/${o.reviewId}`} className={`${buttonClass({ variant, size: "sm" })} shrink-0`}>
+        Bekijk scripts <ArrowRight className="size-4" />
+      </Link>
+    );
+  }
+  return <span className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--color-ink-faint)]"><Clock className="size-3.5" /> Scripts volgen</span>;
+}
+
+function OpnameCard({ o, hero = false }: { o: PortalOpname; hero?: boolean }) {
+  return (
+    <div className={`sc-glass ${hero ? "p-6" : "p-5"}`} style={hero ? { background: "linear-gradient(180deg, rgba(25,168,255,0.08), rgba(255,255,255,0.02))" } : undefined}>
+      <div className="flex items-start gap-4">
+        <DateBadge date={o.date} large={hero} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(25,168,255,0.14)] px-2.5 py-0.5 text-[11px] font-semibold text-[#4bc4ff]"><Video className="size-3" /> Opnamedag</span>
+            <span className="text-[12.5px] font-medium text-[var(--color-ink-muted)]">{relativeLabel(o.date)}</span>
+          </div>
+          <h3 className={`mt-1.5 font-bold leading-tight ${hero ? "text-[19px]" : "text-[16px]"}`}>{dayLabel(o.date)}</h3>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--color-ink-muted)]">
+            {o.startTime ? <span className="inline-flex items-center gap-1"><Clock className="size-3.5" /> {o.startTime}{o.endTime ? `–${o.endTime}` : ""}</span> : null}
+            {o.location ? <span className="inline-flex items-center gap-1"><MapPin className="size-3.5" /> {o.location}</span> : null}
+            {o.plannedShorts ? <span className="inline-flex items-center gap-1"><Film className="size-3.5" /> {o.plannedShorts} shorts</span> : null}
+          </div>
+        </div>
       </div>
 
-      {/* Productie vs publicatie — verwachtingen in één oogopslag */}
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[14px] border border-white/10 bg-white/5 sm:grid-cols-4">
-        {summary.map((s) => (
-          <div key={s.label} className="bg-[rgba(10,12,38,0.6)] p-4">
-            <div className="text-[22px] font-bold tabular-nums leading-none" style={{ color: s.color }}>{s.value}</div>
-            <div className="mt-1.5 text-[12px] font-medium">{s.label}</div>
-            <div className="text-[11px] text-[var(--color-ink-faint)]">{s.hint}</div>
-          </div>
-        ))}
-      </div>
-      {eerstePub ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[#2fd27a]/25 bg-[rgba(47,210,122,0.06)] px-4 py-2.5 text-[13px]">
-          <Send className="size-4 text-[#2fd27a]" />
-          <span className="font-semibold">Eerstvolgende publicatie:</span>
-          <span className="text-[var(--color-ink-muted)]">{eerstePub.title} · {formatDateFull(new Date(`${eerstePub.scheduledOn}T12:00:00`))}</span>
+      {(o.contentCreative || o.videographer) ? (
+        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3 border-t border-white/10 pt-4">
+          {o.contentCreative ? <PersonRow label="Content creative" person={o.contentCreative} /> : null}
+          {o.videographer ? <PersonRow label="Videograaf" person={o.videographer} /> : null}
         </div>
       ) : null}
 
-      {items.length === 0 ? (
-        <EmptyState
-          title="Je planning wordt voorbereid"
-          description="Zodra er een opname, bespreking of publicatiedatum vaststaat, verschijnt die hier automatisch. Je hoeft nu niets te doen."
-          icon={<CalendarDays className="size-6" />}
-        />
-      ) : (
-        <div className="sc-glass p-2 sm:p-3">
-          <ul className="flex flex-col">
-            {items.map((it) => (
-              <li key={it.key} className="flex items-start gap-4 border-t border-white/10 px-3 py-4 first:border-t-0 sm:px-4">
-                <div className="flex size-12 shrink-0 flex-col items-center justify-center rounded-[13px] border border-white/10 bg-white/[0.04]">
-                  <span className="text-[17px] font-bold leading-none tabular-nums">{it.date.getDate()}</span>
-                  <span className="mt-0.5 text-[10px] uppercase tracking-wide text-[var(--color-ink-muted)]">
-                    {it.date.toLocaleDateString("nl-NL", { month: "short" })}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${TYPE_STYLE[it.type].cls}`}>
-                      {it.type === "publicatie" ? <Send className="size-3" /> : it.type === "oplevering" ? <Film className="size-3" /> : <CalendarDays className="size-3" />}
-                      {TYPE_STYLE[it.type].label}
-                    </span>
-                    <span className="text-[12.5px] text-[var(--color-ink-muted)]">{formatDateFull(it.date)} · {relativeDays(it.date)}</span>
-                  </div>
-                  <div className="mt-1 text-[15px] font-semibold">{it.title}</div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-[var(--color-ink-muted)]">
-                    {it.time ? <span>vanaf {it.time.slice(0, 5)}</span> : null}
-                    {it.location ? <span className="inline-flex items-center gap-1"><MapPin className="size-3.5" /> {it.location}</span> : null}
-                    {it.people && it.people.length > 0 ? (
-                      <span className="inline-flex items-center gap-1"><Users className="size-3.5" /> {it.people.join(", ")}</span>
-                    ) : null}
-                    {it.platforms && it.platforms.length > 0 ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        {it.platforms.slice(0, 4).map((pl) => (
-                          <span key={pl} title={PLATFORM[pl]?.label ?? pl} className="size-2.5 rounded-full ring-1 ring-white/30" style={{ background: PLATFORM[pl]?.color ?? "#888" }} />
-                        ))}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+        <ScriptPill s={o.script} />
+        <ScriptsButton o={o} variant={hero ? "accent" : "secondary"} />
+      </div>
+    </div>
+  );
+}
+
+function ScriptMeetingCard({ m }: { m: PortalScriptMeeting }) {
+  const d = new Date(m.startsAt);
+  const dateStr = d.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
+  const time = m.allDay ? null : d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" });
+  return (
+    <div className="sc-glass flex items-start gap-4 p-5">
+      <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[rgba(155,120,255,0.16)] text-[#b79bff]"><MessageSquareText className="size-5" /></span>
+      <div className="min-w-0 flex-1">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(155,120,255,0.16)] px-2.5 py-0.5 text-[11px] font-semibold text-[#b79bff]">Scriptmeeting</span>
+        <h3 className="mt-1.5 text-[15px] font-semibold leading-tight">{dateStr}</h3>
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--color-ink-muted)]">
+          {time ? <span className="inline-flex items-center gap-1"><Clock className="size-3.5" /> {time}</span> : null}
+          {m.people.length > 0 ? <span className="inline-flex items-center gap-1"><Users className="size-3.5" /> {m.people.join(", ")}</span> : null}
         </div>
+      </div>
+      {m.link ? (
+        <a href={m.link} target="_blank" rel="noreferrer" className={`${buttonClass({ variant: "secondary", size: "sm" })} shrink-0`}>
+          Open <ExternalLink className="size-3.5" />
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+export default async function PortalPlanningPage() {
+  const viewer = await requirePortal();
+  const [p, settings] = await Promise.all([getPortalPlanning(viewer), getPortalSettings()]);
+
+  const hasAny = p.nextOpname || p.scriptMeetings.length > 0 || p.laterOpnames.length > 0;
+
+  return (
+    <div className="flex flex-col gap-7">
+      <div>
+        <h1 className="text-[25px] font-bold tracking-tight">Planning</h1>
+        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Je opnames en scriptmeetings — automatisch bijgewerkt vanuit ons team.</p>
+      </div>
+
+      {!hasAny ? (
+        <div className="sc-glass flex flex-col items-start gap-3 border-dashed p-6">
+          <span className="grid size-10 place-items-center rounded-xl bg-white/[0.06] text-[#4bc4ff]"><CalendarDays className="size-5" strokeWidth={1.75} /></span>
+          <div>
+            <p className="text-sm font-semibold">Je planning wordt voorbereid</p>
+            <p className="mt-1 max-w-xl text-sm text-[var(--color-ink-muted)]">
+              Zodra er een opnamedag of scriptmeeting vaststaat, verschijnt die hier automatisch — met tijd, locatie, je content creative,
+              videograaf en de bijbehorende scripts. Je hoeft nu niets te doen.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Eerstvolgende opname */}
+          {p.nextOpname ? (
+            <section>
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--color-ink-faint)]"><CalendarClock className="size-4 text-[#4bc4ff]" /> JE EERSTVOLGENDE OPNAME</h2>
+              <OpnameCard o={p.nextOpname} hero />
+            </section>
+          ) : null}
+
+          {/* Volgende opnames */}
+          {p.laterOpnames.length > 0 ? (
+            <section>
+              <h2 className="mb-3 text-base font-semibold">Volgende opnames</h2>
+              <div className="flex flex-col gap-3">
+                {p.laterOpnames.map((o) => <OpnameCard key={o.id} o={o} />)}
+              </div>
+            </section>
+          ) : null}
+
+          {/* Scriptmeetings */}
+          {p.scriptMeetings.length > 0 ? (
+            <section>
+              <h2 className="mb-3 text-base font-semibold">Scriptmeetings</h2>
+              <div className="flex flex-col gap-3">
+                {p.scriptMeetings.map((m) => <ScriptMeetingCard key={m.id} m={m} />)}
+              </div>
+            </section>
+          ) : null}
+        </>
       )}
+
+      {/* Eerdere opnames (ingeklapt) */}
+      {p.pastOpnames.length > 0 ? (
+        <details className="sc-glass p-5 [&_summary]:cursor-pointer">
+          <summary className="flex items-center gap-2 text-sm font-semibold"><CalendarDays className="size-4 text-[var(--color-ink-muted)]" /> Eerdere opnames ({p.pastOpnames.length})</summary>
+          <div className="mt-4 flex flex-col gap-2.5">
+            {p.pastOpnames.map((o) => (
+              <div key={o.id} className="flex items-center gap-3 border-t border-white/10 pt-2.5 first:border-t-0 first:pt-0">
+                <DateBadge date={o.date} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[14px] font-semibold">{dayLabel(o.date)}</div>
+                  <div className="text-[12px] text-[var(--color-ink-muted)]">
+                    {[o.contentCreative?.name, o.videographer?.name, o.plannedShorts ? `${o.plannedShorts} shorts` : null].filter(Boolean).join(" · ") || "Opnamedag"}
+                  </div>
+                </div>
+                {o.reviewId ? <Link href={`/portal/scripts/${o.reviewId}`} className="shrink-0 text-[var(--color-ink-muted)] hover:text-[#4bc4ff]"><FileText className="size-4" /></Link> : null}
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
 
       {/* Afspraak wijzigen of annuleren — de geldende voorwaarden (intern instelbaar) */}
       <section className="sc-glass p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]"><CalendarClock className="size-4" /></span>
-          <h2 className="text-base font-semibold">Afspraak wijzigen of annuleren</h2>
+          <h2 className="text-base font-semibold">Opname wijzigen of annuleren</h2>
         </div>
         <ul className="mt-3 flex flex-col gap-2 text-[13.5px] text-[var(--color-ink-muted)]">
           <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[#4bc4ff]" /> Wil je een opname verplaatsen of annuleren? Laat het je vaste contactpersoon zo snel mogelijk weten.</li>
