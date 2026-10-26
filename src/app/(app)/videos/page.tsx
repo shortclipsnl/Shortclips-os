@@ -47,7 +47,7 @@ export default async function VideosPage({
             Vragen of kom je ergens niet uit? Neem contact op met je contactpersoon bij ShortClips.
           </p>
           {videos.length > 0 ? (
-            <EditorBoardTable videos={videos} editors={[]} canEdit={false} canAssign={false} canEditFiles={viewer.permissions.has("videos:write")} showTabs={false} editorView />
+            <EditorBoardTable videos={videos} editors={[]} canEdit={false} canAssign={false} canEditFiles showTabs={false} editorView />
           ) : (
             <p className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">
               Je hebt op dit moment geen video&apos;s toegewezen gekregen.
@@ -130,6 +130,8 @@ export default async function VideosPage({
               editors={boardEditors.map((e) => ({ id: e.id, fullName: e.fullName }))}
               canEdit={canEdit}
               canAssign={canAssign}
+              canEditFiles={showAllBoard}
+              viewerId={viewer.id}
             />
           ) : (
             <p className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">

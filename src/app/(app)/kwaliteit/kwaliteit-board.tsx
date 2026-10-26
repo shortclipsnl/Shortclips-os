@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { PenLine, Scissors, MessagesSquare, CalendarRange, LayoutGrid, Dot } from "lucide-react";
-import { Badge, type Tone } from "@/components/ui";
+import { Badge, ClientLogo, type Tone } from "@/components/ui";
 import type { QualityItem, QualityGroup, QualitySeverity } from "@/server/quality";
 
 /**
@@ -72,6 +72,12 @@ export function KwaliteitBoard({ items }: { items: QualityItem[]; counts: Record
                   {list.map((i) => (
                     <li key={i.id}>
                       <Link href={i.href} className="flex items-center gap-2.5 px-4 py-3 hover:bg-[var(--color-surface-sunken)]/50" style={{ boxShadow: `inset 3px 0 0 ${SEV[i.severity].color}` }}>
+                        {/* Klantlogo links, zodat je per regel direct ziet over
+                            welke klant het gaat. Punten zonder klant (koppelingen,
+                            planninggaten) krijgen geen logo. */}
+                        {i.clientName ? (
+                          <ClientLogo name={i.clientName} logoUrl={i.clientLogoUrl} color={i.clientColor} size={30} />
+                        ) : null}
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-[var(--color-ink)]">{i.title}</span>
                           <span className="block truncate text-xs text-[var(--color-ink-muted)]">{i.detail}</span>

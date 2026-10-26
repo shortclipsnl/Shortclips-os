@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requirePermission } from "@/server/auth/context";
+import { requireOwner } from "@/server/auth/context";
 import { getPortalSettings } from "@/server/portal-settings";
 import { Card, PageHeader } from "@/components/ui";
 import { PortalSettingsForm } from "./settings-form";
@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Klantportaal-instellingen" };
 export const dynamic = "force-dynamic";
 
 export default async function PortaalSettingsPage() {
-  await requirePermission("scripts:write");
+  await requireOwner();
   const settings = await getPortalSettings();
   return (
     <div className="mx-auto max-w-[900px]">

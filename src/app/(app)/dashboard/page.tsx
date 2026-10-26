@@ -9,9 +9,7 @@ import { activeClientsMissingCoordinator } from "@/server/clients";
 import { editorCapacityMap } from "@/server/metrics";
 import { periodLabel } from "@/lib/format";
 import { LinkButton, TeamAvatar } from "@/components/ui";
-import { getGoalsOverview } from "@/server/goals/overview";
 import { EditorDashboard } from "./editor-view";
-import { DoelenStrook } from "./doelen-strook";
 import { TodayView } from "./today-view";
 import { WeekPlanning, type WeekUpload } from "./week-planning";
 import { PostingReminder, type TodayPost } from "./posting-reminder";
@@ -33,13 +31,12 @@ export default async function DashboardPage() {
   contentToD.setDate(contentToD.getDate() + 14);
   const contentTo = contentToD.toISOString().slice(0, 10);
 
-  const [data, myDay, capMap, meetings, contentItems, goals, morning] = await Promise.all([
+  const [data, myDay, capMap, meetings, contentItems, morning] = await Promise.all([
     getDashboard(viewer),
     getMyDay(viewer),
     editorCapacityMap(),
     listUpcomingMeetings(7),
     listCalendar(viewer, { from: contentFrom, to: contentTo }),
-    getGoalsOverview(viewer),
     getMorningOverview(viewer),
   ]);
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
@@ -113,11 +110,6 @@ export default async function DashboardPage() {
 
       {/* Gebundeld ochtendoverzicht: verlopen deadlines, acties en aandachtspunten. */}
       <MorningOverviewCard data={morning} />
-
-      {/* Doelen Q4 — compacte strook met alleen de doelen die aandacht vragen. */}
-      {goals.rows.length > 0 ? (
-        <DoelenStrook rows={goals.rows} weekOfQuarter={goals.weekOfQuarter} totalWeeks={goals.totalWeeks} />
-      ) : null}
 
       {/* Rol-gericht: maximaal drie blokken met concrete acties. */}
       <TodayView viewer={viewer} data={data} myDay={myDay} capMap={capMap} />

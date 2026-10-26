@@ -43,6 +43,22 @@ export default async function VideoIntelligencePage({
         description="Analyseer organische short video's: shots, hooks, spraak, montage en AI-conclusies. Begrijp wáárom een video werkt."
       />
 
+      {/* Korte uitleg bovenaan: waarvoor gebruik je dit en hoe? Zodat het team
+          weet wat de patronen betekenen en hoe ze die inzetten voor scripts. */}
+      <div className="mb-5 rounded-[var(--radius-md)] border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)] px-4 py-3.5 text-sm leading-relaxed text-[var(--color-ink)]">
+        <p className="mb-1.5 font-semibold">Waarvoor is dit?</p>
+        <p className="mb-2 text-[var(--color-ink-muted)]">
+          Video Intelligence pluist bestaande, goed presterende short video&apos;s uit: hoe lang ze zijn, hoeveel shots, het montagetempo, de spreeksnelheid en het type hook. Zo zie je <strong className="text-[var(--color-ink)]">wat de video&apos;s van een klant kenmerkt</strong> en gebruik je dat als vertrekpunt voor een volgend script en de editbriefing.
+        </p>
+        <p className="mb-1 font-semibold">Zo gebruik je het:</p>
+        <ol className="ml-4 list-decimal space-y-0.5 text-[var(--color-ink-muted)]">
+          <li>Voeg een organische short toe met een platform-URL of een MP4{canRun ? " (knop hieronder)" : ""}.</li>
+          <li>Kies hieronder een <strong className="text-[var(--color-ink)]">klant</strong> — dan zie je de patronen en scripttips van díe klant.</li>
+          <li>Neem die kenmerken mee in je script en briefing; houd nieuwe video&apos;s in dezelfde buurt.</li>
+        </ol>
+        <p className="mt-2 text-xs text-[var(--color-ink-faint)]">De cijfers zijn beschrijvend (nog niet gewogen op prestaties). AI-conclusies (hooktype, waarom het werkt) verschijnen zodra de Anthropic-sleutel is ingesteld.</p>
+      </div>
+
       {/* Alleen de eigenaar ziet de technische inrichting ("Analyse-onderdelen
           instellen"); teamleden hebben hier niets aan en kunnen het niet zelf. */}
       {isOwner(viewer) ? <ToolStatusPanel status={toolStatus} /> : null}
@@ -55,10 +71,6 @@ export default async function VideoIntelligencePage({
         <Stat label="In verwerking" value={String(processing)} />
         <Stat label="Wacht op AI/tools" value={String(needsAi)} tone={needsAi > 0 ? "warn" : undefined} />
       </div>
-
-      <PatternsCard intel={intel} clientName={selectedClientName} />
-
-      {selectedClientName ? <ScriptHintsCard intel={intel} clientName={selectedClientName} /> : null}
 
       <form method="get" className="mb-3 flex flex-wrap items-end gap-2">
         <label className="block">
@@ -86,17 +98,36 @@ export default async function VideoIntelligencePage({
         {hasFilter ? <Link href="/video-intelligence" className="px-2 py-2 text-sm text-[var(--color-ink-muted)] hover:underline">wissen</Link> : null}
       </form>
 
-      <Card padded={false}>
-        {rows.length === 0 ? (
-          <EmptyState
-            title={hasFilter ? "Geen video's voor deze filter" : "Nog geen video's geanalyseerd"}
-            description={hasFilter ? "Pas de filters aan of wis ze." : canRun ? "Voeg hierboven een platform-URL toe of upload een MP4 om te beginnen." : "Er zijn nog geen analyses voor jouw klanten."}
-            icon={<Sparkles className="size-6" />}
-          />
-        ) : (
-          <AnalysisList rows={rows} canRun={canRun} />
-        )}
-      </Card>
+      {/* Patronen en scripttips alleen per klant — de bak "over alle video's"
+          is niet bruikbaar (klanten verschillen te veel). Kies een klant. */}
+      {selectedClientName ? <PatternsCard intel={intel} clientName={selectedClientName} /> : (
+        <p className="mb-5 rounded-[var(--radius-md)] border border-dashed border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-ink-muted)]">
+          Kies hierboven een <strong className="text-[var(--color-ink)]">klant</strong> om de patronen (lengte, shots, montagetempo, spreeksnelheid, hooktypes) en scripttips van die klant te zien.
+        </p>
+      )}
+
+      {selectedClientName ? <ScriptHintsCard intel={intel} clientName={selectedClientName} /> : null}
+
+      {/* De geanalyseerde video's (het archief) staan ingeklapt achter een knop,
+          zodat de pagina overzichtelijk blijft en de patronen vooropstaan. */}
+      <details className="group rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-[var(--color-ink)] [&::-webkit-details-marker]:hidden">
+          <span>Geanalyseerde video&apos;s{rows.length > 0 ? ` · ${rows.length}` : ""}</span>
+          <span className="text-xs font-normal text-[var(--color-ink-muted)] group-open:hidden">bekijken →</span>
+          <span className="hidden text-xs font-normal text-[var(--color-ink-muted)] group-open:inline">verbergen</span>
+        </summary>
+        <div className="border-t border-[var(--color-line)]">
+          {rows.length === 0 ? (
+            <EmptyState
+              title={hasFilter ? "Geen video's voor deze filter" : "Nog geen video's geanalyseerd"}
+              description={hasFilter ? "Pas de filters aan of wis ze." : canRun ? "Voeg hierboven een platform-URL toe of upload een MP4 om te beginnen." : "Er zijn nog geen analyses voor jouw klanten."}
+              icon={<Sparkles className="size-6" />}
+            />
+          ) : (
+            <AnalysisList rows={rows} canRun={canRun} />
+          )}
+        </div>
+      </details>
     </div>
   );
 }

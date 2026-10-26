@@ -66,6 +66,7 @@ export function EditorBoardTable({
   canEdit,
   canAssign,
   canEditFiles,
+  viewerId,
   showTabs = true,
   editorView = false,
 }: {
@@ -77,11 +78,13 @@ export function EditorBoardTable({
    *  (die het bord verder alleen-lezen zien) tóch hun materiaal en script kunnen
    *  toevoegen. Niet gezet = gelijk aan `canEdit`. */
   canEditFiles?: boolean;
+  /** De ingelogde gebruiker; wie de toegewezen editor van een rij is mag de
+   *  bestanden van díe rij altijd bijwerken (ook zonder `videos:write`). */
+  viewerId?: string;
   showTabs?: boolean;
   /** Editorperspectief: toon de interne deadline (opname + 7 wd) i.p.v. de klantdeadline. */
   editorView?: boolean;
 }) {
-  const filesEditable = canEditFiles ?? canEdit;
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(["afgerond"]));
   const [editor, setEditor] = useState<string>("alle");
 
@@ -192,7 +195,7 @@ export function EditorBoardTable({
                 </button>
                 {open ? (
                   list.length > 0 ? (
-                    list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} canEditFiles={filesEditable} phaseColor={meta.color} editorView={editorView} />)
+                    list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} canEditFiles={canEditFiles} viewerId={viewerId} phaseColor={meta.color} editorView={editorView} />)
                   ) : (
                     <p className="border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2.5 text-2xs text-[var(--color-ink-faint)]">Nog geen video&apos;s in deze fase.</p>
                   )
@@ -269,9 +272,10 @@ function TextTab({ active, onClick, children }: { active: boolean; onClick: () =
   );
 }
 
-function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorView = false }: { v: EditorBoardVideo; editors: Editor[]; canEdit: boolean; canAssign: boolean; canEditFiles?: boolean; phaseColor: string; editorView?: boolean }) {
-  // Downloadlink + script mogen editors ook bewerken (los van `canEdit`).
-  const filesEditable = canEditFiles ?? canEdit;
+function Row({ v, editors, canEdit, canAssign, canEditFiles, viewerId, phaseColor, editorView = false }: { v: EditorBoardVideo; editors: Editor[]; canEdit: boolean; canAssign: boolean; canEditFiles?: boolean; viewerId?: string; phaseColor: string; editorView?: boolean }) {
+  // Downloadlink + script mogen editors ook bewerken (los van `canEdit`): wie
+  // `videos:write` heeft, of wie zelf de toegewezen editor van deze rij is.
+  const filesEditable = (canEditFiles ?? canEdit) || (viewerId != null && v.editorId === viewerId);
   const [pending, start] = useTransition();
   const router = useRouter();
   const run = (fn: () => Promise<unknown>) => start(async () => { await fn(); router.refresh(); });

@@ -39,6 +39,12 @@ export type QualityItem = {
   roles: string[];
   /** Actiegebied (afgeleid van de categorie), voor de indeling op de pagina. */
   group?: QualityGroup;
+  /** De klant waar dit punt over gaat, zodat de pagina links het klantlogo kan
+   *  tonen en in één oogopslag scanbaar is welke klant het betreft. Leeg bij
+   *  punten zonder klant (koppelingen, planninggaten). */
+  clientName?: string;
+  clientLogoUrl?: string | null;
+  clientColor?: string | null;
 };
 
 /** Welke categorie hoort bij welk actiegebied. */
@@ -162,7 +168,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   for (const p of projects) {
     if (p.bucket === "aandacht" || p.risk.level !== "oranje") continue;
     items.push({
-      id: `risk-${p.id}`, severity: "oranje", category: "Deadline in gevaar",
+      id: `risk-${p.id}`, clientName: p.clientName, severity: "oranje", category: "Deadline in gevaar",
       title: `${p.clientName} — ${projTitle(p.clientName, p.title)}`,
       detail: `${p.risk.factors.join(" · ")} → vooruit plannen`,
       href: `/videos/${p.id}`, roles: EDIT,
@@ -174,7 +180,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
     const d = Math.max(1, -daysUntil(v.dueOn));
     const atClient = VIDEO_WAITING_ON[v.status as VideoStage] === "client";
     items.push({
-      id: `late-${v.id}`, severity: "rood",
+      id: `late-${v.id}`, clientName: v.clientName, severity: "rood",
       category: atClient ? "Te laat bij klant" : "Video over deadline",
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: atClient ? `${d} dag(en) te laat · wacht op klant → herinneren` : `${d} dag(en) te laat · ${v.editorName ?? "geen editor"} → afmaken`,
@@ -188,7 +194,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
     const wd = workingDaysBetween(v.shootDate, today);
     if (wd < 7) continue;
     items.push({
-      id: `firstcut-${v.id}`, severity: "oranje", category: "Eerste versie verwacht",
+      id: `firstcut-${v.id}`, clientName: v.clientName, severity: "oranje", category: "Eerste versie verwacht",
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `${wd} werkdagen na opname · nog geen eerste versie · ${v.editorName ?? "geen editor"} → eerste cut maken`,
       href: `/videos/${v.id}`, roles: EDIT,
@@ -200,7 +206,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
     const anyAtEditor = s.shorts.some((x) => x.atEditor);
     if (!anyAtEditor || s.workdaysToEditorDeadline < 0 || s.workdaysToEditorDeadline > 2) continue;
     items.push({
-      id: `editordue-${s.shootId}`, severity: "oranje", category: "Editor moet opleveren",
+      id: `editordue-${s.shootId}`, clientName: s.clientName, severity: "oranje", category: "Editor moet opleveren",
       title: `${s.clientName} — opname ${s.shootDate.slice(5)}`,
       detail: `${s.riskReason ?? `Editordeadline over ${s.workdaysToEditorDeadline} werkdag(en)`} → opleveren`,
       href: `/productions/${s.shootId}`, roles: EDIT,
@@ -210,7 +216,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   // #4 Feedback ontbreekt — te lang bij klant zonder reactie.
   for (const v of data.videos.stalledAtClient.filter((x) => daysSince(x.statusChangedAt) > 3)) {
     items.push({
-      id: `stall-${v.id}`, severity: "oranje", category: "Feedback ontbreekt",
+      id: `stall-${v.id}`, clientName: v.clientName, severity: "oranje", category: "Feedback ontbreekt",
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `${daysSince(v.statusChangedAt)} dagen geen klantfeedback → herinneren`,
       href: `/videos/${v.id}`, roles: CC,
@@ -220,7 +226,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   // #5 Video wacht op controle — editor heeft klaargezet (interne controle).
   for (const v of reviewQueue.teControleren) {
     items.push({
-      id: `review-${v.id}`, severity: "oranje", category: "Video wacht op controle",
+      id: `review-${v.id}`, clientName: v.clientName, severity: "oranje", category: "Video wacht op controle",
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `${Number(v.days)} dag(en) klaargezet · ${v.editorName ?? "geen editor"} → intern controleren`,
       href: `/videos/${v.id}`, roles: CC,
@@ -237,7 +243,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
         Number(s.openBlockers) > 0 ? "benodigdheden" : null,
       ].filter(Boolean);
       items.push({
-        id: `shoot-${s.id}`, severity: daysUntil(s.scheduledOn) <= 0 ? "rood" : "oranje", category: "Opname voorbereiden",
+        id: `shoot-${s.id}`, clientName: s.clientName, severity: daysUntil(s.scheduledOn) <= 0 ? "rood" : "oranje", category: "Opname voorbereiden",
         title: `${s.clientName} — opname`, detail: `${bits.join(", ") || `${open} punt(en)`} nog open · ${s.videographerName ?? "geen videograaf"} → voorbereiden`,
         href: `/productions/${s.id}`, roles: SHOOT,
       });
@@ -247,7 +253,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   // #7 Scripts controleren — scripts klaar voor interne controle.
   for (const r of scripting.rows.filter((x) => x.status === "klaar_shortclips")) {
     items.push({
-      id: `scriptcheck-${r.id}`, severity: "oranje", category: "Scripts controleren",
+      id: `scriptcheck-${r.id}`, clientName: r.clientName, severity: "oranje", category: "Scripts controleren",
       title: `${r.clientName} — opname ${r.scheduledOn.slice(5)}`,
       detail: `Script staat klaar · ${r.scriptWriterName ?? "geen verantwoordelijke"} → intern controleren`,
       href: "/scripting", roles: CC,
@@ -274,7 +280,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   for (const v of missingData) {
     const mist = [!v.editorId ? "editor" : null, !v.dueOn ? "deadline" : null].filter(Boolean).join(" en ");
     items.push({
-      id: `missing-${v.id}`, severity: "oranje", category: "Productiegegevens ontbreken",
+      id: `missing-${v.id}`, clientName: v.clientName, severity: "oranje", category: "Productiegegevens ontbreken",
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `Geen ${mist} ingevuld → aanvullen`,
       href: `/videos/${v.id}`, roles: COORD,
@@ -284,7 +290,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   // #10 Feedback niet verwerkt — klantfeedback staat open.
   for (const v of clientRevision) {
     items.push({
-      id: `clientrev-${v.id}`, severity: "oranje", category: "Feedback niet verwerkt",
+      id: `clientrev-${v.id}`, clientName: v.clientName, severity: "oranje", category: "Feedback niet verwerkt",
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `Klantfeedback ${daysSince(v.statusChangedAt)} dag(en) open · ${v.editorName ?? "geen editor"} → verwerken`,
       href: `/videos/${v.id}`, roles: EDIT,
@@ -294,7 +300,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   // #11 Video klaar maar niet verstuurd — goedgekeurd, nog niet ingepland/live.
   for (const v of readyNotSent) {
     items.push({
-      id: `notsent-${v.id}`, severity: "oranje", category: "Video klaar maar niet verstuurd",
+      id: `notsent-${v.id}`, clientName: v.clientName, severity: "oranje", category: "Video klaar maar niet verstuurd",
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `Goedgekeurd, ${daysSince(v.statusChangedAt)} dag(en) niet verstuurd → inplannen/publiceren`,
       href: `/videos/${v.id}`, roles: CC,
@@ -305,7 +311,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   for (const p of overduePublish) {
     const d = Math.max(1, -daysUntil(p.scheduledOn));
     items.push({
-      id: `unpub-${p.id}`, severity: "oranje", category: "Video niet gepubliceerd",
+      id: `unpub-${p.id}`, clientName: p.clientName, severity: "oranje", category: "Video niet gepubliceerd",
       title: `${p.clientName} — ${p.title}`,
       detail: `${d} dag(en) over geplande publicatie → publiceren`,
       href: p.deliverableId ? `/videos/${p.deliverableId}` : "/calendar", roles: CC,
@@ -316,7 +322,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   if (screen) {
     for (const c of (screen.laggards ?? []).filter((x) => (x.growthPct ?? 0) <= -25)) {
       items.push({
-        id: `drop-${c.slug}`, severity: "oranje", category: "Resultaten vallen terug",
+        id: `drop-${c.slug}`, clientName: c.name, severity: "oranje", category: "Resultaten vallen terug",
         title: c.name,
         detail: `Weergaven ${c.growthPct}% t.o.v. vorige periode → resultaten bekijken`,
         href: `/analytics/${c.slug}`, roles: COORD,
@@ -341,7 +347,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   // Klanten met risico.
   for (const c of data.clients.atRisk) {
     items.push({
-      id: `clientrisk-${c.id}`, severity: c.riskLevel === "high" ? "rood" : "oranje", category: "Klant vraagt aandacht",
+      id: `clientrisk-${c.id}`, clientName: c.name, severity: c.riskLevel === "high" ? "rood" : "oranje", category: "Klant vraagt aandacht",
       title: c.name, detail: `${c.riskReason ?? "Gemarkeerd als risico"} → contact opnemen`,
       href: `/clients/${c.slug}`, roles: CC,
     });
@@ -350,7 +356,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   // Achter op de maandafspraak (quota).
   for (const q of data.clients.quotaGap) {
     items.push({
-      id: `quota-${q.clientId}`, severity: "oranje", category: "Achter op afspraak",
+      id: `quota-${q.clientId}`, clientName: q.clientName, severity: "oranje", category: "Achter op afspraak",
       title: q.clientName, detail: `${q.published + q.inProgress} van ${q.quota} deze maand → opname/edit inplannen`,
       href: `/clients/${q.clientSlug}`, roles: CC,
     });
@@ -371,7 +377,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   for (const c of data.contracts.slice(0, 6)) {
     const d = daysUntil(c.endsOn);
     items.push({
-      id: `contract-${c.id}`, severity: d < 30 ? "oranje" : "blauw", category: "Contract loopt af",
+      id: `contract-${c.id}`, clientName: c.clientName, severity: d < 30 ? "oranje" : "blauw", category: "Contract loopt af",
       title: c.clientName, detail: `Over ${d} dagen · ${c.autoRenew ? "verlengt automatisch" : "verlengt niet"}`,
       href: `/clients/${c.clientSlug}?tab=contract`, roles: COORD,
     });
@@ -437,8 +443,24 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   }
   capped.sort((a, b) => order[a.severity] - order[b.severity] || a.category.localeCompare(b.category));
 
+  // Klantlogo + merkkleur erbij, zodat de pagina links een logo kan tonen en in
+  // één oogopslag scanbaar is welke klant het betreft. Eén query, via de naam
+  // gekoppeld (die elk klant-item al meekrijgt).
+  const logoRows = await db
+    .select({ name: clients.name, logoUrl: clients.logoUrl, color: clients.color })
+    .from(clients);
+  const logoByName = new Map(logoRows.map((r) => [r.name, { logoUrl: r.logoUrl, color: r.color }]));
+
   // Actiegebied per item afleiden, zodat de pagina per soort werk kan indelen.
-  const withGroup = capped.map((it) => ({ ...it, group: groupOf(it.category) }));
+  const withGroup = capped.map((it) => {
+    const logo = it.clientName ? logoByName.get(it.clientName) : undefined;
+    return {
+      ...it,
+      group: groupOf(it.category),
+      clientLogoUrl: logo?.logoUrl ?? null,
+      clientColor: logo?.color ?? null,
+    };
+  });
 
   return { items: withGroup, counts };
 }

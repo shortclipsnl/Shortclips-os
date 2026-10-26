@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ForbiddenError, requirePermission } from "@/server/auth/context";
+import { ForbiddenError, requireOwner } from "@/server/auth/context";
 import { savePortalSettings, type PortalSettings } from "@/server/portal-settings";
 
 export type ActionResult = { ok: boolean; message?: string };
@@ -12,7 +12,7 @@ const str = (v: unknown, max = 400) => String(v ?? "").trim().slice(0, max);
 /** Intern: de klantportaal-termijnen en -voorwaarden aanpassen (owner + coördinatoren). */
 export async function updatePortalSettings(input: PortalSettings): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("scripts:write");
+    const viewer = await requireOwner();
     const clean: PortalSettings = {
       feedbackDaysScripts: clampDay(input.feedbackDaysScripts),
       feedbackDaysVideos: clampDay(input.feedbackDaysVideos),

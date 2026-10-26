@@ -114,7 +114,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/noodprocedure", label: "Noodprocedure", icon: "LifeBuoy", roles: ["project_coordinator"], match: "/noodprocedure" },
       { href: "/settings/agendas", label: "Agenda's", icon: "CalendarRange", ownerOnly: true, match: "/settings/agendas" },
       { href: "/settings/integrations", label: "Koppelingen", icon: "Plug", ownerOnly: true, match: "/settings/integrations" },
-      { href: "/settings/portaal", label: "Klantportaal-instellingen", icon: "SlidersHorizontal", permissions: ["scripts:write"], match: "/settings/portaal" },
+      { href: "/settings/portaal", label: "Klantportaal-instellingen", icon: "SlidersHorizontal", ownerOnly: true, match: "/settings/portaal" },
       { href: "/settings", label: "Instellingen", icon: "Settings", permissions: ["settings:read", "users:read"], match: "/settings" },
     ],
   },

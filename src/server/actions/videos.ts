@@ -14,10 +14,28 @@ import {
 } from "@/db/schema";
 import {
   assertClientAccess,
+  requireInternal,
   requirePermission,
   requireViewer,
   ForbiddenError,
+  type Viewer,
 } from "@/server/auth/context";
+import { isCoreStaff } from "@/server/core-staff";
+
+/**
+ * Wie de bestanden (downloadlinks + script) van een edit-project mag bijwerken:
+ * - iedereen met videos:write;
+ * - het kernteam (Milou, Jiska, Rutger) — zij beheren alle edit-projecten,
+ *   net als de eigenaar;
+ * - een editor voor zijn EIGEN edit-projecten, ook zonder videos:write.
+ * Geeft een melding terug als het niet mag.
+ */
+function mayEditVideoFiles(viewer: Viewer, video: { editorId: string | null }): string | null {
+  if (viewer.permissions.has("videos:write")) return null;
+  if (isCoreStaff(viewer.email)) return null;
+  if (video.editorId && video.editorId === viewer.id) return null;
+  return "Je kunt alleen de bestanden van je eigen editprojecten bijwerken.";
+}
 import { auditLog, recordActivity } from "@/server/audit";
 import { dispatch } from "@/server/automation";
 import { notify } from "@/server/notifications";
@@ -92,10 +110,12 @@ export async function setEditingVideoLinks(
   links: { footageUrl?: string | null; scriptUrl?: string | null },
 ): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireInternal();
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
+    const denied = mayEditVideoFiles(viewer, video);
+    if (denied) return { ok: false, message: denied };
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if ("footageUrl" in links) patch.footageUrl = links.footageUrl?.trim() || null;
@@ -124,10 +144,12 @@ export async function uploadVideoScript(
   file: { fileName: string; contentType: string; base64: string },
 ): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireInternal();
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
+    const denied = mayEditVideoFiles(viewer, video);
+    if (denied) return { ok: false, message: denied };
     if (!video.productionDayId) {
       return { ok: false, message: "Deze video heeft geen gekoppelde opnamedag. Het script hoort bij een opname." };
     }
@@ -164,10 +186,12 @@ export async function uploadVideoScript(
 /** Het geüploade script-pdf van de opname van deze video verwijderen. */
 export async function deleteVideoScript(videoId: string): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireInternal();
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
+    const denied = mayEditVideoFiles(viewer, video);
+    if (denied) return { ok: false, message: denied };
     if (!video.productionDayId) return { ok: true };
 
     await db
@@ -222,10 +246,12 @@ export async function setEditingVideoDeadline(
 /** Aantal shorts van een video zetten. */
 export async function setEditingVideoShorts(videoId: string, shorts: number | null): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireInternal();
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
+    const denied = mayEditVideoFiles(viewer, video);
+    if (denied) return { ok: false, message: denied };
 
     const n = shorts === null ? null : Math.max(0, Math.min(99, Math.round(shorts)));
     await db.update(deliverables).set({ plannedShorts: n, updatedAt: new Date() }).where(eq(deliverables.id, videoId));
