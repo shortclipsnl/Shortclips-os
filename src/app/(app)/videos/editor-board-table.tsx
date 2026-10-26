@@ -65,6 +65,7 @@ export function EditorBoardTable({
   editors,
   canEdit,
   canAssign,
+  canEditFiles,
   showTabs = true,
   editorView = false,
 }: {
@@ -72,10 +73,15 @@ export function EditorBoardTable({
   editors: Editor[];
   canEdit: boolean;
   canAssign: boolean;
+  /** Mag de downloadlink + het script bewerken. Los van `canEdit`, zodat editors
+   *  (die het bord verder alleen-lezen zien) tóch hun materiaal en script kunnen
+   *  toevoegen. Niet gezet = gelijk aan `canEdit`. */
+  canEditFiles?: boolean;
   showTabs?: boolean;
   /** Editorperspectief: toon de interne deadline (opname + 7 wd) i.p.v. de klantdeadline. */
   editorView?: boolean;
 }) {
+  const filesEditable = canEditFiles ?? canEdit;
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(["afgerond"]));
   const [editor, setEditor] = useState<string>("alle");
 
@@ -186,7 +192,7 @@ export function EditorBoardTable({
                 </button>
                 {open ? (
                   list.length > 0 ? (
-                    list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} phaseColor={meta.color} editorView={editorView} />)
+                    list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} canEditFiles={filesEditable} phaseColor={meta.color} editorView={editorView} />)
                   ) : (
                     <p className="border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2.5 text-2xs text-[var(--color-ink-faint)]">Nog geen video&apos;s in deze fase.</p>
                   )
@@ -263,7 +269,9 @@ function TextTab({ active, onClick, children }: { active: boolean; onClick: () =
   );
 }
 
-function Row({ v, editors, canEdit, canAssign, phaseColor, editorView = false }: { v: EditorBoardVideo; editors: Editor[]; canEdit: boolean; canAssign: boolean; phaseColor: string; editorView?: boolean }) {
+function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorView = false }: { v: EditorBoardVideo; editors: Editor[]; canEdit: boolean; canAssign: boolean; canEditFiles?: boolean; phaseColor: string; editorView?: boolean }) {
+  // Downloadlink + script mogen editors ook bewerken (los van `canEdit`).
+  const filesEditable = canEditFiles ?? canEdit;
   const [pending, start] = useTransition();
   const router = useRouter();
   const run = (fn: () => Promise<unknown>) => start(async () => { await fn(); router.refresh(); });
@@ -336,15 +344,15 @@ function Row({ v, editors, canEdit, canAssign, phaseColor, editorView = false }:
         <ShortsField v={v} canEdit={canEdit} onSave={(n) => run(() => setEditingVideoShorts(v.id, n))} />
       </div>
 
-      {/* Links shorts (downloadlink) */}
+      {/* Links shorts (downloadlink) — ook door editors te vullen. */}
       <div className="relative flex items-center justify-center px-1">
-        <LinkCell href={v.downloadHref} canEdit={canEdit} icon={<Download className="size-3.5" />} label="Download"
+        <LinkCell href={v.downloadHref} canEdit={filesEditable} icon={<Download className="size-3.5" />} label="Download"
           onSave={(u) => run(() => setEditingVideoLinks(v.id, { footageUrl: u }))} />
       </div>
 
-      {/* Script — altijd een pdf-bestand (slepen of kiezen), geen link meer. */}
+      {/* Script — altijd een pdf-bestand (slepen of kiezen), geen link meer. Ook door editors. */}
       <div className="relative flex items-center justify-center px-1">
-        <ScriptUploadCell v={v} canEdit={canEdit} run={run} pending={pending} />
+        <ScriptUploadCell v={v} canEdit={filesEditable} run={run} pending={pending} />
       </div>
     </div>
   );
