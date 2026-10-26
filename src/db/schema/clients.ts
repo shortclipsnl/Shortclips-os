@@ -338,3 +338,21 @@ export const clientKnowledgeRelations = relations(clientKnowledge, ({ one }) => 
     references: [clients.id],
   }),
 }));
+
+/**
+ * Klantspecifieke afspraken-overrides: alleen de velden die voor déze klant
+ * afwijken van de algemene afspraken. Puur een informatieve weergave in het
+ * klantportaal — de offerte/overeenkomst blijft leidend. Leeg = algemene
+ * afspraak. Beheerd vanuit het interne portaal.
+ */
+export const clientAgreementOverrides = pgTable("client_agreement_overrides", {
+  id: pk(),
+  clientId: uuid("client_id")
+    .notNull()
+    .unique()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  /** Partial<PortalSettings>: alleen de afwijkende sleutels. */
+  overrides: jsonb("overrides").notNull().default(sql`'{}'::jsonb`),
+  updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+  ...timestamps,
+});

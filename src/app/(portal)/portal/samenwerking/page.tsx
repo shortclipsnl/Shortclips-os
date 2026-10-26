@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Building2, CalendarClock, ClipboardList, Clock, Film, Globe, Mail, Phone, Scale, UserRound, Users } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalProfile } from "@/server/portal";
-import { getPortalSettings } from "@/server/portal-settings";
+import { getPortalSettingsForClient } from "@/server/portal-settings";
 import { buildAfsprakenGroepen } from "@/lib/portal-afspraken";
 import { Avatar, buttonClass } from "@/components/ui";
 import { formatDate, formatDateFull } from "@/lib/format";
@@ -38,7 +38,7 @@ function Row({ k, v }: { k: string; v: React.ReactNode }) {
 
 export default async function PortalSamenwerkingPage() {
   const viewer = await requirePortal();
-  const [profile, contact, settings] = await Promise.all([getPortalProfile(viewer), getPortalContact(viewer), getPortalSettings()]);
+  const [profile, contact, settings] = await Promise.all([getPortalProfile(viewer), getPortalContact(viewer), getPortalSettingsForClient(viewer.clientId ?? "")]);
 
   const platformLabels = profile.platforms.map((p) => PLATFORM[p]?.label ?? p);
   const perWeek = profile.monthlyQuota > 0 ? Math.round((profile.monthlyQuota / 4.33) * 10) / 10 : 0;

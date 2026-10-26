@@ -55,6 +55,8 @@ import {
 import { ClientTabs, type TabDef } from "./tabs";
 import { FinanceMonths } from "./finance-months";
 import { GenerateReportButton, ReportPublishToggle } from "./report-actions";
+import { AgreementOverridesEditor } from "./agreement-overrides";
+import { getClientAgreementOverrides, getPortalSettings } from "@/server/portal-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +88,11 @@ export default async function ClientPage({
   // hier automatisch meelopen.
   const editingProjects = await listEditingProjects(viewer, { clientId: c.id });
   const canEditClient = viewer.permissions.has("clients:write");
+
+  // Klantspecifieke afspraken (alleen voor wie klanten mag bewerken).
+  const [agreementGeneral, agreementOverrides] = canEditClient
+    ? await Promise.all([getPortalSettings(), getClientAgreementOverrides(c.id)])
+    : [null, null];
 
   // Portaallogin-status van deze klant (alleen de eigenaar beheert dit).
   const isOwnerViewer = viewer.primaryRole === "owner";
@@ -233,6 +240,14 @@ export default async function ClientPage({
             <ClientPortalLogin clientId={c.id} hasLogin={Boolean(portalLogin)} loginEmail={portalLogin?.email ?? null} />
           ) : null}
           <OverviewTab hub={hub} publishedThisMonth={publishedThisMonth} nextShoot={nextShoot} activeVideos={activeVideos.length} canEditClient={canEditClient} />
+          {canEditClient && agreementGeneral ? (
+            <Card padded={false}>
+              <CardHeader title="Klantspecifieke afspraken" subtitle="Afwijkingen van de algemene afspraken voor deze klant — zichtbaar op Samenwerking in het klantportaal. De offerte blijft leidend." className="p-5 pb-3" />
+              <div className="px-5 pb-5">
+                <AgreementOverridesEditor clientId={c.id} general={agreementGeneral} overrides={agreementOverrides ?? {}} />
+              </div>
+            </Card>
+          ) : null}
         </div>
       ) : null}
       {active === "videos" ? <VideosTab hub={hub} editingProjects={editingProjects} /> : null}

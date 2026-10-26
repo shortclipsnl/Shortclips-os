@@ -1,4 +1,7 @@
 import "server-only";
+import { eq } from "drizzle-orm";
+import { db } from "@/db/client";
+import { clientAgreementOverrides } from "@/db/schema";
 import { getNumberSetting, getStringSetting, setNumberSetting, setStringSetting } from "@/server/app-settings";
 
 /**
@@ -92,6 +95,38 @@ export async function getPortalSettings(): Promise<PortalSettings> {
     feedbackDaysScripts, feedbackDaysVideos, cancelNoticeDays, cancelFee, cancelLateNote, reshootFee, extraFeedbackFee, travelCost, responseTime,
     contractTerm, billingNote, shootDuration, reviewDays, reviewAutoApproveDays, extraContentNote, rawFootageFee,
   };
+}
+
+/** Welke afspraak-velden per klant mogen afwijken (informatieve weergave). */
+export const OVERRIDABLE_KEYS: Array<keyof PortalSettings> = [
+  "feedbackDaysScripts", "feedbackDaysVideos", "cancelNoticeDays", "cancelFee", "cancelLateNote",
+  "reshootFee", "extraFeedbackFee", "travelCost", "responseTime", "contractTerm", "billingNote",
+  "shootDuration", "reviewDays", "reviewAutoApproveDays", "extraContentNote", "rawFootageFee",
+];
+
+const NUMBER_KEYS = new Set<keyof PortalSettings>(["feedbackDaysScripts", "feedbackDaysVideos", "cancelNoticeDays", "reviewDays", "reviewAutoApproveDays"]);
+
+/** De afwijkende afspraak-velden voor één klant (leeg object = geen afwijkingen). */
+export async function getClientAgreementOverrides(clientId: string): Promise<Partial<PortalSettings>> {
+  const [row] = await db.select({ overrides: clientAgreementOverrides.overrides }).from(clientAgreementOverrides).where(eq(clientAgreementOverrides.clientId, clientId)).limit(1);
+  const raw = (row?.overrides ?? {}) as Record<string, unknown>;
+  const clean: Partial<PortalSettings> = {};
+  for (const k of OVERRIDABLE_KEYS) {
+    if (!(k in raw) || raw[k] === null || raw[k] === "") continue;
+    if (NUMBER_KEYS.has(k)) clean[k] = Number(raw[k]) as never;
+    else clean[k] = String(raw[k]) as never;
+  }
+  return clean;
+}
+
+/**
+ * De afspraken zoals ze voor een specifieke klant gelden: de algemene bron,
+ * overschreven door eventuele klantspecifieke afwijkingen. De offerte blijft
+ * altijd leidend; dit is uitsluitend de weergave in het portaal.
+ */
+export async function getPortalSettingsForClient(clientId: string): Promise<PortalSettings> {
+  const [general, overrides] = await Promise.all([getPortalSettings(), getClientAgreementOverrides(clientId)]);
+  return { ...general, ...overrides };
 }
 
 /** Alleen de getallen; licht, voor jobs (herinneringen) die geen prose nodig hebben. */

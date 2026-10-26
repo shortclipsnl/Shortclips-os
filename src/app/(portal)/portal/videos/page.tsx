@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Check, ExternalLink, MessageSquareText, Play, Video as VideoIcon } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalVideos } from "@/server/portal";
-import { getPortalSettings } from "@/server/portal-settings";
+import { getPortalSettingsForClient } from "@/server/portal-settings";
 import { CoverImage } from "@/components/portal/cover-image";
 import { VideoProces } from "@/components/portal/video-proces";
 import { buttonClass } from "@/components/ui";
@@ -88,7 +88,7 @@ function Group({ title, subtitle, rows, max }: { title: string; subtitle?: strin
 
 export default async function PortalVideosPage() {
   const viewer = await requirePortal();
-  const [data, settings] = await Promise.all([getPortalVideos(viewer), getPortalSettings()]);
+  const [data, settings] = await Promise.all([getPortalVideos(viewer), getPortalSettingsForClient(viewer.clientId ?? "")]);
 
   return (
     <div className="flex flex-col gap-7">

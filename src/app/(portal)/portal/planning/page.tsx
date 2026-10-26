@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, CalendarClock, CalendarDays, ClipboardCheck, Clock, ExternalLink, FileText, Film, MapPin, MessageSquareText, Users, Video } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalPlanning, type PortalOpname, type PortalScriptMeeting, type PortalScriptState } from "@/server/portal-planning";
-import { getPortalSettings } from "@/server/portal-settings";
+import { getPortalSettingsForClient } from "@/server/portal-settings";
 import { Avatar, buttonClass } from "@/components/ui";
 import { formatDateFull } from "@/lib/format";
 import { VoorbereidingChecklist } from "@/components/portal/voorbereiding-checklist";
@@ -168,7 +168,7 @@ const MONTH_NAMES = ["januari", "februari", "maart", "april", "mei", "juni", "ju
 
 export default async function PortalPlanningPage() {
   const viewer = await requirePortal();
-  const [p, settings] = await Promise.all([getPortalPlanning(viewer), getPortalSettings()]);
+  const [p, settings] = await Promise.all([getPortalPlanning(viewer), getPortalSettingsForClient(viewer.clientId ?? "")]);
 
   const hasAny = p.nextOpname || p.scriptMeetings.length > 0 || p.laterOpnames.length > 0;
 
