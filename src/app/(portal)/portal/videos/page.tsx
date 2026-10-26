@@ -3,7 +3,9 @@ import Link from "next/link";
 import { ArrowRight, Check, ExternalLink, MessageSquareText, Play, Video as VideoIcon } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalVideos } from "@/server/portal";
+import { getPortalSettings } from "@/server/portal-settings";
 import { CoverImage } from "@/components/portal/cover-image";
+import { VideoProces } from "@/components/portal/video-proces";
 import { buttonClass } from "@/components/ui";
 import { clientStatusView, statusToneClass } from "@/lib/portal-status";
 import { videoCover } from "../cover";
@@ -86,7 +88,7 @@ function Group({ title, subtitle, rows, max }: { title: string; subtitle?: strin
 
 export default async function PortalVideosPage() {
   const viewer = await requirePortal();
-  const data = await getPortalVideos(viewer);
+  const [data, settings] = await Promise.all([getPortalVideos(viewer), getPortalSettings()]);
 
   return (
     <div className="flex flex-col gap-7">
@@ -153,6 +155,9 @@ export default async function PortalVideosPage() {
           ) : null}
         </>
       )}
+
+      {/* Algemene procesinfo: van beeld naar publicatie (document) */}
+      {data.totaal > 0 ? <VideoProces extraFeedbackFee={settings.extraFeedbackFee} /> : null}
     </div>
   );
 }

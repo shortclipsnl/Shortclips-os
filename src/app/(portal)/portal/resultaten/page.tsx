@@ -72,6 +72,20 @@ export default async function PortalResultatenPage({
           </div>
         </section>
       ) : null}
+
+      {/* Wat we met je resultaten doen — compacte uitleg (analyse & rapportage) */}
+      <section className="sc-glass p-5 sm:p-6">
+        <div className="flex items-center gap-2">
+          <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><TrendingUp className="size-4" /></span>
+          <h2 className="text-base font-semibold">Wat we met je resultaten doen</h2>
+        </div>
+        <ul className="mt-3 grid gap-2.5 sm:grid-cols-2">
+          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> We meten de prestaties en rapporteren je elke maand.</li>
+          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> We evalueren samen wat werkt en wat beter kan.</li>
+          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> We gebruiken de cijfers om je volgende content te verbeteren.</li>
+          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> Analyse en rapportage verzorgen wij volledig — jij hoeft niets bij te houden.</li>
+        </ul>
+      </section>
     </div>
   );
 }

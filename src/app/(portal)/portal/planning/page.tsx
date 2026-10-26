@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarClock, CalendarDays, Clock, ExternalLink, FileText, Film, MapPin, MessageSquareText, Users, Video } from "lucide-react";
+import { ArrowRight, CalendarClock, CalendarDays, ClipboardCheck, Clock, ExternalLink, FileText, Film, MapPin, MessageSquareText, Users, Video } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalPlanning, type PortalOpname, type PortalScriptMeeting, type PortalScriptState } from "@/server/portal-planning";
 import { getPortalSettings } from "@/server/portal-settings";
 import { Avatar, buttonClass } from "@/components/ui";
 import { formatDateFull } from "@/lib/format";
+import { VoorbereidingChecklist } from "@/components/portal/voorbereiding-checklist";
+import { OpnamedagContent } from "../samenwerking/_content";
 
 export const metadata: Metadata = { title: "Planning" };
 export const dynamic = "force-dynamic";
@@ -227,6 +229,24 @@ export default async function PortalPlanningPage() {
             <section>
               <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--color-ink-faint)]"><CalendarClock className="size-4 text-[var(--sc-accent)]" /> JE EERSTVOLGENDE OPNAME</h2>
               <OpnameCard o={p.nextOpname} hero />
+              <a href="#voorbereiding" className={`${buttonClass({ variant: "secondary", size: "sm" })} mt-3`}>
+                <ClipboardCheck className="size-4" /> Bekijk de voorbereiding en dagindeling
+              </a>
+            </section>
+          ) : null}
+
+          {/* Voorbereiding op de opname — checklist (document) + dagindeling */}
+          {p.nextOpname || p.laterOpnames.length > 0 ? (
+            <section id="voorbereiding" className="scroll-mt-24">
+              <h2 className="mb-1 flex items-center gap-2 text-base font-semibold"><ClipboardCheck className="size-4 text-[var(--sc-accent)]" /> Voorbereiding op je opname</h2>
+              <p className="mb-3 text-[13px] text-[var(--color-ink-muted)]">Vink af wat geregeld is. We onthouden je voortgang in deze browser.</p>
+              <div className="sc-glass p-5 sm:p-6">
+                <VoorbereidingChecklist storageKey={p.nextOpname?.id ?? "algemeen"} />
+              </div>
+              <details className="sc-glass mt-3 p-5 [&_summary]:cursor-pointer">
+                <summary className="flex items-center gap-2 text-base font-semibold"><CalendarClock className="size-4 text-[var(--sc-accent)]" /> Zo ziet de opnamedag eruit</summary>
+                <div className="mt-4"><OpnamedagContent /></div>
+              </details>
             </section>
           ) : null}
 

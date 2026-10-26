@@ -3,7 +3,9 @@ import Link from "next/link";
 import { ArrowRight, CalendarClock, CheckCircle2, Clock, FileText, MapPin, MessageSquareText } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalData } from "@/server/portal";
+import { getPortalSettings } from "@/server/portal-settings";
 import { CLIENT_ACTION_STATUSES, listPortalScriptReviews, SCRIPT_REVIEW_STATUS, type PortalReviewListItem } from "@/server/script-review";
+import { ScriptLeeswijzer } from "@/components/portal/script-leeswijzer";
 import { Badge, buttonClass } from "@/components/ui";
 import { formatDateFull, relativeDays } from "@/lib/format";
 
@@ -61,7 +63,7 @@ function ReviewCard({ r }: { r: PortalReviewListItem }) {
 
 export default async function PortalScriptsPage() {
   const viewer = await requirePortal();
-  const [reviews, data] = await Promise.all([listPortalScriptReviews(viewer), getPortalData(viewer)]);
+  const [reviews, data, settings] = await Promise.all([listPortalScriptReviews(viewer), getPortalData(viewer), getPortalSettings()]);
 
   const actieNodig = reviews.filter((r) => CLIENT_ACTION_STATUSES.includes(r.status));
   const bijShortclips = reviews.filter((r) => r.status === "feedback_gegeven" || r.status === "wordt_aangepast");
@@ -122,6 +124,9 @@ export default async function PortalScriptsPage() {
           )}
         </section>
       </div>
+
+      {/* Leeswijzer: hoe lees en controleer je de scripts (document "Zo lees je de scripts") */}
+      <ScriptLeeswijzer feedbackDays={settings.feedbackDaysScripts} />
 
       {/* Scripts die op je wachten */}
       <section>

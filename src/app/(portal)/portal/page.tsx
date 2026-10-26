@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Bell, CalendarRange, Camera, Clock, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
+import { ArrowRight, Bell, CalendarRange, Camera, ClipboardCheck, Clock, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalData } from "@/server/portal";
 import { CLIENT_ACTION_STATUSES, listPortalScriptReviews } from "@/server/script-review";
@@ -200,6 +200,15 @@ export default async function PortalPage() {
           emptyText="Nog geen scriptmeeting gepland."
         />
       </div>
+
+      {/* Voorbereidingsherinnering — alleen als er een opname aankomt */}
+      {shootDate ? (
+        <Link href="/portal/planning#voorbereiding" className="group flex items-center gap-3 rounded-[14px] border border-[#2e90fa]/25 bg-[rgba(46,144,250,0.06)] px-4 py-3 transition-colors hover:border-[var(--sc-accent)]">
+          <ClipboardCheck className="size-5 shrink-0 text-[var(--sc-accent)]" />
+          <span className="min-w-0 flex-1 text-[13.5px]"><span className="font-semibold">Bereid je opname voor</span> <span className="text-[var(--color-ink-muted)]">— bekijk de checklist en de dagindeling.</span></span>
+          <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-muted)] transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      ) : null}
 
       {/* 3 — Directe toegang tot de video's */}
       <Link
