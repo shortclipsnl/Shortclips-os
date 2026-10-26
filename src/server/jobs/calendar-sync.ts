@@ -19,6 +19,7 @@ import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { firstNameKey } from "@/lib/editors";
 import { notify } from "@/server/notifications";
+import { getNumberSetting, setNumberSetting } from "@/server/app-settings";
 import {
   GoogleCalendarService,
   googleCalendar,
@@ -725,4 +726,26 @@ export async function assignMissingEditors(): Promise<number> {
     changed += pd.length + dv.length;
   }
   return changed;
+}
+
+/**
+ * Draait `assignMissingEditors` alleen als het langer dan `maxAgeMinutes` geleden
+ * is, en dan ná de response (Next's `after`), zodat het de editing-pagina niet
+ * vertraagt. Idempotent; faalt nooit richting de pagina.
+ */
+export async function assignMissingEditorsIfStale(maxAgeMinutes = 30): Promise<void> {
+  try {
+    const last = await getNumberSetting("jobs.assign_editors_last_ms", 0);
+    if (Date.now() - last < maxAgeMinutes * 60_000) return;
+    await setNumberSetting("jobs.assign_editors_last_ms", Date.now(), { category: "jobs" });
+    after(async () => {
+      try {
+        await assignMissingEditors();
+      } catch {
+        /* fout wordt al gelogd; nooit de pagina breken */
+      }
+    });
+  } catch {
+    /* nooit de pagina breken door deze check */
+  }
 }

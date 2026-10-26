@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, ClipboardList } from "lucide-react";
 import { requireInternal, isOwner } from "@/server/auth/context";
-import { assignMissingEditors } from "@/server/jobs/calendar-sync";
+import { assignMissingEditorsIfStale } from "@/server/jobs/calendar-sync";
 import { isCoreStaff } from "@/server/core-staff";
 import { getVideoHighlights, listEditorOptions, listVideos } from "@/server/videos";
 import { listEditingProjects } from "@/server/editing-board";
@@ -67,7 +67,7 @@ export default async function VideosPage({
   // Opnames/opleveringen zonder editor automatisch aan de vaste editor van de
   // klant koppelen, zodat het board klopt en editors hun projecten in de
   // planning hebben. Idempotent; alleen het kantoorteam triggert dit.
-  await assignMissingEditors().catch(() => {});
+  await assignMissingEditorsIfStale();
 
   const [rows, highlights, editors, editingProjects, clientList] = await Promise.all([
     listVideos(viewer, {

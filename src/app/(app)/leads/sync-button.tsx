@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, Mail, RefreshCw } from "lucide-react";
 import { syncLeadsFromMail } from "@/server/actions/leads";
 
 function relative(iso: string | null): string {
@@ -31,20 +31,27 @@ export function SyncLeadsButton({ lastSyncAt, configured }: { lastSyncAt: string
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-4 py-3">
+      <div className="flex items-start gap-2.5 text-sm">
+        <Mail className="mt-0.5 size-4 shrink-0 text-[var(--color-brand-600)]" strokeWidth={1.75} />
+        <div>
+          <p className="font-medium text-[var(--color-ink)]">Leads komen binnen via de mail</p>
+          <p className="text-xs text-[var(--color-ink-muted)]">
+            Nieuwe aanvragen worden automatisch uit de mailmap &apos;Leads - Shortclips&apos; opgehaald.{" "}
+            {configured ? `Laatste synchronisatie: ${relative(lastSyncAt)}.` : "Gmail-koppeling nog niet ingesteld."}
+            {msg ? <span className="ml-1 font-medium text-[var(--color-good)]">{msg}</span> : null}
+          </p>
+        </div>
+      </div>
       <button
         type="button"
         onClick={run}
-        disabled={pending}
-        className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60"
+        disabled={pending || !configured}
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
         title="Leest de mailmap 'Leads - Shortclips' uit en voegt nieuwe aanvragen toe"
       >
         {pending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Nu synchroniseren
       </button>
-      <span className="text-2xs text-[var(--color-ink-faint)]">
-        {configured ? `Laatste synchronisatie: ${relative(lastSyncAt)}` : "Gmail-koppeling nog niet ingesteld"}
-      </span>
-      {msg ? <span className="text-2xs text-[var(--color-ink-muted)]">{msg}</span> : null}
     </div>
   );
 }
