@@ -30,10 +30,10 @@ function ReviewCard({ r }: { r: PortalReviewListItem }) {
   return (
     <Link
       href={`/portal/scripts/${r.id}`}
-      className="sc-glass group flex flex-wrap items-center gap-4 p-5 transition-colors hover:border-white/25"
+      className="sc-glass group flex flex-wrap items-center gap-4 p-5 transition-colors hover:border-[var(--sc-line)]"
       style={actie ? { boxShadow: "inset 3px 0 0 #ffb020" } : undefined}
     >
-      <span className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]">
+      <span className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]">
         <FileText className="size-5" strokeWidth={1.8} />
       </span>
       <div className="min-w-0 flex-1">
@@ -85,7 +85,7 @@ export default async function PortalScriptsPage() {
       <div className="grid gap-[18px] sm:grid-cols-2">
         <section className="sc-glass p-5">
           <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-            <CalendarClock className="size-4 text-[#4bc4ff]" /> Volgende opnamedag
+            <CalendarClock className="size-4 text-[var(--sc-accent)]" /> Volgende opnamedag
           </span>
           {shoot ? (
             <>
@@ -102,7 +102,7 @@ export default async function PortalScriptsPage() {
 
         <section className="sc-glass flex flex-col p-5" style={klaarCount > 0 ? { boxShadow: "inset 3px 0 0 #ffb020" } : undefined}>
           <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-            <MessageSquareText className="size-4 text-[#4bc4ff]" /> Scriptstatus
+            <MessageSquareText className="size-4 text-[var(--sc-accent)]" /> Scriptstatus
           </span>
           {klaarCount > 0 ? (
             <>
@@ -148,7 +148,7 @@ export default async function PortalScriptsPage() {
               const rev = reviewByDay.get(s.id);
               const inner = (
                 <div className="flex flex-wrap items-center gap-3 p-4">
-                  <span className="grid size-10 shrink-0 flex-col place-items-center rounded-[12px] border border-white/10 bg-gradient-to-br from-[rgba(25,168,255,0.22)] to-[rgba(27,95,224,0.22)] text-center">
+                  <span className="grid size-10 shrink-0 flex-col place-items-center rounded-[12px] border border-[var(--sc-line)] bg-gradient-to-br from-[rgba(25,168,255,0.22)] to-[rgba(27,95,224,0.22)] text-center">
                     <span className="text-[15px] font-bold leading-none">{new Date(`${s.scheduledOn}T12:00:00`).getDate()}</span>
                     <span className="text-[9px] uppercase text-[var(--color-ink-muted)]">{new Date(`${s.scheduledOn}T12:00:00`).toLocaleDateString("nl-NL", { month: "short" })}</span>
                   </span>
@@ -164,7 +164,7 @@ export default async function PortalScriptsPage() {
                 </div>
               );
               return rev ? (
-                <Link key={s.id} href={`/portal/scripts/${rev.id}`} className="block transition-colors hover:bg-white/[0.03]">{inner}</Link>
+                <Link key={s.id} href={`/portal/scripts/${rev.id}`} className="block transition-colors hover:bg-[var(--sc-fill)]">{inner}</Link>
               ) : (
                 <div key={s.id}>{inner}</div>
               );
@@ -179,7 +179,7 @@ export default async function PortalScriptsPage() {
           <h2 className="mb-3 text-base font-semibold">Eerder goedgekeurd</h2>
           <div className="sc-glass divide-y divide-white/10">
             {goedgekeurd.map((r) => (
-              <Link key={r.id} href={`/portal/scripts/${r.id}`} className="flex items-center gap-3 p-4 transition-colors hover:bg-white/[0.03]">
+              <Link key={r.id} href={`/portal/scripts/${r.id}`} className="flex items-center gap-3 p-4 transition-colors hover:bg-[var(--sc-fill)]">
                 <CheckCircle2 className="size-5 shrink-0 text-[#2fd27a]" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[14px] font-semibold">{r.title}</div>

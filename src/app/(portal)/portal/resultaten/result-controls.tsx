@@ -35,7 +35,7 @@ export function ResultControls({
 
   return (
     <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-      <div className="inline-flex flex-wrap gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1">
+      <div className="inline-flex flex-wrap gap-1 rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] p-1">
         {PORTAL_PERIODS.map((p) => {
           const active = p.key === periodKey;
           return (
@@ -62,13 +62,13 @@ export function ResultControls({
         href={reportHref}
         target="_blank"
         rel="noreferrer"
-        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-[13px] font-semibold text-[#0a0c26] transition-opacity hover:opacity-90"
+        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] px-4 py-1.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
       >
         <Download className="size-4" /> Download rapport
       </a>
 
       {open ? (
-        <div className="flex flex-wrap items-end gap-2 rounded-[14px] border border-white/10 bg-[rgba(10,12,38,0.6)] p-3 sm:absolute sm:right-0 sm:top-full sm:z-10 sm:mt-2 sm:shadow-xl">
+        <div className="flex flex-wrap items-end gap-2 rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-inset)] p-3 sm:absolute sm:right-0 sm:top-full sm:z-10 sm:mt-2 sm:shadow-xl">
           <label className="flex flex-col gap-1 text-[11px] text-[var(--color-ink-muted)]">
             Van
             <input type="date" value={van} max={tot || undefined} onChange={(e) => setVan(e.target.value)} className="sc-input rounded-lg px-2.5 py-1.5 text-[13px]" />

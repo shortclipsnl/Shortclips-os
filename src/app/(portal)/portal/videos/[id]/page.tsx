@@ -167,8 +167,8 @@ export default async function PortalVideoDetailPage({
           </div>
         </Card>
       ) : inFeedback ? (
-        <Card className="flex items-start gap-3 border-[#4bc4ff]/30 bg-[rgba(25,168,255,0.07)]">
-          <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[#4bc4ff]" />
+        <Card className="flex items-start gap-3 border-[rgba(46,144,250,0.35)] bg-[rgba(25,168,255,0.07)]">
+          <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[var(--sc-accent)]" />
           <div>
             <p className="text-sm font-semibold text-[var(--color-ink)]">
               Feedback ontvangen{video.statusChangedAt ? ` op ${formatDate(video.statusChangedAt)}` : ""}

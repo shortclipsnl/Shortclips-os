@@ -34,7 +34,7 @@ function dateFromIso(iso: string): Date {
 /** Datumblok (grote dag + maand) in de huisstijl — links in een planningskaart. */
 function DateChip({ date }: { date: Date }) {
   return (
-    <div className="flex size-[58px] shrink-0 flex-col items-center justify-center rounded-[14px] border border-white/10 bg-gradient-to-br from-[rgba(25,168,255,0.22)] to-[rgba(27,95,224,0.22)]">
+    <div className="flex size-[58px] shrink-0 flex-col items-center justify-center rounded-[14px] border border-[var(--sc-line)] bg-gradient-to-br from-[rgba(25,168,255,0.22)] to-[rgba(27,95,224,0.22)]">
       <span className="text-xl font-bold leading-none tabular-nums">{date.getDate()}</span>
       <span className="mt-0.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-muted)]">
         {date.toLocaleDateString("nl-NL", { month: "short", timeZone: TZ })}
@@ -62,7 +62,7 @@ function PlanCard({
   return (
     <section className="sc-glass flex min-h-[132px] flex-col p-5">
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-        <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]">{icon}</span>
+        <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]">{icon}</span>
         {label}
       </div>
       {date ? (
@@ -92,7 +92,7 @@ function ResultTile({ icon, label, value, sub }: { icon: React.ReactNode; label:
   return (
     <div className="sc-glass p-4">
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
-        <span className="text-[#4bc4ff]">{icon}</span> {label}
+        <span className="text-[var(--sc-accent)]">{icon}</span> {label}
       </div>
       <div className="mt-2 text-[26px] font-bold tabular-nums leading-none">{value}</div>
       <div className="mt-1.5 text-[11px] text-[var(--color-ink-faint)]">{sub}</div>
@@ -161,15 +161,15 @@ export default async function PortalPage() {
           </div>
           <div className="mt-3 flex flex-col gap-2">
             {scriptActions > 0 ? (
-              <Link href="/portal/scripts" className="flex items-center gap-3 rounded-[12px] border border-white/10 bg-white/[0.04] px-4 py-3 transition-colors hover:border-white/25">
-                <FileText className="size-4 shrink-0 text-[#4bc4ff]" />
+              <Link href="/portal/scripts" className="flex items-center gap-3 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-3 transition-colors hover:border-[var(--sc-line)]">
+                <FileText className="size-4 shrink-0 text-[var(--sc-accent)]" />
                 <span className="min-w-0 flex-1 text-sm font-medium">{scriptActions} script{scriptActions === 1 ? "" : "s"} wacht op jouw controle</span>
                 <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
               </Link>
             ) : null}
             {videoActions > 0 ? (
-              <Link href="/portal/videos" className="flex items-center gap-3 rounded-[12px] border border-white/10 bg-white/[0.04] px-4 py-3 transition-colors hover:border-white/25">
-                <Play className="size-4 shrink-0 text-[#4bc4ff]" fill="currentColor" />
+              <Link href="/portal/videos" className="flex items-center gap-3 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-3 transition-colors hover:border-[var(--sc-line)]">
+                <Play className="size-4 shrink-0 text-[var(--sc-accent)]" fill="currentColor" />
                 <span className="min-w-0 flex-1 text-sm font-medium">{videoActions} video{videoActions === 1 ? "" : "'s"} wacht op jouw beoordeling</span>
                 <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
               </Link>
@@ -201,10 +201,10 @@ export default async function PortalPage() {
       {/* 3 — Directe toegang tot de video's */}
       <Link
         href="/portal/videos"
-        className="sc-glass sc-glow group flex flex-wrap items-center gap-4 p-5 transition-colors hover:border-white/25"
+        className="sc-glass sc-glow group flex flex-wrap items-center gap-4 p-5 transition-colors hover:border-[var(--sc-line)]"
         style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.1), rgba(255,255,255,0.03))" }}
       >
-        <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.16)] text-[#4bc4ff]">
+        <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.16)] text-[var(--sc-accent)]">
           <Film className="size-6" strokeWidth={1.8} />
         </span>
         <div className="min-w-0 flex-1">
@@ -228,7 +228,7 @@ export default async function PortalPage() {
       <div className="grid gap-[18px] sm:grid-cols-2">
         <section className="sc-glass flex flex-col p-5">
           <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-            <CalendarRange className="size-4 text-[#4bc4ff]" /> Eerstvolgende publicatie
+            <CalendarRange className="size-4 text-[var(--sc-accent)]" /> Eerstvolgende publicatie
           </span>
           {nextPub ? (
             <div className="mt-4 flex items-start gap-3.5">
@@ -237,7 +237,7 @@ export default async function PortalPage() {
                 <div className="truncate text-[15px] font-semibold">{nextPub.title}</div>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] text-[var(--color-ink-muted)]">
                   <span>{fullDate(dateFromIso(nextPub.scheduledOn))}</span>
-                  {((nextPub.platforms as string[]) ?? []).map((p) => <span key={p} className="rounded-full bg-white/10 px-2 py-0.5 text-[11px]">{PLATFORM[p]?.label ?? p}</span>)}
+                  {((nextPub.platforms as string[]) ?? []).map((p) => <span key={p} className="rounded-full bg-[var(--sc-fill-strong)] px-2 py-0.5 text-[11px]">{PLATFORM[p]?.label ?? p}</span>)}
                 </div>
               </div>
             </div>
@@ -245,8 +245,8 @@ export default async function PortalPage() {
             <p className="mt-4 flex flex-1 items-center text-sm text-[var(--color-ink-muted)]">Nog geen publicatie ingepland.</p>
           )}
         </section>
-        <Link href="/portal/planning" className="sc-glass group flex items-center gap-4 p-5 transition-colors hover:border-white/25">
-          <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]"><CalendarRange className="size-6" strokeWidth={1.8} /></span>
+        <Link href="/portal/planning" className="sc-glass group flex items-center gap-4 p-5 transition-colors hover:border-[var(--sc-line)]">
+          <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><CalendarRange className="size-6" strokeWidth={1.8} /></span>
           <div className="min-w-0 flex-1">
             <h2 className="text-[16px] font-semibold">Jouw contentplanning</h2>
             <p className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">Bekijk wanneer welke video online komt.</p>
@@ -259,7 +259,7 @@ export default async function PortalPage() {
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold">Jouw resultaten</h2>
-          <Link href="/portal/resultaten" className="text-[13px] font-semibold text-[#4bc4ff]">Meer resultaten →</Link>
+          <Link href="/portal/resultaten" className="text-[13px] font-semibold text-[var(--sc-accent)]">Meer resultaten →</Link>
         </div>
         {hasMetrics ? (
           <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
@@ -271,7 +271,7 @@ export default async function PortalPage() {
         ) : (
           <div className="sc-glass flex flex-wrap items-center justify-between gap-4 p-5">
             <div className="flex items-center gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]"><Film className="size-5" /></span>
+              <span className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><Film className="size-5" /></span>
               <div>
                 <div className="text-[17px] font-bold tabular-nums leading-none">{num(online)} video&apos;s online</div>
                 <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">Zodra je content online staat, zie je hier je weergaven, bereik en interacties.</p>

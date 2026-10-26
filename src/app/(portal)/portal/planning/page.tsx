@@ -12,9 +12,9 @@ export const dynamic = "force-dynamic";
 
 const TONE_CLS: Record<PortalScriptState["tone"], string> = {
   warn: "bg-[rgba(255,176,32,0.14)] text-[#ffb020]",
-  info: "bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]",
+  info: "bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]",
   good: "bg-[rgba(47,210,122,0.14)] text-[#2fd27a]",
-  neutral: "bg-white/10 text-[var(--color-ink-muted)]",
+  neutral: "bg-[var(--sc-fill-strong)] text-[var(--color-ink-muted)]",
 };
 
 function dayLabel(date: string): string {
@@ -36,7 +36,7 @@ function relativeLabel(date: string): string {
 function DateBadge({ date, large = false }: { date: string; large?: boolean }) {
   const d = new Date(`${date}T12:00:00`);
   return (
-    <div className={`flex shrink-0 flex-col items-center justify-center rounded-[14px] border border-white/10 bg-white/[0.05] ${large ? "size-[62px]" : "size-12"}`}>
+    <div className={`flex shrink-0 flex-col items-center justify-center rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] ${large ? "size-[62px]" : "size-12"}`}>
       <span className={`font-bold leading-none tabular-nums ${large ? "text-[22px]" : "text-[17px]"}`}>{d.getDate()}</span>
       <span className={`mt-0.5 uppercase tracking-wide text-[var(--color-ink-muted)] ${large ? "text-[11px]" : "text-[10px]"}`}>{d.toLocaleDateString("nl-NL", { month: "short" })}</span>
     </div>
@@ -77,7 +77,7 @@ function OpnameCard({ o, hero = false }: { o: PortalOpname; hero?: boolean }) {
         <DateBadge date={o.date} large={hero} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(25,168,255,0.14)] px-2.5 py-0.5 text-[11px] font-semibold text-[#4bc4ff]"><Video className="size-3" /> Opnamedag</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(25,168,255,0.14)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--sc-accent)]"><Video className="size-3" /> Opnamedag</span>
             <span className="text-[12.5px] font-medium text-[var(--color-ink-muted)]">{relativeLabel(o.date)}</span>
           </div>
           <h3 className={`mt-1.5 font-bold leading-tight ${hero ? "text-[19px]" : "text-[16px]"}`}>{dayLabel(o.date)}</h3>
@@ -90,13 +90,13 @@ function OpnameCard({ o, hero = false }: { o: PortalOpname; hero?: boolean }) {
       </div>
 
       {(o.contentCreative || o.videographer) ? (
-        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3 border-t border-white/10 pt-4">
+        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3 border-t border-[var(--sc-line)] pt-4">
           {o.contentCreative ? <PersonRow label="Content creative" person={o.contentCreative} /> : null}
           {o.videographer ? <PersonRow label="Videograaf" person={o.videographer} /> : null}
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--sc-line)] pt-4">
         <ScriptPill s={o.script} />
         <ScriptsButton o={o} variant={hero ? "accent" : "secondary"} />
       </div>
@@ -143,7 +143,7 @@ export default async function PortalPlanningPage() {
 
       {!hasAny ? (
         <div className="sc-glass flex flex-col items-start gap-3 border-dashed p-6">
-          <span className="grid size-10 place-items-center rounded-xl bg-white/[0.06] text-[#4bc4ff]"><CalendarDays className="size-5" strokeWidth={1.75} /></span>
+          <span className="grid size-10 place-items-center rounded-xl bg-[var(--sc-fill)] text-[var(--sc-accent)]"><CalendarDays className="size-5" strokeWidth={1.75} /></span>
           <div>
             <p className="text-sm font-semibold">Je planning wordt voorbereid</p>
             <p className="mt-1 max-w-xl text-sm text-[var(--color-ink-muted)]">
@@ -157,7 +157,7 @@ export default async function PortalPlanningPage() {
           {/* Eerstvolgende opname */}
           {p.nextOpname ? (
             <section>
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--color-ink-faint)]"><CalendarClock className="size-4 text-[#4bc4ff]" /> JE EERSTVOLGENDE OPNAME</h2>
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--color-ink-faint)]"><CalendarClock className="size-4 text-[var(--sc-accent)]" /> JE EERSTVOLGENDE OPNAME</h2>
               <OpnameCard o={p.nextOpname} hero />
             </section>
           ) : null}
@@ -190,7 +190,7 @@ export default async function PortalPlanningPage() {
           <summary className="flex items-center gap-2 text-sm font-semibold"><CalendarDays className="size-4 text-[var(--color-ink-muted)]" /> Eerdere opnames ({p.pastOpnames.length})</summary>
           <div className="mt-4 flex flex-col gap-2.5">
             {p.pastOpnames.map((o) => (
-              <div key={o.id} className="flex items-center gap-3 border-t border-white/10 pt-2.5 first:border-t-0 first:pt-0">
+              <div key={o.id} className="flex items-center gap-3 border-t border-[var(--sc-line)] pt-2.5 first:border-t-0 first:pt-0">
                 <DateBadge date={o.date} />
                 <div className="min-w-0 flex-1">
                   <div className="text-[14px] font-semibold">{dayLabel(o.date)}</div>
@@ -198,7 +198,7 @@ export default async function PortalPlanningPage() {
                     {[o.contentCreative?.name, o.videographer?.name, o.plannedShorts ? `${o.plannedShorts} shorts` : null].filter(Boolean).join(" · ") || "Opnamedag"}
                   </div>
                 </div>
-                {o.reviewId ? <Link href={`/portal/scripts/${o.reviewId}`} className="shrink-0 text-[var(--color-ink-muted)] hover:text-[#4bc4ff]"><FileText className="size-4" /></Link> : null}
+                {o.reviewId ? <Link href={`/portal/scripts/${o.reviewId}`} className="shrink-0 text-[var(--color-ink-muted)] hover:text-[var(--sc-accent)]"><FileText className="size-4" /></Link> : null}
               </div>
             ))}
           </div>
@@ -208,14 +208,14 @@ export default async function PortalPlanningPage() {
       {/* Afspraak wijzigen of annuleren — de geldende voorwaarden (intern instelbaar) */}
       <section className="sc-glass p-5 sm:p-6">
         <div className="flex items-center gap-2">
-          <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]"><CalendarClock className="size-4" /></span>
+          <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><CalendarClock className="size-4" /></span>
           <h2 className="text-base font-semibold">Opname wijzigen of annuleren</h2>
         </div>
         <ul className="mt-3 flex flex-col gap-2 text-[13.5px] text-[var(--color-ink-muted)]">
-          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[#4bc4ff]" /> Wil je een opname verplaatsen of annuleren? Laat het je vaste contactpersoon zo snel mogelijk weten.</li>
-          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[#4bc4ff]" /> Kosteloos verplaatsen of annuleren kan tot <strong className="text-[var(--color-ink)]">{settings.cancelNoticeDays} werkdagen</strong> voor de opnamedag.</li>
+          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[var(--sc-accent)]" /> Wil je een opname verplaatsen of annuleren? Laat het je vaste contactpersoon zo snel mogelijk weten.</li>
+          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[var(--sc-accent)]" /> Kosteloos verplaatsen of annuleren kan tot <strong className="text-[var(--color-ink)]">{settings.cancelNoticeDays} werkdagen</strong> voor de opnamedag.</li>
           <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[#ffb020]" /> Bij annulering binnen {settings.cancelNoticeDays} werkdagen wordt <strong className="text-[var(--color-ink)]">{settings.cancelFee}</strong> in rekening gebracht. {settings.cancelLateNote}</li>
-          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[#4bc4ff]" /> Een nieuwe datum plannen we direct met je in, afhankelijk van de beschikbaarheid.</li>
+          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[var(--sc-accent)]" /> Een nieuwe datum plannen we direct met je in, afhankelijk van de beschikbaarheid.</li>
         </ul>
       </section>
     </div>

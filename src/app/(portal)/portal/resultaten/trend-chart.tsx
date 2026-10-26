@@ -51,7 +51,7 @@ export function TrendChart({ series }: { series: PortalSeriesPoint[] }) {
     <section className="sc-glass p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold">Ontwikkeling</h2>
-        <div className="inline-flex flex-wrap gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1">
+        <div className="inline-flex flex-wrap gap-1 rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] p-1">
           {METRICS.map((m) => (
             <button
               key={m.key}
@@ -77,17 +77,17 @@ export function TrendChart({ series }: { series: PortalSeriesPoint[] }) {
           </defs>
           {ticks.map((t, i) => (
             <g key={i}>
-              <line x1={PAD.left} y1={y(t)} x2={W - PAD.right} y2={y(t)} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-              <text x={PAD.left - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill="rgba(255,255,255,0.45)">{compact(Math.round(t))}</text>
+              <line x1={PAD.left} y1={y(t)} x2={W - PAD.right} y2={y(t)} stroke="var(--sc-line)" strokeWidth="1" />
+              <text x={PAD.left - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill="var(--color-ink-faint)">{compact(Math.round(t))}</text>
             </g>
           ))}
           <path d={area} fill="url(#trend-fill)" />
-          <path d={line} fill="none" stroke="#4bc4ff" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+          <path d={line} fill="none" stroke="var(--sc-accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
           {series.length <= 31
-            ? values.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r="2.5" fill="#4bc4ff" />)
+            ? values.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r="2.5" fill="var(--sc-accent)" />)
             : null}
           {labelIdx.map((i) => (
-            <text key={i} x={x(i)} y={H - 8} textAnchor={i === 0 ? "start" : i === series.length - 1 ? "end" : "middle"} fontSize="11" fill="rgba(255,255,255,0.45)">
+            <text key={i} x={x(i)} y={H - 8} textAnchor={i === 0 ? "start" : i === series.length - 1 ? "end" : "middle"} fontSize="11" fill="var(--color-ink-faint)">
               {fmtDate(series[i]!.date)}
             </text>
           ))}

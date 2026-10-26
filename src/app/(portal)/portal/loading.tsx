@@ -1,6 +1,6 @@
 /** Skeleton die de dashboard-layout nabootst, rustiger dan een lege pagina. */
 function Bar({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-white/5 ${className}`} />;
+  return <div className={`animate-pulse rounded-md bg-[var(--sc-fill)] ${className}`} />;
 }
 
 export default function DashboardLoading() {

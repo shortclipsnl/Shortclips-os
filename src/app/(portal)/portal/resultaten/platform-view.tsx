@@ -27,7 +27,7 @@ export function PlatformView({ platforms }: { platforms: PortalPlatformResult[] 
     <section>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold">Per platform</h2>
-        <div className="inline-flex flex-wrap gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1">
+        <div className="inline-flex flex-wrap gap-1 rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] p-1">
           <button
             type="button"
             onClick={() => setActive("all")}
@@ -62,9 +62,9 @@ export function PlatformView({ platforms }: { platforms: PortalPlatformResult[] 
             <Stat label="Video's" value={current.videoCount} />
           </div>
           {current.bestVideo ? (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-4 text-[13px]">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--sc-line)] pt-4 text-[13px]">
               <span className="text-[var(--color-ink-muted)]">Best presterende video: <span className="font-semibold text-[var(--color-ink)]">{current.bestVideo.title}</span> · {compact(current.bestVideo.views)} weergaven</span>
-              {current.bestVideo.url ? <a href={current.bestVideo.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#4bc4ff] hover:underline">Bekijken <ExternalLink className="size-3.5" /></a> : null}
+              {current.bestVideo.url ? <a href={current.bestVideo.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[var(--sc-accent)] hover:underline">Bekijken <ExternalLink className="size-3.5" /></a> : null}
             </div>
           ) : null}
         </div>

@@ -49,7 +49,7 @@ export function PortalNav() {
             aria-current={active ? "page" : undefined}
             className={[
               "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              active ? ACTIVE_SIDEBAR : "text-[var(--color-ink-muted)] hover:bg-white/5 hover:text-[var(--color-ink)]",
+              active ? ACTIVE_SIDEBAR : "text-[var(--color-ink-muted)] hover:bg-[var(--sc-fill)] hover:text-[var(--color-ink)]",
             ].join(" ")}
           >
             <Icon className="size-4 shrink-0" strokeWidth={1.75} />
@@ -74,7 +74,7 @@ export function PortalMobileNav() {
     <>
       <nav
         aria-label="Portaalnavigatie"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-[rgba(5,6,29,0.92)] pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--sc-line)] bg-[var(--sc-header-bg)] pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
       >
         <div className="mx-auto flex max-w-[1240px] items-stretch justify-around px-1">
           {primary.map(({ href, label, icon: Icon }) => {
@@ -85,7 +85,7 @@ export function PortalMobileNav() {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
-                  active ? "text-[#4bc4ff]" : "text-[var(--color-ink-muted)]"
+                  active ? "text-[var(--sc-accent)]" : "text-[var(--color-ink-muted)]"
                 }`}
               >
                 <Icon className="size-[22px]" strokeWidth={active ? 2.1 : 1.75} />
@@ -98,7 +98,7 @@ export function PortalMobileNav() {
             onClick={() => setMoreOpen(true)}
             aria-expanded={moreOpen}
             className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
-              overflowActive ? "text-[#4bc4ff]" : "text-[var(--color-ink-muted)]"
+              overflowActive ? "text-[var(--sc-accent)]" : "text-[var(--color-ink-muted)]"
             }`}
           >
             <MoreHorizontal className="size-[22px]" strokeWidth={1.9} />
@@ -115,7 +115,7 @@ export function PortalMobileNav() {
             className="absolute inset-0 bg-black/55"
             onClick={() => setMoreOpen(false)}
           />
-          <div className="absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-white/10 bg-[#0a0c26] p-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]">
+          <div className="absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-[var(--sc-line)] bg-[var(--color-surface)] p-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]">
             <div className="mb-4 flex items-center justify-between">
               <span className="text-sm font-semibold text-[var(--color-ink)]">Meer</span>
               <button type="button" onClick={() => setMoreOpen(false)} aria-label="Sluiten">
@@ -132,7 +132,7 @@ export function PortalMobileNav() {
                     onClick={() => setMoreOpen(false)}
                     aria-current={active ? "page" : undefined}
                     className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors ${
-                      active ? ACTIVE_SIDEBAR : "text-[var(--color-ink)] hover:bg-white/5"
+                      active ? ACTIVE_SIDEBAR : "text-[var(--color-ink)] hover:bg-[var(--sc-fill)]"
                     }`}
                   >
                     <Icon className="size-5 shrink-0" strokeWidth={1.75} />

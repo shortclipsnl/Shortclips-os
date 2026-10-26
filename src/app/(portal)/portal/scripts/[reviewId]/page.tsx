@@ -27,7 +27,7 @@ export default async function PortalScriptReviewPage({ params }: { params: Promi
     <div className="flex flex-col gap-[20px]">
       {/* Terug + kop */}
       <div>
-        <Link href="/portal/scripts" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#4bc4ff] hover:underline">
+        <Link href="/portal/scripts" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--sc-accent)] hover:underline">
           <ArrowLeft className="size-4" /> Terug naar scripts
         </Link>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
@@ -35,9 +35,9 @@ export default async function PortalScriptReviewPage({ params }: { params: Promi
             <h1 className="text-[24px] font-bold tracking-tight">{review.title}</h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--color-ink-muted)]">
               {review.shootOn ? (
-                <span className="inline-flex items-center gap-1.5"><CalendarClock className="size-4 text-[#4bc4ff]" /> {formatDateFull(review.shootOn)} · {relativeDays(review.shootOn)}{review.shootTime ? ` · vanaf ${review.shootTime.slice(0, 5)}` : ""}</span>
+                <span className="inline-flex items-center gap-1.5"><CalendarClock className="size-4 text-[var(--sc-accent)]" /> {formatDateFull(review.shootOn)} · {relativeDays(review.shootOn)}{review.shootTime ? ` · vanaf ${review.shootTime.slice(0, 5)}` : ""}</span>
               ) : null}
-              {review.shootLocation ? <span className="inline-flex items-center gap-1.5"><MapPin className="size-4 text-[#4bc4ff]" /> {review.shootLocation}</span> : null}
+              {review.shootLocation ? <span className="inline-flex items-center gap-1.5"><MapPin className="size-4 text-[var(--sc-accent)]" /> {review.shootLocation}</span> : null}
               {review.currentVersion > 1 ? <span>versie {review.currentVersion}</span> : null}
             </div>
           </div>
@@ -77,12 +77,12 @@ export default async function PortalScriptReviewPage({ params }: { params: Promi
       {review.threads.length > 0 ? (
         <section className="sc-glass p-5">
           <div className="flex items-center gap-2">
-            <MessageSquareText className="size-4 text-[#4bc4ff]" />
+            <MessageSquareText className="size-4 text-[var(--sc-accent)]" />
             <h2 className="text-base font-semibold">Jouw opmerkingen</h2>
           </div>
           <ul className="mt-3 flex flex-col gap-2.5">
             {review.threads.map((t) => (
-              <li key={t.id} className="rounded-[12px] border border-white/10 bg-white/[0.03] p-3.5">
+              <li key={t.id} className="rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-3.5">
                 <div className="flex items-center justify-between gap-2 text-[12px] text-[var(--color-ink-faint)]">
                   <span>
                     {t.pageNumber ? `Pagina ${t.pageNumber}` : "Algemene opmerking"}

@@ -5,6 +5,7 @@ import { Logo } from "@/components/logo";
 import { Avatar } from "@/components/ui";
 import { UserMenu } from "@/components/layout/user-menu";
 import { PortalNav, PortalMobileNav } from "./portal-nav";
+import { PortalThemeToggle, PORTAL_THEME_INIT } from "./portal-theme";
 
 /** Klantgerichte tabtitel: "Shortclips" (geen interne "OS"-toevoeging). */
 export const metadata: Metadata = {
@@ -24,15 +25,18 @@ export default async function PortalLayout({
 
   return (
     <div className="portal-studio min-h-screen text-[var(--color-ink)]">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-[rgba(5,6,29,0.65)] text-white backdrop-blur-md">
+      <script dangerouslySetInnerHTML={{ __html: PORTAL_THEME_INIT }} />
+      <header className="sticky top-0 z-20 border-b border-[var(--sc-line)] bg-[var(--sc-header-bg)] backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between gap-4 px-5">
-          <Link href="/portal" aria-label="Naar je dashboard">
-            <Logo size={30} onDark />
+          <Link href="/portal" aria-label="Naar je dashboard" className="inline-flex">
+            <Logo size={30} onDark className="pl-dark" />
+            <Logo size={30} className="pl-light" />
           </Link>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-white/70 sm:block">
+          <div className="flex items-center gap-2">
+            <span className="hidden text-sm text-[var(--color-ink-muted)] sm:block">
               {viewer.fullName}
             </span>
+            <PortalThemeToggle />
             <UserMenu name={viewer.fullName} email={viewer.email} role="client">
               <Avatar name={viewer.fullName} size={32} />
             </UserMenu>

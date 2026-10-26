@@ -62,7 +62,7 @@ export function ScriptReviewActions({
   }
 
   return (
-    <div className="rounded-[16px] border border-white/10 bg-white/[0.03] p-5">
+    <div className="rounded-[16px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-5">
       <h3 className="text-[15px] font-semibold">Wat wil je doen?</h3>
       <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">Alles klopt? Keur de scripts goed. Nog iets op te merken? Geef je feedback — die slaan we automatisch op.</p>
 

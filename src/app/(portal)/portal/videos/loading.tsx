@@ -1,6 +1,6 @@
 /** Skeleton voor de video-omgeving: koptekst + rasters met 9:16-tegels. */
 function Bar({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-white/5 ${className}`} />;
+  return <div className={`animate-pulse rounded-md bg-[var(--sc-fill)] ${className}`} />;
 }
 
 function Grid() {

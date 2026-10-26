@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
 const SECTIONS: Array<{ k: keyof ImprovementContent; label: string; icon: typeof ThumbsUp; color: string }> = [
   { k: "watWerkt", label: "Wat goed werkte", icon: ThumbsUp, color: "#2fd27a" },
   { k: "watMinder", label: "Wat minder presteerde", icon: TrendingUp, color: "#ffb020" },
-  { k: "volgendeWeek", label: "Volgende week pakken we dit anders aan", icon: ArrowUpRight, color: "#4bc4ff" },
-  { k: "volgendeMaand", label: "Volgende maand testen we", icon: Target, color: "#4bc4ff" },
+  { k: "volgendeWeek", label: "Volgende week pakken we dit anders aan", icon: ArrowUpRight, color: "var(--sc-accent)" },
+  { k: "volgendeMaand", label: "Volgende maand testen we", icon: Target, color: "var(--sc-accent)" },
   { k: "formats", label: "Formats die we vaker inzetten", icon: Wand2, color: "#9fdcff" },
   { k: "optimalisaties", label: "Concrete optimalisaties", icon: Check, color: "#2fd27a" },
 ];
@@ -39,8 +39,8 @@ export default async function PortalResultatenPage({
       {visible.length > 0 ? (
         <section className="sc-glass p-6 sm:p-7" style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.07), rgba(255,255,255,0.02))" }}>
           <div className="flex items-center gap-2">
-            <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]"><Sparkles className="size-4" /></span>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#4bc4ff]">Van jouw team</span>
+            <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><Sparkles className="size-4" /></span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Van jouw team</span>
           </div>
           <h2 className="mt-2 text-[22px] font-bold tracking-tight">Wat gaan we verbeteren?</h2>
           <p className="mt-1.5 max-w-2xl text-[13.5px] text-[var(--color-ink-muted)]">
@@ -50,7 +50,7 @@ export default async function PortalResultatenPage({
             {visible.map((s) => {
               const Icon = s.icon;
               return (
-                <div key={s.k} className="rounded-[14px] border border-white/10 bg-white/[0.03] p-4">
+                <div key={s.k} className="rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4">
                   <div className="flex items-center gap-2 text-[14px] font-semibold">
                     <Icon className="size-4 shrink-0" style={{ color: s.color }} /> {s.label}
                   </div>

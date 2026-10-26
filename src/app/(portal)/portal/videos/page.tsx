@@ -69,7 +69,7 @@ const FEEDBACK_TIPS = [
 function VideoFeedbackGuide() {
   return (
     <section className="sc-glass p-5 sm:p-6">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-[#4bc4ff]">Zo controleer je jouw video&apos;s</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Zo controleer je jouw video&apos;s</span>
       <h2 className="mt-1 text-[18px] font-bold tracking-tight">Eén duidelijke feedbackronde werkt het best</h2>
       <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
         {FEEDBACK_TIPS.map((t) => (

@@ -40,7 +40,7 @@ export function WerkwijzeContent() {
   return (
     <div className="flex flex-col gap-7">
       <section className="sc-glass p-6 sm:p-7">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-[#4bc4ff]">De opnamedag</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">De opnamedag</span>
         <h2 className="mt-1 text-[22px] font-bold tracking-tight">Zo ziet de dag eruit</h2>
         <p className="mt-2 max-w-2xl text-[13.5px] text-[var(--color-ink-muted)]">
           Een gemiddelde opnamedag levert circa acht video&apos;s op en is rond 15:00 uur klaar. Bij meer video&apos;s of complexere opnames kan dat schuiven.
@@ -49,13 +49,13 @@ export function WerkwijzeContent() {
           {SHOOT_STEPS.map((step, i) => (
             <li key={step.title} className="relative flex gap-4 pb-6 last:pb-0">
               {i < SHOOT_STEPS.length - 1 ? (
-                <span className="absolute left-[15px] top-8 h-full w-px bg-white/10" aria-hidden />
+                <span className="absolute left-[15px] top-8 h-full w-px bg-[var(--sc-fill-strong)]" aria-hidden />
               ) : null}
-              <span className="z-10 grid size-8 shrink-0 place-items-center rounded-full border border-[#2e90fa]/40 bg-[rgba(25,168,255,0.12)] text-[12px] font-bold text-[#4bc4ff]">
+              <span className="z-10 grid size-8 shrink-0 place-items-center rounded-full border border-[#2e90fa]/40 bg-[rgba(25,168,255,0.12)] text-[12px] font-bold text-[var(--sc-accent)]">
                 {String(i + 1).padStart(2, "0")}
               </span>
               <div className="pt-0.5">
-                <div className="text-[12px] font-semibold uppercase tracking-wide text-[#4bc4ff]">{step.time}</div>
+                <div className="text-[12px] font-semibold uppercase tracking-wide text-[var(--sc-accent)]">{step.time}</div>
                 <div className="mt-0.5 text-[15px] font-semibold">{step.title}</div>
                 <p className="mt-0.5 text-[13.5px] text-[var(--color-ink-muted)]">{step.body}</p>
               </div>
@@ -67,15 +67,15 @@ export function WerkwijzeContent() {
             <div className="flex items-center gap-2 text-[14px] font-semibold"><Clock className="size-4 text-[#2fd27a]" /> Jullie tijdsbesteding</div>
             <p className="mt-1.5 text-[13px] text-[var(--color-ink-muted)]">Alleen de presentator is de hele dag nodig. Collega&apos;s die kort in beeld komen plannen we op een vast moment in.</p>
           </div>
-          <div className="rounded-[14px] border border-white/10 bg-white/[0.03] p-4">
-            <div className="flex items-center gap-2 text-[14px] font-semibold"><ShieldCheck className="size-4 text-[#4bc4ff]" /> Regie</div>
+          <div className="rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4">
+            <div className="flex items-center gap-2 text-[14px] font-semibold"><ShieldCheck className="size-4 text-[var(--sc-accent)]" /> Regie</div>
             <p className="mt-1.5 text-[13px] text-[var(--color-ink-muted)]">Wij bepalen volgorde, kadrering, tempo en herhalingen. Er is vooraf geen voorbereiding nodig.</p>
           </div>
         </div>
       </section>
 
       <section className="sc-glass p-6 sm:p-7">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-[#4bc4ff]">Rolverdeling</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Rolverdeling</span>
         <h2 className="mt-1 text-[22px] font-bold tracking-tight">Wie doet wat</h2>
         <p className="mt-2 max-w-2xl text-[13.5px] text-[var(--color-ink-muted)]">Een duidelijke taakverdeling zodat jullie je op de inhoud kunnen richten en wij op de productie.</p>
         <div className="mt-5 overflow-x-auto">
@@ -107,18 +107,18 @@ export function WerkwijzeContent() {
               ))}
             </ul>
           </div>
-          <div className="rounded-[14px] border border-white/10 bg-white/[0.03] p-5">
+          <div className="rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-5">
             <div className="text-[14px] font-semibold">Wat je volledig kunt loslaten</div>
             <p className="mt-2 text-[13px] text-[var(--color-ink-muted)]">Formats, openingen, opbouw, toon, volgorde, beeldkeuze, montage, ondertiteling, muziek, captions, hashtags, plaatsingsmomenten en optimalisatie. Wij maken die keuzes en bewaken de kwaliteit.</p>
           </div>
         </div>
       </section>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[16px] border border-white/10 bg-white/[0.03] px-5 py-4 text-[12.5px] text-[var(--color-ink-muted)]">
-        <span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5 text-[#4bc4ff]" /> Edisonstraat 1B, 8606 JH Sneek</span>
-        <span className="inline-flex items-center gap-1.5"><Phone className="size-3.5 text-[#4bc4ff]" /> 06-25083371</span>
-        <span className="inline-flex items-center gap-1.5"><Mail className="size-3.5 text-[#4bc4ff]" /> info@shortclips.nl</span>
-        <span className="inline-flex items-center gap-1.5"><Globe className="size-3.5 text-[#4bc4ff]" /> shortclips.nl</span>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[16px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-5 py-4 text-[12.5px] text-[var(--color-ink-muted)]">
+        <span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5 text-[var(--sc-accent)]" /> Edisonstraat 1B, 8606 JH Sneek</span>
+        <span className="inline-flex items-center gap-1.5"><Phone className="size-3.5 text-[var(--sc-accent)]" /> 06-25083371</span>
+        <span className="inline-flex items-center gap-1.5"><Mail className="size-3.5 text-[var(--sc-accent)]" /> info@shortclips.nl</span>
+        <span className="inline-flex items-center gap-1.5"><Globe className="size-3.5 text-[var(--sc-accent)]" /> shortclips.nl</span>
       </div>
     </div>
   );
@@ -183,14 +183,14 @@ export function TeamContent({
 
       {/* Feedback-kanaal: video's altijd via de videopagina (Frame), niet via WhatsApp */}
       <div className="flex items-start gap-3 rounded-[14px] border border-[#2e90fa]/25 bg-[rgba(46,144,250,0.06)] p-4">
-        <MessageSquareText className="mt-0.5 size-5 shrink-0 text-[#4bc4ff]" />
+        <MessageSquareText className="mt-0.5 size-5 shrink-0 text-[var(--sc-accent)]" />
         <p className="text-[13.5px] text-[var(--color-ink-muted)]">
           <span className="font-semibold text-[var(--color-ink)]">Feedback op video&apos;s?</span> Geef die altijd via de{" "}
-          <a href="/portal/videos" className="font-semibold text-[#4bc4ff]">videopagina</a> (in Frame, met tijdcode). Zo blijft alles bij de juiste video en in één gebundelde ronde.
+          <a href="/portal/videos" className="font-semibold text-[var(--sc-accent)]">videopagina</a> (in Frame, met tijdcode). Zo blijft alles bij de juiste video en in één gebundelde ronde.
         </p>
       </div>
 
-      <div className="flex items-start gap-3 rounded-[14px] border border-white/10 bg-white/[0.03] p-4 text-[13px] text-[var(--color-ink-muted)]">
+      <div className="flex items-start gap-3 rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4 text-[13px] text-[var(--color-ink-muted)]">
         <Video className="mt-0.5 size-4 shrink-0 text-[var(--color-ink-faint)]" />
         Vragen over je video&apos;s, planning of samenwerking? Je vaste contactpersoon helpt je graag.
       </div>
