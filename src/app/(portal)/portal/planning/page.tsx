@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { CalendarDays, Film, MapPin, Send, Users } from "lucide-react";
+import { CalendarClock, CalendarDays, Film, MapPin, Send, Users } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalData } from "@/server/portal";
+import { getPortalSettings } from "@/server/portal-settings";
 import { EmptyState } from "@/components/ui";
 import { formatDateFull, relativeDays } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
@@ -49,7 +50,7 @@ const TYPE_STYLE: Record<Item["type"], { label: string; cls: string }> = {
 
 export default async function PortalPlanningPage() {
   const viewer = await requirePortal();
-  const data = await getPortalData(viewer);
+  const [data, settings] = await Promise.all([getPortalData(viewer), getPortalSettings()]);
 
   const items: Item[] = [];
   for (const a of data.appointments) {
@@ -174,6 +175,20 @@ export default async function PortalPlanningPage() {
           </ul>
         </div>
       )}
+
+      {/* Afspraak wijzigen of annuleren — de geldende voorwaarden (intern instelbaar) */}
+      <section className="sc-glass p-5 sm:p-6">
+        <div className="flex items-center gap-2">
+          <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[#4bc4ff]"><CalendarClock className="size-4" /></span>
+          <h2 className="text-base font-semibold">Afspraak wijzigen of annuleren</h2>
+        </div>
+        <ul className="mt-3 flex flex-col gap-2 text-[13.5px] text-[var(--color-ink-muted)]">
+          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[#4bc4ff]" /> Wil je een opname verplaatsen of annuleren? Laat het je vaste contactpersoon zo snel mogelijk weten.</li>
+          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[#4bc4ff]" /> Kosteloos verplaatsen of annuleren kan tot <strong className="text-[var(--color-ink)]">{settings.cancelNoticeDays} werkdagen</strong> voor de opnamedag.</li>
+          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[#ffb020]" /> Bij annulering binnen {settings.cancelNoticeDays} werkdagen wordt <strong className="text-[var(--color-ink)]">{settings.cancelFee}</strong> in rekening gebracht. {settings.cancelLateNote}</li>
+          <li className="flex gap-2"><span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[#4bc4ff]" /> Een nieuwe datum plannen we direct met je in, afhankelijk van de beschikbaarheid.</li>
+        </ul>
+      </section>
     </div>
   );
 }
