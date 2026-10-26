@@ -102,7 +102,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/kosten", label: "Kostenmonitor", icon: "ReceiptEuro", ownerOnly: true, match: "/kosten" },
       { href: "/editkosten", label: "Winst & editkosten", icon: "Euro", ownerOnly: true, match: "/editkosten" },
       { href: "/winstgevendheid", label: "Winstgevendheid", icon: "TrendingUp", ownerOnly: true, match: "/winstgevendheid" },
-      { href: "/dashboard/vermogen", label: "Vermogen", icon: "Wallet", ownerOnly: true, external: true },
+      { href: "/dashboard/vermogen", label: "Vermogen", icon: "Wallet", ownerOnly: true, match: "/dashboard/vermogen" },
     ],
   },
   {
@@ -112,7 +112,6 @@ export const NAVIGATION: NavGroup[] = [
     items: [
       { href: "/klantenbeheer", label: "Klantenbeheer", icon: "UserCog", roles: ["project_coordinator"], match: "/klantenbeheer" },
       { href: "/noodprocedure", label: "Noodprocedure", icon: "LifeBuoy", roles: ["project_coordinator"], match: "/noodprocedure" },
-      { href: "/koppelingen", label: "Koppeling controleren", icon: "Link2", ownerOnly: true, match: "/koppelingen" },
       { href: "/settings/agendas", label: "Agenda's", icon: "CalendarRange", ownerOnly: true, match: "/settings/agendas" },
       { href: "/settings/integrations", label: "Koppelingen", icon: "Plug", ownerOnly: true, match: "/settings/integrations" },
       { href: "/settings/portaal", label: "Klantportaal-instellingen", icon: "SlidersHorizontal", permissions: ["scripts:write"], match: "/settings/portaal" },

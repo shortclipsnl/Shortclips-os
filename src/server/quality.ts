@@ -338,16 +338,6 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
 
   /* ---------- Bestaande, aanvullende signalen ---------- */
 
-  // Voorgestelde koppelingen die nog bevestigd moeten worden (zeldzaam — meeste gaan automatisch).
-  if (owner && openLinks > 0) {
-    items.push({
-      id: "links-open", severity: "blauw", category: "Koppeling te bevestigen",
-      title: `${openLinks} video${openLinks === 1 ? "" : "'s"} wachten op koppeling`,
-      detail: "Twijfelgeval: opnamedag bevestigen of afwijzen",
-      href: "/koppelingen", roles: COORD,
-    });
-  }
-
   // Klanten met risico.
   for (const c of data.clients.atRisk) {
     items.push({
