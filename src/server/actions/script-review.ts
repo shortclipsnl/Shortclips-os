@@ -10,7 +10,17 @@ import { auditLog, recordActivity } from "@/server/audit";
 import { notify } from "@/server/notifications";
 import { portalEmailHtml, sendEmail } from "@/server/email";
 import { env } from "@/lib/env";
+import { getFeedbackDays } from "@/server/portal-settings";
+import { addWorkingDays } from "@/lib/workdays";
 import { assertReviewAccess } from "@/server/script-review";
+
+/** Uiterste feedbackmoment: N werkdagen vanaf nu (eind van die dag). */
+async function scriptFeedbackDeadline(): Promise<Date> {
+  const { scripts } = await getFeedbackDays();
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  const day = addWorkingDays(today, Math.max(1, scripts));
+  return new Date(`${day}T17:00:00`);
+}
 
 export type ActionResult = { ok: boolean; message?: string; reviewId?: string };
 
@@ -89,6 +99,7 @@ export async function sendScriptForReview(input: z.infer<typeof sendSchema>): Pr
       .limit(1);
 
     const reviewTitle = title?.trim() || `Scripts opname ${fmtDate(day.scheduledOn)}`;
+    const feedbackDeadline = await scriptFeedbackDeadline();
     let reviewId: string;
     let versionNumber: number;
     let herzien = false;
@@ -98,14 +109,14 @@ export async function sendScriptForReview(input: z.infer<typeof sendSchema>): Pr
       herzien = true;
       await db
         .update(scriptReviews)
-        .set({ status: "opnieuw_controle", currentVersion: versionNumber, title: reviewTitle, updatedAt: new Date() })
+        .set({ status: "opnieuw_controle", currentVersion: versionNumber, title: reviewTitle, feedbackDeadline, updatedAt: new Date() })
         .where(eq(scriptReviews.id, existing.id));
       reviewId = existing.id;
     } else {
       versionNumber = 1;
       const [created] = await db
         .insert(scriptReviews)
-        .values({ clientId, productionDayId, title: reviewTitle, status: "klaar_controle", currentVersion: 1, createdById: viewer.id })
+        .values({ clientId, productionDayId, title: reviewTitle, status: "klaar_controle", currentVersion: 1, feedbackDeadline, createdById: viewer.id })
         .returning({ id: scriptReviews.id });
       reviewId = created!.id;
     }
@@ -399,7 +410,7 @@ export async function uploadScriptReviewVersion(input: z.infer<typeof versionSch
     const versionNumber = review.currentVersion + 1;
 
     await db.insert(scriptReviewVersions).values({ reviewId, versionNumber, fileName: fileName.slice(0, 255), contentType: "application/pdf", sizeBytes, dataBase64: base64, note: note ?? null, uploadedById: viewer.id });
-    await db.update(scriptReviews).set({ status: "opnieuw_controle", currentVersion: versionNumber, updatedAt: new Date() }).where(eq(scriptReviews.id, reviewId));
+    await db.update(scriptReviews).set({ status: "opnieuw_controle", currentVersion: versionNumber, feedbackDeadline: await scriptFeedbackDeadline(), updatedAt: new Date() }).where(eq(scriptReviews.id, reviewId));
 
     await auditLog({ viewer, action: "script_review.new_version", entityType: "script_review", entityId: reviewId, clientId: review.clientId, changes: { version: versionNumber } });
     await recordActivity({ clientId: review.clientId, type: "script_review.new_version", title: "Aangepaste scripts klaargezet ter controle", isClientVisible: true });

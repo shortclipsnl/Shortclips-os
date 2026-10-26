@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Play, Video as VideoIcon } from "lucide-react";
+import { Check, Play, Video as VideoIcon } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalVideos } from "@/server/portal";
 import { CoverImage } from "@/components/portal/cover-image";
@@ -56,6 +56,32 @@ function Group({ title, subtitle, rows }: { title: string; subtitle?: string; ro
   );
 }
 
+const FEEDBACK_TIPS = [
+  "Bekijk de video's volledig voordat je feedback geeft.",
+  "Verzamel al je opmerkingen en geef ze zoveel mogelijk in één ronde door.",
+  "Let op feitelijke juistheid: namen, teksten, cijfers en productinformatie.",
+  "Geef je opmerking bij de juiste video en het juiste moment (met tijdcode).",
+  "Houd rekening met de gekozen strategie, montage en stijl van Shortclips.",
+  "Vermijd losse of tegenstrijdige feedback via meerdere kanalen.",
+];
+
+/** Korte, scanbare uitleg hoe de klant video's controleert. */
+function VideoFeedbackGuide() {
+  return (
+    <section className="sc-glass p-5 sm:p-6">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-[#4bc4ff]">Zo controleer je jouw video&apos;s</span>
+      <h2 className="mt-1 text-[18px] font-bold tracking-tight">Eén duidelijke feedbackronde werkt het best</h2>
+      <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
+        {FEEDBACK_TIPS.map((t) => (
+          <li key={t} className="flex items-start gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]">
+            <Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> {t}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default async function PortalVideosPage() {
   const viewer = await requirePortal();
   const data = await getPortalVideos(viewer);
@@ -75,6 +101,7 @@ export default async function PortalVideosPage() {
         </div>
       ) : (
         <>
+          <VideoFeedbackGuide />
           <Group title="Jouw beoordeling" subtitle="Deze video's wachten op jouw akkoord." rows={data.actieNodig} />
           <Group title="In productie" subtitle="Hier zijn wij mee bezig, je hoeft nu niets te doen." rows={data.inProductie} />
           <Group title="Online" subtitle={`${data.gepubliceerd.length} video's`} rows={data.gepubliceerd.slice(0, 40)} />

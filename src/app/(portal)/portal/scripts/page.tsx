@@ -46,6 +46,11 @@ function ReviewCard({ r }: { r: PortalReviewListItem }) {
           {r.currentVersion > 1 ? ` · versie ${r.currentVersion}` : ""}
           {r.openComments > 0 ? ` · ${r.openComments} opmerking${r.openComments === 1 ? "" : "en"} geplaatst` : ""}
         </p>
+        {actie && r.feedbackDeadline ? (
+          <p className="mt-1 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#ffb020]">
+            <Clock className="size-3.5" /> Wacht op jouw feedback · vóór {new Date(r.feedbackDeadline).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "long" })}
+          </p>
+        ) : null}
       </div>
       <span className={`${buttonClass({ variant: actie ? "accent" : "secondary", size: "sm" })} shrink-0`}>
         Bekijk scripts <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />

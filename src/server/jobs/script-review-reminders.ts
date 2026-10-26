@@ -4,11 +4,11 @@ import { db } from "@/db/client";
 import { clients, productionDays, scriptReviews, users } from "@/db/schema";
 import { notify } from "@/server/notifications";
 import { portalEmailHtml, sendEmail } from "@/server/email";
+import { getFeedbackDays } from "@/server/portal-settings";
 import { env } from "@/lib/env";
 import { runJob } from "./runner";
 
 const appUrl = env.APP_URL.replace(/\/$/, "");
-const REMINDER_AFTER_DAYS = 3;
 
 /** Maandag van de huidige week (YYYY-MM-DD) — voor wekelijkse dedupe. */
 function mondayIso(): string {
@@ -33,6 +33,10 @@ function fmtDate(iso: string | null): string {
 export async function runScriptReviewReminders() {
   return runJob("monday", "script_review.reminders", {}, async (ctx) => {
     const week = mondayIso();
+    // Instelbare feedbacktermijn: herinner zodra de deadline nadert of al voorbij
+    // is (±1 dag van tevoren), of — als er geen deadline staat — na de ingestelde
+    // termijn aan stilte.
+    const { scripts: feedbackDays } = await getFeedbackDays();
     const rows = await db
       .select({
         id: scriptReviews.id,
@@ -48,7 +52,10 @@ export async function runScriptReviewReminders() {
       .where(and(
         isNull(scriptReviews.deletedAt),
         inArray(scriptReviews.status, ["klaar_controle", "opnieuw_controle"]),
-        sql`${scriptReviews.updatedAt} < now() - (${REMINDER_AFTER_DAYS} * interval '1 day')`,
+        sql`(
+          (${scriptReviews.feedbackDeadline} is not null and ${scriptReviews.feedbackDeadline} <= now() + interval '1 day')
+          or (${scriptReviews.feedbackDeadline} is null and ${scriptReviews.updatedAt} < now() - (${Math.max(1, feedbackDays)} * interval '1 day'))
+        )`,
       ));
     ctx.counters.processed = rows.length;
 

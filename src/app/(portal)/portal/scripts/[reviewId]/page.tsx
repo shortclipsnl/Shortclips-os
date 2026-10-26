@@ -43,6 +43,11 @@ export default async function PortalScriptReviewPage({ params }: { params: Promi
           </div>
           <Badge tone={TONE[meta.tone]}>{meta.label}</Badge>
         </div>
+        {review.status !== "goedgekeurd" && review.feedbackDeadline ? (
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[rgba(255,176,32,0.14)] px-3 py-1 text-[13px] font-semibold text-[#ffb020]">
+            <CalendarClock className="size-4" /> Wacht op jouw feedback · geef je reactie vóór {new Date(review.feedbackDeadline).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" })}
+          </p>
+        ) : null}
       </div>
 
       {/* PDF met klik-om-te-reageren */}
