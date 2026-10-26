@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { BookOpen, FileText, Search } from "lucide-react";
+import { BookOpen, Search } from "lucide-react";
 import { ClientLogo } from "@/components/ui";
 import type { MyClient } from "@/server/client-library";
 
@@ -57,7 +57,6 @@ export function MijnKlantenGrid({ clients }: { clients: MyClient[] }) {
                   <BookOpen className="size-3" /> {c.hasGuide ? "Editing Guide" : "Geen guide"}
                 </span>
                 {c.richtlijnenCount > 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-info-soft)] px-2 py-0.5 text-2xs font-medium text-[#0060a8]">{c.richtlijnenCount} richtlijn{c.richtlijnenCount === 1 ? "" : "en"}</span> : null}
-                {c.docsCount > 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-neutral-soft)] px-2 py-0.5 text-2xs font-medium text-[var(--color-ink-muted)]"><FileText className="size-3" /> {c.docsCount}</span> : null}
               </div>
               {fmtDate(c.lastUpdated) ? <div className="mt-2 text-2xs text-[var(--color-ink-faint)]">Laatst bijgewerkt {fmtDate(c.lastUpdated)}</div> : null}
             </Link>

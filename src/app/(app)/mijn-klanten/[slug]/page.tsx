@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, Download, ExternalLink, FileText, Info, Scissors } from "lucide-react";
-import { Card, CardHeader, ClientLogo, EmptyState } from "@/components/ui";
+import { ArrowLeft, BookOpen, Download, ExternalLink, Info, Scissors } from "lucide-react";
+import { Card, ClientLogo, EmptyState } from "@/components/ui";
 import { requireInternal } from "@/server/auth/context";
 import { getClientLibraryDetail } from "@/server/client-library";
 import { EditingGuideUpload } from "./editing-guide-upload";
@@ -22,7 +22,7 @@ export default async function KlantInfoPage({ params }: { params: Promise<{ slug
   const viewer = await requireInternal();
   const detail = await getClientLibraryDetail(viewer, slug);
   if (!detail) notFound();
-  const { client, overDeKlant, richtlijnen, editingAandachtspunten, documenten, guide, canManage } = detail;
+  const { client, overDeKlant, richtlijnen, editingAandachtspunten, guide, canManage } = detail;
   const guideUrl = `/api/editing-guide/${client.id}`;
 
   return (
@@ -124,33 +124,6 @@ export default async function KlantInfoPage({ params }: { params: Promise<{ slug
             ))}
             <p className="pt-1 text-xs text-[var(--color-ink-faint)]">Deze richtlijnen komen uit de kennisbank. Bij twijfel is de originele Editing Guide leidend.</p>
           </div>
-        )}
-      </Card>
-
-      {/* D. Aanvullende documenten */}
-      <Card padded={false}>
-        <CardHeader title="Aanvullende documenten" subtitle="Overige bestanden van deze klant uit de kennisbank." className="p-5 pb-2" />
-        {documenten.length === 0 ? (
-          <p className="px-5 pb-5 text-sm text-[var(--color-ink-faint)]">Geen aanvullende documenten beschikbaar.</p>
-        ) : (
-          <ul className="divide-y divide-[var(--color-line)]">
-            {documenten.map((d, i) => (
-              <li key={i}>
-                {d.url ? (
-                  <a href={d.url} target="_blank" rel="noopener" className="flex items-center justify-between gap-3 px-5 py-2.5 hover:bg-[var(--color-surface-sunken)]">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <FileText className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
-                      <span className="truncate text-sm text-[var(--color-ink)]">{d.name}</span>
-                      {d.category ? <span className="shrink-0 rounded-full bg-[var(--color-neutral-soft)] px-2 py-0.5 text-2xs text-[var(--color-ink-muted)]">{d.category}</span> : null}
-                    </span>
-                    <ExternalLink className="size-3.5 shrink-0 text-[var(--color-ink-faint)]" />
-                  </a>
-                ) : (
-                  <span className="flex items-center gap-2 px-5 py-2.5 text-sm text-[var(--color-ink-muted)]"><FileText className="size-4 text-[var(--color-ink-faint)]" /> {d.name}</span>
-                )}
-              </li>
-            ))}
-          </ul>
         )}
       </Card>
     </div>

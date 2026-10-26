@@ -7,16 +7,17 @@ import {
   clientKnowledge,
   clients,
   deliverables,
-  files,
   productionDays,
 } from "@/db/schema";
 import { can, canManageClients, isOwner, requireInternal, type Viewer } from "@/server/auth/context";
 
 /**
- * Persoonlijke klantenbibliotheek voor editors. Hergebruikt volledig de bestaande
- * bronnen (clients, clientKnowledge, clientAiProfiles.editingProfile, files) +
- * de Editing Guide-PDF. Een editor ziet uitsluitend de klanten waaraan hij
- * gekoppeld is; de grens wordt server-side afgedwongen (niet alleen in de UI).
+ * Persoonlijke klantenbibliotheek voor editors. Puur ter informatie: de Editing
+ * Guide-PDF en de editinginfo uit de kennisbank (clientKnowledge,
+ * clientAiProfiles.editingProfile). Editors krijgen hier BEWUST geen toegang tot
+ * projectbestanden (scripts/PDF's uit Google Drive) — die horen hier niet thuis.
+ * Een editor ziet uitsluitend de klanten waaraan hij gekoppeld is; de grens
+ * wordt server-side afgedwongen (niet alleen in de UI).
  */
 
 /** Categorieën klantkennis die als editingrichtlijn gelden. */
@@ -34,7 +35,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 export type MyClient = {
   id: string; name: string; slug: string; logoUrl: string | null; color: string | null;
   sector: string | null; description: string | null;
-  hasGuide: boolean; guideUpdatedAt: Date | null; docsCount: number; richtlijnenCount: number;
+  hasGuide: boolean; guideUpdatedAt: Date | null; richtlijnenCount: number;
   lastUpdated: Date | null;
 };
 
@@ -104,13 +105,6 @@ export async function listMyClients(viewer: Viewer): Promise<MyClient[]> {
     .groupBy(clientKnowledge.clientId);
   const knByClient = new Map(knRows.map((k) => [k.clientId, Number(k.n)]));
 
-  const fileRows = await db
-    .select({ clientId: files.clientId, n: sql<number>`count(*)::int` })
-    .from(files)
-    .where(and(inArray(files.clientId, ids), isNull(files.deletedAt), eq(files.isFolder, false)))
-    .groupBy(files.clientId);
-  const fileByClient = new Map(fileRows.map((f) => [f.clientId ?? "", Number(f.n)]));
-
   return rows.map((c) => {
     const guideUpdatedAt = guideByClient.get(c.id) ?? null;
     const lastUpdated = guideUpdatedAt ?? c.updatedAt ?? null;
@@ -119,7 +113,6 @@ export async function listMyClients(viewer: Viewer): Promise<MyClient[]> {
       description: c.description,
       hasGuide: guideByClient.has(c.id),
       guideUpdatedAt,
-      docsCount: fileByClient.get(c.id) ?? 0,
       richtlijnenCount: knByClient.get(c.id) ?? 0,
       lastUpdated,
     };
@@ -145,7 +138,6 @@ export type ClientLibraryDetail = {
   overDeKlant: KnowledgeItem[];
   richtlijnen: KnowledgeItem[];
   editingAandachtspunten: string[];
-  documenten: { name: string; category: string | null; url: string | null; modifiedAt: Date | null }[];
   guide: GuideMeta | null;
   canManage: boolean;
 };
@@ -169,17 +161,12 @@ export async function getClientLibraryDetail(viewer: Viewer, slug: string): Prom
   const myIds = await getMyClientIds(viewer);
   if (myIds && !myIds.has(client.id)) return null;
 
-  const [knowledge, profile, docs, guide] = await Promise.all([
+  const [knowledge, profile, guide] = await Promise.all([
     db.select({ category: clientKnowledge.category, title: clientKnowledge.title, body: clientKnowledge.body, isPinned: clientKnowledge.isPinned })
       .from(clientKnowledge)
       .where(and(eq(clientKnowledge.clientId, client.id), isNull(clientKnowledge.deletedAt)))
       .orderBy(desc(clientKnowledge.isPinned)),
     db.select({ editingProfile: clientAiProfiles.editingProfile }).from(clientAiProfiles).where(eq(clientAiProfiles.clientId, client.id)).limit(1),
-    db.select({ name: files.name, category: files.category, url: files.externalUrl, modifiedAt: files.modifiedAt })
-      .from(files)
-      .where(and(eq(files.clientId, client.id), isNull(files.deletedAt), eq(files.isFolder, false)))
-      .orderBy(desc(files.modifiedAt))
-      .limit(100),
     getLatestEditingGuide(client.id),
   ]);
 
@@ -196,7 +183,6 @@ export async function getClientLibraryDetail(viewer: Viewer, slug: string): Prom
     overDeKlant,
     richtlijnen,
     editingAandachtspunten,
-    documenten: docs.map((d) => ({ name: d.name, category: d.category, url: d.url, modifiedAt: d.modifiedAt })),
     guide,
     canManage: canManageLibrary(viewer),
   };
