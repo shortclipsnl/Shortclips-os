@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { clients, productionDays, scriptReviewComments, scriptReviewThreads, scriptReviewVersions, scriptReviews, users } from "@/db/schema";
@@ -158,55 +158,84 @@ export async function sendScriptForReview(input: z.infer<typeof sendSchema>): Pr
 
 /* ------------------------------------------------------------ portaal (klant) */
 
-const feedbackSchema = z.object({
+const commentSchema = z.object({
   reviewId: z.string().uuid(),
   body: z.string().trim().min(1, "Schrijf eerst je opmerking.").max(4000),
+  pageNumber: z.number().int().positive().optional(),
+  posX: z.number().min(0).max(1).optional(),
+  posY: z.number().min(0).max(1).optional(),
 });
 
-/** Klant: plaatst een (algemene) opmerking en zet de review op "feedback gegeven". */
-export async function submitScriptReviewFeedback(input: z.infer<typeof feedbackSchema>): Promise<ActionResult> {
+/** Gedeeld: een klantopmerking plaatsen (algemeen of op een pagina/positie),
+ *  de review op "feedback gegeven" zetten en de medewerker op de hoogte brengen. */
+async function createClientComment(viewer: Awaited<ReturnType<typeof requirePortal>>, input: z.infer<typeof commentSchema>): Promise<ActionResult> {
+  const { reviewId, body, pageNumber, posX, posY } = input;
+  const [review] = await db
+    .select({ id: scriptReviews.id, clientId: scriptReviews.clientId, currentVersion: scriptReviews.currentVersion })
+    .from(scriptReviews)
+    .where(and(eq(scriptReviews.id, reviewId), eq(scriptReviews.clientId, viewer.clientId!), isNull(scriptReviews.deletedAt)))
+    .limit(1);
+  if (!review) return { ok: false, message: "Dit script is niet gevonden." };
+
+  const [thread] = await db
+    .insert(scriptReviewThreads)
+    .values({
+      reviewId, versionNumber: review.currentVersion,
+      pageNumber: pageNumber ?? null,
+      posX: posX != null ? String(posX) : null,
+      posY: posY != null ? String(posY) : null,
+      visibility: "client", createdById: viewer.id, authorName: viewer.fullName,
+    })
+    .returning({ id: scriptReviewThreads.id });
+  await db.insert(scriptReviewComments).values({ threadId: thread!.id, body, authorUserId: viewer.id, authorName: viewer.fullName, isInternal: false });
+
+  // Alleen terug naar "feedback gegeven" zolang de review nog niet is goedgekeurd.
+  await db.update(scriptReviews).set({ status: "feedback_gegeven", updatedAt: new Date() })
+    .where(and(eq(scriptReviews.id, reviewId), sql`${scriptReviews.status} <> 'goedgekeurd'`));
+
+  await recordActivity({ clientId: review.clientId, type: "script_review.feedback", title: "Klant gaf feedback op de scripts", isClientVisible: false });
+  const staff = await clientStaff(review.clientId);
+  await notify({
+    roles: ["owner"],
+    userIds: staff.coordinatorId ? [staff.coordinatorId] : undefined,
+    clientId: review.clientId,
+    level: "warning",
+    type: "script_review_feedback",
+    title: `${staff.clientName} gaf feedback op de scripts`,
+    body: `${pageNumber ? `Pagina ${pageNumber}: ` : ""}${body}`.slice(0, 200),
+    href: `/scriptcontrole/${reviewId}`,
+    entityType: "script_review",
+    entityId: reviewId,
+    dedupeKey: `script_review_feedback:${reviewId}:${thread!.id}`,
+  });
+
+  revalidatePath(`/portal/scripts/${reviewId}`);
+  revalidatePath("/portal/scripts");
+  revalidatePath(`/scriptcontrole/${reviewId}`);
+  revalidatePath("/scriptcontrole");
+  return { ok: true };
+}
+
+/** Klant: algemene opmerking over de hele PDF. */
+export async function submitScriptReviewFeedback(input: { reviewId: string; body: string }): Promise<ActionResult> {
   try {
     const viewer = await requirePortal();
-    const parsed = feedbackSchema.safeParse(input);
+    const parsed = commentSchema.safeParse(input);
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Controleer je opmerking." };
-    const { reviewId, body } = parsed.data;
+    return await createClientComment(viewer, parsed.data);
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
 
-    const [review] = await db
-      .select({ id: scriptReviews.id, clientId: scriptReviews.clientId, currentVersion: scriptReviews.currentVersion })
-      .from(scriptReviews)
-      .where(and(eq(scriptReviews.id, reviewId), eq(scriptReviews.clientId, viewer.clientId!), isNull(scriptReviews.deletedAt)))
-      .limit(1);
-    if (!review) return { ok: false, message: "Dit script is niet gevonden." };
-
-    const [thread] = await db
-      .insert(scriptReviewThreads)
-      .values({ reviewId, versionNumber: review.currentVersion, pageNumber: null, visibility: "client", createdById: viewer.id, authorName: viewer.fullName })
-      .returning({ id: scriptReviewThreads.id });
-    await db.insert(scriptReviewComments).values({ threadId: thread!.id, body, authorUserId: viewer.id, authorName: viewer.fullName, isInternal: false });
-
-    await db.update(scriptReviews).set({ status: "feedback_gegeven", updatedAt: new Date() }).where(eq(scriptReviews.id, reviewId));
-
-    await recordActivity({ clientId: review.clientId, type: "script_review.feedback", title: "Klant gaf feedback op de scripts", isClientVisible: false });
-    // De verantwoordelijke medewerker op de hoogte brengen.
-    const staff = await clientStaff(review.clientId);
-    await notify({
-      roles: ["owner"],
-      userIds: staff.coordinatorId ? [staff.coordinatorId] : undefined,
-      clientId: review.clientId,
-      level: "warning",
-      type: "script_review_feedback",
-      title: `${staff.clientName} gaf feedback op de scripts`,
-      body: body.slice(0, 200),
-      href: "/scriptcontrole",
-      entityType: "script_review",
-      entityId: reviewId,
-      dedupeKey: `script_review_feedback:${reviewId}:${thread!.id}`,
-    });
-
-    revalidatePath(`/portal/scripts/${reviewId}`);
-    revalidatePath("/portal/scripts");
-    revalidatePath("/scriptcontrole");
-    return { ok: true };
+/** Klant: opmerking op een specifieke plek in de PDF (pagina + positie). */
+export async function addScriptReviewComment(input: { reviewId: string; body: string; pageNumber: number; posX: number; posY: number }): Promise<ActionResult> {
+  try {
+    const viewer = await requirePortal();
+    const parsed = commentSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Controleer je opmerking." };
+    return await createClientComment(viewer, parsed.data);
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
@@ -253,6 +282,147 @@ export async function approveScriptReview(reviewId: string): Promise<ActionResul
     revalidatePath("/portal/scripts");
     revalidatePath("/scriptcontrole");
     return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/* --------------------------------------- intern: feedback verwerken (Fase 3) */
+
+/** Haalt review + opnamedatum op en controleert de klant-scope van de medewerker. */
+async function loadReviewForStaff(viewer: Awaited<ReturnType<typeof requirePermission>>, reviewId: string) {
+  const review = await assertReviewAccess(viewer, reviewId);
+  if (!review) return null;
+  const [day] = await db.select({ scheduledOn: productionDays.scheduledOn }).from(productionDays).where(eq(productionDays.id, review.productionDayId)).limit(1);
+  return { ...review, scheduledOn: day?.scheduledOn ?? null };
+}
+
+const replySchema = z.object({
+  threadId: z.string().uuid(),
+  body: z.string().trim().min(1, "Schrijf eerst een reactie.").max(4000),
+  /** true = interne notitie (niet zichtbaar voor de klant). */
+  internal: z.boolean().optional(),
+});
+
+/** Intern: reageren op een opmerkingdraad (zichtbaar voor de klant of intern). */
+export async function replyToScriptReviewThread(input: z.infer<typeof replySchema>): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("scripts:write");
+    const parsed = replySchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Controleer je reactie." };
+    const { threadId, body, internal } = parsed.data;
+
+    const [thread] = await db
+      .select({ id: scriptReviewThreads.id, reviewId: scriptReviewThreads.reviewId })
+      .from(scriptReviewThreads)
+      .where(and(eq(scriptReviewThreads.id, threadId), isNull(scriptReviewThreads.deletedAt)))
+      .limit(1);
+    if (!thread) return { ok: false, message: "Opmerking niet gevonden." };
+    const review = await assertReviewAccess(viewer, thread.reviewId);
+    if (!review) return { ok: false, message: "Niet gevonden." };
+
+    await db.insert(scriptReviewComments).values({ threadId, body, authorUserId: viewer.id, authorName: viewer.fullName, isInternal: internal ?? false });
+    revalidatePath(`/scriptcontrole/${thread.reviewId}`);
+    revalidatePath(`/portal/scripts/${thread.reviewId}`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/** Intern: een opmerkingdraad als verwerkt (of weer open) markeren. */
+export async function resolveScriptReviewThread(threadId: string, resolved = true): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("scripts:write");
+    const [thread] = await db
+      .select({ id: scriptReviewThreads.id, reviewId: scriptReviewThreads.reviewId })
+      .from(scriptReviewThreads)
+      .where(and(eq(scriptReviewThreads.id, threadId), isNull(scriptReviewThreads.deletedAt)))
+      .limit(1);
+    if (!thread) return { ok: false, message: "Opmerking niet gevonden." };
+    const review = await assertReviewAccess(viewer, thread.reviewId);
+    if (!review) return { ok: false, message: "Niet gevonden." };
+    await db.update(scriptReviewThreads)
+      .set({ isResolved: resolved, resolvedAt: resolved ? new Date() : null, resolvedById: resolved ? viewer.id : null, updatedAt: new Date() })
+      .where(eq(scriptReviewThreads.id, threadId));
+    revalidatePath(`/scriptcontrole/${thread.reviewId}`);
+    revalidatePath(`/portal/scripts/${thread.reviewId}`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/** Intern: de review "in bewerking" nemen (status wordt aangepast). */
+export async function setScriptReviewRevising(reviewId: string): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("scripts:write");
+    const review = await assertReviewAccess(viewer, reviewId);
+    if (!review) return { ok: false, message: "Niet gevonden." };
+    await db.update(scriptReviews).set({ status: "wordt_aangepast", updatedAt: new Date() })
+      .where(and(eq(scriptReviews.id, reviewId), sql`${scriptReviews.status} <> 'goedgekeurd'`));
+    revalidatePath(`/scriptcontrole/${reviewId}`);
+    revalidatePath("/scriptcontrole");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+const versionSchema = z.object({
+  reviewId: z.string().uuid(),
+  fileName: z.string().min(1).max(255),
+  base64: z.string().min(1),
+  note: z.string().trim().max(500).optional(),
+});
+
+/** Intern: een nieuwe PDF-versie uploaden en opnieuw ter controle naar de klant. */
+export async function uploadScriptReviewVersion(input: z.infer<typeof versionSchema>): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("scripts:write");
+    const parsed = versionSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Controleer de invoer." };
+    const { reviewId, fileName, base64, note } = parsed.data;
+
+    const isPdf = fileName.toLowerCase().endsWith(".pdf");
+    if (!isPdf) return { ok: false, message: "Alleen een PDF-bestand." };
+    const sizeBytes = Math.floor((base64.length * 3) / 4);
+    if (sizeBytes === 0) return { ok: false, message: "Leeg bestand." };
+    if (sizeBytes > MAX_PDF_BYTES) return { ok: false, message: "Het bestand is te groot (max 15 MB)." };
+
+    const review = await loadReviewForStaff(viewer, reviewId);
+    if (!review) return { ok: false, message: "Niet gevonden." };
+    const versionNumber = review.currentVersion + 1;
+
+    await db.insert(scriptReviewVersions).values({ reviewId, versionNumber, fileName: fileName.slice(0, 255), contentType: "application/pdf", sizeBytes, dataBase64: base64, note: note ?? null, uploadedById: viewer.id });
+    await db.update(scriptReviews).set({ status: "opnieuw_controle", currentVersion: versionNumber, updatedAt: new Date() }).where(eq(scriptReviews.id, reviewId));
+
+    await auditLog({ viewer, action: "script_review.new_version", entityType: "script_review", entityId: reviewId, clientId: review.clientId, changes: { version: versionNumber } });
+    await recordActivity({ clientId: review.clientId, type: "script_review.new_version", title: "Aangepaste scripts klaargezet ter controle", isClientVisible: true });
+
+    // Klant op de hoogte brengen van de nieuwe versie.
+    const { ids, emails } = await portalUserIds(review.clientId);
+    const staff = await clientStaff(review.clientId);
+    const href = `/portal/scripts/${reviewId}`;
+    const heading = "Aangepaste scripts staan klaar";
+    const body = review.scheduledOn
+      ? `De aangepaste scripts voor je opname van ${fmtDate(review.scheduledOn)} staan klaar. Bekijk ze en geef je feedback of keur ze goed.`
+      : "De aangepaste scripts staan klaar om te bekijken.";
+    if (ids.length > 0) {
+      await notify({ userIds: ids, clientId: review.clientId, level: "info", type: "script_review_ready", title: heading, body, href, entityType: "script_review", entityId: reviewId, dedupeKey: `script_review_ready:${reviewId}:v${versionNumber}` });
+    }
+    if (emails.length > 0) {
+      await sendEmail({ to: emails, subject: heading, text: `${body}\n\nBekijk de scripts: ${appUrl}${href}`, html: portalEmailHtml({ heading, body, ctaLabel: "Bekijk de scripts", ctaUrl: `${appUrl}${href}` }), replyTo: staff.coordinatorEmail ?? undefined }).catch(() => undefined);
+    }
+
+    revalidatePath(`/scriptcontrole/${reviewId}`);
+    revalidatePath("/scriptcontrole");
+    revalidatePath(`/portal/scripts/${reviewId}`);
+    return { ok: true, reviewId };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;

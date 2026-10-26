@@ -13,6 +13,7 @@ import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
 import { runProfitabilitySignals } from "./profitability-signals";
 import { runContentHealthSignals } from "./content-health-signals";
+import { runScriptReviewReminders } from "./script-review-reminders";
 import {
   pullFrameComments,
   pullFrameDeliverables,
@@ -100,6 +101,8 @@ export async function runNightlySync() {
   results.push(await step("content_health.signals", () => runContentHealthSignals()));
   results.push(await step("reminders.script_todo", () => runScriptTodoReminders()));
   results.push(await step("reminders.post_shoot_todo", () => runPostShootTodoReminders()));
+  // Herinnering aan klanten met scripts die nog ter controle staan (dedupe per week).
+  results.push(await step("reminders.script_review", () => runScriptReviewReminders()));
   // Als laatste: een volledige database-backup naar Google Drive.
   results.push(await step("backup.database", () => runDatabaseBackup()));
   // Noodprocedure-PDF naar Drive, zodat kritieke info bij portaaluitval beschikbaar blijft.

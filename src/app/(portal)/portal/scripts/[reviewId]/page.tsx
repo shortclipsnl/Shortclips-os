@@ -6,7 +6,7 @@ import { requirePortal } from "@/server/auth/context";
 import { getPortalScriptReview, SCRIPT_REVIEW_STATUS } from "@/server/script-review";
 import { Badge } from "@/components/ui";
 import { formatDateFull, relativeDays } from "@/lib/format";
-import { PdfViewer } from "@/components/portal/pdf-viewer";
+import { ScriptPdfReview } from "@/components/portal/script-pdf-review";
 import { ScriptReviewActions } from "./review-actions";
 
 export const metadata: Metadata = { title: "Script bekijken" };
@@ -45,9 +45,14 @@ export default async function PortalScriptReviewPage({ params }: { params: Promi
         </div>
       </div>
 
-      {/* PDF */}
+      {/* PDF met klik-om-te-reageren */}
       {review.currentVersionId ? (
-        <PdfViewer url={`/api/portal/script-pdf/${review.currentVersionId}`} />
+        <ScriptPdfReview
+          url={`/api/portal/script-pdf/${review.currentVersionId}`}
+          reviewId={review.id}
+          canAnnotate={review.status !== "goedgekeurd"}
+          pins={review.threads.map((t) => ({ id: t.id, pageNumber: t.pageNumber, posX: t.posX, posY: t.posY, isResolved: t.isResolved, authorName: t.authorName, comments: t.comments }))}
+        />
       ) : (
         <div className="sc-glass grid place-items-center gap-2 p-10 text-center">
           <FileText className="size-7 text-[var(--color-ink-faint)]" strokeWidth={1.5} />

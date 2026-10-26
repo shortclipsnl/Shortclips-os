@@ -309,6 +309,113 @@ export async function listInternalScriptReviews(viewer: Viewer): Promise<Interna
   }));
 }
 
+export type InternalReviewDetail = {
+  id: string;
+  title: string;
+  status: ScriptReviewStatus;
+  clientId: string;
+  clientName: string;
+  clientSlug: string;
+  currentVersion: number;
+  currentVersionId: string | null;
+  shootOn: string | null;
+  shootTime: string | null;
+  shootLocation: string | null;
+  approvedAt: string | null;
+  approvedByName: string | null;
+  approvedVersion: number | null;
+  versions: Array<{ id: string; versionNumber: number; fileName: string; note: string | null; createdAt: string }>;
+  threads: Array<{
+    id: string;
+    versionNumber: number;
+    pageNumber: number | null;
+    posX: number | null;
+    posY: number | null;
+    visibility: string;
+    isResolved: boolean;
+    authorName: string | null;
+    createdAt: string;
+    comments: Array<{ id: string; body: string; authorName: string | null; isInternal: boolean; createdAt: string }>;
+  }>;
+};
+
+/** Volledige review voor het interne portaal (alle versies + alle opmerkingen). */
+export async function getInternalScriptReview(viewer: Viewer, reviewId: string): Promise<InternalReviewDetail | null> {
+  const [r] = await db
+    .select({
+      id: scriptReviews.id,
+      title: scriptReviews.title,
+      status: scriptReviews.status,
+      clientId: scriptReviews.clientId,
+      currentVersion: scriptReviews.currentVersion,
+      approvedAt: scriptReviews.approvedAt,
+      approvedByName: users.fullName,
+      approvedVersion: scriptReviews.approvedVersion,
+      clientName: clients.name,
+      clientSlug: clients.slug,
+      shootOn: productionDays.scheduledOn,
+      shootTime: productionDays.startTime,
+      shootLocation: productionDays.locationName,
+    })
+    .from(scriptReviews)
+    .innerJoin(clients, eq(clients.id, scriptReviews.clientId))
+    .innerJoin(productionDays, eq(productionDays.id, scriptReviews.productionDayId))
+    .leftJoin(users, eq(users.id, scriptReviews.approvedById))
+    .where(and(eq(scriptReviews.id, reviewId), isNull(scriptReviews.deletedAt)))
+    .limit(1);
+  if (!r) return null;
+  assertClientAccess(viewer, r.clientId);
+
+  const versions = await db
+    .select({ id: scriptReviewVersions.id, versionNumber: scriptReviewVersions.versionNumber, fileName: scriptReviewVersions.fileName, note: scriptReviewVersions.note, createdAt: scriptReviewVersions.createdAt })
+    .from(scriptReviewVersions)
+    .where(eq(scriptReviewVersions.reviewId, reviewId))
+    .orderBy(desc(scriptReviewVersions.versionNumber));
+
+  const threadRows = await db
+    .select()
+    .from(scriptReviewThreads)
+    .where(and(eq(scriptReviewThreads.reviewId, reviewId), isNull(scriptReviewThreads.deletedAt)))
+    .orderBy(asc(scriptReviewThreads.createdAt));
+  const commentRows = threadRows.length
+    ? await db
+        .select({ id: scriptReviewComments.id, threadId: scriptReviewComments.threadId, body: scriptReviewComments.body, authorName: scriptReviewComments.authorName, isInternal: scriptReviewComments.isInternal, createdAt: scriptReviewComments.createdAt })
+        .from(scriptReviewComments)
+        .where(inArray(scriptReviewComments.threadId, threadRows.map((t) => t.id)))
+        .orderBy(asc(scriptReviewComments.createdAt))
+    : [];
+
+  return {
+    id: r.id,
+    title: r.title,
+    status: r.status as ScriptReviewStatus,
+    clientId: r.clientId,
+    clientName: r.clientName,
+    clientSlug: r.clientSlug,
+    currentVersion: r.currentVersion,
+    currentVersionId: versions[0]?.id ?? null,
+    shootOn: r.shootOn ?? null,
+    shootTime: r.shootTime ?? null,
+    shootLocation: r.shootLocation ?? null,
+    approvedAt: r.approvedAt ? r.approvedAt.toISOString() : null,
+    approvedByName: r.approvedByName ?? null,
+    approvedVersion: r.approvedVersion ?? null,
+    versions: versions.map((v) => ({ id: v.id, versionNumber: v.versionNumber, fileName: v.fileName, note: v.note ?? null, createdAt: v.createdAt.toISOString() })),
+    threads: threadRows.map((t) => ({
+      id: t.id,
+      versionNumber: t.versionNumber,
+      pageNumber: t.pageNumber ?? null,
+      posX: t.posX != null ? Number(t.posX) : null,
+      posY: t.posY != null ? Number(t.posY) : null,
+      visibility: t.visibility,
+      isResolved: t.isResolved,
+      authorName: t.authorName ?? null,
+      createdAt: t.createdAt.toISOString(),
+      comments: commentRows.filter((c) => c.threadId === t.id).map((c) => ({ id: c.id, body: c.body, authorName: c.authorName ?? null, isInternal: c.isInternal, createdAt: c.createdAt.toISOString() })),
+    })),
+  };
+}
+
 /** Controleert of de medewerker bij deze review mag (klant-scope). */
 export async function assertReviewAccess(viewer: Viewer, reviewId: string): Promise<{ id: string; clientId: string; productionDayId: string; currentVersion: number } | null> {
   const [r] = await db

@@ -22,6 +22,7 @@ import { runEmergencyExport } from "@/server/jobs/emergency-export";
 import { runLeadMailSync } from "@/server/jobs/leads-mail-sync";
 import { runProfitabilitySignals } from "@/server/jobs/profitability-signals";
 import { runContentHealthSignals } from "@/server/jobs/content-health-signals";
+import { runScriptReviewReminders } from "@/server/jobs/script-review-reminders";
 import { runDriveSync } from "@/server/jobs/drive-sync";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, runMetricoolSync } from "@/server/jobs/metricool-sync";
@@ -100,6 +101,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "leads.sync_mailbox": runLeadMailSync,
   "profit.signals": runProfitabilitySignals,
   "content_health.signals": runContentHealthSignals,
+  "script_review.reminders": runScriptReviewReminders,
   "drive.sync_all": runDriveSync,
   "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,

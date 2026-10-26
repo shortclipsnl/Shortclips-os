@@ -56,7 +56,9 @@ export default async function ScriptcontrolePage() {
                   <td className="sc-td">
                     <Link href={`/clients/${r.clientSlug}`} className="font-medium hover:underline">{r.clientName}</Link>
                   </td>
-                  <td className="sc-td text-[var(--color-ink-muted)]">{r.title}</td>
+                  <td className="sc-td">
+                    <Link href={`/scriptcontrole/${r.id}`} className="font-medium text-[var(--color-brand-600)] hover:underline">{r.title}</Link>
+                  </td>
                   <td className="sc-td tabular-nums text-[var(--color-ink-muted)]">{fmtShoot(r.shootOn)}</td>
                   <td className="sc-td text-center tabular-nums">{r.currentVersion}</td>
                   <td className="sc-td text-center tabular-nums">
