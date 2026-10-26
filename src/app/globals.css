@@ -278,81 +278,76 @@ body {
  * Overschrijft de app-tokens binnen het portaal, zodat de gedeelde
  * componenten automatisch donker renderen, plus studio-utilities.
  * ------------------------------------------------------------------ */
+/* =========================================================================
+   Klantportaal — exact dezelfde huisstijl als het interne platform. Standaard
+   LICHT (crème canvas, navy tekst, merkblauw accent); de klant kan zelf naar
+   donker schakelen (data-portal-theme="dark"). De neutrale-, tekst- en
+   merk-tokens worden hier bewust NIET overschreven, zodat het portaal precies
+   dezelfde kleuren, surfaces en schaduwen erft als intern. Alleen de hulp-
+   tokens (--sc-*) en de portaalkaarten worden aan die huisstijl gekoppeld.
+   ========================================================================= */
 .portal-studio {
-  --color-canvas: #05061d;
-  --color-surface: #0e1033;
-  --color-surface-sunken: #14143f;
-  --color-surface-2: #14143f;
-  --color-ink: #f3f4fe;
-  --color-ink-muted: #a6a8c8;
-  --color-ink-faint: #70729a;
-  --color-line: rgba(255, 255, 255, 0.08);
-  --color-info-soft: rgba(25, 168, 255, 0.14);
-  --color-good-soft: rgba(47, 210, 122, 0.14);
-  --color-bad-soft: rgba(240, 68, 56, 0.16);
-  /* Portaal-tokens die met dag/nacht meeschakelen (zie licht-blok hieronder).
-     Componenten gebruiken deze i.p.v. vaste witte/donkere waarden. */
-  --sc-accent: #4bc4ff;
-  --sc-line: rgba(255, 255, 255, 0.10);
-  --sc-fill: rgba(255, 255, 255, 0.05);
-  --sc-fill-strong: rgba(255, 255, 255, 0.10);
-  --sc-inset: rgba(10, 12, 38, 0.6);
-  --sc-header-bg: rgba(5, 6, 29, 0.65);
-  color-scheme: dark;
-  min-height: 100vh;
-  background:
-    radial-gradient(1100px 520px at 78% -8%, rgba(25, 168, 250, 0.16), transparent 60%),
-    radial-gradient(900px 460px at 0% 0%, rgba(75, 60, 220, 0.14), transparent 55%),
-    #05061d;
-}
-.portal-studio .sc-glass {
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  backdrop-filter: blur(8px);
-}
-.portal-studio .sc-glow {
-  box-shadow: 0 10px 26px -10px rgba(25, 168, 250, 0.7);
-}
-
-/* ---- Portaal dagmodus: zelfde huisstijl, lichte weergave ---- */
-:root[data-portal-theme="light"] .portal-studio {
-  --color-canvas: #f3f4f8;
-  --color-surface: #ffffff;
-  --color-surface-sunken: #eef0f6;
-  --color-surface-2: #eef0f6;
-  --color-ink: #00003b;
-  --color-ink-muted: #51566b;
-  --color-ink-faint: #868aa0;
-  --color-line: rgba(0, 0, 60, 0.10);
-  --color-info-soft: rgba(46, 144, 250, 0.12);
-  --sc-accent: #2e90fa;
-  --sc-line: rgba(0, 0, 60, 0.10);
-  --sc-fill: rgba(0, 0, 60, 0.035);
-  --sc-fill-strong: rgba(0, 0, 60, 0.07);
-  --sc-inset: rgba(0, 0, 60, 0.035);
-  --sc-header-bg: rgba(255, 255, 255, 0.85);
   color-scheme: light;
-  background:
-    radial-gradient(1100px 520px at 78% -8%, rgba(46, 144, 250, 0.08), transparent 60%),
-    radial-gradient(900px 460px at 0% 0%, rgba(75, 60, 220, 0.06), transparent 55%),
-    #f3f4f8;
+  min-height: 100vh;
+  background: var(--color-canvas);
+  /* Hulp-tokens voor de portaalcomponenten, gekoppeld aan de huisstijl-tokens
+     (niet langer losse witte/donkere waarden). */
+  --sc-accent: var(--color-brand-600);
+  --sc-line: var(--color-line);
+  --sc-fill: var(--color-surface-sunken);
+  --sc-fill-strong: var(--color-surface-2);
+  --sc-inset: var(--color-surface-sunken);
+  --sc-header-bg: color-mix(in srgb, var(--color-surface) 88%, transparent);
 }
-:root[data-portal-theme="light"] .portal-studio .sc-glass {
-  background: #ffffff;
-  border: 1px solid var(--sc-line);
-  box-shadow: 0 1px 2px rgba(0, 0, 60, 0.04), 0 2px 10px rgba(0, 0, 60, 0.04);
+/* Portaalkaarten = interne kaarten: surface + lijn + subtiele schaduw. */
+.portal-studio .sc-glass {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   backdrop-filter: none;
 }
-:root[data-portal-theme="light"] .portal-studio .sc-glow {
-  box-shadow: 0 10px 26px -12px rgba(46, 144, 250, 0.45);
+.portal-studio .sc-glow {
+  box-shadow: var(--shadow-raised);
 }
 
-/* Portaal-logo wisselt mee met de dag/nacht-keuze (wit op donker, navy op licht). */
-.portal-studio .pl-light { display: none; }
-.portal-studio .pl-dark { display: block; }
-:root[data-portal-theme="light"] .portal-studio .pl-light { display: block; }
-:root[data-portal-theme="light"] .portal-studio .pl-dark { display: none; }
+/* ---- Donkere weergave: exact dezelfde tokens als de interne donkere modus ---- */
+:root[data-portal-theme="dark"] .portal-studio {
+  color-scheme: dark;
+  --color-canvas: #0a0b16;
+  --color-surface: #15162a;
+  --color-surface-sunken: #101121;
+  --color-surface-2: #20223c;
+  --color-neutral-soft: #181a2e;
+  --color-line: #292b45;
+  --color-line-strong: #3b3d5c;
+  --color-ink: #ecebf6;
+  --color-ink-muted: #a8aac6;
+  --color-ink-faint: #82849f;
+  --color-indigo-ink: #262a55;
+  --color-indigo-deep: #1a1d40;
+  --color-indigo-soft: #333873;
+  --color-indigo-mist: #3d4380;
+  --color-brand-50: #0f2a44;
+  --color-brand-100: #123553;
+  --color-good-soft: #102c21;
+  --color-lime-soft: #202808;
+  --color-warn-soft: #30240a;
+  --color-bad-soft: #311713;
+  --color-info-soft: #0c2b45;
+  --color-violet-soft: #211a3a;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.45);
+  --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-pop: 0 8px 16px rgba(0, 0, 0, 0.5), 0 24px 48px rgba(0, 0, 0, 0.65);
+  /* Accent iets lichter op donker, zodat het leesbaar blijft. */
+  --sc-accent: var(--color-brand-400);
+}
+
+/* Portaal-logo: navy woordmerk op licht (standaard), wit op donker. */
+.portal-studio .pl-dark { display: none; }
+.portal-studio .pl-light { display: block; }
+:root[data-portal-theme="dark"] .portal-studio .pl-light { display: none; }
+:root[data-portal-theme="dark"] .portal-studio .pl-dark { display: block; }
 /* Verticale 9:16 shorts-cover */
 .sc-short {
   position: relative;

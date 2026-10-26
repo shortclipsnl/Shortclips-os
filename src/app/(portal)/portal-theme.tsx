@@ -6,18 +6,18 @@ import { Moon, Sun } from "lucide-react";
 type Theme = "light" | "dark";
 
 /**
- * Dag/nacht-schakelaar voor het klantportaal. Eigen voorkeur (standaard donker,
- * de ShortClips-huisstijl), los van de interne app. De keuze staat in
- * localStorage en op <html data-portal-theme>; een klein script in de layout zet
- * het juiste thema al vóór het renderen, zodat er geen flits is.
+ * Dag/nacht-schakelaar voor het klantportaal. Standaard LICHT (exact dezelfde
+ * huisstijl als het interne platform); de klant kan zelf naar donker schakelen.
+ * De keuze staat in localStorage en op <html data-portal-theme>; een klein
+ * script in de layout zet het juiste thema al vóór het renderen (geen flits).
  */
 export function PortalThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const attr = document.documentElement.getAttribute("data-portal-theme");
-    setTheme(attr === "light" ? "light" : "dark");
+    setTheme(attr === "dark" ? "dark" : "light");
     setMounted(true);
   }, []);
 
@@ -46,5 +46,6 @@ export function PortalThemeToggle() {
   );
 }
 
-/** Inline script dat het bewaarde portaalthema vóór het renderen toepast. */
-export const PORTAL_THEME_INIT = `(function(){try{var t=localStorage.getItem('sc-portal-theme');document.documentElement.setAttribute('data-portal-theme',t==='light'?'light':'dark');}catch(e){document.documentElement.setAttribute('data-portal-theme','dark');}})();`;
+/** Inline script dat het bewaarde portaalthema vóór het renderen toepast.
+ *  Standaard licht; alleen 'dark' als de klant dat zelf koos. */
+export const PORTAL_THEME_INIT = `(function(){try{var t=localStorage.getItem('sc-portal-theme');document.documentElement.setAttribute('data-portal-theme',t==='dark'?'dark':'light');}catch(e){document.documentElement.setAttribute('data-portal-theme','light');}})();`;
