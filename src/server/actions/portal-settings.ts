@@ -23,11 +23,19 @@ export async function updatePortalSettings(input: PortalSettings): Promise<Actio
       extraFeedbackFee: str(input.extraFeedbackFee, 200),
       travelCost: str(input.travelCost, 120),
       responseTime: str(input.responseTime, 200),
+      contractTerm: str(input.contractTerm, 300),
+      billingNote: str(input.billingNote, 300),
+      shootDuration: str(input.shootDuration, 300),
+      reviewDays: clampDay(input.reviewDays),
+      reviewAutoApproveDays: clampDay(input.reviewAutoApproveDays),
+      extraContentNote: str(input.extraContentNote, 500),
+      rawFootageFee: str(input.rawFootageFee, 200),
     };
     await savePortalSettings(clean, viewer.id);
     revalidatePath("/settings/portaal");
     revalidatePath("/portal/samenwerking");
     revalidatePath("/portal/scripts");
+    revalidatePath("/portal/planning");
     return { ok: true };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };

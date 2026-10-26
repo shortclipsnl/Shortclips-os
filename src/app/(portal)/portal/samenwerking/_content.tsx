@@ -1,4 +1,4 @@
-import { Check, Clock, Globe, Mail, MapPin, MessageCircle, MessageSquareText, Phone, ShieldCheck, Users, Video } from "lucide-react";
+import { Check, Clock, Mail, MessageCircle, MessageSquareText, Phone, ShieldCheck, Users, Video } from "lucide-react";
 import type { PortalContactPerson } from "@/server/portal";
 import { Avatar, buttonClass, Card } from "@/components/ui";
 
@@ -36,91 +36,90 @@ const NEED_FROM_YOU = [
   "Beschikbaarheid van de presentator op de opnamedag",
 ];
 
-export function WerkwijzeContent() {
+/** De opnamedag-tijdlijn (document "Zo ziet de dag eruit"). Gedeeld door
+ *  Samenwerking (werkwijze) en Planning (voorbereiding per opname). */
+export function OpnamedagContent() {
   return (
-    <div className="flex flex-col gap-7">
-      <section className="sc-glass p-6 sm:p-7">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">De opnamedag</span>
-        <h2 className="mt-1 text-[22px] font-bold tracking-tight">Zo ziet de dag eruit</h2>
-        <p className="mt-2 max-w-2xl text-[13.5px] text-[var(--color-ink-muted)]">
-          Een gemiddelde opnamedag levert circa acht video&apos;s op en is rond 15:00 uur klaar. Bij meer video&apos;s of complexere opnames kan dat schuiven.
-        </p>
-        <ol className="mt-6 flex flex-col gap-0">
-          {SHOOT_STEPS.map((step, i) => (
-            <li key={step.title} className="relative flex gap-4 pb-6 last:pb-0">
-              {i < SHOOT_STEPS.length - 1 ? (
-                <span className="absolute left-[15px] top-8 h-full w-px bg-[var(--sc-fill-strong)]" aria-hidden />
-              ) : null}
-              <span className="z-10 grid size-8 shrink-0 place-items-center rounded-full border border-[#2e90fa]/40 bg-[rgba(25,168,255,0.12)] text-[12px] font-bold text-[var(--sc-accent)]">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <div className="pt-0.5">
-                <div className="text-[12px] font-semibold uppercase tracking-wide text-[var(--sc-accent)]">{step.time}</div>
-                <div className="mt-0.5 text-[15px] font-semibold">{step.title}</div>
-                <p className="mt-0.5 text-[13.5px] text-[var(--color-ink-muted)]">{step.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-        <div className="mt-6 grid gap-3.5 sm:grid-cols-2">
-          <div className="rounded-[14px] border border-[#2fd27a]/30 bg-[rgba(47,210,122,0.06)] p-4">
-            <div className="flex items-center gap-2 text-[14px] font-semibold"><Clock className="size-4 text-[#2fd27a]" /> Jullie tijdsbesteding</div>
-            <p className="mt-1.5 text-[13px] text-[var(--color-ink-muted)]">Alleen de presentator is de hele dag nodig. Collega&apos;s die kort in beeld komen plannen we op een vast moment in.</p>
-          </div>
-          <div className="rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4">
-            <div className="flex items-center gap-2 text-[14px] font-semibold"><ShieldCheck className="size-4 text-[var(--sc-accent)]" /> Regie</div>
-            <p className="mt-1.5 text-[13px] text-[var(--color-ink-muted)]">Wij bepalen volgorde, kadrering, tempo en herhalingen. Er is vooraf geen voorbereiding nodig.</p>
-          </div>
+    <section className="sc-glass p-6 sm:p-7">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">De opnamedag</span>
+      <h2 className="mt-1 text-[22px] font-bold tracking-tight">Zo ziet de dag eruit</h2>
+      <p className="mt-2 max-w-2xl text-[13.5px] text-[var(--color-ink-muted)]">
+        Een gemiddelde opnamedag levert circa acht video&apos;s op en is rond 15:00 uur klaar. Bij meer video&apos;s of complexere opnames kan dat schuiven. De daadwerkelijke tijden en duur kunnen per opname verschillen.
+      </p>
+      <ol className="mt-6 flex flex-col gap-0">
+        {SHOOT_STEPS.map((step, i) => (
+          <li key={step.title} className="relative flex gap-4 pb-6 last:pb-0">
+            {i < SHOOT_STEPS.length - 1 ? (
+              <span className="absolute left-[15px] top-8 h-full w-px bg-[var(--sc-fill-strong)]" aria-hidden />
+            ) : null}
+            <span className="z-10 grid size-8 shrink-0 place-items-center rounded-full border border-[#2e90fa]/40 bg-[rgba(25,168,255,0.12)] text-[12px] font-bold text-[var(--sc-accent)]">
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <div className="pt-0.5">
+              <div className="text-[12px] font-semibold uppercase tracking-wide text-[var(--sc-accent)]">{step.time}</div>
+              <div className="mt-0.5 text-[15px] font-semibold">{step.title}</div>
+              <p className="mt-0.5 text-[13.5px] text-[var(--color-ink-muted)]">{step.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-6 grid gap-3.5 sm:grid-cols-2">
+        <div className="rounded-[14px] border border-[#2fd27a]/30 bg-[rgba(47,210,122,0.06)] p-4">
+          <div className="flex items-center gap-2 text-[14px] font-semibold"><Clock className="size-4 text-[#2fd27a]" /> Jullie tijdsbesteding</div>
+          <p className="mt-1.5 text-[13px] text-[var(--color-ink-muted)]">Alleen de presentator is de hele dag nodig. Collega&apos;s die kort in beeld komen plannen we op een vast moment in.</p>
         </div>
-      </section>
-
-      <section className="sc-glass p-6 sm:p-7">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Rolverdeling</span>
-        <h2 className="mt-1 text-[22px] font-bold tracking-tight">Wie doet wat</h2>
-        <p className="mt-2 max-w-2xl text-[13.5px] text-[var(--color-ink-muted)]">Een duidelijke taakverdeling zodat jullie je op de inhoud kunnen richten en wij op de productie.</p>
-        <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[560px] border-collapse text-left">
-            <thead>
-              <tr className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-                <th className="pb-3 pr-4 font-semibold">Onderdeel</th>
-                <th className="pb-3 pr-4 font-semibold">Shortclips</th>
-                <th className="pb-3 font-semibold">Jullie</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10">
-              {ROLES.map((r) => (
-                <tr key={r.part} className="align-top">
-                  <td className="py-3 pr-4 text-[13.5px] font-semibold">{r.part}</td>
-                  <td className="py-3 pr-4 text-[13.5px] text-[#9fdcff]">{r.sc}</td>
-                  <td className="py-3 text-[13.5px] text-[var(--color-ink-muted)]">{r.you}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4">
+          <div className="flex items-center gap-2 text-[14px] font-semibold"><ShieldCheck className="size-4 text-[var(--sc-accent)]" /> Regie</div>
+          <p className="mt-1.5 text-[13px] text-[var(--color-ink-muted)]">Wij bepalen volgorde, kadrering, tempo en herhalingen. Er is vooraf geen voorbereiding nodig.</p>
         </div>
-        <div className="mt-6 grid gap-3.5 sm:grid-cols-2">
-          <div className="rounded-[14px] border border-[#2fd27a]/30 bg-[rgba(47,210,122,0.06)] p-5">
-            <div className="flex items-center gap-2 text-[14px] font-semibold"><Users className="size-4 text-[#2fd27a]" /> Wat wij van jullie nodig hebben</div>
-            <ul className="mt-3 flex flex-col gap-2">
-              {NEED_FROM_YOU.map((n) => (
-                <li key={n} className="flex gap-2 text-[13px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> {n}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-5">
-            <div className="text-[14px] font-semibold">Wat je volledig kunt loslaten</div>
-            <p className="mt-2 text-[13px] text-[var(--color-ink-muted)]">Formats, openingen, opbouw, toon, volgorde, beeldkeuze, montage, ondertiteling, muziek, captions, hashtags, plaatsingsmomenten en optimalisatie. Wij maken die keuzes en bewaken de kwaliteit.</p>
-          </div>
-        </div>
-      </section>
-
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[16px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-5 py-4 text-[12.5px] text-[var(--color-ink-muted)]">
-        <span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5 text-[var(--sc-accent)]" /> Edisonstraat 1B, 8606 JH Sneek</span>
-        <span className="inline-flex items-center gap-1.5"><Phone className="size-3.5 text-[var(--sc-accent)]" /> 06-25083371</span>
-        <span className="inline-flex items-center gap-1.5"><Mail className="size-3.5 text-[var(--sc-accent)]" /> info@shortclips.nl</span>
-        <span className="inline-flex items-center gap-1.5"><Globe className="size-3.5 text-[var(--sc-accent)]" /> shortclips.nl</span>
       </div>
-    </div>
+    </section>
+  );
+}
+
+/** Rolverdeling + verantwoordelijkheden (document "Wie doet wat").
+ *  Sectie "Wie doet wat" en "Wat regelen wij / wat verwachten wij". */
+export function RolverdelingContent() {
+  return (
+    <section className="sc-glass p-6 sm:p-7">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Rolverdeling</span>
+      <h2 className="mt-1 text-[22px] font-bold tracking-tight">Wie doet wat</h2>
+      <p className="mt-2 max-w-2xl text-[13.5px] text-[var(--color-ink-muted)]">Een duidelijke taakverdeling zodat jullie je op de inhoud kunnen richten en wij op de productie.</p>
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full min-w-[560px] border-collapse text-left">
+          <thead>
+            <tr className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
+              <th className="pb-3 pr-4 font-semibold">Onderdeel</th>
+              <th className="pb-3 pr-4 font-semibold">Shortclips</th>
+              <th className="pb-3 font-semibold">Jullie</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--sc-line)]">
+            {ROLES.map((r) => (
+              <tr key={r.part} className="align-top">
+                <td className="py-3 pr-4 text-[13.5px] font-semibold">{r.part}</td>
+                <td className="py-3 pr-4 text-[13.5px] text-[#4aa8ff]">{r.sc}</td>
+                <td className="py-3 text-[13.5px] text-[var(--color-ink-muted)]">{r.you}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-6 grid gap-3.5 sm:grid-cols-2">
+        <div className="rounded-[14px] border border-[#2fd27a]/30 bg-[rgba(47,210,122,0.06)] p-5">
+          <div className="flex items-center gap-2 text-[14px] font-semibold"><Users className="size-4 text-[#2fd27a]" /> Wat wij van jullie nodig hebben</div>
+          <ul className="mt-3 flex flex-col gap-2">
+            {NEED_FROM_YOU.map((n) => (
+              <li key={n} className="flex gap-2 text-[13px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> {n}</li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-5">
+          <div className="text-[14px] font-semibold">Wat je volledig kunt loslaten</div>
+          <p className="mt-2 text-[13px] text-[var(--color-ink-muted)]">Formats, openingen, opbouw, toon, volgorde, beeldkeuze, montage, ondertiteling, muziek, captions, hashtags, plaatsingsmomenten en optimalisatie. Wij maken die keuzes en bewaken de kwaliteit.</p>
+        </div>
+      </div>
+    </section>
   );
 }
 

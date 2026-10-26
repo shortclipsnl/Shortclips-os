@@ -1,31 +1,19 @@
 import type { Metadata } from "next";
-import { Building2, CalendarClock, Clock, Film, Globe, Mail, Phone, UserRound, Users } from "lucide-react";
+import { Building2, CalendarClock, ClipboardList, Clock, Film, Globe, Mail, Phone, Scale, UserRound, Users } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalProfile } from "@/server/portal";
-import { getPortalSettings, type PortalSettings } from "@/server/portal-settings";
+import { getPortalSettings } from "@/server/portal-settings";
+import { buildAfsprakenGroepen } from "@/lib/portal-afspraken";
 import { Avatar, buttonClass } from "@/components/ui";
 import { formatDate, formatDateFull } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
-import { TeamContent, WerkwijzeContent } from "./_content";
+import { OpnamedagContent, RolverdelingContent, TeamContent } from "./_content";
 
 export const metadata: Metadata = { title: "Samenwerking" };
 export const dynamic = "force-dynamic";
 
 /** De diensten die standaard in elk Shortclips-pakket zitten. */
 const INBEGREPEN = ["Contentstrategie & scripts", "Opnamedag & regie", "Montage, ondertiteling & audio", "Captions & hashtags", "Planning & publicatie", "Analyse & rapportage"];
-
-/** Afspraken — settable termijnen/bedragen uit de instellingen (intern aanpasbaar). */
-function buildAfspraken(s: PortalSettings): Array<{ k: string; v: string }> {
-  return [
-    { k: "Looptijd", v: "Minimaal 3 maanden, daarna maandelijks opzegbaar met één kalendermaand." },
-    { k: "Feedbacktermijn", v: `${s.feedbackDaysScripts} werkdagen voor scripts en ${s.feedbackDaysVideos} werkdagen voor video's. ${s.responseTime}.` },
-    { k: "Feedbackrondes", v: `Eén gebundelde ronde per video. Een extra ronde: ${s.extraFeedbackFee}.` },
-    { k: "Scripts", v: "Vooraf afgestemd en vóór de opnamedag definitief akkoord. Grote inhoudelijke wijzigingen na akkoord zijn niet inbegrepen." },
-    { k: "Opnieuw opnemen", v: `Bij wijzigingen aan een goedgekeurd script: ${s.reshootFee}.` },
-    { k: "Annulering", v: `Kosteloos tot ${s.cancelNoticeDays} werkdagen voor de opnamedag. Daarna ${s.cancelFee}. ${s.cancelLateNote}` },
-    { k: "Reiskosten", v: s.travelCost + "." },
-  ];
-}
 
 function StatBlock({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
@@ -57,7 +45,7 @@ export default async function PortalSamenwerkingPage() {
   const duurTekst = profile.monthsTogether != null
     ? `${profile.monthsTogether} ${profile.monthsTogether === 1 ? "maand" : "maanden"}${profile.daysTogether != null ? ` · ${profile.daysTogether} dagen` : ""}`
     : null;
-  const afspraken = buildAfspraken(settings);
+  const afsprakenGroepen = buildAfsprakenGroepen(settings);
   const coord = contact.coordinator;
   const startIso = profile.contract?.startsOn ?? profile.startedOn ?? null;
   // Alleen een einddatum tonen als die er echt is én ná de start valt (geen rollend contract).
@@ -98,15 +86,17 @@ export default async function PortalSamenwerkingPage() {
         <TeamContent coordinator={contact.coordinator} videographer={contact.videographer} />
       </section>
 
-      {/* 4 — Contentpakket & afspraken */}
-      <div className="grid gap-[18px] lg:grid-cols-2">
-        <section className="sc-glass p-6">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Jouw contentpakket</span>
-          <div className="mt-3">
+      {/* A — Jouw contentpakket */}
+      <section className="sc-glass p-6">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Jouw contentpakket</span>
+        <div className="mt-3 grid gap-x-10 sm:grid-cols-2">
+          <div>
             {profile.packageName ? <Row k="Pakket" v={profile.packageName} /> : null}
             <Row k="Shorts per maand" v={profile.monthlyQuota > 0 ? `${profile.monthlyQuota}` : "In overleg"} />
             {profile.shootDaysPerMonth > 0 ? <Row k="Opnamedagen per maand" v={`${profile.shootDaysPerMonth}`} /> : null}
             <Row k="Opnames gepland" v={profile.upcomingShoots > 0 ? `${profile.upcomingShoots}` : "Nog niet ingepland"} />
+          </div>
+          <div>
             {platformLabels.length > 0 ? (
               <Row k="Platformen" v={<span className="inline-flex flex-wrap justify-end gap-1.5">{platformLabels.map((p) => <span key={p} className="rounded-full bg-[var(--sc-fill-strong)] px-2 py-0.5 text-[12px]">{p}</span>)}</span>} />
             ) : null}
@@ -114,26 +104,42 @@ export default async function PortalSamenwerkingPage() {
             <Row k="Startdatum" v={startIso ? formatDateFull(startIso) : "—"} />
             {endIso ? <Row k="Einddatum" v={formatDateFull(endIso)} /> : <Row k="Looptijd" v="Doorlopend, maandelijks opzegbaar" />}
           </div>
-          <div className="mt-4 border-t border-[var(--sc-line)] pt-4">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Inbegrepen</span>
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {INBEGREPEN.map((d) => <span key={d} className="rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] px-2.5 py-1 text-[12px] text-[var(--color-ink-muted)]">{d}</span>)}
-            </div>
+        </div>
+        <div className="mt-4 border-t border-[var(--sc-line)] pt-4">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Inbegrepen</span>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {INBEGREPEN.map((d) => <span key={d} className="rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] px-2.5 py-1 text-[12px] text-[var(--color-ink-muted)]">{d}</span>)}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="sc-glass p-6">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">De afspraken</span>
-          <dl className="mt-3 grid gap-2">
-            {afspraken.map((a) => (
-              <div key={a.k} className="grid gap-0.5 rounded-[12px] border border-[#2e90fa]/15 bg-[rgba(46,144,250,0.04)] p-3">
-                <dt className="flex items-center gap-2 text-[13.5px] font-semibold text-[#5bc0ff]"><span className="size-1.5 shrink-0 rounded-full bg-[#2e90fa]" /> {a.k}</dt>
-                <dd className="pl-3.5 text-[13px] text-[var(--color-ink-muted)]">{a.v}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      </div>
+      {/* B — Wie doet wat (rolverdeling + verantwoordelijkheden) */}
+      <RolverdelingContent />
+
+      {/* C — Belangrijke afspraken (uitklapbaar per categorie, centrale bron) */}
+      <section>
+        <h2 className="mb-1 flex items-center gap-2 text-base font-semibold"><Scale className="size-4 text-[var(--sc-accent)]" /> Belangrijke afspraken</h2>
+        <p className="mb-3 text-[13px] text-[var(--color-ink-muted)]">De voorwaarden die bij jullie samenwerking horen. Afwijkende afspraken uit jullie offerte of overeenkomst gaan altijd voor.</p>
+        <div className="flex flex-col gap-2.5">
+          {afsprakenGroepen.map((g) => (
+            <details key={g.title} className="sc-glass p-4 [&_summary]:cursor-pointer" open>
+              <summary className="flex items-center justify-between gap-2 text-[14px] font-semibold">
+                {g.title}
+                <span className="text-[12px] font-normal text-[var(--color-ink-faint)]">{g.items.length}</span>
+              </summary>
+              <dl className="mt-3 grid gap-2">
+                {g.items.map((a) => (
+                  <div key={a.k} className="grid gap-0.5 rounded-[12px] border border-[#2e90fa]/15 bg-[rgba(46,144,250,0.05)] p-3">
+                    <dt className="flex items-center gap-2 text-[13.5px] font-semibold text-[var(--sc-accent)]"><span className="size-1.5 shrink-0 rounded-full bg-[#2e90fa]" /> {a.k}</dt>
+                    <dd className="pl-3.5 text-[13px] text-[var(--color-ink-muted)]">{a.v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
+          ))}
+        </div>
+        <p className="mt-3 text-[12px] text-[var(--color-ink-faint)]">Wijzigingen op deze afspraken leggen we schriftelijk vast bij de offerte.</p>
+      </section>
 
       {/* 5 — Bedrijfsgegevens + contact */}
       <div className="grid gap-[18px] lg:grid-cols-2">
@@ -183,10 +189,10 @@ export default async function PortalSamenwerkingPage() {
         ) : null}
       </div>
 
-      {/* Werkwijze — secundair, onderaan (opnamedag + rolverdeling) */}
+      {/* Opnamedag — secundair, onderaan (staat ook bij Planning) */}
       <details className="sc-glass p-5 [&_summary]:cursor-pointer">
-        <summary className="text-base font-semibold">Hoe een opnamedag verloopt &amp; wie wat doet</summary>
-        <div className="mt-4"><WerkwijzeContent /></div>
+        <summary className="flex items-center gap-2 text-base font-semibold"><ClipboardList className="size-4 text-[var(--sc-accent)]" /> Hoe een opnamedag verloopt</summary>
+        <div className="mt-4"><OpnamedagContent /></div>
       </details>
     </div>
   );

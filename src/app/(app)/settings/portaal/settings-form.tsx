@@ -46,6 +46,11 @@ export function PortalSettingsForm({ initial }: { initial: PortalSettings }) {
         <Num label="Feedbacktermijn video's (werkdagen)" k="feedbackDaysVideos" />
         <Num label="Annulering: kosteloos tot (werkdagen)" k="cancelNoticeDays" />
       </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Num label="Beoordelingstermijn (werkdagen)" k="reviewDays" />
+        <Num label="Akkoord-bij-geen-reactie (werkdagen)" k="reviewAutoApproveDays" />
+        <Txt label="Raw footage op verzoek" k="rawFootageFee" />
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Txt label="Annuleringskosten binnen termijn" k="cancelFee" />
         <Txt label="Reiskosten" k="travelCost" />
@@ -56,6 +61,24 @@ export function PortalSettingsForm({ initial }: { initial: PortalSettings }) {
       <label className="block">
         <span className="sc-label">Toelichting late annulering</span>
         <textarea rows={2} className="sc-input resize-y" value={s.cancelLateNote} onChange={(e) => set("cancelLateNote", e.target.value)} />
+      </label>
+      <label className="block">
+        <span className="sc-label">Looptijd</span>
+        <textarea rows={2} className="sc-input resize-y" value={s.contractTerm} onChange={(e) => set("contractTerm", e.target.value)} />
+      </label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block">
+          <span className="sc-label">Facturatie</span>
+          <textarea rows={2} className="sc-input resize-y" value={s.billingNote} onChange={(e) => set("billingNote", e.target.value)} />
+        </label>
+        <label className="block">
+          <span className="sc-label">Duur opnamedag</span>
+          <textarea rows={2} className="sc-input resize-y" value={s.shootDuration} onChange={(e) => set("shootDuration", e.target.value)} />
+        </label>
+      </div>
+      <label className="block">
+        <span className="sc-label">Extra content op locatie</span>
+        <textarea rows={2} className="sc-input resize-y" value={s.extraContentNote} onChange={(e) => set("extraContentNote", e.target.value)} />
       </label>
       <div className="flex items-center gap-3">
         <Button onClick={save} disabled={pending}>
