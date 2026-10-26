@@ -3,8 +3,10 @@ import { ArrowUpRight, Check, Sparkles, Target, ThumbsUp, TrendingUp, Wand2 } fr
 import { requirePortal } from "@/server/auth/context";
 import { getPortalResults } from "@/server/portal";
 import { getApprovedImprovementForClient, type ImprovementContent } from "@/server/improvements";
+import { getClientVideoUpdate } from "@/server/video-updates";
 import { parsePortalPeriod, portalPeriodQuery } from "@/lib/portal-periods";
 import { PortalResultsView } from "./results-view";
+import { MonthlyVideoCard } from "./monthly-video";
 
 export const metadata: Metadata = { title: "Resultaten" };
 export const dynamic = "force-dynamic";
@@ -25,9 +27,10 @@ export default async function PortalResultatenPage({
 }) {
   const viewer = await requirePortal();
   const period = parsePortalPeriod(await searchParams);
-  const [r, improvement] = await Promise.all([
+  const [r, improvement, videoUpdate] = await Promise.all([
     getPortalResults(viewer, { days: period.days, from: period.from, to: period.to, periodKey: period.key }),
     getApprovedImprovementForClient(viewer),
+    viewer.clientId ? getClientVideoUpdate(viewer.clientId) : Promise.resolve(null),
   ]);
 
   const visible = improvement ? SECTIONS.filter((s) => improvement.content[s.k].length > 0) : [];
@@ -35,6 +38,8 @@ export default async function PortalResultatenPage({
   return (
     <div className="flex flex-col gap-7">
       <PortalResultsView r={r} basePath="/portal/resultaten" reportHref={`/resultatenrapport?${portalPeriodQuery(period)}`} />
+
+      {videoUpdate ? <MonthlyVideoCard update={videoUpdate} /> : null}
 
       {visible.length > 0 ? (
         <section className="sc-glass p-6 sm:p-7" style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.07), rgba(255,255,255,0.02))" }}>

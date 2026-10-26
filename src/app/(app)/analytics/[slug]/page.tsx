@@ -15,7 +15,9 @@ import { VideoThumb } from "../video-thumb";
 import { getLatestInsights, insightsAvailable } from "@/server/insights";
 import { InsightsPanel } from "./insights-ui";
 import { currentPeriod, EMPTY_IMPROVEMENT, getImprovementPlan } from "@/server/improvements";
+import { currentVideoPeriod, getClientVideoUpdate } from "@/server/video-updates";
 import { ImprovementEditor } from "./improvement-editor";
+import { VideoUpdateEditor } from "./video-update-editor";
 
 // Vaste platformvolgorde voor de filterknoppen.
 const PLATFORM_ORDER = ["instagram", "tiktok", "facebook", "youtube", "linkedin"] as const;
@@ -164,6 +166,10 @@ export default async function ClientResultsPage({
   const aiReady = insightsAvailable();
   const latestInsights = await getLatestInsights(cid);
   const improvement = await getImprovementPlan(client.id, currentPeriod());
+  const videoPeriod = currentVideoPeriod();
+  const videoUpdate = await getClientVideoUpdate(client.id, videoPeriod);
+  const videoMonths = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
+  const videoPeriodLabel = `${videoMonths[Number(videoPeriod.slice(5)) - 1]} ${videoPeriod.slice(0, 4)}`;
   const insightsGeneratedAt = latestInsights
     ? latestInsights.createdAt.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })
     : null;
@@ -295,6 +301,19 @@ export default async function ClientResultsPage({
                 initial={improvement?.content ?? EMPTY_IMPROVEMENT}
                 status={improvement?.status ?? null}
                 approvedByName={improvement?.approvedByName ?? null}
+              />
+            </div>
+          </Card>
+
+          {/* Persoonlijke maand-videoboodschap voor op de klant-resultatenpagina. */}
+          <Card padded={false} className="mt-5">
+            <CardHeader title="Videoboodschap voor de klant" subtitle="Een korte persoonlijke video met uitleg over de resultaten — direct zichtbaar op de resultatenpagina van de klant." className="p-5 pb-3" />
+            <div className="px-5 pb-5">
+              <VideoUpdateEditor
+                clientId={client.id}
+                period={videoPeriod}
+                periodLabel={videoPeriodLabel}
+                initial={videoUpdate ? { videoUrl: videoUpdate.videoUrl, note: videoUpdate.note } : null}
               />
             </div>
           </Card>

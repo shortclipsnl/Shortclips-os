@@ -50,6 +50,29 @@ export const clientImprovements = pgTable(
   (t) => [unique("client_improvements_period_unique").on(t.clientId, t.period)],
 );
 
+/**
+ * Persoonlijke maand-videoboodschap van de content creator aan de klant: een
+ * korte video (link) met toelichting over de resultaten en wat we verbeteren.
+ * Eén per klant per maand; getoond op de resultatenpagina van de klant.
+ */
+export const clientVideoUpdates = pgTable(
+  "client_video_updates",
+  {
+    id: pk(),
+    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    /** Periode (YYYY-MM) waar de videoboodschap bij hoort. */
+    period: varchar("period", { length: 7 }).notNull(),
+    /** Link naar de video (Loom/YouTube/Vimeo/…). */
+    videoUrl: text("video_url").notNull(),
+    /** Korte toelichting naast de video (optioneel). */
+    note: text("note"),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+    ...softDelete,
+  },
+  (t) => [unique("client_video_updates_period_unique").on(t.clientId, t.period)],
+);
+
 /* ------------------------------------------------------------------ *
  * Contentplanning
  * ------------------------------------------------------------------ */
