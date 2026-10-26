@@ -67,25 +67,31 @@ export function ScriptPdfReview({
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 z-20 mb-3 flex items-center justify-between gap-2 rounded-[12px] border border-white/10 bg-[rgba(10,12,38,0.9)] px-3 py-2 backdrop-blur">
+      {/* Duidelijke uitleg hoe je feedback geeft — op desktop én mobiel. */}
+      {canAnnotate ? (
+        <div className="mb-3 flex items-start gap-2.5 rounded-[12px] border border-[#2e90fa]/30 bg-[rgba(46,144,250,0.08)] p-3.5 text-[13.5px]">
+          <MessageSquarePlus className="mt-0.5 size-5 shrink-0 text-[var(--sc-accent)]" />
+          <span className="text-[var(--color-ink-muted)]">
+            <strong className="text-[var(--color-ink)]">Tik of klik op een plek in het script</strong> om daar een opmerking achter te laten.
+            Met de knoppen <strong className="text-[var(--color-ink)]">onder het script</strong> keur je het goed of geef je algemene feedback. Je feedback wordt automatisch bewaard.
+          </span>
+        </div>
+      ) : null}
+
+      <div className="sticky top-0 z-20 mb-3 flex items-center justify-between gap-2 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-header-bg)] px-3 py-2 backdrop-blur">
         <span className="text-[12px] text-[var(--color-ink-muted)]">
           {numPages > 0 ? `${numPages} pagina${numPages === 1 ? "" : "'s"}` : "PDF"}
-          {canAnnotate ? <span className="ml-2 hidden text-[var(--color-ink-faint)] sm:inline">· klik op de PDF om een opmerking te plaatsen</span> : null}
         </span>
         <div className="flex items-center gap-1">
           <button type="button" aria-label="Uitzoomen" onClick={() => setScale((s) => Math.max(0.6, Math.round((s - 0.15) * 100) / 100))}
-            className="grid size-8 place-items-center rounded-[8px] border border-white/10 hover:bg-white/10"><Minus className="size-4" /></button>
+            className="grid size-8 place-items-center rounded-[8px] border border-[var(--sc-line)] hover:bg-[var(--sc-fill-strong)]"><Minus className="size-4" /></button>
           <span className="w-12 text-center text-[12px] tabular-nums text-[var(--color-ink-muted)]">{Math.round(scale * 100)}%</span>
           <button type="button" aria-label="Inzoomen" onClick={() => setScale((s) => Math.min(2.4, Math.round((s + 0.15) * 100) / 100))}
-            className="grid size-8 place-items-center rounded-[8px] border border-white/10 hover:bg-white/10"><Plus className="size-4" /></button>
+            className="grid size-8 place-items-center rounded-[8px] border border-[var(--sc-line)] hover:bg-[var(--sc-fill-strong)]"><Plus className="size-4" /></button>
         </div>
       </div>
 
-      {canAnnotate ? (
-        <p className="mb-2 text-[12px] text-[#4bc4ff] sm:hidden">Tik op de PDF om een opmerking te plaatsen.</p>
-      ) : null}
-
-      <div className="max-h-[80vh] overflow-auto rounded-[14px] border border-white/10 bg-[rgba(4,6,20,0.6)] p-3">
+      <div className="max-h-[80vh] overflow-auto rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-3">
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-16 text-sm text-[var(--color-ink-muted)]"><Loader2 className="size-4 animate-spin" /> PDF laden…</div>
         ) : error ? (

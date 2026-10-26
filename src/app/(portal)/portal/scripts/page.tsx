@@ -27,40 +27,6 @@ function fmtShootLine(r: { shootOn: string | null; shootTime: string | null; sho
   return parts.join(" · ");
 }
 
-function ReviewCard({ r }: { r: PortalReviewListItem }) {
-  const actie = CLIENT_ACTION_STATUSES.includes(r.status);
-  return (
-    <Link
-      href={`/portal/scripts/${r.id}`}
-      className="sc-glass group flex flex-wrap items-center gap-4 p-5 transition-colors hover:border-[var(--sc-line)]"
-      style={actie ? { boxShadow: "inset 3px 0 0 #ffb020" } : undefined}
-    >
-      <span className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]">
-        <FileText className="size-5" strokeWidth={1.8} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="min-w-0 truncate text-[15px] font-semibold">{r.title}</h3>
-          <StatusBadge status={r.status} />
-        </div>
-        <p className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">
-          {fmtShootLine(r) || "Opnamedatum volgt"}
-          {r.currentVersion > 1 ? ` · versie ${r.currentVersion}` : ""}
-          {r.openComments > 0 ? ` · ${r.openComments} opmerking${r.openComments === 1 ? "" : "en"} geplaatst` : ""}
-        </p>
-        {actie && r.feedbackDeadline ? (
-          <p className="mt-1 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#ffb020]">
-            <Clock className="size-3.5" /> Wacht op jouw feedback · vóór {new Date(r.feedbackDeadline).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "long" })}
-          </p>
-        ) : null}
-      </div>
-      <span className={`${buttonClass({ variant: actie ? "accent" : "secondary", size: "sm" })} shrink-0`}>
-        Bekijk scripts <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-      </span>
-    </Link>
-  );
-}
-
 export default async function PortalScriptsPage() {
   const viewer = await requirePortal();
   const [reviews, data, settings] = await Promise.all([listPortalScriptReviews(viewer), getPortalData(viewer), getPortalSettingsForClient(viewer.clientId ?? "")]);
@@ -69,6 +35,22 @@ export default async function PortalScriptsPage() {
   const bijShortclips = reviews.filter((r) => r.status === "feedback_gegeven" || r.status === "wordt_aangepast");
   const goedgekeurd = reviews.filter((r) => r.status === "goedgekeurd");
   const reviewByDay = new Map(reviews.map((r) => [r.productionDayId, r]));
+
+  // Elke aankomende opname met het script dat erbij hoort, plus eventuele
+  // scripts die op je wachten waarvan de opname niet (meer) in de lijst staat.
+  const upcomingDayIds = new Set(data.upcomingShoots.map((s) => s.id));
+  const opnameRows = [
+    ...data.upcomingShoots.map((s) => ({
+      key: `shoot-${s.id}`,
+      date: s.scheduledOn,
+      time: s.startTime ?? null,
+      location: s.locationName ?? null,
+      review: reviewByDay.get(s.id) ?? null,
+    })),
+    ...reviews
+      .filter((r) => CLIENT_ACTION_STATUSES.includes(r.status) && r.shootOn && !upcomingDayIds.has(r.productionDayId))
+      .map((r) => ({ key: `rev-${r.id}`, date: r.shootOn!, time: r.shootTime, location: r.shootLocation, review: r })),
+  ].sort((a, b) => a.date.localeCompare(b.date));
 
   const shoot = data.upcomingShoot;
   const klaarCount = actieNodig.length;
@@ -128,50 +110,45 @@ export default async function PortalScriptsPage() {
       {/* Leeswijzer: hoe lees en controleer je de scripts (document "Zo lees je de scripts") */}
       <ScriptLeeswijzer feedbackDays={settings.feedbackDaysScripts} />
 
-      {/* Scripts die op je wachten */}
-      <section>
-        <h2 className="mb-3 text-base font-semibold">Scripts die op je wachten</h2>
-        {actieNodig.length === 0 ? (
-          <div className="sc-glass grid place-items-center gap-2 p-10 text-center">
-            <FileText className="size-7 text-[var(--color-ink-faint)]" strokeWidth={1.5} />
-            <p className="text-sm font-medium">Geen scripts die op je wachten</p>
-            <p className="max-w-md text-[13px] text-[var(--color-ink-muted)]">Zodra er scripts klaarstaan voor jouw controle, verschijnen ze hier. Je hoeft nu niets te doen.</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3.5">
-            {actieNodig.map((r) => <ReviewCard key={r.id} r={r} />)}
-          </div>
-        )}
-      </section>
-
-      {/* Aankomende opnames + scriptstatus */}
-      {data.upcomingShoots.length > 0 ? (
+      {/* Aankomende opnames — met het script dat erbij hoort ernaast, zodat
+          meteen duidelijk is welk script bij welke opname hoort. */}
+      {opnameRows.length > 0 ? (
         <section>
-          <h2 className="mb-3 text-base font-semibold">Aankomende opnames</h2>
-          <div className="sc-glass divide-y divide-white/10">
-            {data.upcomingShoots.map((s) => {
-              const rev = reviewByDay.get(s.id);
-              const inner = (
-                <div className="flex flex-wrap items-center gap-3 p-4">
-                  <span className="grid size-10 shrink-0 flex-col place-items-center rounded-[12px] border border-[var(--sc-line)] bg-gradient-to-br from-[rgba(25,168,255,0.22)] to-[rgba(27,95,224,0.22)] text-center">
-                    <span className="text-[15px] font-bold leading-none">{new Date(`${s.scheduledOn}T12:00:00`).getDate()}</span>
-                    <span className="text-[9px] uppercase text-[var(--color-ink-muted)]">{new Date(`${s.scheduledOn}T12:00:00`).toLocaleDateString("nl-NL", { month: "short" })}</span>
+          <h2 className="mb-1 text-base font-semibold">Aankomende opnames & scripts</h2>
+          <p className="mb-3 text-[13px] text-[var(--color-ink-muted)]">Per opname zie je het bijbehorende script en de status. Scripts die op jou wachten staan oranje gemarkeerd.</p>
+          <div className="flex flex-col gap-3">
+            {opnameRows.map((o) => {
+              const actie = o.review ? CLIENT_ACTION_STATUSES.includes(o.review.status) : false;
+              return (
+                <div key={o.key} className="sc-glass flex flex-wrap items-center gap-4 p-4" style={actie ? { boxShadow: "inset 3px 0 0 #ffb020" } : undefined}>
+                  <span className="grid size-11 shrink-0 flex-col place-items-center rounded-[12px] border border-[var(--sc-line)] bg-gradient-to-br from-[rgba(25,168,255,0.22)] to-[rgba(27,95,224,0.22)] text-center">
+                    <span className="text-[16px] font-bold leading-none">{new Date(`${o.date}T12:00:00`).getDate()}</span>
+                    <span className="text-[9px] uppercase text-[var(--color-ink-muted)]">{new Date(`${o.date}T12:00:00`).toLocaleDateString("nl-NL", { month: "short" })}</span>
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[14px] font-semibold">{formatDateFull(s.scheduledOn)}</div>
+                    <div className="text-[14.5px] font-semibold">{formatDateFull(o.date)}</div>
                     <div className="text-[12.5px] text-[var(--color-ink-muted)]">
-                      {relativeDays(s.scheduledOn)}
-                      {s.startTime ? ` · vanaf ${s.startTime.slice(0, 5)}` : ""}
-                      {s.locationName ? ` · ${s.locationName}` : ""}
+                      {relativeDays(o.date)}{o.time ? ` · vanaf ${o.time.slice(0, 5)}` : ""}{o.location ? ` · ${o.location}` : ""}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--sc-line)] pt-2">
+                      <FileText className="size-4 shrink-0 text-[var(--sc-accent)]" />
+                      {o.review ? (
+                        <>
+                          <span className="text-[13px] font-medium">{o.review.title}</span>
+                          <StatusBadge status={o.review.status} />
+                          {o.review.openComments > 0 ? <span className="text-[11.5px] text-[var(--color-ink-faint)]">{o.review.openComments} opmerking{o.review.openComments === 1 ? "" : "en"}</span> : null}
+                        </>
+                      ) : (
+                        <span className="text-[13px] text-[var(--color-ink-faint)]">Script wordt voorbereid — je krijgt bericht zodra het klaarstaat</span>
+                      )}
                     </div>
                   </div>
-                  {rev ? <StatusBadge status={rev.status} /> : <span className="text-[12px] text-[var(--color-ink-faint)]">Scripts volgen</span>}
+                  {o.review ? (
+                    <Link href={`/portal/scripts/${o.review.id}`} className={`${buttonClass({ variant: actie ? "accent" : "secondary", size: "sm" })} shrink-0`}>
+                      {actie ? "Bekijk & geef feedback" : "Bekijk script"} <ArrowRight className="size-4" />
+                    </Link>
+                  ) : null}
                 </div>
-              );
-              return rev ? (
-                <Link key={s.id} href={`/portal/scripts/${rev.id}`} className="block transition-colors hover:bg-[var(--sc-fill)]">{inner}</Link>
-              ) : (
-                <div key={s.id}>{inner}</div>
               );
             })}
           </div>
