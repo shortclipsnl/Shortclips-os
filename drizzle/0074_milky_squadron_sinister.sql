@@ -1,0 +1,1 @@
+ALTER TABLE "content_calendar" ADD COLUMN "online_notified_at" timestamp with time zone;

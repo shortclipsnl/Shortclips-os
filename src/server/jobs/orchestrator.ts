@@ -6,6 +6,7 @@ import { runAutoPublishDueContent } from "./content-publish";
 import { runTaskArchive } from "./task-archive";
 import { runCalendarSync } from "./calendar-sync";
 import { runMonthlyReportDrafts } from "./report-drafts";
+import { runContentOnlineNotifications } from "./content-online-notify";
 import { runMonthlyInsightTasks } from "./insight-tasks";
 import { runIntegrationHealthCheck } from "./integration-health";
 import { runDriveSync } from "./drive-sync";
@@ -75,6 +76,8 @@ export async function runNightlySync() {
   results.push(await step("content.auto_publish_due", () => runAutoPublishDueContent()));
   results.push(await step("tasks.archive_done", () => runTaskArchive()));
   results.push(await step("reports.generate_drafts", () => runMonthlyReportDrafts()));
+  // Klant de dag ná publicatie mailen dat zijn video online staat.
+  results.push(await step("content.online_notify", () => runContentOnlineNotifications()));
   // Maandelijkse AI-verbeterlus: inzichten → verbeterpunt-taken (idempotent, gated).
   results.push(await step("insights.monthly_tasks", () => runMonthlyInsightTasks()));
   results.push(await step("drive.sync_all", () => runDriveSync()));

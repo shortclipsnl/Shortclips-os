@@ -519,6 +519,13 @@
       "when": 1793099882971,
       "tag": "0073_tearful_mercury",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1793109383323,
+      "tag": "0074_milky_squadron_sinister",
+      "breakpoints": true
     }
   ]
 }

@@ -36,6 +36,7 @@ export async function shareContentPlanning(clientId: string): Promise<ActionResu
     }
     revalidatePath("/calendar");
     revalidatePath("/portal/planning");
+    revalidatePath("/portal/content");
     return { ok: true, shared: updated.length };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };

@@ -16,6 +16,7 @@ import {
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { runFrequentSync, runNightlySync } from "@/server/jobs/orchestrator";
 import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
+import { runContentOnlineNotifications } from "@/server/jobs/content-online-notify";
 import { runMonthlyInsightTasks } from "@/server/jobs/insight-tasks";
 import { runIntegrationHealthCheck } from "@/server/jobs/integration-health";
 import { runEmergencyExport } from "@/server/jobs/emergency-export";
@@ -95,6 +96,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "content.auto_publish_due": runAutoPublishDueContent,
   "tasks.archive_done": runTaskArchive,
   "reports.generate_drafts": runMonthlyReportDrafts,
+  "content.online_notify": runContentOnlineNotifications,
   "insights.monthly_tasks": runMonthlyInsightTasks,
   "integrations.health_check": runIntegrationHealthCheck,
   "emergency.export": runEmergencyExport,

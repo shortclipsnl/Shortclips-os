@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   BarChart3,
+  CalendarDays,
   CalendarRange,
   FileText,
   Handshake,
@@ -19,12 +20,13 @@ const ITEMS = [
   { href: "/portal/videos", label: "Video's", icon: Video },
   { href: "/portal/scripts", label: "Scripts", icon: FileText },
   { href: "/portal/planning", label: "Opnameplanning", icon: CalendarRange },
+  { href: "/portal/content", label: "Contentplanning", icon: CalendarDays },
   { href: "/portal/resultaten", label: "Resultaten", icon: BarChart3 },
   { href: "/portal/samenwerking", label: "Samenwerking", icon: Handshake },
 ];
 
 /** De vaste tabs onderin op mobiel; de rest (Scripts, Samenwerking) zit onder "Meer". */
-const PRIMARY = ["/portal", "/portal/videos", "/portal/planning", "/portal/resultaten"];
+const PRIMARY = ["/portal", "/portal/videos", "/portal/content", "/portal/resultaten"];
 
 function useIsActive() {
   const pathname = usePathname();

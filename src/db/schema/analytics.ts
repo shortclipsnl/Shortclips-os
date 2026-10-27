@@ -108,6 +108,9 @@ export const contentCalendar = pgTable(
     clientApproved: boolean("client_approved").notNull().default(false),
     clientApprovedAt: timestamp("client_approved_at", { withTimezone: true }),
     clientApprovedById: uuid("client_approved_by_id").references(() => users.id, { onDelete: "set null" }),
+    /** Wanneer de klant de "je video staat online"-melding kreeg (de dag ná
+     *  publicatie). Voorkomt dat dezelfde melding twee keer wordt verstuurd. */
+    onlineNotifiedAt: timestamp("online_notified_at", { withTimezone: true }),
     ...timestamps,
     ...softDelete,
   },
