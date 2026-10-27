@@ -5,6 +5,7 @@ import { sessions } from "@/db/schema";
 import { requireViewer } from "@/server/auth/context";
 import { Avatar, Badge, Card, CardHeader, PageHeader, Table } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
+import { ChangePasswordCard } from "./change-password";
 
 export const metadata: Metadata = { title: "Mijn account" };
 export const dynamic = "force-dynamic";
@@ -68,6 +69,8 @@ export default async function AccountPage() {
             ))}
           </div>
         </Card>
+
+        <ChangePasswordCard />
 
         <Card padded={false}>
           <div className="p-5 pb-3">

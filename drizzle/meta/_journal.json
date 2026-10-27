@@ -505,6 +505,13 @@
       "when": 1793036649280,
       "tag": "0071_brief_chimera",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1793082396609,
+      "tag": "0072_clammy_obadiah_stane",
+      "breakpoints": true
     }
   ]
 }

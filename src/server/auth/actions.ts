@@ -7,9 +7,9 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import { auditLog } from "@/server/audit";
-import { dummyVerify, verifyPassword } from "./password";
+import { dummyVerify, hashPassword, verifyPassword } from "./password";
 import { createSession, destroySession, revokeAllSessions } from "./session";
-import { requireOwner, ForbiddenError } from "@/server/auth/context";
+import { requireOwner, requireViewer, ForbiddenError } from "@/server/auth/context";
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Vul een geldig e-mailadres in."),
@@ -163,5 +163,35 @@ export async function revokeSessionsAction(userId: string): Promise<{ ok: boolea
     throw error;
   }
   await revokeAllSessions(userId);
+  return { ok: true };
+}
+
+/**
+ * De ingelogde gebruiker wijzigt zelf zijn wachtwoord (team én klant). Verifieert
+ * eerst het huidige wachtwoord, trekt daarna alle sessies in en logt dit apparaat
+ * meteen opnieuw in, zodat andere apparaten eruit worden gezet.
+ */
+export async function changeOwnPassword(input: { current: string; next: string }): Promise<{ ok: boolean; message?: string }> {
+  const viewer = await requireViewer();
+  const next = input.next ?? "";
+  if (next.length < 10) return { ok: false, message: "Kies een wachtwoord van minstens 10 tekens." };
+
+  const [u] = await db
+    .select({ id: users.id, passwordHash: users.passwordHash })
+    .from(users)
+    .where(and(eq(users.id, viewer.id), isNull(users.deletedAt)))
+    .limit(1);
+  if (!u) return { ok: false, message: "Account niet gevonden." };
+
+  const valid = await verifyPassword(input.current ?? "", u.passwordHash);
+  if (!valid) return { ok: false, message: "Je huidige wachtwoord klopt niet." };
+
+  const passwordHash = await hashPassword(next);
+  await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, u.id));
+  await revokeAllSessions(u.id);
+
+  const h = await headers();
+  await createSession(u.id, { ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null, userAgent: h.get("user-agent") });
+  await auditLog({ viewer, action: "auth.password_changed", entityType: "user", entityId: u.id });
   return { ok: true };
 }

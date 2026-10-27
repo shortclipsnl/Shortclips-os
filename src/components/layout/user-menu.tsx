@@ -65,8 +65,8 @@ export function UserMenu({
               {ROLE_LABELS[role] ?? role}
             </p>
           </div>
-          {/* Interne beheer-links alleen voor teamleden; klanten zien ze niet
-              (voor hen leidden ze alleen terug naar het portaal). */}
+          {/* Teamleden: account + interne instellingen. Klanten: alleen hun eigen
+              account (wachtwoord wijzigen) binnen het portaal. */}
           {role !== "client" ? (
             <div className="py-1">
               <Link
@@ -84,7 +84,17 @@ export function UserMenu({
                 <Settings className="size-4" strokeWidth={1.75} /> Instellingen
               </Link>
             </div>
-          ) : null}
+          ) : (
+            <div className="py-1">
+              <Link
+                href="/portal/account"
+                className="flex items-center gap-2.5 px-4 py-2 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+                onClick={() => setOpen(false)}
+              >
+                <User className="size-4" strokeWidth={1.75} /> Mijn account
+              </Link>
+            </div>
+          )}
           <form action={logoutAction} className="border-t border-[var(--color-line)]">
             <button
               type="submit"

@@ -88,6 +88,40 @@ export const sessions = pgTable(
 );
 
 /* ------------------------------------------------------------------ *
+ * Portaal-uitnodigingen & wachtwoordherstel (beveiligde tokens)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Eenmalige tokens voor het klantportaal: een uitnodiging (klant stelt zelf een
+ * wachtwoord in) of een wachtwoordherstel. Net als bij sessies bewaren we alléén
+ * de SHA-256 van het token; het token zelf staat uitsluitend in de link die per
+ * mail wordt verstuurd. Een token verloopt en kan maar één keer gebruikt worden.
+ */
+export const portalInvites = pgTable(
+  "portal_invites",
+  {
+    id: pk(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** SHA-256 van het token; het token zelf staat nooit in de db. */
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    /** "invite" = account activeren, "reset" = wachtwoord herstellen. */
+    purpose: varchar("purpose", { length: 16 }).notNull().default("invite"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    /** Welk teamlid de uitnodiging/reset aanmaakte (voor de audit). */
+    createdByUserId: uuid("created_by_user_id"),
+    ...timestamps,
+  },
+  (t) => [
+    unique("portal_invites_token_unique").on(t.tokenHash),
+    index("portal_invites_user_idx").on(t.userId),
+    index("portal_invites_expiry_idx").on(t.expiresAt),
+  ],
+);
+
+/* ------------------------------------------------------------------ *
  * Rollen & permissies (flexibel: extra rollen zonder migratie)
  * ------------------------------------------------------------------ */
 
