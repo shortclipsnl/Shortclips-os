@@ -307,9 +307,23 @@ export async function getPortalData(viewer: Viewer) {
       .limit(6)
   ).map((r) => ({ ...r, title: cleanVideoTitle(r.title), platforms: (r.platforms as string[]) ?? [] }));
 
+  // Scripts die aan de eerstvolgende ingeplande opnamedag hangen, zodat de klant
+  // op het overzicht meteen ziet dat de scripts voor die dag al klaarstaan.
+  // Alleen voor een échte opnamedag uit de planning (productionDays) — een losse
+  // agenda-afspraak heeft geen gekoppelde scripts.
+  const shootDayId = upcomingShoot[0]?.id ?? null;
+  const shootScripts = shootDayId
+    ? await db
+        .select({ id: scripts.id, title: scripts.title, status: scripts.status })
+        .from(scripts)
+        .where(and(eq(scripts.clientId, clientId), eq(scripts.productionDayId, shootDayId), isNull(scripts.deletedAt)))
+        .orderBy(asc(scripts.title))
+    : [];
+
   return {
     client,
     recentlyPublished,
+    shootScripts,
     awaitingApproval: awaitingApproval.map((v) => ({ ...v, title: cleanVideoTitle(v.title) })),
     scriptsToReview,
     inProgress: inProgress.map((v) => ({ ...v, title: cleanVideoTitle(v.title) })),
@@ -370,6 +384,8 @@ export type PortalResults = {
   byPlatform: PortalPlatformResult[];
   series: PortalSeriesPoint[];
   topVideos: PortalTopVideo[];
+  /** Alle gepubliceerde video's uit de periode met hun cijfers, van veel → weinig weergaven. */
+  allVideos: PortalTopVideo[];
   likes: number;
   comments: number;
   valuableInteractions: number;
@@ -526,7 +542,7 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
       left join deliverables d on d.id = p.deliverable_id
       left join content_calendar cc on cc.id = p.calendar_item_id
       order by l.views desc
-      limit 40
+      limit 100
     `),
   ]);
 
@@ -577,20 +593,21 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
     const existing = byDeliverable.get(key);
     if (!existing || Number(v.views ?? 0) > Number(existing.views ?? 0)) byDeliverable.set(key, v);
   }
-  const topVideos: PortalTopVideo[] = [...byDeliverable.values()]
+  const toTopVideo = (v: Record<string, unknown>): PortalTopVideo => ({
+    id: String(v.pid),
+    title: titleFor(v),
+    platform: String(v.platform),
+    views: Number(v.views ?? 0),
+    likes: Number(v.likes ?? 0),
+    comments: Number(v.comments ?? 0),
+    publishedAt: v.pub ? String(v.pub).slice(0, 10) : null,
+    url: v.url ? String(v.url) : null,
+    thumbnailUrl: v.dthumb ? String(v.dthumb) : v.cover ? String(v.cover) : null,
+  });
+  const allVideos: PortalTopVideo[] = [...byDeliverable.values()]
     .sort((a, b) => Number(b.views ?? 0) - Number(a.views ?? 0))
-    .slice(0, 3)
-    .map((v) => ({
-      id: String(v.pid),
-      title: titleFor(v),
-      platform: String(v.platform),
-      views: Number(v.views ?? 0),
-      likes: Number(v.likes ?? 0),
-      comments: Number(v.comments ?? 0),
-      publishedAt: v.pub ? String(v.pub).slice(0, 10) : null,
-      url: v.url ? String(v.url) : null,
-      thumbnailUrl: v.dthumb ? String(v.dthumb) : v.cover ? String(v.cover) : null,
-    }));
+    .map(toTopVideo);
+  const topVideos: PortalTopVideo[] = allVideos.slice(0, 3);
 
   // Mijlpaal: hoogste drempel die het totaal aantal weergaven (sinds we meten) bereikte.
   const lifetimeViews = Number(life.lv ?? 0);
@@ -625,6 +642,7 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
     byPlatform,
     series,
     topVideos,
+    allVideos,
     likes,
     comments,
     valuableInteractions,

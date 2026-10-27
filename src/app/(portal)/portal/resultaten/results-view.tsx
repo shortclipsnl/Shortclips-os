@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, BarChart3, ExternalLink, Eye, Film, Play, Sparkles, Trophy, Users } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BarChart3, Bookmark, Clock, ExternalLink, Eye, Film, Heart, ListVideo, MessageSquare, Play, Sparkles, TrendingDown, Trophy, Users } from "lucide-react";
 import { CountUp } from "@/components/portal/count-up";
 import { compact, formatDate, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
@@ -27,6 +27,26 @@ function StatBlock({ icon, label, value, prefix = "", pct }: { icon: React.React
       </div>
       <CountUp value={value} prefix={prefix} className="mt-2 block text-[26px] font-bold tabular-nums leading-none" />
       {pct !== undefined ? <Delta pct={pct} /> : null}
+    </div>
+  );
+}
+
+/** Kijktijd leesbaar maken: seconden, of m:ss vanaf een minuut. */
+function fmtWatch(s: number): string {
+  if (s <= 0) return "0s";
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** Compact extra-statistiekblokje (likes, reacties, opslaan/delen, kijktijd). */
+function MiniStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="sc-glass flex items-center gap-3 p-4">
+      <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[rgba(25,168,255,0.12)] text-[var(--sc-accent)]">{icon}</span>
+      <div className="min-w-0">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">{label}</div>
+        <div className="text-[18px] font-bold tabular-nums leading-tight">{value}</div>
+      </div>
     </div>
   );
 }
@@ -65,6 +85,17 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
       : { "30": "Afgelopen 30 dagen", "90": "Afgelopen 3 maanden", "180": "Afgelopen 6 maanden", "365": "Afgelopen 12 maanden" }[r.periodKey] ?? `Afgelopen ${r.days} dagen`;
 
   const best = r.topVideos[0] ?? null;
+  // Minst bekeken video van de periode (positief gebracht: om van te leren).
+  const worst = r.allVideos.length > 1 ? r.allVideos[r.allVideos.length - 1]! : null;
+  // Beste video per platform (alleen platforms waar we een topvideo van kennen).
+  const platformBests = r.byPlatform.filter((p) => p.bestVideo);
+  // Extra statistieken — alleen tonen wat er is.
+  const extraStats = [
+    { key: "likes", icon: <Heart className="size-4" />, label: "Likes", value: num(r.likes), has: r.likes > 0 },
+    { key: "comments", icon: <MessageSquare className="size-4" />, label: "Reacties", value: num(r.comments), has: r.comments > 0 },
+    { key: "saves", icon: <Bookmark className="size-4" />, label: "Opslaan & delen", value: num(r.valuableInteractions), has: r.valuableInteractions > 0 },
+    { key: "watch", icon: <Clock className="size-4" />, label: "Gem. kijktijd", value: fmtWatch(r.avgWatchSeconds), has: r.avgWatchSeconds > 0 },
+  ].filter((s) => s.has);
 
   return (
     <div className="flex flex-col gap-7">
@@ -101,6 +132,15 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
             <StatBlock icon={<Film className="size-3.5" />} label="Gepubliceerde video's" value={r.metrics.publishedVideos} pct={r.deltas.publishedVideos} />
           </div>
 
+          {/* Extra statistieken — likes, reacties, opslaan & delen, gem. kijktijd */}
+          {extraStats.length > 0 ? (
+            <div className="grid grid-cols-2 gap-[14px] lg:grid-cols-4">
+              {extraStats.map((s) => (
+                <MiniStat key={s.key} icon={s.icon} label={s.label} value={s.value} />
+              ))}
+            </div>
+          ) : null}
+
           {/* Mijlpaal (subtiel) */}
           {r.milestone?.reached ? (
             <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-[#19a8ff]/30 bg-[rgba(25,168,255,0.07)] px-4 py-3">
@@ -117,6 +157,31 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
 
           {/* Per platform */}
           {r.byPlatform.length > 0 ? <PlatformView platforms={r.byPlatform} /> : null}
+
+          {/* Beste video per platform — in één oogopslag de topper per kanaal */}
+          {platformBests.length > 0 ? (
+            <section className="sc-glass p-5 sm:p-6">
+              <div className="flex items-center gap-2">
+                <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><Trophy className="size-4" /></span>
+                <h2 className="text-base font-semibold">Beste video per platform</h2>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {platformBests.map((p) => (
+                  <div key={p.platform} className="rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-3.5">
+                    <div className="flex items-center gap-1.5 text-[12.5px] font-semibold">
+                      <span className="size-2.5 shrink-0 rounded-full" style={{ background: PLATFORM[p.platform]?.color ?? "#888" }} />
+                      {PLATFORM[p.platform]?.label ?? p.platform}
+                    </div>
+                    <div className="mt-2 line-clamp-2 text-[13.5px] font-medium leading-snug">{p.bestVideo!.title}</div>
+                    <div className="mt-1.5 flex items-center justify-between gap-2">
+                      <span className="text-[12px] text-[var(--color-ink-muted)]">{num(p.bestVideo!.views)} weergaven</span>
+                      {p.bestVideo!.url ? <a href={p.bestVideo!.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--sc-accent)] hover:underline">Bekijken <ExternalLink className="size-3.5" /></a> : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {/* Video van de maand + top 3 */}
           {best ? (
@@ -166,6 +231,30 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
             </section>
           ) : null}
 
+          {/* Minst bekeken video — eerlijk beeld, positief gebracht (om van te leren) */}
+          {worst && best && worst.id !== best.id ? (
+            <section className="sc-glass p-5">
+              <div className="flex items-center gap-2">
+                <span className="grid size-7 place-items-center rounded-lg bg-[var(--sc-fill-strong)] text-[var(--color-ink-muted)]"><TrendingDown className="size-4" /></span>
+                <h2 className="text-base font-semibold">Minst bekeken video</h2>
+              </div>
+              <p className="mt-1 text-[12.5px] text-[var(--color-ink-muted)]">Handig om mee te nemen naar de volgende ronde — niet elke video scoort gelijk, en daar leren we van.</p>
+              <div className="mt-4 flex items-center gap-4">
+                <Thumb v={worst} />
+                <div className="min-w-0 flex-1">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--sc-fill-strong)] px-2 py-0.5 text-[11px] font-medium">
+                    <span className="size-2 rounded-full" style={{ background: PLATFORM[worst.platform]?.color ?? "#888" }} /> {PLATFORM[worst.platform]?.label ?? worst.platform}
+                  </span>
+                  <h3 className="mt-1.5 text-[15px] font-semibold leading-snug">{worst.title}</h3>
+                  <div className="mt-1 text-[13px] text-[var(--color-ink-muted)]">
+                    {num(worst.views)} weergaven{worst.likes > 0 ? ` · ${num(worst.likes)} likes` : ""}{worst.publishedAt ? ` · ${formatDate(worst.publishedAt)}` : ""}
+                  </div>
+                </div>
+                {worst.url ? <a href={worst.url} target="_blank" rel="noreferrer" className="shrink-0 text-[var(--color-ink-muted)] hover:text-[var(--sc-accent)]"><ExternalLink className="size-4" /></a> : null}
+              </div>
+            </section>
+          ) : null}
+
           {/* Wat valt op */}
           {r.insights.length > 0 ? (
             <section className="sc-glass p-5 sm:p-6" style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.07), rgba(255,255,255,0.02))" }}>
@@ -211,6 +300,51 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
               </table>
             </div>
           </section>
+
+          {/* Alle video's met cijfers — volledige lijst over de periode */}
+          {r.allVideos.length > 0 ? (
+            <section className="sc-glass overflow-hidden p-0">
+              <div className="flex items-center gap-2 px-5 pt-5">
+                <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><ListVideo className="size-4" /></span>
+                <h2 className="text-base font-semibold">Alle video&apos;s</h2>
+                <span className="rounded-full bg-[var(--sc-fill-strong)] px-2 py-0.5 text-2xs font-bold text-[var(--color-ink-muted)]">{r.allVideos.length}</span>
+              </div>
+              <div className="mt-3 max-h-[520px] overflow-auto">
+                <table className="w-full min-w-[520px] text-[13.5px]">
+                  <thead className="sticky top-0 bg-[var(--color-surface)]">
+                    <tr className="text-left text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">
+                      <th className="px-5 py-2 font-medium">Video</th>
+                      <th className="px-3 py-2 font-medium">Platform</th>
+                      <th className="px-3 py-2 text-right font-medium">Weergaven</th>
+                      <th className="px-3 py-2 text-right font-medium">Likes</th>
+                      <th className="px-5 py-2 text-right font-medium">Geplaatst</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {r.allVideos.map((v) => (
+                      <tr key={v.id} className="border-t border-[var(--sc-line)]">
+                        <td className="max-w-[260px] px-5 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate font-medium">{v.title}</span>
+                            {v.url ? <a href={v.url} target="_blank" rel="noreferrer" className="shrink-0 text-[var(--color-ink-faint)] hover:text-[var(--sc-accent)]"><ExternalLink className="size-3.5" /></a> : null}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="size-2 shrink-0 rounded-full" style={{ background: PLATFORM[v.platform]?.color ?? "#888" }} />
+                            <span className="text-[12.5px] text-[var(--color-ink-muted)]">{PLATFORM[v.platform]?.label ?? v.platform}</span>
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{num(v.views)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-[var(--color-ink-muted)]">{v.likes > 0 ? num(v.likes) : "—"}</td>
+                        <td className="px-5 py-2.5 text-right tabular-nums text-[var(--color-ink-muted)]">{v.publishedAt ? formatDate(v.publishedAt) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
 
           <p className="text-xs text-[var(--color-ink-faint)]">
             Cijfers komen automatisch uit je gekoppelde kanalen (via Metricool) en zijn gelijk aan wat je team intern ziet.

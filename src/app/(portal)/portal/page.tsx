@@ -44,7 +44,9 @@ function DateChip({ date }: { date: Date }) {
   );
 }
 
-/** Eén planningskaart (opnamedag of scriptmeeting) — zelfde opbouw, rustig. */
+/** Eén planningskaart (opnamedag of scriptmeeting) — zelfde opbouw, rustig.
+ *  Met `accent` springt de kaart eruit (gekleurde rand + lichte achtergrond),
+ *  zodat de eerstvolgende opnamedag duidelijk de aandacht trekt. */
 function PlanCard({
   icon,
   label,
@@ -52,6 +54,7 @@ function PlanCard({
   time,
   location,
   emptyText,
+  accent = false,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -59,10 +62,14 @@ function PlanCard({
   time: string | null;
   location: string | null;
   emptyText: string;
+  accent?: boolean;
 }) {
   return (
-    <section className="sc-glass flex min-h-[132px] flex-col p-5">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
+    <section
+      className="sc-glass flex min-h-[132px] flex-col p-5"
+      style={accent && date ? { boxShadow: "inset 3px 0 0 var(--sc-accent)", background: "linear-gradient(180deg, rgba(25,168,255,0.1), rgba(255,255,255,0.02))" } : undefined}
+    >
+      <div className={`flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider ${accent && date ? "text-[var(--sc-accent)]" : "text-[var(--color-ink-faint)]"}`}>
         <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]">{icon}</span>
         {label}
       </div>
@@ -101,6 +108,28 @@ function ResultTile({ icon, label, value, sub }: { icon: React.ReactNode; label:
   );
 }
 
+/** Scriptstatus vertaald naar begrijpelijke klanttaal (geen interne termen). */
+function scriptStatusMeta(status: string): { label: string; tone: "action" | "ready" | "done" | "prep" } {
+  switch (status) {
+    case "client_review":
+      return { label: "Ter controle bij jou", tone: "action" };
+    case "approved":
+    case "ready_to_shoot":
+      return { label: "Klaar voor de opname", tone: "ready" };
+    case "shot":
+      return { label: "Opgenomen", tone: "done" };
+    default:
+      return { label: "In voorbereiding", tone: "prep" };
+  }
+}
+
+const SCRIPT_TONE: Record<"action" | "ready" | "done" | "prep", string> = {
+  action: "bg-[rgba(25,168,255,0.18)] text-[#19a8ff]",
+  ready: "bg-[#2fd27a]/15 text-[#1a9956]",
+  done: "bg-[var(--sc-fill-strong)] text-[var(--color-ink-muted)]",
+  prep: "bg-[var(--sc-fill)] text-[var(--color-ink-muted)]",
+};
+
 export default async function PortalPage() {
   const viewer = await requirePortal();
   const [data, contact, scriptReviews, frameUrl] = await Promise.all([
@@ -125,6 +154,7 @@ export default async function PortalPage() {
   const shoot = data.upcomingShoot;
   const shootDate = shoot ? dateFromIso(shoot.scheduledOn) : null;
   const shootTime = shoot?.startTime ? shoot.startTime.slice(0, 5) : null;
+  const shootScripts = data.shootScripts ?? [];
 
   // Scriptmeeting = eerstvolgende afspraak van het type "scriptbespreking"
   // (uit de gekoppelde agenda). Geen dubbele invoer.
@@ -188,6 +218,7 @@ export default async function PortalPage() {
           time={shootTime}
           location={shoot?.locationName ?? null}
           emptyText="Nog geen opname gepland. Je contactpersoon neemt contact met je op zodra er een datum staat."
+          accent
         />
         <PlanCard
           icon={<MessagesSquare className="size-[18px]" strokeWidth={1.9} />}
@@ -198,6 +229,33 @@ export default async function PortalPage() {
           emptyText="Nog geen scriptmeeting gepland."
         />
       </div>
+
+      {/* Scripts die bij de eerstvolgende opnamedag horen — zo ziet de klant dat
+          de scripts voor die dag al klaarstaan, en in welke fase ze zitten. */}
+      {shootDate && shootScripts.length > 0 ? (
+        <section className="sc-glass p-5">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
+            <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><FileText className="size-[18px]" strokeWidth={1.9} /></span>
+            Scripts voor deze opnamedag
+            <span className="rounded-full bg-[var(--sc-fill-strong)] px-2 py-0.5 text-2xs font-bold text-[var(--color-ink-muted)]">{shootScripts.length}</span>
+          </div>
+          <ul className="mt-3 flex flex-col gap-2">
+            {shootScripts.map((s) => {
+              const st = scriptStatusMeta(s.status);
+              return (
+                <li key={s.id}>
+                  <Link href="/portal/scripts" className="flex items-center gap-3 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-2.5 transition-colors hover:border-[var(--sc-accent)]">
+                    <FileText className="size-4 shrink-0 text-[var(--sc-accent)]" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.title}</span>
+                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${SCRIPT_TONE[st.tone]}`}>{st.label}</span>
+                    <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
 
       {/* Voorbereidingsherinnering — alleen als er een opname aankomt */}
       {shootDate ? (
@@ -277,7 +335,7 @@ export default async function PortalPage() {
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold">Jouw resultaten</h2>
-          <Link href="/portal/resultaten" className="text-[13px] font-semibold text-[var(--sc-accent)]">Meer resultaten →</Link>
+          <Link href="/portal/resultaten" className={buttonClass({ variant: "secondary", size: "sm" })}>Alle resultaten bekijken <ArrowRight className="size-4" /></Link>
         </div>
         {hasMetrics ? (
           <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
@@ -304,11 +362,11 @@ export default async function PortalPage() {
 
       {/* Vaste contactpersoon — met profielfoto, contactgegevens en directe knoppen */}
       {coordinator ? (
-        <section className="sc-glass flex flex-wrap items-center gap-4 p-5">
-          <TeamAvatar name={coordinator.name} avatarUrl={coordinator.avatarUrl} size={56} />
+        <section className="sc-glass flex flex-wrap items-center gap-5 p-5">
+          <TeamAvatar name={coordinator.name} avatarUrl={coordinator.avatarUrl} size={80} />
           <div className="min-w-0 flex-1">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Je vaste contactpersoon</div>
-            <div className="mt-0.5 text-[15px] font-semibold">{coordinator.name}</div>
+            <div className="mt-0.5 text-[17px] font-semibold">{coordinator.name}</div>
             <div className="text-[13px] text-[var(--color-ink-muted)]">{coordinator.role}</div>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[12.5px] text-[var(--color-ink-muted)]">
               {coordinator.phone ? <span className="inline-flex items-center gap-1"><Phone className="size-3" /> {coordinator.phone}</span> : null}

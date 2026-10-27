@@ -177,7 +177,7 @@ export default async function PortalSamenwerkingPage() {
           <section className="sc-glass flex flex-col justify-center p-6">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Direct contact</span>
             <div className="mt-3 flex items-center gap-3.5">
-              <TeamAvatar name={coord.name} avatarUrl={coord.avatarUrl} size={56} />
+              <TeamAvatar name={coord.name} avatarUrl={coord.avatarUrl} size={72} />
               <div>
                 <div className="text-[16px] font-semibold">{coord.name}</div>
                 <div className="text-[13px] text-[var(--color-ink-muted)]">{coord.role}</div>
