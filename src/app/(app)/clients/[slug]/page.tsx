@@ -240,9 +240,11 @@ export default async function ClientPage({
           {isOwnerViewer ? (
             <ClientPortalLogin clientId={c.id} hasLogin={Boolean(portalLogin)} loginEmail={portalLogin?.email ?? null} />
           ) : null}
-          {canEditClient ? (
-            <ClientFrameLink clientId={c.id} current={hub.integrations.find((i) => i.provider === "frameio")?.externalUrl ?? null} />
-          ) : null}
+          {canEditClient ? (() => {
+            const f = hub.integrations.find((i) => i.provider === "frameio");
+            const cur = f?.externalId && f.externalId !== "manual" ? `https://next.frame.io/project/${f.externalId}` : null;
+            return <ClientFrameLink clientId={c.id} current={cur} />;
+          })() : null}
           <OverviewTab hub={hub} publishedThisMonth={publishedThisMonth} nextShoot={nextShoot} activeVideos={activeVideos.length} canEditClient={canEditClient} />
           {canEditClient && agreementGeneral ? (
             <Card padded={false}>

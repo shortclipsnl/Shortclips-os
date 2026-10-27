@@ -763,13 +763,15 @@ export async function getPortalFrameUrl(viewer: Viewer): Promise<string | null> 
   const clientId = viewer.clientId;
   if (!clientId) return null;
   const [link] = await db
-    .select({ externalId: clientIntegrations.externalId, externalUrl: clientIntegrations.externalUrl })
+    .select({ externalUrl: clientIntegrations.externalUrl })
     .from(clientIntegrations)
     .where(and(eq(clientIntegrations.clientId, clientId), eq(clientIntegrations.provider, "frameio")))
     .limit(1);
   if (!link) return null;
-  if (link.externalUrl) return link.externalUrl;
-  return link.externalId ? `https://next.frame.io/project/${link.externalId}` : null;
+  // Alleen een échte, deelbare klant-link teruggeven. De interne project-URL
+  // (next.frame.io/project/...) vereist een Frame.io-login en is NIET voor klanten;
+  // die gebruiken we uitsluitend intern om de sync aan de klant te koppelen.
+  return link.externalUrl ?? null;
 }
 
 /**

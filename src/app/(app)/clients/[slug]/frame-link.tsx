@@ -29,11 +29,13 @@ export function ClientFrameLink({ clientId, current }: { clientId: string; curre
   return (
     <Card>
       <h3 className="flex items-center gap-2 text-base font-semibold text-[var(--color-ink)]">
-        <Clapperboard className="size-4 text-[var(--color-brand-600)]" /> Frame.io-link
+        <Clapperboard className="size-4 text-[var(--color-brand-600)]" /> Frame.io-project koppelen
       </h3>
       <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
-        De Frame.io-omgeving van deze klant. Hiermee wijzen de knop &quot;Bekijk je video&apos;s&quot; en de videopagina
-        in het klantportaal naar de juiste Frame.io-pagina. Leeg laten = geen directe link.
+        Plak de <strong>Frame.io-projectlink</strong> van deze klant (bijv. <code>next.frame.io/project/…</code>).
+        Nodig als de projectnaam in Frame.io niet exact gelijk is aan de klantnaam. Daarna haal je via
+        <strong> Instellingen → Koppelingen → &quot;Frame.io-video&apos;s ophalen&quot;</strong> de video&apos;s + review-links op,
+        zodat ze per opnamesessie in het klantportaal verschijnen. Leeg laten = koppeling verwijderen.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <input

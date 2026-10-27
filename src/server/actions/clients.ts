@@ -117,20 +117,27 @@ export async function setClientPortalLogin(clientId: string): Promise<PortalLogi
 export type ActionResult = { ok: boolean; message?: string; slug?: string };
 
 /**
- * De Frame.io-link van een klant handmatig instellen (owner + coördinatoren). Die
- * link wijst het klantportaal ("Bekijk je video's" + de videopagina) naar de
- * juiste Frame.io-omgeving van déze klant. Leeg laten = link wissen. Opgeslagen
- * op de bestaande frameio-koppeling (client_integrations), zodat de automatische
- * sync er later gewoon op verder kan.
+ * Een Frame.io-project handmatig aan een klant koppelen (owner + coördinatoren).
+ * Nodig wanneer de projectnaam in Frame.io niet exact gelijk is aan de klantnaam
+ * (dan koppelt de automatische sync niet vanzelf). Plak de Frame.io-projectlink;
+ * we halen er het project-id uit en zetten dat op de frameio-koppeling
+ * (client_integrations.externalId). Daarna haalt "Frame.io-video's ophalen" de
+ * video's + review-links van die klant op, zodat ze per opnamesessie in het
+ * klantportaal verschijnen. Leeg laten = koppeling verwijderen.
+ *
+ * Bewust GEEN externalUrl: de interne project-URL vereist een Frame.io-login en
+ * is niet voor klanten. Klanten reviewen via de per-sessie review-links die de
+ * sync ophaalt.
  */
 export async function setClientFrameUrl(clientId: string, url: string): Promise<ActionResult> {
   try {
     const viewer = await requireManageClients();
     assertClientAccess(viewer, clientId);
 
-    const clean = (url ?? "").trim();
-    if (clean && !/^https?:\/\/\S+$/i.test(clean)) {
-      return { ok: false, message: "Vul een geldige link in (begint met https://)." };
+    const raw = (url ?? "").trim();
+    const projectId = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? null;
+    if (raw && !projectId) {
+      return { ok: false, message: "Plak de Frame.io-projectlink (die bevat een project-id)." };
     }
 
     const [client] = await db.select({ slug: clients.slug }).from(clients).where(and(eq(clients.id, clientId), isNull(clients.deletedAt))).limit(1);
@@ -142,15 +149,15 @@ export async function setClientFrameUrl(clientId: string, url: string): Promise<
       .where(and(eq(clientIntegrations.clientId, clientId), eq(clientIntegrations.provider, "frameio")))
       .limit(1);
 
-    if (existing) {
-      await db.update(clientIntegrations).set({ externalUrl: clean || null, updatedAt: new Date() }).where(eq(clientIntegrations.id, existing.id));
-    } else if (clean) {
-      await db.insert(clientIntegrations).values({
-        clientId, provider: "frameio", externalId: "manual", externalName: "Frame.io (handmatig)", externalUrl: clean,
-      });
+    if (!projectId) {
+      if (existing) await db.delete(clientIntegrations).where(eq(clientIntegrations.id, existing.id));
+    } else if (existing) {
+      await db.update(clientIntegrations).set({ externalId: projectId, externalName: "Frame.io-project (handmatig gekoppeld)", isActive: true, updatedAt: new Date() }).where(eq(clientIntegrations.id, existing.id));
+    } else {
+      await db.insert(clientIntegrations).values({ clientId, provider: "frameio", externalId: projectId, externalName: "Frame.io-project (handmatig gekoppeld)" });
     }
 
-    await auditLog({ viewer, action: "client.set_frame_url", entityType: "client", entityId: clientId, clientId });
+    await auditLog({ viewer, action: "client.link_frame_project", entityType: "client", entityId: clientId, clientId });
     revalidatePath(`/clients/${client.slug}`);
     revalidatePath("/portal");
     revalidatePath("/portal/videos");
