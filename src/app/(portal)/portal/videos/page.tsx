@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Check, ExternalLink, MessageSquareText, Play, Video as VideoIcon } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalVideos } from "@/server/portal";
+import { getPortalFrameUrl, getPortalVideos } from "@/server/portal";
 import { getPortalSettingsForClient } from "@/server/portal-settings";
 import { CoverImage } from "@/components/portal/cover-image";
 import { VideoProces } from "@/components/portal/video-proces";
@@ -103,13 +103,20 @@ function Group({ title, subtitle, rows, max }: { title: string; subtitle?: strin
 
 export default async function PortalVideosPage() {
   const viewer = await requirePortal();
-  const [data, settings] = await Promise.all([getPortalVideos(viewer), getPortalSettingsForClient(viewer.clientId ?? "")]);
+  const [data, settings, frameUrl] = await Promise.all([getPortalVideos(viewer), getPortalSettingsForClient(viewer.clientId ?? ""), getPortalFrameUrl(viewer)]);
 
   return (
     <div className="flex flex-col gap-7">
-      <div>
-        <h1 className="text-[25px] font-bold tracking-tight">Video&apos;s</h1>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Bekijk je video&apos;s, geef feedback in Frame en zie wat er online staat.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-[25px] font-bold tracking-tight">Video&apos;s</h1>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Bekijk je video&apos;s, geef feedback in Frame en zie wat er online staat.</p>
+        </div>
+        {frameUrl ? (
+          <a href={frameUrl} target="_blank" rel="noreferrer" className={`${buttonClass({ variant: "accent", size: "sm" })} shrink-0`}>
+            <ExternalLink className="size-4" /> Open alles in Frame.io
+          </a>
+        ) : null}
       </div>
 
       {data.totaal === 0 ? (

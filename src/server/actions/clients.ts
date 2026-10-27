@@ -9,6 +9,7 @@ import { firstNameKey } from "@/lib/editors";
 import {
   assertClientAccess,
   ForbiddenError,
+  requireManageClients,
   requireOwner,
   requirePermission,
 } from "@/server/auth/context";
@@ -114,6 +115,51 @@ export async function setClientPortalLogin(clientId: string): Promise<PortalLogi
 }
 
 export type ActionResult = { ok: boolean; message?: string; slug?: string };
+
+/**
+ * De Frame.io-link van een klant handmatig instellen (owner + coördinatoren). Die
+ * link wijst het klantportaal ("Bekijk je video's" + de videopagina) naar de
+ * juiste Frame.io-omgeving van déze klant. Leeg laten = link wissen. Opgeslagen
+ * op de bestaande frameio-koppeling (client_integrations), zodat de automatische
+ * sync er later gewoon op verder kan.
+ */
+export async function setClientFrameUrl(clientId: string, url: string): Promise<ActionResult> {
+  try {
+    const viewer = await requireManageClients();
+    assertClientAccess(viewer, clientId);
+
+    const clean = (url ?? "").trim();
+    if (clean && !/^https?:\/\/\S+$/i.test(clean)) {
+      return { ok: false, message: "Vul een geldige link in (begint met https://)." };
+    }
+
+    const [client] = await db.select({ slug: clients.slug }).from(clients).where(and(eq(clients.id, clientId), isNull(clients.deletedAt))).limit(1);
+    if (!client) return { ok: false, message: "Klant niet gevonden." };
+
+    const [existing] = await db
+      .select({ id: clientIntegrations.id })
+      .from(clientIntegrations)
+      .where(and(eq(clientIntegrations.clientId, clientId), eq(clientIntegrations.provider, "frameio")))
+      .limit(1);
+
+    if (existing) {
+      await db.update(clientIntegrations).set({ externalUrl: clean || null, updatedAt: new Date() }).where(eq(clientIntegrations.id, existing.id));
+    } else if (clean) {
+      await db.insert(clientIntegrations).values({
+        clientId, provider: "frameio", externalId: "manual", externalName: "Frame.io (handmatig)", externalUrl: clean,
+      });
+    }
+
+    await auditLog({ viewer, action: "client.set_frame_url", entityType: "client", entityId: clientId, clientId });
+    revalidatePath(`/clients/${client.slug}`);
+    revalidatePath("/portal");
+    revalidatePath("/portal/videos");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
 
 /** Velden die de Monday-import normaal overschrijft; eenmaal handmatig gezet,
  *  vergrendelen we ze zodat de nachtelijke sync ze met rust laat. */

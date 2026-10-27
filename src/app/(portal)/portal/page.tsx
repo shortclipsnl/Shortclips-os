@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Bell, CalendarRange, Camera, ClipboardCheck, Clock, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
+import { ArrowRight, Bell, CalendarRange, Camera, ClipboardCheck, Clock, ExternalLink, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalContact, getPortalData } from "@/server/portal";
+import { getPortalContact, getPortalData, getPortalFrameUrl } from "@/server/portal";
 import { CLIENT_ACTION_STATUSES, listPortalScriptReviews } from "@/server/script-review";
 import { buttonClass, ClientLogo, TeamAvatar } from "@/components/ui";
 import { compact, num } from "@/lib/format";
@@ -103,10 +103,11 @@ function ResultTile({ icon, label, value, sub }: { icon: React.ReactNode; label:
 
 export default async function PortalPage() {
   const viewer = await requirePortal();
-  const [data, contact, scriptReviews] = await Promise.all([
+  const [data, contact, scriptReviews, frameUrl] = await Promise.all([
     getPortalData(viewer),
     getPortalContact(viewer),
     listPortalScriptReviews(viewer),
+    getPortalFrameUrl(viewer),
   ]);
 
   const companyName = data.client.name;
@@ -207,9 +208,11 @@ export default async function PortalPage() {
         </Link>
       ) : null}
 
-      {/* 3 — Directe toegang tot de video's */}
-      <Link
-        href="/portal/videos"
+      {/* 3 — Directe toegang tot de video's: rechtstreeks naar de Frame.io-omgeving
+          van de klant als die is ingesteld, anders naar de videopagina in het portaal. */}
+      <a
+        href={frameUrl ?? "/portal/videos"}
+        {...(frameUrl ? { target: "_blank", rel: "noreferrer" } : {})}
         className="sc-glass sc-glow group flex flex-wrap items-center gap-4 p-5 transition-colors hover:border-[var(--sc-line)]"
         style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.1), rgba(255,255,255,0.03))" }}
       >
@@ -219,7 +222,7 @@ export default async function PortalPage() {
         <div className="min-w-0 flex-1">
           <h2 className="text-[17px] font-semibold">Bekijk jouw video&apos;s</h2>
           <p className="mt-0.5 text-[13.5px] text-[var(--color-ink-muted)]">
-            Bekijk alle opnamesessies en video&apos;s van jouw bedrijf.
+            {frameUrl ? "Je video's staan in Frame.io — bekijken en feedback geven." : "Bekijk alle opnamesessies en video's van jouw bedrijf."}
             {pendingReview > 0 ? (
               <span className="ml-1 font-medium text-[#ffb020]">
                 {pendingReview} {pendingReview === 1 ? "wacht" : "wachten"} op jouw beoordeling.
@@ -228,10 +231,9 @@ export default async function PortalPage() {
           </p>
         </div>
         <span className={`${buttonClass({ variant: "accent", size: "md" })} shrink-0`}>
-          <Play className="size-4" fill="currentColor" /> Bekijk video&apos;s
-          <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+          {frameUrl ? <><Play className="size-4" fill="currentColor" /> Open in Frame.io <ExternalLink className="size-4" /></> : <><Play className="size-4" fill="currentColor" /> Bekijk video&apos;s <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" /></>}
         </span>
-      </Link>
+      </a>
 
       {/* Eerstvolgende publicatie + snelkoppeling naar de volledige contentplanning */}
       <div className="grid gap-[18px] sm:grid-cols-2">

@@ -17,6 +17,7 @@ import { ResultsToggle } from "./results-toggle";
 import { ScriptHistory } from "./script-history";
 import { FilesBrowser } from "./files-browser";
 import { ClientPortalLogin } from "./portal-login";
+import { ClientFrameLink } from "./frame-link";
 import {
   Avatar,
   Badge,
@@ -238,6 +239,9 @@ export default async function ClientPage({
         <div className="space-y-5">
           {isOwnerViewer ? (
             <ClientPortalLogin clientId={c.id} hasLogin={Boolean(portalLogin)} loginEmail={portalLogin?.email ?? null} />
+          ) : null}
+          {canEditClient ? (
+            <ClientFrameLink clientId={c.id} current={hub.integrations.find((i) => i.provider === "frameio")?.externalUrl ?? null} />
           ) : null}
           <OverviewTab hub={hub} publishedThisMonth={publishedThisMonth} nextShoot={nextShoot} activeVideos={activeVideos.length} canEditClient={canEditClient} />
           {canEditClient && agreementGeneral ? (
