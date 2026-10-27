@@ -18,7 +18,14 @@
  *      .env.local en herstart de dev-server.
  *
  * Scopes: calendar.readonly + drive.readonly (lezen) + drive.file (schrijven,
- * alleen bestanden die de app zelf maakt — nodig voor de database-backups).
+ * alleen bestanden die de app zelf maakt — nodig voor de database-backups) +
+ * gmail.readonly (alleen-lezen, nodig om het label "Leads - Shortclips" uit te
+ * lezen voor de lead-import op het salesdashboard).
+ *
+ * LET OP: één refresh-token dekt álle Google-koppelingen (Agenda, Drive, Gmail).
+ * Voeg je hier een scope toe, dan moet je het token opnieuw genereren en als
+ * GOOGLE_REFRESH_TOKEN zetten (lokaal in .env.local én in Vercel) — een bestaand
+ * token krijgt de nieuwe scope niet met terugwerkende kracht.
  */
 import http from "node:http";
 import { readFileSync } from "node:fs";
@@ -30,6 +37,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/drive.readonly",
   "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/gmail.readonly",
 ].join(" ");
 
 /** Leest een sleutel uit process.env of uit .env.local. */

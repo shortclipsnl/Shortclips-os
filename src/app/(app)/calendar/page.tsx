@@ -8,7 +8,8 @@ import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { listCalendar, monthGrid, type CalendarItem } from "@/server/calendar";
 import { listClients } from "@/server/clients";
 import { SharePlanningButton } from "./share-planning";
-import { Badge, Card, ClientLogo, EmptyState, PageHeader } from "@/components/ui";
+import { Badge, Card, ClientLogo, EmptyState, GuidelineNote, PageHeader } from "@/components/ui";
+import { ListChecks } from "lucide-react";
 import { formatDateFull, periodLabel } from "@/lib/format";
 import { PLATFORM, PUBLICATION_STATUS } from "@/lib/statuses";
 import { cn } from "@/lib/cn";
@@ -232,6 +233,24 @@ export default async function CalendarPage({
           </div>
         }
       />
+
+      {/* Compacte publicatiecheck — herinnering bij het inplannen/publiceren. */}
+      <div className="mb-4">
+        <GuidelineNote
+          title="Publicatiecheck — controleer dit vóór je publiceert"
+          icon={<ListChecks className="size-4" />}
+          tone="info"
+          items={[
+            <><strong className="font-semibold text-[var(--color-ink)]">Video:</strong> juiste versie, goedgekeurd, beeld en geluid in orde.</>,
+            <><strong className="font-semibold text-[var(--color-ink)]">Caption:</strong> klopt, zonder typefouten, met de juiste toon en hashtags.</>,
+            <><strong className="font-semibold text-[var(--color-ink)]">Cover:</strong> de juiste thumbnail/cover staat ingesteld.</>,
+            <><strong className="font-semibold text-[var(--color-ink)]">Ondertiteling:</strong> aanwezig, leesbaar en synchroon.</>,
+            <><strong className="font-semibold text-[var(--color-ink)]">Klantafspraken:</strong> merkregels, vermijd-woorden en terugkerende correcties nageleefd.</>,
+            <><strong className="font-semibold text-[var(--color-ink)]">Publicatiemoment:</strong> juiste datum, tijd en platform(en) — afgestemd op de klant.</>,
+          ]}
+          footer="Controleer dit zelf per item voordat je op publiceren zet. Een fout is achteraf lastig terug te draaien."
+        />
+      </div>
 
       {/* Schakelen tussen onze planning en wat klanten zelf plaatsen.
           'Content plaatsen' is per klant instelbaar op de klantpagina. */}

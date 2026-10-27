@@ -8,7 +8,8 @@ import { listCalendar } from "@/server/calendar";
 import { activeClientsMissingCoordinator } from "@/server/clients";
 import { editorCapacityMap } from "@/server/metrics";
 import { periodLabel } from "@/lib/format";
-import { LinkButton, TeamAvatar } from "@/components/ui";
+import { Compass } from "lucide-react";
+import { GuidelineNote, LinkButton, TeamAvatar } from "@/components/ui";
 import { EditorDashboard } from "./editor-view";
 import { TodayView } from "./today-view";
 import { WeekPlanning, type WeekUpload } from "./week-planning";
@@ -107,6 +108,21 @@ export default async function DashboardPage() {
           </span>
         </Link>
       ) : null}
+
+      {/* Korte werkrichtlijn: zelfstandigheid, eigenaarschap en eerst zelf
+          oplossen. Compact en standaard dicht — één klik open. */}
+      <GuidelineNote
+        title="Zo werken we — zelfstandigheid & eigenaarschap"
+        icon={<Compass className="size-4" />}
+        tone="good"
+        items={[
+          <><strong className="font-semibold text-[var(--color-ink)]">Eigenaarschap:</strong> je maakt je werk áf — van start tot oplevering, inclusief de kwaliteit.</>,
+          <><strong className="font-semibold text-[var(--color-ink)]">Eerst zelf oplossen:</strong> loop je vast? Zoek eerst zelf een oplossing (kennisbank, eerdere projecten, een collega) voordat je het doorschuift.</>,
+          <><strong className="font-semibold text-[var(--color-ink)]">Denk mee:</strong> zie je iets beter kunnen? Pak het op of meld het — wacht niet af.</>,
+          <><strong className="font-semibold text-[var(--color-ink)]">Bewaak afspraken:</strong> deadlines, klantafspraken en kwaliteit houd je zelf in de gaten.</>,
+        ]}
+        footer="Vragen mag altijd — kom waar het kan met een voorstel erbij in plaats van alleen de vraag."
+      />
 
       {/* Gebundeld ochtendoverzicht: verlopen deadlines, acties en aandachtspunten. */}
       <MorningOverviewCard data={morning} />

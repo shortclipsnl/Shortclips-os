@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { requireInternal } from "@/server/auth/context";
+import { requireInternal, isOwner } from "@/server/auth/context";
 import { getCapacityOverview } from "@/server/capacity";
 import { isCoreStaffByName } from "@/server/core-staff";
 import { PageHeader, Card, Badge, TeamAvatar } from "@/components/ui";
 import { euro } from "@/lib/format";
+import { CapacityLimitsEditor } from "./limits-editor";
 
 export const metadata: Metadata = { title: "Teamcapaciteit" };
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ const STATUS_STYLE: Record<string, { label: string; tone: "good" | "warn" | "bad
 export default async function CapacityPage() {
   const viewer = await requireInternal();
   const canSeeFinance = viewer.permissions.has("finance:read");
+  const canEditLimits = isOwner(viewer);
   const overview = await getCapacityOverview();
   const { params } = overview;
 
@@ -86,6 +88,10 @@ export default async function CapacityPage() {
         ) : null}
         {canSeeFinance && p.costPerMonth ? (
           <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">kosten {euro(p.costPerMonth)}/mnd</p>
+        ) : null}
+
+        {canEditLimits && p.unit !== "niet_gemeten" ? (
+          <CapacityLimitsEditor id={p.id} unitLabel={p.unitLabel} green={p.green} orange={p.orange} max={p.max} />
         ) : null}
       </div>
     );

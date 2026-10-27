@@ -365,7 +365,8 @@ export async function getOverloadedPeople(trusted = false): Promise<OverloadedPe
   const [peopleRes, editRes, shootRes, taskRes] = await Promise.all([
     db.execute(sql`
       select cp.user_id as "userId", cp.name, cp.role, cp.unit,
-             cp.limit_green as "green", u.full_name as "fullName"
+             cp.limit_green as "green", cp.limit_orange as "orange", cp.limit_max as "max",
+             u.full_name as "fullName"
       from capacity_people cp
       join users u on u.id = cp.user_id
       where cp.user_id is not null and u.deleted_at is null and u.status = 'active'
@@ -401,17 +402,25 @@ export async function getOverloadedPeople(trusted = false): Promise<OverloadedPe
   const TASK_LETOP = 4; // ≥ 4 taken over de deadline → meetellen als overbelasting
   const out: OverloadedPerson[] = [];
 
-  for (const p of rows<{ userId: string; name: string; role: string | null; unit: string; green: string | null; fullName: string }>(peopleRes)) {
+  for (const p of rows<{ userId: string; name: string; role: string | null; unit: string; green: string | null; orange: string | null; max: string | null; fullName: string }>(peopleRes)) {
     const load = p.unit === "shorts_4w" ? (editMap.get(p.userId) ?? 0) : (shootMap.get(p.userId) ?? 0);
     const green = p.green != null ? Number(p.green) : null;
+    const orange = p.orange != null ? Number(p.orange) : null;
+    const max = p.max != null ? Number(p.max) : null;
     const overdueTasks = taskMap.get(p.userId) ?? 0;
     const occupancy = load !== null && green ? Math.round((load / green) * 100) : null;
     const unitLabel = p.unit === "shorts_4w" ? "shorts in bewerking" : "opnames komende 4 weken";
 
+    // Zelfde realistische banden als Teamcapaciteit: rood (kritiek) pas boven het
+    // plafond (max/oranje, met terugval 50% boven groen) — niet al zodra iemand
+    // nét boven de comfortabele groene grens zit.
+    const ceiling = green !== null && green > 0 ? (max && max > green ? max : orange && orange > green ? orange : green * 1.5) : null;
     const reasons: string[] = [];
     let level: "hoog" | "kritiek" | null = null;
-    if (occupancy !== null && occupancy > 100) { level = "kritiek"; reasons.push(`${load} ${unitLabel} — ${occupancy}% van de gezonde grens (${green}).`); }
-    else if (occupancy !== null && occupancy >= 80) { level = "hoog"; reasons.push(`${load} ${unitLabel} — ${occupancy}% van de gezonde grens (${green}).`); }
+    if (green !== null && load > green) {
+      if (ceiling !== null && load > ceiling) { level = "kritiek"; reasons.push(`${load} ${unitLabel} — ${occupancy}% van de comfortabele grens (${green}), boven het plafond.`); }
+      else { level = "hoog"; reasons.push(`${load} ${unitLabel} — ${occupancy}% van de comfortabele grens (${green}).`); }
+    }
     if (overdueTasks >= TASK_LETOP) {
       reasons.push(`${overdueTasks} taken staan over de deadline.`);
       if (!level) level = "hoog";

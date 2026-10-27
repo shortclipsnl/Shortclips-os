@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Sparkles, CalendarClock, FileClock, AlarmClock, AlertTriangle } from "lucide-react";
+import { Sparkles, CalendarClock, FileClock, AlarmClock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { listScripting } from "@/server/scripting";
 import { upcomingScriptAppointments } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
-import { Card, CardHeader, ClientLogo, PageHeader, Stat, TeamAvatar } from "@/components/ui";
+import { Card, CardHeader, ClientLogo, GuidelineNote, PageHeader, Stat, TeamAvatar } from "@/components/ui";
 import { ScriptingBoard } from "./scripting-ui";
 
 export const metadata: Metadata = { title: "Scripting" };
@@ -45,6 +45,25 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
         <Stat label="Nog niet afgerond" value={String(stats.notDone)} tone={stats.notDone > 0 ? "warn" : "good"} icon={<FileClock />} href="/scripting?filter=niet-afgerond" />
         <Stat label="Deadline nadert" value={String(stats.deadlineSoon)} tone={stats.deadlineSoon > 0 ? "lime" : "good"} icon={<AlarmClock />} hint="binnen 7 dagen" href="/scripting?filter=nadert" />
         <Stat label="Te laat" value={String(stats.late)} tone={stats.late > 0 ? "bad" : "good"} icon={<AlertTriangle />} href="/scripting?filter=te-laat" />
+      </div>
+
+      {/* Compacte kwaliteitscheck — zichtbaar precies waar scripts worden
+          geschreven en gecontroleerd. Standaard dicht, één klik open. */}
+      <div className="mb-5">
+        <GuidelineNote
+          title="Kwaliteitscheck script — loop dit na vóór je doorstuurt"
+          icon={<ShieldCheck className="size-4" />}
+          tone="violet"
+          items={[
+            <><strong className="font-semibold text-[var(--color-ink)]">Hook direct duidelijk:</strong> in de eerste zinnen is het onderwerp herkenbaar — geen algemene opening.</>,
+            <><strong className="font-semibold text-[var(--color-ink)]">Nieuwsgierigheid:</strong> geef het antwoord niet te vroeg weg, tenzij het format (demo/snelle uitleg) daarom vraagt.</>,
+            <><strong className="font-semibold text-[var(--color-ink)]">Middenstuk:</strong> elke zin voegt iets toe, hoog tempo, geen herhaling of omslachtige uitleg.</>,
+            <><strong className="font-semibold text-[var(--color-ink)]">CTA past bij het doel:</strong> concrete vraag, poll of opslaan — alleen waar het logisch is.</>,
+            <><strong className="font-semibold text-[var(--color-ink)]">Hardop gelezen:</strong> natuurlijk taalgebruik, prettig uitspreekbaar, geen struikelzinnen.</>,
+            <><strong className="font-semibold text-[var(--color-ink)]">Eerdere klantfeedback verwerkt:</strong> tone of voice, afspraken en al behandelde onderwerpen meegenomen.</>,
+          ]}
+          footer="Jij bent zelf verantwoordelijk voor de kwaliteit voordat een script naar de klant gaat. Twijfel je? Leg het eerst voor aan een collega of gebruik de AI-scriptcontrole."
+        />
       </div>
 
       {viewer.permissions.has("video_intelligence:read") ? (

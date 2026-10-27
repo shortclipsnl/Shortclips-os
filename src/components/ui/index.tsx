@@ -515,3 +515,75 @@ export function InfoNote({
     </div>
   );
 }
+
+/* -------------------------- Kwaliteitsrichtlijn -------------------------- */
+
+const GUIDELINE_ACCENT: Record<Tone, string> = {
+  neutral: "var(--color-line-strong)",
+  info: "var(--color-info)",
+  good: "var(--color-good)",
+  warn: "var(--color-warn)",
+  bad: "var(--color-bad)",
+  lime: "var(--color-lime)",
+  violet: "var(--color-violet)",
+  ink: "var(--color-indigo-ink)",
+};
+
+/**
+ * Compact, uitklapbaar richtlijnblok in de huisstijl. Bedoeld om kort naast de
+ * taak zelf te tonen (scripts, contentplanning, dashboard) — standaard dicht,
+ * met één klik open. Werkt zonder JS (native <details>) en leest goed op mobiel.
+ *
+ * `icon` is optioneel (bijv. een lucide-icoon). `items` rendert als korte
+ * checklist; vrije inhoud kan ook via `children`.
+ */
+export function GuidelineNote({
+  title,
+  icon,
+  tone = "info",
+  defaultOpen = false,
+  items,
+  footer,
+  children,
+}: {
+  title: string;
+  icon?: ReactNode;
+  tone?: Tone;
+  defaultOpen?: boolean;
+  items?: ReactNode[];
+  footer?: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className="group sc-card overflow-hidden"
+      style={{ boxShadow: `inset 3px 0 0 ${GUIDELINE_ACCENT[tone]}` }}
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-sm font-semibold text-[var(--color-ink)] [&::-webkit-details-marker]:hidden">
+        {icon ? <span className="shrink-0 text-[var(--color-ink-muted)]">{icon}</span> : null}
+        <span className="min-w-0 flex-1">{title}</span>
+        <svg
+          className="size-4 shrink-0 text-[var(--color-ink-faint)] transition-transform group-open:rotate-180"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </summary>
+      <div className="border-t border-[var(--color-line)] px-3.5 py-3 text-sm leading-relaxed text-[var(--color-ink-muted)]">
+        {items && items.length > 0 ? (
+          <ul className="space-y-1.5">
+            {items.map((it, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="mt-[2px] shrink-0 text-[var(--color-ink-faint)]" style={{ color: GUIDELINE_ACCENT[tone] }} aria-hidden>✓</span>
+                <span className="min-w-0">{it}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {children}
+        {footer ? <p className="mt-2.5 text-xs text-[var(--color-ink-faint)]">{footer}</p> : null}
+      </div>
+    </details>
+  );
+}

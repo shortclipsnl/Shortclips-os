@@ -43,14 +43,23 @@ function n(v: string | number | null | undefined): number | null {
 }
 
 /**
- * Eén drempel, gelijk aan Editors en dashboard (#5): bezetting t.o.v. de
- * gezonde grens — <80% gezond, 80-100% hoog, >100% kritiek.
+ * Realistische statusbepaling met drie grenzen: groen = comfortabele werklast,
+ * max = het absolute plafond. Zo springt iemand niet meteen op "kritiek" (rood)
+ * zodra de belasting nét boven de comfortabele lijn komt — rood betekent
+ * daadwerkelijk overbelast (boven het plafond), niet gewoon een drukke periode.
+ *
+ * - t/m de groene grens → gezond
+ * - tussen groen en het plafond → hoog (druk, maar binnen de rek)
+ * - boven het plafond → kritiek
+ *
+ * Het plafond is `max` (of `orange` als er geen max is), met als laatste
+ * terugval 50% boven de groene grens.
  */
-function statusFor(load: number | null, green: number | null): CapacityStatus {
+function statusFor(load: number | null, green: number | null, orange: number | null, max: number | null): CapacityStatus {
   if (load === null || green === null || green <= 0) return "geen_data";
-  const pct = (load / green) * 100;
-  if (pct > 100) return "kritiek";
-  if (pct >= 80) return "hoog";
+  const ceiling = max && max > green ? max : orange && orange > green ? orange : green * 1.5;
+  if (load > ceiling) return "kritiek";
+  if (load > green) return "hoog";
   return "gezond";
 }
 
@@ -139,7 +148,7 @@ export async function getCapacityOverview(): Promise<{
     const green = n(row.limitGreen);
     const orange = n(row.limitOrange);
     const max = n(row.limitMax);
-    const status = statusFor(load, green);
+    const status = statusFor(load, green, orange, max);
     const occupancy = load !== null && green ? Math.round((load / green) * 100) : null;
 
     people.push({
