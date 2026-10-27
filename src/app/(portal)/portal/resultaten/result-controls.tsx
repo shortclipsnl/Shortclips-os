@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CalendarRange, Download } from "lucide-react";
+import { CalendarRange, Check, Download, Share2 } from "lucide-react";
 import { PORTAL_PERIODS } from "@/lib/portal-periods";
 
 /**
@@ -27,11 +27,34 @@ export function ResultControls({
   const [open, setOpen] = useState(false);
   const [van, setVan] = useState(from ?? "");
   const [tot, setTot] = useState(to ?? "");
+  const [copied, setCopied] = useState(false);
 
   const go = (q: string) => router.push(`${basePath}?${q}`);
   const applyCustom = () => {
     if (van && tot && van <= tot) go(`periode=custom&van=${van}&tot=${tot}`);
   };
+
+  // Rapport doorsturen/delen: op mobiel het OS-deelvenster (mail, WhatsApp, …),
+  // op desktop een terugval die de link naar het rapport kopieert.
+  async function shareReport() {
+    const url = typeof window !== "undefined" ? new URL(reportHref, window.location.origin).href : reportHref;
+    const data = { title: "ShortClips — jouw resultaten", text: "Bekijk de ShortClips-resultaten", url };
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share(data);
+        return;
+      }
+    } catch {
+      /* gebruiker annuleerde of delen niet beschikbaar → kopieer-terugval */
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* geen clipboard beschikbaar */
+    }
+  }
 
   return (
     <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -58,14 +81,23 @@ export function ResultControls({
         </button>
       </div>
 
-      <a
-        href={reportHref}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] px-4 py-1.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
-      >
-        <Download className="size-4" /> Download rapport
-      </a>
+      <div className="inline-flex shrink-0 items-center gap-2">
+        <a
+          href={reportHref}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] px-4 py-1.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+        >
+          <Download className="size-4" /> Download rapport
+        </a>
+        <button
+          type="button"
+          onClick={shareReport}
+          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-1.5 text-[13px] font-semibold text-[var(--color-ink)] transition-colors hover:bg-[var(--sc-fill-strong)]"
+        >
+          {copied ? <><Check className="size-4 text-[#2fd27a]" /> Link gekopieerd</> : <><Share2 className="size-4" /> Delen</>}
+        </button>
+      </div>
 
       {open ? (
         <div className="flex flex-wrap items-end gap-2 rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-inset)] p-3 sm:absolute sm:right-0 sm:top-full sm:z-10 sm:mt-2 sm:shadow-xl">
