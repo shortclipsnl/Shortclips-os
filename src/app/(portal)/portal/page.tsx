@@ -31,11 +31,11 @@ function dateFromIso(iso: string): Date {
   return new Date(`${iso}T12:00:00`);
 }
 
-/** Datumblok (grote dag + maand) — opvallende oranje huisstijlkleur, zodat
- *  belangrijke datums en opnames er meteen uitspringen. */
+/** Datumblok (grote dag + maand) in de huisstijl-blauw, zodat belangrijke datums
+ *  en opnames eruit springen — gelijk aan het interne platform (geen oranje). */
 function DateChip({ date }: { date: Date }) {
   return (
-    <div className="flex size-[58px] shrink-0 flex-col items-center justify-center rounded-[14px] bg-[#FF6A00] text-white shadow-[0_6px_16px_-6px_rgba(255,106,0,0.7)]">
+    <div className="flex size-[58px] shrink-0 flex-col items-center justify-center rounded-[14px] bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] text-white shadow-[0_6px_16px_-6px_rgba(27,95,224,0.6)]">
       <span className="text-xl font-bold leading-none tabular-nums">{date.getDate()}</span>
       <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/85">
         {date.toLocaleDateString("nl-NL", { month: "short", timeZone: TZ })}

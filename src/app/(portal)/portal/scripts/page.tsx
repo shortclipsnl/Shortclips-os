@@ -12,7 +12,9 @@ import { formatDateFull, relativeDays } from "@/lib/format";
 export const metadata: Metadata = { title: "Scripts" };
 export const dynamic = "force-dynamic";
 
-const TONE: Record<string, "warn" | "info" | "good" | "neutral"> = { warn: "warn", info: "info", good: "good", neutral: "neutral" };
+// "warn" (actie nodig) tonen we in het portaal als navy i.p.v. oranje, gelijk
+// aan het interne platform (geen oranje in de huisstijl).
+const TONE: Record<string, "ink" | "info" | "good" | "neutral"> = { warn: "ink", info: "info", good: "good", neutral: "neutral" };
 
 function StatusBadge({ status }: { status: PortalReviewListItem["status"] }) {
   const meta = SCRIPT_REVIEW_STATUS[status];
@@ -84,13 +86,13 @@ export default async function PortalScriptsPage() {
           )}
         </section>
 
-        <section className="sc-glass flex flex-col p-5" style={klaarCount > 0 ? { boxShadow: "inset 3px 0 0 #ffb020" } : undefined}>
+        <section className="sc-glass flex flex-col p-5" style={klaarCount > 0 ? { boxShadow: "inset 3px 0 0 var(--sc-accent)" } : undefined}>
           <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
             <MessageSquareText className="size-4 text-[var(--sc-accent)]" /> Scriptstatus
           </span>
           {klaarCount > 0 ? (
             <>
-              <div className="mt-3 text-[15px] font-semibold text-[#ffb020]">
+              <div className="mt-3 text-[15px] font-semibold text-[var(--sc-accent)]">
                 {klaarCount} script{klaarCount === 1 ? "" : "s"} {klaarCount === 1 ? "wacht" : "wachten"} op jouw controle
               </div>
               <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">Bekijk de scripts hieronder en geef je akkoord of feedback.</p>
@@ -107,20 +109,18 @@ export default async function PortalScriptsPage() {
         </section>
       </div>
 
-      {/* Leeswijzer: hoe lees en controleer je de scripts (document "Zo lees je de scripts") */}
-      <ScriptLeeswijzer feedbackDays={settings.feedbackDaysScripts} />
-
-      {/* Aankomende opnames — met het script dat erbij hoort ernaast, zodat
-          meteen duidelijk is welk script bij welke opname hoort. */}
+      {/* Aankomende opnames staan bovenaan (belangrijkst) — met het script dat
+          erbij hoort ernaast, zodat meteen duidelijk is welk script bij welke
+          opname hoort. De leeswijzer ("zo controleer je") staat eronder. */}
       {opnameRows.length > 0 ? (
         <section>
           <h2 className="mb-1 text-base font-semibold">Aankomende opnames & scripts</h2>
-          <p className="mb-3 text-[13px] text-[var(--color-ink-muted)]">Per opname zie je het bijbehorende script en de status. Scripts die op jou wachten staan oranje gemarkeerd.</p>
+          <p className="mb-3 text-[13px] text-[var(--color-ink-muted)]">Per opname zie je het bijbehorende script en de status. Scripts die op jou wachten zijn duidelijk gemarkeerd.</p>
           <div className="flex flex-col gap-3">
             {opnameRows.map((o) => {
               const actie = o.review ? CLIENT_ACTION_STATUSES.includes(o.review.status) : false;
               return (
-                <div key={o.key} className="sc-glass flex flex-wrap items-center gap-4 p-4" style={actie ? { boxShadow: "inset 3px 0 0 #ffb020" } : undefined}>
+                <div key={o.key} className="sc-glass flex flex-wrap items-center gap-4 p-4" style={actie ? { boxShadow: "inset 3px 0 0 var(--sc-accent)" } : undefined}>
                   <span className="grid size-11 shrink-0 flex-col place-items-center rounded-[12px] border border-[var(--sc-line)] bg-gradient-to-br from-[rgba(25,168,255,0.22)] to-[rgba(27,95,224,0.22)] text-center">
                     <span className="text-[16px] font-bold leading-none">{new Date(`${o.date}T12:00:00`).getDate()}</span>
                     <span className="text-[9px] uppercase text-[var(--color-ink-muted)]">{new Date(`${o.date}T12:00:00`).toLocaleDateString("nl-NL", { month: "short" })}</span>
@@ -154,6 +154,10 @@ export default async function PortalScriptsPage() {
           </div>
         </section>
       ) : null}
+
+      {/* Leeswijzer: hoe lees en controleer je de scripts ("Zo lees je de
+          scripts") — onder de aankomende scripts, want die zijn belangrijker. */}
+      <ScriptLeeswijzer feedbackDays={settings.feedbackDaysScripts} />
 
       {/* Eerder goedgekeurd */}
       {goedgekeurd.length > 0 ? (

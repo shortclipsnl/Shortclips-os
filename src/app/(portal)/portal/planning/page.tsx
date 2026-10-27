@@ -9,7 +9,7 @@ import { formatDateFull } from "@/lib/format";
 import { VoorbereidingOverzicht } from "@/components/portal/voorbereiding-overzicht";
 import { OpnamedagContent } from "../samenwerking/_content";
 
-export const metadata: Metadata = { title: "Planning" };
+export const metadata: Metadata = { title: "Opnameplanning" };
 export const dynamic = "force-dynamic";
 
 const TONE_CLS: Record<PortalScriptState["tone"], string> = {
@@ -209,7 +209,7 @@ export default async function PortalPlanningPage() {
   return (
     <div className="flex flex-col gap-7">
       <div>
-        <h1 className="text-[25px] font-bold tracking-tight">Planning</h1>
+        <h1 className="text-[25px] font-bold tracking-tight">Opnameplanning</h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Je opnames en scriptmeetings — automatisch bijgewerkt vanuit ons team.</p>
       </div>
 

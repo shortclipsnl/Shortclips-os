@@ -18,7 +18,7 @@ const ITEMS = [
   { href: "/portal", label: "Overzicht", icon: LayoutDashboard },
   { href: "/portal/videos", label: "Video's", icon: Video },
   { href: "/portal/scripts", label: "Scripts", icon: FileText },
-  { href: "/portal/planning", label: "Planning", icon: CalendarRange },
+  { href: "/portal/planning", label: "Opnameplanning", icon: CalendarRange },
   { href: "/portal/resultaten", label: "Resultaten", icon: BarChart3 },
   { href: "/portal/samenwerking", label: "Samenwerking", icon: Handshake },
 ];
