@@ -168,6 +168,7 @@ async function gatherContext(viewer: Viewer, pd: Pd): Promise<string> {
     feedback.afspraken ? `Communicatie-afspraken met de klant:\n${feedback.afspraken}` : "",
     feedback.aandachtspunten ? `Editing-/inhoud-aandachtspunten:\n${feedback.aandachtspunten}` : "",
     feedback.recenteKlantopmerkingen.length ? `Recente klant-opmerkingen op eerdere video's:\n- ${feedback.recenteKlantopmerkingen.join("\n- ")}` : "",
+    feedback.recenteScriptfeedback.length ? `Recente klantfeedback op eerdere SCRIPTS (uit de scriptcontrole in het portaal — verwerk dit en maak deze opmerkingen niet opnieuw):\n- ${feedback.recenteScriptfeedback.join("\n- ")}` : "",
     learned ? `Geleerde voorkeuren en terugkerende correcties van deze klant:\n${learned}` : "",
     central ? `Centrale ShortClips-richtlijnen:\n${central}` : "",
     winners,

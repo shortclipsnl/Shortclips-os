@@ -180,6 +180,7 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
     feedback.afspraken ? `Communicatie-afspraken: ${feedback.afspraken}` : "",
     feedback.aandachtspunten ? `Aandachtspunten: ${feedback.aandachtspunten}` : "",
     feedback.recenteKlantopmerkingen.length ? `Recente klantopmerkingen op eerdere video's:\n- ${feedback.recenteKlantopmerkingen.join("\n- ")}` : "",
+    feedback.recenteScriptfeedback.length ? `Recente klantfeedback op eerdere SCRIPTS (uit de scriptcontrole in het portaal — verwerk dit en maak deze opmerkingen niet opnieuw):\n- ${feedback.recenteScriptfeedback.join("\n- ")}` : "",
     learned ? `Geleerde voorkeuren en correcties van deze klant:\n${learned}` : "",
     patterns && patterns.count > 0 ? `Best presterende hooks van deze klant (echte cijfers${isAd ? " — organisch bereik, GEEN bewijs dat een advertentie converteert; gebruik als inspiratie, niet als resultaat" : " — spiegelen, niet kopiëren"}):\n${patterns.top.map((p) => `- "${p.hook}" (${p.views} views)`).join("\n")}` : "",
     viLines,

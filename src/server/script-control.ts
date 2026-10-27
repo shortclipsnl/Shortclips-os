@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { aiOutputs, clientAiProfiles, deliverables, reviewComments, reviewThreads, scripts } from "@/db/schema";
+import { aiOutputs, clientAiProfiles, deliverables, reviewComments, reviewThreads, scriptReviewComments, scriptReviewThreads, scriptReviews, scripts } from "@/db/schema";
 
 /**
  * Deterministische onderdelen van de AI Scriptcontrole (Deel 1): deze werken
@@ -53,13 +53,16 @@ export type FeedbackContext = {
   afspraken: string | null;
   aandachtspunten: string | null;
   recenteKlantopmerkingen: string[];
+  /** Recente klantfeedback op eerdere SCRIPTS (uit de scriptreviews in het
+   *  portaal: opmerkingen op de PDF + algemene feedback). */
+  recenteScriptfeedback: string[];
 };
 
 /** Bundelt eerdere klantfeedback (Deel 1.7): communicatie-afspraken +
  *  editing-aandachtspunten uit het klantprofiel + recente klant-opmerkingen op
  *  video's. Bron voor "eerdere feedback automatisch meenemen". */
 export async function gatherFeedbackContext(clientId: string): Promise<FeedbackContext> {
-  const [profile, comments] = await Promise.all([
+  const [profile, comments, scriptComments] = await Promise.all([
     db.select({ communication: clientAiProfiles.communicationProfile, editing: clientAiProfiles.editingProfile }).from(clientAiProfiles).where(eq(clientAiProfiles.clientId, clientId)).limit(1),
     db
       .select({ body: reviewComments.body })
@@ -69,6 +72,16 @@ export async function gatherFeedbackContext(clientId: string): Promise<FeedbackC
       .where(and(eq(deliverables.clientId, clientId), eq(reviewThreads.visibility, "client"), isNull(deliverables.deletedAt)))
       .orderBy(desc(reviewComments.createdAt))
       .limit(15),
+    // Klantfeedback op eerdere scripts (uit de scriptreviews: opmerkingen op de
+    // PDF + algemene feedback). Alleen opmerkingen ván de klant (niet intern).
+    db
+      .select({ body: scriptReviewComments.body })
+      .from(scriptReviewComments)
+      .innerJoin(scriptReviewThreads, eq(scriptReviewThreads.id, scriptReviewComments.threadId))
+      .innerJoin(scriptReviews, eq(scriptReviews.id, scriptReviewThreads.reviewId))
+      .where(and(eq(scriptReviews.clientId, clientId), eq(scriptReviewComments.isInternal, false), eq(scriptReviewThreads.visibility, "client"), isNull(scriptReviews.deletedAt)))
+      .orderBy(desc(scriptReviewComments.createdAt))
+      .limit(15),
   ]);
   const comm = (profile[0]?.communication ?? {}) as { afspraken?: string };
   const edit = (profile[0]?.editing ?? {}) as { aandachtspunten?: string };
@@ -76,6 +89,7 @@ export async function gatherFeedbackContext(clientId: string): Promise<FeedbackC
     afspraken: comm.afspraken?.trim() || null,
     aandachtspunten: edit.aandachtspunten?.trim() || null,
     recenteKlantopmerkingen: comments.map((c) => c.body).filter((b): b is string => Boolean(b && b.trim())).slice(0, 10),
+    recenteScriptfeedback: scriptComments.map((c) => c.body).filter((b): b is string => Boolean(b && b.trim())).slice(0, 10),
   };
 }
 
