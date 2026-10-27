@@ -63,6 +63,8 @@ export async function getMyDay(viewer: Viewer): Promise<{ shoots: MyShoot[]; tas
           isNull(tasks.deletedAt),
           isNull(tasks.archivedAt),
           inArray(tasks.status, ["todo", "in_progress", "blocked"]),
+          // Automatisch gegenereerde AI-verbeterpunten horen niet in de to-do.
+          sql`not (${tasks.source} = 'automation' and ${tasks.entityType} = 'ai_insight')`,
         ),
       )
       .orderBy(sql`${tasks.dueOn} asc nulls last`)

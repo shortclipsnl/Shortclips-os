@@ -89,6 +89,8 @@ export async function getEditorDashboard(viewer: Viewer) {
           isNull(tasks.deletedAt),
           eq(tasks.assigneeId, viewer.id),
           sql`${tasks.status} in ('todo','in_progress','blocked')`,
+          // Automatisch gegenereerde AI-verbeterpunten niet tonen.
+          sql`not (${tasks.source} = 'automation' and ${tasks.entityType} = 'ai_insight')`,
         ),
       )
       .orderBy(asc(tasks.dueOn))

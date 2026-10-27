@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, handoverNotes, tasks, users } from "@/db/schema";
 import { requireInternal, scopeToClients } from "@/server/auth/context";
@@ -25,7 +25,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     db
       .select({ id: tasks.id, assigneeId: tasks.assigneeId, dueOn: tasks.dueOn })
       .from(tasks)
-      .where(and(isNull(tasks.deletedAt), inArray(tasks.status, [...OPEN]), ne(tasks.source, "automation"), scopeToClients(viewer, tasks.clientId))),
+      .where(and(isNull(tasks.deletedAt), inArray(tasks.status, [...OPEN]), sql`not (${tasks.source} = 'automation' and ${tasks.entityType} = 'ai_insight')`, scopeToClients(viewer, tasks.clientId))),
     db
       .select({ id: handoverNotes.id, body: handoverNotes.body, authorId: handoverNotes.authorId, forUserId: handoverNotes.forUserId, resolvedById: handoverNotes.resolvedById, createdAt: handoverNotes.createdAt, resolvedAt: handoverNotes.resolvedAt })
       .from(handoverNotes)
@@ -63,10 +63,10 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   // Personenrij: het kernteam in de vaste volgorde (Jarno, Milou, Jiska, Rutger).
   const core = [...office].sort((a, b) => coreStaffRank(a.email) - coreStaffRank(b.email));
 
-  // Taken voor de geselecteerde weergave ophalen. Automatisch aangemaakte taken
-  // (opname-/script-/deadline-signalen, `source: "automation"`) horen op de
-  // meldingenpagina en blijven hier buiten beeld: op Taken staan alleen de
-  // daadwerkelijke werkzaamheden en actiepunten die het team zelf toevoegt.
+  // Taken voor de geselecteerde weergave ophalen. De automatisch gegenereerde
+  // AI-verbeterpunten (source "automation" + entiteit "ai_insight") blijven hier
+  // buiten beeld — die horen niet in de takenlijst. Echte actiepunten en
+  // handmatig doorgezette verbeterpunten blijven gewoon staan.
   async function fetchTasks(where: ReturnType<typeof and>) {
     return db
       .select({
@@ -87,7 +87,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       .from(tasks)
       .leftJoin(clients, eq(clients.id, tasks.clientId))
       .leftJoin(users, eq(users.id, tasks.assigneeId))
-      .where(and(where, ne(tasks.source, "automation")))
+      .where(and(where, sql`not (${tasks.source} = 'automation' and ${tasks.entityType} = 'ai_insight')`))
       .orderBy(asc(tasks.dueOn), desc(tasks.priority))
       .limit(400);
   }

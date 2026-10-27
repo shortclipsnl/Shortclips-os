@@ -314,6 +314,8 @@ export async function getDashboard(viewer: Viewer) {
         and(
           isNull(tasks.deletedAt),
           inArray(tasks.status, ["todo", "in_progress", "blocked"]),
+          // Automatisch gegenereerde AI-verbeterpunten niet meetellen.
+          sql`not (${tasks.source} = 'automation' and ${tasks.entityType} = 'ai_insight')`,
           taskScope,
         ),
       )

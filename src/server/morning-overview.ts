@@ -69,6 +69,8 @@ export async function getMorningOverview(viewer: Viewer): Promise<MorningOvervie
       inArray(tasks.status, ["todo", "in_progress", "blocked"]),
       lte(tasks.dueOn, t),
       sql`${tasks.dueOn} is not null`,
+      // Automatisch gegenereerde AI-verbeterpunten niet meetellen.
+      sql`not (${tasks.source} = 'automation' and ${tasks.entityType} = 'ai_insight')`,
     ));
 
   // Nu te laat volgens de prestatieregistratie (team-breed).
