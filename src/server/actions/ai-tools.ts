@@ -8,6 +8,7 @@ import { assertClientAccess, ForbiddenError, requirePermission } from "@/server/
 import { auditLog } from "@/server/audit";
 import { runJsonPrompt, type AiDoc, type AiImage } from "@/server/ai/client";
 import { extractDocxText } from "@/server/ai/docx";
+import { createScriptUploadTarget, downloadScriptPdf } from "@/server/scripts/script-storage";
 import {
   captionProfileToText,
   centralKnowledgeText,
@@ -33,6 +34,43 @@ async function clientName(clientId: string): Promise<string> {
 
 function docFrom(pdfBase64?: string | null): AiDoc[] {
   return pdfBase64 ? [{ base64: pdfBase64, mediaType: "application/pdf" }] : [];
+}
+
+/**
+ * Lost de PDF op tot base64: rechtstreeks uit `pdfBase64`, of — voor grote
+ * bestanden — uit de opslag via `pdfStoragePath`. Grote PDF's (jullie script-
+ * exports zijn al snel 3,5–5MB) passen niet base64-inline door Vercel's harde
+ * ~4,5MB request-limiet; die worden daarom direct naar de opslag geüpload en
+ * hier server-side opgehaald.
+ */
+async function resolvePdfBase64(pdfBase64?: string | null, pdfStoragePath?: string | null): Promise<string | undefined> {
+  if (pdfBase64) return pdfBase64;
+  if (pdfStoragePath) {
+    const buf = await downloadScriptPdf(pdfStoragePath);
+    if (buf) return buf.toString("base64");
+  }
+  return undefined;
+}
+
+/**
+ * Signed upload-URL voor een caption-PDF. De browser uploadt het (grote)
+ * scriptbestand direct naar de opslag — langs Vercel's ~4,5MB request-limiet —
+ * en de caption-generatie haalt het daarna server-side op. Geeft null terug als
+ * de opslag niet is ingesteld; de UI valt dan terug op base64 (kleine bestanden).
+ */
+export async function createCaptionPdfUploadUrl(
+  clientId: string,
+): Promise<{ ok: true; uploadUrl: string; key: string; headers: Record<string, string> } | { ok: false; message?: string }> {
+  try {
+    const viewer = await requirePermission("ai:read");
+    assertClientAccess(viewer, clientId);
+    const target = await createScriptUploadTarget(clientId);
+    if (!target) return { ok: false };
+    return { ok: true, uploadUrl: target.uploadUrl, key: target.key, headers: target.headers };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
 }
 
 /** Voegt tekst uit een geüpload Word-bestand toe aan de geplakte scripttekst. */
@@ -82,6 +120,8 @@ export async function generateCaptions(input: {
   clientId: string;
   scriptText?: string;
   pdfBase64?: string;
+  /** Verwijzing naar een PDF in de opslag (voor grote bestanden i.p.v. base64). */
+  pdfStoragePath?: string;
   docxBase64?: string;
   /** Taal van de captions: Nederlands (standaard) of Engels. */
   language?: "nl" | "en";
@@ -92,7 +132,8 @@ export async function generateCaptions(input: {
     const viewer = await requirePermission("ai:read");
     assertClientAccess(viewer, input.clientId);
     const scriptText = await mergeDocx(input.scriptText, input.docxBase64);
-    if (!scriptText.trim() && !input.pdfBase64) {
+    const pdfB64 = await resolvePdfBase64(input.pdfBase64, input.pdfStoragePath);
+    if (!scriptText.trim() && !pdfB64) {
       return { ok: false, message: "Plak scripttekst of upload een PDF/Word-bestand." };
     }
     const lang = input.language === "en" ? "en" : "nl";
@@ -142,7 +183,7 @@ ${scriptText.trim() ? `De scripts:\n\n${scriptText.trim()}` : "De scripts staan 
     const res = await runJsonPrompt<ShortCaption[]>({
       system,
       user,
-      documents: docFrom(input.pdfBase64),
+      documents: docFrom(pdfB64),
       maxTokens: 12000,
     });
     if (!res.ok) {
@@ -175,6 +216,8 @@ export async function regenerateOneCaption(input: {
   hook: string;
   scriptText?: string;
   pdfBase64?: string;
+  /** Verwijzing naar een PDF in de opslag (voor grote bestanden i.p.v. base64). */
+  pdfStoragePath?: string;
   /** Variant van de nieuwe versie. Leeg = gewoon een frisse variatie. */
   variant?: "variatie" | "met_cta" | "zonder_cta" | "korter" | "langer";
   /** Taal: Nederlands (standaard) of Engels. */
@@ -184,6 +227,7 @@ export async function regenerateOneCaption(input: {
     const viewer = await requirePermission("ai:read");
     assertClientAccess(viewer, input.clientId);
     const lang = input.language === "en" ? "en" : "nl";
+    const pdfB64 = await resolvePdfBase64(input.pdfBase64, input.pdfStoragePath);
 
     const name = await clientName(input.clientId);
     const profile = await getClientAiProfile(input.clientId);
@@ -212,7 +256,7 @@ ${instr}
 
 Short: "${input.shortTitle}"
 Hook: "${input.hook}"
-${input.scriptText?.trim() ? `\nContext (volledige scripts):\n${input.scriptText.trim()}` : input.pdfBase64 ? "\nDe scripts staan in het bijgevoegde document." : ""}
+${input.scriptText?.trim() ? `\nContext (volledige scripts):\n${input.scriptText.trim()}` : pdfB64 ? "\nDe scripts staan in het bijgevoegde document." : ""}
 
 Geef UITSLUITEND geldige JSON terug in dit formaat:
 {
@@ -222,7 +266,7 @@ Geef UITSLUITEND geldige JSON terug in dit formaat:
   "hashtags": ["#.."]
 }`;
 
-    const res = await runJsonPrompt<ShortCaption>({ system, user, documents: docFrom(input.pdfBase64), maxTokens: 2000 });
+    const res = await runJsonPrompt<ShortCaption>({ system, user, documents: docFrom(pdfB64), maxTokens: 2000 });
     if (!res.ok) {
       return res.reason === "no_provider"
         ? { ok: false, reason: "no_provider", message: "Er is nog geen AI-sleutel ingesteld." }

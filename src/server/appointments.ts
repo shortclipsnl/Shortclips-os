@@ -61,6 +61,9 @@ export async function upcomingAppointmentsForClient(
       and(
         eq(calendarEvents.clientId, clientId),
         gte(calendarEvents.startsAt, new Date()),
+        // Verwijderde/geannuleerde afspraken (in Google verwijderd → door de sync
+        // op 'cancelled' gezet) niet meer tonen.
+        or(isNull(calendarEvents.status), ne(calendarEvents.status, "cancelled")),
       ),
     )
     .orderBy(asc(calendarEvents.startsAt))
@@ -77,6 +80,9 @@ export async function nextShootForClient(clientId: string): Promise<Appointment 
         eq(calendarEvents.clientId, clientId),
         eq(calendarEvents.kind, "opname"),
         gte(calendarEvents.startsAt, new Date()),
+        // Een in Google verwijderde opname is 'cancelled' en mag nooit meer als
+        // "eerstvolgende opname" verschijnen.
+        or(isNull(calendarEvents.status), ne(calendarEvents.status, "cancelled")),
       ),
     )
     .orderBy(asc(calendarEvents.startsAt))
@@ -101,6 +107,8 @@ export async function unmatchedAppointments(limit = 100): Promise<UnmatchedAppoi
         isNull(calendarEvents.clientId),
         ne(calendarEvents.kind, "intern"),
         gte(calendarEvents.startsAt, since),
+        // Geannuleerde/verwijderde afspraken horen niet in de controlelijst.
+        or(isNull(calendarEvents.status), ne(calendarEvents.status, "cancelled")),
       ),
     )
     .orderBy(asc(calendarEvents.startsAt))
@@ -123,7 +131,9 @@ export async function appointmentReviewStats(): Promise<{
       kind: calendarEvents.kind,
       syncedAt: calendarEvents.syncedAt,
     })
-    .from(calendarEvents);
+    .from(calendarEvents)
+    // Geannuleerde/verwijderde afspraken niet meetellen in de statistiek.
+    .where(or(isNull(calendarEvents.status), ne(calendarEvents.status, "cancelled")));
 
   let matched = 0;
   let needsReview = 0;

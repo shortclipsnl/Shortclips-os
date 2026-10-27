@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CalendarPlus, Check, FileText, Film, Languages, Loader2, RefreshCw, Sparkles, Tag, X } from "lucide-react";
-import { addCaptionToPlanning, generateCaptions, regenerateOneCaption, getShootVideoSummary, type ShortCaption } from "@/server/actions/ai-tools";
+import { addCaptionToPlanning, createCaptionPdfUploadUrl, generateCaptions, regenerateOneCaption, getShootVideoSummary, type ShortCaption } from "@/server/actions/ai-tools";
 import { listShootDaysForClient } from "@/server/actions/script-generate";
 import { getCaptionFooter, setCaptionFooter } from "@/server/actions/caption-footer";
 import { Button, Card, ErrorNote } from "@/components/ui";
@@ -38,7 +38,11 @@ export function CaptionMaker({
 }) {
   const [clientId, setClientId] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
-  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  // Het gekozen PDF-bestand blijft als File bewaard; de upload naar de opslag
+  // gebeurt pas bij 'genereren' (dan is de klant gekozen). `pdfRef` is de
+  // resolved verwijzing (opslagpad of base64-terugval), herbruikt bij regenereren.
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfRef, setPdfRef] = useState<{ storagePath?: string; base64?: string } | null>(null);
   const [docxBase64, setDocxBase64] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [results, setResults] = useState<ShortCaption[] | null>(null);
@@ -102,20 +106,46 @@ export function CaptionMaker({
     }
     setErr(null);
     setFileName(file.name);
-    const b64 = await fileToBase64(file);
+    setPdfRef(null);
     if (file.name.toLowerCase().endsWith(".docx")) {
-      setDocxBase64(b64);
-      setPdfBase64(null);
+      // Word-bestanden zijn klein → gewoon base64 (geen uploadlimiet-probleem).
+      setPdfFile(null);
+      setDocxBase64(await fileToBase64(file));
     } else {
-      setPdfBase64(b64);
+      // PDF: pas bij genereren uploaden (klant dan bekend), dus hier alleen bewaren.
       setDocxBase64(null);
+      setPdfFile(file);
     }
   }
 
   function clearFile() {
     setFileName(null);
-    setPdfBase64(null);
+    setPdfFile(null);
+    setPdfRef(null);
     setDocxBase64(null);
+  }
+
+  // Lost het PDF-bestand op tot een verwijzing: upload groot bestand direct naar
+  // de opslag (langs Vercel's ~4,5MB request-limiet) en geef het opslagpad terug;
+  // lukt dat niet, val terug op base64 (werkt voor kleine bestanden). Eenmaal
+  // opgelost wordt de verwijzing hergebruikt (ook bij regenereren).
+  async function resolvePdf(): Promise<{ storagePath?: string; base64?: string } | null> {
+    if (!pdfFile) return null;
+    if (pdfRef) return pdfRef;
+    let ref: { storagePath?: string; base64?: string };
+    try {
+      const up = await createCaptionPdfUploadUrl(clientId);
+      if (up.ok && up.uploadUrl && up.key) {
+        const put = await fetch(up.uploadUrl, { method: "PUT", headers: up.headers, body: pdfFile });
+        ref = put.ok ? { storagePath: up.key } : { base64: await fileToBase64(pdfFile) };
+      } else {
+        ref = { base64: await fileToBase64(pdfFile) };
+      }
+    } catch {
+      ref = { base64: await fileToBase64(pdfFile) };
+    }
+    setPdfRef(ref);
+    return ref;
   }
 
   async function onDrop(e: React.DragEvent) {
@@ -129,13 +159,14 @@ export function CaptionMaker({
       setErr("Kies eerst een klant.");
       return;
     }
-    if (!pdfBase64 && !docxBase64) {
+    if (!pdfFile && !docxBase64) {
       setErr("Sleep het scriptbestand erin (PDF of Word).");
       return;
     }
     setErr(null);
     start(async () => {
-      const res = await generateCaptions({ clientId, pdfBase64: pdfBase64 ?? undefined, docxBase64: docxBase64 ?? undefined, language, productionDayId: shootDayId || undefined });
+      const ref = await resolvePdf();
+      const res = await generateCaptions({ clientId, pdfBase64: ref?.base64, pdfStoragePath: ref?.storagePath, docxBase64: docxBase64 ?? undefined, language, productionDayId: shootDayId || undefined });
       if (res.ok) setResults(res.data);
       else setErr(res.message);
     });
@@ -253,7 +284,7 @@ export function CaptionMaker({
               short={short}
               clientId={clientId}
               footer={footer}
-              pdfBase64={pdfBase64}
+              pdfRef={pdfRef}
               language={language}
               productionDayId={shootDayId || undefined}
               onChange={(next) => setResults((cur) => cur!.map((s, j) => (j === i ? next : s)))}
@@ -277,7 +308,7 @@ function ShortBlock({
   short,
   clientId,
   footer,
-  pdfBase64,
+  pdfRef,
   language,
   productionDayId,
   onChange,
@@ -286,7 +317,7 @@ function ShortBlock({
   short: ShortCaption;
   clientId: string;
   footer: string;
-  pdfBase64: string | null;
+  pdfRef: { storagePath?: string; base64?: string } | null;
   language: "nl" | "en";
   productionDayId?: string;
   onChange: (s: ShortCaption) => void;
@@ -308,7 +339,8 @@ function ShortBlock({
         clientId,
         shortTitle: short.shortTitle,
         hook: short.hook,
-        pdfBase64: pdfBase64 ?? undefined,
+        pdfBase64: pdfRef?.base64,
+        pdfStoragePath: pdfRef?.storagePath,
         variant,
         language,
       });
