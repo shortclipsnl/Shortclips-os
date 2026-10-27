@@ -14,8 +14,12 @@ const nextConfig: NextConfig = {
     "/vermogen/vermogen-db-shim.js": ["./data/vermogen/vermogen-db-shim.js"],
   },
   experimental: {
-    // Server actions krijgen soms grotere payloads (import-wizard, scripts).
-    serverActions: { bodySizeLimit: "4mb" },
+    // Server actions krijgen soms grotere payloads: de import-wizard en vooral
+    // script-PDF's die als base64 worden verstuurd. Een PDF van ~15MB (de
+    // bovengrens van het scriptreview-systeem) wordt als base64 ~20MB, dus de
+    // limiet staat daarop afgestemd. (Het platform kan een eigen bovengrens
+    // hebben; grote uploads landen pas als het hostingplan dat toelaat.)
+    serverActions: { bodySizeLimit: "20mb" },
   },
   async headers() {
     return [
