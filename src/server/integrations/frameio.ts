@@ -118,9 +118,11 @@ export class FrameService {
       cache: "no-store",
     });
     if (!response.ok) {
+      const bodyText = await response.text().catch(() => "");
+      const expired = this.refreshToken && (response.status === 400 || response.status === 401);
       throw new IntegrationError(
         "frameio",
-        `Access-token ophalen bij Adobe mislukt (HTTP ${response.status})`,
+        `Adobe IMS gaf HTTP ${response.status} bij het ophalen van een Frame.io-access-token${expired ? " — het FRAMEIO_REFRESH_TOKEN is waarschijnlijk verlopen" : ""}.${bodyText ? ` ${bodyText.slice(0, 200)}` : ""}`,
         response.status,
         response.status >= 500,
       );
@@ -173,7 +175,20 @@ export class FrameService {
       };
     } catch (error) {
       const err = error as IntegrationError;
-      return { ok: false, message: err.userMessage ?? "Verbinding mislukt.", detail: { error: err.message } };
+      const raw = err?.message ?? "";
+      if (err instanceof MissingCredentialsError) {
+        return { ok: false, message: err.userMessage, detail: { error: raw } };
+      }
+      // Meest voorkomende oorzaak concreet benoemen: verlopen refresh-token.
+      if (/refresh-token|access-token|adobe|ims|HTTP 40[01]/i.test(raw) || err?.status === 400 || err?.status === 401 || err?.status === 403) {
+        return {
+          ok: false,
+          message:
+            "Frame.io-verbinding mislukt — het toegangstoken kon niet worden opgehaald bij Adobe. Meestal is het FRAMEIO_REFRESH_TOKEN verlopen. Vernieuw het met `npm run frameio:token` en werk FRAMEIO_REFRESH_TOKEN bij in Vercel (Environment Variables).",
+          detail: { error: raw },
+        };
+      }
+      return { ok: false, message: err.userMessage ?? "Verbinding mislukt.", detail: { error: raw } };
     }
   }
 
