@@ -4,7 +4,7 @@ import { ArrowRight, Bell, CalendarRange, Camera, ClipboardCheck, Clock, Eye, Fi
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalData } from "@/server/portal";
 import { CLIENT_ACTION_STATUSES, listPortalScriptReviews } from "@/server/script-review";
-import { Avatar, buttonClass, ClientLogo } from "@/components/ui";
+import { buttonClass, ClientLogo, TeamAvatar } from "@/components/ui";
 import { compact, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
 
@@ -31,12 +31,13 @@ function dateFromIso(iso: string): Date {
   return new Date(`${iso}T12:00:00`);
 }
 
-/** Datumblok (grote dag + maand) in de huisstijl — links in een planningskaart. */
+/** Datumblok (grote dag + maand) — opvallende oranje huisstijlkleur, zodat
+ *  belangrijke datums en opnames er meteen uitspringen. */
 function DateChip({ date }: { date: Date }) {
   return (
-    <div className="flex size-[58px] shrink-0 flex-col items-center justify-center rounded-[14px] border border-[var(--sc-line)] bg-gradient-to-br from-[rgba(25,168,255,0.22)] to-[rgba(27,95,224,0.22)]">
+    <div className="flex size-[58px] shrink-0 flex-col items-center justify-center rounded-[14px] bg-[#FF6A00] text-white shadow-[0_6px_16px_-6px_rgba(255,106,0,0.7)]">
       <span className="text-xl font-bold leading-none tabular-nums">{date.getDate()}</span>
-      <span className="mt-0.5 text-[10px] uppercase tracking-wider text-[var(--color-ink-muted)]">
+      <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/85">
         {date.toLocaleDateString("nl-NL", { month: "short", timeZone: TZ })}
       </span>
     </div>
@@ -299,14 +300,18 @@ export default async function PortalPage() {
         )}
       </section>
 
-      {/* Vaste contactpersoon — compact, met directe knoppen */}
+      {/* Vaste contactpersoon — met profielfoto, contactgegevens en directe knoppen */}
       {coordinator ? (
         <section className="sc-glass flex flex-wrap items-center gap-4 p-5">
-          <Avatar name={coordinator.name} size={48} src={coordinator.avatarUrl} />
+          <TeamAvatar name={coordinator.name} avatarUrl={coordinator.avatarUrl} size={56} />
           <div className="min-w-0 flex-1">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Je vaste contactpersoon</div>
             <div className="mt-0.5 text-[15px] font-semibold">{coordinator.name}</div>
             <div className="text-[13px] text-[var(--color-ink-muted)]">{coordinator.role}</div>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[12.5px] text-[var(--color-ink-muted)]">
+              {coordinator.phone ? <span className="inline-flex items-center gap-1"><Phone className="size-3" /> {coordinator.phone}</span> : null}
+              {coordinator.email ? <span className="inline-flex items-center gap-1"><Mail className="size-3" /> {coordinator.email}</span> : null}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {coordinator.phone ? (

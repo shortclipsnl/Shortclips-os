@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Building2, CalendarClock, ClipboardList, Clock, Film, Globe, Mail, Phone, Scale, UserRound, Users } from "lucide-react";
+import { Building2, CalendarClock, ClipboardList, Clock, Film, Globe, Mail, MessageCircle, Phone, Scale, UserRound, Users } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalProfile } from "@/server/portal";
 import { getPortalSettingsForClient } from "@/server/portal-settings";
 import { buildAfsprakenGroepen } from "@/lib/portal-afspraken";
-import { Avatar, buttonClass } from "@/components/ui";
+import { buttonClass, TeamAvatar } from "@/components/ui";
 import { formatDate, formatDateFull } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
 import { OpnamedagContent, RolverdelingContent, TeamContent } from "./_content";
@@ -15,14 +15,16 @@ export const dynamic = "force-dynamic";
 /** De diensten die standaard in elk Shortclips-pakket zitten. */
 const INBEGREPEN = ["Contentstrategie & scripts", "Opnamedag & regie", "Montage, ondertiteling & audio", "Captions & hashtags", "Planning & publicatie", "Analyse & rapportage"];
 
+/** Donkerblauw informatieblok met witte tekst — zodat de belangrijkste
+ *  samenwerkingsinfo er duidelijk uitspringt (huisstijl navy). */
 function StatBlock({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
-    <div className="sc-glass p-5">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-        <span className="text-[var(--sc-accent)]">{icon}</span> {label}
+    <div className="rounded-[14px] bg-[var(--color-indigo-ink)] p-5 text-white shadow-[var(--shadow-card)]">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-white/65">
+        <span className="text-[#4bc4ff]">{icon}</span> {label}
       </div>
       <div className="mt-2 text-[22px] font-bold leading-tight">{value}</div>
-      {sub ? <div className="mt-0.5 text-[12px] text-[var(--color-ink-faint)]">{sub}</div> : null}
+      {sub ? <div className="mt-0.5 text-[12px] text-white/55">{sub}</div> : null}
     </div>
   );
 }
@@ -175,13 +177,15 @@ export default async function PortalSamenwerkingPage() {
           <section className="sc-glass flex flex-col justify-center p-6">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Direct contact</span>
             <div className="mt-3 flex items-center gap-3.5">
-              <Avatar name={coord.name} size={52} src={coord.avatarUrl} />
+              <TeamAvatar name={coord.name} avatarUrl={coord.avatarUrl} size={56} />
               <div>
                 <div className="text-[16px] font-semibold">{coord.name}</div>
                 <div className="text-[13px] text-[var(--color-ink-muted)]">{coord.role}</div>
+                {coord.phone ? <div className="mt-0.5 inline-flex items-center gap-1 text-[12.5px] text-[var(--color-ink-muted)]"><Phone className="size-3" /> {coord.phone}</div> : null}
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
+              {coord.phone ? <a href={`https://wa.me/${coord.phone.replace(/[^\d]/g, "").replace(/^0/, "31")}`} target="_blank" rel="noreferrer" className={buttonClass({ variant: "accent", size: "sm" })}><MessageCircle className="size-4" /> WhatsApp</a> : null}
               {coord.email ? <a href={`mailto:${coord.email}`} className={buttonClass({ variant: "primary", size: "sm" })}><Mail className="size-4" /> E-mail</a> : null}
               {coord.phone ? <a href={`tel:${coord.phone}`} className={buttonClass({ variant: "secondary", size: "sm" })}><Phone className="size-4" /> Bellen</a> : null}
             </div>

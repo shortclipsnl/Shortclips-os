@@ -1,6 +1,6 @@
 import { Check, Clock, Mail, MessageCircle, MessageSquareText, Phone, ShieldCheck, Users, Video } from "lucide-react";
 import type { PortalContactPerson } from "@/server/portal";
-import { Avatar, buttonClass, Card } from "@/components/ui";
+import { buttonClass, Card, TeamAvatar } from "@/components/ui";
 
 /* ---------------------------------------------------------------- *
  * Werkwijze (opnamedag + rolverdeling) — tab binnen Samenwerking.
@@ -136,10 +136,14 @@ function ContactCard({ person, focus, showWhatsApp = false }: { person: PortalCo
   return (
     <Card>
       <div className="flex items-center gap-4">
-        <Avatar name={person.name} size={52} src={person.avatarUrl} />
+        <TeamAvatar name={person.name} avatarUrl={person.avatarUrl} size={56} />
         <div className="min-w-0">
           <p className="text-base font-semibold text-[var(--color-ink)]">{person.name}</p>
           <p className="text-sm text-[var(--color-ink-muted)]">{person.role}</p>
+          <div className="mt-0.5 flex flex-col gap-0.5 text-[12px] text-[var(--color-ink-muted)]">
+            {person.phone ? <span className="inline-flex items-center gap-1"><Phone className="size-3" /> {person.phone}</span> : null}
+            {person.email ? <span className="inline-flex items-center gap-1"><Mail className="size-3" /> {person.email}</span> : null}
+          </div>
         </div>
       </div>
       {focus ? (
