@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { readSession, type SessionUser } from "./session";
 import type { PermissionKey } from "./permissions";
+import { isCoreStaff } from "@/server/core-staff";
 
 /**
  * De "viewer": wie kijkt er, wat mag die, en welke klanten mag die zien.
@@ -65,6 +66,12 @@ async function loadClientScope(
 ): Promise<string[] | null> {
   if (user.primaryRole === "client") return user.clientId ? [user.clientId] : [];
   if (perms.has("clients:read_all")) return null;
+  // Het vaste kantoorteam (Milou, Jiska, Rutger) beheert alle klanten, net als de
+  // eigenaar — zij zien overal hetzelfde beeld als Jarno. De DB-rol kan dit recht
+  // missen doordat later toegevoegde rollenrechten niet met terugwerkende kracht
+  // worden toegekend; deze vaste uitzondering (zelfde patroon als het editing-board)
+  // zorgt dat zij niet op "Deze klant hoort niet bij jouw toegang" lopen.
+  if (isCoreStaff(user.email)) return null;
 
   const owned = await db
     .select({ id: clients.id })

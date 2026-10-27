@@ -415,7 +415,15 @@ export async function assignEditor(
   editorId: string | null,
 ): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:assign");
+    // Editors toewijzen mag iedereen met videos:assign én het vaste kantoorteam
+    // (Milou, Jiska, Rutger), net als de eigenaar — zelfde uitzondering als bij
+    // het bijwerken van de bestanden (mayEditVideoFiles).
+    const viewer = await requireInternal();
+    if (!viewer.permissions.has("videos:assign") && !isCoreStaff(viewer.email)) {
+      throw new ForbiddenError(
+        `Hiervoor is het recht "videos:assign" nodig. Vraag een beheerder om toegang.`,
+      );
+    }
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);

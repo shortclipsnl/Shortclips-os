@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BookOpen, ExternalLink, Film, Lock, Users } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
+import { isCoreStaff } from "@/server/core-staff";
 import { getVideo } from "@/server/videos";
 import {
   Avatar,
@@ -242,7 +243,7 @@ export default async function VideoPage({
             </dl>
           </Card>
 
-          {viewer.permissions.has("videos:assign") ? (
+          {viewer.permissions.has("videos:assign") || isCoreStaff(viewer.email) ? (
             <Card>
               <CardHeader title="Toewijzing" />
               <div className="mt-4">
