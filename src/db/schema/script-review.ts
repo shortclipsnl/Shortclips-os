@@ -57,7 +57,11 @@ export const scriptReviewVersions = pgTable(
     fileName: varchar("file_name", { length: 255 }).notNull(),
     contentType: varchar("content_type", { length: 100 }).notNull(),
     sizeBytes: integer("size_bytes").notNull(),
-    dataBase64: text("data_base64").notNull(),
+    /** Oude versies: PDF als base64 in de database. Nieuwe, grote uploads gaan
+     *  via `storagePath` naar Supabase Storage (langs de 4,5MB-requestlimiet). */
+    dataBase64: text("data_base64"),
+    /** Opslagsleutel in Supabase Storage (als de PDF daar staat i.p.v. base64). */
+    storagePath: text("storage_path"),
     /** Korte toelichting bij deze versie (wat is aangepast). */
     note: text("note"),
     uploadedById: uuid("uploaded_by_id").references(() => users.id, { onDelete: "set null" }),

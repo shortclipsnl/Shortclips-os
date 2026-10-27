@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, RefreshCw, Send } from "lucide-react";
-import { sendScriptForReview } from "@/server/actions/script-review";
+import { createScriptPdfUploadUrl, sendScriptForReview } from "@/server/actions/script-review";
 import { Badge } from "@/components/ui";
 import type { ScriptingRow } from "@/server/scripting";
 
@@ -50,14 +50,20 @@ export function PortalSendCell({ row, canWrite }: { row: ScriptingRow; canWrite:
     }
     start(async () => {
       try {
-        const base64 = await fileToBase64(file);
-        const res = await sendScriptForReview({
-          clientId: row.clientId,
-          productionDayId: row.id,
-          fileName: file.name,
-          contentType: file.type || "application/pdf",
-          base64,
-        });
+        // Grote PDF's: direct naar opslag (langs de 4,5MB-limiet van Vercel).
+        const up = await createScriptPdfUploadUrl({ clientId: row.clientId, productionDayId: row.id });
+        if (!up.ok) { setErr(up.message ?? "Versturen mislukt."); return; }
+
+        let res;
+        if (up.uploadUrl && up.key) {
+          const put = await fetch(up.uploadUrl, { method: "PUT", headers: up.headers, body: file });
+          if (!put.ok) { setErr("Uploaden mislukt."); return; }
+          res = await sendScriptForReview({ clientId: row.clientId, productionDayId: row.id, fileName: file.name, contentType: file.type || "application/pdf", storagePath: up.key, sizeBytes: file.size });
+        } else {
+          // Geen opslag ingesteld (lokaal) → base64-terugval.
+          const base64 = await fileToBase64(file);
+          res = await sendScriptForReview({ clientId: row.clientId, productionDayId: row.id, fileName: file.name, contentType: file.type || "application/pdf", base64 });
+        }
         if (res.ok) router.refresh();
         else setErr(res.message ?? "Versturen mislukt.");
       } catch {

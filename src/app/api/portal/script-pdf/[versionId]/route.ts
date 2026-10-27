@@ -1,5 +1,6 @@
 import { getViewer, hasClientAccess } from "@/server/auth/context";
 import { getScriptPdfVersion } from "@/server/script-review";
+import { downloadScriptPdf } from "@/server/scripts/script-storage";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,14 @@ export async function GET(_req: Request, ctx: { params: Promise<{ versionId: str
   if (!file) return new Response("Niet gevonden", { status: 404 });
   if (!hasClientAccess(viewer, file.clientId)) return new Response("Niet toegestaan", { status: 403 });
 
-  const buffer = Buffer.from(file.dataBase64, "base64");
+  // Nieuwe, grote versies staan in Supabase Storage; oude als base64 in de db.
+  let buffer: Buffer | null = null;
+  if (file.storagePath) {
+    buffer = await downloadScriptPdf(file.storagePath);
+  } else if (file.dataBase64) {
+    buffer = Buffer.from(file.dataBase64, "base64");
+  }
+  if (!buffer) return new Response("Niet gevonden", { status: 404 });
   const safeName = file.fileName.replace(/[^\w.\- ]+/g, "_");
   return new Response(new Uint8Array(buffer), {
     headers: {

@@ -206,12 +206,13 @@ export async function getPortalScriptReview(viewer: Viewer, reviewId: string): P
 }
 
 /** PDF-bytes van één versie — klant-veilig (toegang via de klant van de review). */
-export async function getScriptPdfVersion(versionId: string): Promise<{ fileName: string; contentType: string; dataBase64: string; clientId: string } | null> {
+export async function getScriptPdfVersion(versionId: string): Promise<{ fileName: string; contentType: string; dataBase64: string | null; storagePath: string | null; clientId: string } | null> {
   const [row] = await db
     .select({
       fileName: scriptReviewVersions.fileName,
       contentType: scriptReviewVersions.contentType,
       dataBase64: scriptReviewVersions.dataBase64,
+      storagePath: scriptReviewVersions.storagePath,
       clientId: scriptReviews.clientId,
     })
     .from(scriptReviewVersions)

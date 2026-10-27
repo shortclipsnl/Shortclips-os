@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, CheckCircle2, Loader2, RotateCcw, Send, Upload } from "lucide-react";
-import { replyToScriptReviewThread, resolveScriptReviewThread, setScriptReviewRevising, uploadScriptReviewVersion } from "@/server/actions/script-review";
+import { createScriptVersionUploadUrl, replyToScriptReviewThread, resolveScriptReviewThread, setScriptReviewRevising, uploadScriptReviewVersion } from "@/server/actions/script-review";
 import { Button, ErrorNote, TeamAvatar } from "@/components/ui";
 
 async function fileToBase64(file: File): Promise<string> {
@@ -102,36 +102,48 @@ export function ThreadCard({ thread }: { thread: InternalThread }) {
 
 /** Nieuwe PDF-versie uploaden → opnieuw ter controle naar de klant. */
 export function UploadNewVersion({ reviewId }: { reviewId: string }) {
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [base64, setBase64] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  async function onFile(file: File | undefined) {
-    if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".pdf")) { setErr("Alleen een PDF-bestand."); return; }
-    setErr(null); setFileName(file.name); setBase64(await fileToBase64(file));
+  function onFile(f: File | undefined) {
+    if (!f) return;
+    if (!f.name.toLowerCase().endsWith(".pdf")) { setErr("Alleen een PDF-bestand."); return; }
+    setErr(null); setFile(f);
   }
   function submit() {
-    if (!base64 || !fileName) { setErr("Upload eerst de aangepaste PDF."); return; }
+    if (!file) { setErr("Kies eerst de aangepaste PDF."); return; }
     setErr(null);
     start(async () => {
-      const res = await uploadScriptReviewVersion({ reviewId, fileName, base64, note: note.trim() || undefined });
-      if (res.ok) { setFileName(null); setBase64(null); setNote(""); router.refresh(); }
-      else setErr(res.message ?? "Mislukt.");
+      try {
+        // Grote PDF's: direct naar opslag (langs de 4,5MB-limiet van Vercel).
+        const up = await createScriptVersionUploadUrl(reviewId);
+        if (!up.ok) { setErr(up.message ?? "Mislukt."); return; }
+        let res;
+        if (up.uploadUrl && up.key) {
+          const put = await fetch(up.uploadUrl, { method: "PUT", headers: up.headers, body: file });
+          if (!put.ok) { setErr("Uploaden mislukt."); return; }
+          res = await uploadScriptReviewVersion({ reviewId, fileName: file.name, storagePath: up.key, sizeBytes: file.size, note: note.trim() || undefined });
+        } else {
+          const base64 = await fileToBase64(file);
+          res = await uploadScriptReviewVersion({ reviewId, fileName: file.name, base64, note: note.trim() || undefined });
+        }
+        if (res.ok) { setFile(null); setNote(""); router.refresh(); }
+        else setErr(res.message ?? "Mislukt.");
+      } catch { setErr("Mislukt."); }
     });
   }
 
   return (
     <div>
       <input ref={inputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
-      {fileName ? (
+      {file ? (
         <div className="flex items-center justify-between gap-3 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface-sunken)] px-3 py-2 text-sm">
-          <span className="truncate font-medium">{fileName}</span>
-          <button type="button" onClick={() => { setFileName(null); setBase64(null); }} className="text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]">verwijderen</button>
+          <span className="truncate font-medium">{file.name}</span>
+          <button type="button" onClick={() => setFile(null)} className="text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]">verwijderen</button>
         </div>
       ) : (
         <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] px-3 py-2 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
@@ -141,7 +153,7 @@ export function UploadNewVersion({ reviewId }: { reviewId: string }) {
       <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Korte toelichting (optioneel): wat is aangepast?"
         className="sc-input mt-2 text-sm" />
       <div className="mt-2">
-        <Button size="sm" onClick={submit} disabled={pending || !base64}>
+        <Button size="sm" onClick={submit} disabled={pending || !file}>
           {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} Nieuwe versie — opnieuw ter controle
         </Button>
       </div>

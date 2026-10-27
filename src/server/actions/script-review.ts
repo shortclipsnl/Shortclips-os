@@ -13,6 +13,7 @@ import { env } from "@/lib/env";
 import { getFeedbackDays } from "@/server/portal-settings";
 import { addWorkingDays } from "@/lib/workdays";
 import { assertReviewAccess } from "@/server/script-review";
+import { createScriptUploadTarget } from "@/server/scripts/script-storage";
 
 /** Uiterste feedbackmoment: N werkdagen vanaf nu (eind van die dag). */
 async function scriptFeedbackDeadline(): Promise<Date> {
@@ -59,9 +60,43 @@ const sendSchema = z.object({
   productionDayId: z.string().uuid(),
   fileName: z.string().min(1).max(255),
   contentType: z.string().max(100),
-  base64: z.string().min(1),
+  /** Kleine PDF's: base64 via de server-action. */
+  base64: z.string().min(1).optional(),
+  /** Grote PDF's: direct naar Supabase geüpload, hier alleen de opslagsleutel. */
+  storagePath: z.string().min(1).max(500).optional(),
+  sizeBytes: z.number().int().positive().optional(),
   title: z.string().trim().max(240).optional(),
-});
+}).refine((v) => Boolean(v.base64 || v.storagePath), { message: "Geen bestand ontvangen." });
+
+const uploadUrlSchema = z.object({ clientId: z.string().uuid(), productionDayId: z.string().uuid() });
+
+/**
+ * Intern: maakt een ondertekende upload-URL waarmee de browser een script-PDF
+ * rechtstreeks naar de opslag zet (langs de 4,5MB-limiet van server-actions).
+ * Geeft null terug als er geen opslag is ingesteld — dan valt de UI terug op
+ * base64 via sendScriptForReview.
+ */
+export async function createScriptPdfUploadUrl(input: z.infer<typeof uploadUrlSchema>): Promise<ActionResult & { uploadUrl?: string; key?: string; headers?: Record<string, string> }> {
+  try {
+    const viewer = await requirePermission("scripts:write");
+    const parsed = uploadUrlSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: "Controleer de invoer." };
+    assertClientAccess(viewer, parsed.data.clientId);
+    const [day] = await db
+      .select({ clientId: productionDays.clientId })
+      .from(productionDays)
+      .where(and(eq(productionDays.id, parsed.data.productionDayId), isNull(productionDays.deletedAt)))
+      .limit(1);
+    if (!day || day.clientId !== parsed.data.clientId) return { ok: false, message: "Opnamesessie niet gevonden bij deze klant." };
+
+    const target = await createScriptUploadTarget(parsed.data.clientId);
+    if (!target) return { ok: true }; // geen opslag → UI gebruikt base64
+    return { ok: true, uploadUrl: target.uploadUrl, key: target.key, headers: target.headers };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
 
 /**
  * Intern: stuurt een script-PDF ter controle naar de klant. Maakt (of hergebruikt)
@@ -74,12 +109,12 @@ export async function sendScriptForReview(input: z.infer<typeof sendSchema>): Pr
     const viewer = await requirePermission("scripts:write");
     const parsed = sendSchema.safeParse(input);
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Controleer de invoer." };
-    const { clientId, productionDayId, fileName, contentType, base64, title } = parsed.data;
+    const { clientId, productionDayId, fileName, contentType, base64, storagePath, title } = parsed.data;
     assertClientAccess(viewer, clientId);
 
     const isPdf = contentType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
     if (!isPdf) return { ok: false, message: "Alleen een PDF-bestand kan verstuurd worden." };
-    const sizeBytes = Math.floor((base64.length * 3) / 4);
+    const sizeBytes = base64 ? Math.floor((base64.length * 3) / 4) : (parsed.data.sizeBytes ?? 0);
     if (sizeBytes === 0) return { ok: false, message: "Leeg bestand." };
     if (sizeBytes > MAX_PDF_BYTES) return { ok: false, message: "Het bestand is te groot (max 15 MB)." };
 
@@ -122,7 +157,8 @@ export async function sendScriptForReview(input: z.infer<typeof sendSchema>): Pr
     }
 
     await db.insert(scriptReviewVersions).values({
-      reviewId, versionNumber, fileName: fileName.slice(0, 255), contentType: contentType || "application/pdf", sizeBytes, dataBase64: base64, uploadedById: viewer.id,
+      reviewId, versionNumber, fileName: fileName.slice(0, 255), contentType: contentType || "application/pdf", sizeBytes,
+      dataBase64: base64 ?? null, storagePath: storagePath ?? null, uploadedById: viewer.id,
     });
 
     await auditLog({ viewer, action: "script_review.sent", entityType: "script_review", entityId: reviewId, clientId, changes: { version: versionNumber } });
@@ -387,9 +423,26 @@ export async function setScriptReviewRevising(reviewId: string): Promise<ActionR
 const versionSchema = z.object({
   reviewId: z.string().uuid(),
   fileName: z.string().min(1).max(255),
-  base64: z.string().min(1),
+  base64: z.string().min(1).optional(),
+  storagePath: z.string().min(1).max(500).optional(),
+  sizeBytes: z.number().int().positive().optional(),
   note: z.string().trim().max(500).optional(),
-});
+}).refine((v) => Boolean(v.base64 || v.storagePath), { message: "Geen bestand ontvangen." });
+
+/** Upload-URL voor een nieuwe versie (grote PDF direct naar opslag). */
+export async function createScriptVersionUploadUrl(reviewId: string): Promise<ActionResult & { uploadUrl?: string; key?: string; headers?: Record<string, string> }> {
+  try {
+    const viewer = await requirePermission("scripts:write");
+    const review = await loadReviewForStaff(viewer, reviewId);
+    if (!review) return { ok: false, message: "Niet gevonden." };
+    const target = await createScriptUploadTarget(review.clientId);
+    if (!target) return { ok: true };
+    return { ok: true, uploadUrl: target.uploadUrl, key: target.key, headers: target.headers };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
 
 /** Intern: een nieuwe PDF-versie uploaden en opnieuw ter controle naar de klant. */
 export async function uploadScriptReviewVersion(input: z.infer<typeof versionSchema>): Promise<ActionResult> {
@@ -397,11 +450,11 @@ export async function uploadScriptReviewVersion(input: z.infer<typeof versionSch
     const viewer = await requirePermission("scripts:write");
     const parsed = versionSchema.safeParse(input);
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Controleer de invoer." };
-    const { reviewId, fileName, base64, note } = parsed.data;
+    const { reviewId, fileName, base64, storagePath, note } = parsed.data;
 
     const isPdf = fileName.toLowerCase().endsWith(".pdf");
     if (!isPdf) return { ok: false, message: "Alleen een PDF-bestand." };
-    const sizeBytes = Math.floor((base64.length * 3) / 4);
+    const sizeBytes = base64 ? Math.floor((base64.length * 3) / 4) : (parsed.data.sizeBytes ?? 0);
     if (sizeBytes === 0) return { ok: false, message: "Leeg bestand." };
     if (sizeBytes > MAX_PDF_BYTES) return { ok: false, message: "Het bestand is te groot (max 15 MB)." };
 
@@ -409,7 +462,7 @@ export async function uploadScriptReviewVersion(input: z.infer<typeof versionSch
     if (!review) return { ok: false, message: "Niet gevonden." };
     const versionNumber = review.currentVersion + 1;
 
-    await db.insert(scriptReviewVersions).values({ reviewId, versionNumber, fileName: fileName.slice(0, 255), contentType: "application/pdf", sizeBytes, dataBase64: base64, note: note ?? null, uploadedById: viewer.id });
+    await db.insert(scriptReviewVersions).values({ reviewId, versionNumber, fileName: fileName.slice(0, 255), contentType: "application/pdf", sizeBytes, dataBase64: base64 ?? null, storagePath: storagePath ?? null, note: note ?? null, uploadedById: viewer.id });
     await db.update(scriptReviews).set({ status: "opnieuw_controle", currentVersion: versionNumber, feedbackDeadline: await scriptFeedbackDeadline(), updatedAt: new Date() }).where(eq(scriptReviews.id, reviewId));
 
     await auditLog({ viewer, action: "script_review.new_version", entityType: "script_review", entityId: reviewId, clientId: review.clientId, changes: { version: versionNumber } });
