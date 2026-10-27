@@ -104,7 +104,7 @@ export default async function PortalVideoDetailPage({
               <span className="text-xs text-[var(--color-ink-muted)]">{view.sublabel}</span>
             ) : null}
             {dl ? (
-              <span className={`text-xs font-medium ${dl.urgent ? "text-[#ffb020]" : "text-[var(--color-ink-muted)]"}`}>
+              <span className={`text-xs font-medium ${dl.urgent ? "text-[#19a8ff]" : "text-[var(--color-ink-muted)]"}`}>
                 {dl.text}
               </span>
             ) : null}

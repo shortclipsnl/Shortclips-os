@@ -103,8 +103,8 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
 
           {/* Mijlpaal (subtiel) */}
           {r.milestone?.reached ? (
-            <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-[#ffb020]/30 bg-[rgba(255,176,32,0.07)] px-4 py-3">
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[rgba(255,176,32,0.16)] text-[#ffb020]"><Trophy className="size-4" /></span>
+            <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-[#19a8ff]/30 bg-[rgba(25,168,255,0.07)] px-4 py-3">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[rgba(25,168,255,0.16)] text-[#19a8ff]"><Trophy className="size-4" /></span>
               <div className="text-[13.5px]">
                 <span className="font-semibold">Mijlpaal behaald: {compact(r.milestone.reached)} weergaven totaal 🎉</span>
                 {r.milestone.next ? <span className="text-[var(--color-ink-muted)]"> — nog {compact(r.milestone.next - r.milestone.lifetimeViews)} tot {compact(r.milestone.next)}.</span> : null}
@@ -122,7 +122,7 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
           {best ? (
             <section className="sc-glass p-5 sm:p-6">
               <div className="flex items-center gap-2">
-                <span className="grid size-7 place-items-center rounded-lg bg-[rgba(255,176,32,0.16)] text-[#ffb020]"><Trophy className="size-4" /></span>
+                <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.16)] text-[#19a8ff]"><Trophy className="size-4" /></span>
                 <h2 className="text-base font-semibold">Best presterende video</h2>
               </div>
               <div className="mt-4 flex flex-col gap-4 sm:flex-row">

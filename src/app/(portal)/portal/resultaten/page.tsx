@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 const SECTIONS: Array<{ k: keyof ImprovementContent; label: string; icon: typeof ThumbsUp; color: string }> = [
   { k: "watWerkt", label: "Wat goed werkte", icon: ThumbsUp, color: "#2fd27a" },
-  { k: "watMinder", label: "Wat minder presteerde", icon: TrendingUp, color: "#ffb020" },
+  { k: "watMinder", label: "Wat minder presteerde", icon: TrendingUp, color: "#19a8ff" },
   { k: "volgendeWeek", label: "Volgende week pakken we dit anders aan", icon: ArrowUpRight, color: "var(--sc-accent)" },
   { k: "volgendeMaand", label: "Volgende maand testen we", icon: Target, color: "var(--sc-accent)" },
   { k: "formats", label: "Formats die we vaker inzetten", icon: Wand2, color: "#9fdcff" },

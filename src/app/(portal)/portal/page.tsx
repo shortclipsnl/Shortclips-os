@@ -154,11 +154,11 @@ export default async function PortalPage() {
 
       {/* Actie nodig — alleen tonen als er echt iets van de klant wordt verwacht */}
       {openActions > 0 ? (
-        <section className="sc-glass sc-glow p-5" style={{ background: "linear-gradient(180deg, rgba(255,176,32,0.12), rgba(255,255,255,0.03))" }}>
+        <section className="sc-glass sc-glow p-5" style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.12), rgba(255,255,255,0.03))" }}>
           <div className="flex items-center gap-2">
-            <span className="grid size-7 place-items-center rounded-lg bg-[rgba(255,176,32,0.18)] text-[#ffb020]"><Bell className="size-4" /></span>
+            <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.18)] text-[#19a8ff]"><Bell className="size-4" /></span>
             <h2 className="text-[15px] font-bold">Actie nodig</h2>
-            <span className="rounded-full bg-[rgba(255,176,32,0.18)] px-2 py-0.5 text-2xs font-bold text-[#ffb020]">{openActions}</span>
+            <span className="rounded-full bg-[rgba(25,168,255,0.18)] px-2 py-0.5 text-2xs font-bold text-[#19a8ff]">{openActions}</span>
           </div>
           <div className="mt-3 flex flex-col gap-2">
             {scriptActions > 0 ? (
@@ -224,7 +224,7 @@ export default async function PortalPage() {
           <p className="mt-0.5 text-[13.5px] text-[var(--color-ink-muted)]">
             {frameUrl ? "Je video's staan in Frame.io — bekijken en feedback geven." : "Bekijk alle opnamesessies en video's van jouw bedrijf."}
             {pendingReview > 0 ? (
-              <span className="ml-1 font-medium text-[#ffb020]">
+              <span className="ml-1 font-medium text-[#19a8ff]">
                 {pendingReview} {pendingReview === 1 ? "wacht" : "wachten"} op jouw beoordeling.
               </span>
             ) : null}

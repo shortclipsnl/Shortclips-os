@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Opnameplanning" };
 export const dynamic = "force-dynamic";
 
 const TONE_CLS: Record<PortalScriptState["tone"], string> = {
-  warn: "bg-[rgba(255,176,32,0.14)] text-[#ffb020]",
+  warn: "bg-[rgba(25,168,255,0.14)] text-[#19a8ff]",
   info: "bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]",
   good: "bg-[rgba(47,210,122,0.14)] text-[#2fd27a]",
   neutral: "bg-[var(--sc-fill-strong)] text-[var(--color-ink-muted)]",
@@ -274,9 +274,9 @@ export default async function PortalPlanningPage() {
 
           {/* Opname wijzigen of annuleren — belangrijk, dus duidelijk en opvallend
               en bewust vóór de voorbereiding zodat klanten dit snel vinden. */}
-          <section className="overflow-hidden rounded-[16px] border border-[#ffb020]/35 bg-[rgba(255,176,32,0.05)]">
-            <div className="flex items-center gap-2 border-b border-[#ffb020]/25 bg-[rgba(255,176,32,0.1)] px-5 py-3">
-              <span className="grid size-7 place-items-center rounded-lg bg-[rgba(255,176,32,0.18)] text-[#e08900]"><CalendarClock className="size-4" /></span>
+          <section className="overflow-hidden rounded-[16px] border border-[#19a8ff]/35 bg-[rgba(25,168,255,0.05)]">
+            <div className="flex items-center gap-2 border-b border-[#19a8ff]/25 bg-[rgba(25,168,255,0.1)] px-5 py-3">
+              <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.18)] text-[#1b5fe0]"><CalendarClock className="size-4" /></span>
               <h2 className="text-[15px] font-bold">Opname wijzigen of annuleren</h2>
             </div>
             <div className="grid gap-3 p-5 sm:grid-cols-2">
@@ -284,8 +284,8 @@ export default async function PortalPlanningPage() {
                 <div className="text-[13px] font-semibold text-[#2fd27a]">Kosteloos</div>
                 <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Verplaatsen of annuleren kan gratis tot <strong className="text-[var(--color-ink)]">{settings.cancelNoticeDays} werkdagen</strong> vóór de opnamedag.</p>
               </div>
-              <div className="rounded-[12px] border border-[#ffb020]/35 bg-[rgba(255,176,32,0.08)] p-4">
-                <div className="text-[13px] font-semibold text-[#e08900]">Binnen {settings.cancelNoticeDays} werkdagen</div>
+              <div className="rounded-[12px] border border-[#19a8ff]/35 bg-[rgba(25,168,255,0.08)] p-4">
+                <div className="text-[13px] font-semibold text-[#1b5fe0]">Binnen {settings.cancelNoticeDays} werkdagen</div>
                 <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Dan wordt <strong className="text-[var(--color-ink)]">{settings.cancelFee}</strong> in rekening gebracht. {settings.cancelLateNote}</p>
               </div>
               <div className="sm:col-span-2 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-[13px] text-[var(--color-ink-muted)]">

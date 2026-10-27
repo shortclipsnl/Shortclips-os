@@ -132,7 +132,7 @@ export default async function PortalVideosPage() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-[18px] font-bold tracking-tight">Jouw beoordeling</h2>
               {data.actieNodig.length > 0 ? (
-                <span className="rounded-full bg-[rgba(255,176,32,0.16)] px-2.5 py-1 text-[12px] font-semibold text-[#ffb020]">
+                <span className="rounded-full bg-[rgba(25,168,255,0.16)] px-2.5 py-1 text-[12px] font-semibold text-[#19a8ff]">
                   {data.actieNodig.length} video&apos;s wachten op je akkoord
                 </span>
               ) : null}
