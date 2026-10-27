@@ -23,7 +23,8 @@
     "kb:import": "tsx scripts/kennisbank-import.ts",
     "kosten:seed": "tsx scripts/kosten-seed.ts",
     "vermogen:seed": "tsx scripts/vermogen-seed.ts",
-    "data:fixes": "tsx scripts/data-fixes.ts"
+    "data:fixes": "tsx scripts/data-fixes.ts",
+    "portal:testclients": "tsx scripts/portal-test-clients.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
