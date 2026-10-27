@@ -4,7 +4,7 @@ import { ArrowRight, CalendarClock, CalendarDays, ClipboardCheck, Clock, Externa
 import { requirePortal } from "@/server/auth/context";
 import { getPortalPlanning, type PortalOpname, type PortalScriptMeeting, type PortalScriptState } from "@/server/portal-planning";
 import { getPortalSettingsForClient } from "@/server/portal-settings";
-import { Avatar, buttonClass } from "@/components/ui";
+import { buttonClass, TeamAvatar } from "@/components/ui";
 import { formatDateFull } from "@/lib/format";
 import { VoorbereidingOverzicht } from "@/components/portal/voorbereiding-overzicht";
 import { OpnamedagContent } from "../samenwerking/_content";
@@ -52,7 +52,7 @@ function ScriptPill({ s }: { s: PortalScriptState }) {
 function PersonRow({ label, person }: { label: string; person: NonNullable<PortalOpname["contentCreative"]> }) {
   return (
     <div className="flex items-center gap-2">
-      <Avatar name={person.name} size={28} src={person.avatarUrl} />
+      <TeamAvatar name={person.name} avatarUrl={person.avatarUrl} size={32} />
       <div className="leading-tight">
         <div className="text-[13px] font-semibold">{person.name}</div>
         <div className="text-[11px] text-[var(--color-ink-faint)]">{label}</div>
@@ -86,7 +86,8 @@ function OpnameCard({ o, hero = false, id }: { o: PortalOpname; hero?: boolean; 
           <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--color-ink-muted)]">
             {o.startTime ? <span className="inline-flex items-center gap-1"><Clock className="size-3.5" /> {o.startTime}{o.endTime ? `–${o.endTime}` : ""}</span> : null}
             {o.location ? <span className="inline-flex items-center gap-1"><MapPin className="size-3.5" /> {o.location}</span> : null}
-            {o.plannedShorts ? <span className="inline-flex items-center gap-1"><Film className="size-3.5" /> {o.plannedShorts} shorts</span> : null}
+            {o.scriptCount > 0 ? <span className="inline-flex items-center gap-1"><FileText className="size-3.5" /> {o.scriptCount} script{o.scriptCount === 1 ? "" : "s"} gepland</span> : null}
+            {o.plannedShorts ? <span className="inline-flex items-center gap-1"><Film className="size-3.5" /> {o.plannedShorts} video{o.plannedShorts === 1 ? "" : "'s"} gepland</span> : null}
           </div>
         </div>
       </div>
@@ -183,9 +184,10 @@ export default async function PortalPlanningPage() {
   for (const o of futureOpnames) { const d = new Date(`${o.date}T12:00:00`); ensureMonth(d.getFullYear(), d.getMonth()).opnames.push(o); }
   for (const m of p.scriptMeetings) { const d = new Date(m.startsAt); ensureMonth(d.getFullYear(), d.getMonth()).meetings.push(m); }
 
-  // Minstens de komende 3 maanden tonen, tot en met de laatste maand met een afspraak.
+  // Minstens de komende 6 maanden tonen (dus ook jan/feb e.v. als die nog leeg zijn),
+  // en zo nodig verder tot en met de laatste maand met een afspraak.
   const now = new Date();
-  let span = 3;
+  let span = 6;
   for (const v of months.values()) { const diff = (v.year - now.getFullYear()) * 12 + (v.month - now.getMonth()); if (diff + 1 > span) span = diff + 1; }
   span = Math.min(span, 12);
   const agenda = Array.from({ length: span }, (_, i) => {
@@ -252,7 +254,7 @@ export default async function PortalPlanningPage() {
                     {/* Duidelijke maandkop in volle kleur, zodat je per maand kunt scannen. */}
                     <div className="mb-3 flex items-center justify-between gap-2 rounded-[12px] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
                       <h3 className="text-[15px] font-bold capitalize tracking-tight">{MONTH_NAMES[mo.month]} {mo.year}</h3>
-                      <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11.5px] font-semibold">{count > 0 ? `${count} ${count === 1 ? "afspraak" : "afspraken"}` : "niets gepland"}</span>
+                      <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11.5px] font-semibold">{count > 0 ? `${count} ${count === 1 ? "afspraak" : "afspraken"}` : "geen opname gepland"}</span>
                     </div>
                     <div className="grid gap-3 lg:grid-cols-[minmax(260px,320px)_1fr] lg:items-start">
                       <MonthCalendar year={mo.year} month={mo.month} marks={mo.marks} />
@@ -261,12 +263,35 @@ export default async function PortalPlanningPage() {
                           {mo.items.map((it) => it.node)}
                         </div>
                       ) : (
-                        <div className="sc-glass flex items-center px-5 py-4 text-[13.5px] text-[var(--color-ink-faint)]">Nog niets gepland deze maand.</div>
+                        <div className="sc-glass flex items-center gap-2 px-5 py-4 text-[13.5px] text-[var(--color-ink-faint)]"><CalendarDays className="size-4" /> Nog geen opname gepland deze maand.</div>
                       )}
                     </div>
                   </div>
                 );
               })}
+            </div>
+          </section>
+
+          {/* Opname wijzigen of annuleren — belangrijk, dus duidelijk en opvallend
+              en bewust vóór de voorbereiding zodat klanten dit snel vinden. */}
+          <section className="overflow-hidden rounded-[16px] border border-[#ffb020]/35 bg-[rgba(255,176,32,0.05)]">
+            <div className="flex items-center gap-2 border-b border-[#ffb020]/25 bg-[rgba(255,176,32,0.1)] px-5 py-3">
+              <span className="grid size-7 place-items-center rounded-lg bg-[rgba(255,176,32,0.18)] text-[#e08900]"><CalendarClock className="size-4" /></span>
+              <h2 className="text-[15px] font-bold">Opname wijzigen of annuleren</h2>
+            </div>
+            <div className="grid gap-3 p-5 sm:grid-cols-2">
+              <div className="rounded-[12px] border border-[#2fd27a]/30 bg-[rgba(47,210,122,0.06)] p-4">
+                <div className="text-[13px] font-semibold text-[#2fd27a]">Kosteloos</div>
+                <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Verplaatsen of annuleren kan gratis tot <strong className="text-[var(--color-ink)]">{settings.cancelNoticeDays} werkdagen</strong> vóór de opnamedag.</p>
+              </div>
+              <div className="rounded-[12px] border border-[#ffb020]/35 bg-[rgba(255,176,32,0.08)] p-4">
+                <div className="text-[13px] font-semibold text-[#e08900]">Binnen {settings.cancelNoticeDays} werkdagen</div>
+                <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Dan wordt <strong className="text-[var(--color-ink)]">{settings.cancelFee}</strong> in rekening gebracht. {settings.cancelLateNote}</p>
+              </div>
+              <div className="sm:col-span-2 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-[13px] text-[var(--color-ink-muted)]">
+                <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-[var(--sc-accent)]" /> Laat het je vaste contactpersoon zo snel mogelijk weten.</span>
+                <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-[var(--sc-accent)]" /> Een nieuwe datum plannen we direct met je in, afhankelijk van de beschikbaarheid.</span>
+              </div>
             </div>
           </section>
 
@@ -307,28 +332,6 @@ export default async function PortalPlanningPage() {
           </div>
         </details>
       ) : null}
-
-      {/* Opname wijzigen of annuleren — belangrijk, dus duidelijk en opvallend */}
-      <section className="overflow-hidden rounded-[16px] border border-[#ffb020]/35 bg-[rgba(255,176,32,0.05)]">
-        <div className="flex items-center gap-2 border-b border-[#ffb020]/25 bg-[rgba(255,176,32,0.1)] px-5 py-3">
-          <span className="grid size-7 place-items-center rounded-lg bg-[rgba(255,176,32,0.18)] text-[#e08900]"><CalendarClock className="size-4" /></span>
-          <h2 className="text-[15px] font-bold">Opname wijzigen of annuleren</h2>
-        </div>
-        <div className="grid gap-3 p-5 sm:grid-cols-2">
-          <div className="rounded-[12px] border border-[#2fd27a]/30 bg-[rgba(47,210,122,0.06)] p-4">
-            <div className="text-[13px] font-semibold text-[#2fd27a]">Kosteloos</div>
-            <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Verplaatsen of annuleren kan gratis tot <strong className="text-[var(--color-ink)]">{settings.cancelNoticeDays} werkdagen</strong> vóór de opnamedag.</p>
-          </div>
-          <div className="rounded-[12px] border border-[#ffb020]/35 bg-[rgba(255,176,32,0.08)] p-4">
-            <div className="text-[13px] font-semibold text-[#e08900]">Binnen {settings.cancelNoticeDays} werkdagen</div>
-            <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Dan wordt <strong className="text-[var(--color-ink)]">{settings.cancelFee}</strong> in rekening gebracht. {settings.cancelLateNote}</p>
-          </div>
-          <div className="sm:col-span-2 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-[13px] text-[var(--color-ink-muted)]">
-            <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-[var(--sc-accent)]" /> Laat het je vaste contactpersoon zo snel mogelijk weten.</span>
-            <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-[var(--sc-accent)]" /> Een nieuwe datum plannen we direct met je in, afhankelijk van de beschikbaarheid.</span>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, isNull, lt, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { productionDays, users } from "@/db/schema";
+import { productionDays, scripts, users } from "@/db/schema";
 import { type Viewer } from "@/server/auth/context";
 import { upcomingAppointmentsForClient } from "@/server/appointments";
 import { listPortalScriptReviews, SCRIPT_REVIEW_STATUS, type ScriptReviewStatus } from "@/server/script-review";
@@ -18,6 +18,8 @@ export type PortalOpname = {
   endTime: string | null;
   location: string | null;
   plannedShorts: number | null;
+  /** Aantal scripts dat aan deze opnamedag hangt (uit de scripts-tabel). */
+  scriptCount: number;
   contentCreative: PlanningPerson | null;
   videographer: PlanningPerson | null;
   reviewId: string | null;
@@ -105,6 +107,17 @@ export async function getPortalPlanning(viewer: Viewer): Promise<PortalPlanning>
 
   // Namen/avatars van de betrokken medewerkers in één keer ophalen.
   const rows = [...future, ...past];
+
+  // Aantal scripts per opnamedag (echte telling uit de scripts-tabel).
+  const dayIds = rows.map((r) => r.id);
+  const scriptRows = dayIds.length
+    ? await db
+        .select({ dayId: scripts.productionDayId, n: sql<number>`count(*)::int` })
+        .from(scripts)
+        .where(and(inArray(scripts.productionDayId, dayIds), isNull(scripts.deletedAt)))
+        .groupBy(scripts.productionDayId)
+    : [];
+  const scriptCountByDay = new Map(scriptRows.map((r) => [r.dayId ?? "", Number(r.n)]));
   const ids = [...new Set(rows.flatMap((r) => [r.coordinatorId, r.scriptWriterId, r.videographerId]).filter((x): x is string => !!x))];
   const people = ids.length ? await db.select({ id: users.id, fullName: users.fullName, avatarUrl: users.avatarUrl }).from(users).where(inArray(users.id, ids)) : [];
   const personById = new Map(people.map((p) => [p.id, p]));
@@ -124,6 +137,7 @@ export async function getPortalPlanning(viewer: Viewer): Promise<PortalPlanning>
       endTime: hhmm(r.endTime),
       location: r.locationName ?? null,
       plannedShorts: r.plannedShorts ?? null,
+      scriptCount: scriptCountByDay.get(r.id) ?? 0,
       // Content creative = coördinator die de opname draait (valt terug op de scriptschrijver).
       contentCreative: toPerson(r.coordinatorId ?? r.scriptWriterId, "Content creative"),
       videographer: toPerson(r.videographerId, "Videograaf"),
