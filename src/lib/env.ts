@@ -54,6 +54,17 @@ const schema = z.object({
   // contactformulier-mails worden gelezen (standaard "Leads - Shortclips").
   GMAIL_LEADS_LABEL: z.string().optional(),
 
+  // --- Lead-import via IMAP (info@shortclips.nl op Cloud86/Plesk) ---
+  // De website-leads (Framer-contactformulier, Rocket Leads) komen binnen op
+  // info@shortclips.nl, een IMAP-mailbox (mail.shortclips.nl) — niet in Gmail.
+  // Deze koppeling leest de serverfolder "LEADS - SHORTCLIPS" en maakt er leads
+  // van. IMAP_PASSWORD is bij voorkeur een app-/mail-wachtwoord uit Plesk.
+  IMAP_HOST: z.string().optional(),
+  IMAP_PORT: z.coerce.number().optional(),
+  IMAP_USER: z.string().optional(),
+  IMAP_PASSWORD: z.string().optional(),
+  IMAP_LEADS_FOLDER: z.string().optional(),
+
   // --- Social statistieken ---
   AYRSHARE_API_KEY: z.string().optional(),
   // Metricool: één user-token (X-Mc-Auth) voor het hele account. De user-id en
@@ -188,6 +199,14 @@ export function integrationConfig() {
       configured: Boolean(env.RESEND_API_KEY && env.MAIL_FROM),
       required: ["RESEND_API_KEY", "MAIL_FROM"],
       optional: [],
+    },
+    // "gmail" is hier de leads-koppeling. Die leest nu via IMAP (info@shortclips.nl
+    // op Cloud86/Plesk), niet meer via de Gmail-API — de provider-sleutel "gmail"
+    // blijft behouden omdat de DB-enum en de sync-logging die naam gebruiken.
+    gmail: {
+      configured: Boolean(env.IMAP_HOST && env.IMAP_USER && env.IMAP_PASSWORD),
+      required: ["IMAP_HOST", "IMAP_USER", "IMAP_PASSWORD"],
+      optional: ["IMAP_PORT", "IMAP_LEADS_FOLDER"],
     },
   } as const;
 }

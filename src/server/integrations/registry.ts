@@ -6,7 +6,7 @@ import { integrationConfig } from "@/lib/env";
 import { frameio } from "./frameio";
 import { drive } from "./drive";
 import { googleCalendar } from "./google-calendar";
-import { gmail } from "./gmail";
+import { imapLeads } from "./imap-leads";
 import type { ConnectionTest, Provider } from "./types";
 
 /**
@@ -157,38 +157,32 @@ export const INTEGRATION_SPECS: IntegrationSpec[] = [
   },
   {
     provider: "gmail",
-    name: "Gmail (leads)",
+    name: "Leads (info@ · IMAP)",
     description:
-      "Leest het label \"Leads - Shortclips\" uit de mailbox en zet nieuwe contactformulier-mails automatisch om in leads op de Leads-pagina. Twee keer per dag en via de knop 'Nu synchroniseren'.",
+      "Leest de serverfolder \"LEADS - SHORTCLIPS\" van info@shortclips.nl (mail.shortclips.nl, Cloud86/Plesk) en zet contactformulier-mails automatisch om in leads op de Leads-pagina. Alleen-lezen. Twee keer per dag en via de knop 'Nu synchroniseren'. Poort (standaard 993) en mapnaam zijn optioneel via IMAP_PORT / IMAP_LEADS_FOLDER.",
     purpose: [
-      "Contactformulier-aanvragen van de website automatisch als lead toevoegen",
+      "Contactformulier-aanvragen (Framer, Rocket Leads) automatisch als lead toevoegen",
       "Dubbele import voorkomen via de unieke Message-ID",
       "Nieuwe leads toewijzen aan de eigenaar met status 'Nieuw'",
     ],
     required: [
       {
-        key: "GOOGLE_CLIENT_ID",
-        label: "OAuth client-ID (zelfde als Google Drive/Agenda)",
-        where: "console.cloud.google.com → APIs & Services → Credentials → OAuth client ID",
+        key: "IMAP_HOST",
+        label: "IMAP-server",
+        where: "Cloud86/Plesk: mail.shortclips.nl",
       },
       {
-        key: "GOOGLE_CLIENT_SECRET",
-        label: "OAuth client secret",
-        where: "Zelfde scherm als het client-ID",
+        key: "IMAP_USER",
+        label: "Gebruikersnaam",
+        where: "Het volledige mailadres, bijv. info@shortclips.nl",
       },
       {
-        key: "GOOGLE_REFRESH_TOKEN",
-        label: "Refresh-token mét Gmail-scope",
-        where: "Eenmalig via de OAuth-consent flow (access_type=offline, prompt=consent)",
-        scopes: "https://www.googleapis.com/auth/gmail.readonly (naast de Drive/Agenda-scopes)",
-      },
-      {
-        key: "GMAIL_LEADS_LABEL",
-        label: "Labelnaam (optioneel)",
-        where: "Standaard \"Leads - Shortclips\". Pas aan als het label anders heet.",
+        key: "IMAP_PASSWORD",
+        label: "Wachtwoord",
+        where: "Plesk → E-mail → info@shortclips.nl. Gebruik bij voorkeur een apart mail-/app-wachtwoord.",
       },
     ],
-    test: () => gmail.testConnection(),
+    test: () => imapLeads.testConnection(),
   },
   {
     provider: "metricool",

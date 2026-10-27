@@ -5,7 +5,7 @@ import { requireOwner } from "@/server/auth/context";
 import { listLeads } from "@/server/leads";
 import { db } from "@/db/client";
 import { integrationConnections } from "@/db/schema";
-import { gmail } from "@/server/integrations/gmail";
+import { imapLeads } from "@/server/integrations/imap-leads";
 import { PageHeader, Stat } from "@/components/ui";
 import { LeadsBoard, QuickAddLead } from "./leads-ui";
 import { SyncLeadsButton } from "./sync-button";
@@ -30,7 +30,7 @@ export default async function LeadsPage() {
         description="Alle leads en offertes. Wijzig de status en opvolgdatum direct in de lijst. Nieuwe aanvragen via het contactformulier komen automatisch binnen."
       />
 
-      <SyncLeadsButton lastSyncAt={lastSyncAt} configured={gmail.isConfigured} />
+      <SyncLeadsButton lastSyncAt={lastSyncAt} configured={imapLeads.isConfigured} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
         <Stat label="Totaal" value={String(summary.total)} icon={<Users />} />

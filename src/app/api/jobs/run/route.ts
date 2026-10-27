@@ -19,7 +19,7 @@ import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
 import { runMonthlyInsightTasks } from "@/server/jobs/insight-tasks";
 import { runIntegrationHealthCheck } from "@/server/jobs/integration-health";
 import { runEmergencyExport } from "@/server/jobs/emergency-export";
-import { runLeadMailSync } from "@/server/jobs/leads-mail-sync";
+import { runLeadImapSync } from "@/server/jobs/leads-imap-sync";
 import { runProfitabilitySignals } from "@/server/jobs/profitability-signals";
 import { runContentHealthSignals } from "@/server/jobs/content-health-signals";
 import { runScriptReviewReminders } from "@/server/jobs/script-review-reminders";
@@ -98,7 +98,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "insights.monthly_tasks": runMonthlyInsightTasks,
   "integrations.health_check": runIntegrationHealthCheck,
   "emergency.export": runEmergencyExport,
-  "leads.sync_mailbox": runLeadMailSync,
+  "leads.sync_mailbox": runLeadImapSync,
   "profit.signals": runProfitabilitySignals,
   "content_health.signals": runContentHealthSignals,
   "script_review.reminders": runScriptReviewReminders,
