@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clients,
@@ -7,6 +7,8 @@ import {
   deliverables,
   notifications,
   productionDays,
+  reviewComments,
+  reviewThreads,
   scripts,
   users,
 } from "@/db/schema";
@@ -23,6 +25,9 @@ import { portalEmailHtml, sendEmail } from "@/server/email";
  *  1. Nieuwe video klaar om te beoordelen  (deliverable → client_review)
  *  2. Nieuw script klaar om te lezen       (script → client_review)
  *  3. Opname morgen                         (production_day → scheduledOn = morgen)
+ *  4. Video gisteren online gezet           (content_calendar → published, gisteren)
+ *  5. Nieuwe reactie op een video           (klantzichtbare reactie van het team)
+ *  6. Contentplanning beschikbaar           (goedgekeurde planning voor een maand)
  *
  * Idempotent: de notificatierij met zijn dedupeKey is tegelijk het bewijs "al
  * gemeld". We maken de rij met onConflictDoNothing; alleen als er een nieuwe rij
@@ -32,7 +37,7 @@ import { portalEmailHtml, sendEmail } from "@/server/email";
 
 type NotifyItem = {
   clientId: string;
-  kind: "video_review" | "script_review" | "opname_reminder" | "video_published";
+  kind: "video_review" | "script_review" | "opname_reminder" | "video_published" | "file_comment" | "content_plan";
   dedupeKey: string;
   title: string;
   body: string;
@@ -163,6 +168,76 @@ export async function runClientNotifications(): Promise<{
       body: `“${cleanVideoTitle(p.title)}” staat sinds gisteren online${onPlatforms}. Al gezien? Leuk om 'm even te bekijken!`,
       href: p.deliverableId ? `/portal/videos/${p.deliverableId}` : "/portal/videos",
       ctaLabel: "Bekijk de video",
+    });
+  }
+
+  // 5. Nieuwe reactie van het team op een video die de klant ziet. Alleen
+  // klantzichtbare draden (visibility = 'client') en reacties ván een teamlid
+  // (authorUserId gevuld, geen klantcontact). Dedupe per reactie-id.
+  const since = new Date(Date.now() - 2 * 86_400_000);
+  const teamComments = await db
+    .select({
+      id: reviewComments.id,
+      deliverableId: reviewThreads.deliverableId,
+      clientId: deliverables.clientId,
+      title: deliverables.title,
+    })
+    .from(reviewComments)
+    .innerJoin(reviewThreads, eq(reviewThreads.id, reviewComments.threadId))
+    .innerJoin(deliverables, eq(deliverables.id, reviewThreads.deliverableId))
+    .where(
+      and(
+        isNull(reviewComments.deletedAt),
+        isNotNull(reviewComments.authorUserId),
+        isNull(reviewComments.authorContactId),
+        eq(reviewThreads.visibility, "client"),
+        isNull(reviewThreads.deletedAt),
+        isNull(deliverables.deletedAt),
+        gte(reviewComments.createdAt, since),
+      ),
+    );
+
+  for (const c of teamComments) {
+    if (!c.clientId) continue;
+    items.push({
+      clientId: c.clientId,
+      kind: "file_comment",
+      dedupeKey: `portal:file_comment:${c.id}`,
+      title: "Nieuwe reactie op je video",
+      body: `Het team plaatste een opmerking bij “${cleanVideoTitle(c.title)}”. Bekijk 'm in het portaal en reageer gerust.`,
+      href: `/portal/videos/${c.deliverableId}`,
+      ctaLabel: "Bekijk de reactie",
+    });
+  }
+
+  // 6. Contentplanning beschikbaar: er staat goedgekeurde, toekomstige planning
+  // klaar. Eén melding per klant per maand (van het vroegste geplande item), zodat
+  // er geen stroom meldingen ontstaat bij elk nieuw ingepland item.
+  const planRows = await db
+    .select({ clientId: contentCalendar.clientId, scheduledOn: contentCalendar.scheduledOn })
+    .from(contentCalendar)
+    .where(
+      and(
+        isNull(contentCalendar.deletedAt),
+        gte(contentCalendar.scheduledOn, day(0)),
+        inArray(contentCalendar.status, ["scheduled", "ready"]),
+        eq(contentCalendar.clientApproved, true),
+      ),
+    )
+    .orderBy(asc(contentCalendar.scheduledOn));
+  const earliestPlanByClient = new Map<string, string>();
+  for (const r of planRows) {
+    if (r.clientId && !earliestPlanByClient.has(r.clientId)) earliestPlanByClient.set(r.clientId, r.scheduledOn);
+  }
+  for (const [clientId, firstDate] of earliestPlanByClient) {
+    items.push({
+      clientId,
+      kind: "content_plan",
+      dedupeKey: `portal:content_plan:${clientId}:${firstDate.slice(0, 7)}`,
+      title: "Je contentplanning staat klaar",
+      body: "Je contentplanning is bijgewerkt — bekijk wanneer welke video online komt.",
+      href: "/portal/planning",
+      ctaLabel: "Bekijk de planning",
     });
   }
 

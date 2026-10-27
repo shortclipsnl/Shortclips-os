@@ -252,6 +252,13 @@ export default async function PortalPage() {
           ) : (
             <p className="mt-4 flex flex-1 items-center text-sm text-[var(--color-ink-muted)]">Nog geen publicatie ingepland.</p>
           )}
+          {/* Wie plaatst de video's — duidelijk voor de klant (afspraak per klant). */}
+          <p className="mt-4 flex items-center gap-1.5 border-t border-[var(--sc-line)] pt-3 text-[13px] text-[var(--color-ink-muted)]">
+            <Radio className="size-3.5 shrink-0 text-[var(--sc-accent)]" />
+            {data.client.weHandlePosting
+              ? "ShortClips plaatst jullie video's op de afgesproken kanalen."
+              : "Jullie plaatsen de video's zelf — wij leveren ze kant-en-klaar aan."}
+          </p>
         </section>
         <Link href="/portal/planning" className="sc-glass group flex items-center gap-4 p-5 transition-colors hover:border-[var(--sc-line)]">
           <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><CalendarRange className="size-6" strokeWidth={1.8} /></span>

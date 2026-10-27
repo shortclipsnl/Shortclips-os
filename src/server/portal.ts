@@ -65,6 +65,7 @@ export async function getPortalData(viewer: Viewer) {
       color: clients.color,
       logoUrl: clients.logoUrl,
       monthlyVideoQuota: clients.monthlyVideoQuota,
+      weHandlePosting: clients.weHandlePosting,
       startedOn: clients.startedOn,
       coordinatorName: users.fullName,
       coordinatorEmail: users.email,
