@@ -881,6 +881,43 @@ export async function getPortalCollaboration(viewer: Viewer): Promise<{
   };
 }
 
+export type PortalPackageProgress = {
+  quota: number;
+  onlineThisMonth: number;
+  remaining: number;
+  monthLabel: string;
+};
+
+/**
+ * Pakketteller: hoeveel video's er deze maand al online staan t.o.v. het
+ * afgesproken aantal per maand, en hoeveel er nog komen. Beantwoordt de
+ * veelgestelde vraag "hoeveel video's hebben we nog?". Null als er geen
+ * maandafspraak is.
+ */
+export async function getPortalPackageProgress(viewer: Viewer): Promise<PortalPackageProgress | null> {
+  const clientId = viewer.clientId;
+  if (!clientId) return null;
+  const [c] = await db
+    .select({ quota: clients.monthlyVideoQuota })
+    .from(clients)
+    .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
+    .limit(1);
+  const quota = Number(c?.quota ?? 0);
+  if (quota <= 0) return null;
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(deliverables)
+    .where(and(
+      eq(deliverables.clientId, clientId),
+      isNull(deliverables.deletedAt),
+      eq(deliverables.status, "published"),
+      sql`${deliverables.publishedAt} >= date_trunc('month', now())`,
+    ));
+  const onlineThisMonth = Number(row?.n ?? 0);
+  const monthLabel = new Date().toLocaleDateString("nl-NL", { month: "long", timeZone: "Europe/Amsterdam" });
+  return { quota, onlineThisMonth, remaining: Math.max(0, quota - onlineThisMonth), monthLabel };
+}
+
 export type PortalProfile = {
   company: { name: string; legalName: string | null; logoUrl: string | null; color: string | null; sector: string | null; website: string | null; description: string | null };
   startedOn: string | null;

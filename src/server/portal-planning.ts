@@ -5,6 +5,7 @@ import { productionDays, scripts, users } from "@/db/schema";
 import { type Viewer } from "@/server/auth/context";
 import { upcomingAppointmentsForClient } from "@/server/appointments";
 import { listPortalScriptReviews, SCRIPT_REVIEW_STATUS, type ScriptReviewStatus } from "@/server/script-review";
+import { cleanPlanningTitle } from "@/lib/portal-status";
 
 export type PlanningPerson = { name: string; role: string | null; avatarUrl: string | null };
 
@@ -131,7 +132,7 @@ export async function getPortalPlanning(viewer: Viewer): Promise<PortalPlanning>
     const review = reviewByDay.get(r.id) ?? null;
     return {
       id: r.id,
-      title: r.title,
+      title: cleanPlanningTitle(r.title, { fallback: "Opnamedag" }),
       date: r.scheduledOn,
       startTime: hhmm(r.startTime),
       endTime: hhmm(r.endTime),

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Bell, CalendarRange, Camera, Check, ClipboardCheck, Clock, ExternalLink, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalContact, getPortalData, getPortalFrameUrl } from "@/server/portal";
+import { getPortalContact, getPortalData, getPortalFrameUrl, getPortalPackageProgress } from "@/server/portal";
 import { CLIENT_ACTION_STATUSES, listPortalScriptReviews } from "@/server/script-review";
 import { buttonClass, ClientLogo, TeamAvatar } from "@/components/ui";
 import { compact, formatDate, num } from "@/lib/format";
@@ -132,11 +132,12 @@ const SCRIPT_TONE: Record<"action" | "ready" | "done" | "prep", string> = {
 
 export default async function PortalPage() {
   const viewer = await requirePortal();
-  const [data, contact, scriptReviews, frameUrl] = await Promise.all([
+  const [data, contact, scriptReviews, frameUrl, pkg] = await Promise.all([
     getPortalData(viewer),
     getPortalContact(viewer),
     listPortalScriptReviews(viewer),
     getPortalFrameUrl(viewer),
+    getPortalPackageProgress(viewer),
   ]);
 
   const companyName = data.client.name;
@@ -222,6 +223,28 @@ export default async function PortalPage() {
           </div>
         </section>
       )}
+
+      {/* Pakketteller: hoeveel video's deze maand online t.o.v. de afspraak */}
+      {pkg ? (
+        <section className="sc-glass p-5">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
+                <Film className="size-4 text-[var(--sc-accent)]" /> Jouw pakket · {pkg.monthLabel}
+              </span>
+              <p className="mt-2 text-[15px] font-semibold">
+                {pkg.onlineThisMonth} van {pkg.quota} video&apos;s deze maand online
+              </p>
+            </div>
+            <span className="text-[13px] text-[var(--color-ink-muted)]">
+              {pkg.remaining > 0 ? `nog ${pkg.remaining} te gaan` : "pakket voor deze maand compleet"}
+            </span>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--sc-fill-strong)]">
+            <div className="h-full rounded-full bg-[var(--sc-accent)]" style={{ width: `${Math.min(100, Math.round((pkg.onlineThisMonth / pkg.quota) * 100))}%` }} />
+          </div>
+        </section>
+      ) : null}
 
       {/* 2 — Volgende opnamedag en scriptmeeting, naast elkaar */}
       <div className="grid gap-[18px] sm:grid-cols-2">
