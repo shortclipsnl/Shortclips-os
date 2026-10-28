@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requirePortal } from "@/server/auth/context";
+import { getPortalBranding } from "@/server/portal";
 import { Logo } from "@/components/logo";
-import { Avatar } from "@/components/ui";
+import { ClientLogo } from "@/components/ui";
 import { UserMenu } from "@/components/layout/user-menu";
 import { PortalNav, PortalMobileNav } from "./portal-nav";
 import { PortalThemeToggle, PORTAL_THEME_INIT } from "./portal-theme";
@@ -22,6 +23,7 @@ export default async function PortalLayout({
   children: React.ReactNode;
 }) {
   const viewer = await requirePortal();
+  const branding = await getPortalBranding(viewer);
 
   return (
     <div className="portal-studio flex min-h-screen text-[var(--color-ink)]">
@@ -50,10 +52,12 @@ export default async function PortalLayout({
             <Logo size={28} className="pl-light" />
           </Link>
           <div className="ml-auto flex items-center gap-2">
-            <span className="hidden text-sm text-[var(--color-ink-muted)] sm:block">{viewer.fullName}</span>
+            <span className="hidden text-sm text-[var(--color-ink-muted)] sm:block">{branding.name}</span>
             <PortalThemeToggle />
             <UserMenu name={viewer.fullName} email={viewer.email} role="client">
-              <Avatar name={viewer.fullName} size={32} />
+              {/* Logo van de klant i.p.v. persoons-initialen (valt terug op
+                  klant-initialen als er nog geen logo is geüpload). */}
+              <ClientLogo name={branding.name} logoUrl={branding.logoUrl} color={branding.color} size={32} />
             </UserMenu>
           </div>
         </header>

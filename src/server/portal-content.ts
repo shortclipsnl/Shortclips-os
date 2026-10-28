@@ -104,9 +104,32 @@ export async function getPortalContentPlanning(viewer: Viewer): Promise<PortalCo
     else byWeek.set(wk, [post]);
   }
 
-  const weeks: PortalContentWeek[] = [...byWeek.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([weekStart, posts]) => ({ weekStart, label: weekLabel(weekStart), posts }));
+  // Doorlopende weken, óók als er niks gepland staat: de klant moet deze week en
+  // de weken erna altijd zien (met lege dagen), zodat de planning zichtbaar
+  // doorloopt i.p.v. alleen weken mét posts te tonen.
+  const addWeeks = (mondayIso: string, n: number): string => {
+    const d = new Date(`${mondayIso}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + n * 7);
+    return d.toISOString().slice(0, 10);
+  };
+  const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  const thisMonday = mondayOf(todayIso);
+  const postedWeeks = [...byWeek.keys()].sort((a, b) => a.localeCompare(b));
+  // Start: vroegste geplande week of deze week (de vroegste van de twee).
+  const startWeek = postedWeeks.length && postedWeeks[0]! < thisMonday ? postedWeeks[0]! : thisMonday;
+  // Einde: minimaal deze week + 5 (dus deze + 5 volgende weken), of verder als er
+  // later nog iets gepland staat.
+  const defaultEnd = addWeeks(thisMonday, 5);
+  const lastPosted = postedWeeks.length ? postedWeeks[postedWeeks.length - 1]! : thisMonday;
+  let endWeek = lastPosted > defaultEnd ? lastPosted : defaultEnd;
+  // Veiligheidsplafond: nooit meer dan ~16 weken tonen.
+  const maxEnd = addWeeks(startWeek, 16);
+  if (endWeek > maxEnd) endWeek = maxEnd;
+
+  const weeks: PortalContentWeek[] = [];
+  for (let wk = startWeek; wk <= endWeek; wk = addWeeks(wk, 1)) {
+    weeks.push({ weekStart: wk, label: weekLabel(wk), posts: byWeek.get(wk) ?? [] });
+  }
 
   return { shared: true, weeks, total: rows.length };
 }

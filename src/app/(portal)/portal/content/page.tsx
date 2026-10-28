@@ -48,6 +48,17 @@ export default async function PortalContentPage() {
   const data = await getPortalContentPlanning(viewer);
   const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
 
+  // Maandag van deze en volgende week, zodat de koppen "Deze week" / "Volgende
+  // week" tonen en de planning daarna duidelijk doorloopt.
+  const nowUtc = new Date(`${todayIso}T12:00:00Z`);
+  const mondayOffset = (nowUtc.getUTCDay() + 6) % 7;
+  const thisMondayDate = new Date(nowUtc);
+  thisMondayDate.setUTCDate(nowUtc.getUTCDate() - mondayOffset);
+  const thisMonday = thisMondayDate.toISOString().slice(0, 10);
+  const nextMondayDate = new Date(thisMondayDate);
+  nextMondayDate.setUTCDate(thisMondayDate.getUTCDate() + 7);
+  const nextMonday = nextMondayDate.toISOString().slice(0, 10);
+
   return (
     <div className="flex flex-col gap-[22px]">
       {/* Kop */}
@@ -85,14 +96,18 @@ export default async function PortalContentPage() {
         <div className="flex flex-col gap-6">
           {data.weeks.map((week) => {
             const days = daysOfWeek(week.weekStart);
-            const isThisWeek = week.weekStart <= todayIso && todayIso <= days[6]!;
+            const isThisWeek = week.weekStart === thisMonday;
+            const isNextWeek = week.weekStart === nextMonday;
+            const weekTitle = isThisWeek ? "Deze week" : isNextWeek ? "Volgende week" : `Week van ${week.label}`;
             return (
               <section key={week.weekStart}>
-                <div className="mb-2.5 flex items-center gap-2">
+                <div className="mb-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <h2 className="text-[13px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-                    Week van {week.label}
+                    {weekTitle}
                   </h2>
-                  {isThisWeek ? <span className="rounded-full bg-[var(--sc-accent)]/15 px-2 py-0.5 text-[11px] font-semibold text-[var(--sc-accent)]">Deze week</span> : null}
+                  {/* Datumbereik erbij als de kop een naam is, zodat je altijd de datum ziet. */}
+                  {isThisWeek || isNextWeek ? <span className="text-[12px] text-[var(--color-ink-faint)]">· {week.label}</span> : null}
+                  {isThisWeek ? <span className="rounded-full bg-[var(--sc-accent)]/15 px-2 py-0.5 text-[11px] font-semibold text-[var(--sc-accent)]">Nu</span> : null}
                 </div>
 
                 {/* Weekagenda: 7 dagen (ma–zo) als kolommen op desktop, gestapeld op

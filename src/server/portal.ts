@@ -882,6 +882,22 @@ export type PortalProfile = {
 };
 
 /**
+ * Lichte branding van de klant achter dit portaal: naam, logo en merkkleur —
+ * voor de header (logo i.p.v. persoons-initialen). Valt terug op de naam van de
+ * gebruiker als er (nog) geen klant aan hangt.
+ */
+export async function getPortalBranding(viewer: Viewer): Promise<{ name: string; logoUrl: string | null; color: string | null }> {
+  const clientId = viewer.clientId;
+  if (!clientId) return { name: viewer.fullName, logoUrl: null, color: null };
+  const [c] = await db
+    .select({ name: clients.name, logoUrl: clients.logoUrl, color: clients.color })
+    .from(clients)
+    .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
+    .limit(1);
+  return c ?? { name: viewer.fullName, logoUrl: null, color: null };
+}
+
+/**
  * Alles voor de samenwerkingspagina (het "klantprofiel"): bedrijfsgegevens, de
  * afspraken (hergebruikt getPortalCollaboration), de contactpersonen van de klant,
  * en een paar samenwerkingsstatistieken. Volledig klant-gescoped; ontbrekende
