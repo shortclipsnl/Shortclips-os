@@ -3,6 +3,7 @@ import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { contentCalendar } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
+import { cleanPlanningTitle } from "@/lib/portal-status";
 
 export type PortalContentPost = {
   id: string;
@@ -91,7 +92,7 @@ export async function getPortalContentPlanning(viewer: Viewer): Promise<PortalCo
   for (const r of rows) {
     const post: PortalContentPost = {
       id: r.id,
-      title: r.title,
+      title: cleanPlanningTitle(r.title, { fallback: "Nieuwe video" }),
       scheduledOn: r.scheduledOn,
       scheduledAt: r.scheduledAt ? r.scheduledAt.slice(0, 5) : null,
       platforms: Array.isArray(r.platforms) ? (r.platforms as string[]) : [],

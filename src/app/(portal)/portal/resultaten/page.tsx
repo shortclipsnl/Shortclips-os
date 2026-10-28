@@ -49,7 +49,7 @@ export default async function PortalResultatenPage({
           </div>
           <h2 className="mt-2 text-[22px] font-bold tracking-tight">Wat gaan we verbeteren?</h2>
           <p className="mt-1.5 max-w-2xl text-[13.5px] text-[var(--color-ink-muted)]">
-            Op basis van je resultaten — wat werkte, wat beter kan en wat we concreet voor je oppakken.
+            Op basis van je resultaten: wat werkte, wat beter kan en wat we concreet voor je oppakken.
           </p>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             {visible.map((s) => {
@@ -83,7 +83,7 @@ export default async function PortalResultatenPage({
           <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> We meten de prestaties en rapporteren je elke maand.</li>
           <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> We evalueren samen wat werkt en wat beter kan.</li>
           <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> We gebruiken de cijfers om je volgende content te verbeteren.</li>
-          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> Analyse en rapportage verzorgen wij volledig — jij hoeft niets bij te houden.</li>
+          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> Analyse en rapportage verzorgen wij volledig; jij hoeft niets bij te houden.</li>
         </ul>
       </section>
     </div>

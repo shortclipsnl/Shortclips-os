@@ -48,23 +48,37 @@ function toDate(input: Date | string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/** Datum/tijd altijd in Nederlandse tijd (Europe/Amsterdam), los van de
+ *  server-tijdzone. Voorkomt de wintertijd-fout waarbij 16:00 als 15:00 toont. */
+const TZ = "Europe/Amsterdam";
+const amsFmt = new Intl.DateTimeFormat("nl-NL", {
+  timeZone: TZ, year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
+});
+function amsParts(d: Date): { day: number; month: number; year: number; hour: string; minute: string } {
+  const p: Record<string, string> = {};
+  for (const part of amsFmt.formatToParts(d)) p[part.type] = part.value;
+  return { day: Number(p.day), month: Number(p.month), year: Number(p.year), hour: (p.hour === "24" ? "00" : p.hour) ?? "00", minute: p.minute ?? "00" };
+}
+
 export function formatDate(input: Date | string | null | undefined): string {
   const d = toDate(input);
   if (!d) return "–";
-  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  const p = amsParts(d);
+  return `${p.day} ${MONTHS[p.month - 1]}`;
 }
 
 export function formatDateFull(input: Date | string | null | undefined): string {
   const d = toDate(input);
   if (!d) return "–";
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  const p = amsParts(d);
+  return `${p.day} ${MONTHS[p.month - 1]} ${p.year}`;
 }
 
 export function formatDateTime(input: Date | string | null | undefined): string {
   const d = toDate(input);
   if (!d) return "–";
-  const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  return `${formatDate(d)} ${time}`;
+  const p = amsParts(d);
+  return `${p.day} ${MONTHS[p.month - 1]} ${p.hour}:${p.minute}`;
 }
 
 /** "3 dagen geleden", "over 2 dagen", "vandaag". */

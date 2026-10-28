@@ -22,7 +22,7 @@ import {
 import { assertClientAccess, type Viewer } from "@/server/auth/context";
 import { nextShootForClient, upcomingAppointmentsForClient } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
-import { cleanVideoTitle } from "@/lib/portal-status";
+import { cleanVideoTitle, cleanPlanningTitle } from "@/lib/portal-status";
 
 /**
  * Alles wat het klantportaal toont — en niets meer.
@@ -245,7 +245,7 @@ export async function getPortalData(viewer: Viewer) {
         coalesce(sum(dm.follower_delta), 0)::int as follower_growth
       from daily_metrics dm
       where dm.client_id = ${clientId}
-        and dm.measured_on >= current_date - interval '30 days'
+        and dm.measured_on between current_date - interval '29 days' and current_date
     `),
     // Afspraken uit Google Agenda die aan deze klant zijn gekoppeld.
     upcomingAppointmentsForClient(clientId, 8),
@@ -305,7 +305,7 @@ export async function getPortalData(viewer: Viewer) {
       )
       .orderBy(desc(contentCalendar.scheduledOn))
       .limit(6)
-  ).map((r) => ({ ...r, title: cleanVideoTitle(r.title), platforms: (r.platforms as string[]) ?? [] }));
+  ).map((r) => ({ ...r, title: cleanPlanningTitle(r.title, { fallback: "Nieuwe video" }), platforms: (r.platforms as string[]) ?? [] }));
 
   // Scripts die aan de eerstvolgende ingeplande opnamedag hangen, zodat de klant
   // op het overzicht meteen ziet dat de scripts voor die dag al klaarstaan.
@@ -331,7 +331,7 @@ export async function getPortalData(viewer: Viewer) {
     upcomingShoot: nextShoot,
     upcomingShoots: upcomingShoot,
     appointments,
-    calendar,
+    calendar: calendar.map((c) => ({ ...c, title: cleanPlanningTitle(c.title, { fallback: "Nieuwe video" }) })),
     reports,
     documents,
     timeline,
@@ -726,10 +726,13 @@ export async function getPortalVideo(viewer: Viewer, videoId: string) {
   };
 }
 
+// Écht nog in bewerking (wij zijn bezig).
 const IN_PRODUCTION_STATUSES = [
   "recorded", "footage_upload", "awaiting_editor", "editing", "internal_review",
-  "editor_revision", "client_revision", "approved", "ready_to_publish", "scheduled",
+  "editor_revision", "client_revision",
 ] as const;
+// Klaar en wacht op publicatie — hoort in een aparte "Ingepland"-groep.
+const SCHEDULED_STATUSES = ["approved", "ready_to_publish", "scheduled"] as const;
 
 /** Alle video's van de klant, gegroepeerd voor de video-omgeving (§24). */
 export async function getPortalVideos(viewer: Viewer) {
@@ -757,7 +760,12 @@ export async function getPortalVideos(viewer: Viewer) {
     .orderBy(desc(deliverables.publishedAt), desc(deliverables.statusChangedAt))
     .limit(1000);
 
-  const clean = rows.map((v) => ({ ...v, title: cleanVideoTitle(v.title) }));
+  const clean = rows.map((v) => ({
+    ...v,
+    title: cleanVideoTitle(v.title),
+    // Opnamedag-kop ook opschonen (agenda-lek), met nette terugval.
+    sessionTitle: v.sessionTitle ? cleanPlanningTitle(v.sessionTitle, { fallback: "Opnamedag" }) : v.sessionTitle,
+  }));
 
   // Gepubliceerd: één kaart per video. Frame levert per video meerdere bestanden
   // (9:16/4:5/1:1, .mov/.mp4) die naar dezelfde schone titel opschonen — die
@@ -765,9 +773,16 @@ export async function getPortalVideos(viewer: Viewer) {
   // afgeleide titels (bv. "KKFH") vouwen we bewust NIET samen.
   const gepubliceerd = dedupByTitle(clean.filter((v) => v.status === "published"));
 
+  // Ingepland sorteren op geplande publicatiedatum (vroegste eerst); items zonder
+  // datum achteraan.
+  const ingepland = clean
+    .filter((v) => (SCHEDULED_STATUSES as readonly string[]).includes(v.status))
+    .sort((a, b) => (a.plannedPublishOn ?? "9999").localeCompare(b.plannedPublishOn ?? "9999"));
+
   return {
     actieNodig: clean.filter((v) => v.status === "client_review"),
     inProductie: clean.filter((v) => (IN_PRODUCTION_STATUSES as readonly string[]).includes(v.status)),
+    ingepland,
     gepubliceerd,
     totaal: rows.length,
   };
@@ -938,7 +953,10 @@ export async function getPortalProfile(viewer: Viewer): Promise<PortalProfile> {
 
   return {
     company: client,
-    startedOn: collab.startedOn,
+    // Eén bron voor "sinds": de effectieve startdatum (contractstart, met
+    // terugval op clients.startedOn) — zodat de hero, het statblok en de looptijd
+    // dezelfde datum tonen i.p.v. een leeg "sinds"-veld.
+    startedOn: startIso,
     daysTogether,
     monthsTogether,
     monthlyQuota: collab.monthlyQuota,
@@ -980,6 +998,7 @@ export async function getPortalContact(viewer: Viewer): Promise<{
       coordinatorEmail: users.email,
       coordinatorPhone: users.phone,
       coordinatorAvatar: users.avatarUrl,
+      coordinatorRole: users.primaryRole,
     })
     .from(clients)
     .leftJoin(users, eq(users.id, clients.coordinatorId))
@@ -1016,12 +1035,19 @@ export async function getPortalContact(viewer: Viewer): Promise<{
       .limit(1);
   }
 
+  // De interne rol naar een klantvriendelijke functietitel vertalen.
+  const CONTACT_ROLE: Record<string, string> = {
+    project_coordinator: "Content Strategist",
+    content_creator: "Content Creative",
+    owner: "Vaste contactpersoon",
+  };
+
   return {
     clientName: client?.name ?? "",
     coordinator: client?.coordinatorName
       ? {
           name: client.coordinatorName,
-          role: "Vaste contactpersoon",
+          role: CONTACT_ROLE[client.coordinatorRole ?? ""] ?? "Vaste contactpersoon",
           email: client.coordinatorEmail,
           phone: client.coordinatorPhone,
           avatarUrl: client.coordinatorAvatar ?? null,

@@ -146,8 +146,8 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
             <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-[#19a8ff]/30 bg-[rgba(25,168,255,0.07)] px-4 py-3">
               <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[rgba(25,168,255,0.16)] text-[#19a8ff]"><Trophy className="size-4" /></span>
               <div className="text-[13.5px]">
-                <span className="font-semibold">Mijlpaal behaald: {compact(r.milestone.reached)} weergaven totaal 🎉</span>
-                {r.milestone.next ? <span className="text-[var(--color-ink-muted)]"> — nog {compact(r.milestone.next - r.milestone.lifetimeViews)} tot {compact(r.milestone.next)}.</span> : null}
+                <span className="font-semibold">Mijlpaal behaald: {compact(r.milestone.reached)} weergaven totaal.</span>
+                {r.milestone.next ? <span className="text-[var(--color-ink-muted)]"> Nog {compact(r.milestone.next - r.milestone.lifetimeViews)} te gaan tot {compact(r.milestone.next)}.</span> : null}
               </div>
             </div>
           ) : null}
@@ -238,7 +238,7 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
                 <span className="grid size-7 place-items-center rounded-lg bg-[var(--sc-fill-strong)] text-[var(--color-ink-muted)]"><TrendingDown className="size-4" /></span>
                 <h2 className="text-base font-semibold">Minst bekeken video</h2>
               </div>
-              <p className="mt-1 text-[12.5px] text-[var(--color-ink-muted)]">Handig om mee te nemen naar de volgende ronde — niet elke video scoort gelijk, en daar leren we van.</p>
+              <p className="mt-1 text-[12.5px] text-[var(--color-ink-muted)]">Handig om mee te nemen naar de volgende ronde: niet elke video scoort gelijk, en daar leren we van.</p>
               <div className="mt-4 flex items-center gap-4">
                 <Thumb v={worst} />
                 <div className="min-w-0 flex-1">

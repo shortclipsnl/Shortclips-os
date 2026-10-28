@@ -141,7 +141,7 @@ export default async function PortalVideosPage() {
             {data.actieNodig.length === 0 ? (
               <div className="sc-glass flex items-center gap-3 p-5 text-[14px]">
                 <Check className="size-5 shrink-0 text-[#2fd27a]" />
-                <span>Je bent helemaal bij — er staat nu niets op je te wachten.</span>
+                <span>Je bent helemaal bij; er staat nu niets op je te wachten.</span>
               </div>
             ) : (
               <>
@@ -160,6 +160,11 @@ export default async function PortalVideosPage() {
             )}
           </section>
 
+          {/* Ingepland — goedgekeurd en klaar om online te gaan */}
+          {data.ingepland.length > 0 ? (
+            <Group title="Ingepland" subtitle={`${data.ingepland.length} video's staan klaar om online te gaan`} rows={data.ingepland} max={40} />
+          ) : null}
+
           {/* Online — wat er live staat of gaat */}
           <Group title="Online" subtitle={`${data.gepubliceerd.length} video's staan online`} rows={data.gepubliceerd} max={40} />
 
@@ -168,7 +173,7 @@ export default async function PortalVideosPage() {
             <details className="sc-glass p-5 [&_summary]:cursor-pointer">
               <summary className="flex items-center gap-2 text-sm font-semibold">
                 <VideoIcon className="size-4 text-[var(--color-ink-muted)]" /> In productie ({data.inProductie.length})
-                <span className="font-normal text-[var(--color-ink-faint)]">— hier zijn wij mee bezig, je hoeft nu niets te doen</span>
+                <span className="font-normal text-[var(--color-ink-faint)]">hier zijn wij mee bezig, je hoeft nu niets te doen</span>
               </summary>
               <div className="mt-4 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
                 {data.inProductie.map((v) => <Tile key={v.id} v={v} />)}

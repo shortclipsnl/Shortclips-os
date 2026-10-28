@@ -223,7 +223,7 @@ export function ResultReport({ r, clientName, clientLogoUrl }: { r: PortalResult
         )}
 
         <div style={{ marginTop: 30, paddingTop: 14, borderTop: "1px solid #e5e7eb", fontSize: 11, color: "#9ca3af" }}>
-          Gemaakt door ShortClips · Cijfers automatisch uit de gekoppelde kanalen · {compact(r.milestone?.lifetimeViews ?? 0)} weergaven totaal sinds de start.
+          Gemaakt door Shortclips · Cijfers automatisch uit de gekoppelde kanalen · {compact(r.milestone?.lifetimeViews ?? 0)} weergaven totaal sinds de start.
         </div>
       </div>
     </>

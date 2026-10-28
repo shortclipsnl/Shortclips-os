@@ -65,6 +65,10 @@ export function cleanVideoTitle(raw: string | null | undefined): string {
   if (!raw) return "";
   let t = String(raw).trim();
   t = t.replace(/\.(mp4|mov|m4v|mkv|webm|wav|mp3|png|jpg)$/i, "");
+  // Agenda-lek: tijd-staart ("> 16:00", "· 16:00 uur") en leidend tijd-fragment
+  // (":30-", "09:00 -") weg, zodat interne agendatitels niet doorlekken.
+  t = t.replace(/\s*[>|·–-]\s*(om\s*)?\d{1,2}[:.]\d{2}\s*(uur)?\s*$/i, " ");
+  t = t.replace(/^\s*:?\d{1,2}[:.]\d{2}\s*[-–:>|]\s*/i, "");
   t = t.replace(/[_]+/g, " ");                        // underscores eerst, anders blokkeren ze word-boundaries
   t = t.replace(/[\s-]*shortclips[\w-]*/gi, " ");
   t = t.replace(/\b\d{1,3}\s*v\d{1,2}\b/gi, " ");     // 06V3, 03 V4
@@ -74,6 +78,30 @@ export function cleanVideoTitle(raw: string | null | undefined): string {
   t = t.replace(/\s{2,}/g, " ").replace(/^[\s-]+|[\s-]+$/g, "").trim();
   if (!t) return String(raw).trim();
   // Volledig in hoofdletters → zinskapitaal (zodat caps en gewone letters gelijk zijn).
+  if (/[A-Z]/.test(t) && !/[a-z]/.test(t)) t = t.toLowerCase();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/**
+ * Schoont een planning-/opnametitel op voor de klant: haalt interne tijd-
+ * fragmenten (":30-", "> 16:00"), markers ("short online", "intern") en —
+ * indien meegegeven — de eigen klantnaam weg. Blijft er niets zinnigs over, dan
+ * de meegegeven terugval (bv. "Nieuwe video" of "Opnamedag").
+ */
+export function cleanPlanningTitle(raw: string | null | undefined, opts: { fallback?: string; clientName?: string } = {}): string {
+  const fallback = opts.fallback ?? "";
+  if (!raw) return fallback;
+  let t = String(raw).trim();
+  t = t.replace(/\s*[>|·–-]?\s*(om\s*)?\d{1,2}[:.]\d{2}\s*(uur)?\s*$/i, " "); // tijd-staart
+  t = t.replace(/^\s*:?\d{1,2}([:.]\d{2})?\s*[-–:>|]\s*/i, "");               // leidend tijd-fragment
+  t = t.replace(/\b(short\s+online|online zetten|online|intern|concept|publiceren)\b/gi, " ");
+  if (opts.clientName) {
+    const esc = opts.clientName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    t = t.replace(new RegExp(`\\b${esc}\\b`, "gi"), " ");
+  }
+  t = t.replace(/[_]+/g, " ").replace(/\s{2,}/g, " ").replace(/^[\s>|·:–-]+|[\s>|·:–-]+$/g, "").trim();
+  const junk = new Set(["short", "video", "publicatie", "post", "opname"]);
+  if (!t || junk.has(t.toLowerCase())) return fallback;
   if (/[A-Z]/.test(t) && !/[a-z]/.test(t)) t = t.toLowerCase();
   return t.charAt(0).toUpperCase() + t.slice(1);
 }

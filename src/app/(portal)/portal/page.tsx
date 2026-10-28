@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Bell, CalendarRange, Camera, ClipboardCheck, Clock, ExternalLink, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
+import { ArrowRight, Bell, CalendarRange, Camera, Check, ClipboardCheck, Clock, ExternalLink, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalData, getPortalFrameUrl } from "@/server/portal";
 import { CLIENT_ACTION_STATUSES, listPortalScriptReviews } from "@/server/script-review";
 import { buttonClass, ClientLogo, TeamAvatar } from "@/components/ui";
-import { compact, num } from "@/lib/format";
+import { compact, formatDate, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
 
 /** +31 6 ... → 316... voor wa.me. */
@@ -142,9 +142,12 @@ export default async function PortalPage() {
   const companyName = data.client.name;
 
   // Openstaande acties: scripts ter controle + video's ter beoordeling.
-  const scriptActions = scriptReviews.filter((r) => CLIENT_ACTION_STATUSES.includes(r.status)).length;
+  const actionableScripts = scriptReviews.filter((r) => CLIENT_ACTION_STATUSES.includes(r.status));
+  const scriptActions = actionableScripts.length;
   const videoActions = data.awaitingApproval.length;
   const openActions = scriptActions + videoActions;
+  // Eerstvolgende opnamedatum onder de te-controleren scripts → als deadline-hint.
+  const soonestScriptShoot = actionableScripts.map((r) => r.shootOn).filter((d): d is string => !!d).sort()[0] ?? null;
 
   // Eerstvolgende geplande publicatie (uit de goedgekeurde contentplanning).
   const nextPub = data.calendar[0] ?? null;
@@ -176,9 +179,9 @@ export default async function PortalPage() {
       <section className="flex items-start gap-4 px-0.5 pt-1">
         <ClientLogo name={companyName} logoUrl={data.client.logoUrl} color={data.client.color} size={56} />
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Welkom bij ShortClips</p>
+          <p className="text-[13px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Welkom bij Shortclips</p>
           <h1 className="text-[30px] font-bold tracking-tight">{companyName}</h1>
-          <p className="mt-1.5 text-[14px] text-[var(--color-ink-muted)]">Je persoonlijke omgeving — hieronder zie je in één oogopslag wat er speelt.</p>
+          <p className="mt-1.5 text-[14px] text-[var(--color-ink-muted)]">Je persoonlijke omgeving. Hieronder zie je in één oogopslag wat er speelt.</p>
         </div>
       </section>
 
@@ -194,7 +197,10 @@ export default async function PortalPage() {
             {scriptActions > 0 ? (
               <Link href="/portal/scripts" className="flex items-center gap-3 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-3 transition-colors hover:border-[var(--sc-line)]">
                 <FileText className="size-4 shrink-0 text-[var(--sc-accent)]" />
-                <span className="min-w-0 flex-1 text-sm font-medium">{scriptActions} script{scriptActions === 1 ? "" : "s"} wacht op jouw controle</span>
+                <span className="min-w-0 flex-1 text-sm font-medium">
+                  {scriptActions} script{scriptActions === 1 ? "" : "s"} wacht op jouw controle
+                  {soonestScriptShoot ? <span className="font-normal text-[var(--color-ink-muted)]"> · vóór de opname van {formatDate(soonestScriptShoot)}</span> : null}
+                </span>
                 <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
               </Link>
             ) : null}
@@ -207,7 +213,15 @@ export default async function PortalPage() {
             ) : null}
           </div>
         </section>
-      ) : null}
+      ) : (
+        <section className="sc-glass flex items-center gap-3 p-5" style={{ background: "linear-gradient(180deg, rgba(47,210,122,0.08), rgba(255,255,255,0.02))" }}>
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[rgba(47,210,122,0.16)] text-[#2fd27a]"><Check className="size-4" /></span>
+          <div>
+            <p className="text-[14.5px] font-semibold">Alles loopt, jij hoeft niets te doen</p>
+            <p className="text-[13px] text-[var(--color-ink-muted)]">Er wacht op dit moment niets op je. Zodra er iets klaarstaat om te controleren of te beoordelen, zie je het hier.</p>
+          </div>
+        </section>
+      )}
 
       {/* 2 — Volgende opnamedag en scriptmeeting, naast elkaar */}
       <div className="grid gap-[18px] sm:grid-cols-2">
@@ -261,7 +275,7 @@ export default async function PortalPage() {
       {shootDate ? (
         <Link href="/portal/planning#voorbereiding" className="group flex items-center gap-3 rounded-[14px] border border-[#2e90fa]/25 bg-[rgba(46,144,250,0.06)] px-4 py-3 transition-colors hover:border-[var(--sc-accent)]">
           <ClipboardCheck className="size-5 shrink-0 text-[var(--sc-accent)]" />
-          <span className="min-w-0 flex-1 text-[13.5px]"><span className="font-semibold">Bereid je opname voor</span> <span className="text-[var(--color-ink-muted)]">— bekijk de checklist en de dagindeling.</span></span>
+          <span className="min-w-0 flex-1 text-[13.5px]"><span className="font-semibold">Bereid je opname voor</span> <span className="text-[var(--color-ink-muted)]">bekijk de checklist en de dagindeling.</span></span>
           <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-muted)] transition-transform group-hover:translate-x-0.5" />
         </Link>
       ) : null}
@@ -280,7 +294,7 @@ export default async function PortalPage() {
         <div className="min-w-0 flex-1">
           <h2 className="text-[17px] font-semibold">Bekijk jouw video&apos;s</h2>
           <p className="mt-0.5 text-[13.5px] text-[var(--color-ink-muted)]">
-            {frameUrl ? "Je video's staan in Frame.io — bekijken en feedback geven." : "Bekijk alle opnamesessies en video's van jouw bedrijf."}
+            {frameUrl ? "Je video's staan in Frame.io; daar bekijk je ze en geef je feedback." : "Bekijk alle opnamesessies en video's van jouw bedrijf."}
             {pendingReview > 0 ? (
               <span className="ml-1 font-medium text-[#19a8ff]">
                 {pendingReview} {pendingReview === 1 ? "wacht" : "wachten"} op jouw beoordeling.
@@ -317,8 +331,8 @@ export default async function PortalPage() {
           <p className="mt-4 flex items-center gap-1.5 border-t border-[var(--sc-line)] pt-3 text-[13px] text-[var(--color-ink-muted)]">
             <Radio className="size-3.5 shrink-0 text-[var(--sc-accent)]" />
             {data.client.weHandlePosting
-              ? "ShortClips plaatst jullie video's op de afgesproken kanalen."
-              : "Jullie plaatsen de video's zelf — wij leveren ze kant-en-klaar aan."}
+              ? "Shortclips plaatst jullie video's op de afgesproken kanalen."
+              : "Jullie plaatsen de video's zelf; wij leveren ze kant-en-klaar aan."}
           </p>
         </section>
         <Link href="/portal/planning" className="sc-glass group flex items-center gap-4 p-5 transition-colors hover:border-[var(--sc-line)]">

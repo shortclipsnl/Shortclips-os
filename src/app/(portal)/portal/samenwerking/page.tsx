@@ -44,9 +44,15 @@ export default async function PortalSamenwerkingPage() {
 
   const platformLabels = profile.platforms.map((p) => PLATFORM[p]?.label ?? p);
   const perWeek = profile.monthlyQuota > 0 ? Math.round((profile.monthlyQuota / 4.33) * 10) / 10 : 0;
-  const duurTekst = profile.monthsTogether != null
+  // Leesbare "± per week": bij ~1 gewoon "ongeveer 1 per week", anders met een
+  // Nederlandse komma (geen "0.9").
+  const perWeekTekst = perWeek <= 0 ? null : perWeek >= 0.75 ? `ongeveer ${Math.round(perWeek)} per week online` : `± ${perWeek.toLocaleString("nl-NL")} per week online`;
+  // Looptijd: onder de maand alleen dagen tonen (geen "0 maanden").
+  const duurTekst = profile.monthsTogether != null && profile.monthsTogether > 0
     ? `${profile.monthsTogether} ${profile.monthsTogether === 1 ? "maand" : "maanden"}${profile.daysTogether != null ? ` · ${profile.daysTogether} dagen` : ""}`
-    : null;
+    : profile.daysTogether != null
+      ? `${profile.daysTogether} ${profile.daysTogether === 1 ? "dag" : "dagen"}`
+      : null;
   const afsprakenGroepen = buildAfsprakenGroepen(settings);
   const coord = contact.coordinator;
   const startIso = profile.contract?.startsOn ?? profile.startedOn ?? null;
@@ -76,7 +82,7 @@ export default async function PortalSamenwerkingPage() {
 
       {/* 2 — Vier informatieblokken */}
       <div className="grid grid-cols-2 gap-[14px] lg:grid-cols-4">
-        <StatBlock icon={<Film className="size-3.5" />} label="Shorts per maand" value={profile.monthlyQuota > 0 ? `${profile.monthlyQuota}` : "—"} sub={perWeek > 0 ? `± ${perWeek} per week online` : "in overleg"} />
+        <StatBlock icon={<Film className="size-3.5" />} label="Shorts per maand" value={profile.monthlyQuota > 0 ? `${profile.monthlyQuota}` : "—"} sub={perWeekTekst ?? "in overleg"} />
         <StatBlock icon={<CalendarClock className="size-3.5" />} label="Samenwerking sinds" value={profile.startedOn ? formatDate(profile.startedOn) : "—"} sub={duurTekst ?? undefined} />
         <StatBlock icon={<UserRound className="size-3.5" />} label="Vaste contactpersoon" value={coord ? coord.name.split(" ")[0] : "Shortclips"} sub={coord?.role ?? "Je team"} />
         <StatBlock icon={<Film className="size-3.5" />} label="Geproduceerde shorts" value={`${profile.stats.shortsProduced}`} sub={profile.stats.opnamesDone > 0 ? `${profile.stats.opnamesDone} opnames gedaan` : "totaal online"} />
@@ -84,7 +90,7 @@ export default async function PortalSamenwerkingPage() {
 
       {/* 3 — Jouw ShortClips team */}
       <section>
-        <h2 className="mb-3 flex items-center gap-2 text-base font-semibold"><Users className="size-4 text-[var(--sc-accent)]" /> Jouw ShortClips-team</h2>
+        <h2 className="mb-3 flex items-center gap-2 text-base font-semibold"><Users className="size-4 text-[var(--sc-accent)]" /> Jouw Shortclips-team</h2>
         <TeamContent coordinator={contact.coordinator} videographer={contact.videographer} />
       </section>
 

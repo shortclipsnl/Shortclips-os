@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Check, CheckCircle2, ExternalLink, Play } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalVideo } from "@/server/portal";
+import { getPortalVideo, getPortalFrameUrl } from "@/server/portal";
 import { Badge, buttonClass, Card, CardHeader } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { clientStatusView, deadlineText, feedbackBeingProcessed, reviewDeadline, waitingOnClient } from "@/lib/portal-status";
@@ -85,6 +85,11 @@ export default async function PortalVideoDetailPage({
   const inFeedback = feedbackBeingProcessed(video.status);
   const dl = needsDecision ? deadlineText(reviewDeadline(video.statusChangedAt)) : null;
   const expectedNewVersion = inFeedback ? reviewDeadline(video.statusChangedAt) : null;
+  // Een goedgekeurde/ingeplande/online video hoort altijd terug te kijken te zijn.
+  // Ontbreekt de directe Frame-link, val dan terug op de review-omgeving van de klant.
+  const isReady = ["approved", "ready_to_publish", "scheduled", "published", "analysis_available"].includes(video.status);
+  const frameFallback = isReady && !video.frameUrl ? await getPortalFrameUrl(viewer) : null;
+  const playUrl = video.frameUrl ?? frameFallback;
 
   return (
     <div className="space-y-6">
@@ -132,8 +137,8 @@ export default async function PortalVideoDetailPage({
 
       {/* Bekijken gebeurt in Frame (review + download). Alleen een speler tonen
           als er echt iets af te spelen valt. */}
-      {video.frameUrl ? (
-        <a href={video.frameUrl} target="_blank" rel="noreferrer" className="group block">
+      {playUrl ? (
+        <a href={playUrl} target="_blank" rel="noreferrer" className="group block">
           <Card padded={false} className="overflow-hidden">
             <div className="flex aspect-video items-center justify-center bg-[var(--color-indigo-ink)]/[0.06]">
               <span className="flex size-14 items-center justify-center rounded-full bg-[var(--color-brand-600)] text-white transition-transform group-hover:scale-105">

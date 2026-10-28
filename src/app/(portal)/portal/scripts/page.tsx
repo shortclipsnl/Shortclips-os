@@ -7,7 +7,7 @@ import { getPortalSettingsForClient } from "@/server/portal-settings";
 import { CLIENT_ACTION_STATUSES, listPortalScriptReviews, SCRIPT_REVIEW_STATUS, type PortalReviewListItem } from "@/server/script-review";
 import { ScriptLeeswijzer } from "@/components/portal/script-leeswijzer";
 import { Badge, buttonClass } from "@/components/ui";
-import { formatDateFull, relativeDays } from "@/lib/format";
+import { daysUntil, formatDateFull, relativeDays } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Scripts" };
 export const dynamic = "force-dynamic";
@@ -56,6 +56,13 @@ export default async function PortalScriptsPage() {
 
   const shoot = data.upcomingShoot;
   const klaarCount = actieNodig.length;
+  // Eerlijke status i.p.v. "niets openstaand": komt de opname eraan en staat er
+  // nog geen script voor klaar, zeg dat we het afronden (geen vals "niets te doen").
+  const shootReview = shoot ? reviewByDay.get(shoot.id) ?? null : null;
+  const daysToShoot = shoot ? daysUntil(shoot.scheduledOn) : null;
+  const shootSoonNoScript =
+    !!shoot && daysToShoot != null && daysToShoot >= 0 && daysToShoot <= 7 &&
+    (!shootReview || (shootReview.status !== "goedgekeurd" && !CLIENT_ACTION_STATUSES.includes(shootReview.status)));
 
   return (
     <div className="flex flex-col gap-[22px]">
@@ -96,6 +103,14 @@ export default async function PortalScriptsPage() {
                 {klaarCount} script{klaarCount === 1 ? "" : "s"} {klaarCount === 1 ? "wacht" : "wachten"} op jouw controle
               </div>
               <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">Bekijk de scripts hieronder en geef je akkoord of feedback.</p>
+            </>
+          ) : shootSoonNoScript ? (
+            <>
+              <div className="mt-3 flex items-center gap-2 text-[15px] font-semibold text-[var(--sc-accent)]"><Clock className="size-5" /> Scripts in de maak</div>
+              <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">
+                We ronden je scripts af voor de opname van {formatDateFull(shoot!.scheduledOn)} ({relativeDays(shoot!.scheduledOn)}). Je krijgt bericht zodra ze klaarstaan om te controleren.
+                {bijShortclips.length > 0 ? ` ${bijShortclips.length} bij Shortclips in bewerking.` : ""}
+              </p>
             </>
           ) : (
             <>

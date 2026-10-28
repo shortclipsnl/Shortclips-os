@@ -38,7 +38,7 @@ export function ResultControls({
   // op desktop een terugval die de link naar het rapport kopieert.
   async function shareReport() {
     const url = typeof window !== "undefined" ? new URL(reportHref, window.location.origin).href : reportHref;
-    const data = { title: "ShortClips — jouw resultaten", text: "Bekijk de ShortClips-resultaten", url };
+    const data = { title: "Shortclips, jouw resultaten", text: "Bekijk de Shortclips-resultaten", url };
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share(data);
