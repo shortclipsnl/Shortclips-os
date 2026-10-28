@@ -186,6 +186,8 @@ export default async function PortalPage() {
         </div>
       </section>
 
+      <h2 className="px-0.5 text-[12px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Aan jou</h2>
+
       {/* Actie nodig — alleen tonen als er echt iets van de klant wordt verwacht */}
       {openActions > 0 ? (
         <section className="sc-glass sc-glow p-5" style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.12), rgba(255,255,255,0.03))" }}>
@@ -224,27 +226,7 @@ export default async function PortalPage() {
         </section>
       )}
 
-      {/* Pakketteller: hoeveel video's deze maand online t.o.v. de afspraak */}
-      {pkg ? (
-        <section className="sc-glass p-5">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-                <Film className="size-4 text-[var(--sc-accent)]" /> Jouw pakket · {pkg.monthLabel}
-              </span>
-              <p className="mt-2 text-[15px] font-semibold">
-                {pkg.onlineThisMonth} van {pkg.quota} video&apos;s deze maand online
-              </p>
-            </div>
-            <span className="text-[13px] text-[var(--color-ink-muted)]">
-              {pkg.remaining > 0 ? `nog ${pkg.remaining} te gaan` : "pakket voor deze maand compleet"}
-            </span>
-          </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--sc-fill-strong)]">
-            <div className="h-full rounded-full bg-[var(--sc-accent)]" style={{ width: `${Math.min(100, Math.round((pkg.onlineThisMonth / pkg.quota) * 100))}%` }} />
-          </div>
-        </section>
-      ) : null}
+      <h2 className="px-0.5 pt-1 text-[12px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Je opnames &amp; scripts</h2>
 
       {/* 2 — Volgende opnamedag en scriptmeeting, naast elkaar */}
       <div className="grid gap-[18px] sm:grid-cols-2">
@@ -302,6 +284,8 @@ export default async function PortalPage() {
           <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-muted)] transition-transform group-hover:translate-x-0.5" />
         </Link>
       ) : null}
+
+      <h2 className="px-0.5 pt-1 text-[12px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Je video&apos;s &amp; planning</h2>
 
       {/* 3 — Directe toegang tot de video's: rechtstreeks naar de Frame.io-omgeving
           van de klant als die is ingesteld, anders naar de videopagina in het portaal. */}
@@ -368,10 +352,33 @@ export default async function PortalPage() {
         </Link>
       </div>
 
+      <h2 className="px-0.5 pt-1 text-[12px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Je resultaten &amp; pakket</h2>
+
+      {/* Pakketteller: hoeveel video's deze maand online t.o.v. de afspraak */}
+      {pkg ? (
+        <section className="sc-glass p-5">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
+                <Film className="size-4 text-[var(--sc-accent)]" /> Jouw pakket · {pkg.monthLabel}
+              </span>
+              <p className="mt-2 text-[15px] font-semibold">
+                {pkg.onlineThisMonth} van {pkg.quota} video&apos;s deze maand online
+              </p>
+            </div>
+            <span className="text-[13px] text-[var(--color-ink-muted)]">
+              {pkg.remaining > 0 ? `nog ${pkg.remaining} te gaan` : "pakket voor deze maand compleet"}
+            </span>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--sc-fill-strong)]">
+            <div className="h-full rounded-full bg-[var(--sc-accent)]" style={{ width: `${Math.min(100, Math.round((pkg.onlineThisMonth / pkg.quota) * 100))}%` }} />
+          </div>
+        </section>
+      ) : null}
+
       {/* 4 — Resultatenoverzicht */}
       <section>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-base font-semibold">Jouw resultaten</h2>
+        <div className="mb-3 flex items-center justify-end gap-3">
           <Link href="/portal/resultaten" className={buttonClass({ variant: "secondary", size: "sm" })}>Alle resultaten bekijken <ArrowRight className="size-4" /></Link>
         </div>
         {hasMetrics ? (
