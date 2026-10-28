@@ -103,6 +103,42 @@ async function loadManageableClient(clientId: string) {
 }
 
 /**
+ * Eén-klik testportaal: maakt (of hergebruikt) direct een portaalaccount voor de
+ * klant met een tijdelijk wachtwoord, zodat je snel met een klant kunt testen.
+ * Gebruikt een pilot-placeholder-e-mailadres (`<slug>@pilot.shortclips.nl`) als
+ * login — duidelijk een testaccount, geen echte klant-mailbox nodig. Je ziet het
+ * wachtwoord één keer om door te geven. Voor een login op het échte e-mailadres
+ * van de klant: gebruik "Direct wachtwoord" met dat adres.
+ */
+export async function createTestPortal(clientId: string): Promise<PortalAccountResult> {
+  try {
+    const { viewer, client } = await loadManageableClient(clientId);
+    if (!client) return { ok: false, message: "Klant niet gevonden." };
+
+    const email = `${client.slug}@pilot.shortclips.nl`;
+
+    const ensured = await ensurePortalUser(client.id, email, client.name);
+    if (!ensured.ok) return { ok: false, message: ensured.message };
+
+    const password = tempPassword();
+    const passwordHash = await hashPassword(password);
+    await db
+      .update(users)
+      .set({ passwordHash, status: "active", lockedUntil: null, failedLoginCount: 0, updatedAt: new Date() })
+      .where(eq(users.id, ensured.userId));
+    await revokeAllSessions(ensured.userId);
+    await auditLog({ viewer, action: "portal.test_portal_created", entityType: "client", entityId: client.id, clientId: client.id });
+    revalidatePath("/klantenbeheer");
+    revalidatePath("/klantportalen");
+    revalidatePath(`/clients/${client.slug}`);
+    return { ok: true, email, password };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/**
  * Nodig een klantgebruiker uit voor het portaal. Standaard per e-mail (de klant
  * stelt zelf een wachtwoord in via een beveiligde link); valt terug op een
  * kopieerbare link wanneer e-mail (nog) niet is ingericht. Modus "manual" maakt

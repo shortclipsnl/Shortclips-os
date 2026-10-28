@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Copy, KeyRound, Loader2, Mail, Power, RotateCcw, UserPlus } from "lucide-react";
+import { Check, Copy, KeyRound, Loader2, Mail, Power, RotateCcw, UserPlus, Zap } from "lucide-react";
 import {
+  createTestPortal,
   invitePortalUser,
   resendPortalInvite,
   sendPortalPasswordReset,
@@ -100,6 +101,15 @@ export function ClientPortalManager({
 
       {open ? (
         <div className="mt-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-3">
+          {/* Eén-klik testportaal: maakt direct een login + tijdelijk wachtwoord,
+              zodat je meteen met deze klant kunt testen (geen e-mail nodig). */}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--color-brand-300)] bg-[var(--color-brand-50)] px-3 py-2">
+            <span className="text-xs text-[var(--color-brand-700)]"><strong>Snel testen?</strong> Maak in één klik een portaallogin met wachtwoord.</span>
+            <button type="button" disabled={pending} onClick={() => run(() => createTestPortal(clientId))} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-60">
+              {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />} Testportaal + wachtwoord
+            </button>
+          </div>
+
           {/* Bestaande gebruikers */}
           {users.length > 0 ? (
             <ul className="mb-3 space-y-2">
