@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { AssistantWidget } from "@/components/ai/assistant-widget";
 import { NotificationPopper } from "@/components/notifications/notification-popper";
+import { EndOfDayChecklist } from "./end-of-day-checklist";
 import { aiConfigured } from "@/server/ai/client";
 import { getCelebrationContext } from "@/server/awards/service";
 import { CelebrationGate } from "@/app/(app)/showcase/celebration-gate";
@@ -71,6 +72,9 @@ export default async function AppLayout({
       {/* Nieuwe meldingen poppen rechtsboven op met een geluidje — voor het hele
           team én editors, zodat ze opvallen. */}
       <NotificationPopper viewerId={viewer.id} />
+
+      {/* Eindedagmelding: elke werkdag om 16:30 een afvinklijst rechtsonder. */}
+      <EndOfDayChecklist />
 
       {/* Award-viering bij binnenkomst (eenmalig, tot de editor opent). */}
       <CelebrationGate context={celebration} />
