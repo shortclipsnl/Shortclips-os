@@ -59,6 +59,8 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
     clientColor: x.clientColor,
     clientLogo: x.clientLogo,
     videographerName: x.videographerName ?? defaultVg?.fullName ?? null,
+    scriptCount: Number(x.scriptCount ?? 0),
+    scriptId: x.scriptId ?? null,
   }));
 
   const next = shoots.find((x) => x.scheduledOn >= todayIso) ?? null;

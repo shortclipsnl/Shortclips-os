@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Mail, RefreshCw } from "lucide-react";
 import { syncLeadsFromMail } from "@/server/actions/leads";
+
+/** Hoe vaak de pagina automatisch de mailmap opnieuw uitleest (ms). */
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
 
 function relative(iso: string | null): string {
   if (!iso) return "nog niet gesynchroniseerd";
@@ -30,6 +33,19 @@ export function SyncLeadsButton({ lastSyncAt, configured }: { lastSyncAt: string
     });
   }
 
+  // Automatisch verversen zolang de leadspagina open staat: elke paar minuten de
+  // mailmap stil opnieuw uitlezen en de lijst bijwerken (zonder melding/spinner).
+  useEffect(() => {
+    if (!configured) return;
+    const id = setInterval(() => {
+      start(async () => {
+        const res = await syncLeadsFromMail();
+        if (res.ok) router.refresh();
+      });
+    }, AUTO_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [configured, router, start]);
+
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-4 py-3">
       <div className="flex items-start gap-2.5 text-sm">
@@ -38,7 +54,7 @@ export function SyncLeadsButton({ lastSyncAt, configured }: { lastSyncAt: string
           <p className="font-medium text-[var(--color-ink)]">Leads komen binnen via de mail</p>
           <p className="text-xs text-[var(--color-ink-muted)]">
             Nieuwe aanvragen worden automatisch uit de mailmap &apos;Leads - Shortclips&apos; opgehaald.{" "}
-            {configured ? `Laatste synchronisatie: ${relative(lastSyncAt)}.` : "Gmail-koppeling nog niet ingesteld."}
+            {configured ? `Automatisch bijgewerkt terwijl je hier bent · laatste synchronisatie: ${relative(lastSyncAt)}.` : "Mailkoppeling nog niet ingesteld."}
             {msg ? <span className="ml-1 font-medium text-[var(--color-good)]">{msg}</span> : null}
           </p>
         </div>

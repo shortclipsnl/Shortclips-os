@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import { ClientLogo } from "@/components/ui";
 
 export type AgendaShoot = {
@@ -17,6 +17,8 @@ export type AgendaShoot = {
   clientColor: string | null;
   clientLogo: string | null;
   videographerName: string | null;
+  scriptCount?: number;
+  scriptId?: string | null;
 };
 
 /** Volle kleur per opnamestatus — zodat de planning in kleur scanbaar is. */
@@ -163,19 +165,31 @@ function QuickBtn({ onClick, children }: { onClick: () => void; children: React.
 
 function ShootCard({ s }: { s: AgendaShoot }) {
   const color = STATUS_COLOR[s.status] ?? "var(--color-ink-faint)";
+  const count = s.scriptCount ?? 0;
+  // Bij precies één script → directe link naar dat script; bij meer → de
+  // opnamedetail (die alle gekoppelde scripts toont).
+  const scriptHref = count === 1 && s.scriptId ? `/scripts/${s.scriptId}` : count > 1 ? `/productions/${s.id}` : null;
   return (
-    <Link href={`/productions/${s.id}`}
-      className="block rounded-[var(--radius-sm)] border-l-[3px] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-card)] hover:brightness-[0.99]"
+    <div
+      className="rounded-[var(--radius-sm)] border-l-[3px] bg-[var(--color-surface)] shadow-[var(--shadow-card)]"
       style={{ borderLeftColor: color }}>
-      <span className="flex items-center gap-1.5">
-        <ClientLogo name={s.clientName} logoUrl={s.clientLogo} color={s.clientColor} size={18} />
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold">{s.clientName}</span>
-      </span>
-      <span className="mt-1 flex items-center justify-between gap-1 text-[11px] text-[var(--color-ink-muted)]">
-        <span className="truncate">{s.startTime ? s.startTime.slice(0, 5) : "hele dag"}{s.videographerName ? ` · ${s.videographerName.split(" ")[0]}` : ""}</span>
-        <span className="shrink-0 font-semibold" style={{ color }}>{STATUS_LABEL[s.status] ?? s.status}</span>
-      </span>
-    </Link>
+      <Link href={`/productions/${s.id}`} className="block p-2 hover:brightness-[0.99]">
+        <span className="flex items-center gap-1.5">
+          <ClientLogo name={s.clientName} logoUrl={s.clientLogo} color={s.clientColor} size={18} />
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold">{s.clientName}</span>
+        </span>
+        <span className="mt-1 flex items-center justify-between gap-1 text-[11px] text-[var(--color-ink-muted)]">
+          <span className="truncate">{s.startTime ? s.startTime.slice(0, 5) : "hele dag"}{s.videographerName ? ` · ${s.videographerName.split(" ")[0]}` : ""}</span>
+          <span className="shrink-0 font-semibold" style={{ color }}>{STATUS_LABEL[s.status] ?? s.status}</span>
+        </span>
+      </Link>
+      {scriptHref ? (
+        <Link href={scriptHref}
+          className="flex items-center gap-1 border-t border-[var(--color-line)] px-2 py-1 text-[11px] font-semibold text-[var(--color-brand-600)] hover:bg-[var(--color-surface-sunken)]">
+          <FileText className="size-3 shrink-0" /> {count === 1 ? "Open script" : `${count} scripts bekijken`}
+        </Link>
+      ) : null}
+    </div>
   );
 }
 

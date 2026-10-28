@@ -320,6 +320,9 @@ export function computeHealthTasks(overview: HealthOverview, dedupeSuffix: strin
   for (const c of overview.rows) {
     for (const f of c.factors) {
       if (f.level !== "actie") continue; // alleen urgente problemen worden een taak
+      // Op verzoek géén dagelijkse taak meer voor deze twee (te veel ruis op het
+      // Taken-overzicht). Ze blijven wel zichtbaar in de gezondheidscheck zelf.
+      if (f.titel === "Geen content ingepland" || f.titel === "Resultaten vallen sterk terug") continue;
       out.push({
         clientId: c.clientId,
         clientName: c.name,

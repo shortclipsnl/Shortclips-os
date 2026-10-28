@@ -526,6 +526,13 @@
       "when": 1793109383323,
       "tag": "0074_milky_squadron_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1793193167985,
+      "tag": "0075_fixed_maddog",
+      "breakpoints": true
     }
   ]
 }

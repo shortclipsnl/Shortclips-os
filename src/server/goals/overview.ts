@@ -23,6 +23,8 @@ export type GoalRow = {
   target: number | null;
   measured: boolean;
   status: GoalStatus;
+  /** Handmatig als behaald afgevinkt (voor de checkbox in de UI). */
+  achievedManually: boolean;
   expected: number | null;
   shortfallPct: number | null;
   startDate: string;
@@ -147,7 +149,7 @@ export async function getGoalsOverview(viewer: Viewer, now = new Date()): Promis
 
     const effectiveTarget = type === "milestone" ? miles.length || null : target;
     const result = computeGoalStatus(
-      { type, source: g.source as "live" | "manual", startDate: g.startDate, endDate: g.endDate, current, target: effectiveTarget, lastUpdateAt: latestUpdate.get(g.id) ?? g.updatedAt, normConsecutiveHits },
+      { type, source: g.source as "live" | "manual", startDate: g.startDate, endDate: g.endDate, current, target: effectiveTarget, lastUpdateAt: latestUpdate.get(g.id) ?? g.updatedAt, normConsecutiveHits, achievedManually: g.achievedManually },
       now,
     );
     let status = result.status;
@@ -169,6 +171,7 @@ export async function getGoalsOverview(viewer: Viewer, now = new Date()): Promis
       target: effectiveTarget,
       measured,
       status,
+      achievedManually: g.achievedManually,
       expected: result.expected,
       shortfallPct: result.shortfallPct,
       startDate: g.startDate,

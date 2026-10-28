@@ -110,6 +110,8 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
   const [filter, setFilter] = useState<string>(FILTERS.some((f) => f.key === defaultFilter) ? defaultFilter! : "alle");
   const [status, setStatus] = useState<string>("alle");
   const [client, setClient] = useState<string>("alle");
+  // Filter op scriptschrijver via de profielfoto's bovenaan (Milou / Jarno / Jiska).
+  const [writer, setWriter] = useState<string>("alle");
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
@@ -121,9 +123,10 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
       if (filter === "afgerond" && !r.done) return false;
       if (status !== "alle" && r.status !== status) return false;
       if (client !== "alle" && r.clientName !== client) return false;
+      if (writer !== "alle" && r.scriptWriterId !== writer) return false;
       return true;
     });
-  }, [rows, filter, status, client]);
+  }, [rows, filter, status, client, writer]);
 
   // Per week groeperen (deze week / volgende week / ...), gesorteerd op opnamedag.
   const groups = useMemo(() => {
@@ -141,6 +144,27 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
 
   return (
     <div>
+      {writerOptions.length > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="mr-0.5 text-xs text-[var(--color-ink-faint)]">Scriptschrijver</span>
+          <button type="button" onClick={() => setWriter("alle")}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium ${writer === "alle" ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
+            Iedereen
+          </button>
+          {writerOptions.map((w) => {
+            const active = writer === w.id;
+            return (
+              <button key={w.id} type="button" title={w.fullName} aria-pressed={active}
+                onClick={() => setWriter(active ? "alle" : w.id)}
+                className={`flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-3 text-xs font-medium transition ${active ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"}`}>
+                <TeamAvatar name={w.fullName} avatarUrl={w.avatarUrl} size={26} />
+                {w.fullName.split(" ")[0]}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-1">
           {FILTERS.map((f) => (

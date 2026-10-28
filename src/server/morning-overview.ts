@@ -1,7 +1,7 @@
 import "server-only";
-import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, deliverables, scripts, tasks, deadlineMisses } from "@/db/schema";
+import { clients, deliverables, scripts, tasks, deadlineMisses, users } from "@/db/schema";
 import { scopeToClients, type Viewer } from "@/server/auth/context";
 import { nlHolidaySet } from "@/lib/holidays";
 import { internalDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
@@ -11,12 +11,20 @@ const FV_STAGES = ["recorded", "footage_upload", "awaiting_editor", "editing", "
 const today = () => new Date().toISOString().slice(0, 10);
 const dayDiff = (a: string, b: string) => Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000);
 
+/** Eén regel in een uitklapbaar detailpaneel onder een tegel. */
+export type MorningRow = { id: string; label: string; sub?: string; href?: string };
+
 export type MorningOverview = {
   overdueVideos: number;
   atClient: number;
   myOpenTasks: number;
   currentlyLate: number;
   topOverdue: Array<{ id: string; label: string; daysLate: number }>;
+  /** Detaillijsten per tegel — de onderliggende problemen bij het getal. */
+  overdueList: MorningRow[];
+  atClientList: MorningRow[];
+  myOpenTasksList: MorningRow[];
+  currentlyLateList: MorningRow[];
   /** Klanten die nog moeten reageren (video's/scripts), met dagen-wachtend. */
   clientsWaiting: Array<{ id: string; kind: "video" | "script"; clientName: string; title: string; days: number; href: string }>;
 };
@@ -49,19 +57,21 @@ export async function getMorningOverview(viewer: Viewer): Promise<MorningOvervie
 
   // Video's die op klantfeedback wachten (langer dan de ingestelde termijn).
   const feedbackDays = settings["deadline.clientFeedbackDays"];
-  const [atClientRow] = await db
-    .select({ n: sql<number>`count(*)::int` })
+  const atClientRows = await db
+    .select({ id: deliverables.id, title: deliverables.title, since: deliverables.statusChangedAt, clientName: clients.name })
     .from(deliverables)
+    .innerJoin(clients, eq(clients.id, deliverables.clientId))
     .where(and(
       isNull(deliverables.deletedAt),
       inArray(deliverables.status, ["client_review", "client_revision"]),
       sql`${deliverables.statusChangedAt} < now() - (${feedbackDays} * interval '1 day')`,
       scopeToClients(viewer, deliverables.clientId) ?? undefined,
-    ));
+    ))
+    .orderBy(asc(deliverables.statusChangedAt));
 
   // Eigen openstaande taken vandaag of te laat.
-  const [myTasksRow] = await db
-    .select({ n: sql<number>`count(*)::int` })
+  const myTaskRows = await db
+    .select({ id: tasks.id, title: tasks.title, dueOn: tasks.dueOn })
     .from(tasks)
     .where(and(
       isNull(tasks.deletedAt),
@@ -71,13 +81,21 @@ export async function getMorningOverview(viewer: Viewer): Promise<MorningOvervie
       sql`${tasks.dueOn} is not null`,
       // Automatisch gegenereerde AI-verbeterpunten niet meetellen.
       sql`not (${tasks.source} = 'automation' and ${tasks.entityType} = 'ai_insight')`,
-    ));
+    ))
+    .orderBy(asc(tasks.dueOn));
 
-  // Nu te laat volgens de prestatieregistratie (team-breed).
-  const [lateRow] = await db
-    .select({ n: sql<number>`count(*)::int` })
+  // Nu te laat volgens de prestatieregistratie (team-breed), met wie en wat.
+  const lateRows = await db
+    .select({
+      id: deadlineMisses.id, title: deadlineMisses.title, daysLate: deadlineMisses.daysLate,
+      entityType: deadlineMisses.entityType, entityId: deadlineMisses.entityId,
+      person: users.fullName, clientName: clients.name,
+    })
     .from(deadlineMisses)
-    .where(eq(deadlineMisses.resolved, false));
+    .leftJoin(users, eq(users.id, deadlineMisses.responsibleUserId))
+    .leftJoin(clients, eq(clients.id, deadlineMisses.clientId))
+    .where(eq(deadlineMisses.resolved, false))
+    .orderBy(desc(deadlineMisses.daysLate));
 
   // Welke klanten moeten nog reageren: video's én scripts die bij de klant
   // liggen (client_review), met hoeveel dagen ze er al liggen.
@@ -97,10 +115,25 @@ export async function getMorningOverview(viewer: Viewer): Promise<MorningOvervie
 
   return {
     overdueVideos: overdue.length,
-    atClient: Number(atClientRow?.n ?? 0),
-    myOpenTasks: Number(myTasksRow?.n ?? 0),
-    currentlyLate: Number(lateRow?.n ?? 0),
+    atClient: atClientRows.length,
+    myOpenTasks: myTaskRows.length,
+    currentlyLate: lateRows.length,
     topOverdue: overdue.slice(0, 4),
+    overdueList: overdue.map((o) => ({ id: o.id, label: o.label, sub: `${o.daysLate} ${o.daysLate === 1 ? "dag" : "dagen"} te laat`, href: `/videos/${o.id}` })),
+    atClientList: atClientRows.map((r) => {
+      const days = Math.max(0, dayDiff(t, toDay(r.since)));
+      return { id: r.id, label: `${r.clientName} — ${r.title}`, sub: `${days} ${days === 1 ? "dag" : "dagen"} bij de klant`, href: `/videos/${r.id}` };
+    }),
+    myOpenTasksList: myTaskRows.map((r) => ({
+      id: r.id, label: r.title,
+      sub: r.dueOn === t ? "vandaag" : `sinds ${r.dueOn}`, href: "/tasks",
+    })),
+    currentlyLateList: lateRows.map((r) => ({
+      id: r.id,
+      label: [r.person ?? "Onbekend", r.title ?? (r.entityType === "task" ? "taak" : "video")].filter(Boolean).join(" — "),
+      sub: `${r.daysLate} ${r.daysLate === 1 ? "dag" : "dagen"} te laat${r.clientName ? ` · ${r.clientName}` : ""}`,
+      href: r.entityType === "deliverable" ? `/videos/${r.entityId}` : "/tasks",
+    })),
     clientsWaiting: clientsWaiting.slice(0, 8),
   };
 }

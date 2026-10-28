@@ -51,7 +51,7 @@ export async function recomputeGoal(goalId: string, now = new Date(), opts: { sn
   const { current, measured, effectiveTarget } = await resolveCurrent(goal, ownerId, now);
   const [lastUpd] = await db.select({ createdAt: goalUpdates.createdAt }).from(goalUpdates).where(eq(goalUpdates.goalId, goal.id)).orderBy(desc(goalUpdates.createdAt)).limit(1);
   const result = computeGoalStatus(
-    { type: goal.type as GoalType, source: goal.source as "live" | "manual", startDate: goal.startDate, endDate: goal.endDate, current, target: effectiveTarget, lastUpdateAt: lastUpd?.createdAt ?? goal.updatedAt, normConsecutiveHits: await normHits(goal.id, effectiveTarget) },
+    { type: goal.type as GoalType, source: goal.source as "live" | "manual", startDate: goal.startDate, endDate: goal.endDate, current, target: effectiveTarget, lastUpdateAt: lastUpd?.createdAt ?? goal.updatedAt, normConsecutiveHits: await normHits(goal.id, effectiveTarget), achievedManually: goal.achievedManually },
     now,
   );
   let status = result.status;

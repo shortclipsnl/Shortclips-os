@@ -10,7 +10,9 @@ const nextConfig: NextConfig = {
   // Het vermogensdashboard wordt op verzoek als los bestand uitgeleverd (fs),
   // dus de bestanden moeten mee in de serverless functies op Vercel.
   outputFileTracingIncludes: {
-    "/dashboard/vermogen": ["./data/vermogen/vermogen_dashboard.html"],
+    // De HTML wordt uitgeserveerd door de embed-route (/dashboard/vermogen/embed),
+    // dus het databestand moet mee in díe serverless functie.
+    "/dashboard/vermogen/embed": ["./data/vermogen/vermogen_dashboard.html"],
     "/vermogen/vermogen-db-shim.js": ["./data/vermogen/vermogen-db-shim.js"],
   },
   experimental: {
@@ -27,7 +29,10 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
+          // SAMEORIGIN i.p.v. DENY: het vermogensdashboard wordt same-origin in
+          // een iframe geladen (/dashboard/vermogen → /dashboard/vermogen/embed).
+          // Cross-origin framing (clickjacking) blijft geblokkeerd.
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
           // Dwingt de browser om dit domein altijd via HTTPS te benaderen
           // (voorkomt SSL-stripping). 2 jaar, inclusief subdomeinen.
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },

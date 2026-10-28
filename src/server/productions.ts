@@ -91,6 +91,10 @@ export async function shootsInRange(viewer: Viewer, startIso: string, endIso: st
       clientColor: clients.color,
       clientLogo: clients.logoUrl,
       videographerName: users.fullName,
+      // Gekoppelde scripts, zodat de agenda direct een "open script"-knop kan
+      // tonen: bij precies één script een directe link, bij meer de opnamedetail.
+      scriptCount: sql<number>`(select count(*) from scripts sc where sc.production_day_id = production_days.id and sc.deleted_at is null)`,
+      scriptId: sql<string | null>`(select sc.id from scripts sc where sc.production_day_id = production_days.id and sc.deleted_at is null order by sc.created_at asc limit 1)`,
     })
     .from(productionDays)
     .innerJoin(clients, eq(clients.id, productionDays.clientId))

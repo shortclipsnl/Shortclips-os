@@ -68,6 +68,26 @@ export async function toggleGoalMilestone(milestoneId: string, done: boolean): P
   }
 }
 
+/** Doel handmatig als "behaald" afvinken of weer vrijgeven (team). Pint de
+ *  status op "gehaald"; terugzetten laat de automatische berekening weer bepalen. */
+export async function toggleGoalAchieved(goalId: string, achieved: boolean): Promise<GoalActionResult> {
+  try {
+    await requireInternal();
+    const [goal] = await db.select({ id: goals.id }).from(goals).where(eq(goals.id, goalId)).limit(1);
+    if (!goal) return { ok: false, message: "Doel niet gevonden." };
+    await db
+      .update(goals)
+      .set({ achievedManually: achieved, achievedAt: achieved ? new Date() : null, updatedAt: new Date() })
+      .where(eq(goals.id, goalId));
+    await recomputeAndNotify(goalId);
+    revalidateGoals();
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
 /** Eigenaar toewijzen of wijzigen (alleen Jarno). */
 export async function setGoalOwner(goalId: string, ownerId: string | null): Promise<GoalActionResult> {
   try {

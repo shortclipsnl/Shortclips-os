@@ -39,6 +39,7 @@ export default async function CalendarPage({
     platform?: string;
     weergave?: string;
     zelf?: string;
+    lijst?: string;
   }>;
 }) {
   const viewer = await requireInternal();
@@ -93,6 +94,13 @@ export default async function CalendarPage({
   const selfPostingClients = rawClientList
     .filter((c) => c.weHandlePosting === false && c.status === "active")
     .map((c) => c.name);
+  // "Klant plaatst zelf"-weergave is een platte klantenlijst (geen agenda), met
+  // een subfilter: alle klanten of alleen de klanten die zelf plaatsen.
+  const listFilter: "alle" | "zelf" = params.lijst === "alle" ? "alle" : "zelf";
+  const overviewClients = rawClientList
+    .filter((c) => c.status === "active")
+    .filter((c) => (listFilter === "zelf" ? c.weHandlePosting === false : true))
+    .sort((a, b) => a.name.localeCompare(b.name));
   const weekItems = rawWeekItems.filter((i) => inMode(i));
   const weekByDay = new Map<string, CalendarItem[]>();
   for (const item of weekItems) {
@@ -263,11 +271,48 @@ export default async function CalendarPage({
         </Link>
       </div>
       {showSelf ? (
-        <p className="mb-4 text-xs text-[var(--color-ink-muted)]">
-          Dit zijn de klanten die hun content zelf plaatsen. Wij verzorgen de content; het plaatsen doen zij.{selfPostingClients.length > 0 ? ` (${selfPostingClients.join(", ")})` : ""}
-        </p>
+        <section className="mb-6">
+          <p className="mb-3 text-xs text-[var(--color-ink-muted)]">
+            Een overzicht van de klanten. Wij verzorgen de content; bij "Klant plaatst zelf" doet de klant het plaatsen.
+          </p>
+          {/* Subfilter: alle klanten of alleen wie zelf plaatst. */}
+          <div className="mb-4 inline-flex items-center gap-1 rounded-full border border-[var(--color-line)] bg-[var(--color-surface-2)] p-1 text-xs">
+            <Link href={withParam("lijst", "alle")} className={`rounded-full px-3 py-1 font-medium transition-colors ${listFilter === "alle" ? "bg-[var(--color-indigo-ink)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>
+              Alle klanten
+            </Link>
+            <Link href={withParam("lijst", "zelf")} className={`rounded-full px-3 py-1 font-medium transition-colors ${listFilter === "zelf" ? "bg-[#8a5300] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>
+              Klant plaatst zelf
+            </Link>
+          </div>
+          <Card padded={false}>
+            {overviewClients.length === 0 ? (
+              <EmptyState title={listFilter === "zelf" ? "Geen klanten die zelf plaatsen" : "Geen actieve klanten"} />
+            ) : (
+              <ul className="divide-y divide-[var(--color-line)]">
+                {overviewClients.map((c) => (
+                  <li key={c.id} className="flex items-center gap-3 px-5 py-3">
+                    <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={26} />
+                    <Link href={`/clients/${c.slug}`} className="min-w-0 flex-1 truncate text-sm font-medium hover:underline">
+                      {c.name}
+                    </Link>
+                    {c.weHandlePosting === false ? (
+                      <Badge tone="warn">Plaatst zelf</Badge>
+                    ) : (
+                      <Badge tone="neutral">Wij plaatsen</Badge>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+          <p className="mt-2 text-2xs text-[var(--color-ink-faint)]">
+            "Content plaatsen" is per klant instelbaar op de klantpagina.
+          </p>
+        </section>
       ) : null}
 
+      {!showSelf ? (
+        <>
       {/* Filters — klant achter een knop (standaard ingeklapt → overzichtelijk),
           platforms eronder met een label. */}
       <CalendarClientFilter
@@ -518,6 +563,8 @@ export default async function CalendarPage({
           </span>
         ))}
       </div>
+        </>
+      ) : null}
     </div>
   );
 }

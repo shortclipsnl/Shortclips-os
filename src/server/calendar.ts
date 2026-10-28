@@ -52,7 +52,12 @@ export async function listCalendar(viewer: Viewer, filter: CalendarFilter) {
     .limit(500);
 
   if (!filter.platform) return rows;
-  return rows.filter((r) => (r.platforms as string[]).includes(filter.platform!));
+  // Items zonder gekoppelde platforms blijven zichtbaar onder elk platformfilter,
+  // zodat filteren nooit stilletjes de hele planning leegtrekt.
+  return rows.filter((r) => {
+    const ps = (r.platforms as string[]) ?? [];
+    return ps.length === 0 || ps.includes(filter.platform!);
+  });
 }
 
 export type CalendarItem = Awaited<ReturnType<typeof listCalendar>>[number];

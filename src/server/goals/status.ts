@@ -22,6 +22,8 @@ export type GoalStatusInput = {
   lastUpdateAt?: Date | string | null;
   /** Aantal weken op rij dat een norm gehaald is (voor "gehaald" bij norm). */
   normConsecutiveHits?: number;
+  /** Handmatig als "behaald" afgevinkt → status altijd "gehaald". */
+  achievedManually?: boolean;
 };
 
 export type GoalStatusResult = {
@@ -54,6 +56,11 @@ export function computeGoalStatus(input: GoalStatusInput, now: Date): GoalStatus
   const startMs = dayMs(input.startDate);
   const endMs = dayMs(input.endDate);
   const { type, source, current, target } = input;
+
+  // 0. Handmatig afgevinkt als behaald → altijd "gehaald", los van het tempo.
+  if (input.achievedManually) {
+    return { status: "gehaald", measurable: target != null, expected: target, shortfallPct: 0 };
+  }
 
   // 1. Gepland: vandaag ligt vóór de startdatum.
   if (nowMs < startMs) {

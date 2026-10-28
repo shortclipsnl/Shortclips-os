@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, ChevronDown, Loader2, Pencil } from "lucide-react";
 import type { GoalRow, GoalsOverview } from "@/server/goals/overview";
 import type { GoalStatus } from "@/server/goals/status";
-import { archiveGoal, seedGoalsNow, setGoalTarget, toggleGoalMilestone, updateGoalStand } from "@/server/actions/goals";
+import { archiveGoal, seedGoalsNow, setGoalTarget, toggleGoalAchieved, toggleGoalMilestone, updateGoalStand } from "@/server/actions/goals";
 
 const STATUS_META: Record<GoalStatus, { label: string; color: string }> = {
   op_koers: { label: "Op koers", color: "var(--color-good)" },
@@ -78,11 +78,6 @@ function DoelenLegeStaat({ isOwner }: { isOwner: boolean }) {
 export function DoelenBoard({ overview, isOwner }: { overview: GoalsOverview; isOwner: boolean }) {
   const [filter, setFilter] = useState<string>("alles");
 
-  // Lege staat: de doelen staan nog niet in deze omgeving.
-  if (overview.rows.length === 0) {
-    return <DoelenLegeStaat isOwner={isOwner} />;
-  }
-
   const rows = useMemo(() => {
     if (filter === "alles") return overview.rows;
     if (filter === "aandacht") return overview.rows.filter((r) => ["achter", "risico", "niet_bijgewerkt"].includes(r.status));
@@ -93,6 +88,12 @@ export function DoelenBoard({ overview, isOwner }: { overview: GoalsOverview; is
     const keys = [...new Set(rows.map((r) => r.pillar))];
     return overview.pillars.filter((p) => keys.includes(p.key)).map((p) => ({ ...p, rows: rows.filter((r) => r.pillar === p.key) }));
   }, [overview.pillars, rows]);
+
+  // Lege staat: de doelen staan nog niet in deze omgeving. (Ná de hooks, zodat de
+  // hook-volgorde gelijk blijft bij de overgang leeg → gevuld.)
+  if (overview.rows.length === 0) {
+    return <DoelenLegeStaat isOwner={isOwner} />;
+  }
 
   const FILTERS: { key: string; label: string }[] = [
     { key: "alles", label: "Alles" },
@@ -196,30 +197,48 @@ function GoalRowItem({ g, isOwner }: { g: GoalRow; isOwner: boolean }) {
   function toggle(mid: string, done: boolean) {
     start(async () => { await toggleGoalMilestone(mid, done); router.refresh(); });
   }
+  function toggleAchieved(achieved: boolean) {
+    start(async () => { await toggleGoalAchieved(g.id, achieved); router.refresh(); });
+  }
   function doArchive() {
     start(async () => { await archiveGoal(g.id); router.refresh(); });
   }
 
   return (
     <li style={{ boxShadow: `inset 4px 0 0 ${meta.color}` }}>
-      {/* Scanbare regel: titel · status · eigenaar · stand. Klik voor details. */}
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full flex-col gap-1 px-4 py-2.5 text-left hover:bg-[var(--color-surface-sunken)]">
-        <div className="flex items-center gap-3">
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--color-ink)]">{g.title}</span>
-          <span className="shrink-0 text-2xs font-bold uppercase tracking-wide" style={{ color: meta.color }}>
-            {g.status === "gehaald" ? "✓ " : null}{meta.label}
+      {/* Scanbare regel: checkbox 'behaald' · titel · status · stand. Klik op de
+          regel voor details; klik het vakje links om het doel als behaald te vinken. */}
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => toggleAchieved(!g.achievedManually)}
+          aria-pressed={g.achievedManually}
+          title={g.achievedManually ? "Markeer als niet behaald" : "Markeer als behaald"}
+          className="flex shrink-0 items-center pl-4 pr-1.5 hover:bg-[var(--color-surface-sunken)]"
+        >
+          <span className={`grid size-5 place-items-center rounded border transition-colors ${g.achievedManually ? "border-[var(--color-good)] bg-[var(--color-good)] text-white" : "border-[var(--color-line-strong)] hover:border-[var(--color-good)]"}`}>
+            {g.achievedManually ? <Check className="size-3.5" /> : null}
           </span>
-          <ChevronDown className={`size-4 shrink-0 text-[var(--color-ink-faint)] transition-transform ${open ? "rotate-180" : ""}`} />
-        </div>
-        <div className="flex items-center gap-2 text-2xs text-[var(--color-ink-muted)]">
-          {compactValue ? <span className="shrink-0 tabular-nums font-medium text-[var(--color-ink)]">{compactValue}</span> : <span className="font-medium text-[var(--color-warn)]">doel instellen</span>}
-          {hasBar || milePct != null ? (
-            <span className="ml-auto h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--color-surface-2)] sm:w-24">
-              <span className="block h-full rounded-full" style={{ width: `${hasBar ? pct : milePct}%`, background: meta.color }} />
+        </button>
+        <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-w-0 flex-1 flex-col gap-1 py-2.5 pl-1 pr-4 text-left hover:bg-[var(--color-surface-sunken)]">
+          <div className="flex items-center gap-3">
+            <span className={`min-w-0 flex-1 truncate text-sm font-semibold text-[var(--color-ink)] ${g.achievedManually ? "line-through decoration-[var(--color-good)]/60" : ""}`}>{g.title}</span>
+            <span className="shrink-0 text-2xs font-bold uppercase tracking-wide" style={{ color: meta.color }}>
+              {g.status === "gehaald" ? "✓ " : null}{meta.label}
             </span>
-          ) : null}
-        </div>
-      </button>
+            <ChevronDown className={`size-4 shrink-0 text-[var(--color-ink-faint)] transition-transform ${open ? "rotate-180" : ""}`} />
+          </div>
+          <div className="flex items-center gap-2 text-2xs text-[var(--color-ink-muted)]">
+            {compactValue ? <span className="shrink-0 tabular-nums font-medium text-[var(--color-ink)]">{compactValue}</span> : <span className="font-medium text-[var(--color-warn)]">doel instellen</span>}
+            {hasBar || milePct != null ? (
+              <span className="ml-auto h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--color-surface-2)] sm:w-24">
+                <span className="block h-full rounded-full" style={{ width: `${hasBar ? pct : milePct}%`, background: meta.color }} />
+              </span>
+            ) : null}
+          </div>
+        </button>
+      </div>
 
       {/* Details (ingeklapt tot je erop klikt) */}
       {open ? (

@@ -1,7 +1,18 @@
 import "server-only";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { contentCalendar, deliverables } from "@/db/schema";
+import { contentCalendar, deliverables, socialAccounts } from "@/db/schema";
+
+/** De actieve platforms van een klant (uit de gekoppelde social accounts), als
+ *  lijst met de platform-sleutels (instagram/tiktok/…). Leeg als er niets
+ *  gekoppeld is — dan blijft het item in de planning onder "alle platformen". */
+async function clientPlatforms(clientId: string): Promise<string[]> {
+  const rows = await db
+    .select({ platform: socialAccounts.platform })
+    .from(socialAccounts)
+    .where(and(eq(socialAccounts.clientId, clientId), eq(socialAccounts.isActive, true)));
+  return [...new Set(rows.map((r) => r.platform as string))];
+}
 
 /**
  * Koppelt het Editing Dashboard aan de Contentplanning: een video bestaat als
@@ -68,7 +79,9 @@ export async function syncContentForDeliverable(deliverableId: string): Promise<
     title: d.title,
     scheduledOn,
     status: mapStatus(d.status),
-    platforms: [],
+    // Doelplatforms overnemen van de klant, zodat het platformfilter in de
+    // contentplanning daadwerkelijk werkt.
+    platforms: await clientPlatforms(d.clientId),
   });
   // Datum terugspiegelen zodat video en planning dezelfde datum tonen.
   if (d.plannedPublishOn !== scheduledOn) {
@@ -77,8 +90,30 @@ export async function syncContentForDeliverable(deliverableId: string): Promise<
   return { action: "create" };
 }
 
+/**
+ * Vult platforms aan voor bestaande planningsrecords die nog geen platforms
+ * hebben (van vóór deze sync), op basis van de social accounts van de klant.
+ * Zelfhelend: draait mee in de nachtelijke sync.
+ */
+export async function backfillContentPlatforms(): Promise<{ updated: number }> {
+  const rows = await db
+    .select({ id: contentCalendar.id, clientId: contentCalendar.clientId })
+    .from(contentCalendar)
+    .where(and(isNull(contentCalendar.deletedAt), sql`${contentCalendar.platforms} = '[]'::jsonb`));
+  const cache = new Map<string, string[]>();
+  let updated = 0;
+  for (const r of rows) {
+    let ps = cache.get(r.clientId);
+    if (!ps) { ps = await clientPlatforms(r.clientId); cache.set(r.clientId, ps); }
+    if (ps.length === 0) continue; // klant zonder gekoppelde accounts → laten staan
+    await db.update(contentCalendar).set({ platforms: ps, updatedAt: new Date() }).where(eq(contentCalendar.id, r.id));
+    updated++;
+  }
+  return { updated };
+}
+
 /** Alle publiceerbare video's reconciliëren naar de contentplanning. */
-export async function reconcileContentFromVideos(): Promise<{ created: number; updated: number; checked: number }> {
+export async function reconcileContentFromVideos(): Promise<{ created: number; updated: number; checked: number; backfilled: number }> {
   const rows = await db
     .select({ id: deliverables.id })
     .from(deliverables)
@@ -91,5 +126,6 @@ export async function reconcileContentFromVideos(): Promise<{ created: number; u
     if (res.action === "create") created++;
     else if (res.action.startsWith("update")) updated++;
   }
-  return { created, updated, checked: rows.length };
+  const bf = await backfillContentPlatforms();
+  return { created, updated, checked: rows.length, backfilled: bf.updated };
 }

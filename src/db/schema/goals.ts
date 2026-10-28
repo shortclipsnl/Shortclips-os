@@ -34,6 +34,10 @@ export const goals = pgTable(
     status: varchar("status", { length: 16 }).notNull().default("gepland"),
     previousStatus: varchar("previous_status", { length: 16 }),
     statusChangedAt: timestamp("status_changed_at", { withTimezone: true }),
+    /** Handmatig als "behaald" afgevinkt. Pint de status op "gehaald", los van
+     *  de automatische herberekening (die zou het anders elke nacht overschrijven). */
+    achievedManually: boolean("achieved_manually").notNull().default(false),
+    achievedAt: timestamp("achieved_at", { withTimezone: true }),
     sortOrder: integer("sort_order").notNull().default(0),
     archived: boolean("archived").notNull().default(false),
     ...timestamps,

@@ -9,7 +9,7 @@ export async function runContentSync() {
     const r = await reconcileContentFromVideos();
     ctx.counters.processed += r.checked;
     ctx.counters.created += r.created;
-    ctx.counters.updated += r.updated;
-    ctx.log(`${r.checked} video's gecontroleerd: ${r.created} nieuw in planning, ${r.updated} bijgewerkt.`);
+    ctx.counters.updated += r.updated + r.backfilled;
+    ctx.log(`${r.checked} video's gecontroleerd: ${r.created} nieuw in planning, ${r.updated} bijgewerkt, ${r.backfilled} platforms aangevuld.`);
   });
 }

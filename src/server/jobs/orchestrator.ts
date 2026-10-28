@@ -20,7 +20,7 @@ import {
   pullFrameDeliverables,
   pullFrameProjects,
 } from "./frameio-sync";
-import { runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runEditorDeadlineReminders, runEditorEscalations, recordDeadlinePerformance, runHourlySignals, runPostShootTodoReminders, runScriptTodoReminders, runTaskDeadlineReminders } from "./maintenance";
+import { runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runEditorDeadlineReminders, runEditorEscalations, recordDeadlinePerformance, runHourlySignals, runScriptTodoReminders, runTaskDeadlineReminders } from "./maintenance";
 import { enforcePortalAccess } from "./portal-access";
 import { runClientNotifications } from "./notifications";
 import { runDatabaseBackup } from "./backup";
@@ -103,7 +103,8 @@ export async function runNightlySync() {
   // coördinator + overbelasting-melding voor de eigenaar (na alle signalen hierboven).
   results.push(await step("content_health.signals", () => runContentHealthSignals()));
   results.push(await step("reminders.script_todo", () => runScriptTodoReminders()));
-  results.push(await step("reminders.post_shoot_todo", () => runPostShootTodoReminders()));
+  // (reminders.post_shoot_todo — "stuur <klant> een berichtje over de editing" — op
+  //  verzoek uitgezet: te veel dagelijkse ruis op het Taken-overzicht.)
   // Herinnering aan klanten met scripts die nog ter controle staan (dedupe per week).
   results.push(await step("reminders.script_review", () => runScriptReviewReminders()));
   // Als laatste: een volledige database-backup naar Google Drive.

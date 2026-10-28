@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { tasks, users } from "@/db/schema";
 import { aiConfigured, runPrompt } from "@/server/ai/client";
@@ -81,6 +81,29 @@ export async function runContentHealthSignals() {
         .returning({ id: tasks.id });
       if (inserted[0]) ctx.counters.created++;
     }
+
+    // 1b) Ruim eerder automatisch aangemaakte taken op die we niet meer
+    //     genereren (op verzoek): "Geen content ingepland" en "Resultaten vallen
+    //     sterk terug" (content_health, pijler planning/resultaten) en "stuur een
+    //     berichtje over de editing" (na opname). Archiveren i.p.v. verwijderen,
+    //     zodat ze terugvindbaar blijven in het archief.
+    const retired = await db
+      .update(tasks)
+      .set({ archivedAt: new Date() })
+      .where(
+        and(
+          eq(tasks.source, "automation"),
+          isNull(tasks.archivedAt),
+          isNull(tasks.deletedAt),
+          inArray(tasks.status, ["todo", "in_progress", "blocked"]),
+          sql`(
+            (${tasks.entityType} = 'content_health' and (${tasks.dedupeKey} like '%:planning:%' or ${tasks.dedupeKey} like '%:resultaten:%'))
+            or (${tasks.entityType} = 'production_day' and ${tasks.dedupeKey} like 'postshoot_msg:%')
+          )`,
+        ),
+      )
+      .returning({ id: tasks.id });
+    ctx.counters.updated += retired.length;
 
     // 2) Overbelaste medewerkers → melding aan de eigenaar (hulp herverdelen).
     const overloaded = await getOverloadedPeople(true);

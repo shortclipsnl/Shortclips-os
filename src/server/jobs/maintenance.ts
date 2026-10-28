@@ -248,6 +248,8 @@ export async function runDailySignals() {
           isNull(contentCalendar.deletedAt),
           eq(contentCalendar.scheduledOn, day(1)),
           inArray(contentCalendar.status, ["to_prepare", "ready"]),
+          // Geen publiceer-herinnering voor klanten die zelf plaatsen.
+          sql`exists (select 1 from clients c where c.id = ${contentCalendar.clientId} and c.we_handle_posting = true)`,
         ),
       );
 
@@ -762,6 +764,7 @@ export async function runContentGapSignal() {
       select c.id, c.name, c.slug, c.coordinator_id
       from clients c
       where c.deleted_at is null and c.status = 'active'
+        and c.we_handle_posting = true
         and not exists (
           select 1 from content_calendar cc
           where cc.client_id = c.id and cc.deleted_at is null
