@@ -239,14 +239,15 @@ Beoordeel elk meegeleverd script op vijf assen (elk 0-10):
 - spreektaal: natuurlijk en makkelijk uit te spreken, geen AI-taal of kromme zinnen?
 - aansluiting: past het bij déze klant, de doelgroep en het doel, en is het op locatie opneembaar?
 
-Reken STRENG en realistisch: 8 = goed, 9 = uitzonderlijk, 10 = zeldzaam. Rond nooit naar boven af.
+KALIBRATIE (belangrijk — niet onnodig zuinig): 9 is het normale streefniveau voor Shortclips, GEEN zeldzame uitzondering. Een script dat volledig aan de lat voldoet — een scherpe hook die direct pakt, een concreet en origineel concept, vlot en natuurlijk te presenteren, duidelijk afgestemd op de klant, zonder echte zwakke plek — verdient een 9. Geef een 7 of 8 alléén wanneer er een aanwijsbare zwakte is (vlakke hook, voorspelbaar idee, kromme zin, te commercieel, of mismatch met de klant); benoem die zwakte dan in het verbeterpunt. Reserveer de 10 voor écht uitzonderlijk werk. Rond nooit kunstmatig op, maar straf een sterk script ook niet onterecht af.
 
-Herschrijf ELK script waarvan het geheel onder de ${QUALITY_TARGET} ligt: pak gericht de zwakste as aan (meestal de hook en/of de originaliteit), behoud wat al sterk is, verzin niets, en til het naar minimaal ${QUALITY_TARGET}. Scripts die al ≥${QUALITY_TARGET} scoren: laat je exact ongewijzigd.
+Herschrijf ELK script waarvan het geheel onder de ${QUALITY_TARGET} ligt: pak gericht de zwakste as(sen) aan — meestal de hook en/of de originaliteit — maak die merkbaar scherper en verrassender, behoud wat al sterk is, verzin niets, en til het naar minimaal ${QUALITY_TARGET}. Een script dat al ≥${QUALITY_TARGET} scoort: laat je exact ongewijzigd.
 
 Harde regels:
 - Behoud exact dezelfde opmaak, koppen, blokken en volgorde.
 - Verzin NOOIT nieuwe cijfers, prijzen, claims of specificaties.
 - Geef exact hetzelfde aantal scripts terug, in dezelfde volgorde.
+- BELANGRIJK: de 'assen'-scores horen bij het script zoals je het in 'regels' TERUGGEEFT — dus ná je eventuele herschrijving, niet bij de oorspronkelijke versie. Heb je een script verbeterd, scoor dan de verbeterde versie.
 - Antwoord met UITSLUITEND geldige JSON, zonder tekst eromheen en zonder markdown. Gebruik binnen tekstwaarden geen dubbele aanhalingstekens en geen letterlijke regeleinden:
 {"scripts":[{"onderwerp":"<titel>","assen":{"hook":8,"retentie":8,"originaliteit":8,"spreektaal":8,"aansluiting":8},"verbeterpunt":"<1 concrete zin wat eventueel nog beter kan, of leeg>","regels":["<regel 1>","<regel 2>","..."]}]}`;
 
@@ -275,7 +276,7 @@ function scoreFromAxes(a: Record<string, unknown> | undefined): { total: number;
  * Geeft naast de (verbeterde) scripts ook de eindscore per script terug.
  * Best-effort: faalt de lus, dan blijven de scripts staan met score 0 (onbekend).
  */
-async function qualityPass(scripts: GeneratedScript[], context: string, maxRounds = 2): Promise<{ scripts: GeneratedScript[]; scores: ScriptScore[] }> {
+async function qualityPass(scripts: GeneratedScript[], context: string, maxRounds = 1): Promise<{ scripts: GeneratedScript[]; scores: ScriptScore[] }> {
   const current = [...scripts];
   const scores: ScriptScore[] = current.map(() => ({ total: 0, zwakste: null, verbeterpunt: null }));
   if (current.length === 0) return { scripts: current, scores };
