@@ -21,7 +21,7 @@ import { getMetaRules, refreshMetaRules } from "@/server/scripts/meta-rules";
 export type ContentType = "organisch" | "advertentie";
 export type GeneratedScript = { onderwerp: string; tekst: string; contentType?: ContentType; funnel?: Funnel };
 type Result =
-  | { ok: true; scripts: GeneratedScript[]; klantnaam: string }
+  | { ok: true; scripts: GeneratedScript[]; klantnaam: string; scores?: ScriptScore[] }
   | { ok: false; message: string };
 
 const MAX_SCRIPTS = 8;
@@ -121,6 +121,31 @@ function parseScriptsJson(raw: string): ScriptsPayload | null {
   );
 }
 
+type ClientCtx = { name: string; slug: string; extra: string; wpm: number | null; location: string | null };
+
+/**
+ * Korte in-memory cache van de (zware) klantcontext per klant+contenttype, zodat
+ * opeenvolgende acties (genereren, controleren, verbeteren, ander concept,
+ * benodigdheden) de ~9 bronnen niet telkens opnieuw opbouwen. TTL kort; `refresh`
+ * omzeilt de cache (knop "ververs context"). Dit is de belangrijkste snelheidswinst.
+ */
+const CTX_TTL_MS = 5 * 60 * 1000;
+const ctxCache = new Map<string, { at: number; value: ClientCtx | null }>();
+
+async function clientContextCached(
+  viewer: Awaited<ReturnType<typeof requirePermission>>,
+  clientId: string,
+  contentType: ContentType = "organisch",
+  refresh = false,
+): Promise<ClientCtx | null> {
+  const key = `${clientId}:${contentType}`;
+  const hit = ctxCache.get(key);
+  if (!refresh && hit && Date.now() - hit.at < CTX_TTL_MS) return hit.value;
+  const value = await clientContext(viewer, clientId, contentType);
+  ctxCache.set(key, { at: Date.now(), value });
+  return value;
+}
+
 /**
  * Verzamelt de volledige live klantcontext voor de schrijver: stijl, afspraken,
  * geleerde voorkeuren, best presterende hooks (echte cijfers), Video Intelligence,
@@ -199,54 +224,100 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
  * klantcontext (indien gekozen) wordt meegeladen. Het model werkt uit eerdere
  * data en het handboek — nooit een website nodig.
  */
-/** Minimale kwaliteitslat; scripts eronder worden door de gate herschreven. */
-const GATE = 8.0;
+/** Streefniveau: elk script wordt automatisch verbeterd tot minimaal dit totaal. */
+const QUALITY_TARGET = 9.0;
 
-const GATE_SYSTEM = `Je bent een strenge, onafhankelijke scriptbeoordelaar bij Shortclips — NIET de schrijver. Je zorgt dat elke short-videoscript op het niveau van de allerbeste scriptschrijver is, zodat het zonder extra controle live kan.
+/** Per-script score uit de automatische kwaliteitslus (voor het inline-label). */
+export type ScriptScore = { total: number; zwakste: string | null; verbeterpunt: string | null };
 
-Beoordeel elk meegeleverd script streng op vijf punten (elk 0-10): hook (pakt het de aandacht in de eerste 3 seconden?), retentie/opbouw (houdt het vast tot het eind?), originaliteit & creativiteit (uniek, verrassend concept — geen cliché), natuurlijke spreektaal (makkelijk te presenteren, geen AI-taal), en aansluiting op de klant en het doel.
+const JUDGE_SYSTEM = `Je bent een strenge, onafhankelijke scriptbeoordelaar bij Shortclips — NIET de schrijver. Je bewaakt dat elk short-videoscript op het niveau van de allerbeste scriptschrijver staat, zodat het zonder extra controle opgenomen kan worden.
 
-Herschrijf ELK script dat op één van deze punten onder de ${GATE} van 10 zit, zó dat het ruim voldoet: behoud wat sterk is en verscherp de rest — maak vooral de hook en het concept opvallender, unieker en creatiever. Laat een script dat al uitstekend is ongewijzigd.
+Beoordeel elk meegeleverd script op vijf assen (elk 0-10):
+- hook: pakt het de aandacht binnen de eerste 3 seconden en breekt het een patroon?
+- retentie: houdt de opbouw en het tempo vast tot het eind?
+- originaliteit: uniek, verrassend concept — geen cliché of voor de hand liggend idee?
+- spreektaal: natuurlijk en makkelijk uit te spreken, geen AI-taal of kromme zinnen?
+- aansluiting: past het bij déze klant, de doelgroep en het doel, en is het op locatie opneembaar?
+
+Reken STRENG en realistisch: 8 = goed, 9 = uitzonderlijk, 10 = zeldzaam. Rond nooit naar boven af.
+
+Herschrijf ELK script waarvan het geheel onder de ${QUALITY_TARGET} ligt: pak gericht de zwakste as aan (meestal de hook en/of de originaliteit), behoud wat al sterk is, verzin niets, en til het naar minimaal ${QUALITY_TARGET}. Scripts die al ≥${QUALITY_TARGET} scoren: laat je exact ongewijzigd.
 
 Harde regels:
-- Behoud exact dezelfde opmaak en structuur (dezelfde koppen en blokken, dezelfde volgorde).
+- Behoud exact dezelfde opmaak, koppen, blokken en volgorde.
 - Verzin NOOIT nieuwe cijfers, prijzen, claims of specificaties.
 - Geef exact hetzelfde aantal scripts terug, in dezelfde volgorde.
 - Antwoord met UITSLUITEND geldige JSON, zonder tekst eromheen en zonder markdown. Gebruik binnen tekstwaarden geen dubbele aanhalingstekens en geen letterlijke regeleinden:
-{"scripts":[{"onderwerp":"<titel>","regels":["<regel 1>","<regel 2>","..."]}]}`;
+{"scripts":[{"onderwerp":"<titel>","assen":{"hook":8,"retentie":8,"originaliteit":8,"spreektaal":8,"aansluiting":8},"verbeterpunt":"<1 concrete zin wat eventueel nog beter kan, of leeg>","regels":["<regel 1>","<regel 2>","..."]}]}`;
+
+const AXES = ["hook", "retentie", "originaliteit", "spreektaal", "aansluiting"] as const;
+/** Hook en originaliteit wegen zwaarder — daar zit het verschil met gemiddeld. */
+const AXIS_WEIGHT: Record<string, number> = { hook: 0.28, retentie: 0.2, originaliteit: 0.22, spreektaal: 0.15, aansluiting: 0.15 };
+
+function scoreFromAxes(a: Record<string, unknown> | undefined): { total: number; zwakste: string | null } {
+  if (!a) return { total: 0, zwakste: null };
+  let total = 0;
+  let zwakste: string | null = null;
+  let min = Infinity;
+  for (const k of AXES) {
+    const v = Math.max(0, Math.min(10, Number(a[k]) || 0));
+    total += v * (AXIS_WEIGHT[k] ?? 0.2);
+    if (v < min) { min = v; zwakste = k; }
+  }
+  return { total: Math.round(total * 10) / 10, zwakste };
+}
 
 /**
- * Automatische kwaliteitsgate: een onafhankelijke, strenge beoordelaar loopt de
- * net geschreven scripts na en herschrijft de scripts die onder de lat zitten
- * (sterkere hook, uniekere concepten, betere retentie) — zodat het team scripts
- * oplevert op het niveau dat anders de handmatige controle van de eigenaar vroeg.
- * Best-effort: lukt de gate niet, dan blijven de originele scripts staan.
+ * Automatische kwaliteitslus: een onafhankelijke, strenge beoordelaar scoort elk
+ * net geschreven script en herschrijft alléén de scripts onder het streefniveau
+ * (gericht op de zwakste as), tot maximaal `maxRounds` rondes. Zo komt een script
+ * vanaf de eerste generatie op het niveau dat anders de handmatige controle vroeg.
+ * Geeft naast de (verbeterde) scripts ook de eindscore per script terug.
+ * Best-effort: faalt de lus, dan blijven de scripts staan met score 0 (onbekend).
  */
-async function gateScripts(scripts: GeneratedScript[], context: string): Promise<GeneratedScript[]> {
-  if (scripts.length === 0) return scripts;
-  try {
-    const payload = scripts.map((s, i) => ({ index: i, onderwerp: s.onderwerp, regels: s.tekst.split("\n") }));
-    const res = await runJsonPrompt<ScriptsPayload>({
-      system: context ? `${GATE_SYSTEM}\n\nKLANTCONTEXT (gebruik om de aansluiting te beoordelen en te verscherpen):\n${context}` : GATE_SYSTEM,
-      user: `Beoordeel deze ${scripts.length} scripts streng en herschrijf wat onder de lat zit. Data (JSON):\n${JSON.stringify({ scripts: payload })}`,
-      maxTokens: Math.min(24000, scripts.length * 3000 + 3000),
-    });
-    if (!res.ok || !Array.isArray(res.data?.scripts)) return scripts;
-    return scripts.map((orig, i) => {
-      const g = res.data.scripts?.[i];
-      if (!g) return orig;
+async function qualityPass(scripts: GeneratedScript[], context: string, maxRounds = 2): Promise<{ scripts: GeneratedScript[]; scores: ScriptScore[] }> {
+  const current = [...scripts];
+  const scores: ScriptScore[] = current.map(() => ({ total: 0, zwakste: null, verbeterpunt: null }));
+  if (current.length === 0) return { scripts: current, scores };
+
+  for (let round = 0; round < maxRounds; round++) {
+    // Ronde 0: alles beoordelen. Daarna: alleen wat nog onder het streefniveau zit.
+    const idx = round === 0
+      ? current.map((_, i) => i)
+      : scores.map((s, i) => (s.total < QUALITY_TARGET ? i : -1)).filter((i) => i >= 0);
+    if (idx.length === 0) break;
+
+    const payload = idx.map((i) => ({ index: i, onderwerp: current[i]!.onderwerp, regels: current[i]!.tekst.split("\n") }));
+    let res;
+    try {
+      res = await runJsonPrompt<{ scripts?: Array<{ onderwerp?: unknown; assen?: Record<string, unknown>; verbeterpunt?: unknown; regels?: unknown; tekst?: unknown }> }>({
+        system: context ? `${JUDGE_SYSTEM}\n\nKLANTCONTEXT (gebruik om de aansluiting te beoordelen en te verscherpen):\n${context}` : JUDGE_SYSTEM,
+        user: `Beoordeel en verbeter waar nodig deze ${payload.length} scripts. Data (JSON):\n${JSON.stringify({ scripts: payload })}`,
+        maxTokens: Math.min(24000, payload.length * 3000 + 3000),
+      });
+    } catch {
+      break;
+    }
+    if (!res.ok || !Array.isArray(res.data?.scripts)) break;
+
+    res.data.scripts.forEach((g, k) => {
+      const i = idx[k];
+      if (i == null || !g) return;
       const tekst = Array.isArray(g.regels)
         ? g.regels.map((r) => (typeof r === "string" ? r : "")).join("\n").trim()
-        : typeof g.tekst === "string"
-          ? g.tekst.trim()
-          : "";
-      if (!tekst) return orig;
-      const onderwerp = typeof g.onderwerp === "string" && g.onderwerp.trim() ? g.onderwerp.trim() : orig.onderwerp;
-      return { ...orig, onderwerp, tekst };
+        : typeof g.tekst === "string" ? g.tekst.trim() : "";
+      if (tekst) {
+        current[i] = {
+          ...current[i]!,
+          tekst,
+          onderwerp: typeof g.onderwerp === "string" && g.onderwerp.trim() ? g.onderwerp.trim() : current[i]!.onderwerp,
+        };
+      }
+      const { total, zwakste } = scoreFromAxes(g.assen);
+      scores[i] = { total, zwakste, verbeterpunt: typeof g.verbeterpunt === "string" ? g.verbeterpunt.trim() || null : null };
     });
-  } catch {
-    return scripts;
   }
+  return { scripts: current, scores };
 }
 
 export async function generateScripts(input: {
@@ -281,7 +352,7 @@ export async function generateScripts(input: {
     let extra = "";
     let klantnaam = (input.clientName ?? "").trim();
     if (input.clientId) {
-      const ctx = await clientContext(viewer, input.clientId, contentType);
+      const ctx = await clientContextCached(viewer, input.clientId, contentType);
       if (ctx) { extra = ctx.extra; klantnaam = ctx.name; }
     } else {
       // Zonder vaste klant: toch de centrale geleerde regels voor dit contenttype meenemen.
@@ -367,11 +438,13 @@ export async function generateScripts(input: {
           "- regels: een array met het volledige script, één tekstregel per array-element. Zet NOOIT een regeleinde binnen een element — elke nieuwe regel is een nieuw element. Gebruik een leeg element (\"\") voor een witregel tussen de blokken.",
         ].filter(Boolean).join("\n");
 
+    const tGen = Date.now();
     const res = await runPrompt({
       system: isAd ? adScriptGeneratorSystem(extra || undefined) : scriptGeneratorSystem(extra || undefined),
       user,
       documents: documents.length ? documents : undefined,
       maxTokens: Math.min(24000, count * 3000 + 3000),
+      cacheSystem: true,
     });
 
     if (!res.ok) {
@@ -412,11 +485,18 @@ export async function generateScripts(input: {
 
     if (scripts.length === 0) return { ok: false, message: "De schrijver leverde geen scripts op. Probeer het nog eens." };
 
-    // Automatische kwaliteitsgate: een onafhankelijke beoordelaar herschrijft
-    // zwakke scripts, zodat de handmatige controle van de eigenaar niet meer nodig is.
-    const gated = await gateScripts(scripts, extra).catch(() => scripts);
+    const tQuality = Date.now();
+    // Automatische kwaliteitslus: scoort elk script en verbetert alléén wat onder
+    // het streefniveau zit (gericht op de zwakste as), zodat de handmatige controle
+    // van de eigenaar niet meer nodig is. Scores komen mee terug voor het label.
+    const { scripts: improved, scores } = await qualityPass(scripts, extra).catch(() => ({
+      scripts,
+      scores: scripts.map(() => ({ total: 0, zwakste: null, verbeterpunt: null })) as ScriptScore[],
+    }));
 
-    return { ok: true, scripts: gated, klantnaam };
+    const done = Date.now();
+    console.log(`[generateScripts] ${count} script(s), ${contentType}: generatie ${tQuality - tGen}ms, kwaliteitslus ${done - tQuality}ms, totaal ${done - tGen}ms (AI-fase).`);
+    return { ok: true, scripts: improved, klantnaam, scores };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;
@@ -437,6 +517,9 @@ export async function reviseScript(input: {
   clientName?: string;
   /** true = volledig nieuw concept met andere invalshoek i.p.v. kleine aanpassingen. */
   newConcept?: boolean;
+  /** Bij "Ander concept": titels van de andere scripts in de set, zodat het nieuwe
+   *  concept daar duidelijk van afwijkt (echt divergent, geen broertje). */
+  avoidConcepts?: string[];
   /** Organisch of advertentie — bepaalt het schrijfsysteem en de opmaakregels. */
   contentType?: ContentType;
   /** Advertenties: de funnelfase van dit script (behouden bij aanpassen). */
@@ -458,8 +541,15 @@ export async function reviseScript(input: {
     let extra = "";
     let klantnaam = (input.clientName ?? "").trim();
     if (input.clientId) {
-      const ctx = await clientContext(viewer, input.clientId, contentType);
+      const ctx = await clientContextCached(viewer, input.clientId, contentType);
       if (ctx) { extra = ctx.extra; klantnaam = ctx.name; }
+    }
+
+    // Bij "Ander concept": de andere concepten uit de set die vermeden moeten worden,
+    // in de systeemcontext zodat het model echt een andere kant op gaat.
+    if (input.newConcept && input.avoidConcepts?.length) {
+      const avoidLine = `ANDER CONCEPT — de set bevat al deze concepten; kies bewust een WEZENLIJK ander concept, format en invalshoek dan deze (geen variant erop):\n- ${input.avoidConcepts.slice(0, 12).map((t) => t.trim()).filter(Boolean).join("\n- ")}`;
+      extra = `${extra ? extra + "\n\n" : ""}${avoidLine}`;
     }
 
     const user = isAd
@@ -553,29 +643,38 @@ export async function suggestTopics(input: { clientId?: string; clientName?: str
     let extra = "";
     let klantnaam = (input.clientName ?? "").trim();
     if (input.clientId) {
-      const ctx = await clientContext(viewer, input.clientId);
+      const ctx = await clientContextCached(viewer, input.clientId);
       if (ctx) { extra = ctx.extra; klantnaam = ctx.name; }
     }
 
     const avoid = (input.avoid ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 40);
-    // Variatiesignaal: een willekeurige hoek + nonce, zodat twee keer klikken niet
-    // exact dezelfde lijst oplevert (het model krijgt anders identieke input).
-    const angles = ["een verrassende insteek", "een misverstand ontkrachten", "een how-to", "achter de schermen", "een veelgestelde vraag", "een vergelijking", "een mythe vs. feit", "een concreet resultaat/voorbeeld", "een seizoens- of actualiteitshaak", "een tip die bijna niemand toepast"];
-    const pick = angles.sort(() => Math.random() - 0.5).slice(0, 4);
+    // Nonce zodat twee keer klikken niet exact dezelfde input oplevert.
     const nonce = Math.random().toString(36).slice(2, 8);
 
     const user = [
-      `Stel ${count} sterke, concrete onderwerpen voor organische short video's voor${klantnaam ? ` klant "${klantnaam}"` : " een klant"}.`,
-      "WERKWIJZE (belangrijk): onderzoek EERST en kies DAARNA. Analyseer de eerder geschreven scripts, de best presterende hooks (echte cijfers) en de Video Intelligence-patronen van deze klant uit de meegeleverde context: in welke richtingen maken we content, wat werkt, en welke invalshoeken zijn nog NIET gebruikt. Kies onderwerpen die (a) aansluiten op wat aantoonbaar werkt én (b) nieuwe, nog niet behandelde gaten vullen. Geen advertentie-ideeën.",
-      avoid.length ? `Vermijd deze onderwerpen (al eerder voorgesteld of gebruikt) — kom met wezenlijk ANDERE ideeën, niet een herformulering:\n- ${avoid.join("\n- ")}` : "",
-      `Breng variatie aan; leun deze keer onder meer op: ${pick.join(", ")}. (variatiecode ${nonce} — negeer deze code inhoudelijk, hij dient alleen om niet in herhaling te vallen.)`,
-      "Elk onderwerp is één korte, pakkende regel (een titel of hook), zonder nummer.",
+      `Stel ${count} sterke, originele videoconcepten voor organische short video's voor${klantnaam ? ` klant "${klantnaam}"` : " een klant"}. Je denkt als een ervaren short-videostrateeg die deze klant en zijn eerdere producties kent — niet als een algemene AI die veilige titels verzint.`,
+      "",
+      "WERKWIJZE — onderzoek EERST, kies DAARNA:",
+      "1. Analyseer de meegeleverde context: de eerder geschreven scripts (stijl, opbouw, welke concepten al gedaan zijn), de best presterende hooks met echte cijfers, en de Video Intelligence-patronen. Bepaal welke richtingen aantoonbaar werken en welke invalshoeken nog NIET zijn gebruikt.",
+      "2. Kies concepten die (a) voortbouwen op wat werkt én (b) gaten vullen die nog niet behandeld zijn. Nooit standaard bedrijfspromotie, algemene 'tips over X', of voorspelbare commerciële ideeën.",
+      "",
+      "EISEN per concept:",
+      "- Sterke kans om te stoppen-met-scrollen op TikTok, Reels en Shorts: een hook of premisse die in de eerste seconden nieuwsgierig maakt.",
+      "- Concreet VIDEOCONCEPT, geen vage titel: het moet duidelijk zijn wat de kijker letterlijk te zien krijgt. Dus niet \"3 tips over product X\" maar bijv. \"Monteur raadt blind het bouwjaar van een auto aan het geluid van de motor\".",
+      "- Opneembaar op locatie bij deze klant, en passend bij een video van ~15–45 seconden (tenzij het concept echt om een andere lengte vraagt).",
+      "- Herkenbaar of interessant voor de doelgroep; origineel en niet voorspelbaar; niet onnodig commercieel.",
+      "",
+      "VARIATIE: zorg dat de set duidelijk verschillende formattypes bevat — kies telkens wat bij déze klant past uit: herkenbare situatie, humor, trend-haak, een prikkelende vraag, demonstratie/mini-experiment, challenge, kijkersinteractie, educatie/mythe-ontkrachten, insider-geheim, verrassende vergelijking. Niet twee keer bijna hetzelfde format of idee.",
+      avoid.length ? `\nVERMIJD deze onderwerpen (al eerder voorgesteld of gebruikt) — kom met WEZENLIJK andere concepten, geen herformulering of klein varianten ervan:\n- ${avoid.join("\n- ")}` : "",
+      `(variatiecode ${nonce} — negeer inhoudelijk; dient alleen om niet in herhaling te vallen.)`,
+      "",
+      "Schrijf elk concept als één pakkende regel (max ~22 woorden) die het idee en de invalshoek meteen duidelijk maakt, zonder nummer.",
       "",
       "Geef UITSLUITEND geldige JSON terug in exact dit formaat:",
-      "{\"basis\":\"<1-2 zinnen: waarop je deze keuze baseerde — wat je in de eerdere scripts/cijfers/patronen zag>\",\"onderwerpen\":[\"...\",\"...\"]}",
+      "{\"basis\":\"<2-3 zinnen: wat je in de eerdere scripts/cijfers/patronen zag en hoe dat deze keuzes stuurde, incl. welke gaten je invult>\",\"onderwerpen\":[\"...\",\"...\"]}",
     ].filter(Boolean).join("\n");
 
-    const res = await runPrompt({ system: scriptGeneratorSystem(extra || undefined), user, maxTokens: 1800 });
+    const res = await runPrompt({ system: scriptGeneratorSystem(extra || undefined), user, maxTokens: 3500, cacheSystem: true });
     if (!res.ok) return { ok: false, message: "De schrijver gaf geen antwoord. Probeer het nog eens." };
 
     const cleaned = res.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
@@ -640,7 +739,7 @@ export async function generateScriptNeeds(input: {
     let klantnaam = (input.clientName ?? "").trim();
     let extra = "";
     if (input.clientId) {
-      const ctx = await clientContext(viewer, input.clientId, input.contentType === "advertentie" ? "advertentie" : "organisch");
+      const ctx = await clientContextCached(viewer, input.clientId, input.contentType === "advertentie" ? "advertentie" : "organisch");
       if (ctx) { extra = ctx.extra; klantnaam = ctx.name; }
     }
 
@@ -719,7 +818,7 @@ export async function checkScriptQuality(input: {
     let wpm = DEFAULT_WPM;
     let location: string | null = null;
     if (input.clientId) {
-      const ctx = await clientContext(viewer, input.clientId, contentType);
+      const ctx = await clientContextCached(viewer, input.clientId, contentType);
       if (ctx) { extra = ctx.extra; klantnaam = ctx.name; if (ctx.wpm) wpm = ctx.wpm; location = ctx.location; }
     }
     const speaking = estimateSpeakingTime({ hook, body, cta }, wpm);

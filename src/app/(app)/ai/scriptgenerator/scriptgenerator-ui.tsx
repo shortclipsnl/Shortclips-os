@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock, Megaphone, Sprout, Link2, AlertTriangle, ChevronDown, BookmarkPlus, ShieldAlert, ListChecks } from "lucide-react";
-import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, saveScriptToDrive, checkScriptQuality, listShootDaysForClient, rememberScriptFeedback, refreshMetaRulesAction, getMetaRulesInfo, listScriptClientsAction, getClientDriveScriptInfoAction, generateScriptNeeds, type GeneratedScript, type QualityResult, type ContentType, type FeedbackScope } from "@/server/actions/script-generate";
+import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, saveScriptToDrive, checkScriptQuality, listShootDaysForClient, rememberScriptFeedback, refreshMetaRulesAction, getMetaRulesInfo, listScriptClientsAction, getClientDriveScriptInfoAction, generateScriptNeeds, type GeneratedScript, type QualityResult, type ScriptScore, type ContentType, type FeedbackScope } from "@/server/actions/script-generate";
 import { ClientLogo } from "@/components/ui";
 
 type ShootDay = { id: string; scheduledOn: string; title: string };
@@ -132,6 +132,8 @@ function MicButton({ onText, onError, title = "Inspreken" }: { onText: (t: strin
 const appendText = (prev: string, add: string) => prev + (prev && !prev.endsWith("\n") && !prev.endsWith(" ") ? " " : "") + add;
 
 const scoreColor = (n: number) => (n >= 7 ? "var(--color-good)" : n >= 4 ? "var(--color-warn)" : "var(--color-bad)");
+/** Streefniveau van de automatische verbeterlus (gelijk aan de server). */
+const QUALITY_TARGET = 9;
 
 /* ---------------- component ---------------- */
 
@@ -184,9 +186,10 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
   // Kwaliteitscontrole per script
   const [qualityById, setQualityById] = useState<Record<string, QualityResult>>({});
   const [qualityBusyId, setQualityBusyId] = useState<string | null>(null);
-  // Automatische kwaliteitscontrole: draait direct na het genereren voor elk
-  // script, zodat je meteen ziet wat goedgekeurd is (≥8) en wat aandacht vraagt.
-  const [autoCheckBusy, setAutoCheckBusy] = useState(false);
+  // Score uit de automatische verbeterlus bij het genereren (per script) — toont
+  // direct het eindniveau (streven ≥9). De knop "Controleer kwaliteit" geeft het
+  // uitgebreide oordeel per dimensie.
+  const [scoreById, setScoreById] = useState<Record<string, ScriptScore>>({});
   const [qualityOpenId, setQualityOpenId] = useState<string | null>(null);
 
   const [err, setErr] = useState<string | null>(null);
@@ -202,6 +205,12 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
   const [coupleMsg, setCoupleMsg] = useState<string | null>(null);
   const [blockedApproved, setBlockedApproved] = useState<Array<{ index: number; title: string }>>([]);
   const [lastCoupleDayId, setLastCoupleDayId] = useState<string | undefined>(undefined);
+  // Verplichte opnamedag-melding vóór opslaan/koppelen/Drive/export.
+  const [needShoot, setNeedShoot] = useState(false);
+  // "+ Onderwerpen toevoegen" ná generatie.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addText, setAddText] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
   // Lerende feedback (onthouden als regel) + Meta-regels.
   const [rememberScope, setRememberScope] = useState<FeedbackScope>("contenttype");
   const [rememberBusyId, setRememberBusyId] = useState<string | null>(null);
@@ -297,38 +306,16 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
             if (days.length > 0) { setShootDayId(days[0]!.id); setOpnamedag(isoToNl(days[0]!.scheduledOn)); }
           }).catch(() => {});
         }
-        // Automatische kwaliteitscontrole per script (hook, originaliteit,
-        // kijkerswaarde, viral potentie, tone of voice, uitvoerbaarheid, …).
-        void autoCheckAll(newItems, gcid, showOther ? otherName.trim() : selectedName);
+        // Scores uit de automatische verbeterlus direct naast elk script tonen
+        // (de lus heeft zwakke scripts al verbeterd). Geen extra AI-calls meer.
+        const sc: Record<string, ScriptScore> = {};
+        res.scores?.forEach((s, i) => { const it = newItems[i]; if (it) sc[it.id] = s; });
+        setScoreById(sc);
+        setQualityById({});
       } else {
         setErr(res.message);
       }
     });
-  };
-
-  /** Draait de kwaliteitscontrole automatisch voor alle zojuist gegenereerde scripts. */
-  const autoCheckAll = async (
-    items: Array<{ id: string; onderwerp: string; tekst: string; contentType: ContentType; funnel?: Funnel }>,
-    gcid: string,
-    naam: string,
-  ) => {
-    setQualityById({});
-    setAutoCheckBusy(true);
-    try {
-      await Promise.all(items.map(async (it) => {
-        const res = await checkScriptQuality({
-          onderwerp: it.onderwerp,
-          tekst: it.tekst,
-          clientId: gcid || undefined,
-          clientName: gcid ? undefined : (naam || undefined),
-          contentType: it.contentType,
-          funnel: it.funnel,
-        });
-        if (res.ok) setQualityById((m) => ({ ...m, [it.id]: res.data }));
-      }));
-    } finally {
-      setAutoCheckBusy(false);
-    }
   };
 
   const fetchTopics = () => {
@@ -379,6 +366,17 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
    * optioneel aan een opname. Goedgekeurde scripts worden niet overschreven
    * zonder bevestiging (force).
    */
+  // Opnamedag verplicht vóór definitieve acties (opslaan/koppelen/Drive/export)
+  // zodra er een échte klant is gekozen. Zonder gekozen opnamedag: nette melding
+  // met link naar de opnameplanning.
+  const ensureShootDay = (): boolean => {
+    if (!genClientId) return true; // vrije klant: geen opnameplanning beschikbaar
+    if (shootDayId) { setNeedShoot(false); return true; }
+    setNeedShoot(true);
+    setErr(null);
+    return false;
+  };
+
   const persistScripts = async (opts: { productionDayId?: string; force?: boolean }): Promise<{ ok: boolean; blocked: number }> => {
     if (!scripts || scripts.length === 0 || !genClientId) return { ok: false, blocked: 0 };
     const res = await saveScriptsToLibrary({
@@ -396,6 +394,7 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
 
   const saveToLibrary = async () => {
     if (!scripts || scripts.length === 0 || !genClientId) return;
+    if (!ensureShootDay()) return;
     setSaving(true); setErr(null); setSavedMsg(null); setCoupleMsg(null);
     setLastCoupleDayId(shootDayId || undefined);
     try {
@@ -429,6 +428,7 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
 
   const saveToDrive = async () => {
     if (!scripts || scripts.length === 0 || !genClientId) return;
+    if (!ensureShootDay()) return;
     setDriveSaving(true);
     setErr(null);
     setDriveMsg(null);
@@ -443,6 +443,7 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
 
   const exportPdf = async () => {
     if (!scripts || scripts.length === 0) return;
+    if (!ensureShootDay()) return;
     setExporting(true);
     setErr(null);
     try {
@@ -460,6 +461,36 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
   const removeScript = (id: string) => setScripts((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
   const addScript = () => setScripts((prev) => [...(prev ?? []), { id: uid(), onderwerp: "", tekst: "", versions: [], contentType, funnel: isAd ? "TOF" : undefined }]);
 
+  // "+ Onderwerpen toevoegen": genereer alléén de nieuwe onderwerpen (met dezelfde
+  // klantcontext + kwaliteitslus) en voeg ze toe aan de bestaande set — de eerder
+  // gegenereerde scripts en de gekozen opnamedag blijven volledig behouden.
+  const addTopicsRun = () => {
+    const lines = addText.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 8);
+    if (lines.length === 0 || addBusy) return;
+    setAddBusy(true); setErr(null);
+    (async () => {
+      const res = await generateScripts({
+        clientId: genClientId || undefined,
+        clientName: genClientId ? undefined : (genClientName || undefined),
+        count: lines.length,
+        brief: lines.join("\n"),
+        useDriveScripts: !!genClientId && useDrive,
+        withPoll: true,
+        contentType,
+        funnels: isAd ? lines.map(() => "TOF" as Funnel) : undefined,
+      });
+      if (res.ok) {
+        const newItems = res.scripts.map((s: GeneratedScript) => ({ id: uid(), onderwerp: s.onderwerp, tekst: s.tekst, versions: [] as Version[], contentType: s.contentType ?? contentType, funnel: s.funnel }));
+        setScripts((prev) => [...(prev ?? []), ...newItems]);
+        const sc: Record<string, ScriptScore> = {};
+        res.scores?.forEach((s, i) => { const it = newItems[i]; if (it) sc[it.id] = s; });
+        setScoreById((m) => ({ ...m, ...sc }));
+        setAddOpen(false); setAddText("");
+      } else setErr(res.message);
+      setAddBusy(false);
+    })();
+  };
+
   // Eén aanpassing (snelle actie of vrije tekst/spraak). Bewaart de vorige versie met de feedback.
   // withPoll (optioneel, organisch) forceert de CTA mét/zonder poll ná generatie.
   const runRevise = (id: string, instruction: string, feedbackLabel: string, newConcept?: boolean, withPoll?: boolean) => {
@@ -473,6 +504,9 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
         tekst: s.tekst,
         instruction,
         newConcept,
+        // Bij "Ander concept": de titels van de andere scripts meegeven zodat het
+        // echt een andere kant op gaat en niet bij het origineel of een broertje blijft.
+        avoidConcepts: newConcept ? (scripts ?? []).filter((x) => x.id !== id).map((x) => x.onderwerp).filter(Boolean) : undefined,
         clientId: genClientId || undefined,
         clientName: genClientId ? undefined : genClientName || undefined,
         contentType: s.contentType,
@@ -486,6 +520,9 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
           tekst: res.script.tekst,
           versions: [{ onderwerp: x.onderwerp, tekst: x.tekst, feedback: feedbackLabel, at: Date.now() }, ...x.versions].slice(0, 25),
         } : x) ?? prev);
+        // Score is nu verouderd: wissen zodat er geen misleidend oud cijfer blijft staan.
+        setScoreById((m) => { const n = { ...m }; delete n[id]; return n; });
+        setQualityById((m) => { const n = { ...m }; delete n[id]; return n; });
         setReviseId(null);
         setReviseText("");
       } else setErr(res.message);
@@ -615,29 +652,20 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
           </p>
         </div>
 
-        {/* Automatische kwaliteitscontrole: loopt direct na het genereren per
-            script (hook, originaliteit, kijkerswaarde, viral potentie, tone of
-            voice, uitvoerbaarheid op locatie, …). */}
+        {/* Samenvatting van de automatische verbeterlus: elk script is gescoord en
+            waar nodig verbeterd (streven ≥9) vóór het hier verschijnt. */}
         {(() => {
-          const checked = scripts.filter((s) => qualityById[s.id]).length;
-          const approved = scripts.filter((s) => (qualityById[s.id]?.scoreTotaal ?? 0) >= 8).length;
-          if (autoCheckBusy) {
-            return (
-              <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-4 py-2 text-xs text-[var(--color-ink-muted)]">
-                <Loader2 className="size-3.5 animate-spin" /> Automatische kwaliteitscontrole loopt… {checked}/{scripts.length} gecontroleerd.
-              </div>
-            );
-          }
-          if (checked > 0) {
-            const alla = approved === scripts.length;
-            return (
-              <div className="flex items-center gap-2 rounded-[var(--radius-md)] border px-4 py-2 text-xs" style={{ borderColor: alla ? "color-mix(in srgb, var(--color-good) 35%, var(--color-line))" : "color-mix(in srgb, var(--color-warn) 35%, var(--color-line))", background: alla ? "var(--color-good-soft)" : "var(--color-warn-soft)" }}>
-                <ShieldCheck className={`size-3.5 ${alla ? "text-[var(--color-good)]" : "text-[var(--color-warn)]"}`} />
-                <span>Automatisch gecontroleerd: <strong>{approved}/{scripts.length}</strong> script{scripts.length === 1 ? "" : "s"} goedgekeurd (8/10 of hoger). {approved < scripts.length ? "Bekijk de score per script voor wat nog beter kan." : "Klaar om op te slaan."}</span>
-              </div>
-            );
-          }
-          return null;
+          const scored = scripts.filter((s) => scoreById[s.id]);
+          if (scored.length === 0) return null;
+          const goed = scored.filter((s) => (scoreById[s.id]?.total ?? 0) >= QUALITY_TARGET).length;
+          const alla = goed === scored.length;
+          const avg = Math.round((scored.reduce((sum, s) => sum + (scoreById[s.id]?.total ?? 0), 0) / scored.length) * 10) / 10;
+          return (
+            <div className="flex items-center gap-2 rounded-[var(--radius-md)] border px-4 py-2 text-xs" style={{ borderColor: alla ? "color-mix(in srgb, var(--color-good) 35%, var(--color-line))" : "color-mix(in srgb, var(--color-warn) 35%, var(--color-line))", background: alla ? "var(--color-good-soft)" : "var(--color-warn-soft)" }}>
+              <ShieldCheck className={`size-3.5 ${alla ? "text-[var(--color-good)]" : "text-[var(--color-warn)]"}`} />
+              <span>Automatisch verbeterd en gescoord: <strong>{goed}/{scored.length}</strong> op {QUALITY_TARGET}/10 of hoger (gemiddeld {avg.toLocaleString("nl-NL")}/10). {alla ? "Klaar om op te slaan." : "Bekijk de score per script voor wat nog beter kan."}</span>
+            </div>
+          );
         })()}
 
         {/* Scripts — iteratief bewerkbaar */}
@@ -739,6 +767,13 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
                   <button type="button" onClick={() => setQualityOpenId(qualityOpenId === s.id ? null : s.id)} className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-bold text-white" style={{ background: scoreColor(qualityById[s.id]!.scoreTotaal ?? 0) }}>
                     {qualityById[s.id]!.scoreTotaal ?? "?"}/10
                   </button>
+                ) : scoreById[s.id] && (scoreById[s.id]!.total ?? 0) > 0 ? (
+                  <span title={scoreById[s.id]!.verbeterpunt ? `Nog beter: ${scoreById[s.id]!.verbeterpunt}` : "Automatisch gescoord bij het genereren"} className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-bold text-white" style={{ background: scoreColor(scoreById[s.id]!.total) }}>
+                    {scoreById[s.id]!.total.toLocaleString("nl-NL")}/10
+                  </span>
+                ) : null}
+                {!qualityById[s.id] && scoreById[s.id]?.verbeterpunt ? (
+                  <span className="text-2xs text-[var(--color-ink-muted)]">Nog beter: {scoreById[s.id]!.verbeterpunt}</span>
                 ) : null}
               </div>
 
@@ -849,9 +884,36 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
           );
         })}
 
-        <button type="button" onClick={addScript} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] px-3 py-2 text-xs font-medium text-[var(--color-ink-muted)] hover:border-[var(--color-brand-500)] hover:text-[var(--color-ink)]">
-          <Plus className="size-3.5" /> Leeg script toevoegen
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setAddOpen((o) => !o)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-brand-300)] bg-[var(--color-brand-50)] px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] hover:border-[var(--color-brand-500)]">
+            <Plus className="size-3.5" /> Onderwerpen toevoegen
+          </button>
+          <button type="button" onClick={addScript} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] px-3 py-2 text-xs font-medium text-[var(--color-ink-muted)] hover:border-[var(--color-brand-500)] hover:text-[var(--color-ink)]">
+            <Plus className="size-3.5" /> Leeg script toevoegen
+          </button>
+        </div>
+
+        {/* + Onderwerpen toevoegen: genereert alléén de nieuwe onderwerpen en voegt
+            ze toe; de bestaande scripts en de gekozen opnamedag blijven behouden. */}
+        {addOpen ? (
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-brand-300)] bg-[var(--color-surface)] p-3">
+            <p className="mb-1.5 text-xs font-semibold text-[var(--color-ink)]">Extra onderwerpen toevoegen</p>
+            <p className="mb-2 text-2xs text-[var(--color-ink-faint)]">Eén onderwerp of hook per regel. Alleen hiervoor worden nieuwe scripts gemaakt; je huidige set blijft staan.</p>
+            <textarea
+              value={addText}
+              onChange={(e) => setAddText(e.target.value)}
+              rows={3}
+              placeholder={"bijv.\nMonteur raadt het bouwjaar aan het motorgeluid\nDe 3 gekste klusfoto's die klanten insturen"}
+              className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
+            />
+            <div className="mt-2 flex items-center gap-2">
+              <button type="button" onClick={addTopicsRun} disabled={addBusy || !addText.trim()} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-3 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40">
+                {addBusy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Genereer deze erbij
+              </button>
+              <button type="button" onClick={() => { setAddOpen(false); setAddText(""); }} className="text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleren</button>
+            </div>
+          </div>
+        ) : null}
 
         {err ? <p className="text-2xs text-[var(--color-bad)]">{err}</p> : null}
         {savedMsg ? (
@@ -870,6 +932,18 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
             <button type="button" onClick={forceOverwrite} disabled={coupleBusy} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[#8a5300] px-2 py-0.5 font-semibold hover:bg-white/40 disabled:opacity-40">
               {coupleBusy ? <Loader2 className="size-3 animate-spin" /> : null} Toch overschrijven
             </button>
+          </div>
+        ) : null}
+
+        {/* Verplichte opnamedag: nette melding vóór opslaan/koppelen/Drive/export. */}
+        {needShoot ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border px-4 py-2.5 text-xs" style={{ borderColor: "color-mix(in srgb, var(--color-warn) 40%, var(--color-line))", background: "var(--color-warn-soft)" }}>
+            <Clock className="size-4 shrink-0 text-[var(--color-warn)]" />
+            {shootDays.length === 0 ? (
+              <span>Er staat nog <strong>geen opname gepland</strong> voor {genClientName || "deze klant"}. Plan eerst een opnamedag in, dan kun je de scripts koppelen, opslaan en exporteren. <a href="/productions" className="font-semibold text-[var(--color-brand-700)] underline">Naar de opnameplanning →</a></span>
+            ) : (
+              <span>Kies eerst de <strong>opnamedag</strong> waar deze scripts bij horen (via <em>Koppelen aan opname</em> hieronder), vóór je opslaat of exporteert.</span>
+            )}
           </div>
         ) : null}
 
