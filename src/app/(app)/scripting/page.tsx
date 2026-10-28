@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Sparkles, CalendarClock, FileClock, AlarmClock, AlertTriangle, ShieldCheck } from "lucide-react";
+import { CalendarClock, FileClock, AlarmClock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { listScripting } from "@/server/scripting";
 import { upcomingScriptAppointments } from "@/server/appointments";
@@ -65,12 +65,6 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
           footer="Jij bent zelf verantwoordelijk voor de kwaliteit voordat een script naar de klant gaat. Twijfel je? Leg het eerst voor aan een collega of gebruik de AI-scriptcontrole."
         />
       </div>
-
-      {viewer.permissions.has("video_intelligence:read") ? (
-        <Link href="/video-intelligence" className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-brand-600)] hover:underline">
-          <Sparkles className="size-4" /> Video-patronen per klant bekijken (input voor je script)
-        </Link>
-      ) : null}
 
       {/* Script-afspraken uit de Google-agenda (automatisch herkend en gekoppeld). */}
       {scriptAppts.length > 0 ? (

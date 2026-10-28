@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { CalendarPlus, Check, FileText, Film, Languages, Loader2, RefreshCw, Sparkles, Tag, X } from "lucide-react";
+import { CalendarPlus, CaseUpper, Check, FileText, Film, Languages, Loader2, RefreshCw, Sparkles, Tag, X } from "lucide-react";
 import { addCaptionToPlanning, createCaptionPdfUploadUrl, generateCaptions, regenerateOneCaption, getShootVideoSummary, type ShortCaption } from "@/server/actions/ai-tools";
 import { listShootDaysForClient } from "@/server/actions/script-generate";
 import { getCaptionFooter, setCaptionFooter } from "@/server/actions/caption-footer";
@@ -326,7 +326,28 @@ function ShortBlock({
   const [planning, startPlanning] = useTransition();
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
   const hasFooter = footer.trim().length > 0;
+
+  // Nadruk: zet de geselecteerde woorden in HOOFDLETTERS (of terug naar klein als
+  // ze al in hoofdletters staan). Puur client-side, geen AI nodig.
+  function emphasizeSelection() {
+    const ta = taRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    if (start == null || end == null || start === end) {
+      setErr("Selecteer eerst de woorden die je in hoofdletters (of weer klein) wilt zetten.");
+      return;
+    }
+    setErr(null);
+    const text = short.caption;
+    const sel = text.slice(start, end);
+    const alreadyUpper = sel === sel.toUpperCase() && sel !== sel.toLowerCase();
+    const replaced = alreadyUpper ? sel.toLowerCase() : sel.toUpperCase();
+    onChange({ ...short, caption: text.slice(0, start) + replaced + text.slice(end) });
+    requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(start, end); });
+  }
   const full = (hasFooter
     ? withFooter(short.caption, footer)
     : `${short.caption}${short.hashtags?.length ? `\n\n${short.hashtags.join(" ")}` : ""}`
@@ -387,9 +408,20 @@ function ShortBlock({
       <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">Caption · {PLATFORMS}</span>
-          <CopyButton text={full} />
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={emphasizeSelection}
+              title="Selecteer woorden in de caption en zet ze in HOOFDLETTERS voor nadruk (nogmaals = terug naar klein)"
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2 py-0.5 text-2xs font-semibold hover:bg-[var(--color-surface-sunken)]"
+            >
+              <CaseUpper className="size-3.5" /> Nadruk (HOOFDLETTERS)
+            </button>
+            <CopyButton text={full} />
+          </div>
         </div>
         <textarea
+          ref={taRef}
           className="sc-input resize-y text-sm"
           rows={5}
           value={short.caption}

@@ -189,18 +189,17 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
       <div className="mb-2 text-xs text-[var(--color-ink-faint)]">{filtered.length} van {rows.length} opnames</div>
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <table className="w-full min-w-[1360px] text-sm">
+        <table className="w-full min-w-[1180px] text-sm">
           <thead>
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] text-left text-xs text-[var(--color-ink-faint)]">
               <th className="px-3 py-2 font-medium">Klant</th>
               <th className="px-2 py-2 font-medium">Opname</th>
-              <th className="px-2 py-2 font-medium">Scriptdeadline</th>
               <th className="px-2 py-2 font-medium">Afteller</th>
               <th className="px-2 py-2 font-medium">Verantwoordelijke</th>
               <th className="px-2 py-2 font-medium">Scriptingstatus</th>
+              <th className="px-2 py-2 font-medium">Klantportaal</th>
               <th className="px-2 py-2 font-medium">Scripts</th>
               <th className="px-2 py-2 font-medium">Notitie</th>
-              <th className="px-2 py-2 font-medium">Klantportaal</th>
             </tr>
           </thead>
           <tbody>
@@ -209,12 +208,12 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                 {/* Ruimte tussen de weekgroepen, zodat het beter scanbaar is. */}
                 {gi > 0 ? (
                   <tr aria-hidden>
-                    <td colSpan={9} className="h-6 bg-[var(--color-surface)]" />
+                    <td colSpan={8} className="h-6 bg-[var(--color-surface)]" />
                   </tr>
                 ) : null}
                 {/* Week-kop in volle kleur, zodat je van week naar week kunt scannen. */}
                 <tr>
-                  <td colSpan={9} className="p-0">
+                  <td colSpan={8} className="p-0">
                     <div
                       className="flex items-center gap-2 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white"
                       style={{ background: WEEK_COLOR[g.order] ?? "var(--color-ink-muted)" }}
@@ -234,12 +233,12 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                       </Link>
                     </td>
                     <td className="px-2 py-2 tabular-nums">{fmt(r.scheduledOn)}</td>
-                    <td className="px-2 py-2 tabular-nums text-[var(--color-ink-muted)]">{fmt(r.deadline)}</td>
                     <td className="px-2 py-2">
                       <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: FLAG_COLOR[r.flag] }}>
                         <span className="size-2 rounded-full" style={{ background: FLAG_COLOR[r.flag] }} />
                         {countdown(r)}
                       </span>
+                      <span className="mt-0.5 block text-2xs tabular-nums text-[var(--color-ink-faint)]">deadline {fmt(r.deadline)}</span>
                     </td>
                     <td className="px-2 py-2 align-top">
                       <WriterCell id={r.id} writerId={r.scriptWriterId} writerName={r.scriptWriterName} writerAvatar={r.scriptWriterAvatar} options={writerOptions} canWrite={canWrite} urgent={!r.done && r.daysToDeadline <= 7} />
@@ -248,20 +247,20 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                       <StatusPicker id={r.id} status={r.status} canWrite={canWrite} />
                     </td>
                     <td className="px-2 py-2 align-top">
+                      <PortalSendCell row={r} canWrite={canWrite} />
+                    </td>
+                    <td className="px-2 py-2 align-top">
                       <ScriptsCell row={r} />
                     </td>
                     <td className="px-2 py-2 align-top">
                       <NoteCell id={r.id} note={r.note} canWrite={canWrite} />
-                    </td>
-                    <td className="px-2 py-2 align-top">
-                      <PortalSendCell row={r} canWrite={canWrite} />
                     </td>
                   </tr>
                 ))}
               </Fragment>
             ))}
             {groups.length === 0 ? (
-              <tr><td colSpan={9} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
             ) : null}
           </tbody>
         </table>
