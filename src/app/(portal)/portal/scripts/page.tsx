@@ -4,7 +4,7 @@ import { ArrowRight, CalendarClock, CheckCircle2, Clock, FileText, MapPin, Messa
 import { requirePortal } from "@/server/auth/context";
 import { getPortalData } from "@/server/portal";
 import { getPortalSettingsForClient } from "@/server/portal-settings";
-import { CLIENT_ACTION_STATUSES, listPortalScriptReviews, SCRIPT_REVIEW_STATUS, type PortalReviewListItem } from "@/server/script-review";
+import { CLIENT_ACTION_STATUSES, listPortalScriptReviews, type PortalReviewListItem } from "@/server/script-review";
 import { ScriptLeeswijzer } from "@/components/portal/script-leeswijzer";
 import { Badge, buttonClass } from "@/components/ui";
 import { daysUntil, formatDateFull, relativeDays } from "@/lib/format";
@@ -12,13 +12,19 @@ import { daysUntil, formatDateFull, relativeDays } from "@/lib/format";
 export const metadata: Metadata = { title: "Scripts" };
 export const dynamic = "force-dynamic";
 
-// "warn" (actie nodig) tonen we in het portaal als navy i.p.v. oranje, gelijk
-// aan het interne platform (geen oranje in de huisstijl).
-const TONE: Record<string, "ink" | "info" | "good" | "neutral"> = { warn: "ink", info: "info", good: "good", neutral: "neutral" };
+// Statussen waarbij de klant iets moet doen vallen bewust op met de huisstijl-
+// oranje accentkleur; de rest houdt een rustige pil. Klantgerichte labels.
+const PORTAL_STATUS: Record<PortalReviewListItem["status"], { label: string; cls: string }> = {
+  klaar_controle:   { label: "Klaar voor controle",    cls: "bg-[#ff6a00] text-white" },
+  opnieuw_controle: { label: "Opnieuw ter controle",   cls: "bg-[#ff6a00] text-white" },
+  feedback_gegeven: { label: "Feedback ontvangen",     cls: "bg-[rgba(46,144,250,0.15)] text-[#1b6fe8]" },
+  wordt_aangepast:  { label: "Wordt aangepast",        cls: "bg-[rgba(46,144,250,0.15)] text-[#1b6fe8]" },
+  goedgekeurd:      { label: "Goedgekeurd door klant", cls: "bg-[rgba(47,210,122,0.18)] text-[#1d8a52]" },
+};
 
 function StatusBadge({ status }: { status: PortalReviewListItem["status"] }) {
-  const meta = SCRIPT_REVIEW_STATUS[status];
-  return <Badge tone={TONE[meta.tone]}>{meta.label}</Badge>;
+  const s = PORTAL_STATUS[status];
+  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-bold ${s.cls}`}>{s.label}</span>;
 }
 
 function fmtShootLine(r: { shootOn: string | null; shootTime: string | null; shootLocation: string | null }): string {

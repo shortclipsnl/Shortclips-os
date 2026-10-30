@@ -507,3 +507,33 @@ body {
   100% { transform: perspective(500px) rotateY(0deg) scale(1); }
 }
 @media (prefers-reduced-motion: reduce) { .award-reveal { animation: none; } }
+
+/* =========================================================================
+   Script-PDF tekstlaag (pdf.js) — maakt de tekst in de PDF selecteerbaar,
+   zodat de klant een specifieke zin kan aanstrepen en er feedback aan hangen.
+   De spans staan transparant exact over de gerenderde canvas; alleen de
+   selectie-markering is zichtbaar (huisstijl-oranje).
+   ========================================================================= */
+.sc-textlayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 2;
+  caret-color: transparent;
+}
+.sc-textlayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+}
+.sc-textlayer span.markedContent { top: 0; height: 0; }
+.sc-textlayer ::selection { background: rgba(255, 106, 0, 0.35); }
+.sc-textlayer br::selection { background: transparent; }

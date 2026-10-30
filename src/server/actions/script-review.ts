@@ -308,16 +308,23 @@ const commentSchema = z.object({
   posY: z.number().min(0).max(1).optional(),
 });
 
-/** Gedeeld: een klantopmerking plaatsen (algemeen of op een pagina/positie),
- *  de review op "feedback gegeven" zetten en de medewerker op de hoogte brengen. */
-async function createClientComment(viewer: Awaited<ReturnType<typeof requirePortal>>, input: z.infer<typeof commentSchema>): Promise<ActionResult> {
+/** Gedeeld: een klantopmerking OPSLAAN (algemeen of op een pagina/positie).
+ *  Plaatsen alleen = opslaan + tonen; de review-status verandert en het team
+ *  krijgt pas bericht wanneer de klant op "Feedback doorgeven" klikt (zie
+ *  submitScriptReviewFeedback). Zo plaatst de klant rustig meerdere opmerkingen
+ *  zonder dat elk puntje een losse melding oplevert. */
+async function createClientComment(
+  viewer: Awaited<ReturnType<typeof requirePortal>>,
+  input: z.infer<typeof commentSchema>,
+): Promise<ActionResult & { versionNumber?: number }> {
   const { reviewId, body, pageNumber, posX, posY } = input;
   const [review] = await db
-    .select({ id: scriptReviews.id, clientId: scriptReviews.clientId, currentVersion: scriptReviews.currentVersion })
+    .select({ id: scriptReviews.id, clientId: scriptReviews.clientId, currentVersion: scriptReviews.currentVersion, status: scriptReviews.status })
     .from(scriptReviews)
     .where(and(eq(scriptReviews.id, reviewId), eq(scriptReviews.clientId, viewer.clientId!), isNull(scriptReviews.deletedAt)))
     .limit(1);
   if (!review) return { ok: false, message: "Dit script is niet gevonden." };
+  if (review.status === "goedgekeurd") return { ok: false, message: "Dit script is al goedgekeurd." };
 
   const [thread] = await db
     .insert(scriptReviewThreads)
@@ -331,35 +338,14 @@ async function createClientComment(viewer: Awaited<ReturnType<typeof requirePort
     .returning({ id: scriptReviewThreads.id });
   await db.insert(scriptReviewComments).values({ threadId: thread!.id, body, authorUserId: viewer.id, authorName: viewer.fullName, isInternal: false });
 
-  // Alleen terug naar "feedback gegeven" zolang de review nog niet is goedgekeurd.
-  await db.update(scriptReviews).set({ status: "feedback_gegeven", updatedAt: new Date() })
-    .where(and(eq(scriptReviews.id, reviewId), sql`${scriptReviews.status} <> 'goedgekeurd'`));
-
-  await recordActivity({ clientId: review.clientId, type: "script_review.feedback", title: "Klant gaf feedback op de scripts", isClientVisible: false });
-  const staff = await clientStaff(review.clientId);
-  await notify({
-    roles: ["owner"],
-    userIds: staff.coordinatorId ? [staff.coordinatorId] : undefined,
-    clientId: review.clientId,
-    level: "warning",
-    type: "script_review_feedback",
-    title: `${staff.clientName} gaf feedback op de scripts`,
-    body: `${pageNumber ? `Pagina ${pageNumber}: ` : ""}${body}`.slice(0, 200),
-    href: `/scriptcontrole/${reviewId}`,
-    entityType: "script_review",
-    entityId: reviewId,
-    dedupeKey: `script_review_feedback:${reviewId}:${thread!.id}`,
-  });
-
   revalidatePath(`/portal/scripts/${reviewId}`);
-  revalidatePath("/portal/scripts");
   revalidatePath(`/scriptcontrole/${reviewId}`);
-  revalidatePath("/scriptcontrole");
-  return { ok: true };
+  return { ok: true, versionNumber: review.currentVersion };
 }
 
-/** Klant: algemene opmerking over de hele PDF. */
-export async function submitScriptReviewFeedback(input: { reviewId: string; body: string }): Promise<ActionResult> {
+/** Klant: opmerking opslaan (algemeen of op een plek/zin in de PDF). Verandert de
+ *  status NIET en stuurt geen melding — dat gebeurt bij "Feedback doorgeven". */
+export async function addScriptReviewComment(input: { reviewId: string; body: string; pageNumber?: number; posX?: number; posY?: number }): Promise<ActionResult> {
   try {
     const viewer = await requirePortal();
     const parsed = commentSchema.safeParse(input);
@@ -371,13 +357,68 @@ export async function submitScriptReviewFeedback(input: { reviewId: string; body
   }
 }
 
-/** Klant: opmerking op een specifieke plek in de PDF (pagina + positie). */
-export async function addScriptReviewComment(input: { reviewId: string; body: string; pageNumber: number; posX: number; posY: number }): Promise<ActionResult> {
+/**
+ * Klant: "Feedback doorgeven" — dient de geplaatste opmerkingen in. Optioneel met
+ * een afsluitende algemene notitie. Zet de status op "feedback gegeven" (in het
+ * portaal getoond als "Feedback ontvangen") en stuurt het team één melding.
+ */
+export async function submitScriptReviewFeedback(input: { reviewId: string; note?: string }): Promise<ActionResult> {
   try {
     const viewer = await requirePortal();
-    const parsed = commentSchema.safeParse(input);
-    if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Controleer je opmerking." };
-    return await createClientComment(viewer, parsed.data);
+    const reviewId = z.string().uuid().parse(input.reviewId);
+
+    const [review] = await db
+      .select({ id: scriptReviews.id, clientId: scriptReviews.clientId, currentVersion: scriptReviews.currentVersion, status: scriptReviews.status })
+      .from(scriptReviews)
+      .where(and(eq(scriptReviews.id, reviewId), eq(scriptReviews.clientId, viewer.clientId!), isNull(scriptReviews.deletedAt)))
+      .limit(1);
+    if (!review) return { ok: false, message: "Dit script is niet gevonden." };
+    if (review.status === "goedgekeurd") return { ok: false, message: "Dit script is al goedgekeurd." };
+
+    // Optionele afsluitende notitie als algemene opmerking opslaan.
+    const note = input.note?.trim();
+    if (note) {
+      await db.insert(scriptReviewThreads).values({
+        reviewId, versionNumber: review.currentVersion, pageNumber: null,
+        visibility: "client", createdById: viewer.id, authorName: viewer.fullName,
+      }).returning({ id: scriptReviewThreads.id }).then(async ([t]) => {
+        if (t) await db.insert(scriptReviewComments).values({ threadId: t.id, body: note, authorUserId: viewer.id, authorName: viewer.fullName, isInternal: false });
+      });
+    }
+
+    // Minstens één opmerking op de huidige versie vereist om in te dienen.
+    const [{ cnt }] = await db
+      .select({ cnt: sql<number>`count(*)::int` })
+      .from(scriptReviewThreads)
+      .where(and(eq(scriptReviewThreads.reviewId, reviewId), eq(scriptReviewThreads.versionNumber, review.currentVersion), eq(scriptReviewThreads.visibility, "client"), isNull(scriptReviewThreads.deletedAt)));
+    if (!cnt || cnt === 0) {
+      return { ok: false, message: "Plaats eerst een opmerking (of schrijf een notitie) voordat je feedback doorgeeft." };
+    }
+
+    await db.update(scriptReviews).set({ status: "feedback_gegeven", updatedAt: new Date() })
+      .where(and(eq(scriptReviews.id, reviewId), sql`${scriptReviews.status} <> 'goedgekeurd'`));
+
+    await recordActivity({ clientId: review.clientId, type: "script_review.feedback", title: "Klant gaf feedback op de scripts", isClientVisible: false });
+    const staff = await clientStaff(review.clientId);
+    await notify({
+      roles: ["owner"],
+      userIds: staff.coordinatorId ? [staff.coordinatorId] : undefined,
+      clientId: review.clientId,
+      level: "warning",
+      type: "script_review_feedback",
+      title: `${staff.clientName} gaf feedback op de scripts`,
+      body: `${cnt} opmerking${cnt === 1 ? "" : "en"} op versie ${review.currentVersion}. Bekijk en verwerk ze.`,
+      href: `/scriptcontrole/${reviewId}`,
+      entityType: "script_review",
+      entityId: reviewId,
+      dedupeKey: `script_review_feedback:${reviewId}:v${review.currentVersion}`,
+    });
+
+    revalidatePath(`/portal/scripts/${reviewId}`);
+    revalidatePath("/portal/scripts");
+    revalidatePath(`/scriptcontrole/${reviewId}`);
+    revalidatePath("/scriptcontrole");
+    return { ok: true };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
