@@ -290,8 +290,37 @@ body {
   color-scheme: light;
   min-height: 100vh;
   background: var(--color-canvas);
-  /* Hulp-tokens voor de portaalcomponenten, gekoppeld aan de huisstijl-tokens
-     (niet langer losse witte/donkere waarden). */
+  /* Lichte huisstijl-tokens EXPLICIET op het portaal zelf, zodat de portaal-
+     thema-schakelaar (data-portal-theme) onafhankelijk werkt van de interne
+     thema-stand (data-theme op :root). Zonder deze expliciete lichtwaarden erfde
+     het portaal in "licht" de interne tokens — stond de interne modus op donker,
+     dan bleef het portaal donker en leek de schakelaar niets te doen. */
+  --color-canvas: #efeeea;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f7f6f3;
+  --color-surface-2: #eceae4;
+  --color-neutral-soft: #f0efec;
+  --color-line: #e3e1db;
+  --color-line-strong: #cfccc4;
+  --color-ink: #00003b;
+  --color-ink-muted: #5b5b74;
+  --color-ink-faint: #6f6f82;
+  --color-indigo-ink: #00003b;
+  --color-indigo-deep: #000029;
+  --color-indigo-soft: #1a1a4c;
+  --color-indigo-mist: #2e2e63;
+  --color-brand-50: #e6f7ff;
+  --color-brand-100: #cceeff;
+  --color-good-soft: #e8f6f0;
+  --color-lime-soft: #f2f7e0;
+  --color-warn-soft: #fdf3e3;
+  --color-bad-soft: #fdeceb;
+  --color-info-soft: #e6f7ff;
+  --color-violet-soft: #efeaff;
+  --shadow-card: 0 1px 2px rgba(0, 0, 59, 0.04), 0 1px 3px rgba(0, 0, 59, 0.06);
+  --shadow-raised: 0 2px 4px rgba(0, 0, 59, 0.05), 0 8px 24px rgba(0, 0, 59, 0.08);
+  --shadow-pop: 0 8px 16px rgba(0, 0, 59, 0.08), 0 24px 48px rgba(0, 0, 59, 0.14);
+  /* Hulp-tokens voor de portaalcomponenten, gekoppeld aan de huisstijl-tokens. */
   --sc-accent: var(--color-brand-600);
   --sc-line: var(--color-line);
   --sc-fill: var(--color-surface-sunken);
