@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { desc } from "drizzle-orm";
+import { asc, desc, isNull } from "drizzle-orm";
 import {
   AlertCircle,
   CheckCircle2,
   CircleDashed,
 } from "lucide-react";
 import { db } from "@/db/client";
-import { syncJobs, integrationEvents } from "@/db/schema";
+import { clients, syncJobs, integrationEvents } from "@/db/schema";
 import { requireOwner } from "@/server/auth/context";
 import { integrationHealth } from "@/server/integrations/registry";
 import { appointmentReviewStats, unmatchedAppointments } from "@/server/appointments";
@@ -16,6 +16,7 @@ import { Badge, Card, CardHeader, EmptyState, PageHeader, Table } from "@/compon
 import { formatDateTime, relativeDays } from "@/lib/format";
 import { INTEGRATION_LABEL } from "@/lib/statuses";
 import { JobButton, TestButton } from "./actions-ui";
+import { AppointmentReview, type ReviewRow } from "./appointment-review";
 
 export const metadata: Metadata = { title: "Koppelingen" };
 export const dynamic = "force-dynamic";
@@ -58,11 +59,21 @@ export default async function IntegrationsPage() {
     }).from(integrationEvents).orderBy(desc(integrationEvents.receivedAt)).limit(15),
   ]);
 
-  const [agendaReview, agendaStats, agendaColors] = await Promise.all([
+  const [agendaReview, agendaStats, agendaColors, clientOptions] = await Promise.all([
     unmatchedAppointments(50),
     appointmentReviewStats(),
     calendarColorMap(),
+    db.select({ id: clients.id, name: clients.name }).from(clients).where(isNull(clients.deletedAt)).orderBy(asc(clients.name)),
   ]);
+
+  const reviewRows: ReviewRow[] = agendaReview.map((a) => ({
+    id: a.id,
+    title: a.title,
+    when: formatDateTime(a.startsAt),
+    calendarName: a.calendarName ?? null,
+    color: agendaColors.get(a.calendarId) ?? "var(--color-ink-faint)",
+    matchConfidence: a.matchConfidence,
+  }));
 
   return (
     <div className="mx-auto max-w-[1200px]">
@@ -298,43 +309,7 @@ export default async function IntegrationsPage() {
                 agendaStats.ambiguous ? ` (waarvan ${agendaStats.ambiguous} met meerdere mogelijke klanten)` : ""
               }${agendaStats.internal ? ` · ${agendaStats.internal} intern herkend (geen klant nodig)` : ""}.`}
         </p>
-        {agendaReview.length === 0 ? (
-          <div className="mt-4">
-            <EmptyState
-              title="Alles gekoppeld"
-              description="Elke gesynchroniseerde afspraak is aan een klant gekoppeld. Twijfelgevallen verschijnen hier — nooit stilletjes bij de verkeerde klant."
-            />
-          </div>
-        ) : (
-          <Table
-            head={
-              <>
-                <th className="sc-th">Afspraak</th>
-                <th className="sc-th">Wanneer</th>
-                <th className="sc-th">Agenda</th>
-                <th className="sc-th">Reden</th>
-              </>
-            }
-          >
-            {agendaReview.map((a) => (
-              <tr key={a.id}>
-                <td className="sc-td font-medium">{a.title ?? "(zonder titel)"}</td>
-                <td className="sc-td text-[var(--color-ink-muted)]">{formatDateTime(a.startsAt)}</td>
-                <td className="sc-td text-[var(--color-ink-muted)]">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2.5 shrink-0 rounded-full" style={{ background: agendaColors.get(a.calendarId) ?? "var(--color-ink-faint)" }} />
-                    {a.calendarName ?? "–"}
-                  </span>
-                </td>
-                <td className="sc-td">
-                  <Badge tone={a.matchConfidence === "ambiguous" ? "warn" : "neutral"}>
-                    {a.matchConfidence === "ambiguous" ? "meerdere mogelijk" : "geen klant herkend"}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
-          </Table>
-        )}
+        <AppointmentReview rows={reviewRows} clients={clientOptions} />
       </Card>
     </div>
   );

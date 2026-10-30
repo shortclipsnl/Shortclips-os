@@ -287,8 +287,14 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
             target: [calendarEvents.source, calendarEvents.calendarId, calendarEvents.externalId],
             set: {
               calendarName: sql`excluded.calendar_name`,
-              clientId: sql`excluded.client_id`,
-              kind: sql`excluded.kind`,
+              // Een handmatige koppeling (review → "koppel aan klant") blijft staan:
+              // de automatische matcher mag klant/soort van zo'n afspraak niet meer
+              // overschrijven, anders zou de uursync 'm terug op "geen klant" zetten.
+              clientId: sql`case when ${calendarEvents.matchConfidence} = 'manual' then ${calendarEvents.clientId} else excluded.client_id end`,
+              kind: sql`case when ${calendarEvents.matchConfidence} = 'manual' then ${calendarEvents.kind} else excluded.kind end`,
+              matchConfidence: sql`case when ${calendarEvents.matchConfidence} = 'manual' then 'manual' else excluded.match_confidence end`,
+              matchReason: sql`case when ${calendarEvents.matchConfidence} = 'manual' then ${calendarEvents.matchReason} else excluded.match_reason end`,
+              matchedBy: sql`case when ${calendarEvents.matchConfidence} = 'manual' then ${calendarEvents.matchedBy} else excluded.matched_by end`,
               title: sql`excluded.title`,
               description: sql`excluded.description`,
               location: sql`excluded.location`,
@@ -298,9 +304,6 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
               attendees: sql`excluded.attendees`,
               htmlLink: sql`excluded.html_link`,
               status: sql`excluded.status`,
-              matchConfidence: sql`excluded.match_confidence`,
-              matchReason: sql`excluded.match_reason`,
-              matchedBy: sql`excluded.matched_by`,
               candidates: sql`excluded.candidates`,
               syncedAt: sql`excluded.synced_at`,
               updatedAt: sql`excluded.updated_at`,
