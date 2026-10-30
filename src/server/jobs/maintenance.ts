@@ -2,11 +2,13 @@ import "server-only";
 import { and, eq, gte, inArray, isNull, lt, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
+  clientContacts,
   clients,
   contentCalendar,
   contracts,
   deliverables,
   invoices,
+  kostenRegels,
   productionDays,
   scripts,
   tasks,
@@ -688,6 +690,118 @@ export async function runFinanceMonthReminder() {
   return { period, sent };
 }
 
+const EUR = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+
+/**
+ * Wekelijkse financiële samenvatting (punt 6): elke maandagochtend rond 08:45
+ * (Amsterdam) een melding voor Jarno (owner) met de actuele bedrijfskosten uit de
+ * Kostenmonitor — totaal, nieuwe kosten, terugkerende (vaste) kosten en de meest
+ * opvallende wijziging t.o.v. de vorige maand. Werkt uitsluitend op daadwerkelijk
+ * beschikbare DigiBoox-gegevens (maand-aggregaat, bron Knab); toont wanneer die
+ * voor het laatst zijn bijgewerkt en meldt als een recente maand nog ontbreekt.
+ * Geen betalingen/overboekingen. Eén melding per week (dedupe). Twee cron-slots
+ * (06:45/07:45 UTC) + uurcheck → precies één keer rond 08:45 Amsterdam.
+ */
+export async function runFinanceWeeklySummary() {
+  return runJob("monday", "finance.weekly_summary", {}, async (ctx) => {
+    const now = new Date();
+    const weekday = now.toLocaleDateString("en-US", { weekday: "short", timeZone: "Europe/Amsterdam" });
+    const hhmm = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" });
+    const hour = Number(hhmm.slice(0, 2));
+    if (weekday !== "Mon" || hour !== 8) {
+      ctx.log(`Lokaal ${weekday} ${hhmm} (Amsterdam) — niet maandag 08:xx, overgeslagen.`);
+      return;
+    }
+
+    // Bedrijfskosten = alle groepen behalve controle/prive/belasting.
+    const BEDRIJF = sql`${kostenRegels.groep} in ('personeel','editors','freelancers','marketing','vast','operationeel')`;
+
+    // Maanden met data; we rapporteren over de laatst beschikbare maand.
+    const months = await db
+      .select({ maand: kostenRegels.maand })
+      .from(kostenRegels)
+      .groupBy(kostenRegels.maand)
+      .orderBy(sql`${kostenRegels.maand} desc`);
+    if (months.length === 0) {
+      ctx.log("Geen kostendata beschikbaar — samenvatting overgeslagen.");
+      return;
+    }
+    const reportMonth = months[0]!.maand;
+    const prevMonth = months[1]?.maand ?? null;
+    const currentMonth = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" }).slice(0, 7);
+
+    const sumFor = async (maand: string, extra?: ReturnType<typeof sql>) => {
+      const [row] = await db
+        .select({ total: sql<number>`coalesce(sum(${kostenRegels.metBtw}), 0)::float` })
+        .from(kostenRegels)
+        .where(and(eq(kostenRegels.maand, maand), BEDRIJF, ...(extra ? [extra] : [])));
+      return row?.total ?? 0;
+    };
+
+    const total = await sumFor(reportMonth);
+    const vast = await sumFor(reportMonth, sql`${kostenRegels.soort} = 'vast'`);
+    const prevTotal = prevMonth ? await sumFor(prevMonth) : 0;
+
+    // Nieuwe leveranciers: komen in de rapportagemaand voor, maar in geen enkele
+    // eerdere maand (bedrijfskosten).
+    const nieuw = await db.execute(sql`
+      select coalesce(sum(r.met_btw), 0)::float as bedrag, count(*)::int as aantal
+      from kosten_regels r
+      where r.maand = ${reportMonth}
+        and r.groep in ('personeel','editors','freelancers','marketing','vast','operationeel')
+        and not exists (
+          select 1 from kosten_regels p
+          where lower(p.leverancier) = lower(r.leverancier)
+            and p.maand < ${reportMonth}
+            and p.groep in ('personeel','editors','freelancers','marketing','vast','operationeel')
+        )`);
+    const nieuwRow = (((nieuw as { rows?: unknown[] }).rows ?? (nieuw as unknown as unknown[]))[0] ?? { bedrag: 0, aantal: 0 }) as { bedrag: number; aantal: number };
+
+    const [upd] = await db.select({ last: sql<string | null>`max(${kostenRegels.bijgewerkt})::text` }).from(kostenRegels);
+    const lastUpdated = upd?.last ? nlDateLong(upd.last) : "onbekend";
+
+    const deltaPct = prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : null;
+    const deltaTxt =
+      deltaPct === null
+        ? "geen vergelijkbare vorige maand beschikbaar"
+        : `${deltaPct > 0 ? "+" : ""}${deltaPct}% t.o.v. ${nlMonthName(prevMonth!)} (${EUR.format(total)} vs ${EUR.format(prevTotal)})`;
+
+    // Eerlijke datanoot: ontbreekt de lopende maand nog, zeg dat erbij.
+    const missingNote =
+      reportMonth < currentMonth
+        ? `Let op: de gegevens van ${nlMonthName(currentMonth)} zijn nog niet geïmporteerd — dit overzicht gaat over ${nlMonthName(reportMonth)}. `
+        : "";
+
+    const body =
+      `Goedemorgen Jarno,\n\n` +
+      `Je financiële overzicht is bijgewerkt op basis van de laatst beschikbare gegevens (${nlMonthName(reportMonth)}).\n\n` +
+      `Totale bedrijfskosten: ${EUR.format(total)}\n` +
+      `Nieuwe geregistreerde kosten: ${EUR.format(nieuwRow.bedrag)} (${nieuwRow.aantal} nieuwe ${nieuwRow.aantal === 1 ? "leverancier" : "leveranciers"})\n` +
+      `Terugkerende (vaste) kosten: ${EUR.format(vast)}\n` +
+      `Opvallende wijziging: ${deltaTxt}\n\n` +
+      `${missingNote}Laatst bijgewerkt uit DigiBoox: ${lastUpdated}. (Revolut staat niet in DigiBoox — alleen Knab wordt meegenomen.)`;
+
+    const sent = await notify({
+      roles: ["owner"],
+      type: "finance_weekly_summary",
+      level: "info",
+      title: "Financiële update Shortclips",
+      body,
+      href: "/kosten",
+      dedupeKey: `finance_weekly:${mondayIso()}`,
+    });
+    ctx.counters.updated += sent;
+    ctx.log(`Financiële weeksamenvatting verstuurd (${sent}) over ${reportMonth}: totaal ${EUR.format(total)}`);
+  });
+}
+
+/** Maandnaam + jaar in het Nederlands uit een YYYY-MM-string, bv. "oktober 2026". */
+function nlMonthName(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  if (!y || !m) return period;
+  return new Date(y, m - 1, 1).toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
+}
+
 /** Maandag van de huidige week (voor wekelijkse dedupe). */
 function mondayIso(): string {
   const d = new Date();
@@ -1025,9 +1139,11 @@ export async function recordDeadlinePerformance() {
 async function ensureTask(input: {
   clientId: string | null;
   title: string;
+  description?: string | null;
   assigneeId: string | null;
   dueOn: string | null;
   priority?: "normal" | "high" | "urgent";
+  category?: "scripting" | "klantcontact" | "overig";
   entityType: string;
   entityId: string;
   dedupeKey: string;
@@ -1043,9 +1159,11 @@ async function ensureTask(input: {
     .values({
       clientId: input.clientId,
       title: input.title,
+      description: input.description ?? null,
       assigneeId: input.assigneeId,
       dueOn: input.dueOn,
       priority: input.priority ?? "normal",
+      category: input.category ?? "overig",
       status: "todo",
       entityType: input.entityType,
       entityId: input.entityId,
@@ -1105,23 +1223,47 @@ export async function runScriptTodoReminders() {
   });
 }
 
+/** Datum (YYYY-MM-DD) netjes in het Nederlands, bv. "12 december". */
+function nlDateLong(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(y, m - 1, d).toLocaleDateString("nl-NL", { day: "numeric", month: "long" });
+}
+
 /**
- * Na-opname-herinnering als to-do: voor opnames van de afgelopen 2 dagen krijgt
- * de verantwoordelijke coördinator een to-do "stuur de klant een berichtje over
- * de editing". Eén open taak per opname (dedupe).
+ * Na-opname-melding (punt 4): elke werkdagochtend om 08:45 (Amsterdam) controleert
+ * deze job welke opnames er GISTEREN waren, en zet per klant:
+ *  - een taak (klantcontact) met een kant-en-klaar voorbeeldbericht voor de
+ *    contactpersoon, inclusief een realistische verwachte-updatedatum (opname +
+ *    14 werkdagen) — afvinkbaar, met de klant eraan gekoppeld;
+ *  - een melding voor Milou en Jiska zodat duidelijk is dat dit opgepakt moet
+ *    worden (wie 'm oppakt bepalen ze zelf).
+ * Eén taak + melding per klant per opnamedag (dedupe) — geen dubbele berichten.
+ * Twee cron-slots (06:45/07:45 UTC) + de uurcheck laten dit precies één keer
+ * rond 08:45 Amsterdam doorkomen (zomer- en wintertijd).
  */
-export async function runPostShootTodoReminders() {
-  return runJob("monday", "reminders.post_shoot_todo", {}, async (ctx) => {
+export async function runPostShootReminder() {
+  return runJob("monday", "reminders.post_shoot", {}, async (ctx) => {
+    const now = new Date();
+    const weekday = now.toLocaleDateString("en-US", { weekday: "short", timeZone: "Europe/Amsterdam" });
+    const hhmm = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" });
+    const hour = Number(hhmm.slice(0, 2));
+    if (weekday === "Sat" || weekday === "Sun" || hour !== 8) {
+      ctx.log(`Lokaal ${weekday} ${hhmm} (Amsterdam) — niet op een werkdag rond 08:xx, overgeslagen.`);
+      return;
+    }
+
     const today = day(0);
-    const from = day(-2);
-    const rows = await db
+    const yesterday = day(-1);
+
+    // Opnames van gisteren (per klant). Dedup op klant: één bericht per klant,
+    // ook als er meerdere opnamedagen op dezelfde dag staan.
+    const shoots = await db
       .select({
         id: productionDays.id,
-        scheduledOn: productionDays.scheduledOn,
         clientId: productionDays.clientId,
         clientName: clients.name,
-        coordA: productionDays.coordinatorId,
-        coordB: clients.coordinatorId,
+        clientSlug: clients.slug,
       })
       .from(productionDays)
       .innerJoin(clients, eq(clients.id, productionDays.clientId))
@@ -1129,24 +1271,78 @@ export async function runPostShootTodoReminders() {
         and(
           isNull(productionDays.deletedAt),
           ne(productionDays.status, "cancelled"),
-          gte(productionDays.scheduledOn, from),
-          lte(productionDays.scheduledOn, today),
+          eq(productionDays.scheduledOn, yesterday),
         ),
       );
-    for (const r of rows) {
+
+    // Ontvangers: Milou en Jiska (projectcoördinatoren). Vast op e-mail zodat het
+    // onafhankelijk van rol werkt.
+    const pms = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          isNull(users.deletedAt),
+          eq(users.status, "active"),
+          inArray(sql`lower(${users.email})`, ["milou@shortclips.nl", "jiska@shortclips.nl"]),
+        ),
+      );
+    const pmIds = pms.map((p) => p.id);
+
+    const seenClients = new Set<string>();
+    const holidays = nlHolidaySet();
+    const updateDate = nlDateLong(addWorkingDays(yesterday, 14, holidays));
+
+    for (const s of shoots) {
+      if (seenClients.has(s.clientId)) continue;
+      seenClients.add(s.clientId);
       ctx.counters.processed++;
+
+      // Primaire contactpersoon van de klant → voornaam voor de aanhef.
+      const [contact] = await db
+        .select({ fullName: clientContacts.fullName })
+        .from(clientContacts)
+        .where(and(eq(clientContacts.clientId, s.clientId), eq(clientContacts.isPrimary, true)))
+        .limit(1);
+      const firstName = contact?.fullName?.trim().split(/\s+/)[0] ?? "[voornaam]";
+
+      const message =
+        `Hey ${firstName},\n\n` +
+        `De opname van gisteren zit erop! We gaan nu met de beelden aan de slag en starten met de editing.\n\n` +
+        `We houden je uiteraard op de hoogte van de voortgang. Je kunt rond ${updateDate} weer een update van ons verwachten.\n\n` +
+        `Mocht er tussentijds iets zijn, dan mag je ons natuurlijk altijd een berichtje sturen!`;
+
       const created = await ensureTask({
-        clientId: r.clientId,
-        title: `Stuur ${r.clientName} een berichtje over de editing (opname ${r.scheduledOn})`,
-        assigneeId: r.coordA ?? r.coordB ?? null,
+        clientId: s.clientId,
+        title: `Bericht naar ${s.clientName} — opname afgerond`,
+        description: message,
+        assigneeId: null, // Milou én Jiska zien 'm; wie oppakt bepalen ze zelf.
         dueOn: today,
         priority: "normal",
-        entityType: "production_day",
-        entityId: r.id,
-        dedupeKey: `postshoot_msg:${r.id}`,
+        category: "klantcontact",
+        entityType: "client",
+        entityId: s.clientId,
+        // Bewust een ándere sleutel dan 'postshoot_msg:%' (de oude, opgeruimde
+        // automatisering) zodat deze taak blijft staan.
+        dedupeKey: `post_shoot_contact:${s.clientId}:${yesterday}`,
       });
+
+      if (pmIds.length) {
+        await notify({
+          userIds: pmIds,
+          clientId: s.clientId,
+          type: "post_shoot_contact",
+          level: "info",
+          title: `Opname gisteren afgerond: ${s.clientName}`,
+          body: `Stuur ${firstName !== "[voornaam]" ? firstName : "de contactpersoon"} vandaag een persoonlijk bericht dat de opname goed ging en dat we met de editing starten. Voorbeeldbericht staat klaar bij je taken.`,
+          href: "/tasks?persoon=algemeen",
+          entityType: "client",
+          entityId: s.clientId,
+          dedupeKey: `post_shoot_contact:${s.clientId}:${yesterday}`,
+        });
+      }
       if (created) ctx.counters.updated++;
     }
-    ctx.log(`${ctx.counters.updated} na-opname-to-do's aangemaakt`);
+    ctx.log(`${ctx.counters.updated} na-opname-berichten (taak + melding) aangemaakt voor opnames van ${yesterday}`);
   });
 }

@@ -15,6 +15,7 @@ import { listEditingProjects, type EditingProject } from "@/server/editing-board
 import { PostingToggle } from "./posting-toggle";
 import { ResultsToggle } from "./results-toggle";
 import { ScriptHistory } from "./script-history";
+import { IntegrationNotice } from "@/components/integration-notice";
 import { FilesBrowser } from "./files-browser";
 import { ClientPortalLogin } from "./portal-login";
 import { ClientFrameLink } from "./frame-link";
@@ -234,6 +235,14 @@ export default async function ClientPage({
       <Suspense fallback={null}>
         <ClientTabs tabs={tabs} />
       </Suspense>
+
+      {/* Duidelijke melding als een centrale koppeling (Drive/Frame.io) niet
+          beschikbaar is — zo weten medewerkers waarom bestanden/video's ontbreken
+          i.p.v. een stil-lege lijst. Verborgen zolang alles gezond is. */}
+      <div className="mt-3 space-y-2 empty:hidden">
+        <IntegrationNotice provider="google_drive" isOwner={isOwnerViewer} what="documenten en scripts" />
+        <IntegrationNotice provider="frameio" isOwner={isOwnerViewer} what="video's en versies" />
+      </div>
 
       {active === "overzicht" ? (
         <div className="space-y-5">

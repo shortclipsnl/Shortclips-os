@@ -97,3 +97,16 @@ export async function markRead(userId: string, ids?: string[]) {
       ),
     );
 }
+
+/**
+ * Een melding "oplossen": alle meldingen met deze dedupe-sleutel verwijderen,
+ * ongeacht ontvanger. Gebruikt wanneer de aanleiding voor een melding wegvalt —
+ * bv. een script dat niet meer op "Controle Jarno" staat — zodat de melding
+ * verdwijnt i.p.v. te blijven hangen. Verwijderen (niet alleen "gelezen" zetten)
+ * is hier bewust: door de unieke constraint (userId, dedupeKey) zou een nog
+ * bestaande rij een nieuwe melding blokkeren als dezelfde situatie later terugkeert.
+ */
+export async function clearByDedupe(dedupeKey: string): Promise<void> {
+  if (!dedupeKey) return;
+  await db.delete(notifications).where(eq(notifications.dedupeKey, dedupeKey));
+}

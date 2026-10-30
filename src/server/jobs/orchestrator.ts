@@ -103,8 +103,9 @@ export async function runNightlySync() {
   // coördinator + overbelasting-melding voor de eigenaar (na alle signalen hierboven).
   results.push(await step("content_health.signals", () => runContentHealthSignals()));
   results.push(await step("reminders.script_todo", () => runScriptTodoReminders()));
-  // (reminders.post_shoot_todo — "stuur <klant> een berichtje over de editing" — op
-  //  verzoek uitgezet: te veel dagelijkse ruis op het Taken-overzicht.)
+  // De oude, rumoerige "reminders.post_shoot_todo" is vervangen door de gerichte
+  // reminders.post_shoot-job (eigen cron, 08:45 werkdagen, alleen Milou/Jiska, met
+  // kant-en-klaar bericht per klant) — die draait dus niet via deze orchestrator.
   // Herinnering aan klanten met scripts die nog ter controle staan (dedupe per week).
   results.push(await step("reminders.script_review", () => runScriptReviewReminders()));
   // Als laatste: een volledige database-backup naar Google Drive.

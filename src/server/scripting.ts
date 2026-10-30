@@ -220,8 +220,10 @@ export async function listScripting(viewer: Viewer) {
   const clientOptions = [...new Set(list.map((r) => r.clientName))].sort();
 
   // Verantwoordelijken die scripts schrijven: het vaste kernteam (Jarno, Milou,
-  // Jiska), ongeacht hun exacte rol — behalve de videograaf (Rutger). Zo staat
-  // Jiska er altijd bij, ook als haar rol afwijkt.
+  // Jiska), ongeacht hun exacte rol — behalve de videograaf. Rutger schrijft geen
+  // scripts; hij staat als "Head of Content" wél in het kernteam maar heeft rol
+  // content_creator (niet videographer), dus sluiten we hem hier expliciet op
+  // e-mail uit. Zo staat Jiska er altijd bij, ook als haar rol afwijkt.
   const writerOptions: WriterOption[] = (
     await db
       .select({ id: users.id, fullName: users.fullName, email: users.email, avatarUrl: users.avatarUrl })
@@ -232,6 +234,7 @@ export async function listScripting(viewer: Viewer) {
           eq(users.status, "active"),
           sql`lower(${users.email}) in (${sql.join(CORE_STAFF_EMAILS.map((e) => sql`${e}`), sql`, `)})`,
           ne(users.primaryRole, "videographer"),
+          sql`lower(${users.email}) <> 'rutger@shortclips.nl'`,
         ),
       )
   )

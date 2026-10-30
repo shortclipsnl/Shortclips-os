@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Loader2, Plus, Trash2 } from "lucide-react";
+import { Check, Copy, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { createTask, createTasksBulk, deleteTask, setTaskStatus, updateTask } from "@/server/actions/tasks";
 import { Button, ClientLogo, ErrorNote, TeamAvatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -46,6 +46,7 @@ export type ClientOption = { id: string; name: string };
 export type TaskItemData = {
   id: string;
   title: string;
+  description: string | null;
   status: string;
   priority: string;
   category: string;
@@ -232,6 +233,16 @@ export function TaskItem({
   const [justDone, setJustDone] = useState(false);
   const [optimisticDone, setOptimisticDone] = useState(false);
   const [celebration, setCelebration] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [editErr, setEditErr] = useState<string | null>(null);
+  // Bewerkvelden — voorgevuld met de huidige taakgegevens.
+  const [eTitle, setETitle] = useState(task.title);
+  const [eDesc, setEDesc] = useState(task.description ?? "");
+  const [eDue, setEDue] = useState(task.dueOn ?? "");
+  const [eAssignee, setEAssignee] = useState(task.assigneeId ?? "");
+  const [ePriority, setEPriority] = useState(task.priority);
+  const [eCategory, setECategory] = useState(task.category);
   const router = useRouter();
   const done = task.status === "done" || optimisticDone;
 
@@ -240,6 +251,40 @@ export function TaskItem({
       await fn();
       router.refresh();
     });
+  }
+
+  function openEdit() {
+    // Altijd vanaf de actuele taakgegevens starten.
+    setETitle(task.title);
+    setEDesc(task.description ?? "");
+    setEDue(task.dueOn ?? "");
+    setEAssignee(task.assigneeId ?? "");
+    setEPriority(task.priority);
+    setECategory(task.category);
+    setEditErr(null);
+    setEditing(true);
+  }
+
+  function saveEdit() {
+    if (!eTitle.trim()) { setEditErr("Geef de taak een titel."); return; }
+    start(async () => {
+      const res = await updateTask(task.id, {
+        title: eTitle.trim(),
+        description: eDesc.trim() || null,
+        dueOn: eDue || null,
+        assigneeId: eAssignee || null,
+        priority: ePriority as "normal",
+        category: eCategory as "overig",
+      });
+      if (res.ok) { setEditing(false); router.refresh(); }
+      else setEditErr(res.message ?? "Opslaan mislukt.");
+    });
+  }
+
+  async function copyDescription() {
+    if (!task.description) return;
+    try { await navigator.clipboard.writeText(task.description); setCopied(true); setTimeout(() => setCopied(false), 1500); }
+    catch { /* klembord niet beschikbaar */ }
   }
 
   function toggleDone() {
@@ -267,7 +312,8 @@ export function TaskItem({
   }
 
   return (
-    <li className="relative flex flex-wrap items-center gap-3 px-4 py-2.5">
+    <li className="relative px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-3">
       {celebration ? (
         <span className="pointer-events-none absolute left-9 top-0 z-10 -translate-y-1.5 whitespace-nowrap rounded-full bg-[var(--color-good)] px-2.5 py-1 text-xs font-semibold text-white shadow-[var(--shadow-raised)] [animation:scNotifIn_.2s_ease-out]">
           {celebration}
@@ -353,6 +399,17 @@ export function TaskItem({
           <button
             type="button"
             disabled={pending}
+            onClick={() => (editing ? setEditing(false) : openEdit())}
+            className="shrink-0 rounded p-1.5 text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]"
+            aria-label={editing ? "Bewerken sluiten" : "Taak bewerken"}
+            title={editing ? "Bewerken sluiten" : "Taak bewerken"}
+          >
+            {editing ? <X className="size-4" /> : <Pencil className="size-4" />}
+          </button>
+
+          <button
+            type="button"
+            disabled={pending}
             onClick={() => run(() => deleteTask(task.id))}
             className="shrink-0 rounded p-1.5 text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-bad)]"
             aria-label="Taak verwijderen"
@@ -365,6 +422,70 @@ export function TaskItem({
           {PRIORITIES.find((p) => p.value === task.priority)?.label}
         </span>
       )}
+      </div>
+
+      {/* Beschrijving (bv. het voorbeeldbericht bij een na-opname-taak) met een
+          kopieerknop — zichtbaar zolang je niet aan het bewerken bent. */}
+      {task.description && !editing ? (
+        <div className="mt-2 ml-9 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-2.5">
+          <p className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--color-ink-muted)]">{task.description}</p>
+          <button
+            type="button"
+            onClick={copyDescription}
+            className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[var(--color-surface)] px-2.5 py-1 text-2xs font-semibold text-[var(--color-ink)] ring-1 ring-[var(--color-line)] hover:brightness-95"
+          >
+            {copied ? <><Check className="size-3 text-[var(--color-good)]" /> Gekopieerd</> : <><Copy className="size-3" /> Kopieer bericht</>}
+          </button>
+        </div>
+      ) : null}
+
+      {/* Bewerkformulier — voorgevuld, wijzigt de bestaande taak direct. */}
+      {editing && canWrite ? (
+        <div className="mt-2 ml-9 space-y-2 rounded-[var(--radius-md)] border border-[var(--color-line-strong)] bg-[var(--color-surface-2)] p-3">
+          <div>
+            <label className="mb-0.5 block text-2xs font-medium text-[var(--color-ink-faint)]">Titel</label>
+            <input className="sc-input w-full" value={eTitle} onChange={(e) => setETitle(e.target.value)} placeholder="Titel van de taak" />
+          </div>
+          <div>
+            <label className="mb-0.5 block text-2xs font-medium text-[var(--color-ink-faint)]">Beschrijving</label>
+            <textarea className="sc-input w-full resize-y text-sm leading-relaxed" rows={3} value={eDesc} onChange={(e) => setEDesc(e.target.value)} placeholder="Extra toelichting (optioneel)" />
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div>
+              <label className="mb-0.5 block text-2xs font-medium text-[var(--color-ink-faint)]">Deadline</label>
+              <input className="sc-input w-40" type="date" value={eDue} onChange={(e) => setEDue(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-2xs font-medium text-[var(--color-ink-faint)]">Verantwoordelijke</label>
+              <select className="sc-input w-40" value={eAssignee} onChange={(e) => setEAssignee(e.target.value)}>
+                <option value="">Algemeen</option>
+                {users.map((u) => (<option key={u.id} value={u.id}>{u.fullName}</option>))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-0.5 block text-2xs font-medium text-[var(--color-ink-faint)]">Prioriteit</label>
+              <select className="sc-input w-28" value={ePriority} onChange={(e) => setEPriority(e.target.value)}>
+                {PRIORITIES.map((p) => (<option key={p.value} value={p.value}>{p.label}</option>))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-0.5 block text-2xs font-medium text-[var(--color-ink-faint)]">Soort</label>
+              <select className="sc-input w-36" value={eCategory} onChange={(e) => setECategory(e.target.value)}>
+                {TASK_CATEGORIES.map((c) => (<option key={c.value} value={c.value}>{c.label}</option>))}
+              </select>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={saveEdit} disabled={pending || !eTitle.trim()}>
+              {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Opslaan
+            </Button>
+            <button type="button" onClick={() => setEditing(false)} className="rounded-[var(--radius-sm)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+              Annuleren
+            </button>
+          </div>
+          {editErr ? <ErrorNote>{editErr}</ErrorNote> : null}
+        </div>
+      ) : null}
     </li>
   );
 }

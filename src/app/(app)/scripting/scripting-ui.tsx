@@ -106,9 +106,9 @@ const FLAG_COLOR: Record<string, string> = {
   done: "var(--color-good)",
 };
 
-export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, defaultFilter }: { rows: ScriptingRow[]; clientOptions: string[]; writerOptions: WriterOption[]; canWrite: boolean; defaultFilter?: string }) {
+export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, defaultFilter, defaultStatus }: { rows: ScriptingRow[]; clientOptions: string[]; writerOptions: WriterOption[]; canWrite: boolean; defaultFilter?: string; defaultStatus?: string }) {
   const [filter, setFilter] = useState<string>(FILTERS.some((f) => f.key === defaultFilter) ? defaultFilter! : "alle");
-  const [status, setStatus] = useState<string>("alle");
+  const [status, setStatus] = useState<string>((SCRIPTING_ORDER as readonly string[]).includes(defaultStatus ?? "") ? defaultStatus! : "alle");
   const [client, setClient] = useState<string>("alle");
   // Filter op scriptschrijver via de profielfoto's bovenaan (Milou / Jarno / Jiska).
   const [writer, setWriter] = useState<string>("alle");

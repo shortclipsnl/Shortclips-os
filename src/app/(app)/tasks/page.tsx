@@ -72,6 +72,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       .select({
         id: tasks.id,
         title: tasks.title,
+        description: tasks.description,
         status: tasks.status,
         priority: tasks.priority,
         category: tasks.category,

@@ -80,6 +80,7 @@ const TASK_CATEGORIES = ["scripting", "klantcontact", "overig"] as const;
 
 const createSchema = z.object({
   title: z.string().trim().min(1, "Geef de taak een titel.").max(240),
+  description: z.string().trim().max(2000).nullish(),
   clientId: z.string().uuid().nullish(),
   assigneeId: z.string().uuid().nullish(),
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
@@ -141,6 +142,7 @@ export async function createTask(input: z.input<typeof createSchema>): Promise<A
 
     const [created] = await db.insert(tasks).values({
       title: parsed.data.title,
+      description: parsed.data.description || null,
       clientId: parsed.data.clientId ?? null,
       assigneeId: parsed.data.assigneeId ?? null,
       priority: parsed.data.priority,
@@ -163,6 +165,7 @@ export async function createTask(input: z.input<typeof createSchema>): Promise<A
 
 const updateSchema = z.object({
   title: z.string().trim().min(1).max(240).optional(),
+  description: z.string().trim().max(2000).nullable().optional(),
   assigneeId: z.string().uuid().nullable().optional(),
   priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
   category: z.enum(TASK_CATEGORIES).optional(),
@@ -188,6 +191,7 @@ export async function updateTask(
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (parsed.data.title !== undefined) patch.title = parsed.data.title;
+    if (parsed.data.description !== undefined) patch.description = parsed.data.description || null;
     if (parsed.data.assigneeId !== undefined) patch.assigneeId = parsed.data.assigneeId;
     if (parsed.data.priority !== undefined) patch.priority = parsed.data.priority;
     if (parsed.data.category !== undefined) patch.category = parsed.data.category;

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { requirePermission } from "@/server/auth/context";
+import { requireOwner } from "@/server/auth/context";
 import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Table, TeamAvatar } from "@/components/ui";
 import { euro } from "@/lib/format";
 import { VG_DAY, VG_MAX_HOURS, VG_RATE } from "@/lib/videographer-cost";
@@ -70,7 +70,8 @@ function ExpectedBlock({ title, badge, data }: { title: string; badge?: string; 
 // zodat editkosten en winstgevendheid exact dezelfde cijfers gebruiken.
 
 export default async function EditCostsPage({ searchParams }: { searchParams: Promise<{ maand?: string }> }) {
-  await requirePermission("finance:read");
+  // Financieel = uitsluitend de eigenaar (Jarno), ook niet via een directe link.
+  await requireOwner();
   const sp = await searchParams;
 
   // Maandoverzicht: winst per maand over alle klanten (uit de maandstaten).

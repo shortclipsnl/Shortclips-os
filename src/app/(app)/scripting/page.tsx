@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarClock, FileClock, AlarmClock, AlertTriangle, ShieldCheck } from "lucide-react";
-import { requireInternal } from "@/server/auth/context";
+import { requireInternal, isOwner } from "@/server/auth/context";
 import { listScripting } from "@/server/scripting";
 import { upcomingScriptAppointments } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { Card, CardHeader, ClientLogo, GuidelineNote, PageHeader, Stat, TeamAvatar } from "@/components/ui";
+import { IntegrationNotice } from "@/components/integration-notice";
 import { ScriptingBoard } from "./scripting-ui";
 
 export const metadata: Metadata = { title: "Scripting" };
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 // De batch-generator (6 concepten) doet meerdere AI-aanroepen; ruim de tijd geven.
 export const maxDuration = 300;
 
-export default async function ScriptingPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
+export default async function ScriptingPage({ searchParams }: { searchParams: Promise<{ filter?: string; status?: string }> }) {
   const viewer = await requireInternal();
   // Scripting leest dezelfde opnames (production_days) als de opnameplanning, dus
   // ook hier de Google Agenda op de achtergrond verversen als 'ie >20 min oud is.
@@ -25,7 +26,11 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
   // Scriptverantwoordelijke per klant (slug → naam/foto), om bij elke script
   // meeting automatisch te tonen wie die doet.
   const respBySlug = new Map((clientResponsibles ?? []).map((c) => [c.clientSlug, { name: c.responsibleName, avatar: c.responsibleAvatar }]));
-  const filter = (await searchParams).filter;
+  const sp = await searchParams;
+  const filter = sp.filter;
+  // Deep-link vanuit de controle-melding: open direct gefilterd op een status
+  // (bv. "Controle Jarno"), zodat Jarno in één overzicht alles ziet dat wacht.
+  const statusFilter = sp.status;
 
   return (
     <div className="mx-auto max-w-[1200px]">
@@ -38,6 +43,12 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
           </Link>
         ) : undefined}
       />
+
+      {/* Duidelijke melding als de Drive-koppeling (bron van de script-PDF's)
+          niet beschikbaar is — zodat "geen scripts" niet voor verwarring zorgt. */}
+      <div className="mb-4 empty:hidden">
+        <IntegrationNotice provider="google_drive" isOwner={isOwner(viewer)} what="scripts uit Drive" />
+      </div>
 
       {/* Klikbare statusblokken: openen direct de bijbehorende filter hieronder. */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -99,7 +110,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
 
       {/* key op de actieve filter: zo herstart het board met de juiste filter
           zodra je op een blok bovenin klikt (anders blijft de begin-filter staan). */}
-      <ScriptingBoard key={filter ?? "alle"} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} />
+      <ScriptingBoard key={`${filter ?? "alle"}:${statusFilter ?? "alle"}`} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} defaultStatus={statusFilter} />
 
       {/* Vaste verantwoordelijke per klant — zodat in één oogopslag duidelijk is
           wie standaard de scripts van welke klant op zich neemt. Deze persoon

@@ -16,6 +16,10 @@
     { "path": "/api/jobs/run?job=reminders.cleaning_friday&slot=zomer", "schedule": "0 13 * * 5" },
     { "path": "/api/jobs/run?job=reminders.cleaning_friday&slot=winter", "schedule": "0 14 * * 5" },
     { "path": "/api/jobs/run?job=finance.month_reminder", "schedule": "0 8 28 * *" },
+    { "path": "/api/jobs/run?job=finance.weekly_summary&slot=zomer", "schedule": "45 6 * * 1" },
+    { "path": "/api/jobs/run?job=finance.weekly_summary&slot=winter", "schedule": "45 7 * * 1" },
+    { "path": "/api/jobs/run?job=reminders.post_shoot&slot=zomer", "schedule": "45 6 * * *" },
+    { "path": "/api/jobs/run?job=reminders.post_shoot&slot=winter", "schedule": "45 7 * * *" },
     { "path": "/api/jobs/run?job=leads.sync_mailbox", "schedule": "0 7-20 * * *" }
   ]
 }

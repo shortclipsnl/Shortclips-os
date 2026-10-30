@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
-import { runCleaningFridayReminder, runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runDailyTeamTodoReminder, runEditorDeadlineReminders, runEditorEscalations, recordDeadlinePerformance, runEditorFridayWrapUp, runFinanceMonthReminder, runHourlySignals, runPostShootTodoReminders, runScriptTodoReminders, runTaskDeadlineReminders, runVrijdagcheckNotification } from "@/server/jobs/maintenance";
+import { runCleaningFridayReminder, runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runDailyTeamTodoReminder, runEditorDeadlineReminders, runEditorEscalations, recordDeadlinePerformance, runEditorFridayWrapUp, runFinanceMonthReminder, runFinanceWeeklySummary, runHourlySignals, runPostShootReminder, runScriptTodoReminders, runTaskDeadlineReminders, runVrijdagcheckNotification } from "@/server/jobs/maintenance";
 import { runGoalsRecompute, runGoalsSeed } from "@/server/jobs/goals-job";
 import { runAwardsRecompute } from "@/server/jobs/awards-job";
 import { runMeetingsRollOver } from "@/server/jobs/meetings-roll-over";
@@ -62,7 +62,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "signals.clients_without_shoot": runClientsWithoutShootSignal,
   "signals.content_gap": runContentGapSignal,
   "reminders.script_todo": runScriptTodoReminders,
-  "reminders.post_shoot_todo": runPostShootTodoReminders,
+  "reminders.post_shoot": runPostShootReminder,
   "reminders.daily_todo": runDailyTeamTodoReminder,
   "reminders.editor_friday_wrapup": runEditorFridayWrapUp,
   "reminders.cleaning_friday": runCleaningFridayReminder,
@@ -72,6 +72,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "meetings.roll_over": runMeetingsRollOver,
   "vrijdagcheck.notify": runVrijdagcheckNotification,
   "finance.month_reminder": runFinanceMonthReminder,
+  "finance.weekly_summary": runFinanceWeeklySummary,
   "signals.hourly": runHourlySignals,
   "frameio.pull_projects": pullFrameProjects,
   "frameio.pull_comments": pullFrameComments,
