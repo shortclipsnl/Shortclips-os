@@ -1,4 +1,4 @@
-import { requireInternal, isOwner } from "@/server/auth/context";
+import { requireInternal, isOwner, canManageClients } from "@/server/auth/context";
 import { NAVIGATION } from "@/components/layout/nav-config";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
@@ -39,6 +39,11 @@ export default async function AppLayout({
       // Rolgebaseerde zichtbaarheid (geen e-mailuitzonderingen): eigenaar ziet
       // alles, verder alleen de aangewezen rollen.
       if (item.roles && !owner && !(item.roles as string[]).includes(viewer.primaryRole)) {
+        return false;
+      }
+      // Klantenbeheer: zichtbaar voor iedereen die klanten mag beheren
+      // (eigenaar, projectcoördinatoren én het kernteam — bijv. Milou).
+      if (item.manageClients && !canManageClients(viewer)) {
         return false;
       }
       // Rechten-gebaseerde items.

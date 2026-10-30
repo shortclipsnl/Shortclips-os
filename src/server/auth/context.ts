@@ -156,7 +156,12 @@ export function isOwner(viewer: Viewer | null): boolean {
  */
 export function canManageClients(viewer: Viewer | null): boolean {
   if (!viewer) return false;
-  return isOwner(viewer) || viewer.primaryRole === "project_coordinator";
+  // De eigenaar en projectcoördinatoren mogen klanten en klantportalen beheren.
+  // Het vaste kernteam (Jarno, Milou, Jiska, Rutger) krijgt dit óók op e-mail,
+  // onafhankelijk van de exacte rol — zij zien toch al alle klanten. Zo kan bv.
+  // Milou ook portaallogins aanmaken, ook als haar rol niet exact
+  // "project_coordinator" is.
+  return isOwner(viewer) || viewer.primaryRole === "project_coordinator" || isCoreStaff(viewer.email);
 }
 
 export function canAny(viewer: Viewer | null, list: PermissionKey[]): boolean {

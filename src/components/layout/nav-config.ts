@@ -15,6 +15,9 @@ export type NavItem = {
   ownerOnly?: boolean;
   /** Náást de eigenaar ook zichtbaar voor deze rollen (rolgebaseerd, geen e-mailuitzonderingen). */
   roles?: UserRole[];
+  /** Zichtbaar voor iedereen die klanten mag beheren (eigenaar, projectcoördinatoren
+   *  én het vaste kernteam). Gelijk aan de toegang van de klantenbeheer-pagina. */
+  manageClients?: boolean;
   /** Uitsluitend voor editors — ook de eigenaar/het team ziet dit niet. */
   editorsOnly?: boolean;
   /** Externe/zelfstandige pagina: open als gewone link in een nieuw tabblad
@@ -110,7 +113,7 @@ export const NAVIGATION: NavGroup[] = [
     title: "Beheer",
     accent: "var(--color-ink-muted)",
     items: [
-      { href: "/klantenbeheer", label: "Klanten", icon: "UserCog", roles: ["project_coordinator"], match: "/klantenbeheer" },
+      { href: "/klantenbeheer", label: "Klanten", icon: "UserCog", manageClients: true, match: "/klantenbeheer" },
       { href: "/noodprocedure", label: "Noodprocedure", icon: "LifeBuoy", roles: ["project_coordinator"], match: "/noodprocedure" },
       { href: "/settings/agendas", label: "Agenda's", icon: "CalendarRange", ownerOnly: true, match: "/settings/agendas" },
       { href: "/settings/integrations", label: "Koppelingen", icon: "Plug", ownerOnly: true, match: "/settings/integrations" },
