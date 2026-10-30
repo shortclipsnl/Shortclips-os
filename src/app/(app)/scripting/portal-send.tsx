@@ -3,8 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, RefreshCw, Send } from "lucide-react";
-import { createScriptPdfUploadUrl, sendScriptForReview } from "@/server/actions/script-review";
+import { Loader2, Sparkles, Upload } from "lucide-react";
+import { createScriptPdfUploadUrl, generateScriptPdfAndSend, sendScriptForReview } from "@/server/actions/script-review";
 import { Badge } from "@/components/ui";
 import type { ScriptingRow } from "@/server/scripting";
 
@@ -40,6 +40,17 @@ export function PortalSendCell({ row, canWrite }: { row: ScriptingRow; canWrite:
   function pick() {
     setErr(null);
     inputRef.current?.click();
+  }
+
+  /** Eén klik: bouw automatisch een huisstijl-PDF uit de geschreven scripts en
+   *  stuur die direct ter controle naar de klant (geen handmatige upload nodig). */
+  function runGenerate() {
+    setErr(null);
+    start(async () => {
+      const res = await generateScriptPdfAndSend({ productionDayId: row.id });
+      if (res.ok) router.refresh();
+      else setErr(res.message ?? "Genereren mislukt.");
+    });
   }
 
   function onFile(file: File | undefined) {
@@ -86,20 +97,30 @@ export function PortalSendCell({ row, canWrite }: { row: ScriptingRow; canWrite:
             <Badge tone={meta.tone}>{meta.label}</Badge>
           </Link>
           {canWrite ? (
-            <button type="button" onClick={pick} disabled={pending} className="inline-flex items-center gap-1 text-2xs font-semibold text-[var(--color-ink-muted)] hover:text-[var(--color-brand-600)]">
-              {pending ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />} Nieuwe versie
-            </button>
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <button type="button" onClick={runGenerate} disabled={pending} className="inline-flex items-center gap-1 text-2xs font-semibold text-[var(--color-brand-600)] hover:underline disabled:opacity-50">
+                {pending ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />} Genereer nieuwe versie
+              </button>
+              <button type="button" onClick={pick} disabled={pending} className="inline-flex items-center gap-1 text-2xs font-semibold text-[var(--color-ink-muted)] hover:text-[var(--color-brand-600)] disabled:opacity-50">
+                <Upload className="size-3" /> PDF uploaden
+              </button>
+            </div>
           ) : null}
         </>
       ) : canWrite ? (
-        <button
-          type="button"
-          onClick={pick}
-          disabled={pending}
-          className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-brand-600)]/40 bg-[var(--color-brand-50)] px-2.5 py-1 text-xs font-semibold text-[var(--color-brand-600)] hover:bg-[var(--color-brand-100)] disabled:opacity-50"
-        >
-          {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} Stuur op in klantportaal
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={runGenerate}
+            disabled={pending}
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-brand-600)]/40 bg-[var(--color-brand-50)] px-2.5 py-1 text-xs font-semibold text-[var(--color-brand-600)] hover:bg-[var(--color-brand-100)] disabled:opacity-50"
+          >
+            {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} Genereer & stuur ter controle
+          </button>
+          <button type="button" onClick={pick} disabled={pending} className="inline-flex items-center gap-1 text-2xs font-semibold text-[var(--color-ink-muted)] hover:text-[var(--color-brand-600)] disabled:opacity-50">
+            <Upload className="size-3" /> of upload zelf een PDF
+          </button>
+        </>
       ) : (
         <span className="text-2xs text-[var(--color-ink-faint)]">—</span>
       )}

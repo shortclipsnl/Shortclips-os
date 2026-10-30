@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { clients, productionDays, scriptReviewComments, scriptReviewThreads, scriptReviewVersions, scriptReviews, users } from "@/db/schema";
+import { clients, productionDays, scripts as scriptsTable, scriptReviewComments, scriptReviewThreads, scriptReviewVersions, scriptReviews, users } from "@/db/schema";
 import { assertClientAccess, ForbiddenError, requirePermission, requirePortal } from "@/server/auth/context";
 import { auditLog, recordActivity } from "@/server/audit";
 import { notify } from "@/server/notifications";
@@ -201,6 +201,101 @@ export async function sendScriptForReview(input: z.infer<typeof sendSchema>): Pr
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
   }
+}
+
+/** Sjabloonpagina als PNG-bytes: lokaal van schijf, in productie via de eigen URL. */
+async function loadScriptTemplateImage(n: number): Promise<Uint8Array> {
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    return new Uint8Array(await fs.readFile(path.join(process.cwd(), "public", "script-template", `slide${n}.png`)));
+  } catch {
+    /* val terug op fetch (serverless) */
+  }
+  const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (process.env.APP_URL || "http://localhost:3000");
+  const res = await fetch(`${base}/script-template/slide${n}.png`);
+  if (!res.ok) throw new Error(`Sjabloonpagina ${n} kon niet worden geladen (HTTP ${res.status}).`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+/** Zet een opgeslagen script om naar de tekst voor de PDF (hook → body → CTA). */
+function scriptToPdfText(s: { hook: string | null; body: string | null; cta: string | null }): string {
+  const parts: string[] = [];
+  if (s.hook?.trim()) parts.push(`HOOK\n${s.hook.trim()}`);
+  if (s.body?.trim()) parts.push(s.body.trim());
+  if (s.cta?.trim()) parts.push(`CTA\n${s.cta.trim()}`);
+  return parts.join("\n\n");
+}
+
+/**
+ * Intern (één klik): bouwt automatisch een script-PDF in de Shortclips-huisstijl
+ * uit de geschreven scripts van een opname en stuurt die meteen ter controle naar
+ * de klant — zonder dat er handmatig een PDF geüpload hoeft te worden. Hergebruikt
+ * dezelfde opmaak als de scriptgenerator-download en de bestaande verstuur-flow.
+ */
+export async function generateScriptPdfAndSend(input: { productionDayId: string; title?: string }): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("scripts:write");
+    const productionDayId = z.string().uuid().parse(input.productionDayId);
+
+    const [day] = await db
+      .select({
+        id: productionDays.id,
+        clientId: productionDays.clientId,
+        scheduledOn: productionDays.scheduledOn,
+        clientName: clients.name,
+      })
+      .from(productionDays)
+      .innerJoin(clients, eq(clients.id, productionDays.clientId))
+      .where(and(eq(productionDays.id, productionDayId), isNull(productionDays.deletedAt)))
+      .limit(1);
+    if (!day) return { ok: false, message: "Opnamesessie niet gevonden." };
+    assertClientAccess(viewer, day.clientId);
+
+    const rows = await db
+      .select({ title: scriptsTable.title, hook: scriptsTable.hook, body: scriptsTable.body, cta: scriptsTable.cta })
+      .from(scriptsTable)
+      .where(and(eq(scriptsTable.productionDayId, productionDayId), isNull(scriptsTable.deletedAt)))
+      .orderBy(scriptsTable.createdAt);
+
+    const items = rows
+      .map((r) => ({ onderwerp: r.title, tekst: scriptToPdfText(r) }))
+      .filter((s) => s.tekst.trim().length > 0);
+    if (items.length === 0) {
+      return { ok: false, message: "Er zijn nog geen uitgewerkte scripts voor deze opname om te versturen." };
+    }
+
+    const opnamedag = fmtLongDate(day.scheduledOn);
+    const { buildScriptPdfBytes } = await import("@/lib/script-pdf");
+    const bytes = await buildScriptPdfBytes(
+      { klantnaam: day.clientName, opnamedag, scripts: items },
+      loadScriptTemplateImage,
+    );
+    const base64 = Buffer.from(bytes).toString("base64");
+    const safe = day.clientName.replace(/[^\p{L}\p{N} _-]/gu, "").trim() || "Shortclips";
+
+    // Via de bestaande verstuur-flow: maakt/hergebruikt het reviewdocument, voegt
+    // de versie toe en notificeert de klant (in-app + e-mail).
+    return await sendScriptForReview({
+      clientId: day.clientId,
+      productionDayId,
+      fileName: `Scripts - ${safe}${opnamedag ? ` - ${opnamedag}` : ""}.pdf`,
+      contentType: "application/pdf",
+      base64,
+      title: input.title,
+    });
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    const msg = (error as Error)?.message ?? "onbekende fout";
+    return { ok: false, message: `Genereren mislukt: ${msg}` };
+  }
+}
+
+/** Datum als "1 november 2026" voor de PDF-cover. */
+function fmtLongDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(y, m - 1, d).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
 }
 
 /* ------------------------------------------------------------ portaal (klant) */
