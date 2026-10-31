@@ -185,6 +185,8 @@ export function Stat({
   icon,
   delta,
   emphasis = false,
+  onClick,
+  active = false,
 }: {
   label: string;
   value: ReactNode;
@@ -197,6 +199,10 @@ export function Stat({
   delta?: { value: number; suffix?: string; goodWhenUp?: boolean } | null;
   /** Grotere nadruk voor het belangrijkste/urgente blok. */
   emphasis?: boolean;
+  /** Maakt de tegel klikbaar (bijv. als filter). Negeert `href`. */
+  onClick?: () => void;
+  /** Toont de tegel als actief geselecteerd (alleen met `onClick`). */
+  active?: boolean;
 }) {
   const a = STAT_ACCENT[tone];
   const toned = tone !== "neutral";
@@ -239,6 +245,20 @@ export function Stat({
 
   const style = toned ? { borderLeft: `3px solid ${a.bar}` } : undefined;
   const cls = cn("sc-card p-4", toned && a.bg);
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={active}
+        className={cn(cls, "block w-full cursor-pointer text-left transition hover:shadow-[var(--shadow-raised)]", active && "shadow-[var(--shadow-raised)] ring-2 ring-[var(--color-indigo-ink)] ring-offset-1 ring-offset-[var(--color-bg)]")}
+        style={style}
+      >
+        {body}
+      </button>
+    );
+  }
 
   if (href) {
     return (

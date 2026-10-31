@@ -2,10 +2,20 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRightCircle, Check, Loader2, Plus, Search } from "lucide-react";
+import { AlarmClock, ArrowRightCircle, Check, FolderOpen, Loader2, Plus, Search, Trophy, Users, XCircle } from "lucide-react";
 import { convertLeadToClient, createLead, setLeadFollowUp, setLeadSource, setLeadStatus } from "@/server/actions/leads";
 import type { LeadRow } from "@/server/leads";
 import { LEAD_STATUS } from "@/lib/statuses";
+import { Stat } from "@/components/ui";
+
+/** Het jaar waar een lead bij hoort: de jaargang (Monday-groep, bijv. "2026")
+ *  als die er is, anders het jaar van de eerste contactdatum. Zo vallen ook
+ *  nieuwe leads (zonder jaargang) in het juiste jaar. */
+function leadYear(r: LeadRow): string | null {
+  if (r.segment && /^\d{4}$/.test(r.segment.trim())) return r.segment.trim();
+  if (r.firstContactOn) return r.firstContactOn.slice(0, 4);
+  return null;
+}
 
 /** Vaste bronnen met een eigen kleur, zodat ze goed herkenbaar zijn. */
 // Elke bron een eigen, duidelijke kleur — inclusief de bronnen die echt in de
@@ -103,19 +113,49 @@ function fmtDate(d: string | null) {
   return new Date(y!, (m ?? 1) - 1, day).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
 }
 
-export function LeadsBoard({ rows, segments, sources }: { rows: LeadRow[]; segments: string[]; sources: string[] }) {
+const OPEN_SET = new Set(["lead", "offerte", "onderhandeling"]);
+
+export function LeadsBoard({ rows, sources }: { rows: LeadRow[]; sources: string[] }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const currentYear = String(new Date().getFullYear());
+
+  // Beschikbare jaargangen (jaargang óf jaar van eerste contact), nieuwste eerst.
+  const years = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) { const y = leadYear(r); if (y) set.add(y); }
+    return [...set].sort((a, b) => b.localeCompare(a));
+  }, [rows]);
+
+  // Standaard tonen we het lopende jaar (bijv. 2026) — niet alles. Is er voor dit
+  // jaar nog niets, dan het nieuwste jaar met leads.
+  const [year, setYear] = useState<string>(() => (years.includes(currentYear) ? currentYear : (years[0] ?? "alle")));
   const [status, setStatus] = useState<string>("open");
-  const [segment, setSegment] = useState<string>("alle");
   const [source, setSource] = useState<string>("alle");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [q, setQ] = useState("");
 
+  // Rijen van de gekozen jaargang — basis voor zowel de tegels als de tabel.
+  const yearRows = useMemo(
+    () => (year === "alle" ? rows : rows.filter((r) => leadYear(r) === year)),
+    [rows, year],
+  );
+
+  // Tegel-tellingen volgen de gekozen jaargang, zodat de cijfers kloppen.
+  const counts = useMemo(() => ({
+    total: yearRows.length,
+    open: yearRows.filter((r) => OPEN_SET.has(r.status)).length,
+    overdue: yearRows.filter((r) => OPEN_SET.has(r.status) && r.followUpOn && r.followUpOn <= today).length,
+    won: yearRows.filter((r) => r.status === "gewonnen").length,
+    lost: yearRows.filter((r) => r.status === "verloren").length,
+  }), [yearRows, today]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (status === "open" ? !["lead", "offerte", "onderhandeling"].includes(r.status) : status !== "alle" && r.status !== status) return false;
-      if (segment !== "alle" && r.segment !== segment) return false;
+    return yearRows.filter((r) => {
+      if (status === "open") { if (!OPEN_SET.has(r.status)) return false; }
+      else if (status === "overdue") { if (!(OPEN_SET.has(r.status) && r.followUpOn && r.followUpOn <= today)) return false; }
+      else if (status !== "alle" && r.status !== status) return false;
       if (source !== "alle" && r.source !== source) return false;
       // Datumfilter op binnenkomstdatum (firstContactOn).
       if (from || to) {
@@ -130,12 +170,35 @@ export function LeadsBoard({ rows, segments, sources }: { rows: LeadRow[]; segme
       }
       return true;
     });
-  }, [rows, status, segment, source, from, to, q]);
-
-  const today = new Date().toISOString().slice(0, 10);
+  }, [yearRows, status, source, from, to, q, today]);
 
   return (
     <div>
+      {/* Klikbare statustegels — filteren de lijst direct op die status. */}
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <Stat label="Totaal" value={String(counts.total)} icon={<Users />} onClick={() => setStatus("alle")} active={status === "alle"} />
+        <Stat label="Open" value={String(counts.open)} hint="lead/offerte/onderhandeling" tone="info" icon={<FolderOpen />} onClick={() => setStatus("open")} active={status === "open"} />
+        <Stat label="Te laat op te volgen" value={String(counts.overdue)} tone={counts.overdue > 0 ? "bad" : "good"} icon={<AlarmClock />} emphasis={counts.overdue > 0} hint={counts.overdue > 0 ? "direct opvolgen" : undefined} onClick={() => setStatus("overdue")} active={status === "overdue"} />
+        <Stat label="Gewonnen" value={String(counts.won)} tone="good" icon={<Trophy />} onClick={() => setStatus("gewonnen")} active={status === "gewonnen"} />
+        <Stat label="Verloren" value={String(counts.lost)} tone="warn" icon={<XCircle />} onClick={() => setStatus("verloren")} active={status === "verloren"} />
+      </div>
+
+      {/* Jaargang: standaard het lopende jaar (bijv. 2026), met knoppen voor
+          eerdere jaren en "Alle jaren". Niet standaard alles tonen. */}
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Jaargang</span>
+        {years.map((y) => (
+          <button key={y} type="button" onClick={() => setYear(y)}
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${year === y ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-neutral-soft)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>
+            {y}
+          </button>
+        ))}
+        <button type="button" onClick={() => setYear("alle")}
+          className={`rounded-full px-3 py-1 text-xs font-semibold transition ${year === "alle" ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-neutral-soft)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>
+          Alle jaren
+        </button>
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-1">
           {(["open", "lead", "offerte", "onderhandeling", "gewonnen", "verloren", "alle"] as const).map((s) => {
@@ -159,10 +222,6 @@ export function LeadsBoard({ rows, segments, sources }: { rows: LeadRow[]; segme
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-7 bg-transparent text-xs outline-none" aria-label="Tot" title="Tot en met" />
             {from || to ? <button type="button" onClick={() => { setFrom(""); setTo(""); }} className="text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]" title="Datumfilter wissen">×</button> : null}
           </span>
-          <select className="sc-input h-8 w-auto py-0 text-xs" value={segment} onChange={(e) => setSegment(e.target.value)} aria-label="Jaargang">
-            <option value="alle">Alle jaren</option>
-            {segments.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
           <select className="sc-input h-8 w-auto py-0 text-xs" value={source} onChange={(e) => setSource(e.target.value)} aria-label="Bron">
             <option value="alle">Alle bronnen</option>
             {sources.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -174,7 +233,7 @@ export function LeadsBoard({ rows, segments, sources }: { rows: LeadRow[]; segme
         </div>
       </div>
 
-      <div className="mb-2 text-xs text-[var(--color-ink-faint)]">{filtered.length} van {rows.length} leads</div>
+      <div className="mb-2 text-xs text-[var(--color-ink-faint)]">{filtered.length} van {yearRows.length} leads{year === "alle" ? "" : ` in ${year}`}</div>
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
         <table className="w-full min-w-[920px] text-sm">
