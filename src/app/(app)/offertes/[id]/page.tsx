@@ -61,25 +61,41 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
       />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
-        {/* Editor + preview */}
+        {/* Editor + preview, of — bij een uit PandaDoc gemigreerde offerte — het
+            originele document (alleen-lezen). */}
         <div className="space-y-5">
-          <QuoteEditor quote={{
-            id: quote.id, title: quote.title, status: quote.status, isReadOnly: quote.isReadOnly,
-            recipientCompany: quote.recipientCompany, recipientContactName: quote.recipientContactName, recipientEmail: quote.recipientEmail,
-            content: (quote.content ?? { blocks: [] }) as QuoteContent,
-            lines: doc.lines, notes: quote.notes, link,
-          }} />
+          {quote.source === "pandadoc" ? (
+            <div className="sc-card p-5">
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-neutral-soft)] px-2.5 py-1 text-2xs font-semibold text-[var(--color-ink-muted)]">Historische offerte · uit PandaDoc</div>
+              <h2 className="text-base font-bold">{quote.title}</h2>
+              <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Deze offerte is overgenomen uit PandaDoc en wordt in de originele vorm bewaard (alleen-lezen). Status en document blijven zoals ze waren.</p>
+              {quote.originalPdfPath ? (
+                <a href={`/api/offertes/file/${quote.id}/original`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90"><Download className="size-4" /> Origineel PandaDoc-document (PDF)</a>
+              ) : (
+                <p className="mt-3 text-sm text-[var(--color-ink-faint)]">Geen origineel PDF beschikbaar voor deze offerte.</p>
+              )}
+            </div>
+          ) : (
+            <>
+              <QuoteEditor quote={{
+                id: quote.id, title: quote.title, status: quote.status, isReadOnly: quote.isReadOnly,
+                recipientCompany: quote.recipientCompany, recipientContactName: quote.recipientContactName, recipientEmail: quote.recipientEmail,
+                content: (quote.content ?? { blocks: [] }) as QuoteContent,
+                lines: doc.lines, notes: quote.notes, link,
+              }} />
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-bold">Voorbeeld</h2>
-              {link ? <a href={`/api/offertes/${quote.publicToken}/pdf`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--color-brand-700)] hover:underline"><Download className="size-3.5" /> PDF</a> : null}
-            </div>
-            <style dangerouslySetInnerHTML={{ __html: QUOTE_DOCUMENT_CSS }} />
-            <div className="max-h-[640px] overflow-auto rounded-xl border border-[var(--color-line)] bg-white">
-              <QuoteDocument company={company} quote={doc} />
-            </div>
-          </div>
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-sm font-bold">Voorbeeld</h2>
+                  {link ? <a href={`/api/offertes/${quote.publicToken}/pdf`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--color-brand-700)] hover:underline"><Download className="size-3.5" /> PDF</a> : null}
+                </div>
+                <style dangerouslySetInnerHTML={{ __html: QUOTE_DOCUMENT_CSS }} />
+                <div className="max-h-[640px] overflow-auto rounded-xl border border-[var(--color-line)] bg-white">
+                  <QuoteDocument company={company} quote={doc} />
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Zijkolom: tracking + ondertekening */}

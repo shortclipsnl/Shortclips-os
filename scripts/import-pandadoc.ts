@@ -16,8 +16,10 @@ async function main() {
     process.exit(1);
   }
   const dryRun = process.argv.includes("--dry-run");
-  console.log(`→ PandaDoc-import ${dryRun ? "(dry-run, schrijft niets weg)" : "(schrijft weg)"}…`);
-  const report = await importPandaDoc({ dryRun });
+  const skipPdf = process.argv.includes("--skip-pdf");
+  const importTemplates = process.argv.includes("--with-templates");
+  console.log(`→ PandaDoc-import ${dryRun ? "(dry-run, schrijft niets weg)" : "(schrijft weg)"}${skipPdf ? " · zonder PDF-download" : ""}${importTemplates ? " · incl. sjablonen" : ""}…`);
+  const report = await importPandaDoc({ dryRun, skipPdf, importTemplates });
   console.log("\n=== Rapport ===");
   console.log(`Sjablonen:  ${report.templates.imported} geïmporteerd, ${report.templates.skipped} overgeslagen (bestonden al)`);
   console.log(`Offertes:   ${report.documents.imported} geïmporteerd, ${report.documents.skipped} overgeslagen, ${report.documents.pdfMissing} zonder PDF`);

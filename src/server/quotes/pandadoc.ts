@@ -51,15 +51,20 @@ export type ImportReport = {
   notes: string[];
 };
 
-/** Voert de volledige import uit. `dryRun` schrijft niets weg. */
-export async function importPandaDoc(opts: { dryRun?: boolean } = {}): Promise<ImportReport> {
+/**
+ * Voert de import uit. `dryRun` schrijft niets weg; `skipPdf` slaat het
+ * (trage) PDF-downloaden over; `importTemplates` neemt ook de PandaDoc-
+ * sjablonen over (standaard uit — de vaste sjablonen zijn al nagebouwd).
+ */
+export async function importPandaDoc(opts: { dryRun?: boolean; skipPdf?: boolean; importTemplates?: boolean } = {}): Promise<ImportReport> {
   if (!pandadocConfigured()) throw new Error("PANDADOC_API_KEY ontbreekt.");
   const report: ImportReport = { templates: { imported: 0, skipped: 0 }, documents: { imported: 0, skipped: 0, pdfMissing: 0 }, notes: [] };
   report.notes.push("Historische open-/kijkgegevens (eerste/laatste opening, aantal) zijn via de PandaDoc-API doorgaans niet beschikbaar en worden daarom niet overgenomen.");
-  report.notes.push("De visuele opmaak van sjablonen wordt als startpunt overgenomen; loop ze na en verfijn waar nodig. De originele PDF's van historische offertes worden 1-op-1 bewaard.");
+  report.notes.push("De originele PDF's van historische offertes worden 1-op-1 bewaard. De vaste sjablonen zijn apart nagebouwd (navy huisstijl).");
+  const skipPdf = opts.skipPdf || opts.dryRun;
 
-  // --- Sjablonen ---
-  const tpls = await pdGet<{ results?: PdListItem[] }>("/templates");
+  // --- Sjablonen (optioneel) ---
+  const tpls = opts.importTemplates ? await pdGet<{ results?: PdListItem[] }>("/templates") : { results: [] as PdListItem[] };
   for (const t of tpls.results ?? []) {
     const [existing] = await db.select({ id: quoteTemplates.id }).from(quoteTemplates).where(eq(quoteTemplates.externalId, t.id)).limit(1);
     if (existing) { report.templates.skipped++; continue; }

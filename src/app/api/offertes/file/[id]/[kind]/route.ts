@@ -15,9 +15,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!isOwner(viewer)) return new NextResponse("Niet toegestaan", { status: 403 });
   const { id, kind } = await params;
 
-  const [q] = await db.select({ signed: quotes.signedPdfPath, receipt: quotes.signingReceiptPath, number: quotes.number }).from(quotes).where(eq(quotes.id, id)).limit(1);
+  const [q] = await db.select({ signed: quotes.signedPdfPath, receipt: quotes.signingReceiptPath, original: quotes.originalPdfPath, number: quotes.number }).from(quotes).where(eq(quotes.id, id)).limit(1);
   if (!q) return new NextResponse("Niet gevonden", { status: 404 });
-  const key = kind === "signed" ? q.signed : kind === "receipt" ? q.receipt : null;
+  const key = kind === "signed" ? q.signed : kind === "receipt" ? q.receipt : kind === "original" ? q.original : null;
   if (!key) return new NextResponse("Niet beschikbaar", { status: 404 });
 
   const buf = await downloadQuotePdf(key);
