@@ -9,13 +9,11 @@ import { listEditingProjects } from "@/server/editing";
 import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { getReviewQueue } from "@/server/videos";
 import { listScripting } from "@/server/scripting";
-import { getPlanningOverview } from "@/server/planning-overview";
 import { getScreenData } from "@/server/screen";
 import { integrationHealth } from "@/server/integrations/registry";
 import { countOpenLinkSuggestions } from "@/server/link-review";
 import { VIDEO_WAITING_ON, type VideoStage } from "@/lib/statuses";
 import { isOwner, scopeToClients, type Viewer } from "@/server/auth/context";
-import { getGoalsOverview } from "@/server/goals/overview";
 
 /**
  * Centrale kwaliteitsbewaking: bundelt alle automatisch gesignaleerde punten tot
@@ -97,7 +95,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
   const today = new Date().toISOString().slice(0, 10);
 
   const [
-    data, projects, shootDeadlines, reviewQueue, scripting, planning,
+    data, projects, shootDeadlines, reviewQueue, scripting,
     missingVersion, missingData, clientRevision, readyNotSent, overduePublish,
     openLinks, integrations, screen,
   ] = await Promise.all([
@@ -106,7 +104,6 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
     getShootDeadlines(viewer),
     getReviewQueue(viewer),
     listScripting(viewer),
-    getPlanningOverview(viewer, 8),
     // #2 Eerste versie verwacht: opname ≥7 werkdagen geleden, nog geen versie.
     db.select({
       id: deliverables.id, title: deliverables.title, shootDate: productionDays.scheduledOn,
@@ -330,17 +327,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
     }
   }
 
-  // #14 Planning onvoldoende gevuld — komende weken zonder opname.
-  const futureWeeks = planning.filter((w, i) => i > 0); // "Deze week" overslaan
-  const emptyWeeks = futureWeeks.filter((w) => w.opnames.length === 0);
-  if (emptyWeeks.length > 0) {
-    items.push({
-      id: "planning-gap", severity: "blauw", category: "Planning onvoldoende gevuld",
-      title: `${emptyWeeks.length} van de komende ${futureWeeks.length} weken zonder opname`,
-      detail: `Week ${emptyWeeks.slice(0, 4).map((w) => w.weekNumber).join(", ")}${emptyWeeks.length > 4 ? "…" : ""} nog leeg → opnames inplannen`,
-      href: "/planning", roles: COORD,
-    });
-  }
+  // (#14 "Planning onvoldoende gevuld" is verwijderd — zie de planning op /planning.)
 
   /* ---------- Bestaande, aanvullende signalen ---------- */
 
@@ -353,25 +340,9 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
     });
   }
 
-  // Achter op de maandafspraak (quota).
-  for (const q of data.clients.quotaGap) {
-    items.push({
-      id: `quota-${q.clientId}`, clientName: q.clientName, severity: "oranje", category: "Achter op afspraak",
-      title: q.clientName, detail: `${q.published + q.inProgress} van ${q.quota} deze maand → opname/edit inplannen`,
-      href: `/clients/${q.clientSlug}`, roles: CC,
-    });
-  }
-
-  // Actieve klanten zonder geplande opname — gebundeld tot één melding.
-  if (data.clients.withoutShoot.length > 0) {
-    const names = data.clients.withoutShoot.map((c) => c.name);
-    items.push({
-      id: "noshoot-all", severity: "oranje", category: "Geen opname gepland",
-      title: `${names.length} klant${names.length === 1 ? "" : "en"} zonder geplande opname`,
-      detail: `${names.slice(0, 6).join(", ")}${names.length > 6 ? ` +${names.length - 6} meer` : ""} → opnames inplannen`,
-      href: "/productions", roles: SHOOT,
-    });
-  }
+  // (Planning & capaciteit staat niet meer op deze pagina — "achter op de
+  //  maandafspraak" en "klanten zonder geplande opname" gaven te veel ruis die
+  //  het team niet oppakte. De planning zelf bewaak je op /productions en /planning.)
 
   // Aflopende contracten (vooruitkijken).
   for (const c of data.contracts.slice(0, 6)) {
@@ -383,17 +354,8 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
     });
   }
 
-  // Doelen (Q4): achter = Directe actie, risico/niet bijgewerkt = Extra aandacht,
-  // gepland = Vooruit kijken. Niet aan editors tonen.
-  const GOAL_ROLES = ["project_coordinator", "content_creator", "videographer", "finance"];
-  const goalsOverview = await getGoalsOverview(viewer);
-  for (const g of goalsOverview.rows) {
-    if (g.status === "op_koers" || g.status === "gehaald") continue;
-    const severity: QualitySeverity = g.status === "achter" ? "rood" : g.status === "gepland" ? "blauw" : "oranje";
-    const category = g.status === "achter" ? "Doel achter" : g.status === "risico" ? "Doel risico" : g.status === "niet_bijgewerkt" ? "Stand ontbreekt" : "Doel gepland";
-    const detail = g.causeLabels.length > 0 ? `${g.causeLabels.slice(0, 3).join(", ")} → bekijk het doel` : `${g.pillarLabel} → bekijk het doel`;
-    items.push({ id: `goal-${g.id}`, severity, category, title: g.title, detail, href: "/doelen", roles: GOAL_ROLES });
-  }
+  // (Doelen-signalen staan niet meer op deze pagina: ze hebben hun eigen
+  //  Doelen-pagina en gaven hier te veel ruis die het team niet gebruikte.)
 
   // Ernst-volgorde: rood, oranje, blauw; daarbinnen per categorie gegroepeerd,
   // zodat je per soort melding kunt scannen.
