@@ -81,3 +81,25 @@ export async function upsertFinanceMonth(input: z.input<typeof schema>): Promise
     throw error;
   }
 }
+
+/**
+ * De maandstaten van één maand opnieuw opbouwen uit de actuele gegevens: omzet
+ * en editkosten worden alleen geteld voor klanten met een geplande opname die
+ * maand (zie snapshotFinanceMonth). Handig om de winstgevendheid direct bij te
+ * werken na een wijziging in prijzen, opnameplanning of tarieven — naast de
+ * nachtelijke job. Uitsluitend de eigenaar. */
+export async function recalcFinanceMonth(period: string): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("finance:write");
+    if (!/^\d{4}-\d{2}$/.test(period)) return { ok: false, message: "Ongeldige maand." };
+    const { snapshotFinanceMonth } = await import("@/server/jobs/finance-snapshot");
+    const res = await snapshotFinanceMonth(period);
+    await auditLog({ viewer, action: "finance.month_recalculated", changes: { period, clients: res.clients, billable: res.billable } });
+    revalidatePath("/winstgevendheid");
+    revalidatePath("/editkosten");
+    return { ok: true, message: `Bijgewerkt: ${res.billable} van ${res.clients} klanten hebben deze maand een opname en worden gefactureerd.` };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}

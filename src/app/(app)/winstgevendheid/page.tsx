@@ -5,6 +5,7 @@ import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Stat, Table } fro
 import { requireOwner } from "@/server/auth/context";
 import { computeProfitabilitySignals, currentPeriod, getClientProfitability, getProfitabilityMonthly, prevPeriod } from "@/server/profitability";
 import { ThresholdForm } from "./threshold-form";
+import { RecalcButton } from "./recalc-button";
 
 export const metadata: Metadata = { title: "Winstgevendheid" };
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export default async function WinstgevendheidPage({ searchParams }: { searchPara
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
         title="Winstgevendheid per klant"
-        description="In één oogopslag welke klanten geld opleveren en waar de marge aandacht vraagt. Directe kosten zijn geregistreerd; overhead en nettowinst zijn geschat (toegerekend)."
+        description="In één oogopslag welke klanten geld opleveren en waar de marge aandacht vraagt. Omzet telt alleen voor klanten met een geplande opname die maand (op basis van de agenda) — niet elke klant draait elke maand. Directe kosten zijn geregistreerd; overhead en nettowinst zijn geschat (toegerekend)."
         actions={<ThresholdForm green={settings.marginGreenPct} orange={settings.marginOrangePct} includeOverhead={settings.includeOverhead} />}
       />
 
@@ -50,6 +51,7 @@ export default async function WinstgevendheidPage({ searchParams }: { searchPara
         <Link href={`/winstgevendheid?maand=${prevPeriod(period)}`} className="inline-flex size-8 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] hover:bg-[var(--color-surface-sunken)]"><ChevronLeft className="size-4" /></Link>
         <span className="min-w-[9rem] text-center text-sm font-semibold capitalize">{monthLabel(period)}</span>
         <Link href={`/winstgevendheid?maand=${nextPeriod(period)}`} className="inline-flex size-8 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] hover:bg-[var(--color-surface-sunken)]"><ChevronRight className="size-4" /></Link>
+        <span className="ml-auto"><RecalcButton period={period} /></span>
       </div>
 
       {/* Signalen */}
