@@ -7,7 +7,7 @@ import { ChevronDown, ChevronRight, Download, FileText, Loader2, Pencil, Plus, U
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { editorColor, editorDisplayName, firstNameKey } from "@/lib/editors";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase } from "@/lib/statuses";
-import { createEditingProject, deleteProjectScript, setProjectDeadline, setProjectEditStatus, setProjectEditor, setProjectLinks, setProjectPlannedShorts, uploadProjectScript } from "@/server/actions/editing-board";
+import { createEditingProject, createProjectScriptUploadUrl, deleteProjectScript, setProjectDeadline, setProjectEditStatus, setProjectEditor, setProjectLinks, setProjectPlannedShorts, uploadProjectScript } from "@/server/actions/editing-board";
 import { fileToBase64 } from "../ai/_shared";
 import type { EditingProject, BatteryColor } from "@/server/editing-board";
 
@@ -313,6 +313,16 @@ function ScriptCell({ p, canEdit, run, pending }: { p: EditingProject; canEdit: 
     if (file.size > 10 * 1024 * 1024) return;
     setBusy(true);
     try {
+      // Grote PDF's rechtstreeks naar de opslag (langs de 4,5MB-limiet van Vercel).
+      const up = await createProjectScriptUploadUrl(p.id).catch(() => null);
+      if (up?.ok && up.uploadUrl && up.storagePath) {
+        const put = await fetch(up.uploadUrl, { method: "PUT", headers: up.headers, body: file }).catch(() => null);
+        if (put?.ok) {
+          run(() => uploadProjectScript(p.id, { fileName: file.name, contentType: file.type || "application/pdf", storagePath: up.storagePath, sizeBytes: file.size }));
+          return;
+        }
+      }
+      // Terugval: base64 via de server-action (lokaal of zonder opslag ingesteld).
       const base64 = await fileToBase64(file);
       run(() => uploadProjectScript(p.id, { fileName: file.name, contentType: file.type || "application/pdf", base64 }));
     } finally {

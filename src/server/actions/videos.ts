@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { clearEditScript, createEditScriptUploadTarget, replaceEditScript } from "@/server/editing/script-file";
 import {
   clients,
   deliverables,
-  editProjectFiles,
   reviewComments,
   reviewThreads,
   users,
@@ -141,7 +141,7 @@ const MAX_SCRIPT_BYTES = 10 * 1024 * 1024; // 10 MB — ruim voor een script-pdf
  */
 export async function uploadVideoScript(
   videoId: string,
-  file: { fileName: string; contentType: string; base64: string },
+  file: { fileName: string; contentType: string; base64?: string; storagePath?: string; sizeBytes?: number },
 ): Promise<ActionResult> {
   try {
     const viewer = await requireInternal();
@@ -156,27 +156,39 @@ export async function uploadVideoScript(
 
     const isPdf = file.contentType === "application/pdf" || file.fileName.toLowerCase().endsWith(".pdf");
     if (!isPdf) return { ok: false, message: "Alleen een pdf-bestand kan worden geüpload." };
-    const sizeBytes = Math.floor((file.base64.length * 3) / 4);
+    if (!file.base64 && !file.storagePath) return { ok: false, message: "Geen bestand ontvangen." };
+    const sizeBytes = file.base64 ? Math.floor((file.base64.length * 3) / 4) : (file.sizeBytes ?? 0);
     if (sizeBytes > MAX_SCRIPT_BYTES) return { ok: false, message: "Het bestand is te groot (max 10 MB)." };
     if (sizeBytes === 0) return { ok: false, message: "Leeg bestand." };
 
-    // Oud script van deze opname vervangen.
-    await db
-      .delete(editProjectFiles)
-      .where(and(eq(editProjectFiles.productionDayId, video.productionDayId), eq(editProjectFiles.kind, "script")));
-    await db.insert(editProjectFiles).values({
-      productionDayId: video.productionDayId,
-      kind: "script",
-      fileName: file.fileName.slice(0, 255),
-      contentType: "application/pdf",
-      sizeBytes,
-      dataBase64: file.base64,
-      uploadedById: viewer.id,
-    });
+    await replaceEditScript(video.productionDayId, { fileName: file.fileName, contentType: "application/pdf", sizeBytes, base64: file.base64, storagePath: file.storagePath }, viewer.id);
 
     revalidatePath("/videos");
     revalidatePath(`/videos/${videoId}`);
     return { ok: true, message: "Script geüpload." };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Maakt een directe upload-URL (Supabase) zodat de browser de script-pdf buiten de
+ * server-action om kan uploaden — nodig omdat Vercel request-bodies op 4,5MB cap't.
+ * Geeft null terug als er geen opslag is ingesteld; de UI valt dan terug op base64.
+ */
+export async function createVideoScriptUploadUrl(videoId: string): Promise<ActionResult & { uploadUrl?: string; storagePath?: string; headers?: Record<string, string> }> {
+  try {
+    const viewer = await requireInternal();
+    const video = await loadVideo(videoId);
+    if (!video) return { ok: false, message: "Video niet gevonden." };
+    assertClientAccess(viewer, video.clientId);
+    const denied = mayEditVideoFiles(viewer, video);
+    if (denied) return { ok: false, message: denied };
+    if (!video.productionDayId) return { ok: false, message: "Deze video heeft geen gekoppelde opnamedag." };
+    const target = await createEditScriptUploadTarget(video.clientId);
+    if (!target) return { ok: true }; // geen opslag ingesteld → base64-terugval
+    return { ok: true, uploadUrl: target.uploadUrl, storagePath: target.key, headers: target.headers };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
@@ -194,9 +206,7 @@ export async function deleteVideoScript(videoId: string): Promise<ActionResult> 
     if (denied) return { ok: false, message: denied };
     if (!video.productionDayId) return { ok: true };
 
-    await db
-      .delete(editProjectFiles)
-      .where(and(eq(editProjectFiles.productionDayId, video.productionDayId), eq(editProjectFiles.kind, "script")));
+    await clearEditScript(video.productionDayId);
     revalidatePath("/videos");
     revalidatePath(`/videos/${videoId}`);
     return { ok: true };

@@ -9,7 +9,7 @@ import { editorColor, editorDisplayName, firstNameKey } from "@/lib/editors";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase, type VideoStage } from "@/lib/statuses";
-import { askEditorQuestion, assignEditor, changeVideoStatus, deleteVideoScript, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts, uploadVideoScript } from "@/server/actions/videos";
+import { askEditorQuestion, assignEditor, changeVideoStatus, createVideoScriptUploadUrl, deleteVideoScript, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts, uploadVideoScript } from "@/server/actions/videos";
 import { fileToBase64 } from "../ai/_shared";
 import type { EditorBoardVideo } from "@/server/editor-board";
 
@@ -459,6 +459,16 @@ function ScriptUploadCell({ v, canEdit, run, pending }: { v: EditorBoardVideo; c
     if (file.size > 10 * 1024 * 1024) return;
     setBusy(true);
     try {
+      // Grote PDF's rechtstreeks naar de opslag (langs de 4,5MB-limiet van Vercel).
+      const up = await createVideoScriptUploadUrl(v.id).catch(() => null);
+      if (up?.ok && up.uploadUrl && up.storagePath) {
+        const put = await fetch(up.uploadUrl, { method: "PUT", headers: up.headers, body: file }).catch(() => null);
+        if (put?.ok) {
+          run(() => uploadVideoScript(v.id, { fileName: file.name, contentType: file.type || "application/pdf", storagePath: up.storagePath, sizeBytes: file.size }));
+          return;
+        }
+      }
+      // Terugval: base64 via de server-action (lokaal of zonder opslag ingesteld).
       const base64 = await fileToBase64(file);
       run(() => uploadVideoScript(v.id, { fileName: file.name, contentType: file.type || "application/pdf", base64 }));
     } finally {

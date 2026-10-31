@@ -180,7 +180,11 @@ export const editProjectFiles = pgTable(
     fileName: varchar("file_name", { length: 255 }).notNull(),
     contentType: varchar("content_type", { length: 100 }).notNull(),
     sizeBytes: integer("size_bytes").notNull(),
-    dataBase64: text("data_base64").notNull(),
+    // Kleine bestanden: base64 in de database. Grotere PDF's gaan via Supabase
+    // Storage (langs de 4,5MB-requestlimiet van Vercel) — dan staat hier de
+    // opslagsleutel i.p.v. base64. Precies één van beide is gevuld.
+    dataBase64: text("data_base64"),
+    storagePath: text("storage_path"),
     uploadedById: uuid("uploaded_by_id").references(() => users.id, {
       onDelete: "set null",
     }),

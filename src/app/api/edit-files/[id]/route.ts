@@ -1,7 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { editProjectFiles, productionDays } from "@/db/schema";
 import { getViewer, hasClientAccess } from "@/server/auth/context";
+import { downloadEditScript } from "@/server/editing/script-file";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       fileName: editProjectFiles.fileName,
       contentType: editProjectFiles.contentType,
       dataBase64: editProjectFiles.dataBase64,
+      storagePath: editProjectFiles.storagePath,
       clientId: productionDays.clientId,
       editorId: productionDays.editorId,
     })
@@ -35,7 +37,13 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const allowed = row.editorId === viewer.id || hasClientAccess(viewer, row.clientId);
   if (!allowed) return new Response("Niet toegestaan", { status: 403 });
 
-  const buffer = Buffer.from(row.dataBase64, "base64");
+  // Bytes uit Supabase (grote bestanden) of uit base64 in de database (klein).
+  const buffer = row.storagePath
+    ? await downloadEditScript(row.storagePath)
+    : row.dataBase64
+      ? Buffer.from(row.dataBase64, "base64")
+      : null;
+  if (!buffer) return new Response("Bestand niet beschikbaar", { status: 404 });
   const safeName = row.fileName.replace(/[^\w.\- ]+/g, "_");
   return new Response(new Uint8Array(buffer), {
     headers: {

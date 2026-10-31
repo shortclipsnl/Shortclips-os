@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { deliverables, editProjectFiles, productionDays } from "@/db/schema";
+import { deliverables, productionDays } from "@/db/schema";
 import { assertClientAccess, ForbiddenError, requirePermission } from "@/server/auth/context";
+import { clearEditScript, createEditScriptUploadTarget, replaceEditScript } from "@/server/editing/script-file";
 import { auditLog } from "@/server/audit";
 import { EDIT_PHASE_ORDER } from "@/lib/statuses";
 
@@ -194,7 +195,7 @@ export async function setProjectLinks(
  *  script. Wordt als base64 in de database bewaard (klein bestand). */
 export async function uploadProjectScript(
   id: string,
-  file: { fileName: string; contentType: string; base64: string },
+  file: { fileName: string; contentType: string; base64?: string; storagePath?: string; sizeBytes?: number },
 ): Promise<ActionResult> {
   try {
     const viewer = await requirePermission("videos:write");
@@ -204,24 +205,34 @@ export async function uploadProjectScript(
 
     const isPdf = file.contentType === "application/pdf" || file.fileName.toLowerCase().endsWith(".pdf");
     if (!isPdf) return { ok: false, message: "Alleen een pdf-bestand kan worden geüpload." };
-    const sizeBytes = Math.floor((file.base64.length * 3) / 4);
+    if (!file.base64 && !file.storagePath) return { ok: false, message: "Geen bestand ontvangen." };
+    const sizeBytes = file.base64 ? Math.floor((file.base64.length * 3) / 4) : (file.sizeBytes ?? 0);
     if (sizeBytes > MAX_SCRIPT_BYTES) return { ok: false, message: "Het bestand is te groot (max 10 MB)." };
     if (sizeBytes === 0) return { ok: false, message: "Leeg bestand." };
 
-    // Oud script vervangen.
-    await db.delete(editProjectFiles).where(and(eq(editProjectFiles.productionDayId, id), eq(editProjectFiles.kind, "script")));
-    await db.insert(editProjectFiles).values({
-      productionDayId: id,
-      kind: "script",
-      fileName: file.fileName.slice(0, 255),
-      contentType: "application/pdf",
-      sizeBytes,
-      dataBase64: file.base64,
-      uploadedById: viewer.id,
-    });
+    await replaceEditScript(id, { fileName: file.fileName, contentType: "application/pdf", sizeBytes, base64: file.base64, storagePath: file.storagePath }, viewer.id);
 
     revalidatePath("/videos");
     return { ok: true, message: "Script geüpload." };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Directe upload-URL (Supabase) voor een groot script-pdf, langs de 4,5MB-
+ * requestlimiet van Vercel. Null → geen opslag ingesteld, UI valt terug op base64.
+ */
+export async function createProjectScriptUploadUrl(id: string): Promise<ActionResult & { uploadUrl?: string; storagePath?: string; headers?: Record<string, string> }> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const project = await loadProject(id);
+    if (!project) return { ok: false, message: "Project niet gevonden." };
+    assertClientAccess(viewer, project.clientId);
+    const target = await createEditScriptUploadTarget(project.clientId);
+    if (!target) return { ok: true };
+    return { ok: true, uploadUrl: target.uploadUrl, storagePath: target.key, headers: target.headers };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
@@ -236,7 +247,7 @@ export async function deleteProjectScript(id: string): Promise<ActionResult> {
     if (!project) return { ok: false, message: "Project niet gevonden." };
     assertClientAccess(viewer, project.clientId);
 
-    await db.delete(editProjectFiles).where(and(eq(editProjectFiles.productionDayId, id), eq(editProjectFiles.kind, "script")));
+    await clearEditScript(id);
     revalidatePath("/videos");
     return { ok: true };
   } catch (error) {
