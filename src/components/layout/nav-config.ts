@@ -89,6 +89,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/ai/caption", label: "Caption Maker", icon: "Sparkles", permissions: ["ai:read"], match: "/ai/caption" },
       // Editor Briefing staat niet meer in AI-tools: je maakt 'm nu centraal vanaf
       // de Editing-pagina, zodat alles rond de opdracht op één plek staat.
+      { href: "/ai-editor", label: "Shortclips AI Editor", icon: "Clapperboard", permissions: ["ai_editor:read"], match: "/ai-editor" },
       { href: "/ai/bericht", label: "Klantbericht", icon: "MessagesSquare", permissions: ["ai:read"], match: "/ai/bericht" },
       { href: "/ai/bedrijfsonderzoek", label: "AI Sales Research", icon: "Search", permissions: ["ai:read"], match: "/ai/bedrijfsonderzoek" },
       { href: "/ai/geschiedenis", label: "AI-geschiedenis", icon: "History", permissions: ["ai:read"], match: "/ai/geschiedenis" },

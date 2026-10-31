@@ -90,6 +90,15 @@ const schema = z.object({
   SUPABASE_URL: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_VI_BUCKET: z.string().default("video-intelligence"),
+  // --- Shortclips AI Editor ---
+  SUPABASE_AI_EDITOR_BUCKET: z.string().default("ai-editor"),
+  // Whisper-model voor de transcriptie van ruwe beelden (tiny/base/small/medium/large-v3).
+  AI_EDITOR_WHISPER_MODEL: z.string().default("medium"),
+  // Maximale uploadgrootte per bestand via de browser (MB). Supabase Free = 50.
+  AI_EDITOR_MAX_UPLOAD_MB: z.coerce.number().default(50),
+  // Kostenparameters (schattingen, aanpasbaar): renderen per uur en opslag per GB/maand, in eurocent.
+  AI_EDITOR_RENDER_CENTS_PER_HOUR: z.coerce.number().default(0),
+  AI_EDITOR_STORAGE_CENTS_PER_GB_MONTH: z.coerce.number().default(2),
   SUPABASE_SCRIPTS_BUCKET: z.string().default("script-reviews"),
   SUPABASE_OFFERTES_BUCKET: z.string().default("offertes"),
 

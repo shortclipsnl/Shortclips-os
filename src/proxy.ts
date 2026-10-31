@@ -37,7 +37,10 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Alles behalve statische bestanden en Next-interne routes.
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // Alles behalve statische bestanden en Next-interne routes. De lokale
+    // upload-route van de AI Editor slaat de proxy over: anders buffert Next
+    // de body (max. 10 MB) en komen grote camerabestanden afgekapt binnen. Die
+    // route controleert zelf de sessie en rechten.
+    "/((?!_next/static|_next/image|favicon.ico|api/ai-editor/blob|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

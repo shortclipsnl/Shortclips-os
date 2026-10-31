@@ -23,6 +23,7 @@
     "kb:import": "tsx scripts/kennisbank-import.ts",
     "kosten:seed": "tsx scripts/kosten-seed.ts",
     "vi:worker": "NODE_OPTIONS=--conditions=react-server tsx scripts/vi-worker.ts",
+    "ai-editor:worker": "NODE_OPTIONS=--conditions=react-server tsx scripts/ai-editor-worker.ts",
     "quotes:import-pandadoc": "NODE_OPTIONS=--conditions=react-server tsx scripts/import-pandadoc.ts",
     "quotes:seed-templates": "NODE_OPTIONS=--conditions=react-server tsx scripts/seed-quote-templates.ts",
     "vermogen:seed": "tsx scripts/vermogen-seed.ts",

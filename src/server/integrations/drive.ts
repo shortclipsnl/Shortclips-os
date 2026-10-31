@@ -265,6 +265,28 @@ export class DriveService {
     return new Uint8Array(await res.arrayBuffer());
   }
 
+  /**
+   * Download een (groot) bestand rechtstreeks naar schijf, gestreamd, zonder
+   * het in het geheugen te laden. Gebruikt door de AI Editor voor ruwe
+   * camerabestanden van meerdere GB.
+   */
+  async downloadToFile(fileId: string, destPath: string): Promise<number> {
+    const { createWriteStream } = await import("node:fs");
+    const { mkdir, stat } = await import("node:fs/promises");
+    const { dirname } = await import("node:path");
+    const { Readable } = await import("node:stream");
+    const { pipeline } = await import("node:stream/promises");
+    const token = await this.token();
+    const url = `${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true&acknowledgeAbuse=true`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    if (!res.ok || !res.body) {
+      throw new IntegrationError("google_drive", `Bestand downloaden mislukt (HTTP ${res.status})`, res.status, res.status >= 500);
+    }
+    await mkdir(dirname(destPath), { recursive: true });
+    await pipeline(Readable.fromWeb(res.body as unknown as import("node:stream/web").ReadableStream), createWriteStream(destPath));
+    return (await stat(destPath)).size;
+  }
+
   /** Exporteert een Google-document (Docs) als platte tekst. Alleen voor
    *  Google-native bestanden; gewone bestanden gaan via downloadBytes. */
   async exportText(fileId: string): Promise<string> {

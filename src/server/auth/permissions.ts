@@ -69,6 +69,9 @@ export const PERMISSIONS = {
   // Video Intelligence
   "video_intelligence:read": "Video Intelligence-analyses bekijken",
   "video_intelligence:run": "Video's toevoegen en laten analyseren",
+  "ai_editor:read": "Shortclips AI Editor bekijken",
+  "ai_editor:run": "Advertentievideo's laten monteren met de AI Editor",
+  "ai_editor:style": "Stijlbeheer van de AI Editor (montageprofiel, referenties)",
 
   // Beheer
   "integrations:read": "Koppelingen en hun status bekijken",
@@ -162,6 +165,8 @@ export const ROLE_DEFINITIONS: Array<{
       "ai:run",
       "video_intelligence:read",
       "video_intelligence:run",
+      "ai_editor:read",
+      "ai_editor:run",
       "integrations:read",
       "automations:read",
     ],
@@ -184,6 +189,9 @@ export const ROLE_DEFINITIONS: Array<{
       // Het contentteam gebruikt Video Intelligence actief (video's toevoegen en
       // laten analyseren), niet alleen bekijken.
       "video_intelligence:run",
+      // Eigen advertenties monteren met de AI Editor.
+      "ai_editor:read",
+      "ai_editor:run",
       // Het contentteam (o.a. Jiska, Rutger) stuurt ook de editing aan: fases,
       // prioriteit en deadlines wijzigen (videos:write) en editors toewijzen
       // (videos:assign), net als de projectcoördinator.
