@@ -5,6 +5,7 @@
  */
 
 export type QuoteBlock =
+  | { type: "cover"; eyebrow?: string; title: string; subtitle?: string } // navy hero-cover
   | { type: "heading"; text: string }
   | { type: "paragraph"; text: string }
   | { type: "image"; url: string; alt?: string }
@@ -18,6 +19,9 @@ export type QuoteContent = {
   blocks: QuoteBlock[];
   /** Accentkleur (merkkleur) — valt terug op de huisstijl als leeg. */
   accent?: string;
+  /** Standaard prijsregels van het sjabloon; worden bij een nieuwe offerte als
+   *  startregels overgenomen (daarna per offerte aanpasbaar). */
+  defaultLines?: QuoteLineInput[];
 };
 
 export type QuoteLineInput = {
@@ -52,9 +56,12 @@ export function substituteContent(content: QuoteContent, vars: QuoteVars): Quote
     s == null ? s : s.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => (vars as Record<string, string>)[k] ?? `{{${k}}}`);
   return {
     accent: content.accent,
+    defaultLines: content.defaultLines,
     intro: sub(content.intro),
     blocks: (content.blocks ?? []).map((b) => {
       switch (b.type) {
+        case "cover":
+          return { ...b, eyebrow: sub(b.eyebrow), title: sub(b.title) ?? "", subtitle: sub(b.subtitle) };
         case "heading":
           return { ...b, text: sub(b.text) ?? "" };
         case "paragraph":

@@ -4,7 +4,7 @@ import { db } from "@/db/client";
 import { quoteTemplates, quoteTemplateVersions, quotes } from "@/db/schema";
 import { env } from "@/lib/env";
 import { putQuotePdf } from "@/server/quotes/storage";
-import { nextQuoteNumber } from "@/server/quotes";
+import { nextQuoteNumber } from "@/server/quotes/number";
 import { DEFAULT_TEMPLATE_CONTENT, type QuoteContent } from "@/lib/quotes";
 
 /**
@@ -84,18 +84,21 @@ export async function importPandaDoc(opts: { dryRun?: boolean } = {}): Promise<I
     const [existing] = await db.select({ id: quotes.id }).from(quotes).where(eq(quotes.externalId, d.id)).limit(1);
     if (existing) { report.documents.skipped++; continue; }
 
+    // Bij een dry-run slaan we het (trage) PDF-downloaden over; we tellen alleen.
     let pdfPath: string | null = null;
-    try {
-      const res = await fetch(`${BASE}/documents/${d.id}/download`, { headers: { Authorization: `API-Key ${env.PANDADOC_API_KEY}` } });
-      if (res.ok) {
-        const bytes = Buffer.from(await res.arrayBuffer());
-        if (!opts.dryRun) pdfPath = await putQuotePdf(`pandadoc-${d.id}`, "original", bytes).catch(() => null);
-      } else {
+    if (!opts.dryRun) {
+      try {
+        const res = await fetch(`${BASE}/documents/${d.id}/download`, { headers: { Authorization: `API-Key ${env.PANDADOC_API_KEY}` } });
+        if (res.ok) {
+          const bytes = Buffer.from(await res.arrayBuffer());
+          pdfPath = await putQuotePdf(`pandadoc-${d.id}`, "original", bytes).catch(() => null);
+        } else {
+          report.documents.pdfMissing++;
+          report.notes.push(`Offerte "${d.name ?? d.id}": PDF niet te downloaden (status ${res.status}).`);
+        }
+      } catch {
         report.documents.pdfMissing++;
-        report.notes.push(`Offerte "${d.name ?? d.id}": PDF niet te downloaden (status ${res.status}).`);
       }
-    } catch {
-      report.documents.pdfMissing++;
     }
 
     if (!opts.dryRun) {

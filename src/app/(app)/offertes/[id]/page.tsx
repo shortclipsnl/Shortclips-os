@@ -76,8 +76,8 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
               {link ? <a href={`/api/offertes/${quote.publicToken}/pdf`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--color-brand-700)] hover:underline"><Download className="size-3.5" /> PDF</a> : null}
             </div>
             <style dangerouslySetInnerHTML={{ __html: QUOTE_DOCUMENT_CSS }} />
-            <div className="overflow-hidden rounded-xl border border-[var(--color-line)] bg-white">
-              <div className="origin-top scale-[0.92]"><QuoteDocument company={company} quote={doc} /></div>
+            <div className="max-h-[640px] overflow-auto rounded-xl border border-[var(--color-line)] bg-white">
+              <QuoteDocument company={company} quote={doc} />
             </div>
           </div>
         </div>

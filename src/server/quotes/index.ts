@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, isNull, like, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { quoteEvents, quoteLines, quoteTemplateVersions, quoteTemplates, quotes, clients, salesLeads } from "@/db/schema";
 import { requireOwner } from "@/server/auth/context";
@@ -8,23 +8,12 @@ import { recordActivity } from "@/server/audit";
 import { publicQuoteLink } from "@/server/quotes/token";
 import type { QuoteContent } from "@/lib/quotes";
 
+export { nextQuoteNumber } from "@/server/quotes/number";
+
 export type QuoteStatus =
   | "concept" | "verzonden" | "bekeken" | "geaccepteerd" | "ondertekend" | "afgewezen" | "verlopen";
 
 const n = (v: unknown) => Number(v ?? 0);
-
-/** Volgend offertenummer: "JAAR-NNN", oplopend per jaar. */
-export async function nextQuoteNumber(): Promise<string> {
-  const year = new Date().getFullYear();
-  const [row] = await db
-    .select({ number: quotes.number })
-    .from(quotes)
-    .where(like(quotes.number, `${year}-%`))
-    .orderBy(desc(quotes.number))
-    .limit(1);
-  const last = row?.number ? Number(row.number.split("-")[1]) : 0;
-  return `${year}-${String((Number.isFinite(last) ? last : 0) + 1).padStart(3, "0")}`;
-}
 
 export type QuoteListRow = {
   id: string;

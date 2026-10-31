@@ -28,6 +28,7 @@ export function TemplateEditor({ id, name: initialName, content: initial }: { id
   }
 
   const hasLineItems = blocks.some((b) => b.type === "lineItems");
+  const hasCover = blocks.some((b) => b.type === "cover");
 
   return (
     <div className="space-y-4">
@@ -46,14 +47,20 @@ export function TemplateEditor({ id, name: initialName, content: initial }: { id
         {blocks.map((b, i) => (
           <div key={i} className="sc-card p-3">
             <div className="mb-1.5 flex items-center gap-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
-              {b.type === "heading" ? "Kop" : b.type === "paragraph" ? "Tekst" : b.type === "terms" ? "Voorwaarden" : b.type === "lineItems" ? "Prijstabel" : "Afbeelding"}
+              {b.type === "cover" ? "Cover" : b.type === "heading" ? "Kop" : b.type === "paragraph" ? "Tekst" : b.type === "terms" ? "Voorwaarden" : b.type === "lineItems" ? "Prijstabel" : "Afbeelding"}
               <span className="ml-auto flex items-center gap-0.5">
                 <button type="button" onClick={() => move(i, -1)} className="grid size-6 place-items-center rounded text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"><ArrowUp className="size-3.5" /></button>
                 <button type="button" onClick={() => move(i, 1)} className="grid size-6 place-items-center rounded text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"><ArrowDown className="size-3.5" /></button>
                 <button type="button" onClick={() => setBlocks((bs) => bs.filter((_, j) => j !== i))} className="grid size-6 place-items-center rounded text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]"><Trash2 className="size-3.5" /></button>
               </span>
             </div>
-            {b.type === "heading" ? (
+            {b.type === "cover" ? (
+              <div className="space-y-1.5">
+                <input className="sc-input" placeholder="Eyebrow (bijv. Offerte 2026)" value={b.eyebrow ?? ""} onChange={(e) => setBlock(i, { type: "cover", eyebrow: e.target.value, title: b.title, subtitle: b.subtitle })} />
+                <input className="sc-input font-semibold" placeholder="Grote titel" value={b.title} onChange={(e) => setBlock(i, { type: "cover", eyebrow: b.eyebrow, title: e.target.value, subtitle: b.subtitle })} />
+                <textarea className="sc-input min-h-[60px]" placeholder="Ondertitel" value={b.subtitle ?? ""} onChange={(e) => setBlock(i, { type: "cover", eyebrow: b.eyebrow, title: b.title, subtitle: e.target.value })} />
+              </div>
+            ) : b.type === "heading" ? (
               <input className="sc-input" value={b.text} onChange={(e) => setBlock(i, { type: "heading", text: e.target.value })} />
             ) : b.type === "paragraph" ? (
               <textarea className="sc-input min-h-[70px]" value={b.text} onChange={(e) => setBlock(i, { type: "paragraph", text: e.target.value })} />
@@ -72,6 +79,7 @@ export function TemplateEditor({ id, name: initialName, content: initial }: { id
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
+        {!hasCover ? <button type="button" onClick={() => setBlocks((bs) => [{ type: "cover", eyebrow: "Offerte 2026", title: "De short content afdeling van jouw merk.", subtitle: "" }, ...bs])} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2.5 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-sunken)]"><Plus className="size-3.5" /> Cover</button> : null}
         <button type="button" onClick={() => add({ type: "heading", text: "Nieuwe kop" })} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2.5 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-sunken)]"><Heading className="size-3.5" /> Kop</button>
         <button type="button" onClick={() => add({ type: "paragraph", text: "" })} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2.5 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-sunken)]"><Text className="size-3.5" /> Tekst</button>
         <button type="button" onClick={() => add({ type: "image", url: "" })} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2.5 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-sunken)]"><ImageIcon className="size-3.5" /> Afbeelding</button>

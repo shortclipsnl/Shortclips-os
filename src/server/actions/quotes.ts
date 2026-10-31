@@ -170,13 +170,25 @@ export async function createQuote(input: z.input<typeof createSchema>): Promise<
       datum: new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" }),
     });
 
+    // Standaard prijsregels uit het sjabloon overnemen als startregels.
+    const defaults = (content.defaultLines ?? []).filter((l) => l.description?.trim());
+    const amount = defaults.length ? sumLines(defaults) : 0;
+
     const number = await nextQuoteNumber();
     const [q] = await db.insert(quotes).values({
       number, title: title.slice(0, 200), status: "concept",
       clientId: clientId ?? null, leadId: leadId ?? null, templateVersionId,
       recipientCompany, recipientContactName, recipientEmail,
-      content, amount: "0", createdById: viewer.id,
+      content, amount: amount.toFixed(2), createdById: viewer.id,
     }).returning({ id: quotes.id });
+
+    if (defaults.length) {
+      await db.insert(quoteLines).values(defaults.map((l, i) => ({
+        quoteId: q!.id, description: l.description.slice(0, 240),
+        quantity: l.quantity.toFixed(2), unitPrice: l.unitPrice.toFixed(2),
+        lineTotal: (Math.round(l.quantity * l.unitPrice * 100) / 100).toFixed(2), sortOrder: i,
+      })));
+    }
 
     await db.insert(quoteEvents).values({ quoteId: q!.id, type: "created" });
     await auditLog({ viewer, action: "quote.created", entityType: "quote", entityId: q!.id, clientId: clientId ?? null });

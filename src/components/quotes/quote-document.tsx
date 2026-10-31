@@ -61,6 +61,18 @@ function LineItemsTable({ lines, amount }: { lines: QuoteLineInput[]; amount: nu
 
 function Block({ block, lines, amount }: { block: QuoteBlock; lines: QuoteLineInput[]; amount: number }) {
   switch (block.type) {
+    case "cover":
+      return (
+        <section className="qd-cover">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/shortclips-logo-ondark.png" alt="Shortclips" className="qd-cover-logo" />
+          <div className="qd-cover-body">
+            {block.eyebrow ? <div className="qd-cover-eyebrow">{block.eyebrow}</div> : null}
+            <h1 className="qd-cover-title">{block.title}</h1>
+            {block.subtitle ? <p className="qd-cover-subtitle">{block.subtitle}</p> : null}
+          </div>
+        </section>
+      );
     case "heading":
       return <h2 className="qd-h2">{block.text}</h2>;
     case "paragraph":
@@ -91,19 +103,26 @@ export function QuoteDocument({ company, quote, accent = "#00003b" }: { company:
   const brand = quote.content.accent || accent;
   const signed = quote.status === "ondertekend";
   const accepted = quote.status === "geaccepteerd" || signed;
+  const allBlocks = quote.content.blocks ?? [];
+  const cover = allBlocks.find((b) => b.type === "cover");
+  const bodyBlocks = allBlocks.filter((b) => b.type !== "cover");
   return (
     <article className="qd" style={{ ["--qd-brand" as string]: brand }}>
-      <header className="qd-header">
-        <div className="qd-brandblock">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/shortclips-logo-onlight.png" alt={company.name} className="qd-logo" />
-        </div>
-        <div className="qd-meta">
-          <div className="qd-meta-title">Offerte</div>
-          <div className="qd-meta-line">Nr. {quote.number}</div>
-          <div className="qd-meta-line">{fmtDate(quote.createdAt)}</div>
-        </div>
-      </header>
+      {cover && cover.type === "cover" ? (
+        <Block block={cover} lines={quote.lines} amount={quote.amount} />
+      ) : (
+        <header className="qd-header">
+          <div className="qd-brandblock">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/shortclips-logo-onlight.png" alt={company.name} className="qd-logo" />
+          </div>
+          <div className="qd-meta">
+            <div className="qd-meta-title">Offerte</div>
+            <div className="qd-meta-line">Nr. {quote.number}</div>
+            <div className="qd-meta-line">{fmtDate(quote.createdAt)}</div>
+          </div>
+        </header>
+      )}
 
       <div className="qd-parties">
         <div>
@@ -112,18 +131,18 @@ export function QuoteDocument({ company, quote, accent = "#00003b" }: { company:
           {quote.recipientContactName ? <div>t.a.v. {quote.recipientContactName}</div> : null}
         </div>
         <div style={{ textAlign: "right" }}>
-          <div className="qd-label">Van</div>
-          <div className="qd-strong">{company.name}</div>
-          {company.address ? <div>{company.address}</div> : null}
-          {company.postalCity ? <div>{company.postalCity}</div> : null}
-          {company.email ? <div>{company.email}</div> : null}
+          <div className="qd-label">{cover ? `Offerte nr. ${quote.number}` : "Van"}</div>
+          {cover ? <div className="qd-strong">{fmtDate(quote.createdAt)}</div> : <div className="qd-strong">{company.name}</div>}
+          {cover ? <div>{company.name}</div> : company.address ? <div>{company.address}</div> : null}
+          {!cover && company.postalCity ? <div>{company.postalCity}</div> : null}
+          {!cover && company.email ? <div>{company.email}</div> : null}
         </div>
       </div>
 
       <h1 className="qd-h1">{quote.title}</h1>
       {quote.content.intro ? <p className="qd-p" style={{ whiteSpace: "pre-wrap" }}>{quote.content.intro}</p> : null}
 
-      {(quote.content.blocks ?? []).map((b, i) => <Block key={i} block={b} lines={quote.lines} amount={quote.amount} />)}
+      {bodyBlocks.map((b, i) => <Block key={i} block={b} lines={quote.lines} amount={quote.amount} />)}
 
       {accepted ? (
         <div className="qd-stamp">
@@ -149,6 +168,14 @@ export function QuoteDocument({ company, quote, accent = "#00003b" }: { company:
 export const QUOTE_DOCUMENT_CSS = `
   .qd { --qd-brand:#00003b; max-width: 800px; margin: 0 auto; background:#fff; color:#1a1d29;
         font-family: var(--font-poppins), system-ui, sans-serif; padding: 48px 56px; box-sizing:border-box; }
+  /* Navy hero-cover: loopt edge-to-edge binnen het document. */
+  .qd-cover { position:relative; margin: -48px -56px 28px; padding: 56px; min-height: 420px;
+    display:flex; flex-direction:column; justify-content:space-between;
+    background: radial-gradient(120% 120% at 80% 0%, #0a1a6b 0%, #00003b 55%, #00002a 100%); color:#fff; }
+  .qd-cover-logo { height: 34px; width:auto; align-self:flex-end; }
+  .qd-cover-eyebrow { color:#2E90FA; font-weight:600; font-size:15px; margin-bottom:10px; }
+  .qd-cover-title { font-size:40px; line-height:1.05; font-weight:700; margin:0; max-width:11ch; }
+  .qd-cover-subtitle { margin-top:16px; font-size:14px; line-height:1.6; max-width:52ch; color:rgba(255,255,255,0.82); }
   .qd-header { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; border-bottom:3px solid var(--qd-brand); padding-bottom:18px; }
   .qd-logo { height:40px; width:auto; }
   .qd-meta { text-align:right; }
