@@ -54,6 +54,7 @@ export async function listClients(viewer: Viewer) {
       lastActivityAt: clients.lastActivityAt,
       coordinatorId: clients.coordinatorId,
       coordinatorName: users.fullName,
+      coordinatorAvatar: users.avatarUrl,
       publishedThisMonth: sql<number>`(
         select count(*) from deliverables d
         where d.client_id = clients.id and d.deleted_at is null

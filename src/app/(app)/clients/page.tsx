@@ -26,6 +26,7 @@ export default async function ClientsPage() {
     logoUrl: c.logoUrl,
     coordinatorId: c.coordinatorId,
     coordinatorName: c.coordinatorName,
+    coordinatorAvatar: c.coordinatorAvatar,
     nextShoot: c.nextShoot,
     inProduction: Number(c.inProduction),
     shortsPerMonth: Number(c.monthlyVideoQuota),

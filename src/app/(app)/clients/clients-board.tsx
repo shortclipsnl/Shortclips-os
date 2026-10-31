@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Search } from "lucide-react";
-import { ClientLogo } from "@/components/ui";
+import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { setClientStatus } from "@/server/actions/clients";
 
@@ -17,6 +17,7 @@ export type BoardClient = {
   logoUrl: string | null;
   coordinatorId: string | null;
   coordinatorName: string | null;
+  coordinatorAvatar: string | null;
   nextShoot: string | null;
   inProduction: number;
   shortsPerMonth: number;
@@ -37,34 +38,47 @@ function Chip({ children, tone }: { children: React.ReactNode; tone: "blue" | "i
 
 const STOPPED = new Set(["paused", "churned"]);
 
-export function ClientsBoard({ clients, viewerId, defaultPod = "alle", coveringIds = [], coveringNames = [] }: { clients: BoardClient[]; viewerId?: string; defaultPod?: "mijn" | "alle"; coveringIds?: string[]; coveringNames?: string[] }) {
+export function ClientsBoard({ clients, viewerId, defaultPod = "alle", coveringNames = [] }: { clients: BoardClient[]; viewerId?: string; defaultPod?: "mijn" | "alle"; coveringIds?: string[]; coveringNames?: string[] }) {
   const [q, setQ] = useState("");
   // Standaard alleen de actieve klanten; niet-actieve nemen pas ruimte in als je
   // daar bewust naar wisselt.
   const [view, setView] = useState<"active" | "inactive">("active");
-  // "Mijn klanten" = jouw pod (waar jij verantwoordelijke bent), met schakelaar
-  // naar "Alle klanten". Standaard je eigen pod als je er een hebt.
-  const [pod, setPod] = useState<"mijn" | "alle">(defaultPod);
-  // Vervanging bij afwezigheid: klanten van wie je nu vervangt horen ook bij "mijn".
-  const isMine = (c: BoardClient) => !!viewerId && (c.coordinatorId === viewerId || (!!c.coordinatorId && coveringIds.includes(c.coordinatorId)));
-  const myCount = useMemo(() => clients.filter(isMine).length, [clients, viewerId, coveringIds]); // eslint-disable-line react-hooks/exhaustive-deps
-  const inPod = (c: BoardClient) => pod === "alle" || isMine(c);
+  // Filter op verantwoordelijke via de avatars: null = iedereen, anders de
+  // coordinatorId van die persoon. Standaard je eigen klanten als je er hebt.
+  const viewerHasClients = !!viewerId && clients.some((c) => c.coordinatorId === viewerId);
+  const [person, setPerson] = useState<string | null>(defaultPod === "mijn" && viewerHasClients ? viewerId! : null);
+
+  // De verantwoordelijken (met hun klantentelling) voor de avatar-rij — jijzelf
+  // vooraan, daarna op aantal klanten.
+  const coordinators = useMemo(() => {
+    const m = new Map<string, { id: string; name: string; avatar: string | null; count: number }>();
+    for (const c of clients) {
+      if (!c.coordinatorId) continue;
+      const e = m.get(c.coordinatorId) ?? { id: c.coordinatorId, name: c.coordinatorName ?? "?", avatar: c.coordinatorAvatar, count: 0 };
+      e.count++;
+      m.set(c.coordinatorId, e);
+    }
+    return [...m.values()].sort((a, b) => (a.id === viewerId ? -1 : b.id === viewerId ? 1 : 0) || b.count - a.count || a.name.localeCompare(b.name));
+  }, [clients, viewerId]);
+
+  const inPerson = (c: BoardClient) => person === null || c.coordinatorId === person;
 
   const { active, inactive } = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const match = (c: BoardClient) => (!term || c.name.toLowerCase().includes(term)) && inPod(c);
+    const match = (c: BoardClient) => (!term || c.name.toLowerCase().includes(term)) && inPerson(c);
     return {
       active: clients.filter((c) => !STOPPED.has(c.status) && match(c)),
       inactive: clients.filter((c) => STOPPED.has(c.status) && match(c)),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clients, q, pod, viewerId]);
+  }, [clients, q, person]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const totalActive = useMemo(() => clients.filter((c) => !STOPPED.has(c.status) && inPod(c)).length, [clients, pod, viewerId]);
+  const totalActive = useMemo(() => clients.filter((c) => !STOPPED.has(c.status) && inPerson(c)).length, [clients, person]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const totalInactive = useMemo(() => clients.filter((c) => STOPPED.has(c.status) && inPod(c)).length, [clients, pod, viewerId]);
+  const totalInactive = useMemo(() => clients.filter((c) => STOPPED.has(c.status) && inPerson(c)).length, [clients, person]);
   const shown = view === "active" ? active : inactive;
+  const firstName = (n: string) => n.split(" ")[0] ?? n;
 
   return (
     <div>
@@ -74,27 +88,40 @@ export function ClientsBoard({ clients, viewerId, defaultPod = "alle", coveringI
         </div>
       ) : null}
 
-      {/* Pod-schakelaar: eigen klanten vs. alle klanten (alleen als je een pod hebt). */}
-      {viewerId && myCount > 0 ? (
-        <div className="mb-3 inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
-          {([
-            { key: "mijn", label: "Mijn klanten", count: myCount },
-            { key: "alle", label: "Alle klanten", count: clients.length },
-          ] as const).map((opt) => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => setPod(opt.key)}
-              className={
-                pod === opt.key
-                  ? "inline-flex items-center gap-2 rounded-[4px] bg-[var(--color-brand-600)] px-3 py-1.5 text-xs font-semibold text-white"
-                  : "inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-              }
-            >
-              {opt.label}
-              <span className={`rounded-full px-1.5 text-2xs font-semibold ${pod === opt.key ? "bg-white/20" : "bg-[var(--color-surface-2)]"}`}>{opt.count}</span>
-            </button>
-          ))}
+      {/* Verantwoordelijke-filter: klik op een teamlid om diens klanten te zien. */}
+      {coordinators.length > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="mr-0.5 text-xs text-[var(--color-ink-faint)]">Verantwoordelijke</span>
+          <button
+            type="button"
+            onClick={() => setPerson(null)}
+            aria-pressed={person === null}
+            className={person === null
+              ? "inline-flex items-center gap-1.5 rounded-full bg-[var(--color-indigo-ink)] px-3 py-1 text-xs font-semibold text-white"
+              : "inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] px-3 py-1 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}
+          >
+            Iedereen
+            <span className={`rounded-full px-1.5 text-2xs font-semibold ${person === null ? "bg-white/20" : "bg-[var(--color-surface-2)]"}`}>{clients.length}</span>
+          </button>
+          {coordinators.map((p) => {
+            const active = person === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPerson(active ? null : p.id)}
+                aria-pressed={active}
+                title={active ? "Filter uitzetten" : `Toon klanten van ${p.name}`}
+                className={active
+                  ? "inline-flex items-center gap-1.5 rounded-full bg-[var(--color-indigo-ink)] py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-white"
+                  : "inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] py-0.5 pl-0.5 pr-2.5 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}
+              >
+                <TeamAvatar name={p.name} avatarUrl={p.avatar} size={24} />
+                {firstName(p.name)}{p.id === viewerId ? " (jij)" : ""}
+                <span className={`rounded-full px-1.5 text-2xs font-semibold ${active ? "bg-white/20" : "bg-[var(--color-surface-2)]"}`}>{p.count}</span>
+              </button>
+            );
+          })}
         </div>
       ) : null}
 
