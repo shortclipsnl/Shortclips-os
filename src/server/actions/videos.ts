@@ -707,3 +707,33 @@ export async function attachBriefingToProject(input: { videoId: string; briefing
     throw error;
   }
 }
+
+/** De gekoppelde editingbriefing weer verwijderen (krumpje weg bij de opdracht). */
+export async function clearBriefingFromProject(videoId: string): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const video = await loadVideo(videoId);
+    if (!video) return { ok: false, message: "Project niet gevonden." };
+    assertClientAccess(viewer, video.clientId);
+
+    await db
+      .update(deliverables)
+      .set({ briefing: null, updatedAt: new Date() })
+      .where(eq(deliverables.id, videoId));
+
+    await auditLog({
+      viewer,
+      action: "video.briefing_cleared",
+      entityType: "deliverable",
+      entityId: videoId,
+      clientId: video.clientId,
+    });
+
+    revalidatePath(`/videos/${videoId}`);
+    revalidatePath("/videos");
+    return { ok: true, message: "Briefing verwijderd." };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}

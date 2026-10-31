@@ -3,13 +3,13 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Download, FileText, Loader2, MessageSquare, Pencil, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ClipboardList, Download, FileText, Loader2, MessageSquare, Pencil, Upload, X } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { editorColor, editorDisplayName, firstNameKey } from "@/lib/editors";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase, type VideoStage } from "@/lib/statuses";
-import { askEditorQuestion, assignEditor, changeVideoStatus, createVideoScriptUploadUrl, deleteVideoScript, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts, uploadVideoScript } from "@/server/actions/videos";
+import { askEditorQuestion, assignEditor, attachBriefingToProject, changeVideoStatus, clearBriefingFromProject, createVideoScriptUploadUrl, deleteVideoScript, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts, uploadVideoScript } from "@/server/actions/videos";
 import { fileToBase64 } from "../ai/_shared";
 import type { EditorBoardVideo } from "@/server/editor-board";
 
@@ -287,13 +287,18 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, viewerId, phaseColo
 
   return (
     <div className="grid items-stretch gap-px border-b border-[var(--color-line)] bg-[var(--color-surface)] text-sm hover:bg-[var(--color-surface-sunken)]/40" style={{ gridTemplateColumns: GRID }}>
-      {/* Item (klant) + "Vraag stellen"-knop voor de editor */}
-      <div className="flex items-center gap-1.5 px-2.5 py-2" style={{ boxShadow: `inset 4px 0 0 ${phaseColor}` }}>
-        <Link href={`/videos/${v.id}`} className="flex min-w-0 flex-1 items-center gap-2.5 font-medium hover:underline">
-          <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={28} />
-          <span className="truncate">{v.clientName}</span>
-        </Link>
-        <AskButton videoId={v.id} />
+      {/* Item (klant) + "Vraag stellen"-knop voor de editor, met daaronder het
+          editor-briefing-krumpje: centraal bij de opdracht, zodat de editor 'm
+          hier leest (niet meer los in de AI-tools). */}
+      <div className="flex flex-col justify-center gap-1 px-2.5 py-2" style={{ boxShadow: `inset 4px 0 0 ${phaseColor}` }}>
+        <div className="flex items-center gap-1.5">
+          <Link href={`/videos/${v.id}`} className="flex min-w-0 flex-1 items-center gap-2.5 font-medium hover:underline">
+            <ClientLogo name={v.clientName} logoUrl={v.clientLogo} color={v.clientColor} size={28} />
+            <span className="truncate">{v.clientName}</span>
+          </Link>
+          <AskButton videoId={v.id} />
+        </div>
+        <BriefingCell v={v} canEdit={canEdit} run={run} pending={pending} />
       </div>
 
       {/* Editor */}
@@ -359,6 +364,72 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, viewerId, phaseColo
         <ScriptUploadCell v={v} canEdit={filesEditable} run={run} pending={pending} />
       </div>
     </div>
+  );
+}
+
+/** Editor-briefing als krumpje direct bij de opdracht: de editor opent 'm hier en
+ *  leest centraal bij de opname wat de bedoeling is. Wie het bord mag bewerken
+ *  (coördinator/eigenaar) kan de briefing hier ook toevoegen of aanpassen. */
+function BriefingCell({ v, canEdit, run, pending }: { v: EditorBoardVideo; canEdit: boolean; run: (fn: () => Promise<unknown>) => void; pending: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(v.briefing ?? "");
+  const has = !!(v.briefing && v.briefing.trim());
+
+  // Niets te lezen en niet te bewerken → geen ruis in de cel.
+  if (!has && !canEdit) return null;
+
+  const close = () => { setOpen(false); setEditing(false); };
+
+  return (
+    <span className="relative inline-flex">
+      {has ? (
+        <button type="button" onClick={() => { setEditing(false); setOpen((o) => !o); }} title="Editor-briefing lezen"
+          className="inline-flex items-center gap-1 rounded-full bg-[var(--color-brand-50)] px-2 py-0.5 text-2xs font-semibold text-[var(--color-brand-700)] hover:brightness-95">
+          <ClipboardList className="size-3" /> Briefing
+        </button>
+      ) : (
+        <button type="button" onClick={() => { setVal(""); setEditing(true); setOpen(true); }}
+          className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--color-line-strong)] px-2 py-0.5 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+          <ClipboardList className="size-3" /> + briefing
+        </button>
+      )}
+      {open ? (
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={close} />
+          <div className="absolute left-0 top-full z-20 mt-1 w-72 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2.5 shadow-[var(--shadow-raised)]">
+            <p className="mb-1.5 flex items-center gap-1 text-2xs font-semibold text-[var(--color-ink-muted)]"><ClipboardList className="size-3" /> Editor-briefing</p>
+            {editing ? (
+              <>
+                <textarea autoFocus value={val} onChange={(e) => setVal(e.target.value)} rows={7}
+                  placeholder="Wat moet de editor weten voor deze opname? Stijl, hooks, muziek, do's &amp; don'ts…"
+                  className="sc-input w-full resize-none py-1 text-xs" />
+                <div className="mt-1.5 flex items-center justify-end gap-1.5">
+                  {has ? (
+                    <button type="button" onClick={() => { run(() => clearBriefingFromProject(v.id)); close(); }}
+                      className="mr-auto rounded px-2 py-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-bad)]">Verwijderen</button>
+                  ) : null}
+                  <button type="button" onClick={() => { setVal(v.briefing ?? ""); if (has) setEditing(false); else close(); }}
+                    className="rounded px-2 py-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleren</button>
+                  <button type="button" disabled={pending || !val.trim()} onClick={() => { run(() => attachBriefingToProject({ videoId: v.id, briefing: val.trim() })); close(); }}
+                    className="rounded bg-[var(--color-ink)] px-2.5 py-1 text-2xs font-semibold text-white disabled:opacity-50">Opslaan</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="max-h-56 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-[var(--color-ink)]">{v.briefing}</div>
+                {canEdit ? (
+                  <div className="mt-2 flex justify-end">
+                    <button type="button" onClick={() => { setVal(v.briefing ?? ""); setEditing(true); }}
+                      className="inline-flex items-center gap-1 rounded px-2 py-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"><Pencil className="size-3" /> Aanpassen</button>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+        </>
+      ) : null}
+    </span>
   );
 }
 
