@@ -77,12 +77,17 @@ function DoelenLegeStaat({ isOwner }: { isOwner: boolean }) {
 
 export function DoelenBoard({ overview, isOwner }: { overview: GoalsOverview; isOwner: boolean }) {
   const [filter, setFilter] = useState<string>("alles");
+  // Status-filter via de tegels: klik een tegel om alleen die status te tonen,
+  // nog eens klikken zet 'm weer uit. Werkt samen met het categorie-filter.
+  const [statusFilter, setStatusFilter] = useState<GoalStatus | null>(null);
 
   const rows = useMemo(() => {
-    if (filter === "alles") return overview.rows;
-    if (filter === "aandacht") return overview.rows.filter((r) => ["achter", "risico", "niet_bijgewerkt"].includes(r.status));
-    return overview.rows.filter((r) => r.pillar === filter);
-  }, [overview.rows, filter]);
+    let r = overview.rows;
+    if (filter === "aandacht") r = r.filter((x) => ["achter", "risico", "niet_bijgewerkt"].includes(x.status));
+    else if (filter !== "alles") r = r.filter((x) => x.pillar === filter);
+    if (statusFilter) r = r.filter((x) => x.status === statusFilter);
+    return r;
+  }, [overview.rows, filter, statusFilter]);
 
   const pillars = useMemo(() => {
     const keys = [...new Set(rows.map((r) => r.pillar))];
@@ -103,15 +108,47 @@ export function DoelenBoard({ overview, isOwner }: { overview: GoalsOverview; is
 
   return (
     <div className="space-y-5">
-      {/* Statustegels */}
+      {/* Statustegels — klikbaar: filtert de lijst op die status. */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-        {TILE_ORDER.map((s) => (
-          <div key={s} className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3" style={{ boxShadow: `inset 3px 0 0 ${STATUS_META[s].color}` }}>
-            <div className="text-2xl font-bold tabular-nums" style={{ color: STATUS_META[s].color }}>{overview.counts[s]}</div>
-            <div className="text-2xs font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">{STATUS_META[s].label}</div>
-          </div>
-        ))}
+        {TILE_ORDER.map((s) => {
+          const count = overview.counts[s];
+          const active = statusFilter === s;
+          const clickable = count > 0;
+          return (
+            <button
+              key={s}
+              type="button"
+              disabled={!clickable}
+              aria-pressed={active}
+              onClick={() => setStatusFilter((cur) => (cur === s ? null : s))}
+              title={clickable ? (active ? "Filter uitzetten" : `Toon alleen "${STATUS_META[s].label}"`) : undefined}
+              className={`rounded-[var(--radius-md)] border border-[var(--color-line)] p-3 text-left transition ${
+                active
+                  ? "bg-[var(--color-surface-2)]"
+                  : clickable
+                    ? "bg-[var(--color-surface)] hover:bg-[var(--color-surface-sunken)] cursor-pointer"
+                    : "bg-[var(--color-surface)] opacity-60 cursor-default"
+              }`}
+              style={{ boxShadow: `inset 3px 0 0 ${STATUS_META[s].color}`, ...(active ? { outline: `2px solid ${STATUS_META[s].color}`, outlineOffset: "-1px" } : {}) }}
+            >
+              <div className="text-2xl font-bold tabular-nums" style={{ color: STATUS_META[s].color }}>{count}</div>
+              <div className="text-2xs font-medium uppercase tracking-wide text-[var(--color-ink-muted)]">{STATUS_META[s].label}</div>
+            </button>
+          );
+        })}
       </div>
+
+      {/* Actief status-filter: duidelijke indicatie + wissen. */}
+      {statusFilter ? (
+        <div className="-mt-2 flex items-center gap-2 text-xs">
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold text-white" style={{ background: STATUS_META[statusFilter].color }}>
+            {STATUS_META[statusFilter].label}
+          </span>
+          <button type="button" onClick={() => setStatusFilter(null)} className="font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:underline">
+            filter wissen
+          </button>
+        </div>
+      ) : null}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-1.5">
@@ -128,7 +165,7 @@ export function DoelenBoard({ overview, isOwner }: { overview: GoalsOverview; is
       {pillars.length === 0 ? (
         <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-line-strong)] px-4 py-8 text-center text-sm text-[var(--color-ink-muted)]">Geen doelen in deze weergave.</div>
       ) : (
-        pillars.map((p) => <PillarBlock key={p.key} pillar={p} isOwner={isOwner} />)
+        pillars.map((p) => <PillarBlock key={`${p.key}:${statusFilter ?? "all"}`} pillar={p} isOwner={isOwner} initialOpen={statusFilter != null} />)
       )}
 
       <MeldingUitleg />
@@ -136,9 +173,9 @@ export function DoelenBoard({ overview, isOwner }: { overview: GoalsOverview; is
   );
 }
 
-function PillarBlock({ pillar, isOwner }: { pillar: GoalsOverview["pillars"][number]; isOwner: boolean }) {
+function PillarBlock({ pillar, isOwner, initialOpen = false }: { pillar: GoalsOverview["pillars"][number]; isOwner: boolean; initialOpen?: boolean }) {
   const hasRood = pillar.rows.some((r) => r.status === "achter");
-  const [open, setOpen] = useState(hasRood);
+  const [open, setOpen] = useState(initialOpen || hasRood);
   const summary = (["op_koers", "risico", "achter", "niet_bijgewerkt", "gepland", "gehaald"] as GoalStatus[])
     .filter((s) => pillar.counts[s] > 0)
     .map((s) => `${pillar.counts[s]} ${STATUS_META[s].label.toLowerCase()}`)
