@@ -1,4 +1,4 @@
-import { euro, lineTotal, type QuoteBlock, type QuoteContent, type QuoteLineInput } from "@/lib/quotes";
+import { btwAmount, euro, lineTotal, totalIncl, type QuoteBlock, type QuoteContent, type QuoteLineInput } from "@/lib/quotes";
 import type { CompanyInfo } from "@/server/quotes/company";
 
 /**
@@ -51,8 +51,16 @@ function LineItemsTable({ lines, amount }: { lines: QuoteLineInput[]; amount: nu
       </tbody>
       <tfoot>
         <tr>
-          <td colSpan={3} style={{ textAlign: "right", fontWeight: 700 }}>Totaal (excl. btw)</td>
-          <td style={{ textAlign: "right", fontWeight: 700 }}>{euro(amount)}</td>
+          <td colSpan={3} style={{ textAlign: "right" }}>Subtotaal (excl. btw)</td>
+          <td style={{ textAlign: "right" }}>{euro(amount)}</td>
+        </tr>
+        <tr>
+          <td colSpan={3} style={{ textAlign: "right" }}>Btw 21%</td>
+          <td style={{ textAlign: "right" }}>{euro(btwAmount(amount))}</td>
+        </tr>
+        <tr>
+          <td colSpan={3} style={{ textAlign: "right", fontWeight: 700 }}>Totaal (incl. btw)</td>
+          <td style={{ textAlign: "right", fontWeight: 700 }}>{euro(totalIncl(amount))}</td>
         </tr>
       </tfoot>
     </table>
@@ -70,6 +78,16 @@ function Block({ block, lines, amount }: { block: QuoteBlock; lines: QuoteLineIn
             {block.eyebrow ? <div className="qd-cover-eyebrow">{block.eyebrow}</div> : null}
             <h1 className="qd-cover-title">{block.title}</h1>
             {block.subtitle ? <p className="qd-cover-subtitle">{block.subtitle}</p> : null}
+            {block.stats && block.stats.length ? (
+              <div className="qd-cover-stats">
+                {block.stats.map((s, i) => (
+                  <div key={i} className="qd-stat">
+                    <div className="qd-stat-value">{s.value}</div>
+                    <div className="qd-stat-label">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         </section>
       );
@@ -176,6 +194,9 @@ export const QUOTE_DOCUMENT_CSS = `
   .qd-cover-eyebrow { color:#2E90FA; font-weight:600; font-size:15px; margin-bottom:10px; }
   .qd-cover-title { font-size:40px; line-height:1.05; font-weight:700; margin:0; max-width:11ch; }
   .qd-cover-subtitle { margin-top:16px; font-size:14px; line-height:1.6; max-width:52ch; color:rgba(255,255,255,0.82); }
+  .qd-cover-stats { display:flex; flex-wrap:wrap; gap:28px; margin-top:28px; }
+  .qd-stat-value { font-size:26px; font-weight:700; color:#fff; line-height:1; }
+  .qd-stat-label { margin-top:4px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:rgba(255,255,255,0.65); }
   .qd-header { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; border-bottom:3px solid var(--qd-brand); padding-bottom:18px; }
   .qd-logo { height:40px; width:auto; }
   .qd-meta { text-align:right; }
@@ -194,7 +215,9 @@ export const QUOTE_DOCUMENT_CSS = `
   .qd-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
   .qd-table th { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:#8a94a6; padding:8px; border-bottom:2px solid #e6e9f0; }
   .qd-table td { padding:10px 8px; border-bottom:1px solid #eef1f6; }
-  .qd-table tfoot td { border-top:2px solid var(--qd-brand); border-bottom:none; padding-top:12px; font-size:15px; }
+  .qd-table tfoot td { border-bottom:none; font-size:13px; padding:4px 8px; }
+  .qd-table tfoot tr:first-child td { border-top:2px solid var(--qd-brand); padding-top:12px; }
+  .qd-table tfoot tr:last-child td { font-size:15px; }
   .qd-terms { background:#f6f8fc; border-radius:10px; padding:14px 18px; }
   .qd-stamp { display:inline-block; margin-top:22px; border:2px solid var(--qd-brand); color:var(--qd-brand);
               font-weight:700; padding:8px 16px; border-radius:8px; transform:rotate(-2deg); }

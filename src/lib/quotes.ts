@@ -4,8 +4,10 @@
  * de PDF renderen uit ditzelfde model, zodat alles identiek is.
  */
 
+export type QuoteStat = { value: string; label: string };
+
 export type QuoteBlock =
-  | { type: "cover"; eyebrow?: string; title: string; subtitle?: string } // navy hero-cover
+  | { type: "cover"; eyebrow?: string; title: string; subtitle?: string; stats?: QuoteStat[] } // navy hero-cover
   | { type: "heading"; text: string }
   | { type: "paragraph"; text: string }
   | { type: "image"; url: string; alt?: string }
@@ -48,6 +50,15 @@ export function sumLines(lines: QuoteLineInput[]): number {
 
 export function euro(v: number): string {
   return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(v);
+}
+
+/** Nederlandse btw (standaard 21%). Offertes tonen subtotaal, btw en totaal incl. */
+export const BTW_RATE = 0.21;
+export function btwAmount(subtotal: number): number {
+  return Math.round(subtotal * BTW_RATE * 100) / 100;
+}
+export function totalIncl(subtotal: number): number {
+  return Math.round(subtotal * (1 + BTW_RATE) * 100) / 100;
 }
 
 /** Vervangt {{sleutel}} in alle tekstvelden door de opgegeven variabelen. */

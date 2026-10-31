@@ -56,9 +56,10 @@ export function TemplateEditor({ id, name: initialName, content: initial }: { id
             </div>
             {b.type === "cover" ? (
               <div className="space-y-1.5">
-                <input className="sc-input" placeholder="Eyebrow (bijv. Offerte 2026)" value={b.eyebrow ?? ""} onChange={(e) => setBlock(i, { type: "cover", eyebrow: e.target.value, title: b.title, subtitle: b.subtitle })} />
-                <input className="sc-input font-semibold" placeholder="Grote titel" value={b.title} onChange={(e) => setBlock(i, { type: "cover", eyebrow: b.eyebrow, title: e.target.value, subtitle: b.subtitle })} />
-                <textarea className="sc-input min-h-[60px]" placeholder="Ondertitel" value={b.subtitle ?? ""} onChange={(e) => setBlock(i, { type: "cover", eyebrow: b.eyebrow, title: b.title, subtitle: e.target.value })} />
+                <input className="sc-input" placeholder="Eyebrow (bijv. Offerte 2026)" value={b.eyebrow ?? ""} onChange={(e) => setBlock(i, { ...b, eyebrow: e.target.value })} />
+                <input className="sc-input font-semibold" placeholder="Grote titel" value={b.title} onChange={(e) => setBlock(i, { ...b, title: e.target.value })} />
+                <textarea className="sc-input min-h-[60px]" placeholder="Ondertitel" value={b.subtitle ?? ""} onChange={(e) => setBlock(i, { ...b, subtitle: e.target.value })} />
+                {b.stats && b.stats.length ? <p className="text-2xs text-[var(--color-ink-faint)]">Statistieken op de cover: {b.stats.map((s) => `${s.value} ${s.label}`).join(" · ")}</p> : null}
               </div>
             ) : b.type === "heading" ? (
               <input className="sc-input" value={b.text} onChange={(e) => setBlock(i, { type: "heading", text: e.target.value })} />
