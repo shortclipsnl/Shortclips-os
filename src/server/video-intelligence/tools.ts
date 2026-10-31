@@ -124,3 +124,15 @@ export const tools = {
   whisper: () => venvHas("faster_whisper", "__whisper"),
   ocr: () => venvHas("rapidocr_onnxruntime", "__ocr"),
 };
+
+/**
+ * Draait deze omgeving het zware videowerk (transcriptie/OCR/URL-ophalen) zelf?
+ * Alleen een machine mét die tools (lokaal of de aparte verwerk-server) doet dat.
+ * Op Vercel ontbreken ze → dan wordt de analyse enkel in de wachtrij gezet
+ * (status "queued") en pakt de worker 'm op. ffmpeg telt hier bewust niet mee:
+ * dat zit als npm-pakket óók op Vercel en is dus geen goede scheidslijn.
+ */
+export async function canRunHeavyPipeline(): Promise<boolean> {
+  const [w, o, y] = await Promise.all([tools.whisper(), tools.ocr(), tools.ytdlp()]);
+  return w || o || y;
+}

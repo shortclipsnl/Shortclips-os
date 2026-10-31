@@ -8,8 +8,23 @@ import { videoAnalyses, videoAnalysisSteps, videoHooks, publications } from "@/d
 import { requirePermission, assertClientAccess, hasClientAccess, ForbiddenError } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { runPipeline } from "@/server/video-intelligence/pipeline";
+import { canRunHeavyPipeline } from "@/server/video-intelligence/tools";
 
 export type ActionResult<T = undefined> = { ok: true; data?: T } | { ok: false; message: string };
+
+/**
+ * Start de verwerking in de achtergrond — maar alléén op een omgeving die de
+ * zware tools heeft (lokaal of de aparte verwerk-server). Op Vercel ontbreken
+ * die; dan blijft de analyse "queued" staan en pakt de verwerk-server 'm op.
+ * Zo krijg je nooit meer een half-verwerkt resultaat uit de online hub.
+ */
+async function kickoff(id: string): Promise<void> {
+  try {
+    if (await canRunHeavyPipeline()) await runPipeline(id);
+  } catch {
+    /* fouten belanden in video_analyses.error via runPipeline zelf */
+  }
+}
 
 function fail(e: unknown): ActionResult<never> {
   if (e instanceof ForbiddenError) return { ok: false, message: e.message };
@@ -66,7 +81,7 @@ export async function addVideoByUrl(input: { clientId: string; url: string; titl
     await auditLog({ viewer, action: "video_intelligence.add", entityType: "video_analysis", entityId: id, clientId: input.clientId });
 
     // Verwerking start in de achtergrond (in-proces).
-    after(() => runPipeline(id).catch(() => {}));
+    after(() => kickoff(id));
     revalidatePath("/video-intelligence");
     return { ok: true, data: { id } };
   } catch (e) {
@@ -87,7 +102,7 @@ export async function reprocessAnalysis(id: string): Promise<ActionResult> {
       (["download", "probe", "shots", "editing", "ocr", "transcribe", "vision", "insights"] as const).map((step) => ({ analysisId: id, step })),
     );
     await db.update(videoAnalyses).set({ status: "queued", error: null, updatedAt: new Date() }).where(eq(videoAnalyses.id, id));
-    after(() => runPipeline(id).catch(() => {}));
+    after(() => kickoff(id));
     revalidatePath(`/video-intelligence/${id}`);
     return { ok: true };
   } catch (e) {
@@ -113,7 +128,7 @@ export async function reprocessMany(ids: string[]): Promise<ActionResult<{ count
         (["download", "probe", "shots", "editing", "ocr", "transcribe", "vision", "insights"] as const).map((step) => ({ analysisId: r.id, step })),
       );
       await db.update(videoAnalyses).set({ status: "queued", error: null, updatedAt: new Date() }).where(eq(videoAnalyses.id, r.id));
-      after(() => runPipeline(r.id).catch(() => {}));
+      after(() => kickoff(r.id));
       count++;
     }
     revalidatePath("/video-intelligence");

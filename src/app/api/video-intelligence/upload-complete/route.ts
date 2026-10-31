@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { videoAnalyses, videoAnalysisSteps } from "@/db/schema";
 import { getViewer, hasClientAccess } from "@/server/auth/context";
 import { runPipeline } from "@/server/video-intelligence/pipeline";
+import { canRunHeavyPipeline } from "@/server/video-intelligence/tools";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,12 @@ export async function POST(req: NextRequest) {
     .values((["download", "probe", "shots", "editing", "ocr", "transcribe", "vision", "insights"] as const).map((step) => ({ analysisId: id, step })))
     .onConflictDoNothing();
 
-  after(() => runPipeline(id).catch(() => {}));
+  // Alleen inline verwerken op een omgeving met de tools (lokaal/verwerk-server).
+  // Op Vercel blijft de analyse "queued" en pakt de aparte worker 'm op.
+  after(async () => {
+    try {
+      if (await canRunHeavyPipeline()) await runPipeline(id);
+    } catch { /* fouten belanden in video_analyses.error */ }
+  });
   return NextResponse.json({ ok: true, id });
 }

@@ -1,7 +1,7 @@
 import type { Tone } from "@/components/ui";
 
 export const VI_STATUS: Record<string, { label: string; tone: Tone }> = {
-  queued: { label: "In wachtrij", tone: "neutral" },
+  queued: { label: "In wachtrij", tone: "info" },
   downloading: { label: "Downloaden", tone: "info" },
   processing: { label: "Verwerken", tone: "info" },
   needs_ai: { label: "Wacht op AI/tools", tone: "warn" },

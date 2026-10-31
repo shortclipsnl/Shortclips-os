@@ -102,6 +102,12 @@ export default async function AnalysisPage({ params }: { params: Promise<{ id: s
         <Badge tone={VI_STATUS[a.status]?.tone ?? "neutral"}>{VI_STATUS[a.status]?.label ?? a.status}</Badge>
       </div>
 
+      {a.status === "queued" ? (
+        <p className="rounded-[var(--radius-md)] border border-[var(--color-info)]/30 bg-[var(--color-info-soft)] px-3.5 py-2.5 text-sm text-[var(--color-ink-muted)]">
+          In de wachtrij — de verwerk-server pakt deze analyse op zodra die vrij is. Dit kan enkele minuten duren; de pagina ververst automatisch.
+        </p>
+      ) : null}
+
       <AnalysisView data={data} canRun={viewer.permissions.has("video_intelligence:run")} />
     </div>
   );

@@ -22,6 +22,7 @@
     "test:watch": "vitest",
     "kb:import": "tsx scripts/kennisbank-import.ts",
     "kosten:seed": "tsx scripts/kosten-seed.ts",
+    "vi:worker": "NODE_OPTIONS=--conditions=react-server tsx scripts/vi-worker.ts",
     "vermogen:seed": "tsx scripts/vermogen-seed.ts",
     "data:fixes": "tsx scripts/data-fixes.ts",
     "portal:testclients": "tsx scripts/portal-test-clients.ts"
