@@ -66,6 +66,8 @@ async function seedClient(
     title: `${tag}-publicatie`,
     scheduledOn: FUTURE,
     status: "scheduled",
+    // Goedgekeurd én gedeeld: alleen zo hoort geplande publicatie in de klantkalender.
+    clientApproved: true,
     platforms: ["instagram"],
   });
 
