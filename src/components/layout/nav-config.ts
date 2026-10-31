@@ -102,6 +102,7 @@ export const NAVIGATION: NavGroup[] = [
     accent: "var(--color-good)",
     items: [
       { href: "/leads", label: "Leads", icon: "Target", ownerOnly: true, match: "/leads" },
+      { href: "/offertes", label: "Offertes", icon: "FileSignature", ownerOnly: true, match: "/offertes" },
       { href: "/financien", label: "Financiën", icon: "Landmark", ownerOnly: true, match: "/financien" },
       { href: "/kosten", label: "Kostenmonitor", icon: "ReceiptEuro", ownerOnly: true, match: "/kosten" },
       { href: "/editkosten", label: "Winst & editkosten", icon: "Euro", ownerOnly: true, match: "/editkosten" },

@@ -291,3 +291,14 @@ export const scriptReviewStatusEnum = pgEnum("script_review_status", [
   "opnieuw_controle", // Nieuwe versie klaar — opnieuw bij de klant
   "goedgekeurd",      // Definitief goedgekeurd
 ]);
+
+/** Status van een offerte (PandaDoc-vervanger). */
+export const quoteStatusEnum = pgEnum("quote_status", [
+  "concept",       // Nog niet gedeeld
+  "verzonden",     // Als gedeeld gemarkeerd, nog niet bekeken
+  "bekeken",       // Klant heeft de offertelink geopend
+  "geaccepteerd",  // Klant heeft digitaal geaccepteerd
+  "ondertekend",   // Gekwalificeerde e-handtekening gezet (QES)
+  "afgewezen",     // Klant heeft afgewezen
+  "verlopen",      // Vervaldatum voorbij zonder actie
+]);

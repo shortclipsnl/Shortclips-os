@@ -91,6 +91,20 @@ const schema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_VI_BUCKET: z.string().default("video-intelligence"),
   SUPABASE_SCRIPTS_BUCKET: z.string().default("script-reviews"),
+  SUPABASE_OFFERTES_BUCKET: z.string().default("offertes"),
+
+  // --- Offertes: e-handtekening (Signhost/Evidos, QES) ---
+  // Zonder deze waarden werkt de hele offertemodule, maar kan er geen
+  // gekwalificeerde handtekening gezet worden (alleen digitaal accepteren).
+  // SIGNHOST_API_KEY = APIKey-header, SIGNHOST_APP_KEY = Application-header.
+  // Gebruik eerst de sandbox-sleutels. Base-URL: https://api.signhost.com.
+  SIGNHOST_API_KEY: z.string().optional(),
+  SIGNHOST_APP_KEY: z.string().optional(),
+
+  // --- Offertes: PandaDoc-import/migratie ---
+  // Officiële PandaDoc API-sleutel (Workspace → API). Alleen nodig om de
+  // bestaande sjablonen en historische offertes over te nemen; daarna niet meer.
+  PANDADOC_API_KEY: z.string().optional(),
 
   // --- Achtergrondtaken ---
   CRON_SECRET: z.string().optional(),
