@@ -14,6 +14,26 @@ const BASE = "https://app.metricool.com/api/v2";
 export type MetricoolBrand = { id: number; label: string; userId: number };
 export type DailyPoint = { date: string; value: number };
 
+/** Eén gepubliceerde post/reel met zijn eigen cijfers (per-video). */
+export type MetricoolPost = {
+  externalId: string;
+  url: string | null;
+  caption: string | null;
+  thumbnailUrl: string | null;
+  publishedAt: string | null; // ISO-achtig, naïef (zoals Metricool levert)
+  views: number;
+  reach: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  avgWatchSeconds: number | null;
+  watchTimeSeconds: number;
+  durationSeconds: number | null;
+  /** 0..1, afgeleid uit gem. kijktijd / duur wanneer beide bekend zijn. */
+  completionRate: number | null;
+};
+
 /** De netwerken die we meenemen in de gecombineerde cijfers. Niet-gekoppelde
  *  netwerken of niet-beschikbare metrics leveren een lege reeks op (de sync
  *  slaat die vanzelf over), dus dit uitbreiden is veilig. */
@@ -72,6 +92,77 @@ export class MetricoolService {
       return [];
     }
   }
+
+  /**
+   * Per-post/per-reel cijfers voor één merk op één netwerk. `subject` is bv.
+   * "reels" of "posts"; het netwerk gaat in kleine letters in het pad
+   * (/analytics/<subject>/<network>). Geeft een lege lijst wanneer het netwerk
+   * niet gekoppeld is (403) of er niets is — zodat één netwerk de rest niet
+   * blokkeert.
+   */
+  async posts(
+    blogId: number,
+    userId: number,
+    network: string,
+    subject: string,
+    fromISO: string,
+    toISO: string,
+  ): Promise<MetricoolPost[]> {
+    try {
+      const res = await apiFetch<{ data?: Array<Record<string, unknown>> }>(
+        "metricool",
+        `${BASE}/analytics/${subject}/${network.toLowerCase()}`,
+        { headers: this.headers, retries: 0, query: { from: fromISO, to: toISO, blogId, userId } },
+      );
+      const rows = res.data ?? [];
+      return rows.map((r) => normalizePost(r)).filter((p): p is MetricoolPost => p !== null);
+    } catch {
+      return [];
+    }
+  }
+}
+
+const num = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+const firstNum = (...vals: unknown[]): number => {
+  for (const v of vals) if (v !== null && v !== undefined && Number.isFinite(Number(v))) return Number(v);
+  return 0;
+};
+const firstStr = (...vals: unknown[]): string | null => {
+  for (const v of vals) if (typeof v === "string" && v.trim()) return v;
+  return null;
+};
+
+/** Metricool-post/reel (meerdere vormen) → genormaliseerde MetricoolPost. */
+function normalizePost(r: Record<string, unknown>): MetricoolPost | null {
+  const externalId = firstStr(r.reelId, r.contentId, r.postId, r.id, r.mediaId);
+  if (!externalId) return null;
+  const pub = r.publishedAt as { dateTime?: string } | string | undefined;
+  const publishedAt = typeof pub === "string" ? pub : (pub?.dateTime ?? null);
+  const duration = firstNum(r.durationSeconds, r.duration) || null;
+  const avgWatch = r.averageWatchTime != null ? num(r.averageWatchTime) : null;
+  let completion: number | null = null;
+  if (avgWatch != null && duration && duration > 0) completion = Math.min(1, avgWatch / duration);
+  else if (r.reelsSkipRate != null) completion = Math.max(0, Math.min(1, 1 - num(r.reelsSkipRate) / 100));
+  return {
+    externalId,
+    url: firstStr(r.url, r.postUrl, r.link),
+    caption: firstStr(r.content, r.text, r.caption, r.title),
+    thumbnailUrl: firstStr(r.imageUrl, r.thumbnailUrl, r.picture, r.image),
+    publishedAt,
+    views: firstNum(r.views, r.impressionsTotal, r.impressions, r.videoViews),
+    reach: firstNum(r.reach),
+    likes: firstNum(r.likes),
+    comments: firstNum(r.comments),
+    shares: firstNum(r.shares),
+    saves: firstNum(r.saved, r.saves, r.saveCount),
+    avgWatchSeconds: avgWatch,
+    watchTimeSeconds: firstNum(r.videoViewTotalTime, r.watchTime),
+    durationSeconds: duration,
+    completionRate: completion,
+  };
 }
 
 export const metricool = new MetricoolService();

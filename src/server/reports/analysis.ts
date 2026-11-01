@@ -92,28 +92,29 @@ export async function generateMonthlyAnalysis(
 
   const strategy = await loadStrategyProfile(clientId);
 
-  // Per-video cijfers binnen de maand, met hook/format/pijler uit het script.
+  // Per-video cijfers binnen de maand. Publicatie-gericht: elke gepubliceerde
+  // post/reel met eigen cijfers telt als één video, inclusief via Metricool
+  // opgehaalde posts zonder interne deliverable (titel valt terug op de caption).
   const pvRes = await db.execute(sql`
     with pm as (
       select publication_id, max(views) views, max(likes) likes, max(comments) comments,
              max(shares) shares, max(saves) saves, max(avg_watch_seconds) avg_watch, max(completion_rate) completion
       from social_metrics where client_id = ${client.id} group by publication_id
     )
-    select d.title as titel, sc.hook as hook, sc.format as format, sc.pillar as pillar,
-           to_char(d.published_at, 'YYYY-MM-DD') as datum, p.external_url as url,
-           coalesce(sum(pm.views),0)::int as views, coalesce(sum(pm.likes),0)::int as likes,
-           coalesce(sum(pm.comments),0)::int as comments, coalesce(sum(pm.shares),0)::int as shares,
-           coalesce(sum(pm.saves),0)::int as saves,
-           avg(pm.avg_watch) filter (where pm.avg_watch is not null) as avg_watch,
-           avg(pm.completion) filter (where pm.completion is not null) as completion
-    from deliverables d
-    left join publications p on p.deliverable_id = d.id and p.deleted_at is null
-    left join pm on pm.publication_id = p.id
+    select left(coalesce(d.title, p.caption), 140) as titel, sc.hook as hook, sc.format as format, sc.pillar as pillar,
+           to_char(coalesce(d.published_at, p.published_at), 'YYYY-MM-DD') as datum, p.external_url as url,
+           coalesce(pm.views,0)::int as views, coalesce(pm.likes,0)::int as likes,
+           coalesce(pm.comments,0)::int as comments, coalesce(pm.shares,0)::int as shares,
+           coalesce(pm.saves,0)::int as saves,
+           pm.avg_watch as avg_watch, pm.completion as completion
+    from publications p
+    join pm on pm.publication_id = p.id
+    left join deliverables d on d.id = p.deliverable_id and d.deleted_at is null
     left join scripts sc on sc.id = d.script_id and sc.deleted_at is null
-    where d.client_id = ${client.id} and d.deleted_at is null and d.status = 'published'
-      and d.published_at::date >= ${win.from} and d.published_at::date <= ${win.to}
-    group by d.id, d.title, sc.hook, sc.format, sc.pillar, d.published_at, p.external_url
-    order by views desc nulls last, d.published_at desc nulls last
+    where p.client_id = ${client.id} and p.deleted_at is null
+      and coalesce(p.published_at, d.published_at)::date >= ${win.from}
+      and coalesce(p.published_at, d.published_at)::date <= ${win.to}
+    order by views desc nulls last, p.published_at desc nulls last
   `);
   const pvRows = ((pvRes as { rows?: unknown[] }).rows ?? (pvRes as unknown as unknown[])) as Array<Record<string, unknown>>;
   const withCijfers = pvRows.filter((v) => num(v.views) > 0);

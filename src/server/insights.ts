@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { aiOutputs, clients, deliverables } from "@/db/schema";
+import { aiOutputs, deliverables } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { aiConfigured, runJsonPrompt } from "@/server/ai/client";
 import { getClientReport } from "@/server/client-report";
@@ -81,27 +81,28 @@ export async function generateClientInsights(slug: string, days = 90, trusted = 
   // het gekoppelde script. LET OP: per-video cijfers (social_metrics) zijn er
   // alleen als de per-post-koppeling gevuld is; ontbreekt dat, dan is dit leeg en
   // doen we bewust GEEN uitspraken per video.
+  // Publicatie-gericht: elke gepubliceerde post/reel met eigen cijfers is één
+  // "video". Zo verschijnen ook via Metricool opgehaalde posts (zonder interne
+  // deliverable) in de per-video-inzichten; de titel valt dan terug op de caption.
   const pvRes = await db.execute(sql`
     with pm as (
       select publication_id, max(views) views, max(likes) likes, max(comments) comments,
              max(shares) shares, max(saves) saves, max(avg_watch_seconds) avg_watch, max(completion_rate) completion
       from social_metrics where client_id = ${r.client.id} group by publication_id
     )
-    select d.title as titel, sc.hook as hook, sc.format as format, sc.pillar as pillar,
-           to_char(d.published_at, 'YYYY-MM-DD') as datum,
-           coalesce(sum(pm.views),0)::int as views, coalesce(sum(pm.likes),0)::int as likes,
-           coalesce(sum(pm.comments),0)::int as comments, coalesce(sum(pm.shares),0)::int as shares,
-           coalesce(sum(pm.saves),0)::int as saves,
-           avg(pm.avg_watch) filter (where pm.avg_watch is not null) as avg_watch,
-           avg(pm.completion) filter (where pm.completion is not null) as completion
-    from deliverables d
-    left join publications p on p.deliverable_id = d.id and p.deleted_at is null
-    left join pm on pm.publication_id = p.id
+    select left(coalesce(d.title, p.caption), 140) as titel, sc.hook as hook, sc.format as format, sc.pillar as pillar,
+           to_char(coalesce(d.published_at, p.published_at), 'YYYY-MM-DD') as datum,
+           coalesce(pm.views,0)::int as views, coalesce(pm.likes,0)::int as likes,
+           coalesce(pm.comments,0)::int as comments, coalesce(pm.shares,0)::int as shares,
+           coalesce(pm.saves,0)::int as saves,
+           pm.avg_watch as avg_watch, pm.completion as completion
+    from publications p
+    join pm on pm.publication_id = p.id
+    left join deliverables d on d.id = p.deliverable_id and d.deleted_at is null
     left join scripts sc on sc.id = d.script_id and sc.deleted_at is null
-    where d.client_id = ${r.client.id} and d.deleted_at is null and d.status = 'published'
-      and d.published_at >= current_date - ${sql.raw(`interval '${days} days'`)}
-    group by d.id, d.title, sc.hook, sc.format, sc.pillar, d.published_at
-    order by views desc nulls last, d.published_at desc nulls last
+    where p.client_id = ${r.client.id} and p.deleted_at is null
+      and coalesce(p.published_at, d.published_at) >= current_date - ${sql.raw(`interval '${days} days'`)}
+    order by views desc nulls last, p.published_at desc nulls last
   `);
   const pvRows = ((pvRes as { rows?: unknown[] }).rows ?? (pvRes as unknown as unknown[])) as Array<Record<string, unknown>>;
   const num = (v: unknown) => Number(v ?? 0);

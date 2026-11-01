@@ -33,7 +33,7 @@ import { runMonthlyReports } from "@/server/jobs/report-monthly";
 import { runReportReviewReminders } from "@/server/jobs/report-review-reminders";
 import { runDriveSync } from "@/server/jobs/drive-sync";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
-import { linkMetricoolBrands, pullMetricoolMetrics, runMetricoolSync } from "@/server/jobs/metricool-sync";
+import { linkMetricoolBrands, pullMetricoolMetrics, pullMetricoolPosts, runMetricoolSync } from "@/server/jobs/metricool-sync";
 import { setTeamContact } from "@/server/jobs/team";
 import { enforcePortalAccess, portalAccessReport } from "@/server/jobs/portal-access";
 import { seedAiKnowledge } from "@/server/jobs/ai-seed";
@@ -89,6 +89,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "calendar.sync": runCalendarSync,
   "metricool.link_brands": linkMetricoolBrands,
   "metricool.pull_metrics": pullMetricoolMetrics,
+  "metricool.pull_posts": pullMetricoolPosts,
   "metricool.sync": runMetricoolSync,
   "sync.frequent": runFrequentSync,
   "sync.nightly": runNightlySync,

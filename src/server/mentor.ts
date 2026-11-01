@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, mentorMemories } from "@/db/schema";
+import { clients, clientReports, mentorMemories } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 import { getQualityOverview, type QualityGroup } from "@/server/quality";
 import { getGoalsOverview } from "@/server/goals/overview";
@@ -115,6 +115,42 @@ export async function buildMentorContext(viewer: Viewer): Promise<string> {
     const total = revRows.reduce((s, c) => s + c.rev, 0);
     const top = revRows.slice(0, 12).map((c) => `${c.name}: ${eur(c.rev)} (${total > 0 ? Math.round((c.rev / total) * 100) : 0}%)`).join(" | ");
     parts.push(`\nPER-KLANT MAANDOMZET (interne staat, ${revRows.length} klanten, totaal ${eur(total)}): ${top}`);
+  }
+
+  // Laatste gecontroleerde maandrapportage per klant: de door een mens
+  // goedgekeurde/gepubliceerde conclusies (nooit ongecontroleerde AI), zodat de
+  // mentor weet hoe klanten er qua resultaten voor staan en wat de afgesproken
+  // volgende stappen zijn.
+  const reportRows = await db
+    .select({
+      name: clients.name,
+      period: clientReports.period,
+      beoordeling: clientReports.beoordeling,
+      strategischeActies: clientReports.strategischeActies,
+    })
+    .from(clientReports)
+    .innerJoin(clients, eq(clients.id, clientReports.clientId))
+    .where(and(isNull(clientReports.deletedAt), inArray(clientReports.status, ["goedgekeurd", "gepubliceerd"])))
+    .orderBy(desc(clientReports.period))
+    .limit(60)
+    .catch(() => [] as Array<{ name: string; period: string; beoordeling: unknown; strategischeActies: unknown }>);
+  const latestPerClient = new Map<string, (typeof reportRows)[number]>();
+  for (const r of reportRows) if (!latestPerClient.has(r.name)) latestPerClient.set(r.name, r); // rijen al op period aflopend
+  if (latestPerClient.size) {
+    parts.push(`\nLAATSTE MAANDRESULTATEN PER KLANT (gecontroleerde maandrapportage — ${latestPerClient.size} klanten):`);
+    for (const r of latestPerClient.values()) {
+      const b = (r.beoordeling ?? {}) as { positief?: string; verbeteren?: string; volgendeMaand?: string };
+      const acties = Array.isArray(r.strategischeActies)
+        ? (r.strategischeActies as Array<{ titel?: string }>).map((a) => a?.titel).filter(Boolean)
+        : [];
+      const bits = [
+        b.positief ? `sterk: ${b.positief}` : null,
+        b.verbeteren ? `beter kan: ${b.verbeteren}` : null,
+        b.volgendeMaand ? `volgende maand: ${b.volgendeMaand}` : null,
+        acties.length ? `acties: ${acties.join("; ")}` : null,
+      ].filter(Boolean);
+      if (bits.length) parts.push(`• ${r.name} (${r.period}): ${bits.join(" — ")}`);
+    }
   }
 
   if (leads) {

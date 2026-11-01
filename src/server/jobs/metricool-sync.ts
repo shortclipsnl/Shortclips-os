@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, gte, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientIntegrations, clients, dailyMetrics } from "@/db/schema";
+import { clientIntegrations, clients, dailyMetrics, publications, socialMetrics } from "@/db/schema";
 import { normalizeName } from "@/server/import";
 import { aliasesForSlug } from "@/server/integrations/client-aliases";
 import {
@@ -217,9 +217,116 @@ export async function pullMetricoolMetrics(
   );
 }
 
-/** Koppelen + cijfers ophalen in één keer. */
-export async function runMetricoolSync(triggeredById?: string, source: Source = metricool) {
+/** Welke subject-endpoints per netwerk per-post cijfers leveren. Instagram heeft
+ *  zowel reels als feed-posts; de overige netwerken hebben één postslijst. */
+const POST_SUBJECTS: Record<string, string[]> = {
+  Instagram: ["reels", "posts"],
+  Tiktok: ["posts"],
+  Youtube: ["posts"],
+  Facebook: ["posts"],
+  Linkedin: ["posts"],
+};
+
+type PostSource = Pick<MetricoolService, "listBrands" | "posts">;
+
+/**
+ * Haalt per gekoppelde klant de **per-video cijfers** op (elke reel/post met
+ * eigen weergaven, bereik, interacties, kijktijd) en schrijft ze naar
+ * `publications` (één rij per post) + `social_metrics` (dagsnapshot). Dit voedt
+ * de per-video-inzichten in de AI-analyse en de maandrapportages. Elke post is
+ * zichzelf — geen koppeling aan een deliverable nodig, dus geen gokwerk. Reeds
+ * bestaande posts worden bijgewerkt (idempotent op externalPostId + meetdag).
+ */
+export async function pullMetricoolPosts(
+  triggeredById?: string,
+  source: PostSource = metricool,
+  days = 180,
+) {
+  return runJob(
+    "metricool",
+    "metricool.pull_posts",
+    { days },
+    async (ctx) => {
+      const links = await db
+        .select({ clientId: clientIntegrations.clientId, blogId: clientIntegrations.externalId, config: clientIntegrations.config })
+        .from(clientIntegrations)
+        .where(and(eq(clientIntegrations.provider, "metricool"), eq(clientIntegrations.isActive, true)));
+      ctx.log(`${links.length} gekoppelde Metricool-merken`);
+
+      const now = new Date();
+      const from = new Date(now);
+      from.setDate(from.getDate() - days);
+      const fromISO = metricoolDate(from);
+      const toISO = metricoolDate(now, true);
+      // Meetdag in Amsterdamse tijd: één social_metrics-rij per post per dag.
+      const measuredOn = now.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+
+      for (const link of links) {
+        const blogId = Number(link.blogId);
+        const userId = Number((link.config as { userId?: number } | null)?.userId ?? 0);
+        if (!blogId || !userId) {
+          ctx.log(`Merk ${link.blogId}: geen user-id — overslaan.`, "warn");
+          continue;
+        }
+
+        let count = 0;
+        for (const network of METRICOOL_NETWORKS) {
+          const platform = NETWORK_PLATFORM[network];
+          const seen = new Set<string>();
+          for (const subject of POST_SUBJECTS[network] ?? ["posts"]) {
+            const posts = await source.posts(blogId, userId, network, subject, fromISO, toISO);
+            for (const p of posts) {
+              if (seen.has(p.externalId)) continue; // reel kan in meerdere subjects voorkomen
+              seen.add(p.externalId);
+              const publishedAt = p.publishedAt ? new Date(p.publishedAt) : null;
+              const caption = p.caption ? p.caption.slice(0, 2000) : null;
+              const [pub] = await db
+                .insert(publications)
+                .values({ clientId: link.clientId, platform, status: "published", publishedAt, externalPostId: p.externalId, externalUrl: p.url, caption })
+                .onConflictDoUpdate({
+                  target: [publications.platform, publications.externalPostId],
+                  set: { externalUrl: p.url, caption, publishedAt, updatedAt: new Date() },
+                })
+                .returning({ id: publications.id });
+              if (!pub) continue;
+              const metricValues = {
+                views: Math.max(0, Math.round(p.views)),
+                reach: Math.max(0, Math.round(p.reach)),
+                likes: Math.max(0, Math.round(p.likes)),
+                comments: Math.max(0, Math.round(p.comments)),
+                shares: Math.max(0, Math.round(p.shares)),
+                saves: Math.max(0, Math.round(p.saves)),
+                watchTimeSeconds: Math.max(0, Math.round(p.watchTimeSeconds)),
+                avgWatchSeconds: p.avgWatchSeconds != null ? p.avgWatchSeconds.toFixed(2) : null,
+                completionRate: p.completionRate != null ? p.completionRate.toFixed(4) : null,
+                source: "metricool" as const,
+              };
+              await db
+                .insert(socialMetrics)
+                .values({ publicationId: pub.id, clientId: link.clientId, platform, measuredOn, ...metricValues })
+                .onConflictDoUpdate({ target: [socialMetrics.publicationId, socialMetrics.measuredOn], set: metricValues });
+              count++;
+            }
+          }
+        }
+
+        if (count === 0) {
+          ctx.log(`Merk ${link.blogId}: geen posts/reels (netwerk niet gekoppeld?).`, "warn");
+          continue;
+        }
+        ctx.counters.processed++;
+        ctx.counters.created += count;
+        ctx.log(`Merk ${link.blogId}: ${count} posts/reels bijgewerkt.`);
+      }
+    },
+    { triggeredById },
+  );
+}
+
+/** Koppelen + cijfers ophalen in één keer (account-dagcijfers + per-video). */
+export async function runMetricoolSync(triggeredById?: string, source: Source & PostSource = metricool) {
   const link = await linkMetricoolBrands(triggeredById, source);
   const metrics = await pullMetricoolMetrics(triggeredById, source);
-  return { ok: link.ok && metrics.ok, link, metrics };
+  const posts = await pullMetricoolPosts(triggeredById, source);
+  return { ok: link.ok && metrics.ok && posts.ok, link, metrics, posts };
 }
