@@ -16,6 +16,7 @@ import { addWorkingDays } from "@/lib/workdays";
 import { assertReviewAccess } from "@/server/script-review";
 import { createScriptUploadTarget } from "@/server/scripts/script-storage";
 import { ensureCaptionsForShoot } from "@/server/captions/run";
+import { ensureBriefingForShoot } from "@/server/briefing/run";
 
 /** Uiterste feedbackmoment: N werkdagen vanaf nu (eind van die dag). */
 async function scriptFeedbackDeadline(): Promise<Date> {
@@ -204,6 +205,7 @@ export async function sendScriptForReview(input: z.infer<typeof sendSchema>): Pr
     // vertragen. Faalt stil; de cron-inhaalronde pakt het anders alsnog op.
     after(async () => {
       try { await ensureCaptionsForShoot(productionDayId); } catch { /* cron vangt dit op */ }
+      try { await ensureBriefingForShoot(productionDayId); } catch { /* cron vangt dit op */ }
     });
     return { ok: true, reviewId };
   } catch (error) {
@@ -635,6 +637,7 @@ export async function uploadScriptReviewVersion(input: z.infer<typeof versionSch
     // Nieuwe scriptversie → captions bijwerken (behoudt handmatig bewerkte).
     after(async () => {
       try { await ensureCaptionsForShoot(review.productionDayId); } catch { /* cron vangt dit op */ }
+      try { await ensureBriefingForShoot(review.productionDayId); } catch { /* cron vangt dit op */ }
     });
     return { ok: true, reviewId };
   } catch (error) {

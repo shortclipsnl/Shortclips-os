@@ -9,6 +9,7 @@ import { auditLog } from "@/server/audit";
 import { runJsonPrompt, type AiDoc, type AiImage } from "@/server/ai/client";
 import { SHORTCLIPS_IDENTITY } from "@/server/ai/identity";
 import { generateCaptionsForPdf } from "@/server/captions/generate";
+import { generateBriefingForPdf } from "@/server/briefing/generate";
 import { extractDocxText } from "@/server/ai/docx";
 import { createScriptUploadTarget, downloadScriptPdf } from "@/server/scripts/script-storage";
 import {
@@ -352,61 +353,17 @@ export async function generateBriefing(input: {
       return { ok: false, message: "Plak scripttekst of upload een PDF/Word-bestand." };
     }
 
-    const name = await clientName(input.clientId);
-    const profile = await getClientAiProfile(input.clientId);
-    const editing = (profile?.editingProfile as EditingProfile) ?? {};
-    const guidelines = await centralKnowledgeText(["editing", "kwaliteit"]);
-    const learned = await clientLearnedText(input.clientId);
-
-    const system = `${SHORTCLIPS_IDENTITY}
-
-Je maakt een praktische, scanbare editingbriefing voor een editor, voor klant "${name}". Editors moeten direct begrijpen wat de bedoeling is, zonder lange AI-teksten.
-
-ALGEMENE SHORTCLIPS-EDITINGRICHTLIJNEN (algemeen, niet per se uit dit script):
-${guidelines || "- Kies momenten waarop presentatoren goed in beeld staan; vermijd ongelukkige gezichtsuitdrukkingen, gesloten ogen en vreemde tussenframes.\n- Houd belangrijke producten, auto's en onderwerpen goed zichtbaar; plaats tekst/ondertiteling niet over belangrijke onderdelen.\n- Zorg dat de eerste seconden visueel sterk zijn; houd het tempo passend bij het concept.\n- Gebruik alleen relevante, beschikbare beelden; vermijd onnodige effecten. Edit sluit aan op de premium uitstraling van Shortclips."}
-${editing.aandachtspunten ? `\nKLANTSPECIFIEKE EDITINGVOORKEUREN:\n${editing.aandachtspunten}` : ""}
-${learned ? `\nGELEERDE KLANTVOORKEUREN (bevestigd uit eerder werk — houd hier rekening mee):\n${learned}` : ""}
-
-HEEL BELANGRIJK: presenteer nooit beelden, shots of opnamemomenten als daadwerkelijk beschikbaar wanneer die alleen uit het script worden afgeleid. Als een script bijvoorbeeld zegt dat een auto van binnen en buiten getoond wordt, adviseer dan daarop te letten, maar beweer niet dat die beelden er ook echt zijn. Maak onderscheid tussen algemene richtlijnen en instructies die echt uit het script volgen.`;
-
-    const user = `Hieronder staan de scripts van één opnamesessie (uit het aangeleverde scriptbestand). Herken de afzonderlijke scripts en tel hoeveel video's/shorts het zijn. Maak ÉÉN compacte, heel scanbare briefing voor de editor.
-
-HOUD HET KORT. Leg het script NIET volledig uit en herhaal de tekst niet. Per short geef je alleen:
-- een titel (kort);
-- een omschrijving van ÉÉN of TWEE zinnen over wat de short inhoudt;
-- maximaal 2 korte aandachtspunten voor de montage (alleen als ze echt helpen; anders een lege lijst).
-
-Voor het hele project: een omschrijving van één à twee zinnen en maximaal 3 korte algemene aandachtspunten. Verzin niets; presenteer geen beelden als beschikbaar wanneer die alleen uit het script zijn afgeleid.
-
-Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder omliggende tekst:
-{
-  "projectIntro": {
-    "client": "${name}",
-    "aantalShorts": 0,
-    "omschrijving": "één of twee zinnen over de sessie",
-    "algemeneAandachtspunten": ["kort punt", "kort punt"]
-  },
-  "shorts": [
-    {
-      "titel": "korte titel",
-      "omschrijving": "één of twee zinnen over deze short",
-      "aandachtspunten": ["kort punt", "kort punt"]
-    }
-  ]
-}
-
-${scriptText.trim() ? `De scripts:\n\n${scriptText.trim()}` : "De scripts staan in het bijgevoegde document."}`;
-
-    const res = await runJsonPrompt<EditorBriefing>({
-      system,
-      user,
-      documents: docFrom(input.pdfBase64),
-      maxTokens: 4000,
+    // Gedeelde, compacte generatie-logica (zelfde als de automatische
+    // editor-briefing per opname).
+    const res = await generateBriefingForPdf({
+      clientId: input.clientId,
+      pdfBase64: input.pdfBase64,
+      scriptText: scriptText.trim() || undefined,
     });
     if (!res.ok) {
       return res.reason === "no_provider"
         ? { ok: false, reason: "no_provider", message: "Er is nog geen AI-sleutel ingesteld." }
-        : { ok: false, message: res.error ?? "Genereren mislukt." };
+        : { ok: false, message: res.error };
     }
     await saveOutput({
       clientId: input.clientId,

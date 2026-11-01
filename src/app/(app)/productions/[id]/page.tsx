@@ -3,7 +3,9 @@ import Link from "next/link";
 import { AlertTriangle, ExternalLink, MapPin } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getProductionDay } from "@/server/productions";
+import { getBriefingForShoot } from "@/server/briefing/service";
 import { Avatar, Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
+import { BriefingView } from "@/components/briefing-view";
 import { daysUntil, formatDateFull, plural, relativeDays } from "@/lib/format";
 import { PRODUCTION_STATUS, SCRIPT_STATUS, VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 import { ChecklistItem } from "./checklist";
@@ -29,6 +31,7 @@ export default async function ProductionPage({
   const viewer = await requireInternal();
   const { id } = await params;
   const { day, checklist, scripts, videos } = await getProductionDay(viewer, id);
+  const briefing = await getBriefingForShoot(viewer, id);
   const canEdit = viewer.permissions.has("productions:write");
 
   const days = daysUntil(day.scheduledOn);
@@ -112,6 +115,22 @@ export default async function ProductionPage({
               </ul>
             )}
           </Card>
+
+          {scripts.length > 0 ? (
+            <Card padded={false}>
+              <div className="p-5 pb-3">
+                <CardHeader
+                  title="Editor Briefing"
+                  subtitle="Compacte montage-aandachtspunten per opname — automatisch uit de definitieve scripts."
+                />
+              </div>
+              <BriefingView
+                briefing={briefing?.content ?? null}
+                status={briefing?.status ?? "geen"}
+                pdfHref={briefing?.status === "klaar" || briefing?.status === "bijgewerkt_script" ? `/api/briefing/${id}/pdf` : undefined}
+              />
+            </Card>
+          ) : null}
 
           <Card padded={false}>
             <div className="p-5 pb-3">

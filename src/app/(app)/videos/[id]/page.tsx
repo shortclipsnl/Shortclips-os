@@ -4,6 +4,8 @@ import { BookOpen, ExternalLink, Film, Lock, Users } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { isCoreStaff } from "@/server/core-staff";
 import { getVideo } from "@/server/videos";
+import { getBriefingForVideo } from "@/server/briefing/service";
+import { VideoBriefingView } from "@/components/briefing-view";
 import {
   Avatar,
   Badge,
@@ -55,6 +57,7 @@ export default async function VideoPage({
   const detail = await getVideo(viewer, id);
   const v = detail.video;
   const qc = await getQcChecklist(viewer, id);
+  const autoBriefing = await getBriefingForVideo(viewer, id);
   const canWriteVideo = viewer.permissions.has("videos:write");
 
   const days = daysSince(v.statusChangedAt);
@@ -261,9 +264,19 @@ export default async function VideoPage({
             </Card>
           )}
 
+          {autoBriefing && (autoBriefing.videoAandachtspunten.length > 0 || autoBriefing.algemeneAandachtspunten.length > 0) ? (
+            <Card>
+              <CardHeader title="Briefing" subtitle="Montage-aandachtspunten uit de scripts — het volledige script staat bij Script." />
+              <VideoBriefingView
+                briefing={autoBriefing}
+                pdfHref={autoBriefing.status === "klaar" || autoBriefing.status === "bijgewerkt_script" ? `/api/briefing/${autoBriefing.productionDayId}/pdf` : undefined}
+              />
+            </Card>
+          ) : null}
+
           {v.briefing ? (
             <Card>
-              <CardHeader title="Briefing" />
+              <CardHeader title={autoBriefing ? "Handmatige briefing" : "Briefing"} />
               <p className="mt-3 text-sm whitespace-pre-line text-[var(--color-ink-muted)]">
                 {v.briefing}
               </p>

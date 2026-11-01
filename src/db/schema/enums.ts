@@ -308,6 +308,14 @@ export const captionItemStatusEnum = pgEnum("caption_item_status", [
   "bewerkt",     // Handmatig aangepast door een teamlid (niet overschrijven)
 ]);
 
+/** Status van de automatische editor-briefing per opname. */
+export const briefingSetStatusEnum = pgEnum("briefing_set_status", [
+  "bezig",             // AI genereert de briefing
+  "klaar",             // Compacte briefing klaar
+  "bijgewerkt_script", // Nieuwe scriptversie herkend — briefing opnieuw gegenereerd
+  "mislukt",           // Generatie mislukt
+]);
+
 /** Status van een offerte (PandaDoc-vervanger). */
 export const quoteStatusEnum = pgEnum("quote_status", [
   "concept",       // Nog niet gedeeld
