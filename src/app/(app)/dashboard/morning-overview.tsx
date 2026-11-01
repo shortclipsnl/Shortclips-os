@@ -9,11 +9,13 @@ import { MorningTiles, type MorningTile } from "./morning-tiles";
  * nu te laat is. Klik een tegel open om de onderliggende problemen te zien.
  */
 export function MorningOverviewCard({ data }: { data: MorningOverview }) {
-  const total = data.overdueVideos + data.atClient + data.myOpenTasks;
+  const total = data.overdueVideos + data.clientsWaitingTotal + data.currentlyLate;
   const tiles: MorningTile[] = [
     { key: "overdue", label: "Video's over de interne deadline", value: data.overdueVideos, tone: "bad", rows: data.overdueList, allHref: "/videos?filter=te-laat", allLabel: "Alle te late video's" },
-    { key: "atClient", label: "Wacht op klantfeedback", value: data.atClient, tone: "warn", rows: data.atClientList, allHref: "/videos?filter=bij-klant", allLabel: "Alles bij de klant" },
-    { key: "myTasks", label: "Jouw acties (vandaag / te laat)", value: data.myOpenTasks, tone: "info", rows: data.myOpenTasksList, allHref: "/tasks", allLabel: "Naar mijn taken" },
+    // Eén bron voor "wacht op de klant": dezelfde lijst als hieronder, zodat het
+    // getal en de lijst nooit van elkaar verschillen. Eigen taken staan al in
+    // het blok Mijn to-do en hebben hier geen aparte tegel meer.
+    { key: "atClient", label: "Wacht op reactie van de klant", value: data.clientsWaitingTotal, tone: "warn", rows: data.clientsWaitingRows, allHref: "/videos?filter=bij-klant", allLabel: "Alles bij de klant" },
     { key: "late", label: "Nu te laat (per persoon)", value: data.currentlyLate, tone: "bad", rows: data.currentlyLateList },
   ];
   return (
@@ -23,7 +25,7 @@ export function MorningOverviewCard({ data }: { data: MorningOverview }) {
           <Sunrise className="size-4 text-[var(--color-brand-600)]" /> Ochtendoverzicht
         </h2>
         <span className="text-2xs text-[var(--color-ink-faint)]">
-          {total === 0 ? "Alles bij — niets staat over de deadline." : "Klik een tegel open voor de details."}
+          {total === 0 ? "Alles bij: niets staat over de deadline." : "Klik een tegel open voor de details."}
         </span>
       </div>
 

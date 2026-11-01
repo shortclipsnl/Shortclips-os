@@ -27,6 +27,9 @@ export type MorningOverview = {
   currentlyLateList: MorningRow[];
   /** Klanten die nog moeten reageren (video's/scripts), met dagen-wachtend. */
   clientsWaiting: Array<{ id: string; kind: "video" | "script"; clientName: string; title: string; days: number; href: string }>;
+  /** Totaal en volledige lijst van alles wat bij de klant ligt (tegel). */
+  clientsWaitingTotal: number;
+  clientsWaitingRows: MorningRow[];
 };
 
 /**
@@ -135,5 +138,12 @@ export async function getMorningOverview(viewer: Viewer): Promise<MorningOvervie
       href: r.entityType === "deliverable" ? `/videos/${r.entityId}` : "/tasks",
     })),
     clientsWaiting: clientsWaiting.slice(0, 8),
+    clientsWaitingTotal: clientsWaiting.length,
+    clientsWaitingRows: clientsWaiting.map((w) => ({
+      id: `${w.kind}-${w.id}`,
+      label: `${w.clientName} — ${w.kind === "script" ? "script" : "video"}: ${w.title}`,
+      sub: w.days === 0 ? "vandaag" : `${w.days} ${w.days === 1 ? "dag" : "dagen"} bij de klant`,
+      href: w.href,
+    })),
   };
 }

@@ -41,7 +41,7 @@ export function MorningTiles({ tiles }: { tiles: MorningTile[] }) {
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-2.5 ${tiles.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}>
         {tiles.map((tl) => {
           const hasItems = tl.value > 0;
           const active = open === tl.key;

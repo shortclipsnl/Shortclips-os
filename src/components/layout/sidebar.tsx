@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import * as Icons from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Logo } from "@/components/logo";
-import type { NavGroup } from "./nav-config";
+import { matchNavHref, type NavGroup } from "./nav-config";
 
 function Icon({ name, className }: { name: string; className?: string }) {
   const Cmp = (Icons as unknown as Record<string, React.ComponentType<{ className?: string; strokeWidth?: number }>>)[name];
@@ -15,6 +15,12 @@ function Icon({ name, className }: { name: string; className?: string }) {
 
 export function Sidebar({ groups }: { groups: NavGroup[] }) {
   const pathname = usePathname();
+  // Eén actief item: de langste passende href. Staat die pagina als tabblad
+  // onder een ander menu-item (section), dan licht dat menu-item op.
+  const allItems = groups.flatMap((g) => g.items);
+  const activeHref = matchNavHref(allItems, pathname);
+  const activeItem = allItems.find((i) => i.href.split("?")[0] === activeHref);
+  const activeMenuHref = activeItem?.section ?? activeHref;
 
   return (
     <nav className="flex h-full flex-col gap-6 overflow-y-auto px-3 py-5">
@@ -26,7 +32,7 @@ export function Sidebar({ groups }: { groups: NavGroup[] }) {
       </Link>
 
       <div className="flex flex-1 flex-col gap-5">
-        {groups.map((group) => (
+        {groups.map((group) => ({ ...group, items: group.items.filter((i) => !i.section) })).filter((group) => group.items.length > 0).map((group) => (
           <div key={group.title}>
             <p
               className="flex items-center gap-1.5 px-3 pb-1.5 text-2xs font-bold tracking-[0.1em] uppercase"
@@ -41,9 +47,7 @@ export function Sidebar({ groups }: { groups: NavGroup[] }) {
             </p>
             <ul className="space-y-0.5">
               {group.items.map((item) => {
-                const active = item.match
-                  ? pathname === item.href || pathname.startsWith(`${item.match}/`)
-                  : pathname === item.href;
+                const active = item.href.split("?")[0] === activeMenuHref;
                 const className = cn(
                   "flex items-center gap-2.5 rounded-[var(--radius-sm)] px-3 py-2 text-sm font-medium transition-colors",
                   active

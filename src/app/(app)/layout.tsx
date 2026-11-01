@@ -1,6 +1,8 @@
 import { requireInternal, isOwner, canManageClients, canManageQuotes, canManageOperations } from "@/server/auth/context";
 import { NAVIGATION } from "@/components/layout/nav-config";
 import { Sidebar } from "@/components/layout/sidebar";
+import { SectionTabs } from "@/components/layout/section-tabs";
+import { env } from "@/lib/env";
 import { Topbar } from "@/components/layout/topbar";
 import { AssistantWidget } from "@/components/ai/assistant-widget";
 import { NotificationPopper } from "@/components/notifications/notification-popper";
@@ -55,6 +57,9 @@ export default async function AppLayout({
       if (item.manageOperations && !canManageOperations(viewer)) {
         return false;
       }
+      // Bestanden versturen: voor het team pas zichtbaar zodra de R2-opslag is
+      // ingesteld; de eigenaar ziet 'm altijd (om het in te kunnen stellen).
+      if (item.href === "/transfer" && !owner && !(env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY)) return false;
       // Rechten-gebaseerde items.
       return (
         !item.permissions ||
@@ -62,6 +67,14 @@ export default async function AppLayout({
       );
     }),
   })).filter((group) => group.items.length > 0);
+
+  // Tabblad-items waarvan de hoofdpagina voor deze gebruiker niet zichtbaar is,
+  // krijgen gewoon een eigen menu-item: zo blijft elke toegestane pagina vindbaar.
+  const visibleHrefs = new Set(groups.flatMap((g) => g.items.map((i) => i.href)));
+  for (const group of groups) {
+    group.items = group.items.map((i) => (i.section && !visibleHrefs.has(i.section) ? { ...i, section: undefined } : i));
+  }
+  const sectionItems = groups.flatMap((g) => g.items);
 
   return (
     <div className="flex min-h-screen">
@@ -75,7 +88,10 @@ export default async function AppLayout({
         <Topbar viewer={viewer} />
         {/* Verjaardagssfeer: feestelijke balk + confetti op iemands verjaardag. */}
         <BirthdayBanner names={birthdaysToday().map((b) => b.firstName)} />
-        <main className="flex-1 px-5 py-6 lg:px-8">{children}</main>
+        <main className="flex-1 px-5 py-6 lg:px-8">
+          <SectionTabs items={sectionItems} />
+          {children}
+        </main>
       </div>
 
       {/* AI-assistent zwevend rechtsonder, voor wie 'm mag gebruiken. */}

@@ -114,38 +114,25 @@ export default async function DashboardPage() {
         </Link>
       ) : null}
 
-      {/* Klantbeheer & instellingen: herkenbaar blok voor de operationeel
-          beheerder (Milou) + eigenaar — alles rond klanten, accounts, portaal en
-          koppelingen op één plek bereikbaar. */}
-      {showOps ? (
-        <div className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold">Klantbeheer & instellingen</h2>
-            {opsMissingPortal > 0 ? (
-              <Link href="/klantenbeheer?tab=portalen" className="text-xs font-medium text-[#8a5300] hover:underline">
-                {opsMissingPortal} actieve klant{opsMissingPortal === 1 ? "" : "en"} zonder portaallogin →
-              </Link>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { href: "/klantenbeheer", label: "Klanten" },
-              { href: "/klantenbeheer?tab=portalen", label: "Klantaccounts & wachtwoorden" },
-              { href: "/settings/portaal", label: "Klantportaal-instellingen" },
-              { href: "/settings/integrations", label: "Koppelingen" },
-              { href: "/noodprocedure", label: "Noodprocedure" },
-            ].map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-sunken)]"
-              >
-                {l.label}
-              </Link>
-            ))}
-          </div>
-        </div>
+      {/* Operationeel aandachtspunt (eigenaar + operationeel beheerder). Het
+          klantbeheer zelf staat in het menu onder Beheer. */}
+      {showOps && opsMissingPortal > 0 ? (
+        <Link href="/klantenbeheer?tab=portalen" className="block rounded-[var(--radius-lg)] border border-[var(--color-warn)]/30 bg-[var(--color-surface)] px-4 py-3 text-sm hover:brightness-[0.99]">
+          <strong className="font-semibold text-[var(--color-warn)]">
+            {opsMissingPortal} actieve klant{opsMissingPortal === 1 ? "" : "en"} zonder portaallogin.
+          </strong>{" "}
+          <span className="text-[var(--color-ink-muted)]">Maak de logins aan in Klantbeheer →</span>
+        </Link>
       ) : null}
+
+      {/* Gebundeld ochtendoverzicht: verlopen deadlines, acties en aandachtspunten. */}
+      <MorningOverviewCard data={morning} />
+
+      {/* Rol-gericht: maximaal drie blokken met concrete acties. */}
+      <TodayView viewer={viewer} data={data} myDay={myDay} capMap={capMap} />
+
+      {/* Weekplanning: opnames en meetings die eraan komen. */}
+      <WeekPlanning shoots={weekShoots} meetings={meetings} uploads={uploads} />
 
       {/* Korte werkrichtlijn: zelfstandigheid, eigenaarschap en eerst zelf
           oplossen. Compact en standaard dicht — één klik open. */}
@@ -161,15 +148,6 @@ export default async function DashboardPage() {
         ]}
         footer="Vragen mag altijd — kom waar het kan met een voorstel erbij in plaats van alleen de vraag."
       />
-
-      {/* Gebundeld ochtendoverzicht: verlopen deadlines, acties en aandachtspunten. */}
-      <MorningOverviewCard data={morning} />
-
-      {/* Rol-gericht: maximaal drie blokken met concrete acties. */}
-      <TodayView viewer={viewer} data={data} myDay={myDay} capMap={capMap} />
-
-      {/* Weekplanning: opnames en meetings die eraan komen. */}
-      <WeekPlanning shoots={weekShoots} meetings={meetings} uploads={uploads} />
 
       {/* Dagelijkse postherinnering (rechtsonder, met pingetje om 14:00). */}
       <PostingReminder posts={todaysPosts} />
