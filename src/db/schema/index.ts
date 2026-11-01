@@ -19,5 +19,6 @@ export * from "./vermogen";
 export * from "./development";
 export * from "./client-library";
 export * from "./script-review";
+export * from "./caption-sets";
 export * from "./quotes";
 export * from "./ai-editor";

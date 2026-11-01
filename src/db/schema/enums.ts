@@ -292,6 +292,22 @@ export const scriptReviewStatusEnum = pgEnum("script_review_status", [
   "goedgekeurd",      // Definitief goedgekeurd
 ]);
 
+/** Status van de automatisch gegenereerde captions per opname (Caption Maker). */
+export const captionSetStatusEnum = pgEnum("caption_set_status", [
+  "bezig",             // AI is op dit moment captions aan het genereren
+  "klaar_controle",    // Alle captions gegenereerd — klaar om te controleren
+  "gedeeltelijk",      // Deels gelukt (sommige shorts ontbreken/fout)
+  "bijgewerkt_script", // Nieuwe script-PDF-versie herkend — captions vernieuwd
+  "gecontroleerd",     // Door een teamlid gecontroleerd/akkoord
+  "mislukt",           // Generatie mislukt (opnieuw proberen)
+]);
+
+/** Status van één caption binnen een caption-set. */
+export const captionItemStatusEnum = pgEnum("caption_item_status", [
+  "gegenereerd", // Door de AI gemaakt, nog niet aangepast
+  "bewerkt",     // Handmatig aangepast door een teamlid (niet overschrijven)
+]);
+
 /** Status van een offerte (PandaDoc-vervanger). */
 export const quoteStatusEnum = pgEnum("quote_status", [
   "concept",       // Nog niet gedeeld

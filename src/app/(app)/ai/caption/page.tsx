@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { requirePermission } from "@/server/auth/context";
 import { listActiveClientsForAi, listAiOutputs } from "@/server/ai/knowledge";
 import { aiConfigured } from "@/server/ai/client";
+import { listShootCaptionOverview } from "@/server/captions/service";
 import { PageHeader } from "@/components/ui";
 import { CaptionMaker } from "./caption-ui";
+import { ShootCaptionsOverview } from "./shoot-captions-overview";
 import type { ShortCaption } from "@/server/actions/ai-tools";
 
 export const metadata: Metadata = { title: "Caption Maker" };
@@ -15,9 +17,10 @@ export const maxDuration = 300;
 
 export default async function CaptionPage() {
   const viewer = await requirePermission("ai:read");
-  const [clients, outputs] = await Promise.all([
+  const [clients, outputs, overview] = await Promise.all([
     listActiveClientsForAi(viewer),
     listAiOutputs(viewer, "caption"),
+    listShootCaptionOverview(viewer),
   ]);
   const recent = outputs.map((o) => ({
     id: o.id,
@@ -33,7 +36,10 @@ export default async function CaptionPage() {
         title="AI Caption Maker"
         description="Sleep het scriptbestand erin en kies de klant — je krijgt per short één caption voor Instagram, TikTok, Facebook en YouTube Shorts, met eventueel toepasbare hashtags."
       />
-      <CaptionMaker clients={clients} aiReady={aiConfigured()} recent={recent} />
+      <div className="space-y-5">
+        <ShootCaptionsOverview rows={overview.rows} stats={overview.stats} />
+        <CaptionMaker clients={clients} aiReady={aiConfigured()} recent={recent} />
+      </div>
     </div>
   );
 }

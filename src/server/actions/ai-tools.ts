@@ -7,6 +7,8 @@ import { aiKnowledge, aiOutputs, clientAiProfiles, clients, contentCalendar, pro
 import { assertClientAccess, ForbiddenError, requirePermission } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { runJsonPrompt, type AiDoc, type AiImage } from "@/server/ai/client";
+import { SHORTCLIPS_IDENTITY } from "@/server/ai/identity";
+import { generateCaptionsForPdf } from "@/server/captions/generate";
 import { extractDocxText } from "@/server/ai/docx";
 import { createScriptUploadTarget, downloadScriptPdf } from "@/server/scripts/script-storage";
 import {
@@ -24,8 +26,6 @@ import {
 export type AiActionResult<T> =
   | { ok: true; data: T }
   | { ok: false; reason?: "no_provider"; message: string };
-
-const SHORTCLIPS_IDENTITY = `Je bent de interne AI-assistent van Shortclips, een gespecialiseerd bureau dat voor klanten organische short-videocontent maakt voor Instagram, TikTok, Facebook en YouTube Shorts. Je schrijft uitsluitend in natuurlijk, vlot Nederlands. Je klinkt nooit als standaard AI-tekst. Je verzint nooit feiten, cijfers, afspraken, prijzen, deadlines of contactgegevens — gebruik alleen wat je expliciet krijgt aangeleverd.`;
 
 async function clientName(clientId: string): Promise<string> {
   const [c] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, clientId)).limit(1);
@@ -138,60 +138,20 @@ export async function generateCaptions(input: {
     }
     const lang = input.language === "en" ? "en" : "nl";
 
-    const name = await clientName(input.clientId);
-    const profile = await getClientAiProfile(input.clientId);
-    const caption = captionProfileToText((profile?.captionProfile as CaptionProfile) ?? null);
-    const knowledge = await centralKnowledgeText(["branding", "schrijfstijl", "communicatie", "algemeen"]);
-    const learned = await clientLearnedText(input.clientId);
-
-    const system = `${SHORTCLIPS_IDENTITY}
-
-Je maakt social media captions voor klant "${name}".
-
-CAPTIONPROFIEL VAN DEZE KLANT:
-${caption}
-${learned ? `\nGELEERDE KLANTVOORKEUREN (bevestigd uit eerder werk — volg deze):\n${learned}\n` : ""}
-
-${knowledge ? `ALGEMENE SHORTCLIPS-KENNIS:\n${knowledge}\n` : ""}
-REGELS VOOR DE CAPTIONS:
-- HEEL BELANGRIJK: de caption draait volledig om de hoek/hook van de video. Pak uit het script de hook (de invalshoek waarmee de video opent) en spreek de kijker daar direct op aan. Niet het script navertellen of samenvatten.
-- ZEER KORT en pakkend: 1 à 2 korte zinnen, zoals het team ze écht schrijft. Nooit lange captions.
-- Gebruik de tone of voice en schrijfstijl van deze klant. Laat het natuurlijk klinken, nooit herkenbaar als AI.
-- Gebruik passende emoji's alleen als dat bij deze klant past.
-- Voeg contactgegevens alleen toe als dat onderdeel is van de captionstijl van de klant, en uitsluitend de gegevens die in het profiel staan. Verzin nooit gegevens.
-- Eén caption per short die werkt op Instagram, TikTok, Facebook én YouTube Shorts (niet per platform verschillend).
-- Zet GEEN hashtags in de caption zelf; die geef je apart als eventueel toepasbare hashtags (relevant voor onderwerp en branche, geen generieke of willekeurige — mag een lege lijst zijn).
-- Zorg dat de captions onderling variëren — niet elke video dezelfde soort opening.
-${lang === "en"
-  ? "- TAAL: schrijf ALLE captions in natuurlijk, vloeiend ENGELS (geen Nederlands), passend bij de tone of voice van deze klant. Ook de hashtags in het Engels waar logisch. shortTitle en hook mag je in het Engels teruggeven."
-  : "- TAAL: schrijf alle captions in natuurlijk Nederlands."}`;
-
-    const user = `Hieronder staat een document of tekst met één of meer scripts voor afzonderlijke shorts. Herken automatisch hoeveel losse shorts erin staan. Analyseer per short de hook, het onderwerp, de inhoud en de call to action. Genereer per short ÉÉN caption die bruikbaar is voor Instagram, TikTok, Facebook en YouTube Shorts, plus eventueel toepasbare hashtags.
-
-Geef UITSLUITEND geldige JSON terug in exact dit formaat, zonder omliggende tekst:
-[
-  {
-    "shortTitle": "korte titel van de short",
-    "hook": "de herkende hook",
-    "caption": "de caption (zonder hashtags erin)",
-    "hashtags": ["#..", "#.."]
-  }
-]
-
-${scriptText.trim() ? `De scripts:\n\n${scriptText.trim()}` : "De scripts staan in het bijgevoegde document."}`;
-
-    const res = await runJsonPrompt<ShortCaption[]>({
-      system,
-      user,
-      documents: docFrom(pdfB64),
-      maxTokens: 12000,
+    // Gedeelde generatie-logica (zelfde prompt/stijl als de automatische
+    // caption-generatie vanuit de opnameplanning).
+    const res = await generateCaptionsForPdf({
+      clientId: input.clientId,
+      pdfBase64: pdfB64,
+      scriptText: scriptText.trim() || undefined,
+      language: lang,
     });
     if (!res.ok) {
       return res.reason === "no_provider"
         ? { ok: false, reason: "no_provider", message: "Er is nog geen AI-sleutel ingesteld." }
-        : { ok: false, message: res.error ?? "Genereren mislukt." };
+        : { ok: false, message: res.error };
     }
-    const data = Array.isArray(res.data) ? res.data : [];
+    const data = res.data;
     await saveOutput({
       clientId: input.clientId,
       tool: "caption",
