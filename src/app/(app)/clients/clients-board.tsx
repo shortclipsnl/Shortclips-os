@@ -116,7 +116,7 @@ export function ClientsBoard({ clients, viewerId, defaultPod = "alle", coveringN
                   ? "inline-flex items-center gap-1.5 rounded-full bg-[var(--color-indigo-ink)] py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-white"
                   : "inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] py-0.5 pl-0.5 pr-2.5 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}
               >
-                <TeamAvatar name={p.name} avatarUrl={p.avatar} size={24} />
+                <TeamAvatar name={p.name} avatarUrl={p.avatar} size={30} />
                 {firstName(p.name)}{p.id === viewerId ? " (jij)" : ""}
                 <span className={`rounded-full px-1.5 text-2xs font-semibold ${active ? "bg-white/20" : "bg-[var(--color-surface-2)]"}`}>{p.count}</span>
               </button>

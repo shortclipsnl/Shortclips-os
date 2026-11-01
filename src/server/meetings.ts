@@ -59,16 +59,32 @@ export async function buildMeetingSummary(meetingId: string): Promise<string | n
   return res.ok && res.text.trim() ? res.text.trim() : bullets;
 }
 
-/** De eerstvolgende woensdag om 16:00 (vandaag als het woensdag is en vóór de avond). */
+/** Hoe ver Europe/Amsterdam vóór UTC ligt op een moment, in ms (DST-proof). */
+function amsterdamOffsetMs(at: Date): number {
+  const utc = new Date(at.toLocaleString("en-US", { timeZone: "UTC" }));
+  const ams = new Date(at.toLocaleString("en-US", { timeZone: "Europe/Amsterdam" }));
+  return ams.getTime() - utc.getTime();
+}
+
+/** Het UTC-moment dat in Amsterdam exact die wandklok-tijd is (bv. 16:00). */
+function amsterdamWallToUtc(y: number, mon: number, day: number, hour: number): Date {
+  const guess = Date.UTC(y, mon, day, hour, 0, 0);
+  return new Date(guess - amsterdamOffsetMs(new Date(guess)));
+}
+
+/**
+ * De eerstvolgende woensdag om 16:00 Nederlandse tijd (vandaag als het woensdag is
+ * en vóór de avond). Onafhankelijk van de serverzone (Vercel draait op UTC), zodat
+ * de meeting overal als 16:00 wordt getoond.
+ */
 function nextWednesday16(): Date {
-  const d = new Date();
-  const day = d.getDay(); // 0=zo … 3=wo … 6=za
+  // "Nu" als Amsterdamse wandklok (de kalendervelden kloppen dan met NL).
+  const ams = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Amsterdam" }));
+  const day = ams.getDay(); // 0=zo … 3=wo … 6=za
   let add = (3 - day + 7) % 7;
-  if (add === 0 && d.getHours() >= 18) add = 7; // woensdagavond → volgende week
-  const t = new Date(d);
-  t.setDate(d.getDate() + add);
-  t.setHours(16, 0, 0, 0);
-  return t;
+  if (add === 0 && ams.getHours() >= 18) add = 7; // woensdagavond → volgende week
+  ams.setDate(ams.getDate() + add);
+  return amsterdamWallToUtc(ams.getFullYear(), ams.getMonth(), ams.getDate(), 16);
 }
 
 /**

@@ -126,7 +126,7 @@ export const NAVIGATION: NavGroup[] = [
     // zelfstandig regelt — klanten, klantaccounts, portaal, koppelingen,
     // noodprocedure. Herkenbaar gebundeld, zonder dubbele pagina's.
     title: "Klantbeheer & instellingen",
-    accent: "var(--color-ink-muted)",
+    accent: "var(--color-lime)",
     items: [
       { href: "/klantenbeheer", label: "Klanten", icon: "UserCog", manageClients: true, match: "/klantenbeheer" },
       { href: "/klantenbeheer?tab=portalen", label: "Klantaccounts & wachtwoorden", icon: "KeyRound", manageClients: true },
@@ -138,7 +138,7 @@ export const NAVIGATION: NavGroup[] = [
   {
     // Systeembeheer: agenda's en algemene instellingen (eigenaar/beheerders).
     title: "Beheer",
-    accent: "var(--color-ink-muted)",
+    accent: "var(--color-info)",
     items: [
       { href: "/settings/agendas", label: "Agenda's", icon: "CalendarRange", ownerOnly: true, match: "/settings/agendas" },
       { href: "/settings", label: "Instellingen", icon: "Settings", permissions: ["settings:read", "users:read"], match: "/settings" },
