@@ -318,3 +318,42 @@ export const quoteStatusEnum = pgEnum("quote_status", [
   "afgewezen",     // Klant heeft afgewezen
   "verlopen",      // Vervaldatum voorbij zonder actie
 ]);
+
+/* ------------------------------------------------------------------ *
+ * AI Content Research — organische video-ideeën per klant.
+ * ------------------------------------------------------------------ */
+
+/** Status van één onderzoeksronde (web-onderzoek → ideeën). */
+export const contentResearchRunStatusEnum = pgEnum("content_research_run_status", [
+  "bezig",   // Onderzoek draait op dit moment (web-onderzoek of ideeën)
+  "klaar",   // Onderzoek afgerond, ideeën toegevoegd
+  "mislukt", // Onderzoek mislukt (opnieuw proberen)
+]);
+
+/** Levensloop van één idee. */
+export const contentIdeaStatusEnum = pgEnum("content_idea_status", [
+  "nieuw",        // Vers uit het onderzoek, nog niet beoordeeld
+  "favoriet",     // Door een teamlid als favoriet gemarkeerd
+  "opgeslagen",   // Bewaard voor later gebruik
+  "afgewezen",    // Niet interessant (met reden → AI leert)
+  "gearchiveerd", // Uit beeld, maar niet verwijderd
+  "doorgestuurd", // Doorgestuurd naar de scriptgenerator
+]);
+
+/** Soort idee. */
+export const contentIdeaCategoryEnum = pgEnum("content_idea_category", [
+  "humor",
+  "educatief",
+  "teamcontent",
+  "trends",
+  "productcontent",
+  "seizoen",
+  "overig",
+]);
+
+/** Inschatting van de uitvoerbaarheid van een idee. */
+export const contentIdeaEffortEnum = pgEnum("content_idea_effort", [
+  "eenvoudig",
+  "gemiddeld",
+  "uitgebreid",
+]);

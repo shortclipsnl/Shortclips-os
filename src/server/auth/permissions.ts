@@ -69,6 +69,10 @@ export const PERMISSIONS = {
   // Video Intelligence
   "video_intelligence:read": "Video Intelligence-analyses bekijken",
   "video_intelligence:run": "Video's toevoegen en laten analyseren",
+
+  // Content Research
+  "content_research:read": "AI Content Research bekijken (ideeën per klant)",
+  "content_research:write": "Onderzoek starten en ideeën beheren",
   "ai_editor:read": "Shortclips AI Editor bekijken",
   "ai_editor:run": "Advertentievideo's laten monteren met de AI Editor",
   "ai_editor:style": "Stijlbeheer van de AI Editor (montageprofiel, referenties)",
@@ -165,6 +169,8 @@ export const ROLE_DEFINITIONS: Array<{
       "ai:run",
       "video_intelligence:read",
       "video_intelligence:run",
+      "content_research:read",
+      "content_research:write",
       "ai_editor:read",
       "ai_editor:run",
       "integrations:read",
@@ -189,6 +195,9 @@ export const ROLE_DEFINITIONS: Array<{
       // Het contentteam gebruikt Video Intelligence actief (video's toevoegen en
       // laten analyseren), niet alleen bekijken.
       "video_intelligence:run",
+      // Content Research: onderzoek starten en ideeën beheren.
+      "content_research:read",
+      "content_research:write",
       // Eigen advertenties monteren met de AI Editor.
       "ai_editor:read",
       "ai_editor:run",

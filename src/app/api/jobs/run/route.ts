@@ -25,6 +25,7 @@ import { runProfitabilitySignals } from "@/server/jobs/profitability-signals";
 import { runContentHealthSignals } from "@/server/jobs/content-health-signals";
 import { runScriptReviewReminders } from "@/server/jobs/script-review-reminders";
 import { runCaptionsAutoGenerate } from "@/server/jobs/captions-autogen";
+import { runContentResearchWeekly } from "@/server/jobs/content-research-autogen";
 import { runDriveSync } from "@/server/jobs/drive-sync";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, runMetricoolSync } from "@/server/jobs/metricool-sync";
@@ -107,6 +108,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "content_health.signals": runContentHealthSignals,
   "script_review.reminders": runScriptReviewReminders,
   "captions.auto_generate": runCaptionsAutoGenerate,
+  "content_research.weekly": runContentResearchWeekly,
   "drive.sync_all": runDriveSync,
   "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,

@@ -137,7 +137,7 @@ const QUALITY_TARGET = 9;
 
 /* ---------------- component ---------------- */
 
-export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialClientId }: { clients: Client[]; aiReady: boolean; initialClientId?: string }) {
+export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialClientId, initialBrief }: { clients: Client[]; aiReady: boolean; initialClientId?: string; initialBrief?: string }) {
   // Klantenlijst in state zodat die live kan verversen (nieuwe klanten verschijnen
   // zonder de pagina te herladen) — bij openen en zodra het venster weer focus krijgt.
   const [clients, setClients] = useState<Client[]>(initialClients);
@@ -153,7 +153,7 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
   const [contentType, setContentType] = useState<ContentType>("organisch");
   // Advertenties: verdeling over de funnel (standaard 2/2/2 = 6 scripts).
   const [funnelSplit, setFunnelSplit] = useState<Record<Funnel, number>>({ TOF: 2, MOF: 2, BOF: 2 });
-  const [brief, setBrief] = useState("");
+  const [brief, setBrief] = useState(initialBrief ?? "");
   const [priorFiles, setPriorFiles] = useState<Array<{ name: string; text: string }>>([]);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [dragOver, setDragOver] = useState(false);
