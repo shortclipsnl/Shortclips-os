@@ -8,6 +8,10 @@ import { addDriveSources, chooseTake, exportFinal, generate, removeSource, resto
 import { FORMATS, bytes, euro, secs } from "../labels";
 import { AiEditorGuide } from "../guide";
 import { ChatPanel, type ChatMessage } from "./chat-panel";
+import dynamic from "next/dynamic";
+
+// Alleen in de browser: de schuifbalk bewaart niet verstuurde opmerkingen in sessionStorage.
+const TimelinePanel = dynamic(() => import("./timeline-panel").then((m) => m.TimelinePanel), { ssr: false });
 
 type QcFinding = { code: string; message: string; atS?: number };
 
@@ -33,6 +37,14 @@ export type EditorData = {
   feedback: ChatMessage[];
   editVersions: Array<{ id: string; version: number; note: string | null; createdAt: string; qcPassed: boolean | null }>;
   versions: Array<{ id: string; version: number; isActive: boolean }>;
+  /** Tijdlijn van de huidige versie (uitvoertijd), voor de schuifbalk onder de preview. */
+  timeline: {
+    durationS: number;
+    sentences: Array<{ n: number; startS: number; endS: number }>;
+    captions: Array<{ startS: number; endS: number; text: string }>;
+    cards: Array<{ startS: number; endS: number; title: string }>;
+    broll: Array<{ startS: number; endS: number }>;
+  } | null;
   canRun: boolean;
   canStyle: boolean;
   sourceNames: Record<string, string>;
@@ -297,6 +309,17 @@ export function EditorView({ data }: { data: EditorData }) {
               {busy ? "Bezig met monteren…" : "Hier verschijnt de preview"}
             </div>
           )}
+          {data.hasPreview && data.timeline && !viewed ? (
+            <TimelinePanel
+              projectId={data.id}
+              videoRef={videoRef}
+              timeline={data.timeline}
+              canRun={data.canRun}
+              busy={busy}
+              pending={pending}
+              onSend={(text, after) => act(() => submitFeedback({ projectId: data.id, text }), after)}
+            />
+          ) : null}
           {data.hasPreview ? <p className="px-4 py-2 text-2xs text-[var(--color-ink-faint)]">Preview op halve resolutie. De definitieve export wordt in volle kwaliteit uit de originele bestanden gemaakt.</p> : null}
         </Card>
 

@@ -68,3 +68,13 @@ export async function staleQueuedCount(): Promise<number> {
   const now = Date.now();
   return rows.filter((j) => now - new Date(j.createdAt).getTime() > 120_000).length;
 }
+
+/** Het montageprofiel van een project (of het actieve), voor afgeleide tijdlijnen in de UI. */
+export async function styleConfigFor(styleProfileId: string | null) {
+  if (styleProfileId) {
+    const [row] = await db.select({ config: adStyleProfiles.config }).from(adStyleProfiles).where(eq(adStyleProfiles.id, styleProfileId)).limit(1);
+    if (row) return normalizeStyleConfig(row.config);
+  }
+  const [act] = await db.select({ config: adStyleProfiles.config }).from(adStyleProfiles).where(eq(adStyleProfiles.isActive, true)).orderBy(desc(adStyleProfiles.version)).limit(1);
+  return act ? normalizeStyleConfig(act.config) : defaultStyleConfig();
+}

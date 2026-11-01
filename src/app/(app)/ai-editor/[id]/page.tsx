@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/server/auth/context";
-import { getProject, listStyleVersions } from "@/server/ai-editor/queries";
+import { getProject, listStyleVersions, styleConfigFor } from "@/server/ai-editor/queries";
+import { deriveTimeline } from "@/server/ai-editor/plan";
 import type { StoredPlan } from "@/server/ai-editor/pipeline";
 import { PageHeader, Badge } from "@/components/ui";
 import { EditorView, type EditorData } from "./editor-view";
@@ -20,6 +21,24 @@ export default async function AiEditorProjectPage({ params }: { params: Promise<
   const { project: p } = data;
   const stored = p.plan as StoredPlan | null;
   const st = PROJECT_STATUS[p.status] ?? PROJECT_STATUS.draft;
+  let timeline: EditorData["timeline"] = null;
+  if (stored?.plan.segments.length) {
+    const cfg = await styleConfigFor(p.styleProfileId);
+    const tl = deriveTimeline(stored.plan, cfg.captions, cfg.export.fps);
+    const sentences: NonNullable<EditorData["timeline"]>["sentences"] = [];
+    for (const s of tl.segments) {
+      const last = sentences[sentences.length - 1];
+      if (last && last.n === s.sentenceIdx + 1) last.endS = s.atS + s.durS;
+      else sentences.push({ n: s.sentenceIdx + 1, startS: s.atS, endS: s.atS + s.durS });
+    }
+    timeline = {
+      durationS: tl.durationS,
+      sentences,
+      captions: tl.captions.map((c) => ({ startS: c.startS, endS: c.endS, text: c.text })),
+      cards: tl.cards.map((c) => ({ startS: c.startS, endS: c.endS, title: c.title })),
+      broll: tl.broll.map((b) => ({ startS: b.atS, endS: b.atS + b.durS })),
+    };
+  }
 
   const editor: EditorData = {
     id: p.id,
@@ -49,6 +68,7 @@ export default async function AiEditorProjectPage({ params }: { params: Promise<
     }),
     editVersions: data.versions.map((v) => ({ id: v.id, version: v.version, note: v.note, createdAt: v.createdAt.toISOString(), qcPassed: (v.qc as { passed?: boolean } | null)?.passed ?? null })),
     versions: versions.map((v) => ({ id: v.id, version: v.version, isActive: v.isActive })),
+    timeline,
     canRun: viewer.permissions.has("ai_editor:run"),
     canStyle: viewer.permissions.has("ai_editor:style"),
     sourceNames: Object.fromEntries(data.sources.map((s) => [s.id, s.filename])),
