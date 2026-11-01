@@ -101,6 +101,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/ai-editor", label: "Shortclips AI Editor", icon: "Clapperboard", permissions: ["ai_editor:read"], match: "/ai-editor" },
       { href: "/ai/bericht", label: "Klantbericht", icon: "MessagesSquare", permissions: ["ai:read"], match: "/ai/bericht" },
       { href: "/ai/bedrijfsonderzoek", label: "AI Sales Research", icon: "Search", permissions: ["ai:read"], match: "/ai/bedrijfsonderzoek" },
+      { href: "/ai/content-research", label: "AI Content Research", icon: "Lightbulb", permissions: ["content_research:read"], match: "/ai/content-research" },
       { href: "/ai/geschiedenis", label: "AI-geschiedenis", icon: "History", permissions: ["ai:read"], match: "/ai/geschiedenis" },
       { href: "/ai/kennisbank", label: "AI-kennisbank", icon: "BookOpen", permissions: ["ai:read"], match: "/ai/kennisbank" },
     ],

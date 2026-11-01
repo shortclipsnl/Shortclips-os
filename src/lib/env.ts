@@ -78,6 +78,9 @@ const schema = z.object({
   // Model voor de AI Tools. Sonnet = beste prijs/kwaliteit; claude-opus-5-5 voor
   // hoogste kwaliteit, claude-haiku-5-5 voor laagste kosten.
   AI_MODEL: z.string().default("claude-sonnet-5-5"),
+  // Krachtiger model voor creatief/origineel werk (o.a. het bedenken van
+  // content-ideeën in AI Content Research). Standaard Opus.
+  AI_MODEL_STRONG: z.string().default("claude-opus-5-5"),
   // Optioneel: YouTube Data API-sleutel voor echte kanaalcijfers in het
   // bedrijfsonderzoek (Google Cloud, gratis quota).
   YOUTUBE_API_KEY: z.string().optional(),

@@ -28,6 +28,11 @@ export type AiRunInput = {
   images?: AiImage[];
   maxTokens?: number;
   /**
+   * Optioneel: gebruik voor deze aanroep een ander model dan het app-standaard
+   * (`aiModel()`). Bijv. een krachtiger model voor creatief werk. Leeg = default.
+   */
+  model?: string;
+  /**
    * Markeer de system-prompt als cachebaar (Anthropic prompt caching). Bij
    * herhaalde aanroepen met dezelfde system-prompt binnen het cachevenster is
    * het antwoord sneller en goedkoper. Veilig: bij een afwijkende prompt valt
@@ -59,12 +64,20 @@ export function aiModel(): string {
   return env.AI_MODEL || "claude-sonnet-5-5";
 }
 
+/**
+ * Krachtiger model voor creatief/origineel werk (bijv. het bedenken van
+ * content-ideeën). Via AI_MODEL_STRONG per omgeving instelbaar; standaard Opus.
+ */
+export function aiModelStrong(): string {
+  return env.AI_MODEL_STRONG || "claude-opus-5-5";
+}
+
 export async function runPrompt(input: AiRunInput): Promise<AiResult> {
   if (!env.ANTHROPIC_API_KEY) return { ok: false, reason: "no_provider" };
 
   try {
     const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-    const model = aiModel();
+    const model = input.model ?? aiModel();
 
     // Volgorde van content-blokken: documenten en afbeeldingen vóór de tekst.
     const content: Anthropic.ContentBlockParam[] = [];
@@ -113,12 +126,12 @@ export async function runPrompt(input: AiRunInput): Promise<AiResult> {
  * gespreksgeschiedenis. Voor de Scriptgenerator, die volgens een vaste werkwijze
  * vragen stelt en daarna scripts schrijft.
  */
-export async function runChat(input: { system: string; messages: ChatMessage[]; maxTokens?: number; cacheSystem?: boolean }): Promise<AiResult> {
+export async function runChat(input: { system: string; messages: ChatMessage[]; maxTokens?: number; cacheSystem?: boolean; model?: string }): Promise<AiResult> {
   if (!env.ANTHROPIC_API_KEY) return { ok: false, reason: "no_provider" };
   if (input.messages.length === 0) return { ok: false, reason: "error", error: "Geen bericht." };
   try {
     const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-    const model = aiModel();
+    const model = input.model ?? aiModel();
     const response = await client.messages.create({
       model,
       max_tokens: input.maxTokens ?? 4000,

@@ -1,0 +1,92 @@
+name: Dagelijkse backup
+
+# Draait volledig los van het portaal (op GitHub-servers), dus raakt de live-app
+# nooit. Maakt elke nacht een versleutelde backup (code + database) en zet die in
+# Google Drive, met bewaartermijn. Zie docs/BACKUP-RESTORE.md voor het terugzetten.
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # elke nacht 02:00 UTC
+  workflow_dispatch: {} # handmatig startbaar (tabblad Actions → Run workflow)
+
+concurrency:
+  group: daily-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DRIVE_REMOTE: ${{ vars.BACKUP_DRIVE_REMOTE || 'drive' }}
+      DRIVE_FOLDER: ${{ vars.BACKUP_DRIVE_FOLDER || 'ShortClips-Backups' }}
+      RETENTION_DAYS: ${{ vars.BACKUP_RETENTION_DAYS || '30' }}
+    steps:
+      - name: Code ophalen (volledige historie)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Node installeren
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Dependencies
+        run: npm ci
+
+      - name: Backupmap opbouwen
+        run: |
+          set -euo pipefail
+          STAMP="$(date -u +%Y%m%d-%H%M)"
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          mkdir -p backup/code
+          # 1) Volledige code incl. historie als git bundle
+          git bundle create backup/code/shortclips-os.bundle --all
+          git rev-parse HEAD > backup/code/COMMIT.txt
+          git log -1 --format='%H %ci %s' >> backup/code/COMMIT.txt
+          # 2) Herstelhandleiding meeverpakken
+          cp docs/BACKUP-RESTORE.md backup/RESTORE-HANDLEIDING.md
+          printf 'ShortClips OS backup\nGemaakt: %s UTC\nCommit: %s\n' "$STAMP" "$(git rev-parse HEAD)" > backup/BACKUP-INFO.txt
+
+      - name: Database exporteren
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx scripts/backup-export.ts backup
+
+      - name: Inpakken en versleutelen (AES-256)
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BACKUP_PASSPHRASE}" ]; then echo "BACKUP_PASSPHRASE ontbreekt"; exit 1; fi
+          OUT="shortclips-backup-${STAMP}.tar.gz.gpg"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+          tar -czf - backup | gpg --batch --yes --symmetric --cipher-algo AES256 \
+            --passphrase "${BACKUP_PASSPHRASE}" -o "$OUT"
+          ls -lh "$OUT"
+
+      - name: rclone installeren
+        run: |
+          set -euo pipefail
+          curl -fsSL https://rclone.org/install.sh | sudo bash
+
+      - name: Naar Google Drive uploaden + bewaartermijn toepassen
+        env:
+          RCLONE_CONF_BASE64: ${{ secrets.RCLONE_CONF_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RCLONE_CONF_BASE64}" ]; then echo "RCLONE_CONF_BASE64 ontbreekt"; exit 1; fi
+          echo "${RCLONE_CONF_BASE64}" | base64 -d > rclone.conf
+          DEST="${DRIVE_REMOTE}:${DRIVE_FOLDER}"
+          rclone --config rclone.conf mkdir "$DEST" || true
+          rclone --config rclone.conf copy "$OUT" "$DEST/" --drive-chunk-size 64M --no-traverse
+          echo "Bewaartermijn: backups ouder dan ${RETENTION_DAYS} dagen worden verwijderd."
+          rclone --config rclone.conf delete "$DEST/" --min-age "${RETENTION_DAYS}d" --include "shortclips-backup-*.tar.gz.gpg"
+          echo "Huidige backups in Drive:"
+          rclone --config rclone.conf lsl "$DEST/" | tail -40
+
+      - name: Opruimen
+        if: always()
+        run: rm -f rclone.conf "${OUT:-}" || true
