@@ -116,6 +116,10 @@ export function QuoteEditor({ quote }: { quote: EditorQuote }) {
         {msg ? <span className="ml-auto text-xs text-[var(--color-ink-muted)]">{msg}</span> : null}
       </div>
 
+      {!readOnly ? (
+        <p className="-mt-2 px-1 text-2xs text-[var(--color-ink-faint)]">Zo werkt het: pas hieronder alles aan, klik <strong>Opslaan</strong>, en daarna <strong>Genereer link</strong>. Je krijgt dan een beveiligde offertelink die je <strong>zelf</strong> naar de klant mailt. De offerte gaat op &quot;verzonden&quot; en je ziet rechts wanneer de klant &apos;m opent, accepteert of afwijst.</p>
+      ) : null}
+
       {readOnly ? (
         <div className="sc-card p-4 text-sm text-[var(--color-ink-muted)]">
           Deze offerte is {quote.status === "ondertekend" ? "ondertekend" : "geaccepteerd"} en daarom vergrendeld. De inhoud blijft ongewijzigd als bewijs.
@@ -136,16 +140,25 @@ export function QuoteEditor({ quote }: { quote: EditorQuote }) {
           </div>
 
           <div className="sc-card p-4">
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-1 flex items-center justify-between">
               <label className="sc-label mb-0">Regels (diensten & prijzen)</label>
               <span className="text-sm font-semibold tabular-nums">Totaal: {euro(total)}</span>
+            </div>
+            <p className="mb-2 text-2xs text-[var(--color-ink-faint)]">Pas omschrijving, aantal en prijs aan. Bedragen zijn <strong>excl. btw</strong> — de 21% btw rekent de offerte automatisch bij. Bij een <strong>verlenging</strong> vul je hier zelf het aantal shorts, de prijs of een eventuele korting naar afspraak in.</p>
+            {/* Kolomkopjes zodat duidelijk is wat de velden zijn. */}
+            <div className="mb-1 flex items-center gap-2 px-1 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
+              <span className="flex-1">Omschrijving</span>
+              <span className="w-16 text-right">Aantal</span>
+              <span className="w-24 text-right">Prijs p/st</span>
+              <span className="w-24 text-right">Totaal</span>
+              <span className="w-7" />
             </div>
             <div className="space-y-2">
               {lines.map((l, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <input className="sc-input flex-1" placeholder="Omschrijving" value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} />
                   <input className="sc-input w-16 text-right" type="number" min={0} value={l.quantity} onChange={(e) => setLine(i, { quantity: Number(e.target.value) })} title="Aantal" />
-                  <input className="sc-input w-24 text-right" type="number" min={0} step="0.01" value={l.unitPrice} onChange={(e) => setLine(i, { unitPrice: Number(e.target.value) })} title="Prijs per stuk" />
+                  <input className="sc-input w-24 text-right" type="number" min={0} step="0.01" value={l.unitPrice} onChange={(e) => setLine(i, { unitPrice: Number(e.target.value) })} title="Prijs per stuk (excl. btw)" />
                   <span className="w-24 text-right text-sm tabular-nums text-[var(--color-ink-muted)]">{euro(lineTotal(l))}</span>
                   <button type="button" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} className="grid size-7 place-items-center rounded text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]"><Trash2 className="size-3.5" /></button>
                 </div>

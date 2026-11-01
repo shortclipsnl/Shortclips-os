@@ -56,6 +56,7 @@ export function NieuwOfferteForm({ templates, clients, leads }: { templates: Tpl
         ) : (
           <p className="text-sm text-[var(--color-ink-muted)]">Nog geen sjablonen. <Link href="/offertes/sjablonen" className="text-[var(--color-brand-700)] hover:underline">Maak er eerst één</Link>, of ga verder zonder.</p>
         )}
+        {templates.length ? <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">Kies het type offerte — teksten, prijzen en opmaak staan al klaar. Je kunt daarna alles nog aanpassen.</p> : null}
       </div>
 
       {packages.length ? (
@@ -69,6 +70,7 @@ export function NieuwOfferteForm({ templates, clients, leads }: { templates: Tpl
               </button>
             ))}
           </div>
+          <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">Dit zet meteen de juiste prijs. De prijs en het aantal kun je daarna op de offerte nog aanpassen.</p>
         </div>
       ) : null}
 
@@ -95,6 +97,7 @@ export function NieuwOfferteForm({ templates, clients, leads }: { templates: Tpl
         ) : (
           <p className="text-xs text-[var(--color-ink-muted)]">De ontvangergegevens vul je zo op de offerte zelf in.</p>
         )}
+        {recipientKind !== "none" ? <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">Bedrijfsnaam, contactpersoon en datum worden automatisch ingevuld op de offerte.</p> : null}
       </div>
 
       {err ? <p className="text-sm font-medium text-[var(--color-bad)]">{err}</p> : null}
