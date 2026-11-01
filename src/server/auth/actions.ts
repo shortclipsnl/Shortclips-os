@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import { auditLog } from "@/server/audit";
+import { notify } from "@/server/notifications";
 import { dummyVerify, hashPassword, verifyPassword } from "./password";
 import { createSession, destroySession, revokeAllSessions } from "./session";
 import { requireOwner, requireViewer, ForbiddenError } from "@/server/auth/context";
@@ -110,6 +111,24 @@ export async function loginAction(
       })
       .where(eq(users.id, user.id));
     await auditLog({ action: lock ? "auth.account_locked" : "auth.login_failed", entityType: "user", entityId: user.id, outcome: "deny" });
+    // Klantaccount geblokkeerd na te veel pogingen → eigenaar + operationeel
+    // beheerder op de hoogte brengen zodat Milou de klant kan helpen (reset/
+    // ontgrendelen). Dedupe per account per dag voorkomt ruis.
+    if (lock && user.primaryRole === "client") {
+      const dayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+      await notify({
+        roles: ["owner", "operational_manager"],
+        clientId: user.clientId ?? null,
+        level: "warning",
+        type: "client_account_locked",
+        title: "Klant kan niet inloggen (account geblokkeerd)",
+        body: `${user.fullName || user.email} is tijdelijk geblokkeerd na te veel inlogpogingen. Start eventueel een wachtwoordreset of ontgrendel het account.`,
+        href: "/klantenbeheer?tab=portalen",
+        entityType: "user",
+        entityId: user.id,
+        dedupeKey: `client_account_locked:${user.id}:${dayKey}`,
+      }).catch(() => undefined);
+    }
     return { error: "E-mailadres of wachtwoord klopt niet." };
   }
 

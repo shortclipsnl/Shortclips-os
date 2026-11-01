@@ -75,10 +75,10 @@ const GROUP_OF: Record<string, QualityGroup> = {
 };
 const groupOf = (category: string): QualityGroup => GROUP_OF[category] ?? "overig";
 
-const CC = ["project_coordinator", "content_creator"];
-const EDIT = ["project_coordinator", "editor"];
-const SHOOT = ["project_coordinator", "videographer"];
-const COORD = ["project_coordinator"];
+const CC = ["operational_manager", "project_coordinator", "content_creator"];
+const EDIT = ["operational_manager", "project_coordinator", "editor"];
+const SHOOT = ["operational_manager", "project_coordinator", "videographer"];
+const COORD = ["operational_manager", "project_coordinator"];
 
 // Pipelinestatussen waarin een video "in productie" is (niet af, niet geannuleerd).
 const ACTIVE_EDIT: VideoStage[] = [

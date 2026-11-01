@@ -12,6 +12,7 @@ import {
 import { Button, ErrorNote, InfoNote } from "@/components/ui";
 
 const ROLES = [
+  { value: "operational_manager", label: "Operationeel beheerder" },
   { value: "project_coordinator", label: "Projectcoördinator" },
   { value: "content_creator", label: "Content creative" },
   { value: "videographer", label: "Videograaf" },

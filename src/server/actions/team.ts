@@ -12,6 +12,7 @@ export type ActionResult = { ok: boolean; message?: string; id?: string };
 const ROLE_KEYS = [
   "owner",
   "admin",
+  "operational_manager",
   "project_coordinator",
   "content_creator",
   "videographer",

@@ -15,7 +15,7 @@ export const maxDuration = 60;
 export async function GET() {
   const viewer = await getViewer();
   if (!viewer) return new NextResponse(null, { status: 401 });
-  if (!(isOwner(viewer) || viewer.primaryRole === "project_coordinator")) {
+  if (!(isOwner(viewer) || viewer.primaryRole === "project_coordinator" || viewer.primaryRole === "operational_manager")) {
     return new NextResponse(null, { status: 403 });
   }
 

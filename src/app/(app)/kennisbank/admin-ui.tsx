@@ -9,6 +9,7 @@ import type { CourseCard } from "@/server/kennisbank";
 
 export const ROLE_OPTIONS: Array<{ key: string; label: string }> = [
   { key: "admin", label: "Beheerder" },
+  { key: "operational_manager", label: "Operationeel beheerder" },
   { key: "project_coordinator", label: "Projectcoördinator" },
   { key: "content_creator", label: "Content creator" },
   { key: "videographer", label: "Videograaf" },

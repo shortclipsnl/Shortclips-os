@@ -1,7 +1,7 @@
 import type { PermissionKey } from "@/server/auth/permissions";
 
 /** Rollen zoals in de user_role-enum (zie src/db/schema/enums.ts). */
-type UserRole = "owner" | "admin" | "project_coordinator" | "content_creator" | "videographer" | "editor" | "finance" | "client";
+type UserRole = "owner" | "admin" | "operational_manager" | "project_coordinator" | "content_creator" | "videographer" | "editor" | "finance" | "client";
 
 export type NavItem = {
   href: string;
@@ -20,6 +20,9 @@ export type NavItem = {
   manageClients?: boolean;
   /** Zichtbaar voor de eigenaar + aangewezen teamleden van de offertemodule. */
   quotesAccess?: boolean;
+  /** Zichtbaar voor de eigenaar + de operationeel beheerder (Milou). Voor de
+   *  voorheen eigenaar-only operationele surfaces (koppelingen, portaal-instellingen). */
+  manageOperations?: boolean;
   /** Uitsluitend voor editors — ook de eigenaar/het team ziet dit niet. */
   editorsOnly?: boolean;
   /** Externe/zelfstandige pagina: open als gewone link in een nieuw tabblad
@@ -117,15 +120,25 @@ export const NAVIGATION: NavGroup[] = [
     ],
   },
   {
-    // Beheer: koppelingen, agenda's, klantenbeheer en instellingen.
-    title: "Beheer",
+    // Operationeel klantbeheer: alles wat de operationeel beheerder (Milou)
+    // zelfstandig regelt — klanten, klantaccounts, portaal, koppelingen,
+    // noodprocedure. Herkenbaar gebundeld, zonder dubbele pagina's.
+    title: "Klantbeheer & instellingen",
     accent: "var(--color-ink-muted)",
     items: [
       { href: "/klantenbeheer", label: "Klanten", icon: "UserCog", manageClients: true, match: "/klantenbeheer" },
-      { href: "/noodprocedure", label: "Noodprocedure", icon: "LifeBuoy", roles: ["project_coordinator"], match: "/noodprocedure" },
+      { href: "/klantenbeheer?tab=portalen", label: "Klantaccounts & wachtwoorden", icon: "KeyRound", manageClients: true },
+      { href: "/settings/portaal", label: "Klantportaal-instellingen", icon: "SlidersHorizontal", manageOperations: true, match: "/settings/portaal" },
+      { href: "/settings/integrations", label: "Koppelingen", icon: "Plug", manageOperations: true, match: "/settings/integrations" },
+      { href: "/noodprocedure", label: "Noodprocedure", icon: "LifeBuoy", manageClients: true, match: "/noodprocedure" },
+    ],
+  },
+  {
+    // Systeembeheer: agenda's en algemene instellingen (eigenaar/beheerders).
+    title: "Beheer",
+    accent: "var(--color-ink-muted)",
+    items: [
       { href: "/settings/agendas", label: "Agenda's", icon: "CalendarRange", ownerOnly: true, match: "/settings/agendas" },
-      { href: "/settings/integrations", label: "Koppelingen", icon: "Plug", ownerOnly: true, match: "/settings/integrations" },
-      { href: "/settings/portaal", label: "Klantportaal-instellingen", icon: "SlidersHorizontal", ownerOnly: true, match: "/settings/portaal" },
       { href: "/settings", label: "Instellingen", icon: "Settings", permissions: ["settings:read", "users:read"], match: "/settings" },
     ],
   },

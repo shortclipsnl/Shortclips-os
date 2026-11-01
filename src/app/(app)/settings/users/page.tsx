@@ -23,6 +23,7 @@ const ROLE_LABELS: Record<string, string> = {
   owner: "Eigenaar",
   admin: "Beheerder",
   project_coordinator: "Projectcoördinator",
+  operational_manager: "Operationeel beheerder",
   content_creator: "Content creator",
   videographer: "Videograaf",
   editor: "Editor",

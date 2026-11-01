@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireInternal, isOwner } from "@/server/auth/context";
+import { requireInternal, isOwner, canManageOperations } from "@/server/auth/context";
+import { portalAccessReport } from "@/server/jobs/portal-access";
 import { getDashboard } from "@/server/dashboard";
 import { getMyDay } from "@/server/my-day";
 import { listUpcomingMeetings } from "@/server/meetings";
@@ -41,6 +42,10 @@ export default async function DashboardPage() {
     getMorningOverview(viewer),
   ]);
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
+  // Operationeel beheer (eigenaar + operationeel beheerder): snelkoppelingen +
+  // aandachtspunt "klanten zonder portaallogin".
+  const showOps = canManageOperations(viewer);
+  const opsMissingPortal = showOps ? (await portalAccessReport()).missingPortal.length : 0;
 
   // Opnames binnen de komende 7 dagen voor de weekplanning.
   const weekEnd = new Date();
@@ -107,6 +112,39 @@ export default async function DashboardPage() {
             {missingCoord.names.length > 6 ? "…" : ""}.
           </span>
         </Link>
+      ) : null}
+
+      {/* Klantbeheer & instellingen: herkenbaar blok voor de operationeel
+          beheerder (Milou) + eigenaar — alles rond klanten, accounts, portaal en
+          koppelingen op één plek bereikbaar. */}
+      {showOps ? (
+        <div className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">Klantbeheer & instellingen</h2>
+            {opsMissingPortal > 0 ? (
+              <Link href="/klantenbeheer?tab=portalen" className="text-xs font-medium text-[#8a5300] hover:underline">
+                {opsMissingPortal} actieve klant{opsMissingPortal === 1 ? "" : "en"} zonder portaallogin →
+              </Link>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { href: "/klantenbeheer", label: "Klanten" },
+              { href: "/klantenbeheer?tab=portalen", label: "Klantaccounts & wachtwoorden" },
+              { href: "/settings/portaal", label: "Klantportaal-instellingen" },
+              { href: "/settings/integrations", label: "Koppelingen" },
+              { href: "/noodprocedure", label: "Noodprocedure" },
+            ].map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-sunken)]"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </div>
+        </div>
       ) : null}
 
       {/* Korte werkrichtlijn: zelfstandigheid, eigenaarschap en eerst zelf

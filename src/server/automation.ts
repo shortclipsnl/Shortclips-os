@@ -205,7 +205,7 @@ async function runAction(action: Action, event: AutomationEvent, ruleKey?: strin
       const coordinatorId = event.data?.coordinatorId as string | undefined;
       const count = await notify({
         userIds: coordinatorId ? [coordinatorId] : [],
-        roles: coordinatorId ? undefined : ["project_coordinator"],
+        roles: coordinatorId ? undefined : ["project_coordinator", "operational_manager"],
         clientId: event.clientId ?? null,
         type: event.trigger,
         level: (action.level as "warning") ?? "warning",

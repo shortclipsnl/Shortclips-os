@@ -156,12 +156,33 @@ export function isOwner(viewer: Viewer | null): boolean {
  */
 export function canManageClients(viewer: Viewer | null): boolean {
   if (!viewer) return false;
-  // De eigenaar en projectcoördinatoren mogen klanten en klantportalen beheren.
-  // Het vaste kernteam (Jarno, Milou, Jiska, Rutger) krijgt dit óók op e-mail,
-  // onafhankelijk van de exacte rol — zij zien toch al alle klanten. Zo kan bv.
-  // Milou ook portaallogins aanmaken, ook als haar rol niet exact
-  // "project_coordinator" is.
-  return isOwner(viewer) || viewer.primaryRole === "project_coordinator" || isCoreStaff(viewer.email);
+  // De eigenaar, projectcoördinatoren en de operationeel beheerder mogen klanten
+  // en klantportalen beheren. Het vaste kernteam (Jarno, Milou, Jiska, Rutger)
+  // krijgt dit óók op e-mail, onafhankelijk van de exacte rol — zij zien toch al
+  // alle klanten. Zo kan bv. Milou ook portaallogins aanmaken.
+  return (
+    isOwner(viewer) ||
+    viewer.primaryRole === "project_coordinator" ||
+    viewer.primaryRole === "operational_manager" ||
+    isCoreStaff(viewer.email)
+  );
+}
+
+/**
+ * Operationeel beheer: de eigenaar en de operationeel beheerder (Milou). Dit is
+ * de gate voor de voorheen eigenaar-only operationele surfaces (koppelingen,
+ * klantportaal-instellingen) die níet voor elke projectcoördinator bedoeld zijn.
+ */
+export function canManageOperations(viewer: Viewer | null): boolean {
+  if (!viewer) return false;
+  return isOwner(viewer) || viewer.primaryRole === "operational_manager";
+}
+export async function requireOperationalManager(): Promise<Viewer> {
+  const viewer = await requireInternal();
+  if (!canManageOperations(viewer)) {
+    throw new ForbiddenError("Dit onderdeel is alleen voor de eigenaar en de operationeel beheerder.");
+  }
+  return viewer;
 }
 
 export function canAny(viewer: Viewer | null, list: PermissionKey[]): boolean {
@@ -231,7 +252,11 @@ export async function requireQuotesAccess(): Promise<Viewer> {
  */
 export function canAuthorKennisbank(viewer: Viewer | null): boolean {
   if (!viewer) return false;
-  return isOwner(viewer) || viewer.primaryRole === "project_coordinator";
+  return (
+    isOwner(viewer) ||
+    viewer.primaryRole === "project_coordinator" ||
+    viewer.primaryRole === "operational_manager"
+  );
 }
 
 export async function requireAuthorKennisbank(): Promise<Viewer> {

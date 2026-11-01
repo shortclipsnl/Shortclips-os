@@ -36,6 +36,7 @@ export function canSeeTeamDevelopment(viewer: Viewer | null): boolean {
   return (
     isOwner(viewer) ||
     viewer.primaryRole === "project_coordinator" ||
+    viewer.primaryRole === "operational_manager" ||
     can(viewer, "team:read") ||
     can(viewer, "editors:read")
   );
@@ -47,6 +48,7 @@ export function canReviewDevelopment(viewer: Viewer | null): boolean {
   return (
     isOwner(viewer) ||
     viewer.primaryRole === "project_coordinator" ||
+    viewer.primaryRole === "operational_manager" ||
     can(viewer, "team:write") ||
     can(viewer, "editors:write")
   );

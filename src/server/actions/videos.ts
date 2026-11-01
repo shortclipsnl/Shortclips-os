@@ -300,7 +300,7 @@ export async function changeVideoStatus(
     // van de Content Creative. Alleen een Content Creative/coördinator/eigenaar
     // mag de status op "Feedback klant" (naar de klant) zetten.
     if (nextStatus === "client_review") {
-      const approverRoles = ["owner", "admin", "project_coordinator", "content_creator"];
+      const approverRoles = ["owner", "admin", "operational_manager", "project_coordinator", "content_creator"];
       if (!approverRoles.includes(viewer.primaryRole)) {
         return { ok: false, message: "Alleen een Content Creative mag een video naar de klant sturen — laat de interne review eerst akkoord geven." };
       }

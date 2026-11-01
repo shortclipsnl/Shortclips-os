@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, tasks, users } from "@/db/schema";
 import { requireInternal, requirePermission, ForbiddenError } from "@/server/auth/context";
@@ -51,7 +51,7 @@ export async function recommendationToTask(
       const [coord] = await db
         .select({ id: users.id })
         .from(users)
-        .where(and(eq(users.primaryRole, "project_coordinator"), eq(users.status, "active"), isNull(users.deletedAt)))
+        .where(and(inArray(users.primaryRole, ["operational_manager", "project_coordinator"]), eq(users.status, "active"), isNull(users.deletedAt)))
         .orderBy(asc(users.fullName))
         .limit(1);
       assigneeId = coord?.id ?? null;

@@ -10,7 +10,6 @@ import {
   assertClientAccess,
   ForbiddenError,
   requireManageClients,
-  requireOwner,
   requirePermission,
 } from "@/server/auth/context";
 import { hashPassword } from "@/server/auth/password";
@@ -37,15 +36,17 @@ export type PortalLoginResult = {
 };
 
 /**
- * Portaallogin voor een klant aanmaken of een nieuw wachtwoord geven. Alleen de
- * eigenaar. Het wachtwoord wordt hier éénmalig teruggegeven (daarna alleen
- * versleuteld opgeslagen — ook wij kunnen het niet meer inzien). Veilig: een
- * e-mailadres dat al bij een teamlid of een andere klant hoort, weigeren we,
- * zodat er nooit per ongeluk een bestaand account wordt gekaapt.
+ * Portaallogin voor een klant aanmaken of een nieuw wachtwoord geven. Voor de
+ * eigenaar en de klantbeheerders (o.a. de operationeel beheerder). Het wachtwoord
+ * wordt hier éénmalig teruggegeven (daarna alleen versleuteld opgeslagen — ook
+ * wij kunnen het niet meer inzien). Veilig: een e-mailadres dat al bij een teamlid
+ * of een andere klant hoort, weigeren we, zodat er nooit per ongeluk een bestaand
+ * account wordt gekaapt.
  */
 export async function setClientPortalLogin(clientId: string): Promise<PortalLoginResult> {
   try {
-    const viewer = await requireOwner();
+    const viewer = await requireManageClients();
+    assertClientAccess(viewer, clientId);
 
     const [client] = await db
       .select({ id: clients.id, name: clients.name, slug: clients.slug })

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { db } from "@/db/client";
 import { clients, syncJobs, integrationEvents } from "@/db/schema";
-import { requireOwner } from "@/server/auth/context";
+import { requireOperationalManager } from "@/server/auth/context";
 import { integrationHealth } from "@/server/integrations/registry";
 import { appointmentReviewStats, unmatchedAppointments } from "@/server/appointments";
 import { calendarColorMap } from "@/server/calendar-couplings";
@@ -38,7 +38,7 @@ function staleHours(ms: number | null): string {
 }
 
 export default async function IntegrationsPage() {
-  const viewer = await requireOwner();
+  const viewer = await requireOperationalManager();
   const health = await integrationHealth();
   const canWrite = viewer.permissions.has("integrations:write");
 

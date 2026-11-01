@@ -94,7 +94,7 @@ async function notifyStatusChange(goal: GoalRecord, to: GoalStatus, now: Date): 
   } else if (to === "niet_bijgewerkt") {
     await notify({ roles: ["owner"], type: "goal_stand_ontbreekt", level: "info", title: `Stand ontbreekt: ${title}`, body: "Werk de stand van dit doel even bij.", href, dedupeKey: `goal_stand:${goal.id}:${dayKey}` });
   } else if (to === "gehaald") {
-    await notify({ roles: ["owner", "project_coordinator", "content_creator", "videographer"], type: "goal_gehaald", level: "success", title: `Doel gehaald: ${title}`, body: "Dit doel is gehaald. Mooi werk, team.", href, dedupeKey: `goal_gehaald:${goal.id}` });
+    await notify({ roles: ["owner", "operational_manager", "project_coordinator", "content_creator", "videographer"], type: "goal_gehaald", level: "success", title: `Doel gehaald: ${title}`, body: "Dit doel is gehaald. Mooi werk, team.", href, dedupeKey: `goal_gehaald:${goal.id}` });
   }
 }
 

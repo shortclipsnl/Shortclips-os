@@ -2270,6 +2270,21 @@ export const BESLIS: BeslisData = {
   ],
   "grenzen": [
     {
+      "onderwerp": "Klantaccount & wachtwoord",
+      "zelf": "Milou (operationeel beheerder): account aanmaken, veilige wachtwoordreset starten, (de)activeren, uitnodigen — zelfstandig",
+      "jarno": "Niet nodig; dit regelt Milou. Alleen bij een beveiligingsprobleem naar Jarno"
+    },
+    {
+      "onderwerp": "Klantportaal-instellingen",
+      "zelf": "Milou: termijnen, voorwaarden en portaalinstellingen van de klant aanpassen",
+      "jarno": "Twijfel over commerciële voorwaarden of bedragen"
+    },
+    {
+      "onderwerp": "Koppeling (Frame.io/Drive/Agenda)",
+      "zelf": "Milou: status bekijken, opnieuw synchroniseren, een verbroken koppeling signaleren",
+      "jarno": "Geheime API-sleutels instellen en gevoelige systeem-/beveiligingsinstellingen"
+    },
+    {
       "onderwerp": "Deadline verschuiven",
       "zelf": "Tot [[2 werkdagen]]",
       "jarno": "Meer, en de klant protesteert of wil compensatie"

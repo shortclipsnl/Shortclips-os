@@ -74,7 +74,7 @@ export async function recordAwards(editorUserId: string, now = new Date()): Prom
     const tier = awardByKey(e.awardKey);
     if (!tier) continue;
     await notify({
-      roles: ["owner", "project_coordinator"],
+      roles: ["owner", "operational_manager", "project_coordinator"],
       type: "award_earned",
       level: "success",
       title: `${editor?.name ?? "Een editor"} heeft de award ${tier.name} behaald (${tier.threshold} shorts)`,
