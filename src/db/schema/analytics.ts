@@ -15,7 +15,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { pk, softDelete, timestamps } from "./_shared";
-import { platformEnum, publicationStatusEnum } from "./enums";
+import { monthlyReportStatusEnum, platformEnum, publicationStatusEnum } from "./enums";
 import { clients, socialAccounts } from "./clients";
 import { users } from "./identity";
 import { deliverables } from "./video";
@@ -253,13 +253,79 @@ export const clientReports = pgTable(
     generatedById: uuid("generated_by_id").references(() => users.id, {
       onDelete: "set null",
     }),
+
+    /* ---- AI Maandrapportage (controleflow) ---- */
+    /** Controle-status (spiegelt `isPublished` wanneer 'gepubliceerd'). */
+    status: monthlyReportStatusEnum("status").notNull().default("gegevens_verzamelen"),
+    /** De gestructureerde AI-analyse (ClientInsights). */
+    analysis: jsonb("analysis").notNull().default(sql`'{}'::jsonb`),
+    /** Max. 3 belangrijkste aandachtspunten deze maand. */
+    aandachtspunten: jsonb("aandachtspunten").notNull().default(sql`'[]'::jsonb`),
+    /** Max. 3 strategische actiepunten. */
+    strategischeActies: jsonb("strategische_acties").notNull().default(sql`'[]'::jsonb`),
+    /** Persoonlijke beoordeling: { positief, verbeteren, volgendeMaand, klanttekst }. */
+    beoordeling: jsonb("beoordeling").notNull().default(sql`'{}'::jsonb`),
+    /** Interne kwaliteitscontrole-uitslag (nooit in de klantversie). */
+    kwaliteit: jsonb("kwaliteit").notNull().default(sql`'{}'::jsonb`),
+    /** Gemarkeerde ontbrekende/onvolledige gegevens. */
+    ontbrekendeGegevens: jsonb("ontbrekende_gegevens").notNull().default(sql`'[]'::jsonb`),
+    /** Start van de huidige generatie (dubbel-draai-guard). */
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    /** Wanneer de AI-analyse klaar was. */
+    generatedAt: timestamp("generated_at", { withTimezone: true }),
+    reviewedById: uuid("reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
+    approvedById: uuid("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    errorMessage: text("error_message"),
     ...timestamps,
     ...softDelete,
   },
   (t) => [
     unique("client_reports_unique").on(t.clientId, t.periodType, t.period),
     index("client_reports_client_idx").on(t.clientId),
+    index("client_reports_status_idx").on(t.status),
   ],
+);
+
+/**
+ * Licht strategieprofiel per klant voor AI Maandrapportages: wat de klant met de
+ * content wil bereiken, zodat de analyse doelgericht is. Doelgroep en tone-of-voice
+ * komen uit de bestaande profielen (clientAiProfiles / Content DNA) — niet hier.
+ */
+export const clientStrategyProfiles = pgTable(
+  "client_strategy_profiles",
+  {
+    id: pk(),
+    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    /** Primaire doelstelling (bekendheid/bereik/volgers/sollicitanten/websitebezoek/aanvragen/verkoop/vertrouwen/werkgeverschap). */
+    primaryGoal: varchar("primary_goal", { length: 40 }),
+    /** Secundaire doelstellingen: string[]. */
+    secondaryGoals: jsonb("secondary_goals").notNull().default(sql`'[]'::jsonb`),
+    /** Eén zin die de contentstrategie samenvat. */
+    strategyNote: text("strategy_note"),
+    updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [unique("client_strategy_profiles_client_unique").on(t.clientId)],
+);
+
+/**
+ * Versiegeschiedenis van een goedgekeurd/gepubliceerd maandrapport. Een wijziging
+ * ná goedkeuring maakt een nieuwe versie i.p.v. de definitieve versie stil te
+ * overschrijven (interne traceerbaarheid).
+ */
+export const monthlyReportVersions = pgTable(
+  "monthly_report_versions",
+  {
+    id: pk(),
+    reportId: uuid("report_id").notNull().references(() => clientReports.id, { onDelete: "cascade" }),
+    versionNumber: integer("version_number").notNull(),
+    /** Snapshot van analyse + beoordeling + strategische acties bij goedkeuring. */
+    content: jsonb("content").notNull().default(sql`'{}'::jsonb`),
+    approvedById: uuid("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [index("monthly_report_versions_report_idx").on(t.reportId, t.versionNumber)],
 );
 
 /* ------------------------------------------------------------------ *
@@ -304,9 +370,18 @@ export const socialMetricsRelations = relations(socialMetrics, ({ one }) => ({
   }),
 }));
 
-export const clientReportsRelations = relations(clientReports, ({ one }) => ({
+export const clientReportsRelations = relations(clientReports, ({ one, many }) => ({
   client: one(clients, {
     fields: [clientReports.clientId],
     references: [clients.id],
   }),
+  versions: many(monthlyReportVersions),
+}));
+
+export const clientStrategyProfilesRelations = relations(clientStrategyProfiles, ({ one }) => ({
+  client: one(clients, { fields: [clientStrategyProfiles.clientId], references: [clients.id] }),
+}));
+
+export const monthlyReportVersionsRelations = relations(monthlyReportVersions, ({ one }) => ({
+  report: one(clientReports, { fields: [monthlyReportVersions.reportId], references: [clientReports.id] }),
 }));

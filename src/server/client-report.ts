@@ -17,7 +17,22 @@ const dayOffset = (n: number) => {
  * data: ontbreekt iets, dan blijft het leeg. De inhoudelijke AI-analyse en
  * verbeterpunten worden apart toegevoegd (vereist ANTHROPIC_API_KEY).
  */
-export async function getClientReport(slug: string, days = 90, trusted = false) {
+/** Dagen tussen twee ISO-datums (inclusief). */
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
+}
+function isoShift(iso: string, deltaDays: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}
+
+export async function getClientReport(
+  slug: string,
+  days = 90,
+  trusted = false,
+  window?: { from: string; to: string },
+) {
   // `trusted` alleen voor vertrouwde server-jobs (geen gebruikerssessie, bv. de
   // nachtelijke AI-verbeterlus). De normale UI-/actiepaden laten dit op false.
   if (!trusted) await requireInternal();
@@ -29,9 +44,14 @@ export async function getClientReport(slug: string, days = 90, trusted = false) 
     .limit(1);
   if (!client) notFound();
 
-  const start = dayOffset(-days);
-  const prevStart = dayOffset(-2 * days);
-  const prevEnd = dayOffset(-days - 1);
+  // Met een expliciet venster (bv. een kalendermaand voor een maandrapport)
+  // vergelijken we met de gelijk-lange periode er direct vóór. Zonder venster
+  // geldt het rollende `days`-venster vanaf vandaag.
+  const start = window ? window.from : dayOffset(-days);
+  const end = window ? window.to : dayOffset(0);
+  const span = window ? daysBetween(window.from, window.to) : days;
+  const prevStart = window ? isoShift(window.from, -span) : dayOffset(-2 * days);
+  const prevEnd = window ? isoShift(window.from, -1) : dayOffset(-days - 1);
   const totalsSql = (from: string, to: string) => sql`
     select coalesce(sum(views),0)::bigint views, coalesce(sum(reach),0)::bigint reach,
            coalesce(sum(engagements),0)::bigint engagements, coalesce(sum(follower_delta),0)::int follower_growth,
@@ -39,17 +59,20 @@ export async function getClientReport(slug: string, days = 90, trusted = false) 
            coalesce(sum(comments),0)::bigint comments, coalesce(sum(shares),0)::bigint shares, coalesce(sum(saves),0)::bigint saves
     from daily_metrics where client_id = ${client.id} and measured_on >= ${from} and measured_on <= ${to}`;
 
+  // Maandreeks: voor een maandvenster een bredere terugblik (laatste 6 maanden)
+  // zodat de maandvergelijking context heeft; anders gewoon het rollende venster.
+  const monthsFrom = window ? isoShift(start, -185) : start;
   const [totalsRes, prevRes, perPlatformRes, perMonthRes] = await Promise.all([
-    db.execute(totalsSql(start, dayOffset(0))),
+    db.execute(totalsSql(start, end)),
     db.execute(totalsSql(prevStart, prevEnd)),
     db.execute(sql`
       select platform, coalesce(sum(views),0)::bigint views, coalesce(sum(reach),0)::bigint reach,
              coalesce(sum(follower_delta),0)::int volgers, coalesce(sum(engagements),0)::bigint engagements
-      from daily_metrics where client_id = ${client.id} and measured_on >= ${start} and measured_on <= ${dayOffset(0)} and platform is not null
+      from daily_metrics where client_id = ${client.id} and measured_on >= ${start} and measured_on <= ${end} and platform is not null
       group by platform order by views desc`),
     db.execute(sql`
       select to_char(measured_on,'YYYY-MM') maand, coalesce(sum(views),0)::bigint views
-      from daily_metrics where client_id = ${client.id} and measured_on >= ${start} and measured_on <= ${dayOffset(0)}
+      from daily_metrics where client_id = ${client.id} and measured_on >= ${monthsFrom} and measured_on <= ${end}
       group by maand order by maand`),
   ]);
 
@@ -77,8 +100,8 @@ export async function getClientReport(slug: string, days = 90, trusted = false) 
 
   return {
     client,
-    days,
-    period: { from: start, to: dayOffset(0) },
+    days: span,
+    period: { from: start, to: end },
     totals: {
       views,
       reach: n(t.reach),
