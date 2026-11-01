@@ -336,7 +336,7 @@ export const BESLIS: BeslisData = {
       "vastleggen": "Nieuwe versie van het script.",
       "afgerond": "Het script is goedgekeurd.",
       "klantbericht": "Hoi [naam], dank voor je feedback, daar kan ik goed mee verder. Ik pas het script aan en stuur je de nieuwe versie uiterlijk [dag].",
-      "zoekwoorden": "script niet leuk, script niet goed, feedback script, script aanpassen, andere toon, commercieel, insteek, hook, herschrijven"
+      "zoekwoorden": "script niet leuk, script niet goed, feedback script, script aanpassen, andere toon, commercieel, insteek, hook, herschrijven, tekst anders, script anders schrijven, andere tekst"
     },
     {
       "id": "alle-scripts-anders",
@@ -593,7 +593,7 @@ export const BESLIS: BeslisData = {
       "vastleggen": "Feedback en oplossing.",
       "afgerond": "De klant keurt de video goed.",
       "klantbericht": "Hoi [naam], dank dat je dit eerlijk aangeeft. Ik wil het graag goed maken. Kun je me laten weten wat je precies anders wilt zien? Dan passen we het aan en heb je de nieuwe versie uiterlijk [dag].",
-      "zoekwoorden": "ontevreden, niet mooi, niet goed, kwaliteit, niet professioneel, slecht, afgekeurd, niet blij, boos video",
+      "zoekwoorden": "ontevreden, niet mooi, niet goed, kwaliteit, niet professioneel, slecht, afgekeurd, niet blij, boos video, lelijk, keurt video af, niet mooi",
       "keuzehulp": {
         "vraag": "Gaat het om normale inhoudelijke feedback of om een ernstige klacht?",
         "opties": [
@@ -1084,7 +1084,7 @@ export const BESLIS: BeslisData = {
       "vastleggen": "Wat verloren is.",
       "afgerond": "Er is een oplossing en de klant is geïnformeerd.",
       "klantbericht": null,
-      "zoekwoorden": "beschadigd, kapot, bestanden kwijt, corrupt, kaart, data weg",
+      "zoekwoorden": "beschadigd, kapot, bestanden kwijt, corrupt, kaart, data weg, beelden kwijt, footage kwijt, materiaal kwijt",
       "voorbereiding": "cc"
     },
     {
@@ -1131,7 +1131,7 @@ export const BESLIS: BeslisData = {
       "vastleggen": "Vertraging bij de editor in de Hub.",
       "afgerond": "De video is opgeleverd.",
       "klantbericht": null,
-      "zoekwoorden": "editor te laat, deadline gemist, montage vertraagd, editor achter, editor reageert niet, editor onbereikbaar",
+      "zoekwoorden": "editor te laat, deadline gemist, montage vertraagd, editor achter, editor reageert niet, editor onbereikbaar, montage te laat, montage niet op tijd",
       "keuzehulp": {
         "vraag": "Haalt de video de klantdeadline nog?",
         "opties": [
@@ -1943,7 +1943,7 @@ export const BESLIS: BeslisData = {
       "vastleggen": "Verzoek en voorstel.",
       "afgerond": "Er ligt een akkoord en het staat in de Hub.",
       "klantbericht": "Hoi [naam], leuk dat je dit aangeeft! Ik werk een voorstel voor je uit en kom er uiterlijk [dag] bij je op terug.",
-      "zoekwoorden": "voorwaarden, tweede bedrijf, ander bedrijf, extra dienst, advertenties, ads, meer kanalen, live, uitbreiding",
+      "zoekwoorden": "voorwaarden, tweede bedrijf, ander bedrijf, extra dienst, advertenties, ads, meer kanalen, live, uitbreiding, linkedin, youtube, facebook, tiktok, instagram, ander kanaal, extra kanaal",
       "voorbereiding": "cc"
     },
     {

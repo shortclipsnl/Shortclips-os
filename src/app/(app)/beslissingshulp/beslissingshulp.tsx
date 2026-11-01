@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { BESLIS, ROLLEN, type Keuzehulp, type Niveau, type Rol, type Situatie } from "@/lib/beslissingshulp/data";
+import { maakIndex, zoek as zoekIn } from "@/lib/beslissingshulp/zoek";
 
 /* ------------------------------------------------------------------ */
 /* Basis                                                                */
@@ -54,36 +55,7 @@ function Tekst({ t, markeer }: { t: string; markeer: boolean }) {
 }
 const kaal = (t: string) => t.replace(/\[\[(.+?)\]\]/g, "$1");
 
-function norm(t: string) {
-  return kaal(t).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9€ ]/g, " ");
-}
-const STOP = new Set(["klant", "wil", "de", "het", "een", "is", "van", "op", "te", "en", "met", "niet", "voor", "naar", "er", "mijn", "we", "ik", "die", "dat"]);
-const INDEX = S.map((s) => ({ s, t: norm(s.titel), k: norm(s.zoekwoorden), b: norm(s.situatie) }));
-
-function zoek(q: string): Situatie[] {
-  const nq = norm(q).trim();
-  if (!nq) return [];
-  let woorden = nq.split(/\s+/).filter((w) => w.length > 1 && !STOP.has(w));
-  if (!woorden.length) woorden = nq.split(/\s+/).filter((w) => w.length > 1);
-  const uit: [number, Situatie][] = [];
-  for (const it of INDEX) {
-    let score = 0, raak = 0;
-    if (it.t.includes(nq)) score += 20;
-    if (it.k.includes(nq)) score += 12;
-    for (const w of woorden) {
-      const stam = w.length > 5 ? w.slice(0, w.length - 2) : w;
-      let h = false;
-      if (it.t.includes(stam)) { score += 4; h = true; }
-      if (it.k.includes(stam)) { score += 3; h = true; }
-      if (it.b.includes(stam)) { score += 1; h = true; }
-      if (h) raak++;
-    }
-    if (score > 0 && raak >= Math.ceil(woorden.length * 0.6)) uit.push([score, it.s]);
-  }
-  uit.sort((a, b) => b[0] - a[0]);
-  const top = uit.length ? uit[0][0] : 0;
-  return uit.filter((x) => x[0] >= top * 0.45).map((x) => x[1]).slice(0, 5);
-}
+const INDEX = maakIndex(S);
 
 async function kopieer(tekst: string): Promise<boolean> {
   try {
@@ -215,7 +187,7 @@ function Kop({ children, rechts }: { children: ReactNode; rechts?: ReactNode }) 
 function Start({ owner, rol, setRol, q, setQ, ga }: {
   owner: boolean; rol: Rol; setRol: (r: Rol) => void; q: string; setQ: (q: string) => void; ga: Nav;
 }) {
-  const resultaten = useMemo(() => zoek(q), [q]);
+  const resultaten = useMemo(() => zoekIn(INDEX, q), [q]);
   const top = BESLIS.top[rol].map((id) => PER_ID.get(id)).filter(Boolean) as Situatie[];
   const R = ROLLEN[rol];
 
@@ -262,7 +234,7 @@ function Start({ owner, rol, setRol, q, setQ, ga }: {
             if (e.key === "Enter" && resultaten[0]) ga({ naam: "situatie", id: resultaten[0].id });
             if (e.key === "Escape") setQ("");
           }}
-          placeholder="Bijvoorbeeld: klant wil extra script"
+          placeholder="Typ wat er speelt, bijvoorbeeld: klant wil extra script"
           aria-label="Zoek een situatie"
           className="w-full rounded-[var(--radius-md,12px)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] py-3.5 pl-12 pr-11 text-base text-[var(--color-ink)] outline-none focus:border-[var(--color-indigo-ink)] focus:ring-4 focus:ring-[var(--color-indigo-ink)]/10"
         />
