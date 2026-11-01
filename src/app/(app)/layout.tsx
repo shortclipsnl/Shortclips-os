@@ -1,4 +1,4 @@
-import { requireInternal, isOwner, canManageClients } from "@/server/auth/context";
+import { requireInternal, isOwner, canManageClients, canManageQuotes } from "@/server/auth/context";
 import { NAVIGATION } from "@/components/layout/nav-config";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
@@ -44,6 +44,10 @@ export default async function AppLayout({
       // Klantenbeheer: zichtbaar voor iedereen die klanten mag beheren
       // (eigenaar, projectcoördinatoren én het kernteam — bijv. Milou).
       if (item.manageClients && !canManageClients(viewer)) {
+        return false;
+      }
+      // Offertemodule: eigenaar + aangewezen teamleden (bijv. Milou).
+      if (item.quotesAccess && !canManageQuotes(viewer)) {
         return false;
       }
       // Rechten-gebaseerde items.

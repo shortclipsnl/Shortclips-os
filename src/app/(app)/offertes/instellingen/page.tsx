@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { requireOwner } from "@/server/auth/context";
+import { requireQuotesAccess } from "@/server/auth/context";
 import { getCompanyInfo } from "@/server/quotes/company";
 import { signhostConfigured } from "@/server/quotes/signhost";
 import { PageHeader } from "@/components/ui";
@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Bedrijfsgegevens" };
 export const dynamic = "force-dynamic";
 
 export default async function CompanySettingsPage() {
-  await requireOwner();
+  await requireQuotesAccess();
   const company = await getCompanyInfo();
   return (
     <div className="mx-auto max-w-[760px]">

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Download, FileCheck2 } from "lucide-react";
-import { requireOwner } from "@/server/auth/context";
+import { requireQuotesAccess } from "@/server/auth/context";
 import { getQuoteDetail } from "@/server/quotes";
 import { publicQuoteLink } from "@/server/quotes/token";
 import { getCompanyInfo } from "@/server/quotes/company";
@@ -35,7 +35,7 @@ function dt(d: Date) {
 }
 
 export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireOwner();
+  await requireQuotesAccess();
   const { id } = await params;
   const detail = await getQuoteDetail(id);
   if (!detail) notFound();

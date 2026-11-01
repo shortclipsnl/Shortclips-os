@@ -2,7 +2,7 @@ import "server-only";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { quoteEvents, quoteLines, quoteTemplateVersions, quoteTemplates, quotes, clients, salesLeads } from "@/db/schema";
-import { requireOwner } from "@/server/auth/context";
+import { requireQuotesAccess } from "@/server/auth/context";
 import { notify } from "@/server/notifications";
 import { recordActivity } from "@/server/audit";
 import { publicQuoteLink } from "@/server/quotes/token";
@@ -33,7 +33,7 @@ export async function getQuotesOverview(): Promise<{
   rows: QuoteListRow[];
   stats: { total: number; concept: number; verzonden: number; bekeken: number; geaccepteerd: number; ondertekend: number; afgewezen: number };
 }> {
-  await requireOwner();
+  await requireQuotesAccess();
   const rows = await db
     .select({
       id: quotes.id,
@@ -81,7 +81,7 @@ export async function getQuotesOverview(): Promise<{
 
 /** Eén offerte volledig laden (intern, owner-only) incl. regels en gebeurtenissen. */
 export async function getQuoteDetail(id: string) {
-  await requireOwner();
+  await requireQuotesAccess();
   const [q] = await db.select().from(quotes).where(and(eq(quotes.id, id), isNull(quotes.deletedAt))).limit(1);
   if (!q) return null;
   const [lines, events, client, lead] = await Promise.all([
@@ -95,7 +95,7 @@ export async function getQuoteDetail(id: string) {
 
 /** Actieve sjablonen met hun huidige versie-inhoud. */
 export async function listQuoteTemplates(includeArchived = false) {
-  await requireOwner();
+  await requireQuotesAccess();
   const tpls = await db
     .select()
     .from(quoteTemplates)
@@ -105,7 +105,7 @@ export async function listQuoteTemplates(includeArchived = false) {
 }
 
 export async function getTemplateWithVersion(templateId: string) {
-  await requireOwner();
+  await requireQuotesAccess();
   const [tpl] = await db.select().from(quoteTemplates).where(and(eq(quoteTemplates.id, templateId), isNull(quoteTemplates.deletedAt))).limit(1);
   if (!tpl) return null;
   const [ver] = await db

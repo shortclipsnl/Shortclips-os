@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import { requireOwner } from "@/server/auth/context";
+import { requireQuotesAccess } from "@/server/auth/context";
 import { getTemplateWithVersion } from "@/server/quotes";
 import { PageHeader } from "@/components/ui";
 import { TemplateEditor } from "./template-editor";
@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Sjabloon bewerken" };
 export const dynamic = "force-dynamic";
 
 export default async function TemplateEditPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireOwner();
+  await requireQuotesAccess();
   const { id } = await params;
   const data = await getTemplateWithVersion(id);
   if (!data) notFound();

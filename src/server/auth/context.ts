@@ -206,6 +206,25 @@ export async function requireManageClients(): Promise<Viewer> {
 }
 
 /**
+ * Offertemodule: naast de eigenaar mogen deze aangewezen teamleden offertes
+ * maken, versturen en de tracking zien — zodat het doorgaat als de eigenaar er
+ * niet is. Bewust een expliciete lijst (niet alle coördinatoren), zodat alleen
+ * de gekozen personen erbij kunnen. Uitbreiden = een e-mail toevoegen.
+ */
+export const QUOTES_EXTRA_EMAILS = ["milou@shortclips.nl"] as const;
+export function canManageQuotes(viewer: Viewer | null): boolean {
+  if (!viewer) return false;
+  return isOwner(viewer) || (QUOTES_EXTRA_EMAILS as readonly string[]).includes(viewer.email.toLowerCase());
+}
+export async function requireQuotesAccess(): Promise<Viewer> {
+  const viewer = await requireInternal();
+  if (!canManageQuotes(viewer)) {
+    throw new ForbiddenError("De offertemodule is alleen voor de eigenaar en aangewezen teamleden.");
+  }
+  return viewer;
+}
+
+/**
  * SOP's en cursussen in de kennisbank schrijven: de eigenaar én
  * projectcoördinatoren (Jarno, Milou, Jiska, Tim …). Zo hoeft niet alles via
  * de eigenaar te lopen. Rolgebaseerd, net als klantbeheer.

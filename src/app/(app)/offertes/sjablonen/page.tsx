@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { requireOwner } from "@/server/auth/context";
+import { requireQuotesAccess } from "@/server/auth/context";
 import { listQuoteTemplates } from "@/server/quotes";
 import { PageHeader } from "@/components/ui";
 import { TemplatesUI } from "./templates-ui";
@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Offertesjablonen" };
 export const dynamic = "force-dynamic";
 
 export default async function TemplatesPage() {
-  await requireOwner();
+  await requireQuotesAccess();
   const templates = await listQuoteTemplates(true);
   return (
     <div className="mx-auto max-w-[900px]">

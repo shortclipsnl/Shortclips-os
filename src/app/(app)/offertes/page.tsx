@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FileSignature, LayoutTemplate, Plus, Settings } from "lucide-react";
-import { requireOwner } from "@/server/auth/context";
+import { requireQuotesAccess } from "@/server/auth/context";
 import { getQuotesOverview } from "@/server/quotes";
 import { PageHeader } from "@/components/ui";
 import { OffertesBoard } from "./offertes-board";
@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Offertes" };
 export const dynamic = "force-dynamic";
 
 export default async function OffertesPage() {
-  await requireOwner();
+  await requireQuotesAccess();
   const { rows, stats } = await getQuotesOverview();
 
   return (

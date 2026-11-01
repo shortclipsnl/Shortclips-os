@@ -4,7 +4,7 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { ChevronLeft } from "lucide-react";
 import { db } from "@/db/client";
 import { clients, quoteTemplateVersions, salesLeads } from "@/db/schema";
-import { requireOwner } from "@/server/auth/context";
+import { requireQuotesAccess } from "@/server/auth/context";
 import { listQuoteTemplates } from "@/server/quotes";
 import { PageHeader } from "@/components/ui";
 import { NieuwOfferteForm } from "./nieuw-form";
@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Nieuwe offerte" };
 export const dynamic = "force-dynamic";
 
 export default async function NieuweOffertePage() {
-  await requireOwner();
+  await requireQuotesAccess();
   const [templates, clientList, leadList] = await Promise.all([
     listQuoteTemplates(),
     db.select({ id: clients.id, name: clients.name }).from(clients).where(and(isNull(clients.deletedAt))).orderBy(asc(clients.name)),

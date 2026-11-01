@@ -15,7 +15,7 @@ import {
   clientContacts,
   salesLeads,
 } from "@/db/schema";
-import { ForbiddenError, requireOwner } from "@/server/auth/context";
+import { ForbiddenError, requireQuotesAccess } from "@/server/auth/context";
 import { auditLog, recordActivity } from "@/server/audit";
 import { notify } from "@/server/notifications";
 import { DEFAULT_TEMPLATE_CONTENT, sumLines, substituteContent, type QuoteContent, type QuoteLineInput } from "@/lib/quotes";
@@ -31,7 +31,7 @@ export type ActionResult = { ok: boolean; message?: string };
 /** Shortclips' eigen bedrijfsgegevens voor op de offerte/PDF. Owner-only. */
 export async function saveCompanyInfo(patch: Partial<CompanyInfo>): Promise<ActionResult> {
   try {
-    const viewer = await requireOwner();
+    const viewer = await requireQuotesAccess();
     await setCompanyInfo(patch, viewer.id);
     revalidatePath("/offertes/instellingen");
     return { ok: true, message: "Bedrijfsgegevens opgeslagen." };
@@ -56,7 +56,7 @@ async function reqMeta() {
 
 export async function createTemplate(input: { name: string; description?: string }): Promise<ActionResult & { id?: string }> {
   try {
-    const viewer = await requireOwner();
+    const viewer = await requireQuotesAccess();
     const name = input.name.trim();
     if (!name) return { ok: false, message: "Geef het sjabloon een naam." };
     const [tpl] = await db.insert(quoteTemplates).values({ name: name.slice(0, 160), description: input.description ?? null, createdById: viewer.id }).returning({ id: quoteTemplates.id });
@@ -73,7 +73,7 @@ export async function createTemplate(input: { name: string; description?: string
 /** Sjabloon bijwerken = een nieuwe versie opslaan (eerdere offertes blijven ongewijzigd). */
 export async function updateTemplate(input: { id: string; name?: string; content: QuoteContent }): Promise<ActionResult> {
   try {
-    const viewer = await requireOwner();
+    const viewer = await requireQuotesAccess();
     const [tpl] = await db.select().from(quoteTemplates).where(and(eq(quoteTemplates.id, input.id), isNull(quoteTemplates.deletedAt))).limit(1);
     if (!tpl) return { ok: false, message: "Sjabloon niet gevonden." };
     const nextVersion = tpl.currentVersion + 1;
@@ -91,7 +91,7 @@ export async function updateTemplate(input: { id: string; name?: string; content
 
 export async function duplicateTemplate(id: string): Promise<ActionResult & { id?: string }> {
   try {
-    const viewer = await requireOwner();
+    const viewer = await requireQuotesAccess();
     const [tpl] = await db.select().from(quoteTemplates).where(and(eq(quoteTemplates.id, id), isNull(quoteTemplates.deletedAt))).limit(1);
     if (!tpl) return { ok: false, message: "Sjabloon niet gevonden." };
     const [ver] = await db.select().from(quoteTemplateVersions).where(and(eq(quoteTemplateVersions.templateId, id), eq(quoteTemplateVersions.version, tpl.currentVersion))).limit(1);
@@ -107,7 +107,7 @@ export async function duplicateTemplate(id: string): Promise<ActionResult & { id
 
 export async function archiveTemplate(id: string, archived: boolean): Promise<ActionResult> {
   try {
-    await requireOwner();
+    await requireQuotesAccess();
     await db.update(quoteTemplates).set({ isArchived: archived, updatedAt: new Date() }).where(eq(quoteTemplates.id, id));
     revalidatePath("/offertes/sjablonen");
     return { ok: true };
@@ -132,7 +132,7 @@ const createSchema = z.object({
  *  prefill de ontvanger uit de klant of lead. Start als concept. */
 export async function createQuote(input: z.input<typeof createSchema>): Promise<ActionResult & { id?: string }> {
   try {
-    const viewer = await requireOwner();
+    const viewer = await requireQuotesAccess();
     const p = createSchema.safeParse(input);
     if (!p.success) return { ok: false, message: p.error.issues[0]?.message ?? "Ongeldig." };
     const { templateId, clientId, leadId, title } = p.data;
@@ -222,7 +222,7 @@ const updateSchema = z.object({
 /** Concept bijwerken: tekst, ontvanger, regels. Alleen zolang nog niet definitief. */
 export async function updateQuoteDraft(input: z.input<typeof updateSchema>): Promise<ActionResult> {
   try {
-    const viewer = await requireOwner();
+    const viewer = await requireQuotesAccess();
     const p = updateSchema.safeParse(input);
     if (!p.success) return { ok: false, message: p.error.issues[0]?.message ?? "Ongeldig." };
     const [q] = await db.select({ status: quotes.status, isReadOnly: quotes.isReadOnly }).from(quotes).where(eq(quotes.id, p.data.id)).limit(1);
@@ -266,7 +266,7 @@ export async function updateQuoteDraft(input: z.input<typeof updateSchema>): Pro
 
 export async function duplicateQuote(id: string): Promise<ActionResult & { id?: string }> {
   try {
-    const viewer = await requireOwner();
+    const viewer = await requireQuotesAccess();
     const [q] = await db.select().from(quotes).where(and(eq(quotes.id, id), isNull(quotes.deletedAt))).limit(1);
     if (!q) return { ok: false, message: "Offerte niet gevonden." };
     const lines = await db.select().from(quoteLines).where(eq(quoteLines.quoteId, id)).orderBy(quoteLines.sortOrder);
@@ -290,7 +290,7 @@ export async function duplicateQuote(id: string): Promise<ActionResult & { id?: 
 
 export async function deleteQuote(id: string): Promise<ActionResult> {
   try {
-    const viewer = await requireOwner();
+    const viewer = await requireQuotesAccess();
     await db.update(quotes).set({ deletedAt: new Date() }).where(eq(quotes.id, id));
     await auditLog({ viewer, action: "quote.deleted", entityType: "quote", entityId: id });
     revalidatePath("/offertes");
@@ -304,7 +304,7 @@ export async function deleteQuote(id: string): Promise<ActionResult> {
 /** Publieke link genereren + status naar "verzonden" (jij deelt 'm zelf per mail). */
 export async function markQuoteSent(id: string): Promise<ActionResult & { link?: string }> {
   try {
-    const viewer = await requireOwner();
+    const viewer = await requireQuotesAccess();
     const [q] = await db.select().from(quotes).where(and(eq(quotes.id, id), isNull(quotes.deletedAt))).limit(1);
     if (!q) return { ok: false, message: "Offerte niet gevonden." };
 
@@ -333,7 +333,7 @@ export async function markQuoteSent(id: string): Promise<ActionResult & { link?:
 /** Opnieuw een verse link maken (bijv. als de oude gelekt is). Owner-only. */
 export async function regenerateQuoteLink(id: string): Promise<ActionResult & { link?: string }> {
   try {
-    await requireOwner();
+    await requireQuotesAccess();
     const token = newQuoteToken();
     await db.update(quotes).set({ publicToken: token, updatedAt: new Date() }).where(eq(quotes.id, id));
     return { ok: true, link: publicQuoteLink(token) };
