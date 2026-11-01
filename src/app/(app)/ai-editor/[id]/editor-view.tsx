@@ -189,16 +189,19 @@ export function EditorView({ data }: { data: EditorData }) {
             ))}
 
             {data.canRun ? (
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div>
-                  <input ref={fileRef} type="file" accept="video/*,.mxf,.mts" multiple className="hidden" onChange={(e) => onFiles(e.target.files)} />
-                  <Button variant="secondary" className="w-full" disabled={busy} onClick={() => fileRef.current?.click()}><Upload className="size-4" /> Bestanden uploaden</Button>
+              <>
+                <p className="text-xs font-medium text-[var(--color-ink)]">Voeg de ruwe camerabeelden toe — upload ze óf plak de link van de Google Drive-map:</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <input ref={fileRef} type="file" accept="video/*,.mxf,.mts" multiple className="hidden" onChange={(e) => onFiles(e.target.files)} />
+                    <Button variant="secondary" className="w-full" disabled={busy} onClick={() => fileRef.current?.click()}><Upload className="size-4" /> Bestanden uploaden</Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input value={driveLink} onChange={(e) => setDriveLink(e.target.value)} placeholder="Plak hier de Google Drive-map-link" className="sc-input min-w-0 flex-1" />
+                    <Button variant="secondary" disabled={pending || busy || !driveLink} onClick={() => act(() => addDriveSources({ projectId: data.id, link: driveLink }), () => setDriveLink(""))} title="Drive-map koppelen"><FolderInput className="size-4" /> Koppelen</Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <input value={driveLink} onChange={(e) => setDriveLink(e.target.value)} placeholder="Google Drive-link (map of bestand)" className="sc-input min-w-0 flex-1" />
-                  <Button variant="secondary" disabled={pending || busy || !driveLink} onClick={() => act(() => addDriveSources({ projectId: data.id, link: driveLink }), () => setDriveLink(""))}><FolderInput className="size-4" /></Button>
-                </div>
-              </div>
+              </>
             ) : null}
             <p className="text-2xs text-[var(--color-ink-faint)]">Grote camerabestanden (meerdere GB) gaan het snelst via een Google Drive-map: de verwerk-server haalt de originelen daar zelf op, zonder upload vanuit je browser.</p>
 

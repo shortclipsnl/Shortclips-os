@@ -8,6 +8,7 @@ import {
   AbortMultipartUploadCommand,
   GetObjectCommand,
   DeleteObjectsCommand,
+  HeadBucketCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "@/lib/env";
@@ -45,6 +46,37 @@ export function r2Configured(): boolean {
 }
 
 const BUCKET = env.R2_BUCKET;
+
+export type R2Health =
+  | { ok: true; bucket: string }
+  | { ok: false; configured: boolean; message: string };
+
+/**
+ * Serverzijdige verbindingstest: controleert of de sleutels kloppen en de bucket
+ * bestaat en bereikbaar is. Draait via de server (geen CORS in het spel), dus
+ * scheidt "sleutels/bucket fout" van "CORS fout bij browser-upload". Zo kun je
+ * na het invullen van de R2-sleutels meteen zien of de opslag staat.
+ */
+export async function r2HealthCheck(): Promise<R2Health> {
+  const c = client();
+  if (!c) {
+    return { ok: false, configured: false, message: "R2-sleutels nog niet ingevuld (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)." };
+  }
+  try {
+    await c.send(new HeadBucketCommand({ Bucket: BUCKET }));
+    return { ok: true, bucket: BUCKET };
+  } catch (e) {
+    const err = e as { name?: string; $metadata?: { httpStatusCode?: number } };
+    const status = err.$metadata?.httpStatusCode;
+    if (status === 404 || err.name === "NotFound" || err.name === "NoSuchBucket") {
+      return { ok: false, configured: true, message: `Bucket "${BUCKET}" niet gevonden. Maak hem aan in Cloudflare R2 of pas R2_BUCKET aan.` };
+    }
+    if (status === 403 || err.name === "Forbidden" || err.name === "AccessDenied") {
+      return { ok: false, configured: true, message: "Sleutels afgekeurd (403). Controleer R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY en of het token leesrecht op de bucket heeft." };
+    }
+    return { ok: false, configured: true, message: e instanceof Error ? e.message : "Verbinding met R2 mislukt." };
+  }
+}
 
 /** Start een multipart-upload en geef het upload-id terug. */
 export async function createMultipartUpload(key: string, contentType?: string | null): Promise<string> {

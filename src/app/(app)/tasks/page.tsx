@@ -94,7 +94,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   }
 
   const selected = persoon && persoon !== "algemeen" && persoon !== "overdracht" ? team.find((u) => u.id === persoon) : null;
-  const selectedLabel = selected ? selected.fullName : persoon === "algemeen" ? "Algemene taken" : persoon === "overdracht" ? "Overdracht" : null;
+  const selectedLabel = selected ? selected.fullName : persoon === "algemeen" ? "Verdelen onder team" : persoon === "overdracht" ? "Overdracht" : null;
 
   let buckets: { label: string; tone?: "bad" | "warn"; items: TaskItemData[] }[] = [];
   if (persoon && persoon !== "overdracht") {
@@ -121,7 +121,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="mx-auto max-w-[1100px]">
-      <PageHeader title="Taken" description={selectedLabel ? `Taken van ${selectedLabel}` : "Kies een persoon om direct de taken te zien."} />
+      <PageHeader title="Taken" description={persoon === "algemeen" ? "Taken die nog verdeeld moeten worden — wijs ze toe aan een teamlid." : selectedLabel ? `Taken van ${selectedLabel}` : "Kies een persoon om direct de taken te zien."} />
 
       {/* Personen als primaire navigatie — eigen taken staan zo meteen bovenaan.
           Overdracht is een klein tabblad naast "Algemeen" i.p.v. een groot blok. */}
@@ -129,7 +129,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         {core.map((u) => (
           <PersonCard key={u.id} id={u.id} name={u.fullName} count={openCountFor(u.id)} active={persoon === u.id} />
         ))}
-        <PersonCard id="algemeen" name="Algemeen" count={algemeenCount} active={persoon === "algemeen"} generic chip="AL" />
+        <PersonCard id="algemeen" name="Verdelen onder team" count={algemeenCount} active={persoon === "algemeen"} generic chip="⇢" countLabel="te verdelen" />
         <PersonCard id="overdracht" name="Overdracht" count={handoverOpen} active={persoon === "overdracht"} generic chip="⇄" countLabel="open" accent="var(--color-violet)" />
       </div>
 

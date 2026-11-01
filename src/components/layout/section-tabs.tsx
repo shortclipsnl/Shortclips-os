@@ -22,8 +22,8 @@ export function SectionTabs({ items }: { items: NavItem[] }) {
   if (tabs.length < 2) return null;
 
   return (
-    <div className="mx-auto mb-6 max-w-[1400px] border-b border-[var(--color-line)]">
-      <nav className="-mb-px flex gap-1 overflow-x-auto" aria-label="Onderdelen">
+    <div className="mx-auto mb-6 max-w-[1400px]">
+      <nav className="inline-flex max-w-full gap-1 overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-1" aria-label="Onderdelen">
         {tabs.map((t) => {
           const on = t.href === activeHref;
           return (
@@ -32,10 +32,10 @@ export function SectionTabs({ items }: { items: NavItem[] }) {
               href={t.href}
               aria-current={on ? "page" : undefined}
               className={cn(
-                "whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+                "whitespace-nowrap rounded-[var(--radius-sm)] px-3 py-1.5 text-sm font-medium transition-colors",
                 on
-                  ? "border-[var(--color-ink)] text-[var(--color-ink)]"
-                  : "border-transparent text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]",
+                  ? "bg-[var(--color-indigo-ink)] text-white"
+                  : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]",
               )}
             >
               {t.label}

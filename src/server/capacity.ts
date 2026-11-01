@@ -21,6 +21,10 @@ export type CapacityPerson = {
   status: CapacityStatus;
   costPerMonth: number | null;
   detail: string | null;
+  /** Aantal klanten waar nu werk voor loopt (editors: klanten met shorts in bewerking). */
+  clientCount: number | null;
+  /** Aantal shorts dat nu loopt (editors). */
+  shortsInProgress: number | null;
   /** Zelf-ingevulde beschikbaarheidsnotitie (wanneer niet beschikbaar). */
   availabilityNote: string | null;
 };
@@ -103,6 +107,8 @@ export async function getCapacityOverview(): Promise<{
   for (const row of peopleRows) {
     let load: number | null = null;
     let detail: string | null = null;
+    let clientCount: number | null = null;
+    let shortsInProgress: number | null = null;
 
     if (row.userId && row.unit === "opnames_4w") {
       const [r] = await db
@@ -120,12 +126,14 @@ export async function getCapacityOverview(): Promise<{
       detail = `${load} opname(s) gepland in de komende 4 weken`;
     } else if (row.userId && row.unit === "shorts_4w") {
       const [r] = await db
-        .select({ c: sql<number>`count(*)` })
+        .select({ c: sql<number>`count(*)`, klanten: sql<number>`count(distinct ${deliverables.clientId})` })
         .from(deliverables)
         .where(and(eq(deliverables.editorId, row.userId), isNull(deliverables.deletedAt), inArray(deliverables.status, EDITING_STATES)))
         .limit(1);
       load = Number(r?.c ?? 0);
-      detail = `${load} short(s) in bewerking`;
+      clientCount = Number(r?.klanten ?? 0);
+      shortsInProgress = load;
+      detail = `${load} short(s) bij ${clientCount} klant(en) in bewerking`;
     } else if (row.userId && row.unit === "cc_uren_maand") {
       const cs = await db
         .select({ quota: clients.monthlyVideoQuota, complexity: clients.complexity })
@@ -166,6 +174,8 @@ export async function getCapacityOverview(): Promise<{
       status,
       costPerMonth: n(row.costPerMonth),
       detail,
+      clientCount,
+      shortsInProgress,
       availabilityNote: row.userId ? noteMap.get(row.userId) ?? null : null,
     });
   }

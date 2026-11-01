@@ -80,7 +80,13 @@ export default async function CapacityPage() {
           <p className="mt-3 text-xs text-[var(--color-ink-faint)]">Belasting niet gemeten voor deze rol.</p>
         )}
 
-        {p.detail ? <p className="mt-2 text-2xs text-[var(--color-ink-muted)]">{p.detail}</p> : null}
+        {p.clientCount !== null ? (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="rounded-full bg-[var(--color-info-soft)] px-2 py-0.5 font-semibold text-[#0060a8] tabular-nums">{p.clientCount} {p.clientCount === 1 ? "klant" : "klanten"}</span>
+            <span className="rounded-full bg-[var(--color-neutral-soft)] px-2 py-0.5 font-semibold text-[var(--color-ink)] tabular-nums">{p.shortsInProgress ?? 0} shorts</span>
+            <span className="text-[var(--color-ink-faint)]">in bewerking</span>
+          </div>
+        ) : p.detail ? <p className="mt-2 text-2xs text-[var(--color-ink-muted)]">{p.detail}</p> : null}
         {p.availabilityNote ? (
           <p className="mt-2 flex items-start gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-warn-soft)] px-2 py-1.5 text-2xs text-[#8a5300]">
             <span className="font-semibold">Niet beschikbaar:</span> <span className="min-w-0">{p.availabilityNote}</span>
