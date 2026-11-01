@@ -641,7 +641,7 @@ export async function runVrijdagcheckNotification() {
   const { weekLabel, checks, okCount } = await getVrijdagcheck();
   const open = checks.filter((c) => !c.ok);
   // Eigenaar erbij: Jarno wil de vrijdagcheck zelf ook als melding ontvangen.
-  const roles = ["owner", "project_coordinator", "content_creator"];
+  const roles = ["owner", "operational_manager", "project_coordinator", "content_creator"];
   const dedupeKey = `vrijdagcheck:${mondayIso()}`;
 
   if (open.length === 0) {

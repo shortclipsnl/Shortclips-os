@@ -29,7 +29,7 @@ export async function runIntegrationHealthCheck() {
       if (h.status === "error" || h.status === "stale" || h.status === "never_synced") {
         const reason = STATUS_REASON[h.status] ?? "vraagt aandacht";
         const sent = await notify({
-          roles: ["owner"],
+          roles: ["owner", "operational_manager"],
           level: h.status === "error" ? "critical" : "warning",
           type: "integration_health",
           title: `Koppeling ${h.spec.name} vraagt aandacht`,

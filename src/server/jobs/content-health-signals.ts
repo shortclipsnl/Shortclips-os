@@ -49,7 +49,7 @@ export async function runContentHealthSignals() {
     const [fallbackCoord] = await db
       .select({ id: users.id })
       .from(users)
-      .where(and(eq(users.primaryRole, "project_coordinator"), eq(users.status, "active"), isNull(users.deletedAt)))
+      .where(and(inArray(users.primaryRole, ["operational_manager", "project_coordinator"]), eq(users.status, "active"), isNull(users.deletedAt)))
       .orderBy(asc(users.fullName))
       .limit(1);
 

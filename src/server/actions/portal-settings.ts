@@ -1,18 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ForbiddenError, requireOwner } from "@/server/auth/context";
+import { ForbiddenError, requireOperationalManager } from "@/server/auth/context";
 import { savePortalSettings, type PortalSettings } from "@/server/portal-settings";
+import { auditLog } from "@/server/audit";
 
 export type ActionResult = { ok: boolean; message?: string };
 
 const clampDay = (n: unknown) => Math.max(0, Math.min(60, Math.round(Number(n) || 0)));
 const str = (v: unknown, max = 400) => String(v ?? "").trim().slice(0, max);
 
-/** Intern: de klantportaal-termijnen en -voorwaarden aanpassen (owner + coördinatoren). */
+/** Intern: de klantportaal-termijnen en -voorwaarden aanpassen (eigenaar + operationeel beheerder). */
 export async function updatePortalSettings(input: PortalSettings): Promise<ActionResult> {
   try {
-    const viewer = await requireOwner();
+    const viewer = await requireOperationalManager();
     const clean: PortalSettings = {
       feedbackDaysScripts: clampDay(input.feedbackDaysScripts),
       feedbackDaysVideos: clampDay(input.feedbackDaysVideos),
@@ -32,6 +33,7 @@ export async function updatePortalSettings(input: PortalSettings): Promise<Actio
       rawFootageFee: str(input.rawFootageFee, 200),
     };
     await savePortalSettings(clean, viewer.id);
+    await auditLog({ viewer, action: "portal_settings.updated", entityType: "settings", entityId: "portaal" });
     revalidatePath("/settings/portaal");
     revalidatePath("/portal/samenwerking");
     revalidatePath("/portal/scripts");

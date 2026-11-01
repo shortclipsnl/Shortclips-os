@@ -57,6 +57,30 @@ async function main() {
   `);
   const a = ((r1 as unknown as { rowCount?: number }).rowCount ?? 0) + ((r2 as unknown as { rowCount?: number }).rowCount ?? 0);
   console.log(`[data-fixes] Feedback-automatiseringsregels op instelbare marker gezet: ${a} rij(en).`);
+
+  // Milou wordt operationeel beheerder (tweede verantwoordelijke klantbeheer).
+  // Idempotent: de rol-update matcht alleen zolang ze nog projectcoördinator is,
+  // en de rol-koppeling wordt alleen bijgewerkt als die afwijkt. De rol zelf is
+  // door rbac-sync al aangemaakt (draait eerder in de vercel-build).
+  const milouRole = await db.execute(sql`
+    UPDATE users SET primary_role = 'operational_manager', updated_at = now()
+    WHERE email = 'milou@shortclips.nl' AND primary_role = 'project_coordinator'
+  `);
+  const mr = (milouRole as unknown as { rowCount?: number }).rowCount ?? 0;
+  // Rol-koppeling (user_roles) gelijktrekken met de nieuwe primaryRole: oude
+  // koppelingen weg, de operational_manager-rol erin (alleen als nodig).
+  await db.execute(sql`
+    DELETE FROM user_roles ur USING users u
+    WHERE ur.user_id = u.id AND u.email = 'milou@shortclips.nl'
+      AND ur.role_id <> (SELECT id FROM roles WHERE key = 'operational_manager')
+  `);
+  await db.execute(sql`
+    INSERT INTO user_roles (user_id, role_id)
+    SELECT u.id, r.id FROM users u, roles r
+    WHERE u.email = 'milou@shortclips.nl' AND r.key = 'operational_manager'
+    ON CONFLICT (user_id, role_id) DO NOTHING
+  `);
+  console.log(`[data-fixes] Milou als operationeel beheerder: ${mr} rol(len) gewijzigd.`);
 }
 
 main()

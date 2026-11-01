@@ -12,7 +12,7 @@ import { clients, deliverables, productionDays, users } from "@/db/schema";
  */
 
 const ROLE_LABEL: Record<string, string> = {
-  owner: "Eigenaar", admin: "Beheer", project_coordinator: "Coördinator",
+  owner: "Eigenaar", admin: "Beheer", operational_manager: "Operationeel beheerder", project_coordinator: "Coördinator",
   content_creator: "Content", videographer: "Videograaf", editor: "Editor", finance: "Finance",
 };
 const STATUS_LABEL: Record<string, string> = {

@@ -1074,6 +1074,7 @@ export async function getPortalContact(viewer: Viewer): Promise<{
 
   // De interne rol naar een klantvriendelijke functietitel vertalen.
   const CONTACT_ROLE: Record<string, string> = {
+    operational_manager: "Content Strategist",
     project_coordinator: "Content Strategist",
     content_creator: "Content Creative",
     owner: "Vaste contactpersoon",

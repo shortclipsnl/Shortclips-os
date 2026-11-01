@@ -129,7 +129,7 @@ type TeamSpec = {
 
 const TEAM: TeamSpec[] = [
   { email: "jarno@shortclips.nl", fullName: "Jarno Klijnsma", role: "owner", jobTitle: "Eigenaar", color: "#00003B" },
-  { email: "milou@shortclips.nl", fullName: "Milou de Vries", role: "project_coordinator", jobTitle: "Projectcoördinator", color: "#00AFFA" },
+  { email: "milou@shortclips.nl", fullName: "Milou de Vries", role: "operational_manager", jobTitle: "Operationeel beheerder", color: "#00AFFA" },
   { email: "jiska@shortclips.nl", fullName: "Jiska Bakker", role: "project_coordinator", jobTitle: "Projectcoördinator", color: "#8FB300" },
   { email: "sven@shortclips.nl", fullName: "Sven Hoekstra", role: "videographer", jobTitle: "Videograaf", color: "#2E9A6E" },
   { email: "noa@shortclips.nl", fullName: "Noa Veenstra", role: "content_creator", jobTitle: "Content creator", color: "#D98200" },
