@@ -169,3 +169,25 @@ export const aiEditorJobs = pgTable(
   },
   (t) => [index("ai_editor_jobs_status_idx").on(t.status, t.createdAt)],
 );
+
+/** Elke gerenderde versie van een montage: om terug te kunnen naar een eerdere versie. */
+export const adEditVersions = pgTable(
+  "ad_edit_versions",
+  {
+    id: pk(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => adEditProjects.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    /** Het montageplan van deze versie (zonder de take-pool). */
+    plan: jsonb("plan").notNull(),
+    previewStore: varchar("preview_store", { length: 20 }),
+    previewPath: text("preview_path"),
+    qc: jsonb("qc"),
+    explanation: jsonb("explanation").notNull().default(sql`'[]'::jsonb`),
+    /** Wat er in deze versie veranderde (feedback, take-keuze, terugzetten). */
+    note: text("note"),
+    ...timestamps,
+  },
+  (t) => [index("ad_edit_versions_project_idx").on(t.projectId, t.version)],
+);

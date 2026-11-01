@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { adEditFeedback, adEditProjects, adEditSources, adStyleAssets, adStyleProfiles, adStyleReferences, aiEditorJobs, users } from "@/db/schema";
+import { adEditFeedback, adEditProjects, adEditSources, adEditVersions, adStyleAssets, adStyleProfiles, adStyleReferences, aiEditorJobs, users } from "@/db/schema";
 import { STYLE_PROFILE_NAME, defaultStyleConfig, normalizeStyleConfig } from "./style-profile";
 
 /** Zorgt dat er een actief profiel is (startversie = gemeten Shortclips Ads Style). */
@@ -34,14 +34,16 @@ export async function listProjects() {
 export async function getProject(id: string) {
   const [p] = await db.select().from(adEditProjects).where(and(eq(adEditProjects.id, id), isNull(adEditProjects.deletedAt))).limit(1);
   if (!p) return null;
-  const [sources, feedback, jobs] = await Promise.all([
+  const [sources, feedback, jobs, versions] = await Promise.all([
     db.select({ id: adEditSources.id, filename: adEditSources.filename, origin: adEditSources.origin, status: adEditSources.status, sizeBytes: adEditSources.sizeBytes, durationMs: adEditSources.durationMs, analysis: adEditSources.analysis, probe: adEditSources.probe })
       .from(adEditSources).where(eq(adEditSources.projectId, id)).orderBy(asc(adEditSources.createdAt)),
     db.select().from(adEditFeedback).where(eq(adEditFeedback.projectId, id)).orderBy(desc(adEditFeedback.createdAt)),
     db.select({ id: aiEditorJobs.id, kind: aiEditorJobs.kind, status: aiEditorJobs.status, createdAt: aiEditorJobs.createdAt, error: aiEditorJobs.error })
       .from(aiEditorJobs).where(eq(aiEditorJobs.projectId, id)).orderBy(desc(aiEditorJobs.createdAt)).limit(10),
+    db.select({ id: adEditVersions.id, version: adEditVersions.version, note: adEditVersions.note, qc: adEditVersions.qc, createdAt: adEditVersions.createdAt })
+      .from(adEditVersions).where(eq(adEditVersions.projectId, id)).orderBy(desc(adEditVersions.version), desc(adEditVersions.createdAt)).limit(40),
   ]);
-  return { project: p, sources, feedback, jobs };
+  return { project: p, sources, feedback, jobs, versions };
 }
 
 export async function listReferences() {

@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Download, FolderInput, Loader2, MessageSquare, Play, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, Eye, FolderInput, History, Loader2, MessageSquare, Play, RotateCcw, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, ErrorNote, InfoNote } from "@/components/ui";
-import { addDriveSources, chooseTake, exportFinal, generate, removeSource, setSourceRole, submitFeedback, updateProject, markAsStyleReference } from "@/server/actions/ai-editor";
+import { addDriveSources, chooseTake, exportFinal, generate, removeSource, restoreVersion, setSourceRole, submitFeedback, updateProject, markAsStyleReference } from "@/server/actions/ai-editor";
 import { FORMATS, bytes, euro, secs } from "../labels";
+import { AiEditorGuide } from "../guide";
+import { ChatPanel, type ChatMessage } from "./chat-panel";
 
 type QcFinding = { code: string; message: string; atS?: number };
 
@@ -25,9 +27,11 @@ export type EditorData = {
   explanation: string[];
   qc: { passed: boolean; technical: QcFinding[]; creative: QcFinding[]; metrics: Record<string, number | string | null> } | null;
   costs: { aiCents?: number; aiInputTokens?: number; aiOutputTokens?: number; renderSeconds?: number; renderCents?: number; storageBytes?: number; storageCentsPerMonth?: number; transcribeSeconds?: number; renders?: number; totalCents?: number };
-  takes: Array<{ sentenceIdx: number; sentenceText: string; needsUser: boolean; userChosen: boolean; chosenTakeId: string | null; options: Array<{ takeId: string; text: string; score: number; inS: number; outS: number; sourceId: string }> }>;
+  takes: Array<{ sentenceIdx: number; sentenceText: string; needsUser: boolean; userChosen: boolean; excluded: boolean; chosenTakeId: string | null; options: Array<{ takeId: string; text: string; score: number; inS: number; outS: number; sourceId: string }> }>;
   sources: Array<{ id: string; filename: string; origin: string; status: string; sizeBytes: number | null; durationMs: number | null; role: string | null; roleOverride: string | null; speechRatio: number | null; log: { isLog: boolean; reason: string } | null; resolution: string | null }>;
-  feedback: Array<{ id: string; text: string; status: string; response: string | null; createdAt: string; version: number | null }>;
+  /** Chatberichten, oud → nieuw. */
+  feedback: ChatMessage[];
+  editVersions: Array<{ id: string; version: number; note: string | null; createdAt: string; qcPassed: boolean | null }>;
   versions: Array<{ id: string; version: number; isActive: boolean }>;
   canRun: boolean;
   canStyle: boolean;
@@ -64,7 +68,9 @@ export function EditorView({ data }: { data: EditorData }) {
   const [scriptSaved, setScriptSaved] = useState(true);
   const [uploads, setUploads] = useState<Record<string, number>>({});
   const [driveLink, setDriveLink] = useState("");
-  const [feedback, setFeedback] = useState("");
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [pausedAt, setPausedAt] = useState<number | null>(null);
+  const [viewVersion, setViewVersion] = useState<string | null>(null);
   const [format, setFormat] = useState<"9x16" | "4x5" | "1x1">("9x16");
   const [live, setLive] = useState({ status: data.status, phase: data.phase, progress: data.progress, waitingForWorker: false });
   const fileRef = useRef<HTMLInputElement>(null);
@@ -116,6 +122,7 @@ export function EditorView({ data }: { data: EditorData }) {
   }
 
   const pendingChoices = data.takes.filter((t) => t.needsUser);
+  const viewed = viewVersion ? data.editVersions.find((v) => v.id === viewVersion && v.version !== data.planVersion) ?? null : null;
   const qc = data.qc;
   const c = data.costs;
   const activePhase = [...PHASES].reverse().find((p) => live.progress >= p.at)?.label;
@@ -123,6 +130,7 @@ export function EditorView({ data }: { data: EditorData }) {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-5">
+        <AiEditorGuide defaultOpen={!data.sources.length} />
         {/* Stap 1 — bestanden + script */}
         <Card>
           <CardHeader title="1. Ruwe beelden en script" subtitle="Alle camerabestanden van de opnamedag: spreker-opnames en b-roll. De AI herkent zelf wat wat is." />
@@ -229,7 +237,7 @@ export function EditorView({ data }: { data: EditorData }) {
                   <summary className="cursor-pointer text-sm">
                     <span className="font-medium">Zin {t.sentenceIdx + 1}</span>
                     <span className="ml-2 text-[var(--color-ink-muted)]">{t.sentenceText.slice(0, 90)}{t.sentenceText.length > 90 ? "…" : ""}</span>
-                    <span className="ml-2 text-2xs text-[var(--color-ink-faint)]">{t.options.length} take(s){t.userChosen ? " · jouw keuze" : ""}{!t.chosenTakeId ? " · niet gevonden" : ""}</span>
+                    <span className="ml-2 text-2xs text-[var(--color-ink-faint)]">{t.options.length} take(s){t.userChosen ? " · jouw keuze" : ""}{t.excluded ? " · weggelaten (terug met \"zin " + (t.sentenceIdx + 1) + " terug\")" : ""}{!t.chosenTakeId ? " · niet gevonden" : ""}</span>
                   </summary>
                   <ul className="mt-2 space-y-1.5">
                     {t.options.map((o, i) => (
@@ -251,31 +259,6 @@ export function EditorView({ data }: { data: EditorData }) {
           </Card>
         ) : null}
 
-        {/* Feedback */}
-        {data.hasPreview ? (
-          <Card>
-            <CardHeader title="Feedback aan de AI" subtitle="In gewone taal. De bestaande montage wordt aangepast; alleen wat verandert wordt opnieuw gerenderd." />
-            {data.canRun ? (
-              <div className="mt-3 flex gap-2">
-                <input value={feedback} onChange={(e) => setFeedback(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && feedback.trim()) act(() => submitFeedback({ projectId: data.id, text: feedback }), () => setFeedback("")); }} placeholder='Bijv. "De eerste drie seconden moeten sneller" of "De zoom bij seconde 12 mag eruit"' className="sc-input min-w-0 flex-1" disabled={busy} />
-                <Button disabled={pending || busy || !feedback.trim()} onClick={() => act(() => submitFeedback({ projectId: data.id, text: feedback }), () => setFeedback(""))}><MessageSquare className="size-4" /> Verwerk</Button>
-              </div>
-            ) : null}
-            {data.feedback.length ? (
-              <ul className="mt-3 space-y-2">
-                {data.feedback.map((f) => (
-                  <li key={f.id} className="rounded-[var(--radius-sm)] bg-[var(--color-surface-sunken)] px-3 py-2 text-xs">
-                    <div className="flex justify-between gap-2"><span className="font-medium text-[var(--color-ink)]">&ldquo;{f.text}&rdquo;</span>
-                      <Badge tone={f.status === "applied" ? "good" : f.status === "queued" ? "info" : "warn"}>{f.status === "applied" ? `Verwerkt${f.version ? ` (v${f.version})` : ""}` : f.status === "queued" ? "In de wachtrij" : f.status === "not_understood" ? "Niet begrepen" : "Mislukt"}</Badge>
-                    </div>
-                    {f.response ? <p className="mt-1 text-[var(--color-ink-muted)]">{f.response}</p> : null}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </Card>
-        ) : null}
-
         {/* Uitleg */}
         {data.explanation.length ? (
           <Card>
@@ -290,8 +273,24 @@ export function EditorView({ data }: { data: EditorData }) {
       {/* Rechterkolom: preview, QC, export, kosten */}
       <div className="space-y-5">
         <Card padded={false} className="overflow-hidden">
+          {viewed ? (
+            <div className="flex items-center gap-2 bg-[var(--color-warn-soft)] px-4 py-2 text-xs text-[#8a5300]">
+              <History className="size-3.5" /> Je bekijkt versie {viewed.version}
+              <button className="ml-auto underline" onClick={() => setViewVersion(null)}>Terug naar huidige</button>
+            </div>
+          ) : null}
           {data.hasPreview ? (
-            <video key={data.planVersion} controls playsInline className="aspect-[9/16] w-full bg-black" src={`/api/ai-editor/media?project=${data.id}&kind=preview&v=${data.planVersion}`} />
+            <video
+              ref={videoRef}
+              key={viewed ? `v-${viewed.id}` : `cur-${data.planVersion}`}
+              controls
+              playsInline
+              className="aspect-[9/16] w-full bg-black"
+              src={viewed ? `/api/ai-editor/media?version=${viewed.id}` : `/api/ai-editor/media?project=${data.id}&kind=preview&v=${data.planVersion}`}
+              onPause={(e) => { const t = e.currentTarget.currentTime; setPausedAt(t > 0.05 && !e.currentTarget.ended ? t : null); }}
+              onPlay={() => setPausedAt(null)}
+              onSeeked={(e) => { if (e.currentTarget.paused && e.currentTarget.currentTime > 0.05) setPausedAt(e.currentTarget.currentTime); }}
+            />
           ) : (
             <div className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-2 bg-[var(--color-surface-sunken)] text-sm text-[var(--color-ink-faint)]">
               {busy ? <Loader2 className="size-6 animate-spin" /> : <Play className="size-6" />}
@@ -300,6 +299,22 @@ export function EditorView({ data }: { data: EditorData }) {
           )}
           {data.hasPreview ? <p className="px-4 py-2 text-2xs text-[var(--color-ink-faint)]">Preview op halve resolutie. De definitieve export wordt in volle kwaliteit uit de originele bestanden gemaakt.</p> : null}
         </Card>
+
+        {data.hasPreview ? (
+          <Card padded={false}>
+            <div className="px-4 pt-4"><CardHeader title="Wat moet er anders?" subtitle="Chat met de editor. Alleen wat verandert wordt opnieuw gerenderd." action={<MessageSquare className="size-4 text-[var(--color-ink-faint)]" />} /></div>
+            <ChatPanel
+              messages={data.feedback}
+              canRun={data.canRun}
+              busy={busy}
+              pending={pending}
+              pausedAt={viewed ? null : pausedAt}
+              getTime={() => (viewed ? null : videoRef.current?.currentTime ?? null)}
+              onSeek={(t) => { setViewVersion(null); requestAnimationFrame(() => { const v = videoRef.current; if (v) { v.currentTime = t; v.pause(); setPausedAt(t); } }); }}
+              onSend={(text, after) => act(() => submitFeedback({ projectId: data.id, text }), after)}
+            />
+          </Card>
+        ) : null}
 
         {qc ? (
           <Card>
@@ -345,6 +360,30 @@ export function EditorView({ data }: { data: EditorData }) {
                 <Button variant="secondary" className="w-full" size="sm" disabled={pending} onClick={() => act(() => markAsStyleReference(data.id))}>Gebruik deze video als stijlreferentie</Button>
               ) : null}
             </div>
+          </Card>
+        ) : null}
+
+        {data.editVersions.length > 1 ? (
+          <Card>
+            <CardHeader title="Versies" subtitle="Bekijk een eerdere versie of zet die terug. Terugzetten rendert niets opnieuw." />
+            <ul className="mt-3 max-h-72 space-y-1 overflow-y-auto">
+              {data.editVersions.map((v) => {
+                const current = v.version === data.planVersion;
+                return (
+                  <li key={v.id} className={`flex items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-xs ${viewVersion === v.id ? "bg-[var(--color-warn-soft)]" : current ? "bg-[var(--color-surface-sunken)]" : ""}`}>
+                    <span className="w-8 shrink-0 font-semibold text-[var(--color-ink)]">v{v.version}</span>
+                    <span className="min-w-0 flex-1 truncate text-[var(--color-ink-muted)]" title={v.note ?? ""}>{v.note ?? "Aanpassing"}</span>
+                    {v.qcPassed === false ? <AlertTriangle className="size-3.5 shrink-0 text-[#a3271c]" aria-label="Technische fouten" /> : null}
+                    {current ? <Badge tone="good">Huidig</Badge> : (
+                      <>
+                        <button className="shrink-0 text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]" title="Bekijken" onClick={() => setViewVersion(viewVersion === v.id ? null : v.id)}><Eye className="size-4" /></button>
+                        {data.canRun ? <button className="shrink-0 text-[var(--color-ink-faint)] hover:text-[var(--color-ink)] disabled:opacity-40" title="Deze versie terugzetten" disabled={pending || busy} onClick={() => act(() => restoreVersion({ projectId: data.id, versionId: v.id }), () => setViewVersion(null))}><RotateCcw className="size-4" /></button> : null}
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           </Card>
         ) : null}
 

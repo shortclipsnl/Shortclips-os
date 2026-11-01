@@ -70,6 +70,7 @@ export function segmentsFromTakes(takes: TakeChoice[], pool: Record<number, Take
   const rules = cutRules(style);
   const segs: PlanSegment[] = [];
   for (const choice of takes) {
+    if (choice.excluded) continue;
     const take = pool[choice.sentenceIdx]?.find((t) => t.takeId === choice.chosenTakeId);
     if (!take) continue;
     const words = hasScript ? applyScriptSpelling(take.words, sentences[choice.sentenceIdx]) : take.words;

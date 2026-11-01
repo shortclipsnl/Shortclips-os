@@ -3,20 +3,21 @@ import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import { db } from "@/db/client";
-import { adEditFeedback, adEditProjects, adEditSources, adStyleAssets, adStyleProfiles, adStyleReferences, aiEditorJobs } from "@/db/schema";
+import { adEditFeedback, adEditProjects, adEditSources, adEditVersions, adStyleAssets, adStyleProfiles, adStyleReferences, aiEditorJobs } from "@/db/schema";
 import { drive } from "@/server/integrations/drive";
 import { run, whisperPython } from "@/server/video-intelligence/tools";
 import { aiAvailable, aiCostCents, callClaude } from "./ai";
-import { applyOps, feedbackPrompt, parseAiOps, parseFeedbackRules, type ApplyContext, type FeedbackOp } from "./feedback";
+import { feedbackPrompt, parseAiPoints, parseFeedbackRules, processPoints, reapplyEdits, splitPoints, type AiPoint, type FeedbackOp, type PointResult } from "./feedback";
 import { matchGrade } from "./grade";
 import { colorStats, detectLog, extractAudioWav, loudness, meanVolume, mediaDuration, probe, sceneCuts, silences, type Probe } from "./media";
-import { deriveTimeline, stableHash, type EditPlan, type PlanSegment, type Word } from "./plan";
-import { aiPlanningPrompt, applyAiSuggestions, draftPlan, parseAiSuggestions, segmentsFromTakes, type PlannerSource } from "./planner";
+import { deriveTimeline, stableHash, type EditPlan, type Word } from "./plan";
+import { aiPlanningPrompt, applyAiSuggestions, draftPlan, parseAiSuggestions, type PlannerSource } from "./planner";
 import { runQc } from "./qc";
+import { buildApplyContext, reanchor } from "./apply-context";
 import { geometry, renderPlan, type ExportFormat, type RenderSource } from "./render";
 import { activeStore, ensureDir, fetchToLocal, localSize, putLocalFile, workDir, type Store } from "./storage";
 import { normalizeStyleConfig, type StyleConfig } from "./style-profile";
-import { cutTake, type Take } from "./takes";
+import type { Take } from "./takes";
 import { env } from "@/lib/env";
 
 /**
@@ -279,72 +280,11 @@ async function computeGrades(projectId: string, plan: EditPlan, list: LocalSourc
 /* Ankers herstellen na het herbouwen van segmenten                   */
 /* ------------------------------------------------------------------ */
 
-export function reanchor(oldPlan: EditPlan, newPlan: EditPlan): void {
-  const find = (segId: string, wordIdx: number): { segmentId: string; wordIdx: number } | null => {
-    const oldSeg = oldPlan.segments.find((s) => s.id === segId);
-    if (!oldSeg) return null;
-    const w = oldSeg.words[Math.min(wordIdx, oldSeg.words.length - 1)];
-    for (const s of newPlan.segments) {
-      const idx = s.words.findIndex((x) => s.sourceId === oldSeg.sourceId && Math.abs(x.s - (w?.s ?? -1)) < 0.02);
-      if (idx >= 0) return { segmentId: s.id, wordIdx: idx };
-    }
-    // Andere take: zelfde zin, zelfde woord.
-    for (const s of newPlan.segments.filter((x) => x.sentenceIdx === oldSeg.sentenceIdx)) {
-      const idx = s.words.findIndex((x) => x.w.toLowerCase() === (w?.w ?? "").toLowerCase());
-      if (idx >= 0) return { segmentId: s.id, wordIdx: idx };
-    }
-    const first = newPlan.segments.find((x) => x.sentenceIdx === oldSeg.sentenceIdx);
-    return first ? { segmentId: first.id, wordIdx: 0 } : null;
-  };
-  newPlan.cards = newPlan.cards.flatMap((c) => {
-    const start = find(c.start.segmentId, c.start.wordIdx);
-    if (!start) return [];
-    const items = c.items.map((it) => ({ ...it, anchor: find(it.anchor.segmentId, it.anchor.wordIdx) ?? start }));
-    const end = c.end ? find(c.end.segmentId, c.end.wordIdx) : null;
-    return [{ ...c, start, items, end: end ? { ...end, after: c.end?.after } : undefined }];
-  });
-  newPlan.broll = newPlan.broll.flatMap((b) => {
-    const a = find(b.anchorSegmentId, 0);
-    return a ? [{ ...b, anchorSegmentId: a.segmentId }] : [];
-  });
-}
-
-function applyContext(stored: StoredPlan, style: StyleConfig): ApplyContext {
-  const tl = (p: EditPlan) => deriveTimeline(p, style.captions, style.export.fps);
-  return {
-    style,
-    rebuildSegments: (takes) => segmentsFromTakes(takes, stored.pool, stored.sentences, stored.hasScript, style),
-    reanchor,
-    segmentAt: (p, atS) => tl(p).segments.find((s) => atS >= s.atS && atS < s.atS + s.durS)?.id ?? null,
-    cardAt: (p, atS) => {
-      const cards = tl(p).cards;
-      const hit = cards.find((c) => atS >= c.startS - 0.5 && atS <= c.endS + 0.5);
-      return hit?.id ?? null;
-    },
-    brollAt: (p, atS) => tl(p).broll.find((b) => atS >= b.atS - 0.5 && atS <= b.atS + b.durS + 0.5)?.id ?? null,
-    retighten: (p, untilS, maxPauseS) => {
-      const timeline = tl(p);
-      const tighter = new Set(timeline.segments.filter((s) => untilS == null || s.atS < untilS).map((s) => s.sentenceIdx));
-      const loose = { ...style, editing: { ...style.editing } };
-      const tight = { ...style, editing: { ...style.editing, maxPauseS, tailHandleS: Math.min(style.editing.tailHandleS, 0.06), headHandleS: Math.min(style.editing.headHandleS, 0.03) } };
-      const segs: PlanSegment[] = [];
-      for (const choice of p.takes) {
-        const take = stored.pool[choice.sentenceIdx]?.find((t) => t.takeId === choice.chosenTakeId);
-        if (!take) continue;
-        const st = tighter.has(choice.sentenceIdx) ? tight : loose;
-        segs.push(...cutTake(take.words, take.sourceId, choice.sentenceIdx, { maxPauseS: st.editing.maxPauseS, headHandleS: st.editing.headHandleS, tailHandleS: st.editing.tailHandleS, fillers: st.editing.fillers }));
-      }
-      // Unieke ids na het herknippen.
-      segs.forEach((s, i) => { s.id = `seg${i + 1}t${p.version}`; });
-      if (segs[0]) segs[0].inS = Math.max(segs[0].inS, segs[0].words[0].s - 0.02);
-      const last = segs[segs.length - 1];
-      if (last) last.outS += style.editing.endTailS;
-      // Zooms per zin overnemen.
-      const zoomBySentence = new Map(p.segments.map((s) => [s.sentenceIdx, s.zoom]));
-      segs.forEach((s) => { s.zoom = zoomBySentence.get(s.sentenceIdx) ?? { from: 1, to: 1 }; });
-      return segs;
-    },
-  };
+async function musicLibrary(): Promise<Array<{ id: string; name: string }>> {
+  const rows = await db.select({ id: adStyleAssets.id, name: adStyleAssets.name }).from(adStyleAssets)
+    .where(and(eq(adStyleAssets.kind, "music"), eq(adStyleAssets.isActive, true), isNull(adStyleAssets.deletedAt)))
+    .orderBy(desc(adStyleAssets.createdAt));
+  return rows.map((r) => ({ id: r.id, name: r.name.replace(/\.[a-z0-9]+$/i, "") }));
 }
 
 /* ------------------------------------------------------------------ */
@@ -391,8 +331,16 @@ function explanation(stored: StoredPlan, render: { segmentsRendered: number; seg
   return lines;
 }
 
-async function saveResult(projectId: string, stored: StoredPlan, out: Awaited<ReturnType<typeof renderAndCheck>>, costs: Costs, extraNotes: string[] = []) {
+async function saveResult(projectId: string, stored: StoredPlan, out: Awaited<ReturnType<typeof renderAndCheck>>, costs: Costs, extraNotes: string[] = [], versionNote = "") {
   const { res, qc } = out;
+  // Eerste keer met versiebeheer: de huidige (oude) montage als startpunt bewaren.
+  const [any] = await db.select({ id: adEditVersions.id }).from(adEditVersions).where(eq(adEditVersions.projectId, projectId)).limit(1);
+  if (!any) {
+    const [prev] = await db.select().from(adEditProjects).where(eq(adEditProjects.id, projectId)).limit(1);
+    if (prev?.plan && prev.previewPath && prev.planVersion !== stored.plan.version) {
+      await db.insert(adEditVersions).values({ projectId, version: prev.planVersion, plan: prev.plan, previewStore: prev.previewStore, previewPath: prev.previewPath, qc: prev.qc, explanation: prev.explanation ?? [], note: "Eerdere versie" });
+    }
+  }
   const key = `${projectId}/preview-v${stored.plan.version}.mp4`;
   const put = await putLocalFile(res.file, key);
   costs.storageBytes += await localSize(res.file);
@@ -411,6 +359,8 @@ async function saveResult(projectId: string, stored: StoredPlan, out: Awaited<Re
     costs: finalizeCosts(costs),
     updatedAt: new Date(),
   }).where(eq(adEditProjects.id, projectId));
+  const expl = [...extraNotes, ...explanation(stored, res.stats, res.timeline)];
+  await db.insert(adEditVersions).values({ projectId, version: stored.plan.version, plan: stored, previewStore: put.store, previewPath: put.key, qc, explanation: expl, note: versionNote.slice(0, 500) || null });
 }
 
 /* ------------------------------------------------------------------ */
@@ -439,6 +389,8 @@ export async function runGenerate(projectId: string): Promise<void> {
   const musicId = style.audio.music ? await pickMusic() : null;
   const draft = draftPlan({ sources: plannerSources, script: project.script, style, musicAssetId: musicId, userTakeChoices: userChoices });
   draft.plan.version = (prev?.plan.version ?? 0) + 1;
+  // Spellingcorrecties uit eerdere feedback blijven gelden.
+  if (prev?.plan.wordFixes) { draft.plan.wordFixes = prev.plan.wordFixes; reapplyEdits(draft.plan); }
 
   const extra: string[] = [];
   if (aiAvailable()) {
@@ -474,7 +426,7 @@ export async function runGenerate(projectId: string): Promise<void> {
   await setPhase(projectId, "Preview renderen", 65);
   const out = await renderAndCheck(projectId, stored, style, list, "preview", "9x16", costs);
   await setPhase(projectId, "Kwaliteitscontrole", 95);
-  await saveResult(projectId, stored, out, costs, [...draft.warnings, ...extra]);
+  await saveResult(projectId, stored, out, costs, [...draft.warnings, ...extra], prev ? "Opnieuw gegenereerd" : "Eerste montage");
 }
 
 /** Feedback of een take-wissel: plan aanpassen en alleen het nodige opnieuw renderen. */
@@ -484,11 +436,11 @@ export async function runRevise(projectId: string, feedbackId: string | null, pa
   const style = await styleFor(project.styleProfileId);
   const stored = project.plan as StoredPlan;
   const costs = { ...emptyCosts(), ...((project.costs ?? {}) as Partial<Costs>) };
+  const restStatus = () => (stored.plan.takes.some((t) => t.needsUser) ? "needs_choice" : project.status === "exported" ? "exported" : "review");
   await db.update(adEditProjects).set({ status: "processing", error: null, updatedAt: new Date() }).where(eq(adEditProjects.id, projectId));
-  const ctx = applyContext(stored, style);
+  const ctx = buildApplyContext(stored, style, await musicLibrary());
   const notes: string[] = [];
-  let ops: FeedbackOp[] = [];
-  let reply = "";
+  let versionNote = "";
 
   if (payload.takeChoice) {
     const choice = stored.plan.takes.find((t) => t.sentenceIdx === payload.takeChoice!.sentenceIdx);
@@ -500,44 +452,66 @@ export async function runRevise(projectId: string, feedbackId: string | null, pa
     c.needsUser = false;
     c.userChosen = true;
     next.segments = ctx.rebuildSegments(next.takes);
+    reapplyEdits(next);
     reanchor(old, next);
     next.version = old.version + 1;
     stored.plan = next;
     notes.push(`Zin ${c.sentenceIdx + 1}: take gewisseld op jouw keuze.`);
+    versionNote = `Take gewisseld (zin ${c.sentenceIdx + 1})`;
   }
 
   if (feedbackId) {
     const [fb] = await db.select().from(adEditFeedback).where(eq(adEditFeedback.id, feedbackId)).limit(1);
     if (!fb) throw new Error("Feedback niet gevonden.");
     await setPhase(projectId, "Feedback verwerken", 10);
-    ops = parseFeedbackRules(fb.text);
-    if (!ops.length && aiAvailable()) {
-      const tl = deriveTimeline(stored.plan, style.captions, style.export.fps);
-      const pr = feedbackPrompt(fb.text, stored.plan, { segments: tl.segments, cards: tl.cards });
-      const ai = await callClaude(pr.system, pr.user, 800);
+    const points = splitPoints(fb.text);
+    const rulesOps: FeedbackOp[][] = points.map((pt) => parseFeedbackRules(pt.text, pt.atS));
+    const open = points.map((pt, i) => ({ pt, i })).filter((x) => !rulesOps[x.i].length);
+    let aiPoints: AiPoint[] | null = null;
+    if (open.length && aiAvailable()) {
+      await setPhase(projectId, "AI leest je feedback", 15);
+      const history = await db.select({ text: adEditFeedback.text, response: adEditFeedback.response }).from(adEditFeedback)
+        .where(eq(adEditFeedback.projectId, projectId)).orderBy(desc(adEditFeedback.createdAt)).limit(5);
+      const pr = feedbackPrompt(open.map((x) => x.pt), {
+        plan: stored.plan, style, brollSources: ctx.brollSources, musicAssets: ctx.musicAssets,
+        history: history.filter((h) => h.text !== fb.text).slice(0, 4).reverse(),
+      });
+      const ai = await callClaude(pr.system, pr.user, 1500);
       if (ai.ok) {
         costs.aiInputTokens += ai.inputTokens;
         costs.aiOutputTokens += ai.outputTokens;
         costs.aiCents += aiCostCents(ai.inputTokens, ai.outputTokens);
-        const parsed = parseAiOps(ai.text);
-        if (parsed) { ops = parsed.ops; reply = parsed.reply; }
+        // De AI nummert alleen de open punten; terugzetten naar de plek in het bericht.
+        aiPoints = (parseAiPoints(ai.text) ?? []).map((a) => ({ ...a, i: open[a.i]?.i ?? -1 })).filter((a) => a.i >= 0);
       }
     }
-    if (!ops.length) {
-      await db.update(adEditFeedback).set({ status: "not_understood", response: reply || "Deze feedback kan ik niet vertalen naar een montagewijziging. Probeer het concreter (bijv. \"zoom bij seconde 12 eruit\" of \"ondertiteling iets kleiner\").", updatedAt: new Date() }).where(eq(adEditFeedback.id, feedbackId));
-      await db.update(adEditProjects).set({ status: stored.plan.takes.some((t) => t.needsUser) ? "needs_choice" : "review", phase: "Feedback niet toegepast", progress: 100, updatedAt: new Date() }).where(eq(adEditProjects.id, projectId));
+    const r = processPoints(stored.plan, points, rulesOps, aiPoints, ctx);
+    const summary = summarize(r.results, open.length > 0 && !aiAvailable());
+    const fbStatus = r.changed ? (r.results.every((x) => x.status === "done") ? "applied" : "partial") : r.results.some((x) => x.status === "question") ? "question" : "not_understood";
+    if (!r.changed) {
+      await db.update(adEditFeedback).set({ status: fbStatus, operations: { points: r.results }, response: summary, updatedAt: new Date() }).where(eq(adEditFeedback.id, feedbackId));
+      await db.update(adEditProjects).set({ status: restStatus(), phase: fbStatus === "question" ? "Wacht op je antwoord" : "Feedback niet toegepast", progress: 100, costs: finalizeCosts(costs), updatedAt: new Date() }).where(eq(adEditProjects.id, projectId));
       return;
     }
-    const applied = applyOps(stored.plan, ops, ctx);
-    stored.plan = applied.plan;
-    notes.push(...applied.done.map((d) => `Feedback: ${d}`), ...applied.skipped.map((d) => `Niet toegepast: ${d}`));
-    await db.update(adEditFeedback).set({ status: "applied", operations: ops, response: [reply, ...applied.done, ...applied.skipped].filter(Boolean).join(" "), appliedPlanVersion: stored.plan.version, updatedAt: new Date() }).where(eq(adEditFeedback.id, feedbackId));
+    stored.plan = r.plan;
+    for (const x of r.results) {
+      if (x.status === "done" || x.status === "partial") notes.push(`Feedback: ${x.reply}`);
+      else if (x.status !== "question") notes.push(`Niet toegepast ("${x.text.slice(0, 60)}"): ${x.reply}`);
+    }
+    versionNote = fb.text;
+    await db.update(adEditFeedback).set({ status: fbStatus, operations: { points: r.results }, response: summary, appliedPlanVersion: stored.plan.version, updatedAt: new Date() }).where(eq(adEditFeedback.id, feedbackId));
   }
 
   const list = await localSources(projectId);
   await setPhase(projectId, "Preview bijwerken", 40);
   const out = await renderAndCheck(projectId, stored, style, list, "preview", "9x16", costs);
-  await saveResult(projectId, stored, out, costs, notes);
+  await saveResult(projectId, stored, out, costs, notes, versionNote);
+}
+
+function summarize(results: PointResult[], noAi: boolean): string {
+  const lines = results.map((r) => (results.length > 1 ? `• ${r.reply}` : r.reply));
+  if (noAi && results.some((r) => r.status === "not_understood")) lines.push("(Zonder AI-sleutel worden alleen vaste formuleringen herkend.)");
+  return lines.join("\n");
 }
 
 /** Definitieve export uit de originele bestanden, in volle kwaliteit. */
@@ -677,4 +651,4 @@ export async function canRunAiEditor(): Promise<boolean> {
   return res.code === 0;
 }
 
-export { activeStore };
+export { activeStore, reanchor };

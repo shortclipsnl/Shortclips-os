@@ -37,13 +37,17 @@ export default async function AiEditorProjectPage({ params }: { params: Promise<
     explanation: (p.explanation ?? []) as string[],
     qc: (p.qc ?? null) as EditorData["qc"],
     costs: (p.costs ?? {}) as EditorData["costs"],
-    takes: stored?.plan.takes.map((t) => ({ sentenceIdx: t.sentenceIdx, sentenceText: t.sentenceText, needsUser: t.needsUser, userChosen: Boolean(t.userChosen), chosenTakeId: t.chosenTakeId, options: t.options.map((o) => ({ takeId: o.takeId, text: o.text, score: o.score, inS: o.inS, outS: o.outS, sourceId: o.sourceId })) })) ?? [],
+    takes: stored?.plan.takes.map((t) => ({ sentenceIdx: t.sentenceIdx, sentenceText: t.sentenceText, needsUser: t.needsUser, userChosen: Boolean(t.userChosen), excluded: Boolean(t.excluded), chosenTakeId: t.chosenTakeId, options: t.options.map((o) => ({ takeId: o.takeId, text: o.text, score: o.score, inS: o.inS, outS: o.outS, sourceId: o.sourceId })) })) ?? [],
     sources: data.sources.map((s) => {
       const a = (s.analysis ?? {}) as { role?: string; roleOverride?: string | null; speechRatio?: number; log?: { isLog: boolean; reason: string } };
       const pr = (s.probe ?? {}) as { width?: number; height?: number; fps?: number };
       return { id: s.id, filename: s.filename, origin: s.origin, status: s.status, sizeBytes: s.sizeBytes, durationMs: s.durationMs, role: a.role ?? null, roleOverride: a.roleOverride ?? null, speechRatio: a.speechRatio ?? null, log: a.log ?? null, resolution: pr.width ? `${pr.width}×${pr.height} @ ${Math.round((pr.fps ?? 0) * 100) / 100}` : null };
     }),
-    feedback: data.feedback.map((f) => ({ id: f.id, text: f.text, status: f.status, response: f.response, createdAt: f.createdAt.toISOString(), version: f.appliedPlanVersion })),
+    feedback: [...data.feedback].reverse().map((f) => {
+      const ops = f.operations as { points?: Array<{ text: string; atS: number | null; status: string; reply: string }> } | null;
+      return { id: f.id, text: f.text, status: f.status, response: f.response, createdAt: f.createdAt.toISOString(), version: f.appliedPlanVersion, points: Array.isArray(ops?.points) ? ops.points.map((x) => ({ text: x.text, atS: x.atS, status: x.status, reply: x.reply })) : null };
+    }),
+    editVersions: data.versions.map((v) => ({ id: v.id, version: v.version, note: v.note, createdAt: v.createdAt.toISOString(), qcPassed: (v.qc as { passed?: boolean } | null)?.passed ?? null })),
     versions: versions.map((v) => ({ id: v.id, version: v.version, isActive: v.isActive })),
     canRun: viewer.permissions.has("ai_editor:run"),
     canStyle: viewer.permissions.has("ai_editor:style"),

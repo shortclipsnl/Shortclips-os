@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "vercel-build": "npm run db:migrate && (npm run rbac:sync || echo \"[rbac-sync] mislukt, zie log hierboven\") && (npm run kb:import || echo \"[kennisbank-import] mislukt, zie log hierboven\") && (npm run kosten:seed || echo \"[kosten-seed] mislukt, zie log hierboven\") && (npm run vermogen:seed || echo \"[vermogen-seed] mislukt, zie log hierboven\") && (npm run data:fixes || echo \"[data-fixes] mislukt, zie log hierboven\") && next build",
+    "vercel-build": "npm run db:migrate && (npm run rbac:sync || echo \"[rbac-sync] mislukt, zie log hierboven\") && (npm run kb:import || echo \"[kennisbank-import] mislukt, zie log hierboven\") && (npm run kosten:seed || echo \"[kosten-seed] mislukt, zie log hierboven\") && (npm run vermogen:seed || echo \"[vermogen-seed] mislukt, zie log hierboven\") && (npm run data:fixes || echo \"[data-fixes] mislukt, zie log hierboven\") && (npm run ai-editor:kb || echo \"[ai-editor-kb] mislukt, zie log hierboven\") && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
@@ -23,6 +23,7 @@
     "kb:import": "tsx scripts/kennisbank-import.ts",
     "kosten:seed": "tsx scripts/kosten-seed.ts",
     "vi:worker": "NODE_OPTIONS=--conditions=react-server tsx scripts/vi-worker.ts",
+    "ai-editor:kb": "tsx scripts/ai-editor-kb.ts",
     "ai-editor:worker": "NODE_OPTIONS=--conditions=react-server tsx scripts/ai-editor-worker.ts",
     "quotes:import-pandadoc": "NODE_OPTIONS=--conditions=react-server tsx scripts/import-pandadoc.ts",
     "quotes:seed-templates": "NODE_OPTIONS=--conditions=react-server tsx scripts/seed-quote-templates.ts",

@@ -3,7 +3,7 @@ import { createReadStream, statSync } from "node:fs";
 import { Readable } from "node:stream";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { adEditProjects, adStyleReferences } from "@/db/schema";
+import { adEditProjects, adEditVersions, adStyleReferences } from "@/db/schema";
 import { getViewer } from "@/server/auth/context";
 import { diskPath, signedUrl, type Store } from "@/server/ai-editor/storage";
 
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * Afspelen/downloaden van previews, exports en referenties. Supabase: redirect
  * naar een kortlevende ondertekende URL. Disk: gestreamd met Range-support,
  * zodat de speler kan doorspoelen.
- *   ?project=<id>&kind=preview|final[&download=1]   of   ?reference=<id>
+ *   ?project=<id>&kind=preview|final[&download=1]   ?version=<id>   of   ?reference=<id>
  */
 export async function GET(req: NextRequest) {
   const viewer = await getViewer();
@@ -32,6 +32,10 @@ export async function GET(req: NextRequest) {
     key = final ? p.finalPath : p.previewPath;
     const slug = p.title.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "advertentie";
     name = final ? `${slug}-${p.finalFormat ?? "9x16"}-v${p.planVersion}.mp4` : `${slug}-preview-v${p.planVersion}.mp4`;
+  } else if (sp.get("version")) {
+    const [v] = await db.select({ store: adEditVersions.previewStore, key: adEditVersions.previewPath, version: adEditVersions.version }).from(adEditVersions).where(eq(adEditVersions.id, sp.get("version")!)).limit(1);
+    if (!v) return new NextResponse(null, { status: 404 });
+    store = v.store; key = v.key; name = `preview-v${v.version}.mp4`;
   } else if (sp.get("reference")) {
     const [r] = await db.select().from(adStyleReferences).where(eq(adStyleReferences.id, sp.get("reference")!)).limit(1);
     if (!r) return new NextResponse(null, { status: 404 });

@@ -97,6 +97,8 @@ export type TakeChoice = {
   needsUser: boolean;
   /** Gekozen door een mens (overschrijft de automatische keuze). */
   userChosen?: boolean;
+  /** Bewust weggelaten via feedback ("zin 3 mag eruit"); terug te zetten. */
+  excluded?: boolean;
 };
 
 export type GradeAdjust = {
@@ -140,6 +142,14 @@ export type EditPlan = {
   sfx: boolean;
   /** Uitleg van de keuzes, in mensentaal. */
   notes: string[];
+  /** Spellingcorrecties in de ondertitels (genormaliseerd woord → juiste schrijfwijze). */
+  wordFixes?: Record<string, string>;
+  /**
+   * Handmatig verschoven knippen. Sleutel = bron + tijd van het eerste (start)
+   * of laatste (eind) woord van het segment, zodat ze na een herbouw opnieuw
+   * worden toegepast.
+   */
+  trims?: Array<{ sourceId: string; at: number; edge: "start" | "end"; deltaS: number }>;
 };
 
 /* -------------------------- Afgeleide tijdlijn -------------------------- */

@@ -4,7 +4,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { db } from "@/db/client";
-import { adEditFeedback, adEditProjects, adEditSources, adStyleAssets, adStyleProfiles, adStyleReferences, aiEditorJobs } from "@/db/schema";
+import { adEditFeedback, adEditProjects, adEditSources, adEditVersions, adStyleAssets, adStyleProfiles, adStyleReferences, aiEditorJobs } from "@/db/schema";
 import { ForbiddenError, requirePermission } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { drive, DriveService } from "@/server/integrations/drive";
@@ -151,6 +151,36 @@ export async function submitFeedback(input: { projectId: string; text: string })
     await db.update(adEditProjects).set({ status: "queued", phase: "Feedback in de wachtrij", progress: 0, updatedAt: new Date() }).where(eq(adEditProjects.id, input.projectId));
     await enqueue("revise", { projectId: input.projectId, payload: { feedbackId: fb!.id } });
     kick();
+    revalidatePath(`/ai-editor/${input.projectId}`);
+    return { ok: true };
+  } catch (e) { return fail(e); }
+}
+
+/**
+ * Terug naar een eerdere versie: het plan en de preview van die versie worden
+ * weer actief, zonder opnieuw te renderen. Dit wordt zelf een nieuwe versie,
+ * zodat ook het terugzetten terug te draaien is.
+ */
+export async function restoreVersion(input: { projectId: string; versionId: string }): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("ai_editor:run");
+    await assertIdle(input.projectId);
+    const [v] = await db.select().from(adEditVersions).where(and(eq(adEditVersions.id, input.versionId), eq(adEditVersions.projectId, input.projectId))).limit(1);
+    if (!v?.previewPath) return { ok: false, message: "Deze versie bestaat niet (meer)." };
+    const [p] = await db.select({ planVersion: adEditProjects.planVersion }).from(adEditProjects).where(eq(adEditProjects.id, input.projectId)).limit(1);
+    if (!p) return { ok: false, message: "Project niet gevonden." };
+    if (p.planVersion === v.version) return { ok: false, message: "Dit is al de huidige versie." };
+    const stored = JSON.parse(JSON.stringify(v.plan)) as StoredPlan;
+    const version = p.planVersion + 1;
+    stored.plan.version = version;
+    const note = `Teruggezet naar versie ${v.version}`;
+    const explanation = [`${note}.`, ...((v.explanation ?? []) as string[])];
+    await db.update(adEditProjects).set({
+      plan: stored, planVersion: version, previewStore: v.previewStore, previewPath: v.previewPath, qc: v.qc, explanation,
+      status: stored.plan.takes.some((t) => t.needsUser) ? "needs_choice" : "review", phase: note, progress: 100, error: null, updatedAt: new Date(),
+    }).where(eq(adEditProjects.id, input.projectId));
+    await db.insert(adEditVersions).values({ projectId: input.projectId, version, plan: stored, previewStore: v.previewStore, previewPath: v.previewPath, qc: v.qc, explanation, note });
+    await auditLog({ viewer, action: "ai_editor.version_restore", entityType: "ad_edit_project", entityId: input.projectId, changes: { from: v.version, to: version } });
     revalidatePath(`/ai-editor/${input.projectId}`);
     return { ok: true };
   } catch (e) { return fail(e); }
