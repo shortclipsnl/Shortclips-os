@@ -102,6 +102,21 @@ const schema = z.object({
   SUPABASE_SCRIPTS_BUCKET: z.string().default("script-reviews"),
   SUPABASE_OFFERTES_BUCKET: z.string().default("offertes"),
 
+  // --- Shortclips Transfer (WeTransfer-vervanger) — Cloudflare R2 ---
+  // S3-compatibele objectopslag. Zonder deze waarden werkt de hele Transfer-
+  // module (UI, overzicht, kosten), maar kan er niet daadwerkelijk ge-upload of
+  // gedownload worden ("opslag nog niet ingesteld"). R2_ACCOUNT_ID = het
+  // Cloudflare-account-id; de sleutels maak je bij R2 → Manage API Tokens.
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET: z.string().default("shortclips-transfer"),
+  // Basis-URL waarop de publieke deel-/downloadlinks worden gebouwd. Leeg = APP_URL.
+  // Zet deze op https://transfer.shortclips.nl zodra dat domein gekoppeld is.
+  TRANSFER_PUBLIC_URL: z.string().optional(),
+  // Geschatte R2-opslagkosten per GB per maand, in dollarcent (default $0,015).
+  TRANSFER_STORAGE_CENTS_PER_GB_MONTH: z.coerce.number().default(1.5),
+
   // --- Offertes: e-handtekening (Signhost/Evidos, QES) ---
   // Zonder deze waarden werkt de hele offertemodule, maar kan er geen
   // gekwalificeerde handtekening gezet worden (alleen digitaal accepteren).

@@ -88,6 +88,10 @@ export const PERMISSIONS = {
   // Klantportaal
   "portal:access": "Toegang tot het klantportaal",
   "portal:approve": "Als klant goedkeuren",
+
+  // Shortclips Transfer (bestanden versturen)
+  "transfer:read": "Transfers bekijken",
+  "transfer:write": "Transfers aanmaken en beheren",
 } as const;
 
 export type PermissionKey = keyof typeof PERMISSIONS;
@@ -105,6 +109,9 @@ const INTERNAL_BASE: PermissionKey[] = [
   "tasks:write",
   "comments:read_internal",
   "comments:write_internal",
+  // Iedereen intern mag bestanden versturen via Shortclips Transfer.
+  "transfer:read",
+  "transfer:write",
 ];
 
 /**
@@ -261,6 +268,9 @@ export const ROLE_DEFINITIONS: Array<{
       "comments:read_internal",
       "comments:write_internal",
       "tasks:read",
+      // Editors sturen ruwe beelden/projectbestanden via Transfer.
+      "transfer:read",
+      "transfer:write",
     ],
   },
   {
@@ -277,6 +287,8 @@ export const ROLE_DEFINITIONS: Array<{
       "analytics:read",
       "video_intelligence:read",
       "video_intelligence:run",
+      "transfer:read",
+      "transfer:write",
     ],
   },
   {

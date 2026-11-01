@@ -22,6 +22,7 @@
     { "path": "/api/jobs/run?job=reminders.post_shoot&slot=winter", "schedule": "45 7 * * *" },
     { "path": "/api/jobs/run?job=leads.sync_mailbox", "schedule": "0 7-20 * * *" },
     { "path": "/api/jobs/run?job=captions.auto_generate", "schedule": "15 7-20 * * *" },
-    { "path": "/api/jobs/run?job=briefing.auto_generate", "schedule": "25 7-20 * * *" }
+    { "path": "/api/jobs/run?job=briefing.auto_generate", "schedule": "25 7-20 * * *" },
+    { "path": "/api/jobs/run?job=transfers.cleanup", "schedule": "30 3 * * *" }
   ]
 }

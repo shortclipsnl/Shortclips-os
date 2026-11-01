@@ -24,6 +24,7 @@ import { runLeadImapSync } from "@/server/jobs/leads-imap-sync";
 import { runProfitabilitySignals } from "@/server/jobs/profitability-signals";
 import { runContentHealthSignals } from "@/server/jobs/content-health-signals";
 import { runScriptReviewReminders } from "@/server/jobs/script-review-reminders";
+import { runTransferCleanup } from "@/server/jobs/transfer-cleanup";
 import { runCaptionsAutoGenerate } from "@/server/jobs/captions-autogen";
 import { runBriefingAutoGenerate } from "@/server/jobs/briefing-autogen";
 import { runDriveSync } from "@/server/jobs/drive-sync";
@@ -107,6 +108,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "profit.signals": runProfitabilitySignals,
   "content_health.signals": runContentHealthSignals,
   "script_review.reminders": runScriptReviewReminders,
+  "transfers.cleanup": runTransferCleanup,
   "captions.auto_generate": runCaptionsAutoGenerate,
   "briefing.auto_generate": runBriefingAutoGenerate,
   "drive.sync_all": runDriveSync,

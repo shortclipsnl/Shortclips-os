@@ -317,6 +317,14 @@ export const briefingSetStatusEnum = pgEnum("briefing_set_status", [
   "mislukt",           // Generatie mislukt
 ]);
 
+/** Status van een transfer (Shortclips Transfer — WeTransfer-vervanger). */
+export const transferStatusEnum = pgEnum("transfer_status", [
+  "uploading",  // Upload loopt nog — link bestaat al, download nog niet actief
+  "available",  // Volledig geüpload en downloadbaar
+  "expired",    // Downloadtermijn (30d) voorbij; intern nog zichtbaar, heractiveerbaar
+  "deleted",    // Bestanden definitief uit de opslag verwijderd
+]);
+
 /** Status van een offerte (PandaDoc-vervanger). */
 export const quoteStatusEnum = pgEnum("quote_status", [
   "concept",       // Nog niet gedeeld
