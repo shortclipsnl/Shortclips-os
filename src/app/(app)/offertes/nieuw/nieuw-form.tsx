@@ -7,9 +7,11 @@ import { Loader2 } from "lucide-react";
 import { createQuote } from "@/server/actions/quotes";
 
 type Opt = { id: string; name?: string; company?: string };
+type Tpl = { id: string; name: string; packages: { label: string }[] };
 
-export function NieuwOfferteForm({ templates, clients, leads }: { templates: { id: string; name: string }[]; clients: Opt[]; leads: Opt[] }) {
+export function NieuwOfferteForm({ templates, clients, leads }: { templates: Tpl[]; clients: Opt[]; leads: Opt[] }) {
   const [templateId, setTemplateId] = useState("");
+  const [packageIndex, setPackageIndex] = useState(0);
   const [recipientKind, setRecipientKind] = useState<"client" | "lead" | "none">(clients.length ? "client" : "none");
   const [clientId, setClientId] = useState("");
   const [leadId, setLeadId] = useState("");
@@ -18,6 +20,9 @@ export function NieuwOfferteForm({ templates, clients, leads }: { templates: { i
   const [pending, start] = useTransition();
   const router = useRouter();
 
+  const selectedTpl = templates.find((t) => t.id === templateId);
+  const packages = selectedTpl?.packages ?? [];
+
   function submit() {
     setErr(null);
     if (!title.trim()) { setErr("Geef de offerte een naam."); return; }
@@ -25,6 +30,7 @@ export function NieuwOfferteForm({ templates, clients, leads }: { templates: { i
       const res = await createQuote({
         title,
         templateId: templateId || undefined,
+        packageIndex: packages.length ? packageIndex : undefined,
         clientId: recipientKind === "client" && clientId ? clientId : undefined,
         leadId: recipientKind === "lead" && leadId ? leadId : undefined,
       });
@@ -51,6 +57,20 @@ export function NieuwOfferteForm({ templates, clients, leads }: { templates: { i
           <p className="text-sm text-[var(--color-ink-muted)]">Nog geen sjablonen. <Link href="/offertes/sjablonen" className="text-[var(--color-brand-700)] hover:underline">Maak er eerst één</Link>, of ga verder zonder.</p>
         )}
       </div>
+
+      {packages.length ? (
+        <div>
+          <label className="sc-label">Pakket</label>
+          <div className="flex flex-wrap gap-1.5">
+            {packages.map((p, i) => (
+              <button key={i} type="button" onClick={() => setPackageIndex(i)}
+                className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${packageIndex === i ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-neutral-soft)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div>
         <label className="sc-label">Voor wie</label>

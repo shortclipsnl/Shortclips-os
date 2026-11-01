@@ -3,11 +3,12 @@ import Link from "next/link";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { ChevronLeft } from "lucide-react";
 import { db } from "@/db/client";
-import { clients, salesLeads } from "@/db/schema";
+import { clients, quoteTemplateVersions, salesLeads } from "@/db/schema";
 import { requireOwner } from "@/server/auth/context";
 import { listQuoteTemplates } from "@/server/quotes";
 import { PageHeader } from "@/components/ui";
 import { NieuwOfferteForm } from "./nieuw-form";
+import type { QuoteContent } from "@/lib/quotes";
 
 export const metadata: Metadata = { title: "Nieuwe offerte" };
 export const dynamic = "force-dynamic";
@@ -20,6 +21,19 @@ export default async function NieuweOffertePage() {
     db.select({ id: salesLeads.id, company: salesLeads.company }).from(salesLeads).where(and(isNull(salesLeads.deletedAt), eq(salesLeads.status, "offerte"))).orderBy(asc(salesLeads.company)),
   ]);
 
+  // Pakketkeuzes (bijv. 6/8 video's) per sjabloon ophalen voor de wizard.
+  const templatesWithPkgs = await Promise.all(
+    templates.map(async (t) => {
+      const [ver] = await db
+        .select({ content: quoteTemplateVersions.content })
+        .from(quoteTemplateVersions)
+        .where(and(eq(quoteTemplateVersions.templateId, t.id), eq(quoteTemplateVersions.version, t.currentVersion)))
+        .limit(1);
+      const packages = ((ver?.content ?? {}) as QuoteContent).packageOptions ?? [];
+      return { id: t.id, name: t.name, packages: packages.map((p) => ({ label: p.label })) };
+    }),
+  );
+
   return (
     <div className="mx-auto max-w-[760px]">
       <PageHeader
@@ -28,7 +42,7 @@ export default async function NieuweOffertePage() {
         description="Kies een sjabloon en de klant (of lead). De gegevens worden automatisch ingevuld; daarna kun je alles nalopen en aanpassen."
       />
       <NieuwOfferteForm
-        templates={templates.map((t) => ({ id: t.id, name: t.name }))}
+        templates={templatesWithPkgs}
         clients={clientList}
         leads={leadList}
       />

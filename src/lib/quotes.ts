@@ -14,6 +14,10 @@ export type QuoteBlock =
   | { type: "lineItems"; title?: string } // rendert de offerteregels (prijzen)
   | { type: "terms"; title?: string; text: string };
 
+/** Pakketkeuze op een sjabloon, bijv. "6 video's" / "8 video's". Bij het maken
+ *  van de offerte kies je er één; die zet de startregel (omschrijving + prijs). */
+export type QuotePackage = { label: string; description: string; price: number };
+
 export type QuoteContent = {
   /** Begeleidende introtekst bovenaan de offerte. */
   intro?: string;
@@ -24,6 +28,8 @@ export type QuoteContent = {
   /** Standaard prijsregels van het sjabloon; worden bij een nieuwe offerte als
    *  startregels overgenomen (daarna per offerte aanpasbaar). */
   defaultLines?: QuoteLineInput[];
+  /** Keuzepakketten (bijv. 6 of 8 video's). Bij een nieuwe offerte kies je er één. */
+  packageOptions?: QuotePackage[];
 };
 
 export type QuoteLineInput = {
@@ -68,6 +74,7 @@ export function substituteContent(content: QuoteContent, vars: QuoteVars): Quote
   return {
     accent: content.accent,
     defaultLines: content.defaultLines,
+    packageOptions: content.packageOptions,
     intro: sub(content.intro),
     blocks: (content.blocks ?? []).map((b) => {
       switch (b.type) {

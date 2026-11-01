@@ -12,7 +12,7 @@
 import { and, eq, isNull, like, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { quoteTemplates, quoteTemplateVersions } from "@/db/schema";
-import type { QuoteContent, QuoteStat } from "@/lib/quotes";
+import type { QuoteContent, QuotePackage, QuoteStat } from "@/lib/quotes";
 
 const STATS: QuoteStat[] = [
   { value: "500M+", label: "gegenereerde views" },
@@ -25,7 +25,8 @@ const TERMS =
 
 const PRICE = 3450;
 
-function content(opts: { eyebrow: string; title: string; subtitle: string; heading: string; body: string; lineDescription: string; price?: number }): QuoteContent {
+function content(opts: { eyebrow: string; title: string; subtitle: string; heading: string; body: string; lineDescription: string; price?: number; terms?: string; packages?: QuotePackage[] }): QuoteContent {
+  const first = opts.packages?.[0];
   return {
     intro: "Beste {{contactpersoon}},\n\nWat leuk dat {{bedrijf}} met Shortclips aan de slag gaat. Hieronder ons voorstel voor de samenwerking.",
     blocks: [
@@ -33,9 +34,10 @@ function content(opts: { eyebrow: string; title: string; subtitle: string; headi
       { type: "heading", text: opts.heading },
       { type: "paragraph", text: opts.body },
       { type: "lineItems", title: "Investering — Niveau vast" },
-      { type: "terms", title: "Voorwaarden", text: TERMS },
+      { type: "terms", title: "Voorwaarden", text: opts.terms ?? TERMS },
     ],
-    defaultLines: [{ description: opts.lineDescription, quantity: 1, unitPrice: opts.price ?? PRICE }],
+    defaultLines: [first ? { description: first.description, quantity: 1, unitPrice: first.price } : { description: opts.lineDescription, quantity: 1, unitPrice: opts.price ?? PRICE }],
+    ...(opts.packages ? { packageOptions: opts.packages } : {}),
   };
 }
 
@@ -70,7 +72,12 @@ const TEMPLATES: { name: string; content: QuoteContent }[] = [
       subtitle: "Wij produceren de advertentievideo's die jouw campagnes laten presteren — van hook tot call-to-action, getest en geoptimaliseerd.",
       heading: "Wat we voor je doen",
       body: "We maken maandelijks performance-gerichte advertentie-creatives: meerdere hooks en varianten per concept, klaar voor Meta/TikTok, met focus op wat daadwerkelijk converteert. We sturen bij op basis van de advertentieresultaten.",
-      lineDescription: "Advertentie creatives — Niveau vast (maandelijks)",
+      lineDescription: "Externe Short Creative afdeling — advertentievideo's",
+      terms: "Eén vaste investering per levering. Jij kiest de frequentie: maandelijks of één keer per kwartaal. Deze offerte is 30 dagen geldig. Minimaal 3 maanden, daarna maandelijks opzegbaar. Prijzen zijn exclusief btw.",
+      packages: [
+        { label: "6 video's", description: "Externe Short Creative afdeling — 6 advertentievideo's + 2 video's per maand", price: 2495 },
+        { label: "8 video's", description: "Externe Short Creative afdeling — 8 advertentievideo's + 2 video's per maand", price: 2950 },
+      ],
     }),
   },
 ];
@@ -82,16 +89,23 @@ async function main() {
     .set({ deletedAt: new Date() })
     .where(and(isNull(quoteTemplates.deletedAt), or(like(quoteTemplates.name, "Externe short content afdeling%"), like(quoteTemplates.name, "Externe Short Creative afdeling%"))));
 
-  let created = 0, skipped = 0;
+  let created = 0, updated = 0;
   for (const t of TEMPLATES) {
-    const [existing] = await db.select({ id: quoteTemplates.id }).from(quoteTemplates).where(and(eq(quoteTemplates.name, t.name), isNull(quoteTemplates.deletedAt))).limit(1);
-    if (existing) { skipped++; continue; }
-    const [tpl] = await db.insert(quoteTemplates).values({ name: t.name }).returning({ id: quoteTemplates.id });
-    await db.insert(quoteTemplateVersions).values({ templateId: tpl!.id, version: 1, content: t.content });
-    created++;
-    console.log(`  ✓ ${t.name}`);
+    const [existing] = await db.select({ id: quoteTemplates.id, currentVersion: quoteTemplates.currentVersion }).from(quoteTemplates).where(and(eq(quoteTemplates.name, t.name), isNull(quoteTemplates.deletedAt))).limit(1);
+    if (existing) {
+      // Bestaand sjabloon: inhoud bijwerken (zelfde versie overschrijven).
+      await db.update(quoteTemplateVersions).set({ content: t.content }).where(and(eq(quoteTemplateVersions.templateId, existing.id), eq(quoteTemplateVersions.version, existing.currentVersion)));
+      await db.update(quoteTemplates).set({ updatedAt: new Date() }).where(eq(quoteTemplates.id, existing.id));
+      updated++;
+      console.log(`  ↻ ${t.name} (bijgewerkt)`);
+    } else {
+      const [tpl] = await db.insert(quoteTemplates).values({ name: t.name }).returning({ id: quoteTemplates.id });
+      await db.insert(quoteTemplateVersions).values({ templateId: tpl!.id, version: 1, content: t.content });
+      created++;
+      console.log(`  ✓ ${t.name} (nieuw)`);
+    }
   }
-  console.log(`\n✓ Sjablonen: ${created} aangemaakt, ${skipped} overgeslagen (bestonden al). Generieke sjablonen opgeruimd.`);
+  console.log(`\n✓ Sjablonen: ${created} aangemaakt, ${updated} bijgewerkt. Generieke sjablonen opgeruimd.`);
   process.exit(0);
 }
 

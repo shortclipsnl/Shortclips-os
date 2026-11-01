@@ -124,6 +124,8 @@ const createSchema = z.object({
   clientId: z.string().uuid().optional(),
   leadId: z.string().uuid().optional(),
   title: z.string().trim().min(1).max(200),
+  /** Gekozen pakket (bijv. 6 of 8 video's) — index in content.packageOptions. */
+  packageIndex: z.coerce.number().int().min(0).optional(),
 });
 
 /** Nieuwe offerte uit een sjabloon (of leeg). Snapshot de sjablooninhoud en
@@ -169,6 +171,10 @@ export async function createQuote(input: z.input<typeof createSchema>): Promise<
       offertenaam: title,
       datum: new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" }),
     });
+
+    // Gekozen pakket (6/8 video's) → zet de startregel (omschrijving + prijs).
+    const pkg = content.packageOptions?.[p.data.packageIndex ?? 0];
+    if (pkg) content = { ...content, defaultLines: [{ description: pkg.description, quantity: 1, unitPrice: pkg.price }] };
 
     // Standaard prijsregels uit het sjabloon overnemen als startregels.
     const defaults = (content.defaultLines ?? []).filter((l) => l.description?.trim());
