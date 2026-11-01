@@ -40,6 +40,9 @@ export const NAVIGATION: NavGroup[] = [
     accent: "var(--color-brand-600)",
     items: [
       { href: "/dashboard", label: "Vandaag", icon: "LayoutDashboard" },
+      // Wat mag je zelf beslissen en wat gaat naar Jarno. Voor het hele interne
+      // team; editors zien hem niet (strikte editor-allowlist in de layout).
+      { href: "/beslissingshulp", label: "Beslissingshulp", icon: "Compass", match: "/beslissingshulp" },
       { href: "/doelen", label: "Doelen", icon: "Target", match: "/doelen" },
       { href: "/kwaliteit", label: "Kwaliteit & Aandachtspunten", icon: "ShieldCheck", match: "/kwaliteit" },
     ],
