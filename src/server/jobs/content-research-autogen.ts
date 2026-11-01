@@ -4,8 +4,12 @@ import { db } from "@/db/client";
 import { clients, contentResearchRuns } from "@/db/schema";
 import { runContentResearchForClient } from "@/server/content-research/run";
 
-const MAX_PER_RUN = 8;
-const MIN_DAYS_BETWEEN = 7;
+// Elk onderzoek duurt enkele minuten (web-onderzoek + Opus). Op Vercel geldt een
+// maxDuration per aanroep, dus per run doen we er weinig; de cron draait maandag­
+// ochtend vaak genoeg om alle actieve klanten te dekken (de 7-dagen-skip voorkomt
+// dubbel werk).
+const MAX_PER_RUN = 2;
+const MIN_DAYS_BETWEEN = 6;
 
 /**
  * Wekelijkse inhaalronde: verzamelt automatisch nieuwe inspiratie voor actieve

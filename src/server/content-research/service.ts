@@ -8,7 +8,7 @@ import {
   contentResearchRuns,
 } from "@/db/schema";
 import { assertClientAccess, scopeToClients, type Viewer } from "@/server/auth/context";
-import { listActiveClientsForAi, clientLearnedText } from "@/server/ai/knowledge";
+import { listClientsForScripts, clientLearnedText } from "@/server/ai/knowledge";
 import { gatherFeedbackContext } from "@/server/script-control";
 import { getClientWinningPatterns } from "@/server/scripts/winning-patterns";
 import { loadDna, dnaToText, type ContentDna } from "./content-dna";
@@ -18,17 +18,18 @@ export type OverviewClient = {
   name: string;
   logoUrl: string | null;
   color: string | null;
+  active: boolean;
   totalIdeas: number;
   newIdeas: number;
   lastResearchAt: string | null;
   running: boolean;
 };
 
-/** Overzicht: alle actieve klanten + hun idee-tellingen en laatste onderzoek. */
+/** Overzicht: alle klanten (met actief-vlag) + hun idee-tellingen en laatste onderzoek. */
 export async function listContentResearchOverview(viewer: Viewer): Promise<OverviewClient[]> {
-  const active = await listActiveClientsForAi(viewer);
-  if (active.length === 0) return [];
-  const ids = new Set(active.map((c) => c.id));
+  const clientsList = await listClientsForScripts(viewer);
+  if (clientsList.length === 0) return [];
+  const ids = new Set(clientsList.map((c) => c.id));
 
   const scope = scopeToClients(viewer, contentIdeas.clientId);
   const ideas = await db
@@ -65,11 +66,12 @@ export async function listContentResearchOverview(viewer: Viewer): Promise<Overv
     }
   }
 
-  return active.map((c) => ({
+  return clientsList.map((c) => ({
     id: c.id,
     name: c.name,
     logoUrl: c.logoUrl,
     color: c.color,
+    active: c.active,
     totalIdeas: totals.get(c.id) ?? 0,
     newIdeas: news.get(c.id) ?? 0,
     lastResearchAt: lastAt.get(c.id) ?? null,
