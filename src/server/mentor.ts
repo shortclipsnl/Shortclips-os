@@ -1,7 +1,7 @@
 import "server-only";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { mentorMemories } from "@/db/schema";
+import { clients, mentorMemories } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 import { getQualityOverview, type QualityGroup } from "@/server/quality";
 import { getGoalsOverview } from "@/server/goals/overview";
@@ -98,6 +98,23 @@ export async function buildMentorContext(viewer: Viewer): Promise<string> {
   }
   if (cap && (cap.summary.monthlyRevenue != null || cap.summary.estimatedProfit != null)) {
     parts.push(`Schatting uit capaciteit: maandomzet ${eur(cap.summary.monthlyRevenue)}, personeelskosten ${eur(cap.summary.staffCost)}, geschatte winst ${eur(cap.summary.estimatedProfit)} (schatting, geen boekhouding).`);
+  }
+
+  // Per-klant maandomzet, zodat de mentor vragen over het aandeel van een klant
+  // in de omzet kan beantwoorden (voorheen ontbrak dit in de context).
+  const clientRevs = await db
+    .select({ name: clients.name, revenue: clients.monthlyRevenue })
+    .from(clients)
+    .where(and(isNull(clients.deletedAt), inArray(clients.status, ["active", "onboarding"])))
+    .catch(() => [] as Array<{ name: string; revenue: string | null }>);
+  const revRows = clientRevs
+    .map((c) => ({ name: c.name, rev: Number(c.revenue ?? 0) }))
+    .filter((c) => c.rev > 0)
+    .sort((a, b) => b.rev - a.rev);
+  if (revRows.length) {
+    const total = revRows.reduce((s, c) => s + c.rev, 0);
+    const top = revRows.slice(0, 12).map((c) => `${c.name}: ${eur(c.rev)} (${total > 0 ? Math.round((c.rev / total) * 100) : 0}%)`).join(" | ");
+    parts.push(`\nPER-KLANT MAANDOMZET (interne staat, ${revRows.length} klanten, totaal ${eur(total)}): ${top}`);
   }
 
   if (leads) {

@@ -7,15 +7,39 @@ import { Film, Quote, LayoutGrid, TrendingUp, ThumbsDown } from "lucide-react";
 import { generateInsights, recommendationToTask } from "@/server/actions/insights";
 import type { ClientInsights, Finding, Recommendation, TopVideo, HookInzicht, FormatInzicht, MindereVideo } from "@/server/insights";
 
-const ZEKER: Record<string, { label: string; cls: string }> = {
-  bewezen: { label: "Bewezen", cls: "bg-[var(--color-good-soft)] text-[#14633a]" },
-  waarschijnlijk: { label: "Waarschijnlijk", cls: "bg-[#e7f0ff] text-[#1b5fe0]" },
-  hypothese: { label: "Hypothese", cls: "bg-[#fff3e0] text-[#8a5300]" },
+const ZEKER: Record<string, { label: string; dot: string }> = {
+  bewezen: { label: "Bewezen", dot: "var(--color-good)" },
+  waarschijnlijk: { label: "Waarschijnlijk", dot: "var(--color-info)" },
+  hypothese: { label: "Hypothese", dot: "var(--color-warn)" },
 };
 
-function Zeker({ z }: { z: string }) {
+// Compacte zekerheids-indicator: een gekleurde stip i.p.v. een badge, zodat de
+// tekst van het inzicht voorop staat en de lijst scanbaar blijft. De legenda
+// onder de kop legt de kleuren uit.
+function Zeker({ z, align = "center" }: { z: string; align?: "center" | "top" }) {
   const m = ZEKER[z] ?? ZEKER.hypothese!;
-  return <span className={`rounded-full px-2 py-0.5 text-2xs font-medium ${m.cls}`}>{m.label}</span>;
+  return (
+    <span
+      title={`Zekerheid: ${m.label}`}
+      aria-label={`Zekerheid: ${m.label}`}
+      className={`size-2 shrink-0 rounded-full ${align === "top" ? "mt-[7px]" : ""}`}
+      style={{ background: m.dot }}
+    />
+  );
+}
+
+function ZekerLegenda() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-[var(--color-ink-faint)]">
+      <span className="font-medium text-[var(--color-ink-muted)]">Zekerheid:</span>
+      {Object.values(ZEKER).map((m) => (
+        <span key={m.label} className="inline-flex items-center gap-1.5">
+          <span className="size-2 rounded-full" style={{ background: m.dot }} />
+          {m.label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export function InsightsPanel({
@@ -69,6 +93,8 @@ export function InsightsPanel({
           <p className="text-sm text-[var(--color-ink-muted)]">Nog geen analyse. Klik op “Analyse genereren”.</p>
         ) : (
           <div className="space-y-6">
+            <ZekerLegenda />
+
             {/* 1-2. Top 3 video's + waarom ze werkten */}
             <TopVideosSection items={insights.topVideos ?? []} />
 
@@ -122,7 +148,7 @@ function FindingList({ title, tone, items }: { title: string; tone: "good" | "ba
           {items.map((f, i) => (
             <li key={i} className="flex items-start gap-2 text-sm">
               <span className="min-w-0 flex-1 text-[var(--color-ink-muted)]">{f.punt}</span>
-              <Zeker z={f.zekerheid} />
+              <Zeker z={f.zekerheid} align="top" />
             </li>
           ))}
         </ul>
@@ -208,7 +234,7 @@ function HookList({ items }: { items: HookInzicht[] }) {
             <li key={i} className="text-sm">
               <div className="flex items-start gap-2">
                 <span className="min-w-0 flex-1 font-medium text-[var(--color-ink)]">&ldquo;{h.hook}&rdquo;</span>
-                <Zeker z={h.zekerheid} />
+                <Zeker z={h.zekerheid} align="top" />
               </div>
               {h.waarom ? <p className="text-xs text-[var(--color-ink-muted)]">{h.waarom}</p> : null}
             </li>
@@ -229,7 +255,7 @@ function FormatList({ items }: { items: FormatInzicht[] }) {
             <li key={i} className="text-sm">
               <div className="flex items-start gap-2">
                 <span className="min-w-0 flex-1 font-medium text-[var(--color-ink)]">{f.format}</span>
-                <Zeker z={f.zekerheid} />
+                <Zeker z={f.zekerheid} align="top" />
               </div>
               {f.waarom ? <p className="text-xs text-[var(--color-ink-muted)]">{f.waarom}</p> : null}
             </li>
