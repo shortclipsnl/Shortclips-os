@@ -9,6 +9,8 @@ import {
 import { cn } from "@/lib/cn";
 import { BESLIS, ROLLEN, type Keuzehulp, type Niveau, type Rol, type Situatie } from "@/lib/beslissingshulp/data";
 import { maakIndex, zoek as zoekIn } from "@/lib/beslissingshulp/zoek";
+import { logZoekZonderResultaat } from "@/server/actions/beslissingshulp";
+import type { GemisteZoekopdracht } from "@/server/beslissingshulp";
 
 /* ------------------------------------------------------------------ */
 /* Basis                                                                */
@@ -56,6 +58,8 @@ function Tekst({ t, markeer }: { t: string; markeer: boolean }) {
 const kaal = (t: string) => t.replace(/\[\[(.+?)\]\]/g, "$1");
 
 const INDEX = maakIndex(S);
+/** Zoekopdrachten zonder resultaat die deze sessie al zijn vastgelegd. */
+const GELOGD = new Set<string>();
 
 async function kopieer(tekst: string): Promise<boolean> {
   try {
@@ -77,7 +81,7 @@ async function kopieer(tekst: string): Promise<boolean> {
 /* Hoofdcomponent                                                       */
 /* ------------------------------------------------------------------ */
 
-export function Beslissingshulp({ owner, startRol }: { owner: boolean; startRol: Rol }) {
+export function Beslissingshulp({ owner, startRol, gemist }: { owner: boolean; startRol: Rol; gemist: GemisteZoekopdracht[] }) {
   const [view, setView] = useState<View>({ naam: "start" });
   const [rol, setRol] = useState<Rol>(startRol);
   const [q, setQ] = useState("");
@@ -132,7 +136,7 @@ export function Beslissingshulp({ owner, startRol }: { owner: boolean; startRol:
       )}
       {view.naam === "jarno" && <Jarno key={view.id ?? "x"} voorId={view.id} ga={ga} mk={mk} toon={toon} />}
       {view.naam === "grenzen" && <Grenzen ga={ga} mk={mk} />}
-      {view.naam === "beheer" && owner && <Beheer ga={ga} markeer={markeer} setMarkeer={setMarkeer} />}
+      {view.naam === "beheer" && owner && <Beheer ga={ga} markeer={markeer} setMarkeer={setMarkeer} gemist={gemist} />}
 
       {melding ? (
         <div role="status" className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm text-white shadow-lg">
@@ -188,6 +192,20 @@ function Start({ owner, rol, setRol, q, setQ, ga }: {
   owner: boolean; rol: Rol; setRol: (r: Rol) => void; q: string; setQ: (q: string) => void; ga: Nav;
 }) {
   const resultaten = useMemo(() => zoekIn(INDEX, q), [q]);
+
+  // Niets gevonden en even gestopt met typen? Leg de zoekopdracht vast, zodat
+  // de eigenaar ziet welke woorden het team gebruikt. Elke tekst maar één keer.
+  const geenResultaat = q.trim().length >= 3 && resultaten.length === 0;
+  useEffect(() => {
+    if (!geenResultaat) return;
+    const tekst = q.trim().toLowerCase();
+    const t = window.setTimeout(() => {
+      if (GELOGD.has(tekst)) return;
+      GELOGD.add(tekst);
+      logZoekZonderResultaat(tekst, rol).catch(() => GELOGD.delete(tekst));
+    }, 1500);
+    return () => window.clearTimeout(t);
+  }, [geenResultaat, q, rol]);
   const top = BESLIS.top[rol].map((id) => PER_ID.get(id)).filter(Boolean) as Situatie[];
   const R = ROLLEN[rol];
 
@@ -674,7 +692,7 @@ function Grenzen({ ga, mk }: { ga: Nav; mk: boolean }) {
 
 /* ------------------------------ Beheer (alleen eigenaar) ------------------------------ */
 
-function Beheer({ ga, markeer, setMarkeer }: { ga: Nav; markeer: boolean; setMarkeer: (b: boolean) => void }) {
+function Beheer({ ga, markeer, setMarkeer, gemist }: { ga: Nav; markeer: boolean; setMarkeer: (b: boolean) => void; gemist: GemisteZoekopdracht[] }) {
   const aantal = (JSON.stringify(BESLIS).match(/\[\[/g) ?? []).length;
   return (
     <>
@@ -691,6 +709,29 @@ function Beheer({ ga, markeer, setMarkeer }: { ga: Nav; markeer: boolean; setMar
         <input type="checkbox" checked={markeer} onChange={(e) => setMarkeer(e.target.checked)} className="size-4" />
         Toon de {aantal} voorstellen (termijnen, bedragen) ook geel in de rest van de Beslissingshulp
       </label>
+
+      <Kop rechts={<span className="text-xs text-[var(--color-ink-muted)]">laatste 30 dagen</span>}>Zoekopdrachten zonder resultaat</Kop>
+      <div className="sc-card overflow-x-auto">
+        {gemist.length === 0 ? (
+          <p className="p-4 text-sm text-[var(--color-ink-muted)]">Nog niets. Zodra iemand iets zoekt en geen situatie vindt, verschijnt het hier. Zie je een zoekopdracht vaak terugkomen? Dan ontbreekt er een situatie of een zoekwoord.</p>
+        ) : (
+          <table className="w-full min-w-[520px] text-sm">
+            <thead className="border-b border-[var(--color-line)] text-left text-xs text-[var(--color-ink-muted)]">
+              <tr><th className="px-3 py-2 font-semibold">Zoekopdracht</th><th className="px-3 py-2 font-semibold">Aantal</th><th className="px-3 py-2 font-semibold">Laatst</th><th className="px-3 py-2 font-semibold">Door</th></tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--color-line)]">
+              {gemist.map((g) => (
+                <tr key={g.zoekopdracht}>
+                  <td className="px-3 py-2 font-medium text-[var(--color-ink)]">&quot;{g.zoekopdracht}&quot;</td>
+                  <td className="px-3 py-2 tabular-nums">{g.aantal}</td>
+                  <td className="px-3 py-2 text-[var(--color-ink-muted)]">{new Date(g.laatst).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}</td>
+                  <td className="px-3 py-2 text-[var(--color-ink-muted)]">{g.door.join(", ") || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       <Kop>Bevoegdheden per rol</Kop>
       <div className="grid gap-2">

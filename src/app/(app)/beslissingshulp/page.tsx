@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireInternal, isOwner } from "@/server/auth/context";
 import type { Rol } from "@/lib/beslissingshulp/data";
+import { gemisteZoekopdrachten, type GemisteZoekopdracht } from "@/server/beslissingshulp";
 import { Beslissingshulp } from "./beslissingshulp";
 
 export const metadata: Metadata = { title: "Beslissingshulp" };
@@ -21,5 +22,11 @@ export default async function BeslissingshulpPage() {
   // de eigenaar ziet waar hij over beslist, de rest start als Content Creative.
   const startRol: Rol = owner ? "bi" : viewer.primaryRole === "videographer" ? "vg" : "cc";
 
-  return <Beslissingshulp owner={owner} startRol={startRol} />;
+  // Alleen de eigenaar ziet welke zoekopdrachten niets opleverden (in Beheer).
+  let gemist: GemisteZoekopdracht[] = [];
+  if (owner) {
+    try { gemist = await gemisteZoekopdrachten(); } catch { gemist = []; }
+  }
+
+  return <Beslissingshulp owner={owner} startRol={startRol} gemist={gemist} />;
 }
