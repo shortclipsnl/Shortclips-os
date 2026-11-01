@@ -7,6 +7,7 @@ import {
   BarChart3,
   CalendarDays,
   CalendarRange,
+  FileBarChart,
   FileText,
   Handshake,
   LayoutDashboard,
@@ -22,6 +23,7 @@ const ITEMS = [
   { href: "/portal/planning", label: "Opnameplanning", icon: CalendarRange },
   { href: "/portal/content", label: "Contentplanning", icon: CalendarDays },
   { href: "/portal/resultaten", label: "Resultaten", icon: BarChart3 },
+  { href: "/portal/analyses", label: "Maandanalyses", icon: FileBarChart },
   { href: "/portal/samenwerking", label: "Samenwerking", icon: Handshake },
 ];
 

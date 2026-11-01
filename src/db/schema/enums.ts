@@ -374,3 +374,16 @@ export const contentIdeaEffortEnum = pgEnum("content_idea_effort", [
   "gemiddeld",
   "uitgebreid",
 ]);
+
+/* ------------------------------------------------------------------ *
+ * AI Maandrapportages — statusflow van één maandrapport.
+ * ------------------------------------------------------------------ */
+export const monthlyReportStatusEnum = pgEnum("monthly_report_status", [
+  "gegevens_verzamelen", // statistieken worden verzameld
+  "analyse_bezig",       // AI stelt de analyse op
+  "klaar_voor_controle", // analyse compleet, wacht op een medewerker
+  "aanpassing_nodig",    // medewerker vroeg aanpassingen
+  "goedgekeurd",         // gecontroleerd en akkoord, klaar om te publiceren
+  "gepubliceerd",        // definitief in het klantportaal
+  "mislukt",             // technische fout / ontbrekende gegevens
+]);

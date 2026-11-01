@@ -28,6 +28,8 @@ import { runTransferCleanup } from "@/server/jobs/transfer-cleanup";
 import { runCaptionsAutoGenerate } from "@/server/jobs/captions-autogen";
 import { runBriefingAutoGenerate } from "@/server/jobs/briefing-autogen";
 import { runContentResearchWeekly } from "@/server/jobs/content-research-autogen";
+import { runMonthlyReports } from "@/server/jobs/report-monthly";
+import { runReportReviewReminders } from "@/server/jobs/report-review-reminders";
 import { runDriveSync } from "@/server/jobs/drive-sync";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, runMetricoolSync } from "@/server/jobs/metricool-sync";
@@ -113,6 +115,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "captions.auto_generate": runCaptionsAutoGenerate,
   "briefing.auto_generate": runBriefingAutoGenerate,
   "content_research.weekly": runContentResearchWeekly,
+  "reports.generate_monthly": runMonthlyReports,
+  "reports.review_reminders": runReportReviewReminders,
   "drive.sync_all": runDriveSync,
   "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,

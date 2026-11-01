@@ -72,6 +72,7 @@ export const NAVIGATION: NavGroup[] = [
     accent: "var(--color-good)",
     items: [
       { href: "/analytics", label: "Resultatenoverzicht", icon: "TrendingUp", permissions: ["analytics:read"], match: "/analytics" },
+      { href: "/analytics/maandrapportages", label: "AI Maandrapportages", icon: "FileText", permissions: ["reports:read"], match: "/analytics/maandrapportages" },
       { href: "/video-intelligence", label: "Video Intelligence", icon: "Sparkles", permissions: ["video_intelligence:read"], match: "/video-intelligence" },
     ],
   },
