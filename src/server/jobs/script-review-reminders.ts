@@ -31,7 +31,7 @@ function fmtDate(iso: string | null): string {
  * stopt de herinnering vanzelf.
  */
 export async function runScriptReviewReminders() {
-  return runJob("monday", "script_review.reminders", {}, async (ctx) => {
+  return runJob("system", "script_review.reminders", {}, async (ctx) => {
     const week = mondayIso();
     // Instelbare feedbacktermijn: herinner zodra de deadline nadert of al voorbij
     // is (±1 dag van tevoren), of — als er geen deadline staat — na de ingestelde

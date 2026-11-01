@@ -17,7 +17,7 @@ function startOfToday(): Date {
  * klaarzetten met een lege bespreekpuntenlijst.
  */
 export async function runMeetingsRollOver() {
-  return runJob("monday", "meetings.roll_over", {}, async (ctx) => {
+  return runJob("system", "meetings.roll_over", {}, async (ctx) => {
     const today = startOfToday();
     // Eerst de te archiveren meetings ophalen, zodat we per stuk een samenvatting
     // van de besproken punten kunnen maken vóórdat we 'm wegzetten in "Geweest".

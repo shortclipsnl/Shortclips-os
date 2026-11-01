@@ -25,7 +25,7 @@ function currentPeriod(): string {
  * Draait nachtelijk; de eerste nacht van de maand doet het werk.
  */
 export async function runMonthlyInsightTasks() {
-  return runJob("monday", "insights.monthly_tasks", {}, async (ctx) => {
+  return runJob("system", "insights.monthly_tasks", {}, async (ctx) => {
     if (!aiConfigured()) {
       ctx.log("Geen AI-sleutel — maandelijkse resultatenanalyse overgeslagen.");
       return;

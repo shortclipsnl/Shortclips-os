@@ -137,7 +137,7 @@ export async function runClientNotifications(): Promise<{
   }
 
   // 4. Video's die gisteren online zijn gezet — "we hebben gisteren geplaatst".
-  // Bron is de publicatiekalender (o.a. gevoed vanuit Google Agenda/Monday):
+  // Bron is de publicatiekalender (o.a. gevoed vanuit Google Agenda):
   // status 'published' met publicatiedatum = gisteren.
   const publishedYesterday = await db
     .select({

@@ -7,7 +7,7 @@ import {
   calendarEvents,
   clients,
   deliverables,
-  mondayMappings,
+  calendarMappings,
   productionDays,
   users,
 } from "@/db/schema";
@@ -91,9 +91,9 @@ export async function linkAppointmentToClient(
     };
 
     const [map] = await db
-      .select({ id: mondayMappings.id, entityId: mondayMappings.entityId })
-      .from(mondayMappings)
-      .where(and(eq(mondayMappings.entityType, "calendar_shoot"), eq(mondayMappings.itemId, event.id)))
+      .select({ id: calendarMappings.id, entityId: calendarMappings.entityId })
+      .from(calendarMappings)
+      .where(and(eq(calendarMappings.entityType, "calendar_shoot"), eq(calendarMappings.itemId, event.id)))
       .limit(1);
 
     let productionDayId = map?.entityId ?? null;
@@ -102,7 +102,7 @@ export async function linkAppointmentToClient(
     } else {
       const [created] = await db.insert(productionDays).values(base).returning({ id: productionDays.id });
       productionDayId = created!.id;
-      await db.insert(mondayMappings).values({
+      await db.insert(calendarMappings).values({
         entityType: "calendar_shoot",
         entityId: productionDayId,
         boardId: "google_calendar",

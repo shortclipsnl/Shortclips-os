@@ -9,7 +9,7 @@ import { IntegrationError, MissingCredentialsError } from "@/server/integrations
 
 export type JobLogEntry = { at: string; level: "info" | "warn" | "error"; message: string };
 
-/** Echte externe koppelingen (de rest gebruikt 'monday' als placeholder voor
+/** Echte externe koppelingen (de rest gebruikt 'system' als placeholder voor
  *  interne jobs — die willen we niet als koppelingsfout melden). */
 const EXTERNAL_PROVIDERS = new Set<Provider>(["frameio", "google_drive", "google_calendar", "gmail", "metricool"]);
 const PROVIDER_LABEL: Record<string, string> = {

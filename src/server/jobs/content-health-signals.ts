@@ -40,7 +40,7 @@ async function aiTip(task: HealthTask): Promise<string | null> {
  * niet dubbel aangemaakt. Draait nachtelijk.
  */
 export async function runContentHealthSignals() {
-  return runJob("monday", "content_health.signals", {}, async (ctx) => {
+  return runJob("system", "content_health.signals", {}, async (ctx) => {
     const week = mondayIso();
     const overview = await getContentHealth(true);
     ctx.counters.processed = overview.rows.length;

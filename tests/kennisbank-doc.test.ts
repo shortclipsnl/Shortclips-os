@@ -7,7 +7,7 @@ const doc: PMDoc = {
     { type: "paragraph", content: [{ type: "text", marks: [{ type: "bold" }], text: "Verantwoordelijke:" }, { type: "text", text: " Content Creative" }] },
     { type: "horizontalRule" },
     { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Doel" }] },
-    { type: "unorderedList", content: [{ type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Monday." }] }] }] },
+    { type: "unorderedList", content: [{ type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Doelstelling." }] }] }] },
     { type: "paragraph", content: [{ type: "text", marks: [{ type: "videoTimestamp", attrs: { timestamp: "09:00" } }], text: "09:00" }] },
   ],
 };
@@ -17,7 +17,7 @@ describe("kennisbank-doc", () => {
     const t = docToPlainText(doc);
     expect(t).toContain("Verantwoordelijke: Content Creative");
     expect(t).toContain("Doel");
-    expect(t).toContain("Monday.");
+    expect(t).toContain("Doelstelling.");
     expect(t).toContain("09:00");
   });
 

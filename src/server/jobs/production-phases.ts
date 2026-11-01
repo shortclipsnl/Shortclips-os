@@ -6,7 +6,7 @@ import { runJob } from "./runner";
 
 /**
  * Laat de projectfase van een opnamedag automatisch meelopen met de
- * opnamedatum — overgenomen uit Monday, zodat niemand de fase handmatig hoeft
+ * opnamedatum —, zodat niemand de fase handmatig hoeft
  * bij te werken:
  *   nieuw → scripting (−14d) → opnamevoorbereiding (−3d) → opname (0d) → editing (+1d)
  * Alleen vooruit: een al verder gezette fase wordt nooit teruggedraaid.
@@ -27,7 +27,7 @@ function targetPhase(scheduledOn: string, today: string): Phase {
 }
 
 export async function runProductionPhaseAdvance() {
-  return runJob("monday", "production.advance_phases", {}, async (ctx) => {
+  return runJob("system", "production.advance_phases", {}, async (ctx) => {
     const today = new Date().toISOString().slice(0, 10);
 
     // Alleen dagen die nog niet in editing (of verder) zitten.

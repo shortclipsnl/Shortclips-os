@@ -4,7 +4,6 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clientContacts,
-  clientIntegrations,
   clients,
   roles,
   userRoles,
@@ -18,7 +17,7 @@ import { hashPassword } from "@/server/auth/password";
  * klant A nooit data van klant B ziet.
  *
  * Veilig en herhaalbaar:
- *  - alleen klanten die echt uit Monday komen (hebben een monday-koppeling);
+ *  - alleen actieve, niet-verwijderde klanten;
  *  - elke klant krijgt één portaalgebruiker, gekoppeld aan precies die klant
  *    (users.client_id dwingt de scheiding af in de datalaag);
  *  - verse, willekeurige tijdelijke wachtwoorden — nooit een bestaand wachtwoord
@@ -65,11 +64,11 @@ export async function runPilotPortalSetup(options: {
     return { ok: false, accounts: [], note: "Rol 'client' ontbreekt — draai eerst de seed." };
   }
 
-  // Kandidaat-klanten: echt (monday-koppeling) én met een contactpersoon-e-mail.
+  // Kandidaat-klanten: actieve, niet-verwijderde klanten.
   const realClientRows = await db
-    .selectDistinct({ id: clientIntegrations.clientId })
-    .from(clientIntegrations)
-    .where(eq(clientIntegrations.provider, "monday"));
+    .select({ id: clients.id })
+    .from(clients)
+    .where(and(isNull(clients.deletedAt), eq(clients.status, "active")));
   const realIds = new Set(realClientRows.map((r) => r.id));
 
   const chosenIds = options.clientIds?.filter((id) => realIds.has(id)) ?? [];
@@ -98,8 +97,8 @@ export async function runPilotPortalSetup(options: {
       .limit(1);
     if (!client) continue;
 
-    // Contactpersoon van de klant (primair eerst). In Monday staan de namen
-    // wel, maar de e-mailadressen vaak nog niet — daarom een duidelijk
+    // Contactpersoon van de klant (primair eerst). De namen zijn vaak bekend,
+    // maar de e-mailadressen vaak nog niet — daarom een duidelijk
     // pilot-loginadres als terugval (er wordt lokaal niets gemaild).
     const contacts = await db
       .select({

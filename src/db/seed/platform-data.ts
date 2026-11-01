@@ -256,7 +256,7 @@ export const AUTOMATION_RULES: Array<{
     ],
   },
 
-  /* ---- Overgenomen uit Monday: team- en eigenaarmeldingen ---- */
+  /* ---- Team- en eigenaarmeldingen ---- */
   {
     key: "video_internal_review_notifies_team",
     name: "Video klaar met edit → interne review melden",
@@ -313,7 +313,7 @@ export const AUTOMATION_RULES: Array<{
     ],
   },
 
-  /* ---- Tijd-gestuurde herinneringen (overgenomen uit Monday) ---- */
+  /* ---- Tijd-gestuurde herinneringen ---- */
   {
     key: "contract_45d_plan_evaluation",
     name: "Contract loopt over 45 dagen af → evaluatie inplannen",
@@ -389,7 +389,6 @@ export const AUTOMATION_RULES: Array<{
 
 export const INTEGRATIONS: Array<{
   provider:
-    | "monday"
     | "frameio"
     | "google_drive"
     | "google_calendar"
@@ -398,11 +397,6 @@ export const INTEGRATIONS: Array<{
   requiredEnv: string[];
   config: Record<string, unknown>;
 }> = [
-  {
-    provider: "monday",
-    requiredEnv: ["MONDAY_API_TOKEN"],
-    config: { apiVersion: "2026-07", webhookPath: "/api/webhooks/monday" },
-  },
   {
     provider: "frameio",
     requiredEnv: ["FRAMEIO_TOKEN"],

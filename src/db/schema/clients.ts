@@ -61,25 +61,24 @@ export const clients = pgTable(
      *  Kwaliteit & Aandachtspunten, en zichtbaar in de contentplanning. */
     weHandlePosting: boolean("we_handle_posting").notNull().default(true),
     /** Tonen op de resultatenpagina? Standaard true. Op false voor records die
-     *  geen echte klant van ons zijn (bijv. uit Monday/Metricool meegekomen),
+     *  geen echte klant van ons zijn (bijv. historisch meegekomen),
      *  zodat ze niet in de resultaten (overzicht, tegels, lijst) verschijnen. */
     showInResults: boolean("show_in_results").notNull().default(true),
     monthlyRevenue: numeric("monthly_revenue", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
-    /** Financiële velden uit Monday (HOOFDBOARD). editCostPerVideo = editkosten
-     *  per short; contractMonths = contractduur; endedOn = stopdatum (leeg = loopt). */
+    /** Financiële velden. editCostPerVideo = editkosten per short;
+     *  contractMonths = contractduur; endedOn = stopdatum (leeg = loopt). */
     editCostPerVideo: numeric("edit_cost_per_video", { precision: 10, scale: 2 }),
     contractMonths: integer("contract_months"),
     endedOn: date("ended_on"),
-    /** Toegewezen editor volgens Monday (HOOFDBOARD kolom "Editor"). */
+    /** Toegewezen vaste editor van de klant. */
     editorName: varchar("editor_name", { length: 80 }),
-    /** Aanvullende omzet deze maand (Monday "Meerwerk deze maand ex btw"). */
+    /** Aanvullende omzet deze maand (meerwerk ex btw). */
     extraRevenue: numeric("extra_revenue", { precision: 12, scale: 2 }),
-    /** Netto opbrengst per maand uit Monday = afnameprijs − editkosten
-     *  (HOOFDBOARD-formule "Netto opbrengst per maand"). De officiële "wat
+    /** Netto opbrengst per maand = afnameprijs − editkosten. De officiële "wat
      *  overblijft"-waarde; dit is winst ná editkosten, nog vóór overige kosten. */
-    netMonthlyMonday: numeric("net_monthly_monday", { precision: 12, scale: 2 }),
+    netMonthly: numeric("net_monthly", { precision: 12, scale: 2 }),
     lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
     /** Vaste caption-footer van de klant: het contact-/servicesblok met icoontjes
@@ -88,17 +87,15 @@ export const clients = pgTable(
      *  tekst nog geschreven hoeft te worden. */
     captionFooter: text("caption_footer"),
     notes: text("notes"),
-    /** Werklast/complexiteit van de klant: laag | gemiddeld | hoog. Overgenomen
-     *  uit Monday "KLANT VERDELING" (werklastanalyse). */
+    /** Werklast/complexiteit van de klant: laag | gemiddeld | hoog
+     *  (werklastanalyse). */
     complexity: varchar("complexity", { length: 12 }),
-    /** Aandachtspunten bij deze klant — wat je moet weten (overdrachtsnotities
-     *  uit Monday "KLANT VERDELING"). */
+    /** Aandachtspunten bij deze klant — wat je moet weten (overdrachtsnotities). */
     attentionNotes: text("attention_notes"),
     /**
-     * Velden die handmatig (via Klantenbeheer) zijn gezet en dus NIET door de
-     * Monday-import overschreven mogen worden. Zo blijft een handmatige wijziging
-     * (bijv. status op "gestopt" of een andere coördinator) staan, terwijl Monday
-     * de overige velden gewoon blijft bijwerken.
+     * Velden die handmatig (via Klantenbeheer) zijn gezet en dus beschermd zijn
+     * tegen overschrijven door geautomatiseerde updates. Zo blijft een handmatige
+     * wijziging (bijv. status op "gestopt" of een andere coördinator) staan.
      */
     managedFields: jsonb("managed_fields")
       .notNull()

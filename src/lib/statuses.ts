@@ -144,7 +144,7 @@ export const EDIT_PHASE_ORDER: EditPhase[] = [
   "afgerond",
 ];
 
-/** Label, volle kleur en "wacht op" per editingfase (Monday-indeling). */
+/** Label, volle kleur en "wacht op" per editingfase. */
 export const EDIT_PHASE_META: Record<EditPhase, { label: string; color: string; waitOn: string }> = {
   te_plannen: { label: "Binnenkort beschikbaar", color: "#22b573", waitOn: "Eigen team" },
   in_edit: { label: "In edit", color: "var(--color-info)", waitOn: "Editor" },
@@ -257,7 +257,6 @@ export const PLATFORM: Record<string, { label: string; color: string }> = {
 };
 
 export const INTEGRATION_LABEL: Record<string, string> = {
-  monday: "Monday.com",
   frameio: "Frame.io",
   google_drive: "Google Drive",
   ayrshare: "Ayrshare",

@@ -4,7 +4,7 @@ import { recomputeAllAwards } from "@/server/awards/service";
 
 /** Nachtelijk vangnet (en eenmalige backfill): awards per editor herberekenen. */
 export async function runAwardsRecompute() {
-  return runJob("monday", "awards.recompute", {}, async (ctx) => {
+  return runJob("system", "awards.recompute", {}, async (ctx) => {
     const r = await recomputeAllAwards();
     ctx.counters.processed = r.editors;
     ctx.counters.updated = r.newAwards;

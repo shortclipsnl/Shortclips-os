@@ -39,7 +39,7 @@ const statusSchema = z.object({
   status: z.enum(["lead", "offerte", "onderhandeling", "gewonnen", "verloren"]),
 });
 
-/** Leadstatus wijzigen — zoals de statuskolom in Monday. */
+/** Leadstatus wijzigen — zoals een statuskolom. */
 export async function setLeadStatus(input: z.infer<typeof statusSchema>): Promise<ActionResult> {
   return wrap(async () => {
     await requireOwner();
@@ -47,7 +47,7 @@ export async function setLeadStatus(input: z.infer<typeof statusSchema>): Promis
     if (!p.success) return { ok: false, message: "Ongeldige status." };
     await db.update(salesLeads).set({ status: p.data.status, updatedAt: new Date() }).where(eq(salesLeads.id, p.data.id));
 
-    // Automatiseringen aftrappen bij winst/offerte (zoals in Monday).
+    // Automatiseringen aftrappen bij winst/offerte.
     const trigger = p.data.status === "gewonnen" ? "lead.won" : p.data.status === "offerte" ? "lead.quote_sent" : null;
     if (trigger) {
       await dispatch({ trigger, entityType: "sales_lead", entityId: p.data.id, data: { to: p.data.status, href: "/leads" } });

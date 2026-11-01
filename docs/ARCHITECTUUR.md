@@ -2,25 +2,24 @@
 
 ## Uitgangspunt
 
-ShortClips OS bouwt geen bestaande software opnieuw. Monday.com, Frame.io en
+ShortClips OS bouwt geen bestaande software opnieuw. Frame.io en
 Google Drive blijven doen waar ze goed in zijn; ShortClips OS legt daar één
 interface en één intelligentielaag overheen, met een eigen database die de
 relaties tussen die systemen vasthoudt.
 
 De centrale entiteit is de **klant**. Elke klant heeft één ShortClips-id waaraan
-alles hangt: een Monday-board, een Frame.io-project, een Drive-map, contracten,
+alles hangt: een Frame.io-project, een Drive-map, contracten,
 scripts, opnamedagen, video's, publicaties, cijfers en facturen.
 
 ## Verdeling van verantwoordelijkheid
 
 | Systeem | Blijft leidend voor |
 |---|---|
-| Monday.com | Bestaande operationele planning, zolang die nog niet is overgezet |
 | Frame.io | Videobestanden, versies, getimede opmerkingen, review |
 | Google Drive | Documenten, ruwe beelden, rapportages |
 | **ShortClips OS** | Cross-systeem relaties, dashboards, workflowlogica, analytics, AI, automatisering, notificaties, finance, rechten, audit, zoeken |
 
-De architectuur is niet afhankelijk van Monday. Alle externe systemen lopen via
+De architectuur is niet afhankelijk van één extern systeem. Alle externe systemen lopen via
 adapters (`src/server/integrations/`) met een eigen interface. Een koppeling
 vervangen betekent één bestand vervangen, niet de applicatie herschrijven.
 
@@ -113,7 +112,7 @@ Dubbele bezorging wordt op twee manieren afgevangen: een unieke sleutel op
 `(provider, external_event_id)` en een hash van de payload. Frame.io-opmerkingen
 worden bovendien gecontroleerd op hun eigen id voordat ze worden aangemaakt.
 
-Sync-lussen met Monday worden voorkomen door de hash van de laatst
+Sync-lussen met externe agenda's worden voorkomen door de hash van de laatst
 weggeschreven payload te bewaren in de mapping. Komt er een webhook binnen met
 dezelfde hash, dan is dat ons eigen echo-bericht en gebeurt er niets.
 

@@ -11,7 +11,7 @@ describe("naamherkenning bij importeren", () => {
     expect(normalizeName("Friesland Lease 2026")).toBe("frieslandlease");
   });
 
-  it("herkent dezelfde klant in Monday, Frame.io en Drive", () => {
+  it("herkent dezelfde klant over systemen heen (Frame.io en Drive)", () => {
     expect(matchScore("Friesland Lease", "Friesland Lease")).toBe(100);
     expect(matchScore("FrieslandLease", "Friesland Lease")).toBe(100);
     expect(matchScore("Friesland Lease 2026", "Friesland Lease")).toBe(100);

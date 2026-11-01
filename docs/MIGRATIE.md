@@ -5,7 +5,7 @@ stoppen met werken zoals het nu werkt.
 
 ## Fase 1 — Meekijken (nu mogelijk)
 
-ShortClips OS leest bestaande informatie en toont die op één plek. Monday,
+ShortClips OS leest bestaande informatie en toont die op één plek.
 Frame.io en Drive blijven leidend; er wordt niets teruggeschreven.
 
 **Stappen**
@@ -14,17 +14,17 @@ Frame.io en Drive blijven leidend; er wordt niets teruggeschreven.
 3. Instellingen → Importeren → dry run.
 4. Voorstellen beoordelen: koppelen, nieuw aanmaken of overslaan.
 5. Import uitvoeren.
-6. Webhook-adressen registreren bij Monday en Frame.io.
+6. Webhook-adressen registreren bij Frame.io.
 
 **Wat je erover wint:** één klantpagina, één zoekbalk, één dashboard, zonder dat
 er iets verandert aan de manier van werken.
 
 **Risico:** geen. Er wordt alleen gelezen.
 
-## Fase 2 — Werken in ShortClips OS, Monday blijft bestaan
+## Fase 2 — Werken in ShortClips OS
 
 Het team gaat de video pipeline, scripts en opnamedagen in ShortClips OS
-bijhouden. Monday blijft draaien voor wat er nog niet is overgezet.
+bijhouden.
 
 **Wat je regelt**
 - Statussen en streeftijden controleren onder Instellingen → Statussen.
@@ -46,10 +46,10 @@ verlengingssignalen, risicomeldingen.
 - Klantaccounts aanmaken voor de contactpersonen die mogen goedkeuren.
 - Eén klant als pilot, daarna uitrollen.
 
-## Fase 4 — Monday uitfaseren waar het kan
+## Fase 4 — Externe systemen uitfaseren waar het kan
 
-Zodra een proces volledig in ShortClips OS draait, kan het bijbehorende
-Monday-board uit. Frame.io en Drive mogen blijven zolang dat technisch en
+Zodra een proces volledig in ShortClips OS draait, kan het bijbehorende externe
+systeem uit. Frame.io en Drive mogen blijven zolang dat technisch en
 financieel logisch is: ze doen hun werk goed en de koppeling verbergt ze al voor
 het team.
 

@@ -255,7 +255,7 @@ export async function getPortalData(viewer: Viewer) {
     ((metrics as unknown as { rows?: Array<Record<string, number>> }).rows ??
       (metrics as unknown as Array<Record<string, number>>))[0] ?? {};
 
-  // "Volgende opname": eerst de handmatige/Monday-opnamedag; is die er niet,
+  // "Volgende opname": eerst de handmatige opnamedag; is die er niet,
   // dan de eerstvolgende opname uit Google Agenda, zodat de kaart echte data
   // toont zodra de agenda gekoppeld is.
   let nextShoot = upcomingShoot[0] ?? null;
@@ -769,8 +769,8 @@ export async function getPortalVideos(viewer: Viewer) {
 
   // Gepubliceerd: één kaart per video. Frame levert per video meerdere bestanden
   // (9:16/4:5/1:1, .mov/.mp4) die naar dezelfde schone titel opschonen — die
-  // vouwen we samen (nieuwste eerst, want gesorteerd op publishedAt). De Monday-
-  // afgeleide titels (bv. "KKFH") vouwen we bewust NIET samen.
+  // vouwen we samen (nieuwste eerst, want gesorteerd op publishedAt). Afgeleide
+  // code-titels (bv. "KKFH") vouwen we bewust NIET samen.
   const gepubliceerd = dedupByTitle(clean.filter((v) => v.status === "published"));
 
   // Ingepland sorteren op geplande publicatiedatum (vroegste eerst); items zonder

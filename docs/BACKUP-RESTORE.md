@@ -62,7 +62,7 @@ git push origin HEAD:main      # Vercel bouwt en deployt automatisch
 4. **Omgevingsvariabelen** uit `docs/ENV-VARS.md` terug in Vercel (Production +
    Preview). Zonder DB-URL's faalt de build; zonder de rest blijven koppelingen
    slapend maar start de app.
-5. **Koppelingen** opnieuw verbinden (Google Drive+Agenda, Monday, Frame.io,
+5. **Koppelingen** opnieuw verbinden (Google Drive+Agenda, Frame.io,
    Metricool, Ayrshare, Anthropic, Resend) door hun sleutels te zetten. De
    koppelings-configuratie zelf staat al in de teruggezette data.
 6. **Deploy + controle:** push naar `main`, wacht op de Vercel-build, open

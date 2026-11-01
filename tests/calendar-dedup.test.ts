@@ -87,8 +87,8 @@ describe("Agenda-synchronisatie: ontdubbelen over meerdere agenda's", () => {
     // Beide agenda-afspraken wijzen naar diezelfde opnamedag.
     const maps = await db
       .select()
-      .from(s.mondayMappings)
-      .where(eq(s.mondayMappings.entityType, "calendar_shoot"));
+      .from(s.calendarMappings)
+      .where(eq(s.calendarMappings.entityType, "calendar_shoot"));
     expect(maps.length).toBe(2);
     expect(new Set(maps.map((m) => m.entityId)).size).toBe(1);
     expect(maps[0]!.entityId).toBe(pds[0]!.id);

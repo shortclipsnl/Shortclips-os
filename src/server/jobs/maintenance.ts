@@ -37,7 +37,7 @@ const day = (offset: number) => {
  * Zo staan de regels op één plek in plaats van verspreid door de code.
  */
 export async function runDailySignals() {
-  return runJob("monday", "signals.daily", {}, async (ctx) => {
+  return runJob("system", "signals.daily", {}, async (ctx) => {
     const settings = await getDeadlineSettings();
     // 1. Contracten die binnen 60 dagen aflopen
     const expiring = await db
@@ -272,7 +272,7 @@ export async function runDailySignals() {
     }
     ctx.log(`${tomorrow.length} publicaties morgen`);
 
-    // 5. Opnames over 7 of 2 dagen zonder videograaf (Monday: "Wie gaat filmen?").
+    // 5. Opnames over 7 of 2 dagen zonder videograaf ("Wie gaat filmen?").
     const shootTier = new Map<string, number>([
       [day(7), 7],
       [day(2), 2],
@@ -320,7 +320,7 @@ export async function runDailySignals() {
 
 /** Uurlijkse controle op opnames die binnen 48 uur niet rond zijn. */
 export async function runHourlySignals() {
-  return runJob("monday", "signals.hourly", {}, async (ctx) => {
+  return runJob("system", "signals.hourly", {}, async (ctx) => {
     const soon = await db
       .select({
         id: productionDays.id,
@@ -377,7 +377,7 @@ export async function runHourlySignals() {
  * externe sleutel nodig. Dedupe per dag, zodat niemand dubbele meldingen krijgt.
  */
 export async function runEditorDeadlineReminders() {
-  return runJob("monday", "reminders.editor_deadlines", {}, async (ctx) => {
+  return runJob("system", "reminders.editor_deadlines", {}, async (ctx) => {
     const settings = await getDeadlineSettings();
     const today = day(0);
     const soon = day(settings["deadline.editorSoonDays"]);
@@ -452,7 +452,7 @@ export async function runEditorDeadlineReminders() {
  * te laat is of met een deadline binnen 2 dagen. In-app, dedupe per dag.
  */
 export async function runTaskDeadlineReminders() {
-  return runJob("monday", "reminders.task_deadlines", {}, async (ctx) => {
+  return runJob("system", "reminders.task_deadlines", {}, async (ctx) => {
     const settings = await getDeadlineSettings();
     const today = day(0);
     const soon = day(settings["deadline.taskSoonDays"]);
@@ -505,7 +505,7 @@ export async function runTaskDeadlineReminders() {
  * rond 13:30 lokaal een reminder krijgt.
  */
 export async function runDailyTeamTodoReminder() {
-  return runJob("monday", "reminders.daily_todo", {}, async (ctx) => {
+  return runJob("system", "reminders.daily_todo", {}, async (ctx) => {
     const hhmm = new Date().toLocaleTimeString("en-GB", {
       hour: "2-digit",
       minute: "2-digit",
@@ -556,7 +556,7 @@ export async function runDailyTeamTodoReminder() {
  * om 09:xx Amsterdam doorkomen (zomer- én wintertijd).
  */
 export async function runEditorFridayWrapUp() {
-  return runJob("monday", "reminders.editor_friday_wrapup", {}, async (ctx) => {
+  return runJob("system", "reminders.editor_friday_wrapup", {}, async (ctx) => {
     const now = new Date();
     const weekday = now.toLocaleDateString("en-US", { weekday: "short", timeZone: "Europe/Amsterdam" });
     const hhmm = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" });
@@ -597,7 +597,7 @@ export async function runEditorFridayWrapUp() {
  * doorkomen (zomer- én wintertijd). Dedupe = één melding per persoon per vrijdag.
  */
 export async function runCleaningFridayReminder() {
-  return runJob("monday", "reminders.cleaning_friday", {}, async (ctx) => {
+  return runJob("system", "reminders.cleaning_friday", {}, async (ctx) => {
     const now = new Date();
     const weekday = now.toLocaleDateString("en-US", { weekday: "short", timeZone: "Europe/Amsterdam" });
     const hhmm = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" });
@@ -703,7 +703,7 @@ const EUR = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR",
  * (06:45/07:45 UTC) + uurcheck → precies één keer rond 08:45 Amsterdam.
  */
 export async function runFinanceWeeklySummary() {
-  return runJob("monday", "finance.weekly_summary", {}, async (ctx) => {
+  return runJob("system", "finance.weekly_summary", {}, async (ctx) => {
     const now = new Date();
     const weekday = now.toLocaleDateString("en-US", { weekday: "short", timeZone: "Europe/Amsterdam" });
     const hhmm = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" });
@@ -816,7 +816,7 @@ function mondayIso(): string {
  * stuurt de verantwoordelijke coördinator één melding per week (dedupe).
  */
 export async function runClientsWithoutShootSignal() {
-  return runJob("monday", "signals.clients_without_shoot", {}, async (ctx) => {
+  return runJob("system", "signals.clients_without_shoot", {}, async (ctx) => {
     const week = mondayIso();
     const res = await db.execute(sql`
       select c.id, c.name, c.slug, c.coordinator_id,
@@ -870,7 +870,7 @@ export async function runClientsWithoutShootSignal() {
  * klanten die dreigen stil te vallen.
  */
 export async function runContentGapSignal() {
-  return runJob("monday", "signals.content_gap", {}, async (ctx) => {
+  return runJob("system", "signals.content_gap", {}, async (ctx) => {
     const week = mondayIso();
     const today = day(0);
     const until = addWorkingDays(today, 10); // ~10 werkdagen vooruit
@@ -935,7 +935,7 @@ const toDateStr = (d: Date | string | null): string | null => {
  * gebeurt. Eén gebundelde melding per coördinator/eigenaar per dag (dedupe).
  */
 export async function runEditorEscalations() {
-  return runJob("monday", "escalations.editor_deadlines", {}, async (ctx) => {
+  return runJob("system", "escalations.editor_deadlines", {}, async (ctx) => {
     const settings = await getDeadlineSettings();
     const today = day(0);
     const holidays = nlHolidaySet();
@@ -1022,7 +1022,7 @@ export async function runEditorEscalations() {
  * bewaard, ook nadat de video/taak is afgerond en uit de actieve lijsten valt.
  */
 export async function recordDeadlinePerformance() {
-  return runJob("monday", "performance.record_deadlines", {}, async (ctx) => {
+  return runJob("system", "performance.record_deadlines", {}, async (ctx) => {
     const today = day(0);
     const holidays = nlHolidaySet();
 
@@ -1182,7 +1182,7 @@ async function ensureTask(input: {
  * vanzelf zodra hij afgevinkt wordt.
  */
 export async function runScriptTodoReminders() {
-  return runJob("monday", "reminders.script_todo", {}, async (ctx) => {
+  return runJob("system", "reminders.script_todo", {}, async (ctx) => {
     const today = day(0);
     const in7 = day(7);
     const rows = await db
@@ -1243,7 +1243,7 @@ function nlDateLong(iso: string): string {
  * rond 08:45 Amsterdam doorkomen (zomer- en wintertijd).
  */
 export async function runPostShootReminder() {
-  return runJob("monday", "reminders.post_shoot", {}, async (ctx) => {
+  return runJob("system", "reminders.post_shoot", {}, async (ctx) => {
     const now = new Date();
     const weekday = now.toLocaleDateString("en-US", { weekday: "short", timeZone: "Europe/Amsterdam" });
     const hhmm = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" });

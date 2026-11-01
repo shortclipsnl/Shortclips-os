@@ -14,7 +14,7 @@ import { runJob } from "./runner";
  * `online_notified_at`). Draait dagelijks.
  */
 export async function runContentOnlineNotifications() {
-  return runJob("monday", "content.online_notify", {}, async (ctx) => {
+  return runJob("system", "content.online_notify", {}, async (ctx) => {
     if (!emailConfigured()) {
       ctx.log("E-mail niet ingesteld (RESEND_API_KEY/MAIL_FROM) — online-meldingen overgeslagen.");
       return;

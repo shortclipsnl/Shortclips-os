@@ -1,13 +1,14 @@
 /** Gedeelde vorm van alle externe koppelingen. */
 
 export type Provider =
-  | "monday"
   | "frameio"
   | "google_drive"
   | "google_calendar"
   | "gmail"
   | "ayrshare"
-  | "metricool";
+  | "metricool"
+  // Interne jobs zonder externe koppeling.
+  | "system";
 
 export class IntegrationError extends Error {
   constructor(

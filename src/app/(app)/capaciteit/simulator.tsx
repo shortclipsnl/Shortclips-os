@@ -22,7 +22,7 @@ function euro(v: number): string {
 /**
  * Wat-als: bij hoeveel actieve klanten heb je hoeveel editors, content
  * creatives en videografen nodig — en wat blijft er indicatief over? Gebruikt
- * de aannames uit CAPACITEIT INSTELLINGEN (overgenomen uit Monday).
+ * de aannames uit CAPACITEIT INSTELLINGEN.
  */
 export function GrowthSimulator({ currentClients, canSeeFinance, p }: { currentClients: number; canSeeFinance: boolean; p: Params }) {
   const [clients, setClients] = useState(currentClients);

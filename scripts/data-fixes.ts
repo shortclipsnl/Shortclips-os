@@ -7,9 +7,9 @@ import { sql } from "drizzle-orm";
 import { db, rawClient } from "../src/db/client";
 
 async function main() {
-  // Naamcorrectie: "<...>collector Snake" → "<...>collector Museum". De naam komt
-  // uit Monday; we vergrendelen 'm (managed_fields += "name") zodat de nachtelijke
-  // sync de correctie niet terugzet. Match ongeacht Bans-/Benzcollector-spelling.
+  // Naamcorrectie: "<...>collector Snake" → "<...>collector Museum". We
+  // vergrendelen 'm (managed_fields += "name") zodat een geautomatiseerde update
+  // de correctie niet terugzet. Match ongeacht Bans-/Benzcollector-spelling.
   const res = await db.execute(sql`
     UPDATE clients
     SET name = regexp_replace(name, 'snake', 'Museum', 'gi'),
@@ -23,7 +23,7 @@ async function main() {
   const n = (res as unknown as { rowCount?: number }).rowCount ?? 0;
   console.log(`[data-fixes] Banscollector-naamcorrectie: ${n} rij(en) bijgewerkt.`);
 
-  // Records die geen echte klant van ons zijn (meegekomen uit Monday/Metricool)
+  // Records die geen echte klant van ons zijn (historisch meegekomen)
   // uit de resultatenpagina halen: show_in_results = false. Niet-destructief — ze
   // blijven elders bestaan en kunnen per klant weer aangezet worden. De WHERE
   // matcht ná toepassing niet meer, dus herhaald draaien verandert niets. Meer

@@ -115,7 +115,7 @@ export async function shootsInRange(viewer: Viewer, startIso: string, endIso: st
 
 /** Opnamestatistieken voor één maand (YYYY-MM): hoeveel gepland, afgerond, nog
  *  te doen, en of alle opnames die al hadden moeten plaatsvinden ook echt zijn
- *  uitgevoerd. Data komt uit production_days (gevoed door Google Agenda/Monday). */
+ *  uitgevoerd. Data komt uit production_days (gevoed door Google Agenda). */
 export async function getMonthShootStats(viewer: Viewer, month?: string) {
   const m = month ?? new Date().toISOString().slice(0, 7);
   const [y, mm] = m.split("-").map(Number);

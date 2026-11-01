@@ -62,7 +62,7 @@ export async function runFrequentSync() {
 /**
  * 's Nachts draaien: de zwaardere, volledige syncs — Frame.io-projecten en
  * -video's, Drive, Metricool, rapportages en de dag-signalen. Alle data staat nu
- * in het platform zelf; er is geen Monday-koppeling meer.
+ * in het platform zelf; er is geen externe projectkoppeling meer.
  */
 export async function runNightlySync() {
   const results: StepResult[] = [];

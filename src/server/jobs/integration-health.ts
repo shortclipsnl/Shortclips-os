@@ -19,7 +19,7 @@ const STATUS_REASON: Record<string, string> = {
  * Idempotent: één melding per koppeling per status per dag (dedupe).
  */
 export async function runIntegrationHealthCheck() {
-  return runJob("monday", "integrations.health_check", {}, async (ctx) => {
+  return runJob("system", "integrations.health_check", {}, async (ctx) => {
     const health = await integrationHealth();
     const dayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
     for (const h of health) {

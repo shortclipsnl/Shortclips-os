@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Lead-intake vanaf een extern formulier (Meta-advertentie "Shortclips
- * kennismaking" of een Framer-formulier). Vervangt de Monday-automatisering die
+ * kennismaking" of een Framer-formulier). Vervangt de eerdere externe automatisering die
  * leads uit de advertentie in het leadsbord zette.
  *
  * Beveiliging: het formulier stuurt een gedeeld geheim mee (header

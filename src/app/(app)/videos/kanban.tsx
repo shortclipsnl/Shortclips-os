@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 
 /**
  * Kanban over de volledige pipeline. Sleep een kaart naar een andere kolom om
- * de status te wijzigen (Monday-stijl); klik op de titel om de video te openen.
+ * de status te wijzigen; klik op de titel om de video te openen.
  * De gevolgen (revisietellers, goedkeuringen, automatiseringen) lopen gewoon mee
  * via changeVideoStatus.
  */

@@ -11,7 +11,7 @@ import {
   contentCalendar,
   deliverables,
   integrationConnections,
-  mondayMappings,
+  calendarMappings,
   productionDays,
   users,
 } from "@/db/schema";
@@ -340,9 +340,9 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
           // Afgeleide opnamedag annuleren (de calendar_shoot-mapping gebruikt
           // het calendar_events-id als itemId).
           const [map] = await db
-            .select({ entityId: mondayMappings.entityId })
-            .from(mondayMappings)
-            .where(and(eq(mondayMappings.entityType, "calendar_shoot"), eq(mondayMappings.itemId, row.id)))
+            .select({ entityId: calendarMappings.entityId })
+            .from(calendarMappings)
+            .where(and(eq(calendarMappings.entityType, "calendar_shoot"), eq(calendarMappings.itemId, row.id)))
             .limit(1);
           if (map?.entityId) {
             await db.update(productionDays).set({ status: "cancelled", updatedAt: new Date() }).where(eq(productionDays.id, map.entityId));
@@ -356,9 +356,9 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
           // Verwijderde publicatie-afspraak ("Klant Content uploaden") → ook de
           // afgeleide contentplanning-post opruimen, tenzij die al gepubliceerd is.
           const [contentMap] = await db
-            .select({ entityId: mondayMappings.entityId })
-            .from(mondayMappings)
-            .where(and(eq(mondayMappings.entityType, "calendar_content"), eq(mondayMappings.itemId, row.id)))
+            .select({ entityId: calendarMappings.entityId })
+            .from(calendarMappings)
+            .where(and(eq(calendarMappings.entityType, "calendar_content"), eq(calendarMappings.itemId, row.id)))
             .limit(1);
           if (contentMap?.entityId) {
             await db
@@ -442,9 +442,9 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         };
 
         const [map] = await db
-          .select({ id: mondayMappings.id, entityId: mondayMappings.entityId })
-          .from(mondayMappings)
-          .where(and(eq(mondayMappings.entityType, "calendar_shoot"), eq(mondayMappings.itemId, ev.id)))
+          .select({ id: calendarMappings.id, entityId: calendarMappings.entityId })
+          .from(calendarMappings)
+          .where(and(eq(calendarMappings.entityType, "calendar_shoot"), eq(calendarMappings.itemId, ev.id)))
           .limit(1);
 
         // Doel-opnamedag bepalen: eerst een al in deze run gezien exemplaar
@@ -507,10 +507,10 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         // Koppeling voor déze agenda-afspraak naar de (gedeelde) opnamedag wijzen.
         if (map) {
           if (map.entityId !== targetPdId) {
-            await db.update(mondayMappings).set({ entityId: targetPdId, lastSyncedAt: new Date() }).where(eq(mondayMappings.id, map.id));
+            await db.update(calendarMappings).set({ entityId: targetPdId, lastSyncedAt: new Date() }).where(eq(calendarMappings.id, map.id));
           }
         } else {
-          await db.insert(mondayMappings).values({
+          await db.insert(calendarMappings).values({
             entityType: "calendar_shoot",
             entityId: targetPdId,
             boardId: "google_calendar",
@@ -601,9 +601,9 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         };
 
         const [map] = await db
-          .select({ id: mondayMappings.id, entityId: mondayMappings.entityId })
-          .from(mondayMappings)
-          .where(and(eq(mondayMappings.entityType, "calendar_content"), eq(mondayMappings.itemId, ev.id)))
+          .select({ id: calendarMappings.id, entityId: calendarMappings.entityId })
+          .from(calendarMappings)
+          .where(and(eq(calendarMappings.entityType, "calendar_content"), eq(calendarMappings.itemId, ev.id)))
           .limit(1);
 
         let targetId = seenPub.get(dedupKey) ?? map?.entityId ?? null;
@@ -618,10 +618,10 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
 
         if (map) {
           if (map.entityId !== targetId) {
-            await db.update(mondayMappings).set({ entityId: targetId, lastSyncedAt: new Date() }).where(eq(mondayMappings.id, map.id));
+            await db.update(calendarMappings).set({ entityId: targetId, lastSyncedAt: new Date() }).where(eq(calendarMappings.id, map.id));
           }
         } else {
-          await db.insert(mondayMappings).values({
+          await db.insert(calendarMappings).values({
             entityType: "calendar_content",
             entityId: targetId,
             boardId: "google_calendar",

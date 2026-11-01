@@ -36,25 +36,6 @@ openssl rand -hex 32
 
 ---
 
-## Monday.com
-
-| Variabele | Nodig | Waar |
-|---|---|---|
-| `MONDAY_API_TOKEN` | ja | monday.com → avatar rechtsboven → **Developers** → **My access tokens** |
-| `MONDAY_WEBHOOK_SECRET` | aanbevolen | Wordt getoond bij het aanmaken van een webhook |
-| `MONDAY_API_VERSION` | nee | Standaard `2026-07` |
-
-**Benodigde rechten:** `boards:read`, `boards:write`, `users:read`,
-`updates:read`, `webhooks:write`.
-
-**Webhook-adres:** `https://<jouw-domein>/api/webhooks/monday`
-Monday stuurt bij registratie eerst een `challenge`; de applicatie beantwoordt
-die automatisch.
-
-**Testen:** Instellingen → Koppelingen → Monday.com → Verbinding testen. Bij
-succes zie je met welk account je verbonden bent.
-
----
 
 ## Frame.io
 

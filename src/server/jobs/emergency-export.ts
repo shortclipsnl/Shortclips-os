@@ -11,11 +11,11 @@ const KEEP = 14;
 /**
  * Zet elke nacht de noodprocedure als PDF in Google Drive, zodat de kritieke
  * operationele info beschikbaar blijft wanneer het portaal zelf niet werkt.
- * Bewust met provider "monday" (interne placeholder): een mislukte PDF-render is
+ * Bewust met provider "system" (interne placeholder): een mislukte PDF-render is
  * geen storing van de Drive-koppeling en moet die status niet beïnvloeden.
  */
 export async function runEmergencyExport() {
-  return runJob("monday", "emergency.export", {}, async (ctx) => {
+  return runJob("system", "emergency.export", {}, async (ctx) => {
     if (!drive.isConfigured) {
       ctx.log("Google Drive niet geconfigureerd — noodexport overgeslagen.");
       return;

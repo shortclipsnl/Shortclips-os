@@ -17,7 +17,7 @@ const QC_DONE_STATUSES = new Set([
 ]);
 
 /**
- * Eenmalige opschoning van de uit Monday geïmporteerde video's, zodat ze goed
+ * Eenmalige opschoning van de geïmporteerde video's, zodat ze goed
  * leesbaar en kloppend zijn (bevindingen uit het portaalonderzoek):
  *  1. Titels: video's die alleen de klantnaam als titel hebben krijgen een
  *     onderscheidbare titel "<klant> #n".

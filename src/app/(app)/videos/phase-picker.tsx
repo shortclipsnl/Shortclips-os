@@ -6,7 +6,7 @@ import { ChevronDown, Loader2 } from "lucide-react";
 import { changeVideoStatus } from "@/server/actions/videos";
 import { STATUS_TO_PHASE, VIDEO_PHASE_META, type VideoPhase } from "@/lib/statuses";
 
-/** Volle, onderscheidende kleur per productiefase (Monday-stijl) — overal gelijk. */
+/** Volle, onderscheidende kleur per productiefase — overal gelijk. */
 export const PHASE_COLOR: Record<VideoPhase, string> = {
   gepland: "var(--color-ink-muted)",
   beelden_binnen: "var(--color-info)",

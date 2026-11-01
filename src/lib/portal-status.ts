@@ -59,7 +59,7 @@ export function statusToneClass(tone: Tone | string): string {
  * Maakt van een Frame-bestandsnaam een leesbare videotitel voor de klant:
  * haalt extensie, versie (V3/06V3), 'Shortclips', leidende nummering en
  * formaat-tokens (9:16, 4:5, 1-1) weg. Een titel zonder bestandsruis (bv. een
- * Monday-titel of de klantnaam) blijft ongewijzigd.
+ * externe titel of de klantnaam) blijft ongewijzigd.
  */
 export function cleanVideoTitle(raw: string | null | undefined): string {
   if (!raw) return "";

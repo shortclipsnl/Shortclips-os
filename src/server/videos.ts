@@ -113,7 +113,7 @@ export async function listEditorOptions(): Promise<{ id: string; fullName: strin
 }
 
 /** Aandachtscijfers voor de highlight-blokken boven de videolijst. Respecteert
- *  klantscope en editor-only, net als listVideos. Voedt zich uit Monday (fase +
+ *  klantscope en editor-only, net als listVideos. Voedt zich uit de productiegegevens (fase +
  *  deadline) via de deliverables-tabel. */
 export async function getVideoHighlights(viewer: Viewer) {
   const base = [isNull(deliverables.deletedAt), scopeToClients(viewer, deliverables.clientId)];

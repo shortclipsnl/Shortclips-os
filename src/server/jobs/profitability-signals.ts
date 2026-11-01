@@ -19,7 +19,7 @@ function mondayIso(): string {
  * per klant per signaaltype per week (dedupe). Alleen de eigenaar ontvangt dit.
  */
 export async function runProfitabilitySignals() {
-  return runJob("monday", "profit.signals", {}, async (ctx) => {
+  return runJob("system", "profit.signals", {}, async (ctx) => {
     const overview = await getClientProfitability(currentPeriod(), true);
     const signals = computeProfitabilitySignals(overview, mondayIso());
     ctx.counters.processed = overview.rows.length;

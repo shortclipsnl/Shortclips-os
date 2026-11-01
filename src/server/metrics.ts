@@ -5,7 +5,7 @@ import { capacityPeople } from "@/db/schema";
 
 /**
  * Canonieke editorcapaciteit: de gezonde grens in shorts per 4 weken uit
- * capacity_people (overgenomen uit Monday). Eén bron voor dashboard, Editors en
+ * capacity_people. Eén bron voor dashboard, Editors en
  * Teamcapaciteit, zodat dezelfde editor overal dezelfde bezetting en hetzelfde
  * oordeel krijgt (#5).
  */

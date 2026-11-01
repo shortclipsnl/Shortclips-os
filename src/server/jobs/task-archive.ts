@@ -10,7 +10,7 @@ import { runJob } from "./runner";
  * `archived_at` blijven ze terugvindbaar in de archiefweergave.
  */
 export async function runTaskArchive() {
-  return runJob("monday", "tasks.archive_done", {}, async (ctx) => {
+  return runJob("system", "tasks.archive_done", {}, async (ctx) => {
     const cutoff = new Date(Date.now() - 7 * 86_400_000);
     const res = await db
       .update(tasks)

@@ -856,8 +856,8 @@ function FinanceTab({ hub }: { hub: ClientHub }) {
   const totalEditMonth = editPer != null && shorts > 0 ? editPer * shorts : null;
   // Netto opbrengst = afnameprijs − editkosten. Primair de overgenomen officiële
   // waarde, met de eigen berekening als terugval.
-  const mondayNet = c.netMonthlyMonday != null ? Number(c.netMonthlyMonday) : null;
-  const grossMonth = mondayNet ?? (totalEditMonth != null ? revenue - totalEditMonth : null);
+  const netMonthly = c.netMonthly != null ? Number(c.netMonthly) : null;
+  const grossMonth = netMonthly ?? (totalEditMonth != null ? revenue - totalEditMonth : null);
   const marginPct = grossMonth != null && revenue > 0 ? Math.round((grossMonth / revenue) * 100) : null;
 
   // Looptijd en totale (geschatte) omzet o.b.v. het maandbedrag.
@@ -1100,7 +1100,6 @@ function InsightsTab({ hub }: { hub: ClientHub }) {
 /* --------------------------- Koppelingen --------------------------- */
 
 const PROVIDER_LABELS: Record<string, string> = {
-  monday: "Monday.com",
   frameio: "Frame.io",
   google_drive: "Google Drive",
   ayrshare: "Ayrshare",

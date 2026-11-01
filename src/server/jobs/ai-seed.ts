@@ -69,8 +69,8 @@ const STARTER: Array<{ category: string; title: string; body: string }> = [
       "Scripts worden eerst intern en daarna door de klant goedgekeurd voordat er wordt opgenomen.",
       "Na de edit volgt eerst interne controle, daarna pas de klantcontrole.",
       "Publicatie gebeurt standaard op werkdagen (maandag t/m vrijdag); weekend wordt overgeslagen.",
-      "Het afgesproken aantal shorts per maand (afname) staat per klant vast in Monday.",
-      "Bestanden en versies staan in Frame.io; klant- en projectgegevens in Monday.",
+      "Het afgesproken aantal shorts per maand (afname) staat per klant vast in het portaal.",
+      "Bestanden en versies staan in Frame.io; klant- en projectgegevens in het Shortclips-portaal.",
     ].map((l) => `- ${l}`).join("\n"),
   },
   {
@@ -80,7 +80,7 @@ const STARTER: Array<{ category: string; title: string; body: string }> = [
       "Elke productiefase heeft een streeftijd; video's die daar overheen gaan krijgen voorrang en worden als 'te laat' gemarkeerd.",
       "Klantfeedback is nodig om door te kunnen; we vragen de klant tijdig (binnen enkele werkdagen) te reageren en sturen een herinnering als het te lang stil blijft.",
       "Beloof nooit een exacte opleverdatum of doorlooptijd zonder dat die is afgestemd; verwijs bij twijfel naar de planning in het dashboard.",
-      "Tarieven, contractduur en editkosten staan per klant in Monday — nooit zelf prijzen of bedragen verzinnen; haal ze uit het financieel overzicht of verwijs naar Jarno.",
+      "Tarieven, contractduur en editkosten staan per klant in het portaal — nooit zelf prijzen of bedragen verzinnen; haal ze uit het financieel overzicht of verwijs naar Jarno.",
     ].map((l) => `- ${l}`).join("\n"),
   },
 ];

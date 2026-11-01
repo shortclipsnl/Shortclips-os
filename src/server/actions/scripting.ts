@@ -13,7 +13,7 @@ export type ActionResult = { ok: boolean; message?: string };
 /** Status waarop een script op controle bij Jarno (de owner) staat. */
 const CONTROLE_JARNO = "controle_jarno";
 
-/** Scriptingstatus van een opnamedag wijzigen (één klik, Monday-stijl). */
+/** Scriptingstatus van een opnamedag wijzigen (één klik). */
 export async function setScriptingStatus(productionDayId: string, status: string): Promise<ActionResult> {
   try {
     const viewer = await requirePermission("scripts:write");

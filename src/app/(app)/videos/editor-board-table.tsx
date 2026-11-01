@@ -56,7 +56,7 @@ function priority(v: EditorBoardVideo, editorView = false): { label: string; col
 }
 
 /**
- * Editing-opdrachten als tabel (Monday-stijl): editor-tabs bovenaan, per fase
+ * Editing-opdrachten als tabel: editor-tabs bovenaan, per fase
  * gegroepeerd, met een deadline-batterij, prioriteit, aantal shorts, downloadlink
  * en script — allemaal direct in te vullen.
  */

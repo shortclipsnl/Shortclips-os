@@ -2,7 +2,7 @@ import "server-only";
 
 /**
  * Het kernteam: de vaste medewerkers van ShortClips, expliciet vastgesteld.
- * Dit is bewust een vaste lijst (geen afgeleide van rollen of Monday-import),
+ * Dit is bewust een vaste lijst (geen afgeleide van rollen of import),
  * zodat vakantiesaldo en de "Vaste medewerkers"-kaarten precies deze vier
  * personen tonen — en niet elke als "intern" geïmporteerde freelancer.
  *

@@ -5,7 +5,7 @@ import { runJob } from "./runner";
 /** Reconciliatie: publiceerbare video's als één gekoppeld record in de
  *  contentplanning zetten en statussen/datums gelijkhouden. */
 export async function runContentSync() {
-  return runJob("monday", "content.sync_from_videos", {}, async (ctx) => {
+  return runJob("system", "content.sync_from_videos", {}, async (ctx) => {
     const r = await reconcileContentFromVideos();
     ctx.counters.processed += r.checked;
     ctx.counters.created += r.created;

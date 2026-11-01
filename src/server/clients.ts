@@ -114,7 +114,7 @@ export async function getClientHub(viewer: Viewer, slug: string) {
       contractMonths: clients.contractMonths,
       endedOn: clients.endedOn,
       extraRevenue: clients.extraRevenue,
-      netMonthlyMonday: clients.netMonthlyMonday,
+      netMonthly: clients.netMonthly,
       lastContactAt: clients.lastContactAt,
       lastActivityAt: clients.lastActivityAt,
       notes: clients.notes,

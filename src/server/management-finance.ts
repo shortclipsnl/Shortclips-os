@@ -24,14 +24,14 @@ export async function getManagementFinance() {
     db.select().from(companyFinanceMonths).orderBy(asc(companyFinanceMonths.period)),
     db.select().from(fixedCosts).where(isNull(fixedCosts.deletedAt)).orderBy(asc(fixedCosts.category), asc(fixedCosts.name)),
     // Alleen echte offertes (met verwacht bedrag) of handmatig toegevoegde leads;
-    // het volledige leadregister (uit Monday) staat op /leads.
+    // het volledige leadregister staat op /leads.
     db
       .select()
       .from(salesLeads)
       .where(
         and(
           isNull(salesLeads.deletedAt),
-          or(gt(salesLeads.expectedMonthly, "0"), gt(salesLeads.expectedValue, "0"), isNull(salesLeads.mondayStatus)),
+          or(gt(salesLeads.expectedMonthly, "0"), gt(salesLeads.expectedValue, "0"), isNull(salesLeads.externalStatus)),
         ),
       )
       .orderBy(desc(salesLeads.createdAt)),

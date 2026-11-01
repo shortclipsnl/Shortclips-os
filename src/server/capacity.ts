@@ -66,7 +66,7 @@ function statusFor(load: number | null, green: number | null, orange: number | n
 /**
  * Teamcapaciteit: per persoon de belasting in de eigen eenheid (native
  * berekend uit opnamedagen, editwerk en klanten), plus de globale aannames
- * en een economische samenvatting. Vervangt het Monday-capaciteitsdashboard.
+ * en een economische samenvatting. Eigen capaciteitsdashboard.
  */
 export async function getCapacityOverview(): Promise<{
   people: CapacityPerson[];

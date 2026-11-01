@@ -53,7 +53,7 @@ async function wipe() {
     "ai_insights", "activity_events", "notifications", "notification_preferences",
     "automation_runs", "automation_rules", "audit_logs", "error_logs",
     "import_candidates", "import_runs", "integration_events", "sync_jobs",
-    "integration_connections", "monday_mappings", "frame_mappings", "drive_mappings",
+    "integration_connections", "calendar_mappings", "frame_mappings", "drive_mappings",
     "files", "sop_documents", "app_settings", "workflow_statuses",
     "client_knowledge", "social_accounts", "client_integrations", "contracts",
     "client_packages", "client_contacts",

@@ -10,7 +10,7 @@ import { type EditPhase, type VideoStage } from "@/lib/statuses";
 
 /**
  * Editing-board voor een editor, op basis van de video's (deliverables) die aan
- * hém zijn toegewezen — niet op basis van opnames. Veel video's komen via Monday
+ * hém zijn toegewezen — niet op basis van opnames. Veel video's komen binnen
  * binnen zonder opname, dus het opname-board (editing-board.ts) laat die niet
  * zien. Dit board toont de editor exact zijn eigen werk, gegroepeerd per fase.
  */
@@ -214,7 +214,7 @@ export async function listEditorBoard(
     else if (editorWorkdaysToDeadline !== null && editorWorkdaysToDeadline <= 2) editorBatteryColor = "oranje";
     else if (atEditor) editorBatteryColor = "blauw";
     else editorBatteryColor = "groen";
-    // Script: interne scriptpagina > scriptlink van de video (Monday) >
+    // Script: interne scriptpagina > scriptlinkvan de video >
     // geüpload scriptbestand van de opname > externe scriptlink van de opname.
     const scriptHref = r.scriptId
       ? `/scripts/${r.scriptId}`
@@ -222,7 +222,7 @@ export async function listEditorBoard(
         (r.dayScriptFileId ? `/api/edit-files/${r.dayScriptFileId}` : null) ||
         r.dayScriptUrl ||
         null;
-    // Download: downloadlink van de video (Monday) > footage van de opname >
+    // Download: downloadlinkvan de video > footage van de opname >
     // Drive-map van de video.
     const downloadHref =
       r.footageUrl ||

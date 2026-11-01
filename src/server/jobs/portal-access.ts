@@ -1,10 +1,10 @@
 import "server-only";
-import { and, eq, inArray, isNull, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, isNotNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientIntegrations, clients, users } from "@/db/schema";
+import { clients, users } from "@/db/schema";
 
 /**
- * Houdt de portaaltoegang gelijk met de samenwerkingsstatus (uit Monday):
+ * Houdt de portaaltoegang gelijk met de samenwerkingsstatus:
  *  - klant 'churned' / 'paused' of verwijderd → portaalgebruiker 'suspended'
  *    (inloggen wordt dan geweigerd in readSession);
  *  - klant weer 'active' → portaalgebruiker weer 'active'.
@@ -60,13 +60,7 @@ export async function portalAccessReport(): Promise<{
   realEmailLogins: number;
   missingPortal: { name: string; status: string }[];
 }> {
-  // Echte klanten = klanten met een Monday-koppeling (zoals pilot-setup kiest).
-  const realRows = await db
-    .selectDistinct({ id: clientIntegrations.clientId })
-    .from(clientIntegrations)
-    .where(eq(clientIntegrations.provider, "monday"));
-  const realIds = new Set(realRows.map((r) => r.id));
-
+  // Echte klanten = actieve, niet-verwijderde klanten.
   const clientRows = await db
     .select({ id: clients.id, name: clients.name, status: clients.status })
     .from(clients)
@@ -89,7 +83,7 @@ export async function portalAccessReport(): Promise<{
   return {
     ok: true,
     activeClients: activeClients.length,
-    realClients: clientRows.filter((c) => realIds.has(c.id)).length,
+    realClients: activeClients.length,
     withPortalUser: clientRows.filter((c) => hasPortal.has(c.id)).length,
     placeholderLogins,
     realEmailLogins: portalUsers.length - placeholderLogins,

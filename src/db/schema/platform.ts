@@ -64,17 +64,23 @@ export const files = pgTable(
  * Bewust per provider, zodat elke koppeling eigen velden mag hebben.
  * ------------------------------------------------------------------ */
 
-export const mondayMappings = pgTable(
-  "monday_mappings",
+/**
+ * Koppelt een externe agenda-afspraak (Google Agenda) aan een ShortClips-
+ * entiteit (opnamedag of contentplanning), zodat de agenda-sync dezelfde
+ * afspraak bij elke ronde terugvindt i.p.v. duplicaten te maken. `itemId` =
+ * het externe event-id; `boardId` = de bron-agenda.
+ */
+export const calendarMappings = pgTable(
+  "calendar_mappings",
   {
     id: pk(),
-    /** Welke ShortClips-entiteit: `client`, `deliverable`, `task`, ... */
+    /** Welke ShortClips-entiteit: `calendar_shoot`, `calendar_content`, ... */
     entityType: varchar("entity_type", { length: 40 }).notNull(),
     entityId: uuid("entity_id"),
     boardId: varchar("board_id", { length: 60 }).notNull(),
     groupId: varchar("group_id", { length: 60 }),
     itemId: varchar("item_id", { length: 60 }),
-    /** Kolom-mapping: { "status": "status_1", "deadline": "date4" }. */
+    /** Optionele veld-mapping. */
     columnMap: jsonb("column_map").notNull().default(sql`'{}'::jsonb`),
     direction: syncDirectionEnum("direction").notNull().default("inbound"),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
@@ -83,9 +89,9 @@ export const mondayMappings = pgTable(
     ...timestamps,
   },
   (t) => [
-    unique("monday_mappings_item_unique").on(t.entityType, t.itemId),
-    index("monday_mappings_entity_idx").on(t.entityType, t.entityId),
-    index("monday_mappings_board_idx").on(t.boardId),
+    unique("calendar_mappings_item_unique").on(t.entityType, t.itemId),
+    index("calendar_mappings_entity_idx").on(t.entityType, t.entityId),
+    index("calendar_mappings_board_idx").on(t.boardId),
   ],
 );
 
@@ -207,7 +213,7 @@ export const syncJobs = pgTable(
   {
     id: pk(),
     provider: integrationProviderEnum("provider").notNull(),
-    /** Bijv. `monday.import_clients`, `frameio.pull_comments`. */
+    /** Bijv. `calendar.sync`, `frameio.pull_comments`. */
     jobType: varchar("job_type", { length: 80 }).notNull(),
     status: jobStatusEnum("status").notNull().default("queued"),
     direction: syncDirectionEnum("direction").notNull().default("inbound"),

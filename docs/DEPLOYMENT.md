@@ -108,7 +108,7 @@ pg_dump "$DATABASE_URL" --no-owner --format=custom \
 # bewaar minstens 14 dagen aan dumps buiten de server
 ```
 
-## Herstel (restore) — test dit vóór je Monday opzegt
+## Herstel (restore) — test dit vóór livegang
 
 Zet een back-up altijd eerst terug in een **gescheiden** database, nooit over
 productie heen:
@@ -132,8 +132,6 @@ aantoonbaar is uitgevoerd.
 - **Beheer → Koppelingen**: per koppeling status, **laatste succesvolle sync** en
   een **"Verouderd"-waarschuwing** als data > 24 u oud is. Een groen icoon alleen
   is onvoldoende — let op de versheid.
-- **Beheer → Monday-migratie**: de 8 exitcriteria met status + bewijs, en de
-  Monday-sync-schakelaar.
 - **Beheer → Audit log / Systeemstatus**: recente `sync_jobs` (nieuw/bij/mislukt)
   en databaselatentie.
 - Handmatig een sync forceren: `POST /api/jobs/run?job=<naam>` met
@@ -155,6 +153,6 @@ aantoonbaar is uitgevoerd.
 
 Een tweede ontwikkelaar kan met deze map (`docs/`) zelfstandig: deployen
 (dit bestand), de database en architectuur begrijpen (`ARCHITECTUUR.md`),
-secrets vinden en zetten (`CREDENTIALS.md`), de Monday-migratie volgen
+secrets vinden en zetten (`CREDENTIALS.md`), de invoering volgen
 (`MIGRATIE.md`) en lokaal ontwikkelen (`ONTWIKKELEN.md`). Houd deze bestanden
 bij elke structurele wijziging actueel.

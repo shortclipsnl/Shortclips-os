@@ -161,7 +161,7 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
 
 /**
  * Eén rij per klant per maand. De omzet-/editkostenvelden worden automatisch
- * gevuld (snapshot uit Monday), de directe kosten (opname, strategie, overig)
+ * gevuld (snapshot), de directe kosten (opname, strategie, overig)
  * vult het team handmatig in. Zo ontstaat echte nettowinst én maandhistorie
  * zonder dat elke maand alles opnieuw hoeft te worden ingevoerd.
  */
@@ -174,7 +174,7 @@ export const clientFinanceMonths = pgTable(
       .references(() => clients.id, { onDelete: "cascade" }),
     /** Maand als YYYY-MM. */
     period: varchar("period", { length: 7 }).notNull(),
-    /** Automatisch uit Monday (snapshot). */
+    /** Automatisch gevuld (snapshot). */
     revenue: numeric("revenue", { precision: 12, scale: 2 }).notNull().default("0"),
     extraRevenue: numeric("extra_revenue", { precision: 12, scale: 2 }).notNull().default("0"),
     editCost: numeric("edit_cost", { precision: 12, scale: 2 }).notNull().default("0"),
@@ -240,7 +240,7 @@ export const fixedCosts = pgTable("fixed_costs", {
 });
 
 /** Offertes en potentiële klanten (verwachte omzet, los van gerealiseerd).
- *  Tevens het volledige leads-register (overgenomen uit Monday). */
+ *  Tevens het volledige leads-register. */
 export const salesLeads = pgTable(
   "sales_leads",
   {
@@ -257,13 +257,13 @@ export const salesLeads = pgTable(
     /** Gezet zodra de lead is omgezet naar een klant — zo geen dubbele klanten
      *  en direct klikbaar naar het klantdossier. */
     convertedClientId: uuid("converted_client_id").references(() => clients.id, { onDelete: "set null" }),
-    /* --- Leadregister (uit Monday LEADS 2026 DASHBOARD) --- */
+    /* --- Leadregister --- */
     /** Waar de lead binnenkwam: Website, Socials, Netwerk, Meta advertentie… */
     source: varchar("source", { length: 40 }),
     phone: varchar("phone", { length: 40 }),
     email: varchar("email", { length: 160 }),
     website: varchar("website", { length: 200 }),
-    /** Vrij tekstveld met budgetindicatie uit Monday. */
+    /** Vrij tekstveld met budgetindicatie. */
     budget: varchar("budget", { length: 120 }),
     firstContactOn: date("first_contact_on"),
     /** Uiterste opvolgdatum (SOP). */
@@ -274,10 +274,10 @@ export const salesLeads = pgTable(
     auditOutcome: varchar("audit_outcome", { length: 80 }),
     auditNextStep: varchar("audit_next_step", { length: 120 }),
     salesBrief: text("sales_brief"),
-    /** Jaargang/segment uit de Monday-groep, bijv. "2026" of "2025". */
+    /** Jaargang/segment, bijv. "2026" of "2025". */
     segment: varchar("segment", { length: 24 }),
-    /** Ruwe Monday-status, voor volledige getrouwheid naast onze bucket. */
-    mondayStatus: varchar("monday_status", { length: 60 }),
+    /** Ruwe externe status, voor volledige getrouwheid naast onze bucket. */
+    externalStatus: varchar("external_status", { length: 60 }),
     /** Unieke bron-identificatie (bijv. de e-mail Message-ID) om dubbele import
      *  te voorkomen. Leeg voor handmatig toegevoegde leads. */
     externalId: varchar("external_id", { length: 400 }),

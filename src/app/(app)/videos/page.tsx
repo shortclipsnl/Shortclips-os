@@ -26,7 +26,7 @@ export default async function VideosPage({
   const params = await searchParams;
 
   // Editors zien een board op basis van hún video's (deliverables) — niet op
-  // opnames. Veel video's komen via Monday binnen zonder opname, dus het
+  // opnames. Veel video's komen binnen zonder opname, dus het
   // opname-board zou leeg blijven. Dit toont de editor precies zijn eigen werk.
   if (viewer.isEditorOnly) {
     const videos = await listEditorBoard(viewer);

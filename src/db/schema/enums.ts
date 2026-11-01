@@ -154,13 +154,14 @@ export const contractStatusEnum = pgEnum("contract_status", [
 ]);
 
 export const integrationProviderEnum = pgEnum("integration_provider", [
-  "monday",
   "frameio",
   "google_drive",
   "google_calendar",
   "gmail",
   "ayrshare",
   "metricool",
+  // Interne jobs (geen externe koppeling) loggen hun run onder deze bron.
+  "system",
 ]);
 
 export const integrationStatusEnum = pgEnum("integration_status", [
@@ -225,7 +226,6 @@ export const fileSourceEnum = pgEnum("file_source", [
   "shortclips_os",
   "google_drive",
   "frameio",
-  "monday",
   "upload",
 ]);
 

@@ -16,7 +16,7 @@ type Source = Pick<MetricoolService, "listBrands" | "timeline">;
 
 /**
  * Koppelt Metricool-merken automatisch aan klanten op naam (+ bekende aliassen),
- * net als bij Frame.io en Monday. Eén merk → één klant.
+ * net als bij Frame.io. Eén merk → één klant.
  */
 export async function linkMetricoolBrands(triggeredById?: string, source: Source = metricool) {
   return runJob(

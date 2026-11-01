@@ -14,7 +14,7 @@ export type LeadRow = {
   company: string;
   contactName: string | null;
   status: string;
-  mondayStatus: string | null;
+  externalStatus: string | null;
   source: string | null;
   phone: string | null;
   email: string | null;
@@ -41,7 +41,7 @@ export async function listLeads() {
       company: salesLeads.company,
       contactName: salesLeads.contactName,
       status: salesLeads.status,
-      mondayStatus: salesLeads.mondayStatus,
+      externalStatus: salesLeads.externalStatus,
       source: salesLeads.source,
       phone: salesLeads.phone,
       email: salesLeads.email,

@@ -9,7 +9,7 @@ import { videoPhase } from "@/lib/statuses";
 import type { Tone } from "@/components/ui";
 
 /**
- * Automatische deadlinebewaking per klantopname (§7), zoals in Monday.
+ * Automatische deadlinebewaking per klantopname (§7).
  * Vanaf de opnamedatum loopt een timer van 14 werkdagen tot de klantoplevering;
  * de editor moet 2 werkdagen eerder opleveren voor interne controle. Werkdagen
  * tellen weekenden én Nederlandse feestdagen niet mee. Alles wordt live uit de

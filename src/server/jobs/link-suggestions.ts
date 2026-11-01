@@ -20,7 +20,7 @@ import { runJob } from "./runner";
  *  - (geen) : te onzeker → blijft onbeslist voor handmatige koppeling.
  */
 export async function runLinkSuggestions() {
-  return runJob("monday", "editing.suggest_opname_links", {}, async (ctx) => {
+  return runJob("system", "editing.suggest_opname_links", {}, async (ctx) => {
     // Opnamedagen per klant verzamelen.
     const days = await db
       .select({ id: productionDays.id, clientId: productionDays.clientId, scheduledOn: productionDays.scheduledOn })

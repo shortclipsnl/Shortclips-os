@@ -13,7 +13,7 @@ export const BOARD_EDITOR_FIRST_NAMES: readonly string[] = BOARD_EDITORS.map((n)
  *  één Sem. */
 const FIRST_NAME_ALIAS: Record<string, string> = { sam: "sem" };
 
-/** Vaste kleur per editor (zoals in Monday), op voornaam. Sem heeft bewust een
+/** Vaste kleur per editor, op voornaam. Sem heeft bewust een
  *  duidelijk andere kleur (framboos) dan Fabian (teal). */
 export const EDITOR_COLOR: Record<string, string> = {
   quinn: "#7c5cff",

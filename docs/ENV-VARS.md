@@ -27,7 +27,6 @@
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REFRESH_TOKEN` | Google Drive **en** Google Agenda (OAuth) | **ja** |
 | `GOOGLE_DRIVE_ROOT_FOLDER_ID` | Drive-hoofdmap | nee |
 | `GOOGLE_CALENDAR_IDS` | Komma-lijst van te syncen agenda's (leeg = alle) | nee |
-| `MONDAY_API_TOKEN` / `MONDAY_WEBHOOK_SECRET` / `MONDAY_API_VERSION` | Monday.com | **ja** (token/secret) |
 | `FRAMEIO_TOKEN` of `FRAMEIO_CLIENT_ID`+`FRAMEIO_CLIENT_SECRET`+`FRAMEIO_REFRESH_TOKEN` / `FRAMEIO_ACCOUNT_ID` / `FRAMEIO_WEBHOOK_SECRET` / `FRAMEIO_IMS_URL` | Frame.io (V4 via Adobe IMS) | **ja** |
 | `AYRSHARE_API_KEY` | Social publiceren (Ayrshare) | **ja** |
 | `METRICOOL_USER_TOKEN` | Social statistieken (Metricool) | **ja** |

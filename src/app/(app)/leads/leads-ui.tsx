@@ -8,7 +8,7 @@ import type { LeadRow } from "@/server/leads";
 import { LEAD_STATUS } from "@/lib/statuses";
 import { Stat } from "@/components/ui";
 
-/** Het jaar waar een lead bij hoort: de jaargang (Monday-groep, bijv. "2026")
+/** Het jaar waar een lead bij hoort: de jaargang (bijv. "2026")
  *  als die er is, anders het jaar van de eerste contactdatum. Zo vallen ook
  *  nieuwe leads (zonder jaargang) in het juiste jaar. */
 function leadYear(r: LeadRow): string | null {

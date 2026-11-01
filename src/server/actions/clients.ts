@@ -168,13 +168,9 @@ export async function setClientFrameUrl(clientId: string, url: string): Promise<
   }
 }
 
-/** Velden die de Monday-import normaal overschrijft; eenmaal handmatig gezet,
- *  vergrendelen we ze zodat de nachtelijke sync ze met rust laat. */
-const MONDAY_MANAGED = ["name", "status", "coordinatorId", "monthlyRevenue", "startedOn"] as const;
-
 /** Edit-economie van een klant aanpassen: aantal shorts per maand (quota) en de
- *  prijs per short (editkosten per video). Beide worden vergrendeld zodat de
- *  Monday-sync ze niet overschrijft. */
+ *  prijs per short (editkosten per video). Beide worden vergrendeld zodat een
+ *  geautomatiseerde update ze niet overschrijft. */
 export async function setClientEditEconomics(
   clientId: string,
   input: { quota?: number | null; costPerVideo?: number | null },
@@ -255,8 +251,8 @@ export async function setClientShowInResults(clientId: string, showInResults: bo
   }
 }
 
-/** De vaste editor die een klant doet (Monday-veld "Editor"). Handmatig gezet =
- *  vergrendeld, zodat de nachtelijke sync het niet terugzet. */
+/** De vaste editor die een klant doet. Handmatig gezet =
+ *  vergrendeld, zodat een geautomatiseerde update het niet terugzet. */
 export async function setClientEditor(clientId: string, editorName: string | null): Promise<ActionResult> {
   try {
     const viewer = await requirePermission("clients:write");
@@ -385,8 +381,8 @@ async function upsertPrimaryContact(
 }
 
 /**
- * Zet bij een nieuwe klant automatisch de ontbrekende skeletten klaar — zoals
- * Monday cross-board deed: een contactpersoon-placeholder én een contract-shell.
+ * Zet bij een nieuwe klant automatisch de ontbrekende skeletten klaar:
+ * een contactpersoon-placeholder én een contract-shell.
  * Idempotent: alleen aanmaken wat er nog niet is.
  */
 async function provisionClientSkeleton(
@@ -437,8 +433,8 @@ export async function createClient(input: ClientInput): Promise<ActionResult> {
       return { ok: false, message: "Kies een verantwoordelijke (coördinator) voor deze klant." };
     }
 
-    // Handmatig aangemaakte klant: de Monday-velden die we nu invullen
-    // vergrendelen, zodat een latere Monday-match ze niet overschrijft.
+    // Handmatig aangemaakte klant: de kernvelden die we nu invullen
+    // vergrendelen, zodat een geautomatiseerde update ze niet overschrijft.
     const managed = new Set<string>(["name", "status"]);
     if (input.coordinatorId) managed.add("coordinatorId");
     if (clean(input.monthlyRevenue)) managed.add("monthlyRevenue");
@@ -468,7 +464,7 @@ export async function createClient(input: ClientInput): Promise<ActionResult> {
 
     const clientId = created!.id;
     await upsertPrimaryContact(clientId, input);
-    // Zoals in Monday: bij een nieuwe klant meteen een contract- en
+    // Bij een nieuwe klant meteen een contract- en
     // contactpersoon-skelet klaarzetten, zodat niets handmatig hoeft.
     await provisionClientSkeleton(clientId, {
       startedOn: clean(input.startedOn),
@@ -527,7 +523,7 @@ export async function updateClient(slug: string, input: ClientInput): Promise<Ac
     const newRevenue = clean(input.monthlyRevenue);
     const newStarted = clean(input.startedOn);
 
-    // Welke Monday-velden wijzigt de gebruiker? Die vergrendelen we.
+    // Welke kernvelden wijzigt de gebruiker? Die vergrendelen we.
     const managed = new Set<string>(existing.managedFields ?? []);
     if (name !== existing.name) managed.add("name");
     if (status !== existing.status) managed.add("status");
@@ -671,8 +667,8 @@ export async function toggleClientIntegration(
 }
 
 /**
- * Klant verwijderen (soft-delete): verdwijnt overal uit de app en wordt door de
- * Monday-import niet opnieuw aangemaakt. Historische data blijft in de database
+ * Klant verwijderen (soft-delete): verdwijnt overal uit de app. Historische
+ * data blijft in de database
  * bewaard en is door een beheerder herstelbaar. Ter bevestiging moet de exacte
  * klantnaam worden meegetypt.
  */

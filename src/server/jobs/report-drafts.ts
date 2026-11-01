@@ -20,7 +20,7 @@ function periodTitle(period: string): string {
  * publiceert pas naar het portaal. Idempotent per klant+maand.
  */
 export async function runMonthlyReportDrafts() {
-  return runJob("monday", "reports.generate_drafts", {}, async (ctx) => {
+  return runJob("system", "reports.generate_drafts", {}, async (ctx) => {
     const period = currentPeriod();
     const active = await db
       .select({ id: clients.id, slug: clients.slug })

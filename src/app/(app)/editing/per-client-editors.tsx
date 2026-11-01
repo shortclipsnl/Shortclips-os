@@ -135,7 +135,7 @@ function EditorBadge({ value }: { value: string | null }) {
 }
 
 /** Bewerkbare editor-keuze per klant. Houdt een afwijkende bestaande waarde
- *  (bijv. een volledige naam uit Monday) als extra optie, zodat die niet
+ *  (bijv. een volledige naam) als extra optie, zodat die niet
  *  verloren gaat. */
 function EditorSelect({ clientId, value }: { clientId: string; value: string | null }) {
   const router = useRouter();
