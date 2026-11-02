@@ -537,3 +537,12 @@ body {
 .sc-textlayer span.markedContent { top: 0; height: 0; }
 .sc-textlayer ::selection { background: rgba(255, 106, 0, 0.35); }
 .sc-textlayer br::selection { background: transparent; }
+
+/* Aandachtspunten: korte vinkje-pop bij afvinken (met het afgerond-geluidje). */
+@keyframes sc-check-pop {
+  0% { transform: scale(0.55); }
+  55% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+.sc-check-pop { animation: sc-check-pop 0.4s ease-out; }
+@media (prefers-reduced-motion: reduce) { .sc-check-pop { animation: none; } }

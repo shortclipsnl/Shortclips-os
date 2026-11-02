@@ -21,6 +21,29 @@ const AREAS: { key: AttentionArea; label: string; icon: typeof Scissors }[] = [
   { key: "overig", label: "Overig", icon: CircleAlert },
 ];
 const AREA_ICON = Object.fromEntries(AREAS.map((a) => [a.key, a.icon])) as Record<AttentionArea, typeof Scissors>;
+
+/** Kort, voldaan "afgerond"-geluidje via de Web Audio API (geen bestand nodig).
+ *  Aangeroepen vanuit een klik, dus browsers staan het geluid toe. Faalt stil. */
+function playDoneChime() {
+  try {
+    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    const now = ctx.currentTime;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.11, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+    gain.connect(ctx.destination);
+    // Twee snelle, stijgende tonen (C6 → E6) — kort en subtiel.
+    ([[1046.5, 0], [1318.5, 0.09]] as const).forEach(([f, t]) => {
+      const o = ctx.createOscillator();
+      o.type = "sine"; o.frequency.value = f;
+      o.connect(gain); o.start(now + t); o.stop(now + t + 0.26);
+    });
+    setTimeout(() => { ctx.close().catch(() => {}); }, 650);
+  } catch { /* geluid is optioneel */ }
+}
 const GROUPS: { p: AttentionPriority; label: string; color: string }[] = [
   { p: "hoog", label: "Vandaag", color: "var(--color-bad)" },
   { p: "normaal", label: "Deze week", color: "var(--color-warn)" },
@@ -51,6 +74,8 @@ export function AttentionBoard({ items: initial, team, viewerId, defaultScope }:
   const [newOpen, setNewOpen] = useState(false);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Welk punt is net afgevinkt — voor de korte vinkje-pop-animatie.
+  const [poppedKey, setPoppedKey] = useState<string | null>(null);
 
   const member = (id: string | null) => team.find((t) => t.id === id) ?? null;
   const showToast = (text: string, undo?: () => void) => {
@@ -70,6 +95,12 @@ export function AttentionBoard({ items: initial, team, viewerId, defaultScope }:
 
   function setStatus(i: AttentionItem, status: AttentionItem["status"]) {
     const prev = { status: i.status, ownerId: i.ownerId, doneAt: i.doneAt };
+    // Afvinken: een kort, voldaan geluidje + een vinkje-pop (direct bij de klik).
+    if (status === "klaar") {
+      playDoneChime();
+      setPoppedKey(i.key);
+      setTimeout(() => setPoppedKey((k) => (k === i.key ? null : k)), 420);
+    }
     patch(i.key, { status, doneAt: status === "klaar" ? new Date().toISOString() : null, ...(status === "bezig" ? { ownerId: viewerId } : {}) });
     run(() => setAttentionStatus({ key: i.key, status }));
     const msg = status === "klaar" ? `Afgerond: ${label(i)}` : status === "bezig" ? "Jij pakt dit op" : "Heropend";
@@ -242,7 +273,7 @@ export function AttentionBoard({ items: initial, team, viewerId, defaultScope }:
       <div key={i.key} onClick={() => setOpenKey(i.key)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") setOpenKey(i.key); }}
         className="group flex min-h-[62px] cursor-pointer items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5 transition hover:border-[var(--color-line-strong)] sm:gap-3.5 sm:pl-3.5">
         <button type="button" title={doneRow ? "Heropenen" : "Afronden"} onClick={(e) => { e.stopPropagation(); setStatus(i, doneRow ? "open" : "klaar"); }}
-          className={`grid size-[22px] shrink-0 place-items-center rounded-full border-2 transition ${doneRow ? "border-[var(--color-good)] bg-[var(--color-good)]" : "border-[var(--color-line-strong)] hover:border-[var(--color-good)] hover:bg-[var(--color-good-soft)]"}`}>
+          className={`grid size-[22px] shrink-0 place-items-center rounded-full border-2 transition ${poppedKey === i.key ? "sc-check-pop" : ""} ${doneRow ? "border-[var(--color-good)] bg-[var(--color-good)]" : "border-[var(--color-line-strong)] hover:border-[var(--color-good)] hover:bg-[var(--color-good-soft)]"}`}>
           <Check className={`size-3 text-white ${doneRow ? "" : "opacity-0 group-hover:opacity-0"}`} strokeWidth={3.5} />
         </button>
         <span className="hidden sm:block">
