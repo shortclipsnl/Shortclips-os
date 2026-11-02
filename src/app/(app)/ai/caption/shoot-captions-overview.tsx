@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, CheckCircle2, Clapperboard, Search, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, CalendarDays, Check, CheckCircle2, Clapperboard, HardDrive, Loader2, Search, Sparkles, X } from "lucide-react";
 import { Badge, Card, ClientLogo, Stat } from "@/components/ui";
+import { confirmDriveScriptSource, dismissDriveScriptSource } from "@/server/actions/captions";
 import { CAPTION_STATUS, type CaptionListStatus } from "./caption-status";
 
 export type ShootCaptionRow = {
@@ -20,7 +22,51 @@ export type ShootCaptionRow = {
   hasPdf: boolean;
   status: CaptionListStatus;
   generatedAt: string | null;
+  driveStatus: "gekoppeld" | "suggestie" | "afgewezen" | null;
+  driveFileName: string | null;
+  driveReason: string | null;
 };
+
+/** Bevestig/verwerp-knoppen voor een automatische Drive-suggestie. */
+function DriveSuggestion({ row }: { row: ShootCaptionRow }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [done, setDone] = useState<"bevestigd" | "verworpen" | null>(null);
+
+  if (done) {
+    return (
+      <span className="text-2xs text-[var(--color-ink-faint)]">
+        {done === "bevestigd" ? "Gekoppeld — captions worden voorbereid." : "Suggestie verworpen."}
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex w-full flex-wrap items-center gap-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-warn)]/50 bg-[var(--color-warn-soft)]/40 px-2.5 py-1.5">
+      <HardDrive className="size-3.5 shrink-0 text-[var(--color-warn)]" />
+      <span className="min-w-0 flex-1 text-2xs text-[var(--color-ink-muted)]">
+        Mogelijke match in Drive: <span className="font-semibold text-[var(--color-ink)]">{row.driveFileName}</span>
+        {row.driveReason ? <span className="text-[var(--color-ink-faint)]"> — {row.driveReason}</span> : null}
+      </span>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => start(async () => { const r = await confirmDriveScriptSource(row.productionDayId); if (r.ok) { setDone("bevestigd"); router.refresh(); } })}
+        className="inline-flex items-center gap-1 rounded-full bg-[var(--color-good)] px-2.5 py-1 text-2xs font-semibold text-white disabled:opacity-50"
+      >
+        {pending ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />} Bevestig
+      </button>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => start(async () => { const r = await dismissDriveScriptSource(row.productionDayId); if (r.ok) { setDone("verworpen"); router.refresh(); } })}
+        className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface)] px-2.5 py-1 text-2xs font-semibold text-[var(--color-ink-muted)] ring-1 ring-[var(--color-line)] hover:text-[var(--color-bad)] disabled:opacity-50"
+      >
+        <X className="size-3" /> Niet deze
+      </button>
+    </div>
+  );
+}
 
 type Stats = { komend: number; klaar: number; teGenereren: number; gecontroleerd: number };
 
@@ -66,7 +112,7 @@ export function ShootCaptionsOverview({ rows, stats }: { rows: ShootCaptionRow[]
           <h2 className="text-sm font-semibold">Captions voor geplande opnames</h2>
         </div>
         <p className="text-xs text-[var(--color-ink-faint)]">
-          Captions worden automatisch gemaakt zodra de scripts in de scriptcontrole klaarstaan.
+          Captions worden automatisch gemaakt zodra de scripts klaarstaan — uit de scriptcontrole óf automatisch gekoppeld uit Google Drive.
         </p>
       </div>
 
@@ -123,6 +169,11 @@ export function ShootCaptionsOverview({ rows, stats }: { rows: ShootCaptionRow[]
                 <div className="hidden items-center gap-3 text-xs text-[var(--color-ink-muted)] sm:flex">
                   <span>{r.captionCount} caption{r.captionCount === 1 ? "" : "s"}</span>
                 </div>
+                {r.driveStatus === "gekoppeld" ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-info-soft)] px-2 py-0.5 text-2xs font-medium text-[#0060a8]" title={`Script uit Google Drive gekoppeld${r.driveFileName ? `: ${r.driveFileName}` : ""}`}>
+                    <HardDrive className="size-3" /> Script uit Drive
+                  </span>
+                ) : null}
                 <Badge tone={st.tone}>{st.label}</Badge>
                 {canOpen ? (
                   <Link
@@ -136,6 +187,8 @@ export function ShootCaptionsOverview({ rows, stats }: { rows: ShootCaptionRow[]
                     {r.status === "pdf_ontbreekt" ? "Wacht op scripts" : "—"}
                   </span>
                 )}
+                {/* Onzekere automatische match: team bevestigt met één klik. */}
+                {r.driveStatus === "suggestie" ? <DriveSuggestion row={r} /> : null}
               </div>
             );
           })

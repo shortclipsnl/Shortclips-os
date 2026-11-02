@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq, gte, isNull, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { captionItems, captionSets, clients, productionDays, users } from "@/db/schema";
+import { captionItems, captionSets, clients, productionDays, shootScriptSources, users } from "@/db/schema";
 import { assertClientAccess, scopeToClients, type Viewer } from "@/server/auth/context";
 import { shootHasReviewPdf } from "@/server/captions/generate";
 
@@ -33,6 +33,11 @@ export type ShootCaptionRow = {
   hasPdf: boolean;
   status: CaptionListStatus;
   generatedAt: string | null;
+  /** Automatische Drive-koppeling: "gekoppeld" (bron), "suggestie" (wacht op
+   *  bevestiging) of null. Met de bestandsnaam en reden voor het team. */
+  driveStatus: "gekoppeld" | "suggestie" | "afgewezen" | null;
+  driveFileName: string | null;
+  driveReason: string | null;
 };
 
 export type CaptionOverview = {
@@ -62,10 +67,14 @@ export async function listShootCaptionOverview(
       generatedAt: captionSets.generatedAt,
       scriptCount: sql<number>`(select count(*)::int from scripts sc where sc.production_day_id = production_days.id and sc.deleted_at is null)`,
       captionCount: sql<number>`(select count(*)::int from caption_items ci where ci.caption_set_id = caption_sets.id)`,
+      driveStatus: shootScriptSources.status,
+      driveFileName: shootScriptSources.fileName,
+      driveReason: shootScriptSources.matchReason,
     })
     .from(productionDays)
     .innerJoin(clients, eq(clients.id, productionDays.clientId))
     .leftJoin(captionSets, and(eq(captionSets.productionDayId, productionDays.id), isNull(captionSets.deletedAt)))
+    .leftJoin(shootScriptSources, eq(shootScriptSources.productionDayId, productionDays.id))
     .where(
       and(
         isNull(productionDays.deletedAt),
@@ -101,6 +110,9 @@ export async function listShootCaptionOverview(
       hasPdf,
       status,
       generatedAt: r.generatedAt ? r.generatedAt.toISOString() : null,
+      driveStatus: (r.driveStatus as ShootCaptionRow["driveStatus"]) ?? null,
+      driveFileName: r.driveFileName ?? null,
+      driveReason: r.driveReason ?? null,
     };
   });
 

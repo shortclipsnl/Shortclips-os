@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { captionItems, captionSets, productionDays } from "@/db/schema";
+import { captionItems, captionSets, clients, productionDays, shootScriptSources } from "@/db/schema";
 import { assertClientAccess, ForbiddenError, requirePermission } from "@/server/auth/context";
 import { ensureCaptionsForShoot } from "@/server/captions/run";
 import { shootReviewPdf } from "@/server/captions/generate";
+import { matchDriveScriptsForShoots } from "@/server/captions/drive-script-match";
 import { regenerateOneCaption } from "@/server/actions/ai-tools";
 
 export type CaptionActionResult = { ok: boolean; message?: string };
@@ -139,6 +140,96 @@ export async function markShootCaptionsChecked(productionDayId: string): Promise
     revalidatePath(`/ai/caption/opname/${productionDayId}`);
     revalidatePath("/ai/caption");
     return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Een automatische Drive-koppeling die als "suggestie" stond, bevestigen: de
+ * script-PDF wordt de bron en de captions worden meteen voorbereid.
+ */
+export async function confirmDriveScriptSource(productionDayId: string): Promise<CaptionActionResult> {
+  try {
+    const viewer = await requirePermission("ai:read");
+    const clientId = await shootClientId(productionDayId);
+    if (!clientId) return { ok: false, message: "Opname niet gevonden." };
+    assertClientAccess(viewer, clientId);
+
+    const res = await db
+      .update(shootScriptSources)
+      .set({ status: "gekoppeld", confirmedAt: new Date(), confirmedById: viewer.id, updatedAt: new Date() })
+      .where(eq(shootScriptSources.productionDayId, productionDayId))
+      .returning({ id: shootScriptSources.id });
+    if (res.length === 0) return { ok: false, message: "Geen Drive-suggestie gevonden voor deze opname." };
+
+    // Captions meteen voorbereiden op basis van de bevestigde PDF.
+    try { await ensureCaptionsForShoot(productionDayId); } catch { /* cron vangt dit op */ }
+    revalidatePath("/ai/caption");
+    revalidatePath(`/ai/caption/opname/${productionDayId}`);
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/** Een onjuiste Drive-suggestie afwijzen (wordt niet opnieuw voorgesteld). */
+export async function dismissDriveScriptSource(productionDayId: string): Promise<CaptionActionResult> {
+  try {
+    const viewer = await requirePermission("ai:read");
+    const clientId = await shootClientId(productionDayId);
+    if (!clientId) return { ok: false, message: "Opname niet gevonden." };
+    assertClientAccess(viewer, clientId);
+
+    await db
+      .update(shootScriptSources)
+      .set({ status: "afgewezen", confirmedAt: null, confirmedById: null, updatedAt: new Date() })
+      .where(eq(shootScriptSources.productionDayId, productionDayId));
+    revalidatePath("/ai/caption");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Handmatig nu in Drive zoeken naar de bijbehorende script-PDF voor één opname
+ * (zonder op de achtergrond-cron te wachten). Koppelt zeker, of zet een suggestie.
+ */
+export async function findDriveScriptForShoot(productionDayId: string): Promise<CaptionActionResult> {
+  try {
+    const viewer = await requirePermission("ai:read");
+    const [day] = await db
+      .select({
+        id: productionDays.id,
+        clientId: productionDays.clientId,
+        scheduledOn: productionDays.scheduledOn,
+        title: productionDays.title,
+        clientName: clients.name,
+      })
+      .from(productionDays)
+      .innerJoin(clients, eq(clients.id, productionDays.clientId))
+      .where(and(eq(productionDays.id, productionDayId), isNull(productionDays.deletedAt)))
+      .limit(1);
+    if (!day) return { ok: false, message: "Opname niet gevonden." };
+    assertClientAccess(viewer, day.clientId);
+
+    const [outcome] = await matchDriveScriptsForShoots([
+      { productionDayId: day.id, clientId: day.clientId, scheduledOn: day.scheduledOn, title: day.title, clientName: day.clientName },
+    ]);
+    if (outcome?.linked) {
+      try { await ensureCaptionsForShoot(productionDayId); } catch { /* cron vangt dit op */ }
+      revalidatePath("/ai/caption");
+      return { ok: true, message: "Script uit Drive gekoppeld; captions worden voorbereid." };
+    }
+    if (outcome?.suggested) {
+      revalidatePath("/ai/caption");
+      return { ok: true, message: "Mogelijke match gevonden — bevestig de suggestie." };
+    }
+    return { ok: false, message: "Geen bijbehorende script-PDF in Drive gevonden." };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;

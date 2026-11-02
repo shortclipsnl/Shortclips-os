@@ -26,6 +26,7 @@ import { runContentHealthSignals } from "@/server/jobs/content-health-signals";
 import { runScriptReviewReminders } from "@/server/jobs/script-review-reminders";
 import { runTransferCleanup } from "@/server/jobs/transfer-cleanup";
 import { runCaptionsAutoGenerate } from "@/server/jobs/captions-autogen";
+import { runCaptionDriveLink } from "@/server/jobs/caption-drive-link";
 import { runBriefingAutoGenerate } from "@/server/jobs/briefing-autogen";
 import { runContentResearchWeekly } from "@/server/jobs/content-research-autogen";
 import { runContentResearchNotify } from "@/server/jobs/content-research-notify";
@@ -119,6 +120,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "script_review.reminders": runScriptReviewReminders,
   "transfers.cleanup": runTransferCleanup,
   "captions.auto_generate": runCaptionsAutoGenerate,
+  "captions.link_drive_scripts": runCaptionDriveLink,
   "briefing.auto_generate": runBriefingAutoGenerate,
   "content_research.weekly": runContentResearchWeekly,
   "content_research.notify": runContentResearchNotify,

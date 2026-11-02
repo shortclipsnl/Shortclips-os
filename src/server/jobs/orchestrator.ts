@@ -11,6 +11,7 @@ import { runContentOnlineNotifications } from "./content-online-notify";
 import { runMonthlyInsightTasks } from "./insight-tasks";
 import { runIntegrationHealthCheck } from "./integration-health";
 import { runDriveSync } from "./drive-sync";
+import { runCaptionDriveLink } from "./caption-drive-link";
 import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
 import { runProfitabilitySignals } from "./profitability-signals";
@@ -82,6 +83,9 @@ export async function runNightlySync() {
   // Maandelijkse AI-verbeterlus: inzichten → verbeterpunt-taken (idempotent, gated).
   results.push(await step("insights.monthly_tasks", () => runMonthlyInsightTasks()));
   results.push(await step("drive.sync_all", () => runDriveSync()));
+  // Direct ná de Drive-sync: koppel nieuwe script-PDF's automatisch aan de juiste
+  // opname en bereid de captions voor (de files-tabel is nu vers).
+  results.push(await step("captions.link_drive_scripts", () => runCaptionDriveLink()));
   results.push(await step("frameio.pull_projects", () => pullFrameProjects()));
   results.push(await step("frameio.pull_deliverables", () => pullFrameDeliverables()));
   results.push(await step("calendar.sync", () => runCalendarSync()));

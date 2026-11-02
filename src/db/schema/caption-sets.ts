@@ -79,6 +79,59 @@ export const captionItems = pgTable(
   (t) => [index("caption_items_set_idx").on(t.captionSetId, t.position)],
 );
 
+/* ------------------------------------------------------------------ *
+ * Automatische koppeling opname → script-PDF in Google Drive
+ *
+ * Veel opnames hebben (nog) geen scriptcontrole-PDF in het portaal, terwijl de
+ * script-PDF wél in Google Drive klaarstaat (gesynct in `files`, categorie
+ * "Scripts"). Deze tabel legt per opname een INTERNE koppeling naar die
+ * Drive-PDF vast, zodat de Caption Maker 'm als bron kan gebruiken — zónder er
+ * een klant-zichtbare scriptReview van te maken.
+ *
+ * `status`: "gekoppeld" (zeker — wordt als bron gebruikt), "suggestie" (niet
+ * zeker — wacht op bevestiging door het team) of "afgewezen". `confidence` legt
+ * vast hoe sterk de match was; `matchReason` is de leesbare uitleg voor het team.
+ * ------------------------------------------------------------------ */
+export const shootScriptSources = pgTable(
+  "shoot_script_sources",
+  {
+    id: pk(),
+    /** Eén koppeling per opname. */
+    productionDayId: uuid("production_day_id")
+      .notNull()
+      .references(() => productionDays.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    /** "gekoppeld" | "suggestie" | "afgewezen". */
+    status: varchar("status", { length: 16 }).notNull().default("suggestie"),
+    /** "hoog" | "middel" | "laag". */
+    confidence: varchar("confidence", { length: 8 }).notNull().default("laag"),
+    /** Het Drive-bestand (files.external_id) en de leesbare metadata. */
+    fileExternalId: varchar("file_external_id", { length: 240 }).notNull(),
+    fileName: varchar("file_name", { length: 400 }).notNull(),
+    filePath: text("file_path"),
+    /** Leesbare uitleg waarom dit bestand gekoppeld is (bijv. "datum 12-11 in naam"). */
+    matchReason: text("match_reason"),
+    /** sha256 van de laatst verwerkte PDF-bytes — detecteert een gewijzigde PDF. */
+    contentHash: varchar("content_hash", { length: 64 }),
+    matchedAt: timestamp("matched_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Door wie/wanneer een suggestie is bevestigd. */
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    confirmedById: uuid("confirmed_by_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [
+    unique("shoot_script_sources_day_unique").on(t.productionDayId),
+    index("shoot_script_sources_client_idx").on(t.clientId, t.status),
+  ],
+);
+
+export const shootScriptSourcesRelations = relations(shootScriptSources, ({ one }) => ({
+  productionDay: one(productionDays, { fields: [shootScriptSources.productionDayId], references: [productionDays.id] }),
+  client: one(clients, { fields: [shootScriptSources.clientId], references: [clients.id] }),
+}));
+
 export const captionSetsRelations = relations(captionSets, ({ one, many }) => ({
   productionDay: one(productionDays, { fields: [captionSets.productionDayId], references: [productionDays.id] }),
   client: one(clients, { fields: [captionSets.clientId], references: [clients.id] }),

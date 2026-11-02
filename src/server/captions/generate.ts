@@ -1,8 +1,9 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, scriptReviewVersions, scriptReviews } from "@/db/schema";
+import { clients, scriptReviewVersions, scriptReviews, shootScriptSources } from "@/db/schema";
+import { drive } from "@/server/integrations/drive";
 import { runJsonPrompt, type AiDoc } from "@/server/ai/client";
 import { SHORTCLIPS_IDENTITY } from "@/server/ai/identity";
 import {
@@ -119,16 +120,22 @@ export async function generateCaptionsForPdf(input: {
 }
 
 export type ShootPdf = {
-  reviewVersionId: string;
+  /** script_review_versions.id, of null als de bron een Drive-PDF is. */
+  reviewVersionId: string | null;
   pdfBase64: string;
   hash: string;
   fileName: string;
+  /** Waar de PDF vandaan komt — voor logging/weergave. */
+  origin: "review" | "drive";
 };
 
 /**
- * Haalt de laatste scriptcontrole-PDF van een opname op (de scripts die in het
- * klantportaal ter review staan) met een sha256-hash voor wijzigingsdetectie.
- * Geeft null als er (nog) geen review-PDF voor deze opname is.
+ * Haalt de script-PDF van een opname op als bron voor de captions, met een
+ * sha256-hash voor wijzigingsdetectie. Volgorde:
+ *  1. De laatste scriptcontrole-PDF uit het portaal (als die er is);
+ *  2. anders de automatisch gekoppelde script-PDF uit Google Drive
+ *     (shoot_script_sources, status "gekoppeld").
+ * Geeft null als er (nog) geen bruikbare PDF voor deze opname is.
  */
 export async function shootReviewPdf(productionDayId: string): Promise<ShootPdf | null> {
   const [review] = await db
@@ -136,42 +143,83 @@ export async function shootReviewPdf(productionDayId: string): Promise<ShootPdf 
     .from(scriptReviews)
     .where(and(eq(scriptReviews.productionDayId, productionDayId), isNull(scriptReviews.deletedAt)))
     .limit(1);
-  if (!review) return null;
 
-  const [version] = await db
-    .select({
-      id: scriptReviewVersions.id,
-      fileName: scriptReviewVersions.fileName,
-      dataBase64: scriptReviewVersions.dataBase64,
-      storagePath: scriptReviewVersions.storagePath,
-    })
-    .from(scriptReviewVersions)
-    .where(eq(scriptReviewVersions.reviewId, review.id))
-    .orderBy(desc(scriptReviewVersions.versionNumber))
-    .limit(1);
-  if (!version) return null;
-
-  let pdfBase64 = version.dataBase64 ?? undefined;
-  if (!pdfBase64 && version.storagePath) {
-    const buf = await downloadScriptPdf(version.storagePath);
-    if (buf) pdfBase64 = buf.toString("base64");
+  if (review) {
+    const [version] = await db
+      .select({
+        id: scriptReviewVersions.id,
+        fileName: scriptReviewVersions.fileName,
+        dataBase64: scriptReviewVersions.dataBase64,
+        storagePath: scriptReviewVersions.storagePath,
+      })
+      .from(scriptReviewVersions)
+      .where(eq(scriptReviewVersions.reviewId, review.id))
+      .orderBy(desc(scriptReviewVersions.versionNumber))
+      .limit(1);
+    if (version) {
+      let pdfBase64 = version.dataBase64 ?? undefined;
+      if (!pdfBase64 && version.storagePath) {
+        const buf = await downloadScriptPdf(version.storagePath);
+        if (buf) pdfBase64 = buf.toString("base64");
+      }
+      if (pdfBase64) {
+        const hash = createHash("sha256").update(pdfBase64).digest("hex");
+        return { reviewVersionId: version.id, pdfBase64, hash, fileName: version.fileName, origin: "review" };
+      }
+    }
   }
-  if (!pdfBase64) return null;
 
-  const hash = createHash("sha256").update(pdfBase64).digest("hex");
-  return { reviewVersionId: version.id, pdfBase64, hash, fileName: version.fileName };
+  // Terugval: automatisch gekoppelde script-PDF uit Google Drive.
+  return driveSourcedPdf(productionDayId);
 }
 
-/** Bestaat er een scriptcontrole-PDF voor deze opname? (goedkoop, zonder bytes). */
+/** Download de gekoppelde Drive-script-PDF van een opname (status "gekoppeld"). */
+async function driveSourcedPdf(productionDayId: string): Promise<ShootPdf | null> {
+  const [src] = await db
+    .select({ fileExternalId: shootScriptSources.fileExternalId, fileName: shootScriptSources.fileName })
+    .from(shootScriptSources)
+    .where(and(eq(shootScriptSources.productionDayId, productionDayId), eq(shootScriptSources.status, "gekoppeld")))
+    .limit(1);
+  if (!src) return null;
+  try {
+    const bytes = await drive.downloadBytes(src.fileExternalId);
+    const pdfBase64 = Buffer.from(bytes).toString("base64");
+    if (!pdfBase64) return null;
+    const hash = createHash("sha256").update(pdfBase64).digest("hex");
+    // Bijwerken zodat we een gewijzigde Drive-PDF kunnen herkennen (weergave).
+    await db
+      .update(shootScriptSources)
+      .set({ contentHash: hash, updatedAt: new Date() })
+      .where(eq(shootScriptSources.productionDayId, productionDayId))
+      .catch(() => undefined);
+    return { reviewVersionId: null, pdfBase64, hash, fileName: src.fileName, origin: "drive" };
+  } catch {
+    // Drive niet bereikbaar / bestand weg → geen bron (cron probeert later opnieuw).
+    return null;
+  }
+}
+
+/**
+ * Welke opnames hebben een bruikbare script-PDF? Telt zowel de portaal-review-PDF
+ * als een automatisch gekoppelde Drive-PDF (status "gekoppeld"). Goedkoop (geen bytes).
+ */
 export async function shootHasReviewPdf(productionDayIds: string[]): Promise<Set<string>> {
   if (productionDayIds.length === 0) return new Set();
-  const rows = await db
+  const wanted = new Set(productionDayIds);
+  const out = new Set<string>();
+
+  const reviewRows = await db
     .select({ productionDayId: scriptReviews.productionDayId })
     .from(scriptReviews)
     .innerJoin(scriptReviewVersions, eq(scriptReviewVersions.reviewId, scriptReviews.id))
-    .where(and(isNull(scriptReviews.deletedAt)));
-  const wanted = new Set(productionDayIds);
-  const out = new Set<string>();
-  for (const r of rows) if (wanted.has(r.productionDayId)) out.add(r.productionDayId);
+    .where(isNull(scriptReviews.deletedAt));
+  for (const r of reviewRows) if (wanted.has(r.productionDayId)) out.add(r.productionDayId);
+
+  const driveRows = await db
+    .select({ productionDayId: shootScriptSources.productionDayId })
+    .from(shootScriptSources)
+    .where(and(eq(shootScriptSources.status, "gekoppeld"), inArray(shootScriptSources.productionDayId, productionDayIds)));
+  for (const r of driveRows) out.add(r.productionDayId);
+
   return out;
 }
