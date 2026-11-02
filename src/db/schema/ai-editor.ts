@@ -2,6 +2,8 @@ import { sql } from "drizzle-orm";
 import { bigint, boolean, index, integer, jsonb, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { pk, softDelete, timestamps } from "./_shared";
 import { users } from "./identity";
+import { clients } from "./clients";
+import { productionDays, scripts } from "./production";
 
 /* ------------------------------------------------------------------ *
  * Shortclips AI Editor — automatische montage van de eigen advertenties.
@@ -76,6 +78,14 @@ export const adEditProjects = pgTable(
     title: varchar("title", { length: 240 }).notNull(),
     /** Optioneel script: bepaalt de bedoelde tekst en volgorde. */
     script: text("script"),
+    /** Aanlevering vanuit het portaal: klant, opname en het gekozen script. Zo
+     *  haalt de AI Editor beeld, script en montageaanwijzingen automatisch op. */
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+    productionDayId: uuid("production_day_id").references(() => productionDays.id, { onDelete: "set null" }),
+    scriptId: uuid("script_id").references(() => scripts.id, { onDelete: "set null" }),
+    /** Extra montage-instructies van de editor (getypt of ingesproken), los van
+     *  het script — gaan naar de AI-planlaag, niet als gesproken scriptzinnen. */
+    instructions: text("instructions"),
     styleProfileId: uuid("style_profile_id").references(() => adStyleProfiles.id, { onDelete: "set null" }),
     /** draft | queued | processing | review | needs_choice | failed | exported */
     status: varchar("status", { length: 20 }).notNull().default("draft"),

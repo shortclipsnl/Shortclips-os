@@ -4,10 +4,11 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { db } from "@/db/client";
-import { adEditFeedback, adEditProjects, adEditSources, adEditVersions, adStyleAssets, adStyleProfiles, adStyleReferences, aiEditorJobs } from "@/db/schema";
+import { adEditFeedback, adEditProjects, adEditSources, adEditVersions, adStyleAssets, adStyleProfiles, adStyleReferences, aiEditorJobs, clients } from "@/db/schema";
 import { ForbiddenError, requirePermission } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { drive, DriveService } from "@/server/integrations/drive";
+import { getOpnameDetail, getScriptForIntake, listOpnamesForClient } from "@/server/ai-editor/intake";
 import { kickInline } from "@/server/ai-editor/inline";
 import { enqueue } from "@/server/ai-editor/queue";
 import { getOrCreateActiveStyle } from "@/server/ai-editor/queries";
@@ -43,6 +44,119 @@ export async function createProject(input: { title: string; script?: string }): 
     await auditLog({ viewer, action: "ai_editor.project_create", entityType: "ad_edit_project", entityId: row!.id });
     revalidatePath("/ai-editor");
     return { ok: true, data: { id: row!.id } };
+  } catch (e) { return fail(e); }
+}
+
+/* ---------------- Aanlevering vanuit het portaal (klant → opname → script) ---------------- */
+
+/** Resolve een Drive map-/bestandslink naar de videobestanden erin. Gedeeld door
+ *  de intake-check en het aanmaken. Geeft een nette fout terug. */
+async function resolveDriveVideos(link: string): Promise<{ ok: true; files: Awaited<ReturnType<typeof drive.listFolder>> } | { ok: false; message: string }> {
+  if (!drive.isConfigured) return { ok: false, message: "Google Drive is nog niet gekoppeld (Koppelingen)." };
+  const m = link.match(/(?:folders\/|file\/d\/|id=)([A-Za-z0-9_-]{10,})/) ?? link.trim().match(/^([A-Za-z0-9_-]{20,})$/);
+  if (!m) return { ok: false, message: "Plak een geldige Google Drive-link naar een map of videobestand." };
+  try {
+    const file = await drive.getFile(m[1]);
+    const files = DriveService.isFolder(file)
+      ? (await drive.listFolder(m[1])).filter((f) => f.mimeType.startsWith("video/"))
+      : file.mimeType.startsWith("video/") ? [file] : [];
+    if (!files.length) return { ok: false, message: "Geen videobestanden op deze link gevonden." };
+    files.sort((a, b) => a.name.localeCompare(b.name, "nl", { numeric: true }));
+    return { ok: true, files };
+  } catch {
+    return { ok: false, message: "Geen toegang tot deze map. Deel hem met teamshortclips@gmail.com of controleer de link." };
+  }
+}
+
+export async function intakeOpnames(clientId: string): Promise<ActionResult<{ opnames: Awaited<ReturnType<typeof listOpnamesForClient>> }>> {
+  try {
+    const viewer = await requirePermission("ai_editor:run");
+    return { ok: true, data: { opnames: await listOpnamesForClient(viewer, clientId) } };
+  } catch (e) { return fail(e); }
+}
+
+export async function intakeOpnameDetail(productionDayId: string): Promise<ActionResult<{ detail: Awaited<ReturnType<typeof getOpnameDetail>> }>> {
+  try {
+    const viewer = await requirePermission("ai_editor:run");
+    return { ok: true, data: { detail: await getOpnameDetail(viewer, productionDayId) } };
+  } catch (e) { return fail(e); }
+}
+
+export async function checkDriveFolder(link: string): Promise<ActionResult<{ count: number }>> {
+  try {
+    await requirePermission("ai_editor:run");
+    const res = await resolveDriveVideos((link ?? "").trim());
+    if (!res.ok) return { ok: false, message: res.message };
+    return { ok: true, data: { count: res.files.length } };
+  } catch (e) { return fail(e); }
+}
+
+/** Maakt een AI Editor-project vanuit de portaal-aanlevering: klant + opname +
+ *  script (uit het portaal) + Drive-map + extra instructies. Vult alles
+ *  automatisch en start — geen titel of handmatige upload nodig. */
+export async function createProjectFromIntake(input: {
+  clientId: string; productionDayId: string; scriptId: string; driveLink?: string; instructions?: string;
+}): Promise<ActionResult<{ id: string; sourcesAdded: number; driveWarning?: string; started: boolean }>> {
+  try {
+    const viewer = await requirePermission("ai_editor:run");
+    if (!input.clientId || !input.productionDayId || !input.scriptId) {
+      return { ok: false, message: "Kies een klant, opname en script." };
+    }
+    const detail = await getOpnameDetail(viewer, input.productionDayId);
+    if (!detail) return { ok: false, message: "Opname niet gevonden." };
+    const script = await getScriptForIntake(viewer, input.scriptId);
+    if (!script) return { ok: false, message: "Script niet gevonden." };
+    if (!script.spoken.trim()) return { ok: false, message: "Dit script heeft nog geen tekst om te monteren." };
+
+    const [client] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, input.clientId)).limit(1);
+    const style = await getOrCreateActiveStyle(viewer.id);
+
+    // Montageaanwijzingen uit het script + de extra instructies van de editor —
+    // samen naar de AI-planlaag (niet als gesproken scriptzinnen).
+    const extra = (input.instructions ?? "").trim();
+    const instructions = [
+      script.montageNotes ? `Montageaanwijzingen uit het script:\n${script.montageNotes}` : null,
+      extra || null,
+    ].filter(Boolean).join("\n\n") || null;
+
+    const title = `${client?.name ?? "Video"} — ${script.title}`.slice(0, 240);
+    const [row] = await db.insert(adEditProjects).values({
+      title, script: script.spoken, instructions,
+      clientId: input.clientId, productionDayId: input.productionDayId, scriptId: input.scriptId,
+      styleProfileId: style.id, createdById: viewer.id,
+    }).returning({ id: adEditProjects.id });
+    const projectId = row!.id;
+
+    // Beeldmateriaal: de meegegeven link, anders de al gekoppelde Drive-map van de opname.
+    const link = (input.driveLink ?? "").trim() || detail.driveFolderId || "";
+    let sourcesAdded = 0; let driveWarning: string | undefined;
+    if (link) {
+      const res = await resolveDriveVideos(link);
+      if (res.ok) {
+        await db.insert(adEditSources).values(res.files.map((f) => ({
+          projectId, filename: f.name, origin: "drive" as const, driveFileId: f.id, sizeBytes: f.size ? Number(f.size) : null, status: "ready" as const,
+        })));
+        sourcesAdded = res.files.length;
+      } else {
+        driveWarning = res.message;
+      }
+    } else {
+      driveWarning = "Nog geen Drive-map gekoppeld — voeg de beelden op de volgende stap toe.";
+    }
+
+    await auditLog({ viewer, action: "ai_editor.project_create", entityType: "ad_edit_project", entityId: projectId, changes: { fromIntake: true, clientId: input.clientId } });
+
+    // Start de montage meteen als er beelden zijn (het "AI Editor starten"-moment).
+    let started = false;
+    if (sourcesAdded > 0) {
+      await db.update(adEditProjects).set({ status: "queued", phase: "In de wachtrij", progress: 0, error: null, updatedAt: new Date() }).where(eq(adEditProjects.id, projectId));
+      await enqueue("generate", { projectId });
+      await auditLog({ viewer, action: "ai_editor.generate", entityType: "ad_edit_project", entityId: projectId });
+      kick();
+      started = true;
+    }
+    revalidatePath("/ai-editor");
+    return { ok: true, data: { id: projectId, sourcesAdded, driveWarning, started } };
   } catch (e) { return fail(e); }
 }
 

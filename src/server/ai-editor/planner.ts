@@ -363,7 +363,7 @@ export function applyAiSuggestions(plan: EditPlan, s: AiSuggestions, brollSource
 }
 
 /** De prompt voor de AI-laag (compact; segmenten genummerd). */
-export function aiPlanningPrompt(plan: EditPlan, brollSources: PlannerSource[]): { system: string; user: string } {
+export function aiPlanningPrompt(plan: EditPlan, brollSources: PlannerSource[], instructions?: string | null): { system: string; user: string } {
   const system = `Je bent de senior editor van Shortclips, een Nederlands short video bureau. Je verbetert de montage van een eigen Shortclips-advertentie (9:16, Meta/Instagram/TikTok) in de vaste Shortclips Ads Style: strak ritme, ondertitels in een blauw blok, en witte UI-kaarten die het verhaal visualiseren (checklist, status_list, process, stat, cta_form).
 
 Regels:
@@ -374,8 +374,13 @@ Regels:
 Antwoord uitsluitend met JSON volgens het schema.`;
   const segLines = plan.segments.map((s, i) => `${i}: [zin ${s.sentenceIdx}] ${s.words.map((w, wi) => `${w.w}(${wi})`).join(" ")}`).join("\n");
   const broll = brollSources.length ? brollSources.map((b, i) => `${i}: ${b.filename} (${b.durationS.toFixed(1)} s)`).join("\n") : "geen";
+  // Extra montage-instructies van de editor (uit de script-aanwijzingen en/of zelf
+  // ingesproken/getypt). Sturen de keuzes, maar voegen nooit gesproken tekst toe.
+  const instr = (instructions ?? "").trim();
+  const instrBlock = instr ? `\nExtra montage-instructies van de editor (volg deze waar mogelijk, maar verzin geen tekst):\n${instr.slice(0, 1200)}\n` : "";
   const user = `Segmenten (index: [zin] woord(woordindex) ...):
 ${segLines}
+${instrBlock}
 
 B-roll-bronnen:
 ${broll}

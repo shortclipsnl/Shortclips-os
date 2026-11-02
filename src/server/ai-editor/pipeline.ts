@@ -396,7 +396,7 @@ export async function runGenerate(projectId: string): Promise<void> {
   if (aiAvailable()) {
     await setPhase(projectId, "AI: kaarten en b-roll kiezen", 48);
     const brollSources = plannerSources.filter((s) => s.role === "broll");
-    const prompt = aiPlanningPrompt(draft.plan, brollSources);
+    const prompt = aiPlanningPrompt(draft.plan, brollSources, project.instructions);
     const ai = await callClaude(prompt.system, prompt.user);
     if (ai.ok) {
       costs.aiInputTokens += ai.inputTokens;

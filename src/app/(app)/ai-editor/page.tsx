@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Clapperboard, Palette } from "lucide-react";
 import { requirePermission } from "@/server/auth/context";
 import { getOrCreateActiveStyle, listProjects, staleQueuedCount } from "@/server/ai-editor/queries";
+import { listIntakeClients } from "@/server/ai-editor/intake";
+import { drive } from "@/server/integrations/drive";
 import { Badge, Card, EmptyState, LinkButton, PageHeader, Table } from "@/components/ui";
 import { NewProject } from "./new-project";
 import { PROJECT_STATUS, euro } from "./labels";
@@ -14,7 +16,8 @@ export default async function AiEditorPage() {
   const viewer = await requirePermission("ai_editor:read");
   const canRun = viewer.permissions.has("ai_editor:run");
   const canStyle = viewer.permissions.has("ai_editor:style");
-  const [style, projects, stale] = await Promise.all([getOrCreateActiveStyle(viewer.id), listProjects(), staleQueuedCount()]);
+  const [style, projects, stale, clients] = await Promise.all([getOrCreateActiveStyle(viewer.id), listProjects(), staleQueuedCount(), canRun ? listIntakeClients(viewer) : Promise.resolve([])]);
+  const driveConfigured = drive.isConfigured;
 
   return (
     <div className="mx-auto max-w-[1100px]">
@@ -27,8 +30,8 @@ export default async function AiEditorPage() {
       <div className="mb-5 rounded-[var(--radius-md)] border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)] px-4 py-3.5 text-sm leading-relaxed text-[var(--color-ink)]">
         <p className="mb-1 font-semibold">Zo werkt het</p>
         <ol className="ml-4 list-decimal space-y-0.5 text-[var(--color-ink-muted)]">
-          <li>Maak een nieuwe video en voeg alle ruwe camerabestanden van de opnamedag toe (upload of Google Drive-map). Plak het script erbij als je dat hebt.</li>
-          <li>Klik op <strong className="text-[var(--color-ink)]">Genereer advertentievideo</strong>. De AI kiest de beste takes, knipt versprekingen en pauzes weg, zet ondertitels en kaarten, gradeert en mixt het geluid.</li>
+          <li>Kies de <strong className="text-[var(--color-ink)]">klant en de opname</strong>. Het bijbehorende <strong className="text-[var(--color-ink)]">script</strong> en de <strong className="text-[var(--color-ink)]">Drive-map</strong> met de beelden worden automatisch opgehaald uit het portaal.</li>
+          <li>Voeg eventueel <strong className="text-[var(--color-ink)]">extra instructies</strong> toe — getypt of ingesproken — en klik op <strong className="text-[var(--color-ink)]">AI Editor starten</strong>.</li>
           <li>Bekijk de preview, geef eventueel feedback in gewone taal en download de definitieve export.</li>
         </ol>
         <p className="mt-2 text-xs text-[var(--color-ink-faint)]">Actief profiel: {style.name} v{style.version}. De AI verzint geen tekst: alles komt uit wat er gezegd is en uit het script.</p>
@@ -40,7 +43,7 @@ export default async function AiEditorPage() {
         </div>
       ) : null}
 
-      {canRun ? <NewProject /> : null}
+      {canRun ? <NewProject clients={clients} driveConfigured={driveConfigured} /> : null}
 
       <Card padded={false}>
         {projects.length === 0 ? (
