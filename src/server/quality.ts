@@ -14,6 +14,7 @@ import { integrationHealth } from "@/server/integrations/registry";
 import { countOpenLinkSuggestions } from "@/server/link-review";
 import { VIDEO_WAITING_ON, type VideoStage } from "@/lib/statuses";
 import { isOwner, scopeToClients, type Viewer } from "@/server/auth/context";
+import { CORE_STAFF_EMAILS, isCoreStaff } from "@/server/core-staff";
 
 /**
  * Centrale kwaliteitsbewaking: bundelt alle automatisch gesignaleerde punten tot
@@ -43,7 +44,22 @@ export type QualityItem = {
   clientName?: string;
   clientLogoUrl?: string | null;
   clientColor?: string | null;
+  /** Korte, concrete actie ("Video versturen"). Samen met de klantnaam de regel. */
+  action: string;
+  /** Korte reden in een paar woorden ("Goedgekeurd 6 dagen geleden"). */
+  reason: string;
+  /** Wanneer: hoog = vandaag, normaal = deze week, laag = later. */
+  priority: AttentionPriority;
+  /** Indeling op de pagina (categorie-chips). */
+  area: AttentionArea;
+  /** Automatische verantwoordelijke (user-id), zie `routeOwner`. */
+  ownerId?: string | null;
+  /** Gebundelde punten (bijv. 5 deadlines in gevaar) — één regel met deze lijst. */
+  kids?: { label: string; sub: string; href?: string }[];
 };
+
+export type AttentionPriority = "hoog" | "normaal" | "laag";
+export type AttentionArea = "editing" | "klant" | "opname" | "script" | "resultaat" | "overig";
 
 /** Welke categorie hoort bij welk actiegebied. */
 const GROUP_OF: Record<string, QualityGroup> = {
@@ -75,6 +91,30 @@ const GROUP_OF: Record<string, QualityGroup> = {
 };
 const groupOf = (category: string): QualityGroup => GROUP_OF[category] ?? "overig";
 
+/** Categorie-chip op de pagina. Wijkt alleen af van het actiegebied voor resultaten en opnames. */
+const AREA_OF: Record<QualityGroup, AttentionArea> = {
+  scripting: "script", editing: "editing", klant: "klant", planning: "opname", overig: "overig",
+};
+const areaOf = (category: string): AttentionArea =>
+  category === "Resultaten vallen terug" ? "resultaat" : AREA_OF[groupOf(category)];
+
+/**
+ * Wie pakt welk punt op? Vaste verdeling, zodat niemand alles krijgt:
+ *  - klantcontact, scripts, resultaten en editingplanning → de Content Creative
+ *    die als coördinator op de klant staat (Klantbeheer);
+ *  - opnames en de kwaliteit/voortgang van de editing → Rutger;
+ *  - contracten en koppelingen → Jarno.
+ * Ontbreekt de juiste persoon, dan valt het punt terug op Jarno.
+ */
+const TO_RUTGER = new Set([
+  "Opname voorbereiden", "Eerste versie verwacht", "Video wacht op controle", "Video over deadline",
+  "Editor moet opleveren", "Feedback niet verwerkt",
+]);
+const TO_JARNO = new Set(["Contract loopt af", "Koppeling werkt niet", "Koppeling te bevestigen"]);
+
+type PartialItem = Omit<QualityItem, "action" | "reason" | "priority" | "area"> &
+  Partial<Pick<QualityItem, "action" | "reason" | "priority" | "area">>;
+
 const CC = ["operational_manager", "project_coordinator", "content_creator"];
 const EDIT = ["operational_manager", "project_coordinator", "editor"];
 const SHOOT = ["operational_manager", "project_coordinator", "videographer"];
@@ -90,7 +130,7 @@ const AT_EDITOR: VideoStage[] = ["recorded", "footage_upload", "awaiting_editor"
 
 const projTitle = (clientName: string, title: string) => (title === clientName ? "video" : title);
 
-export async function getQualityOverview(viewer: Viewer): Promise<{ items: QualityItem[]; counts: Record<QualitySeverity, number> }> {
+export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boolean } = {}): Promise<{ items: QualityItem[]; counts: Record<QualitySeverity, number> }> {
   const owner = isOwner(viewer);
   const today = new Date().toISOString().slice(0, 10);
 
@@ -103,7 +143,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
     listEditingProjects(viewer),
     getShootDeadlines(viewer),
     getReviewQueue(viewer),
-    listScripting(viewer),
+    listScripting(viewer, opts),
     // #2 Eerste versie verwacht: opname ≥7 werkdagen geleden, nog geen versie.
     db.select({
       id: deliverables.id, title: deliverables.title, shootDate: productionDays.scheduledOn,
@@ -154,10 +194,10 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
     owner ? integrationHealth() : Promise.resolve([]),
     // Achterblijvende klanten (resultaten vallen terug): ook voor coördinatoren,
     // niet alleen de eigenaar — het is een analysesignaal, geen financiële data.
-    getScreenData(30).catch(() => null),
+    getScreenData(30, opts).catch(() => null),
   ]);
 
-  const items: QualityItem[] = [];
+  const items: PartialItem[] = [];
 
   /* ---------- LIJST A — Productie & deadlines ---------- */
 
@@ -169,6 +209,7 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: `${p.clientName} — ${projTitle(p.clientName, p.title)}`,
       detail: `${p.risk.factors.join(" · ")} → vooruit plannen`,
       href: `/videos/${p.id}`, roles: EDIT,
+      action: "Editing vooruit plannen", reason: `${projTitle(p.clientName, p.title)} · ${p.risk.factors.join(" · ")}`, priority: "hoog",
     });
   }
 
@@ -182,6 +223,9 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: atClient ? `${d} dag(en) te laat · wacht op klant → herinneren` : `${d} dag(en) te laat · ${v.editorName ?? "geen editor"} → afmaken`,
       href: `/videos/${v.id}`, roles: atClient ? CC : EDIT,
+      action: atClient ? "Klant herinneren aan feedback" : `${projTitle(v.clientName, v.title)} afmaken`,
+      reason: atClient ? `${d} ${d === 1 ? "dag" : "dagen"} over deadline, wacht op klant` : `${d} ${d === 1 ? "dag" : "dagen"} over deadline · ${v.editorName ?? "geen editor"}`,
+      priority: "hoog",
     });
   }
 
@@ -195,6 +239,8 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `${wd} werkdagen na opname · nog geen eerste versie · ${v.editorName ?? "geen editor"} → eerste cut maken`,
       href: `/videos/${v.id}`, roles: EDIT,
+      action: "Eerste versie opleveren", reason: `${wd} werkdagen na opname · ${v.editorName ?? "geen editor"}`,
+      priority: wd >= 10 ? "hoog" : "normaal",
     });
   }
 
@@ -207,6 +253,9 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: `${s.clientName} — opname ${s.shootDate.slice(5)}`,
       detail: `${s.riskReason ?? `Editordeadline over ${s.workdaysToEditorDeadline} werkdag(en)`} → opleveren`,
       href: `/productions/${s.shootId}`, roles: EDIT,
+      action: `Editor laten opleveren (opname ${s.shootDate.slice(8, 10)}-${s.shootDate.slice(5, 7)})`,
+      reason: s.workdaysToEditorDeadline === 0 ? "Editordeadline is vandaag" : `Editordeadline over ${s.workdaysToEditorDeadline} werkdag${s.workdaysToEditorDeadline === 1 ? "" : "en"}`,
+      priority: s.workdaysToEditorDeadline <= 1 ? "hoog" : "normaal",
     });
   }
 
@@ -217,6 +266,8 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `${daysSince(v.statusChangedAt)} dagen geen klantfeedback → herinneren`,
       href: `/videos/${v.id}`, roles: CC,
+      action: "Klant herinneren aan feedback", reason: `${daysSince(v.statusChangedAt)} dagen geen reactie op ${projTitle(v.clientName, v.title)}`,
+      priority: daysSince(v.statusChangedAt) >= 7 ? "hoog" : "normaal",
     });
   }
 
@@ -227,6 +278,9 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `${Number(v.days)} dag(en) klaargezet · ${v.editorName ?? "geen editor"} → intern controleren`,
       href: `/videos/${v.id}`, roles: CC,
+      action: `${projTitle(v.clientName, v.title)} controleren`,
+      reason: Number(v.days) <= 0 ? `Vandaag klaargezet door ${v.editorName ?? "de editor"}` : `${Number(v.days)} ${Number(v.days) === 1 ? "dag" : "dagen"} klaargezet door ${v.editorName ?? "de editor"}`,
+      priority: Number(v.days) >= 3 ? "hoog" : "normaal",
     });
   }
 
@@ -243,6 +297,9 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
         id: `shoot-${s.id}`, clientName: s.clientName, severity: daysUntil(s.scheduledOn) <= 0 ? "rood" : "oranje", category: "Opname voorbereiden",
         title: `${s.clientName} — opname`, detail: `${bits.join(", ") || `${open} punt(en)`} nog open · ${s.videographerName ?? "geen videograaf"} → voorbereiden`,
         href: `/productions/${s.id}`, roles: SHOOT,
+        action: "Opname voorbereiden",
+        reason: `${daysUntil(s.scheduledOn) <= 0 ? "Vandaag" : daysUntil(s.scheduledOn) === 1 ? "Morgen" : `Over ${daysUntil(s.scheduledOn)} dagen`} · ${bits.join(", ") || `${open} punt(en)`} nog open`,
+        priority: daysUntil(s.scheduledOn) <= 1 ? "hoog" : "normaal",
       });
     }
   }
@@ -254,6 +311,8 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: `${r.clientName} — opname ${r.scheduledOn.slice(5)}`,
       detail: `Script staat klaar · ${r.scriptWriterName ?? "geen verantwoordelijke"} → intern controleren`,
       href: "/scripting", roles: CC,
+      action: "Scripts controleren", reason: `Opname ${r.scheduledOn.slice(8, 10)}-${r.scheduledOn.slice(5, 7)} · geschreven door ${r.scriptWriterName ?? "onbekend"}`,
+      priority: daysUntil(r.scheduledOn) <= 3 ? "hoog" : "normaal",
     });
   }
 
@@ -270,6 +329,8 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: `${h.spec.name} ${label}`,
       detail: `${h.lastErrorMessage ?? "Geen recente synchronisatie"} → verbinding controleren`,
       href: "/settings/integrations", roles: COORD,
+      clientName: undefined, action: `${h.spec.name}-koppeling herstellen`, reason: label.charAt(0).toUpperCase() + label.slice(1),
+      priority: h.status === "error" ? "hoog" : "normaal",
     });
   }
 
@@ -281,6 +342,8 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `Geen ${mist} ingevuld → aanvullen`,
       href: `/videos/${v.id}`, roles: COORD,
+      action: `${mist.charAt(0).toUpperCase() + mist.slice(1)} invullen`, reason: `${projTitle(v.clientName, v.title)} heeft nog geen ${mist}`,
+      priority: "normaal",
     });
   }
 
@@ -291,6 +354,8 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `Klantfeedback ${daysSince(v.statusChangedAt)} dag(en) open · ${v.editorName ?? "geen editor"} → verwerken`,
       href: `/videos/${v.id}`, roles: EDIT,
+      action: "Klantfeedback laten verwerken", reason: `${daysSince(v.statusChangedAt)} ${daysSince(v.statusChangedAt) === 1 ? "dag" : "dagen"} open · ${v.editorName ?? "geen editor"}`,
+      priority: daysSince(v.statusChangedAt) >= 3 ? "hoog" : "normaal",
     });
   }
 
@@ -301,6 +366,9 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `Goedgekeurd, ${daysSince(v.statusChangedAt)} dag(en) niet verstuurd → inplannen/publiceren`,
       href: `/videos/${v.id}`, roles: CC,
+      action: `${projTitle(v.clientName, v.title)} versturen of inplannen`,
+      reason: daysSince(v.statusChangedAt) <= 0 ? "Vandaag goedgekeurd" : `Goedgekeurd ${daysSince(v.statusChangedAt)} ${daysSince(v.statusChangedAt) === 1 ? "dag" : "dagen"} geleden`,
+      priority: daysSince(v.statusChangedAt) >= 7 ? "hoog" : "normaal",
     });
   }
 
@@ -312,6 +380,8 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       title: `${p.clientName} — ${p.title}`,
       detail: `${d} dag(en) over geplande publicatie → publiceren`,
       href: p.deliverableId ? `/videos/${p.deliverableId}` : "/calendar", roles: CC,
+      action: `${p.title} publiceren`, reason: `${d} ${d === 1 ? "dag" : "dagen"} over de geplande datum`,
+      priority: d >= 3 ? "hoog" : "normaal",
     });
   }
 
@@ -323,6 +393,8 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
         title: c.name,
         detail: `Weergaven ${c.growthPct}% t.o.v. vorige periode → resultaten bekijken`,
         href: `/analytics/${c.slug}`, roles: COORD,
+        action: "Daling weergaven bekijken", reason: `Weergaven ${c.growthPct}% t.o.v. vorige periode`,
+        priority: (c.growthPct ?? 0) <= -50 ? "normaal" : "laag",
       });
     }
   }
@@ -337,6 +409,8 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       id: `clientrisk-${c.id}`, clientName: c.name, severity: c.riskLevel === "high" ? "rood" : "oranje", category: "Klant vraagt aandacht",
       title: c.name, detail: `${c.riskReason ?? "Gemarkeerd als risico"} → contact opnemen`,
       href: `/clients/${c.slug}`, roles: CC,
+      action: "Contact opnemen met klant", reason: c.riskReason ?? "Gemarkeerd als risico",
+      priority: c.riskLevel === "high" ? "hoog" : "normaal",
     });
   }
 
@@ -351,78 +425,129 @@ export async function getQualityOverview(viewer: Viewer): Promise<{ items: Quali
       id: `contract-${c.id}`, clientName: c.clientName, severity: d < 30 ? "oranje" : "blauw", category: "Contract loopt af",
       title: c.clientName, detail: `Over ${d} dagen · ${c.autoRenew ? "verlengt automatisch" : "verlengt niet"}`,
       href: `/clients/${c.clientSlug}?tab=contract`, roles: COORD,
+      action: c.autoRenew ? "Automatische verlenging checken" : "Verlengingsgesprek plannen",
+      reason: `Contract eindigt over ${d} dagen · ${c.autoRenew ? "verlengt automatisch" : "verlengt niet"}`,
+      priority: c.autoRenew ? "laag" : d < 30 ? "hoog" : "normaal",
     });
   }
 
   // (Doelen-signalen staan niet meer op deze pagina: ze hebben hun eigen
   //  Doelen-pagina en gaven hier te veel ruis die het team niet gebruikte.)
 
-  // Ernst-volgorde: rood, oranje, blauw; daarbinnen per categorie gegroepeerd,
-  // zodat je per soort melding kunt scannen.
-  const order: Record<QualitySeverity, number> = { rood: 0, oranje: 1, blauw: 2 };
-  items.sort((a, b) => order[a.severity] - order[b.severity] || a.category.localeCompare(b.category));
-
-  // Per rol filteren — eigenaar/admin zien alles.
+  // Per rol filteren. Het vaste kernteam (Jarno, Milou, Jiska, Rutger) en de
+  // eigenaar/admin zien alles, zodat iedereen kan wisselen naar "Hele team".
   const role = viewer.primaryRole;
-  const seeAll = owner || role === "admin";
+  const seeAll = owner || role === "admin" || isCoreStaff(viewer.email);
   const visible = seeAll ? items : items.filter((i) => i.roles.includes(role));
 
-  // Tellers op de échte totalen (vóór het inkorten).
-  const counts: Record<QualitySeverity, number> = { rood: 0, oranje: 0, blauw: 0 };
-  for (const i of visible) counts[i.severity]++;
+  // Klantgegevens: logo, merkkleur en coördinator (voor de verdeling).
+  const [clientRows, staffRows] = await Promise.all([
+    db.select({ name: clients.name, logoUrl: clients.logoUrl, color: clients.color, coordinatorId: clients.coordinatorId }).from(clients),
+    db.select({ id: users.id, email: users.email }).from(users)
+      .where(and(inArray(users.email, [...CORE_STAFF_EMAILS]), isNull(users.deletedAt))),
+  ]);
+  const clientByName = new Map(clientRows.map((r) => [r.name, r]));
+  const staffId = new Map(staffRows.map((r) => [r.email.toLowerCase().split("@")[0], r.id]));
+  const coreIds = new Set(staffRows.map((r) => r.id));
+  const jarno = staffId.get("jarno") ?? null;
 
-  // Per categorie beperken zodat de pagina scanbaar blijft: toon de eerste paar,
-  // en vat de rest samen in één "+N meer"-regel.
-  const CAP = 5;
-  const CAT_HREF: Record<string, string> = {
-    "Video niet gepubliceerd": "/calendar",
-    "Editor moet opleveren": "/productions",
-    "Opname voorbereiden": "/productions",
-    "Scripts controleren": "/scripting",
-    "Geen opname gepland": "/clients",
-    "Achter op afspraak": "/clients",
-    "Klant vraagt aandacht": "/clients",
+  const routeOwner = (it: PartialItem): string | null => {
+    if (TO_JARNO.has(it.category)) return jarno;
+    if (TO_RUTGER.has(it.category)) return staffId.get("rutger") ?? jarno;
+    const coord = it.clientName ? clientByName.get(it.clientName)?.coordinatorId : null;
+    if (coord && coreIds.has(coord)) return coord;
+    return staffId.get("milou") ?? jarno;
   };
-  const seenPerCat = new Map<string, number>();
-  const overflow = new Map<string, { severity: QualitySeverity; count: number; href: string }>();
-  const capped: QualityItem[] = [];
-  for (const it of visible) {
-    const n = seenPerCat.get(it.category) ?? 0;
-    if (n < CAP) {
-      capped.push(it);
-      seenPerCat.set(it.category, n + 1);
-    } else {
-      const o = overflow.get(it.category) ?? { severity: it.severity, count: 0, href: CAT_HREF[it.category] ?? it.href };
-      o.count++;
-      overflow.set(it.category, o);
-    }
-  }
-  for (const [category, o] of overflow) {
-    capped.push({
-      id: `more-${category}`, severity: o.severity, category,
-      title: `+${o.count} meer`, detail: "Bekijk de volledige lijst →", href: o.href, roles: [],
-    });
-  }
-  capped.sort((a, b) => order[a.severity] - order[b.severity] || a.category.localeCompare(b.category));
 
-  // Klantlogo + merkkleur erbij, zodat de pagina links een logo kan tonen en in
-  // één oogopslag scanbaar is welke klant het betreft. Eén query, via de naam
-  // gekoppeld (die elk klant-item al meekrijgt).
-  const logoRows = await db
-    .select({ name: clients.name, logoUrl: clients.logoUrl, color: clients.color })
-    .from(clients);
-  const logoByName = new Map(logoRows.map((r) => [r.name, { logoUrl: r.logoUrl, color: r.color }]));
-
-  // Actiegebied per item afleiden, zodat de pagina per soort werk kan indelen.
-  const withGroup = capped.map((it) => {
-    const logo = it.clientName ? logoByName.get(it.clientName) : undefined;
+  const sevToPrio: Record<QualitySeverity, AttentionPriority> = { rood: "hoog", oranje: "normaal", blauw: "laag" };
+  const full: QualityItem[] = visible.map((it) => {
+    const c = it.clientName ? clientByName.get(it.clientName) : undefined;
     return {
       ...it,
+      action: it.action ?? it.title,
+      reason: it.reason ?? it.detail,
+      priority: it.priority ?? sevToPrio[it.severity],
+      area: it.area ?? areaOf(it.category),
       group: groupOf(it.category),
-      clientLogoUrl: logo?.logoUrl ?? null,
-      clientColor: logo?.color ?? null,
+      ownerId: routeOwner(it),
+      clientLogoUrl: c?.logoUrl ?? null,
+      clientColor: c?.color ?? null,
     };
   });
 
-  return { items: withGroup, counts };
+  // Bundelen: losse "Deadline in gevaar"-regels worden één punt per
+  // verantwoordelijke, en automatische contractverlengingen één punt. Zo blijft
+  // de lijst kort en zie je toch per project wat er speelt.
+  const out: QualityItem[] = [];
+  const riskByOwner = new Map<string, QualityItem[]>();
+  const autoRenew: QualityItem[] = [];
+  for (const it of full) {
+    if (it.category === "Deadline in gevaar") {
+      const k = it.ownerId ?? "none";
+      riskByOwner.set(k, [...(riskByOwner.get(k) ?? []), it]);
+    } else if (it.category === "Contract loopt af" && it.action === "Automatische verlenging checken") {
+      autoRenew.push(it);
+    } else out.push(it);
+  }
+  for (const [ownerKey, list] of riskByOwner) {
+    if (list.length === 1) { out.push(list[0]); continue; }
+    out.push({
+      ...list[0],
+      id: `riskbundle-${ownerKey}`,
+      clientName: undefined, clientLogoUrl: null, clientColor: null,
+      title: `${list.length} deadlines in gevaar`,
+      action: `${list.length} deadlines in gevaar: editing herverdelen`,
+      reason: "Editors hebben meer werk dan ze aankunnen",
+      detail: "Editors hebben meer werk dan ze aankunnen → vooruit plannen",
+      href: "/planning",
+      kids: list.map((x) => ({ label: x.title.replace(" — ", " · "), sub: x.detail.replace(/ → .*$/, ""), href: x.href })),
+    });
+  }
+  if (autoRenew.length === 1) out.push(autoRenew[0]);
+  else if (autoRenew.length > 1) {
+    out.push({
+      ...autoRenew[0],
+      id: "contracts-autorenew",
+      clientName: undefined, clientLogoUrl: null, clientColor: null,
+      title: `${autoRenew.length} contracten verlengen automatisch`,
+      action: `${autoRenew.length} automatische verlengingen checken`,
+      reason: "Alleen actie als pakket of prijs moet veranderen",
+      detail: "Verlengen vanzelf → alleen actie als pakket of prijs moet veranderen",
+      href: "/klantenbeheer",
+      kids: autoRenew.map((x) => ({ label: x.clientName ?? x.title, sub: x.reason.replace(" · verlengt automatisch", ""), href: x.href })),
+    });
+  }
+
+  const order: Record<AttentionPriority, number> = { hoog: 0, normaal: 1, laag: 2 };
+
+  // Zelfde soort punt bij dezelfde klant (bijv. vier video's wachten op
+  // feedback) wordt één regel met de lijst eronder: één actie, niet vier.
+  const sameKind = new Map<string, QualityItem[]>();
+  const merged: QualityItem[] = [];
+  for (const it of out) {
+    if (!it.clientName || it.kids?.length) { merged.push(it); continue; }
+    const k = `${it.category}|${it.clientName}|${it.ownerId ?? ""}`;
+    sameKind.set(k, [...(sameKind.get(k) ?? []), it]);
+  }
+  for (const list of sameKind.values()) {
+    if (list.length === 1) { merged.push(list[0]); continue; }
+    list.sort((a, b) => order[a.priority] - order[b.priority]);
+    const first = list[0];
+    const slug = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
+    merged.push({
+      ...first,
+      id: `bundle-${slug(first.category)}-${slug(first.clientName ?? "")}`,
+      reason: `${first.reason} (+${list.length - 1} meer)`,
+      href: first.href,
+      kids: list.map((x) => ({ label: x.title.replace(/^.*? — /, ""), sub: x.reason, href: x.href })),
+    });
+  }
+  out.length = 0;
+  out.push(...merged);
+  out.sort((a, b) => order[a.priority] - order[b.priority] || a.category.localeCompare(b.category));
+
+  const counts: Record<QualitySeverity, number> = { rood: 0, oranje: 0, blauw: 0 };
+  for (const i of out) counts[i.severity]++;
+
+  return { items: out, counts };
 }

@@ -7,6 +7,7 @@ export * from "./analytics";
 export * from "./finance";
 export * from "./platform";
 export * from "./ops";
+export * from "./attention";
 export * from "./ai-tools";
 export * from "./team-planning";
 export * from "./video-intelligence";

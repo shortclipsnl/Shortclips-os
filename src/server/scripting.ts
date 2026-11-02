@@ -87,8 +87,10 @@ export type ClientResponsible = {
   responsibleAvatar: string | null;
 };
 
-export async function listScripting(viewer: Viewer) {
-  await requireInternal();
+export async function listScripting(viewer: Viewer, opts: { trusted?: boolean } = {}) {
+  // `trusted`: aangeroepen vanuit een geplande taak met een al opgebouwde Viewer
+  // (zie viewerForUser) — dan is er geen request/sessie om te controleren.
+  if (!opts.trusted) await requireInternal();
   const today = new Date().toISOString().slice(0, 10);
 
   // Tweede users-join voor de vaste verantwoordelijke per klant (de

@@ -27,8 +27,9 @@ export type ScreenClient = {
  * Metricool-cijfers, geen vertrouwelijke financiële gegevens. Periode = laatste
  * 30 dagen t.o.v. de 30 dagen daarvoor.
  */
-export async function getScreenData(days = 30) {
-  await requireInternal();
+export async function getScreenData(days = 30, opts: { trusted?: boolean } = {}) {
+  // `trusted`: aangeroepen vanuit een geplande taak (geen sessie aanwezig).
+  if (!opts.trusted) await requireInternal();
   const start = dayOffset(-days);
   const prevStart = dayOffset(-2 * days);
   const prevEnd = dayOffset(-days - 1);

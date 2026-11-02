@@ -1,29 +1,27 @@
 import type { Metadata } from "next";
-import { requireInternal } from "@/server/auth/context";
-import { getQualityOverview } from "@/server/quality";
-import { PageHeader } from "@/components/ui";
-import { KwaliteitBoard } from "./kwaliteit-board";
+import { isOwner, requireInternal } from "@/server/auth/context";
+import { getAttentionBoard } from "@/server/attention";
+import { AttentionBoard } from "./attention-board";
 
-export const metadata: Metadata = { title: "Kwaliteit & Aandachtspunten" };
+export const metadata: Metadata = { title: "Aandachtspunten" };
 export const dynamic = "force-dynamic";
 
 /**
- * Automatisch gesignaleerde aandachtspunten, per ernst gegroepeerd. De drie
- * groepen — Directe actie (rood), Extra aandacht (oranje) en Vooruit kijken
- * (blauw) — staan als knoppen naast elkaar; klik een knop om de punten van die
- * ernst te zien. Zo blijft het overzichtelijk en snel te scannen.
+ * Aandachtspunten: wat er moet gebeuren, per persoon verdeeld. Elk teamlid opent
+ * standaard op de eigen punten en kan wisselen naar het hele team. Elke regel is
+ * één actie met een korte reden; afvinken is één klik.
  */
-export default async function QualityPage() {
+export default async function AttentionPage() {
   const viewer = await requireInternal();
-  const { items, counts } = await getQualityOverview(viewer);
-
+  const { items, team } = await getAttentionBoard(viewer);
   return (
-    <div className="mx-auto max-w-[1000px]">
-      <PageHeader
-        title="Kwaliteit & Aandachtspunten"
-        description="Waar het team op stuurt, ingedeeld per actiegebied: zijn de scripts op tijd, loopt de editing achter, moet er iets naar de klant, en welke plekken in de agenda moeten nog gevuld worden. De kleur toont de ernst — rood = directe actie, oranje = extra aandacht, blauw = vooruitkijken."
+    <div className="mx-auto max-w-[940px]">
+      <AttentionBoard
+        items={items}
+        team={team}
+        viewerId={viewer.id}
+        defaultScope={isOwner(viewer) || !team.some((t) => t.id === viewer.id) ? "all" : "mine"}
       />
-      <KwaliteitBoard items={items} counts={counts} />
     </div>
   );
 }

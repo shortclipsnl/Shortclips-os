@@ -589,6 +589,13 @@
       "when": 1793559842686,
       "tag": "0083_noisy_inertia",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1793627476462,
+      "tag": "0084_aandachtspunten",
+      "breakpoints": true
     }
   ]
 }

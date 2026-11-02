@@ -31,6 +31,7 @@ import { runContentResearchWeekly } from "@/server/jobs/content-research-autogen
 import { runContentResearchNotify } from "@/server/jobs/content-research-notify";
 import { runMonthlyReports } from "@/server/jobs/report-monthly";
 import { runReportReviewReminders } from "@/server/jobs/report-review-reminders";
+import { runAttentionNotify } from "@/server/jobs/attention-notify";
 import { runDriveSync } from "@/server/jobs/drive-sync";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, pullMetricoolPosts, runMetricoolSync } from "@/server/jobs/metricool-sync";
@@ -123,6 +124,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "content_research.notify": runContentResearchNotify,
   "reports.generate_monthly": runMonthlyReports,
   "reports.review_reminders": runReportReviewReminders,
+  "attention.notify": runAttentionNotify,
   "drive.sync_all": runDriveSync,
   "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,

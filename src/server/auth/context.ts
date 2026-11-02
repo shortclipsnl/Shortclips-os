@@ -11,6 +11,7 @@ import {
   roles,
   tasks,
   userRoles,
+  users,
 } from "@/db/schema";
 import { readSession, type SessionUser } from "./session";
 import type { PermissionKey } from "./permissions";
@@ -290,4 +291,30 @@ export function assertClientAccess(viewer: Viewer, clientId: string): void {
 
 export function hasClientAccess(viewer: Viewer, clientId: string): boolean {
   return viewer.clientScope === null || viewer.clientScope.includes(clientId);
+}
+
+/**
+ * Een Viewer opbouwen voor een gebruiker buiten een request om (geplande taken),
+ * met dezelfde rechten en klantscope als wanneer die persoon zelf inlogt.
+ */
+export async function viewerForUser(userId: string): Promise<Viewer | null> {
+  const [u] = await db
+    .select({
+      id: users.id, email: users.email, fullName: users.fullName, primaryRole: users.primaryRole,
+      clientId: users.clientId, avatarUrl: users.avatarUrl, status: users.status,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!u) return null;
+  const user: SessionUser = { ...u, primaryRole: String(u.primaryRole), status: String(u.status) };
+  const perms = await loadPermissions(user.id);
+  const clientScope = await loadClientScope(user, perms);
+  return {
+    ...user,
+    permissions: perms,
+    clientScope,
+    isPortalUser: user.primaryRole === "client",
+    isEditorOnly: user.primaryRole === "editor" && !perms.has("clients:read_all"),
+  };
 }
