@@ -10,6 +10,8 @@
     { "path": "/api/jobs/run?job=sync.nightly", "schedule": "0 3 * * *" },
     { "path": "/api/jobs/run?job=reminders.daily_todo&slot=winter", "schedule": "30 12 * * *" },
     { "path": "/api/jobs/run?job=reminders.daily_todo&slot=zomer", "schedule": "30 11 * * *" },
+    { "path": "/api/jobs/run?job=reminders.next_day_todo&slot=zomer", "schedule": "45 14 * * 1-5" },
+    { "path": "/api/jobs/run?job=reminders.next_day_todo&slot=winter", "schedule": "45 15 * * 1-5" },
     { "path": "/api/jobs/run?job=vrijdagcheck.notify", "schedule": "0 7 * * 5" },
     { "path": "/api/jobs/run?job=reminders.editor_friday_wrapup&slot=zomer", "schedule": "0 7 * * 5" },
     { "path": "/api/jobs/run?job=reminders.editor_friday_wrapup&slot=winter", "schedule": "0 8 * * 5" },

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
-import { runCleaningFridayReminder, runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runDailyTeamTodoReminder, runEditorDeadlineReminders, runEditorEscalations, recordDeadlinePerformance, runEditorFridayWrapUp, runFinanceMonthReminder, runFinanceWeeklySummary, runHourlySignals, runPostShootReminder, runScriptTodoReminders, runTaskDeadlineReminders, runVrijdagcheckNotification } from "@/server/jobs/maintenance";
+import { runCleaningFridayReminder, runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runDailyTeamTodoReminder, runNextDayTodoReminder, runEditorDeadlineReminders, runEditorEscalations, recordDeadlinePerformance, runEditorFridayWrapUp, runFinanceMonthReminder, runFinanceWeeklySummary, runHourlySignals, runPostShootReminder, runScriptTodoReminders, runTaskDeadlineReminders, runVrijdagcheckNotification } from "@/server/jobs/maintenance";
 import { runGoalsRecompute, runGoalsSeed } from "@/server/jobs/goals-job";
 import { runAwardsRecompute } from "@/server/jobs/awards-job";
 import { runMeetingsRollOver } from "@/server/jobs/meetings-roll-over";
@@ -71,6 +71,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "reminders.script_todo": runScriptTodoReminders,
   "reminders.post_shoot": runPostShootReminder,
   "reminders.daily_todo": runDailyTeamTodoReminder,
+  "reminders.next_day_todo": runNextDayTodoReminder,
   "reminders.editor_friday_wrapup": runEditorFridayWrapUp,
   "reminders.cleaning_friday": runCleaningFridayReminder,
   "goals.recompute": runGoalsRecompute,

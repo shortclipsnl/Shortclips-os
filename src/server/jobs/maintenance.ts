@@ -548,6 +548,47 @@ export async function runDailyTeamTodoReminder() {
 }
 
 /**
+ * Werkdag-reminder om 16:45 (Amsterdam) voor Milou en Jiska: de to-do van de
+ * volgende werkdag invullen. Twee cron-slots (14:45 en 15:45 UTC) + de uurcheck
+ * laten dit precies één keer doorkomen (zomer- én wintertijd); op vrijdag gaat
+ * de tekst over maandag. Dedupe = één melding per persoon per dag.
+ */
+export async function runNextDayTodoReminder() {
+  return runJob("system", "reminders.next_day_todo", {}, async (ctx) => {
+    const now = new Date();
+    const weekday = now.toLocaleDateString("en-US", { weekday: "short", timeZone: "Europe/Amsterdam" });
+    const hhmm = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" });
+    const hour = Number(hhmm.slice(0, 2));
+    if (weekday === "Sat" || weekday === "Sun" || hour !== 16) {
+      ctx.log(`Lokaal ${weekday} ${hhmm} (Amsterdam) — niet op een werkdag rond 16:xx, overgeslagen.`);
+      return;
+    }
+
+    const coords = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(isNull(users.deletedAt), eq(users.status, "active"), inArray(sql`lower(${users.email})`, ["milou@shortclips.nl", "jiska@shortclips.nl"])));
+
+    const today = day(0);
+    const nextDay = weekday === "Fri" ? "maandag" : "morgen";
+    for (const c of coords) {
+      ctx.counters.processed++;
+      await notify({
+        userIds: [c.id],
+        type: "next_day_todo_reminder",
+        level: "info",
+        title: `Vul je to-do voor ${nextDay} in`,
+        body: `Zet klaar wat je ${nextDay} gaat doen: welke mensen je moet contacteren en welke taken je oppakt.`,
+        href: "/tasks",
+        dedupeKey: `next_day_todo_reminder:${c.id}:${today}`,
+      });
+      ctx.counters.updated++;
+    }
+    ctx.log(`${ctx.counters.updated} coördinatoren een to-do-reminder voor ${nextDay} gestuurd`);
+  });
+}
+
+/**
  * Vrijdagherinnering voor editors: op vrijdagochtend (09:00 Amsterdam) een
  * melding om vóór 13:00 af te ronden wat nog deze week de deur uit kan — zodat
  * het team het vóór het weekend naar de klant kan sturen (buiten werktijd
