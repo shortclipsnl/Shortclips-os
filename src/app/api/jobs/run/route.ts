@@ -34,6 +34,7 @@ import { runReportReviewReminders } from "@/server/jobs/report-review-reminders"
 import { runDriveSync } from "@/server/jobs/drive-sync";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, pullMetricoolPosts, runMetricoolSync } from "@/server/jobs/metricool-sync";
+import { runShootReconciliation } from "@/server/jobs/shoot-reconciliation";
 import { setTeamContact } from "@/server/jobs/team";
 import { enforcePortalAccess, portalAccessReport } from "@/server/jobs/portal-access";
 import { seedAiKnowledge } from "@/server/jobs/ai-seed";
@@ -88,6 +89,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "frameio.normalize_imported": normalizeImportedFrameDeliverables,
   "frameio.list_projects": listFrameProjects,
   "calendar.sync": runCalendarSync,
+  "shoots.reconcile": runShootReconciliation,
   "metricool.link_brands": linkMetricoolBrands,
   "metricool.pull_metrics": pullMetricoolMetrics,
   "metricool.pull_posts": pullMetricoolPosts,

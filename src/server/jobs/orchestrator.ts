@@ -5,6 +5,7 @@ import { runContentSync } from "./content-sync";
 import { runAutoPublishDueContent } from "./content-publish";
 import { runTaskArchive } from "./task-archive";
 import { runCalendarSync } from "./calendar-sync";
+import { runShootReconciliation } from "./shoot-reconciliation";
 import { runMonthlyReportDrafts } from "./report-drafts";
 import { runContentOnlineNotifications } from "./content-online-notify";
 import { runMonthlyInsightTasks } from "./insight-tasks";
@@ -84,6 +85,9 @@ export async function runNightlySync() {
   results.push(await step("frameio.pull_projects", () => pullFrameProjects()));
   results.push(await step("frameio.pull_deliverables", () => pullFrameDeliverables()));
   results.push(await step("calendar.sync", () => runCalendarSync()));
+  // Direct ná de agenda-sync: controleer of alle opnames ook echt in de planning
+  // staan en meld afwijkingen (opname zonder klant / mogelijk gemiste opname).
+  results.push(await step("shoots.reconcile", () => runShootReconciliation()));
   results.push(await step("metricool.sync", () => runMetricoolSync()));
   // Na alle externe syncs: controleer de gezondheid van de koppelingen en meld
   // proactief verouderde/nooit-geslaagde koppelingen aan de verantwoordelijke.

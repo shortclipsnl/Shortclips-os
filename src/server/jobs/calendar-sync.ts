@@ -29,6 +29,7 @@ import {
   classifyAppointment,
   isInternalAppointment,
   matchEvent,
+  strongShootSignal,
   type ClientMatcher,
 } from "@/server/integrations/calendar-matching";
 import { MissingCredentialsError } from "@/server/integrations/types";
@@ -219,6 +220,19 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);
           ctx.log(`Agenda "${cal.summary}" overgeslagen (niet bereikbaar): ${msg}`);
+          // Punt 7: duidelijke melding als één agenda niet synchroniseert, zodat
+          // het team het meteen kan oplossen (de andere agenda's gaan door). Eén
+          // melding per agenda per dag.
+          const dayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+          await notify({
+            roles: ["owner", "operational_manager"],
+            level: "critical",
+            type: "calendar_agenda_unreachable",
+            title: `Agenda synchroniseert niet: ${cal.summary}`,
+            body: `De agenda "${cal.summary}" kon niet worden opgehaald en is overgeslagen. Opnames uit deze agenda ontbreken mogelijk in de planning. ${msg}`.slice(0, 300),
+            href: "/settings/agendas",
+            dedupeKey: `calendar_unreachable:${cal.id}:${dayKey}`,
+          }).catch(() => {});
           continue;
         }
         ctx.log(`Agenda "${cal.summary}": ${events.length} afspraken`);
@@ -240,10 +254,18 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
               : null;
           // Niet-gekoppelde, duidelijk interne afspraken apart markeren zodat ze
           // niet in de controlelijst terechtkomen.
-          const kind =
+          let kind =
             !clientId && isInternalAppointment(ev, cal.summary)
               ? "intern"
               : classifyAppointment(ev.summary, cal.summary);
+          // Context-override: een afspraak met een herkende klant, een aantal shorts
+          // in de titel en een stevig dagblok (geen hard overleg-woord) is in de
+          // praktijk een opname — ook als de titel-classifier 'm als "overig" zag
+          // (bijv. "AI2 - 8 shorts - afstemmen datums"). Alleen hier, met context.
+          if (kind === "overig" && clientId) {
+            const durationMinutes = startsAt && endsAt ? Math.round((endsAt.getTime() - startsAt.getTime()) / 60000) : null;
+            if (strongShootSignal(ev.summary, { durationMinutes, allDay, hasClient: true })) kind = "opname";
+          }
           if (clientId) matched++;
           else if (kind !== "intern") needsReview++;
 

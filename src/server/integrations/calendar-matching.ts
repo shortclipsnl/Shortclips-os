@@ -149,6 +149,35 @@ export function classifyAppointment(title?: string | null, calendarSummary?: str
   return "overig";
 }
 
+/** Een "aantal shorts/video's" in de titel (bijv. "8 shorts"), los van het woord opname. */
+export function hasShortsCount(text?: string | null): boolean {
+  return SHORTS_COUNT.test(text ?? "");
+}
+
+// Harde niet-opname-signalen: deze woorden duiden écht op een overleg/publicatie,
+// niet op een opnamedag. Zwakke woorden als "afstemmen/datums/strategie" staan hier
+// bewust NIET in — een opnamedag plant in de titel vaak óók de volgende datums.
+const HARD_NON_SHOOT = /\b(meeting|overleg|call|bespreking|evaluatie\w*|online|upload\w*|geupload|plaatsen|posten|gepost|publicatie\w*|kick\s*-?\s*off)\b/i;
+
+/**
+ * Overrulet een te strenge "overig"-classificatie wanneer de context sterke
+ * opname-signalen geeft: een aantal shorts in de titel, géén hard overleg-woord,
+ * géén hele dag, én (met een herkende klant) een stevig dagblok (≥ 2 uur). Zo wordt
+ * "AI2 - 8 shorts - Q4 + afstemmen datums" als opname herkend, maar
+ * "Online meeting AI2 x Shortclips - 8 shorts" niet. Alleen gebruikt op plekken met
+ * eventcontext (de sync), nooit in de pure titel-classifier.
+ */
+export function strongShootSignal(
+  title: string | null | undefined,
+  opts: { durationMinutes: number | null; allDay: boolean; hasClient: boolean },
+): boolean {
+  const t = title ?? "";
+  if (!hasShortsCount(t)) return false;
+  if (HARD_NON_SHOOT.test(t)) return false;
+  if (opts.allDay || !opts.hasClient) return false;
+  return (opts.durationMinutes ?? 0) >= 120;
+}
+
 /* ------------------------------ titel-alias ------------------------------ */
 
 const TYPE_WORDS =

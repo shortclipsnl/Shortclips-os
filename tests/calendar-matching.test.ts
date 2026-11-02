@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   classifyAppointment,
   extractTitleHint,
+  hasShortsCount,
   isInternalAppointment,
   isInternalEmail,
   matchEvent,
+  strongShootSignal,
   type ClientMatcher,
 } from "@/server/integrations/calendar-matching";
 import type { CalendarEvent } from "@/server/integrations/google-calendar";
@@ -76,6 +78,30 @@ describe("soort afspraak herkennen", () => {
   });
   it("valt terug op 'overig' zonder duidelijke aanwijzing", () => {
     expect(classifyAppointment("Teamoverleg")).toBe("overig");
+  });
+});
+
+describe("context-override: sterke opname-signalen", () => {
+  it("herkent een aantal shorts in de titel", () => {
+    expect(hasShortsCount("AI2 - 8 shorts - Q4")).toBe(true);
+    expect(hasShortsCount("3 video's maken")).toBe(true);
+    expect(hasShortsCount("Teamoverleg")).toBe(false);
+  });
+  it("overrulet 'overig' bij een klant + dagblok + géén hard overleg-woord", () => {
+    // "AI2 - 8 shorts - afstemmen datums" is titel-only 'overig', maar met klant
+    // en een dagblok (09:00–16:00) is het een echte opname.
+    expect(strongShootSignal("9:30 AI2 - 8 shorts - Q4 + afstemmen datums Q1 2027", { durationMinutes: 390, allDay: false, hasClient: true })).toBe(true);
+  });
+  it("overrulet NIET bij een hard overleg-woord (online/meeting)", () => {
+    expect(strongShootSignal("Online meeting AI2 x Shortclips - 8 shorts", { durationMinutes: 60, allDay: false, hasClient: true })).toBe(false);
+  });
+  it("overrulet NIET zonder klant, als hele dag, of bij een kort blok", () => {
+    expect(strongShootSignal("8 shorts afstemmen", { durationMinutes: 390, allDay: false, hasClient: false })).toBe(false);
+    expect(strongShootSignal("8 shorts afstemmen", { durationMinutes: null, allDay: true, hasClient: true })).toBe(false);
+    expect(strongShootSignal("8 shorts afstemmen", { durationMinutes: 30, allDay: false, hasClient: true })).toBe(false);
+  });
+  it("overrulet NIET zonder shorts-aantal", () => {
+    expect(strongShootSignal("Afstemmen Q1 datums", { durationMinutes: 390, allDay: false, hasClient: true })).toBe(false);
   });
 });
 
