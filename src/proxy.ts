@@ -10,12 +10,13 @@ import type { NextRequest } from "next/server";
  * inlogscherm gaan. De échte controle — bestaat de sessie, welke rechten, welke
  * klanten — gebeurt server-side in `getViewer()` bij elke pagina en actie.
  */
-// /api/jobs, /api/kosten en /api/vermogen/import zijn publiek op proxy-niveau,
-// maar worden door de route zélf beveiligd met een geheim token (CRON_SECRET,
-// KOSTEN_IMPORT_TOKEN resp. VERMOGEN_IMPORT_TOKEN) — anders zou de geplande
-// import nooit binnenkomen. De overige /api/vermogen-routes blijven
-// sessiebeschermd (eigenaar), dus die staan hier bewust niet bij.
-const PUBLIC_PATHS = ["/login", "/api/webhooks", "/api/health", "/api/jobs", "/api/kosten", "/api/vermogen/import"];
+// /api/jobs, /api/kosten, /api/vermogen/import en /api/editor/agenda zijn publiek
+// op proxy-niveau, maar worden door de route zélf beveiligd met een geheim token
+// (CRON_SECRET, KOSTEN_IMPORT_TOKEN, VERMOGEN_IMPORT_TOKEN resp. het persoonlijke
+// iCal-token in de URL) — anders zou de geplande import of de agenda-abonnee van
+// Google (die geen sessie heeft) nooit binnenkomen. De overige /api/vermogen-routes
+// blijven sessiebeschermd (eigenaar), dus die staan hier bewust niet bij.
+const PUBLIC_PATHS = ["/login", "/api/webhooks", "/api/health", "/api/jobs", "/api/kosten", "/api/vermogen/import", "/api/editor/agenda"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
