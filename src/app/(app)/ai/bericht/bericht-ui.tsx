@@ -1,8 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { AlertTriangle, ImageUp, Loader2, Sparkles, X } from "lucide-react";
-import { generateReply, type ReplyDraft } from "@/server/actions/ai-tools";
+import { AlertTriangle, ImageUp, Loader2, Sparkles, Undo2, Wand2, X } from "lucide-react";
+import { generateReply, refineReply, type ReplyDraft } from "@/server/actions/ai-tools";
 import { Button, Card, ErrorNote, InfoNote } from "@/components/ui";
 import { CopyButton, HistoryPanel, NoProviderNote, ToolHowTo, VoiceButton, fileToBase64, type HistoryEntry } from "../_shared";
 
@@ -10,14 +10,15 @@ type Img = { name: string; base64: string; mediaType: "image/png" | "image/jpeg"
 
 const IMG_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
-const TONES = [
-  { value: "standaard", label: "Standaard" },
-  { value: "vriendelijker", label: "Vriendelijker" },
-  { value: "netter", label: "Netter" },
-  { value: "duidelijker", label: "Duidelijker" },
-  { value: "korter", label: "Korter" },
-  { value: "directer", label: "Directer" },
-  { value: "uitgebreider", label: "Uitgebreider" },
+// Bijstuur-opties die ná het concept verschijnen. Ze verfijnen de HUIDIGE tekst
+// (dus inclusief handmatige aanpassingen) in plaats van opnieuw te genereren.
+const REFINE = [
+  { key: "vriendelijker", label: "Vriendelijker" },
+  { key: "duidelijker", label: "Duidelijker uitleg" },
+  { key: "korter", label: "Korter" },
+  { key: "formeler", label: "Formeler" },
+  { key: "empathischer", label: "Empathischer" },
+  { key: "overtuigender", label: "Overtuigender" },
 ] as const;
 
 export function BerichtAssistent({
@@ -28,11 +29,14 @@ export function BerichtAssistent({
   recent: HistoryEntry<ReplyDraft>[];
 }) {
   const [messageText, setMessageText] = useState("");
-  const [tone, setTone] = useState<(typeof TONES)[number]["value"]>("standaard");
   const [images, setImages] = useState<Img[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [result, setResult] = useState<ReplyDraft | null>(null);
   const [draft, setDraft] = useState("");
+  // Verfijnen: welke bijstuur-actie loopt nu, en de vorige tekst voor undo.
+  const [refining, setRefining] = useState<string | null>(null);
+  const [prevDraft, setPrevDraft] = useState<string | null>(null);
+  const [customInstr, setCustomInstr] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -66,18 +70,16 @@ export function BerichtAssistent({
     }
   }
 
-  function run(withTone?: (typeof TONES)[number]["value"]) {
+  function run() {
     if (!messageText.trim() && images.length === 0) {
       setErr("Plak het klantbericht of sleep een screenshot erin.");
       return;
     }
     setErr(null);
-    const useTone = withTone ?? tone;
-    if (withTone) setTone(withTone);
+    setPrevDraft(null);
     start(async () => {
       const res = await generateReply({
         messageText,
-        tone: useTone,
         images: images.map((i) => ({ base64: i.base64, mediaType: i.mediaType })),
       });
       if (res.ok) {
@@ -87,6 +89,25 @@ export function BerichtAssistent({
         setErr(res.message);
       }
     });
+  }
+
+  // Verfijn het HUIDIGE concept (inclusief handmatige aanpassingen) met één
+  // bijstuur-instructie. De vorige tekst wordt bewaard zodat je terug kunt.
+  function refine(instruction: string) {
+    const text = draft.trim();
+    if (!text || pending) return;
+    setErr(null);
+    setRefining(instruction);
+    start(async () => {
+      const res = await refineReply({ draft: text, instruction, channel: result?.channel });
+      if (res.ok) { setPrevDraft(text); setDraft(res.data.reply); }
+      else setErr(res.message);
+      setRefining(null);
+    });
+  }
+
+  function undo() {
+    if (prevDraft != null) { setDraft(prevDraft); setPrevDraft(null); }
   }
 
   return (
@@ -178,19 +199,57 @@ export function BerichtAssistent({
           <textarea className="sc-input resize-y text-sm" rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} />
           <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">Pas de tekst zelf aan, of klik op <strong>Inspreken</strong> om je aanvulling in te spreken.</p>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-[var(--color-ink-faint)]">Pas de toon aan:</span>
-            {TONES.filter((t) => t.value !== "standaard").map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                disabled={pending}
-                onClick={() => run(t.value)}
-                className="rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1 text-xs font-medium hover:bg-[var(--color-surface-sunken)]"
+          {/* Verfijnen ná het concept: één klik stuurt de HUIDIGE tekst bij
+              (ook jouw eigen aanpassingen). Aanpassingen stapelen; met "Ongedaan
+              maken" ga je één stap terug. */}
+          <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-3.5">
+            <div className="flex items-center gap-2">
+              <Wand2 className="size-4 text-[var(--color-brand-600)]" />
+              <span className="text-sm font-semibold text-[var(--color-ink)]">Verfijn dit concept</span>
+              {pending && refining ? <Loader2 className="size-3.5 animate-spin text-[var(--color-ink-faint)]" /> : null}
+              {prevDraft != null ? (
+                <button
+                  type="button"
+                  onClick={undo}
+                  disabled={pending}
+                  className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                >
+                  <Undo2 className="size-3.5" /> Ongedaan maken
+                </button>
+              ) : null}
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              {REFINE.map((r) => (
+                <button
+                  key={r.key}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => refine(r.key)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium transition hover:bg-[var(--color-surface)] hover:border-[var(--color-brand-400)] disabled:opacity-60"
+                >
+                  {pending && refining === r.key ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2.5 flex items-center gap-2">
+              <input
+                className="sc-input h-9 flex-1 text-sm"
+                placeholder="Of typ zelf een aanpassing, bijv. 'noem de deadline erbij'…"
+                value={customInstr}
+                onChange={(e) => setCustomInstr(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && customInstr.trim()) { refine(customInstr.trim()); setCustomInstr(""); } }}
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={pending || !customInstr.trim()}
+                onClick={() => { refine(customInstr.trim()); setCustomInstr(""); }}
               >
-                {t.label}
-              </button>
-            ))}
+                {pending && refining != null && !REFINE.some((r) => r.key === refining) ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+                Pas aan
+              </Button>
+            </div>
           </div>
           <p className="mt-3 text-xs text-[var(--color-ink-faint)]">
             Dit is een concept — niets wordt automatisch verstuurd. Controleer altijd voordat je het kopieert en verstuurt.

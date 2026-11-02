@@ -524,6 +524,79 @@ ${input.messageText?.trim() ? `Het bericht:\n\n${input.messageText.trim()}` : "H
   }
 }
 
+/**
+ * Verfijnt een al gegenereerd (en eventueel handmatig bijgewerkt) conceptantwoord
+ * op basis van één bijstuur-instructie. Werkt op de HUIDIGE tekst in plaats van
+ * opnieuw vanaf het klantbericht te genereren, zodat aanpassingen stapelen en
+ * handmatige wijzigingen behouden blijven. Verandert nooit de kernboodschap en
+ * verzint geen afspraken, prijzen of deadlines.
+ */
+const REFINE_DIRECTIVES: Record<string, string> = {
+  vriendelijker: "Maak de toon warmer, persoonlijker en vriendelijker.",
+  duidelijker: "Leg het duidelijker uit: eenvoudiger taal, logische opbouw, geen jargon of dubbelzinnigheid.",
+  korter: "Maak het beknopter: haal overbodige woorden en herhaling weg, behoud de kern.",
+  formeler: "Maak het net wat formeler en zakelijker, zonder afstandelijk te worden.",
+  empathischer: "Toon meer begrip en inleving richting de klant; erken hoe het voor hen is.",
+  overtuigender: "Maak het overtuigender en zelfverzekerder, zonder pusherig of commercieel te klinken.",
+};
+
+export async function refineReply(input: {
+  draft: string;
+  /** Een bekende sleutel (zie REFINE_DIRECTIVES) of een vrije eigen instructie. */
+  instruction: string;
+  channel?: "whatsapp" | "email" | "onbekend";
+}): Promise<AiActionResult<{ reply: string }>> {
+  try {
+    await requirePermission("ai:read");
+    const draft = (input.draft ?? "").trim();
+    if (!draft) return { ok: false, message: "Er is nog geen concepttekst om te verfijnen." };
+
+    const key = (input.instruction ?? "").trim();
+    if (!key) return { ok: false, message: "Geef aan wat er aangepast moet worden." };
+    const directive = REFINE_DIRECTIVES[key] ?? key; // bekende knop of eigen instructie
+
+    const channelHint =
+      input.channel === "email"
+        ? "Het is een e-mail: nette aanhef en afsluiting passen."
+        : input.channel === "whatsapp"
+          ? "Het is een WhatsApp-bericht: kort en informeel, geen formele aanhef/afsluiting."
+          : "";
+
+    const system = `${SHORTCLIPS_IDENTITY}
+
+Je herschrijft een bestaand CONCEPT-antwoord aan een klant volgens één bijstuur-instructie van de medewerker. Je past alleen de stijl/vorm aan die gevraagd wordt.
+
+HARDE REGELS:
+- Behoud de kernboodschap, de feiten en de bedoeling exact. Voeg GEEN nieuwe afspraken, prijzen, deadlines of toezeggingen toe en verzin niets.
+- Schrijf in het Nederlands, in de Shortclips-stijl: professioneel, vriendelijk, persoonlijk, "wij" als team, natuurlijke zinnen, geen standaard AI-taal.
+- Laat het een concept blijven; verwijder geen belangrijke informatie.
+${channelHint ? `- ${channelHint}` : ""}`;
+
+    const user = `Bijstuur-instructie: ${directive}
+
+Herschrijf onderstaand conceptantwoord volgens die instructie en geef UITSLUITEND geldige JSON terug, zonder omliggende tekst:
+{ "reply": "het herschreven conceptantwoord" }
+
+Concept:
+"""
+${draft}
+"""`;
+
+    const res = await runJsonPrompt<{ reply: string }>({ system, user, maxTokens: 4000 });
+    if (!res.ok) {
+      return res.reason === "no_provider"
+        ? { ok: false, reason: "no_provider", message: "Er is nog geen AI-sleutel ingesteld." }
+        : { ok: false, message: res.error ?? "Verfijnen mislukt." };
+    }
+    const reply = (res.data?.reply ?? "").trim();
+    if (!reply) return { ok: false, message: "Geen herschreven tekst gekregen. Probeer het nog eens." };
+    return { ok: true, data: { reply } };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 /* ------------------------------------------------------------------ *
  * Kennisbank & klantprofiel beheren
  * ------------------------------------------------------------------ */
