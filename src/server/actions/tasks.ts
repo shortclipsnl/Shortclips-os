@@ -76,7 +76,10 @@ export async function setTaskStatus(taskId: string, status: string): Promise<Act
   }
 }
 
-const TASK_CATEGORIES = ["scripting", "klantcontact", "overig"] as const;
+// Nog maar twee soorten: Klantcontact of Werkzaamheden. Oude categorieën
+// (scripting/overig) vallen automatisch onder Werkzaamheden (zie cleanCategory
+// en de weergave), zonder bestaande taken te wijzigen.
+const TASK_CATEGORIES = ["klantcontact", "werkzaamheden"] as const;
 
 const createSchema = z.object({
   title: z.string().trim().min(1, "Geef de taak een titel.").max(240),
@@ -84,12 +87,13 @@ const createSchema = z.object({
   clientId: z.string().uuid().nullish(),
   assigneeId: z.string().uuid().nullish(),
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
-  category: z.enum(TASK_CATEGORIES).default("overig"),
+  category: z.enum(TASK_CATEGORIES).default("werkzaamheden"),
   dueOn: z.string().nullish(),
 });
 
+/** Alles behalve "klantcontact" valt onder "werkzaamheden" (ook oude waarden). */
 function cleanCategory(c: string | null | undefined): (typeof TASK_CATEGORIES)[number] {
-  return (TASK_CATEGORIES as readonly string[]).includes(c ?? "") ? (c as (typeof TASK_CATEGORIES)[number]) : "overig";
+  return c === "klantcontact" ? "klantcontact" : "werkzaamheden";
 }
 
 /** Meerdere taken in één keer: elke tekstregel wordt een taak (snelle invoer). */

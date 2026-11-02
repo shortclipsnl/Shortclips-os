@@ -67,13 +67,14 @@ const PRIORITIES = [
   { value: "urgent", label: "Urgent" },
 ];
 
-/** Soort taak — voor de groepering op de takenpagina. */
+/** Soort taak — nog maar twee keuzes voor de groepering op de takenpagina. */
 export const TASK_CATEGORIES = [
-  { value: "scripting", label: "Scripting" },
   { value: "klantcontact", label: "Klantcontact" },
-  { value: "overig", label: "Overige taken" },
+  { value: "werkzaamheden", label: "Werkzaamheden" },
 ];
 export const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(TASK_CATEGORIES.map((c) => [c.value, c.label]));
+/** Oude categorieën (scripting/overig) tonen we als "Werkzaamheden". */
+const normCategory = (c: string) => (c === "klantcontact" ? "klantcontact" : "werkzaamheden");
 
 const prioDot: Record<string, string> = {
   low: "var(--color-ink-faint)",
@@ -86,7 +87,7 @@ const prioDot: Record<string, string> = {
 export function QuickTaskLines({ users, defaultAssignee }: { users: UserOption[]; defaultAssignee?: string }) {
   const [lines, setLines] = useState("");
   const [assigneeId, setAssigneeId] = useState(defaultAssignee ?? "");
-  const [category, setCategory] = useState("overig");
+  const [category, setCategory] = useState("werkzaamheden");
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -111,17 +112,23 @@ export function QuickTaskLines({ users, defaultAssignee }: { users: UserOption[]
     <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold text-[var(--color-ink-muted)]">Snel toevoegen — typ taken, één per regel:</span>
-        <select className="sc-input ml-auto h-8 w-36 py-0 text-xs" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Soort taak">
-          {TASK_CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>{c.label}</option>
-          ))}
-        </select>
-        <select className="sc-input h-8 w-40 py-0 text-xs" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} aria-label="Toewijzen aan">
-          <option value="">Algemeen / niet toegewezen</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>{u.fullName}</option>
-          ))}
-        </select>
+        <label className="ml-auto flex items-center gap-1.5 text-2xs font-medium text-[var(--color-ink-faint)]">
+          Soort
+          <select className="sc-input h-8 w-36 py-0 text-xs" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Soort taak">
+            {TASK_CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-1.5 text-2xs font-medium text-[var(--color-ink-faint)]">
+          Voor wie
+          <select className="sc-input h-8 w-44 py-0 text-xs" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} aria-label="Toewijzen aan">
+            <option value="">Algemeen / niet toegewezen</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>{u.fullName}</option>
+            ))}
+          </select>
+        </label>
       </div>
       <textarea
         className="sc-input resize-y text-sm leading-relaxed"
@@ -242,7 +249,7 @@ export function TaskItem({
   const [eDue, setEDue] = useState(task.dueOn ?? "");
   const [eAssignee, setEAssignee] = useState(task.assigneeId ?? "");
   const [ePriority, setEPriority] = useState(task.priority);
-  const [eCategory, setECategory] = useState(task.category);
+  const [eCategory, setECategory] = useState(normCategory(task.category));
   const router = useRouter();
   const done = task.status === "done" || optimisticDone;
 
@@ -260,7 +267,7 @@ export function TaskItem({
     setEDue(task.dueOn ?? "");
     setEAssignee(task.assigneeId ?? "");
     setEPriority(task.priority);
-    setECategory(task.category);
+    setECategory(normCategory(task.category));
     setEditErr(null);
     setEditing(true);
   }
@@ -274,7 +281,7 @@ export function TaskItem({
         dueOn: eDue || null,
         assigneeId: eAssignee || null,
         priority: ePriority as "normal",
-        category: eCategory as "overig",
+        category: normCategory(eCategory),
       });
       if (res.ok) { setEditing(false); router.refresh(); }
       else setEditErr(res.message ?? "Opslaan mislukt.");
@@ -350,52 +357,26 @@ export function TaskItem({
         )}
       </span>
 
+      {/* Prioriteit als kleine stip — rustig in de regel, details in bewerken. */}
+      {task.priority !== "normal" ? (
+        <span
+          className="hidden shrink-0 items-center gap-1 text-2xs font-medium sm:inline-flex"
+          style={{ color: prioDot[task.priority] }}
+          title={`Prioriteit: ${PRIORITIES.find((p) => p.value === task.priority)?.label}`}
+        >
+          <span className="size-2 rounded-full" style={{ background: prioDot[task.priority] }} />
+          {PRIORITIES.find((p) => p.value === task.priority)?.label}
+        </span>
+      ) : null}
+
       {task.assigneeName ? (
         <span className="hidden shrink-0 items-center gap-1.5 text-xs text-[var(--color-ink-muted)] sm:inline-flex" title={`Toegewezen aan ${task.assigneeName}`}>
-          <TeamAvatar name={task.assigneeName} avatarUrl={task.assigneeAvatar} size={32} />
+          <TeamAvatar name={task.assigneeName} avatarUrl={task.assigneeAvatar} size={28} />
         </span>
       ) : null}
 
       {canWrite ? (
         <>
-          <select
-            className="sc-input h-8 w-32 py-0 text-xs"
-            value={task.assigneeId ?? ""}
-            disabled={pending}
-            onChange={(e) => run(() => updateTask(task.id, { assigneeId: e.target.value || null }))}
-            aria-label="Toegewezen aan"
-          >
-            <option value="">Algemeen</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>{u.fullName}</option>
-            ))}
-          </select>
-
-          <select
-            className="sc-input h-8 w-32 py-0 text-xs"
-            value={task.category}
-            disabled={pending}
-            onChange={(e) => run(() => updateTask(task.id, { category: e.target.value as "overig" }))}
-            aria-label="Soort taak"
-          >
-            {TASK_CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
-
-          <select
-            className="sc-input h-8 w-24 py-0 text-xs"
-            value={task.priority}
-            disabled={pending}
-            onChange={(e) => run(() => updateTask(task.id, { priority: e.target.value as "normal" }))}
-            aria-label="Prioriteit"
-            style={{ color: prioDot[task.priority] }}
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
-          </select>
-
           <button
             type="button"
             disabled={pending}
@@ -417,11 +398,7 @@ export function TaskItem({
             {pending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
           </button>
         </>
-      ) : (
-        <span className="text-xs text-[var(--color-ink-muted)]">
-          {PRIORITIES.find((p) => p.value === task.priority)?.label}
-        </span>
-      )}
+      ) : null}
       </div>
 
       {/* Beschrijving (bv. het voorbeeldbericht bij een na-opname-taak) met een
