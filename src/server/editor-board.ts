@@ -60,6 +60,9 @@ export type EditorBoardVideo = {
   scriptFileName: string | null;
   /** Heeft deze video een gekoppelde opname(dag)? Zo niet, dan kan er geen script-pdf bij. */
   hasShoot: boolean;
+  /** Echte opnamedatum uit de gekoppelde opnamedag (YYYY-MM-DD), of null als er
+   *  geen betrouwbare opname gekoppeld is ("Opnamedatum nog niet bekend"). */
+  opnameDate: string | null;
   /** Downloadlink naar het beeldmateriaal (opname-footage of Drive-map). */
   downloadHref: string | null;
   /** Werkdagen tot de KLANTdeadline (negatief = te laat). null als er geen deadline is. */
@@ -142,6 +145,11 @@ export async function listEditorBoard(
         order by f.created_at desc limit 1
       )`,
       productionDayId: deliverables.productionDayId,
+      // De ECHTE opnamedatum uit de gekoppelde opnamedag (nooit verzonnen): is er
+      // geen gekoppelde opname, dan blijft dit null → "Opnamedatum nog niet bekend".
+      dayScheduledOn: sql<string | null>`(
+        select to_char(pd.scheduled_on, 'YYYY-MM-DD') from production_days pd where pd.id = deliverables.production_day_id limit 1
+      )`,
       openComments: sql<number>`(
         select count(*) from review_threads rt
         where rt.deliverable_id = deliverables.id
@@ -254,6 +262,7 @@ export async function listEditorBoard(
       scriptFileId: r.dayScriptFileId,
       scriptFileName: r.dayScriptFileName,
       hasShoot: !!r.productionDayId,
+      opnameDate: r.dayScheduledOn,
       downloadHref,
       workdaysToDeadline,
       overdue: !!r.dueOn && r.dueOn < today,

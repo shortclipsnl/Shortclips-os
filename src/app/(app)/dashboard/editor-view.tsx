@@ -318,6 +318,15 @@ function GreetStat({ label, value, icon }: { label: string; value: number; icon:
   );
 }
 
+/** Opnamedatum (YYYY-MM-DD) → leesbare NL-datum, bijv. "do 5 nov 2026". */
+function opnameLabel(iso: string): string {
+  try {
+    return new Date(`${iso}T00:00:00`).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return iso;
+  }
+}
+
 /** Eén video-regel op het editor-dashboard: klant, titel, fase en de interne
  *  deadline. Gedeeld door "Jouw video's" en "Binnenkort beschikbaar". */
 function VideoRow({ v }: { v: EditorBoardVideo }) {
@@ -333,6 +342,16 @@ function VideoRow({ v }: { v: EditorBoardVideo }) {
             <span className="block truncate text-xs text-[var(--color-ink-muted)]">
               {v.clientName} · <span style={{ color: phaseMeta.color }} className="font-medium">{phaseMeta.label}</span>
             </span>
+            {/* Wacht op beeld? Toon de échte opnamedatum uit de opnameplanning,
+                zodat de editor weet wanneer de beelden komen. Nooit verzonnen. */}
+            {v.phase === "te_plannen" ? (
+              <span className="mt-0.5 flex items-center gap-1 truncate text-2xs text-[var(--color-ink-faint)]">
+                <CalendarClock className="size-3 shrink-0" strokeWidth={2} />
+                {v.opnameDate
+                  ? `Opname ${opnameLabel(v.opnameDate)} · beelden na de opname`
+                  : "Opnamedatum nog niet bekend"}
+              </span>
+            ) : null}
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-0.5">
