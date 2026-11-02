@@ -17,6 +17,7 @@ import { Planner } from "./planner";
 import { CalDateCell, CalStatusCell } from "./calendar-cells";
 import { ContentChip, CaptionToggle } from "./content-items";
 import { CalendarClientFilter } from "./client-filter";
+import { PlatformIcon } from "@/components/platform-icon";
 
 export const metadata: Metadata = { title: "Contentplanning" };
 export const dynamic = "force-dynamic";
@@ -329,7 +330,7 @@ export default async function CalendarPage({
         <Link href={withParam("platform", undefined)} className={chip(!params.platform)}>Alle platformen</Link>
         {Object.entries(PLATFORM).map(([key, p]) => (
           <Link key={key} href={withParam("platform", params.platform === key ? undefined : key)} className={chip(params.platform === key)}>
-            <span className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: p.color }} />
+            <PlatformIcon platform={key} size={15} className="mr-1.5 align-middle" />
             {p.label}
           </Link>
         ))}
@@ -430,9 +431,9 @@ export default async function CalendarPage({
                       {i.contentType ? ` · ${i.contentType}` : ""}
                     </span>
                   </span>
-                  <span className="flex gap-1">
+                  <span className="flex items-center gap-1">
                     {(i.platforms as string[]).map((p) => (
-                      <span key={p} title={PLATFORM[p]?.label} className="size-2 rounded-full" style={{ background: PLATFORM[p]?.color ?? "#999" }} />
+                      <PlatformIcon key={p} platform={p} size={13} title={PLATFORM[p]?.label} />
                     ))}
                   </span>
                   <CaptionToggle

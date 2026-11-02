@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check, Copy, ExternalLink, MessageSquare, X } from "lucide-react";
 import { PLATFORM } from "@/lib/statuses";
 import { ClientLogo } from "@/components/ui";
+import { PlatformIcon } from "@/components/platform-icon";
 import { cn } from "@/lib/cn";
 
 export type ContentItemLite = {
@@ -79,7 +80,7 @@ export function ContentChip({ item, color, today = false }: { item: ContentItemL
           </span>
           <span className="mt-0.5 flex items-center gap-1">
             {item.platforms.slice(0, 3).map((p) => (
-              <span key={p} className="size-1.5 rounded-full" style={{ background: PLATFORM[p]?.color ?? "#999" }} />
+              <PlatformIcon key={p} platform={p} size={12} title={PLATFORM[p]?.label} />
             ))}
             <span className="truncate text-2xs text-[var(--color-ink-faint)]">{item.clientName}</span>
           </span>
@@ -138,7 +139,7 @@ function CaptionModal({ item, onClose }: { item: ContentItemLite; onClose: () =>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {item.platforms.map((p) => (
                     <span key={p} className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-2xs text-[var(--color-ink-muted)]">
-                      <span className="size-1.5 rounded-full" style={{ background: PLATFORM[p]?.color ?? "#999" }} />
+                      <PlatformIcon platform={p} size={12} title={PLATFORM[p]?.label} />
                       {PLATFORM[p]?.label ?? p}
                     </span>
                   ))}
