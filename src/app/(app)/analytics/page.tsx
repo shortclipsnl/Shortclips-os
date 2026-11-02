@@ -7,7 +7,7 @@ import { db } from "@/db/client";
 import {
   requirePermission,
 } from "@/server/auth/context";
-import { Monitor, MousePointerClick } from "lucide-react";
+import { AlertCircle, Monitor, MousePointerClick, Plug } from "lucide-react";
 import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Table } from "@/components/ui";
 import { compact, num } from "@/lib/format";
 
@@ -111,6 +111,11 @@ export default async function AnalyticsPage({
     linked: Number(c.linked) === 1,
   }));
   const linkedCount = allTiles.filter((c) => c.linked).length;
+  // Nog te koppelen: actieve klanten (de lijst is al op status='active' +
+  // show_in_results gefilterd) zonder werkende resultatenkoppeling. Automatisch
+  // bepaald, dus altijd actueel — zodra er cijfers binnenkomen verdwijnt de klant
+  // hieruit en verschijnt hij bij de gekoppelde klanten.
+  const toLink = allTiles.filter((c) => !c.linked);
   const tileClients = linkFilter === "gekoppeld"
     ? allTiles.filter((c) => c.linked)
     : linkFilter === "niet"
@@ -231,6 +236,35 @@ export default async function AnalyticsPage({
           </Link>
         ))}
       </div>
+
+      {/* Nog te koppelen klanten — direct onder de gekoppelde, duidelijk rood,
+          zodat we niemand vergeten. Automatisch bepaald en altijd actueel. */}
+      {toLink.length > 0 ? (
+        <div className="mb-5 rounded-[var(--radius-lg)] border border-[var(--color-bad)]/35 bg-[var(--color-bad-soft)]/40 p-3.5">
+          <div className="mb-2.5 flex items-center gap-2">
+            <AlertCircle className="size-4 shrink-0 text-[var(--color-bad)]" strokeWidth={2} />
+            <span className="text-sm font-semibold text-[var(--color-bad)]">Nog te koppelen klanten</span>
+            <span className="rounded-full bg-[var(--color-bad)] px-2 py-0.5 text-2xs font-bold text-white tabular-nums">{toLink.length}</span>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {toLink.map((c) => (
+              <div key={c.slug} className="flex items-center gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-bad)]/25 bg-[var(--color-surface)] px-3 py-2">
+                <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={34} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold leading-tight">{c.name}</span>
+                  <span className="mt-0.5 inline-flex items-center gap-1 text-2xs font-semibold text-[var(--color-bad)]">
+                    <span className="size-1.5 rounded-full bg-[var(--color-bad)]" /> Nog niet gekoppeld
+                  </span>
+                </span>
+                <Link href={`/clients/${c.slug}/edit`} className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-bad)] px-2.5 py-1.5 text-2xs font-semibold text-white transition hover:brightness-95" title={`Koppeling instellen voor ${c.name}`}>
+                  <Plug className="size-3" /> Koppel
+                </Link>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2.5 text-2xs text-[var(--color-ink-faint)]">Zodra een klant resultaten uit Metricool binnenkrijgt, verschuift die automatisch naar de gekoppelde klanten hierboven.</p>
+        </div>
+      ) : null}
 
       <div className="mb-5 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--color-info)]/30 bg-[var(--color-info-soft)]/60 px-4 py-2.5 text-sm text-[var(--color-ink)]">
         <MousePointerClick className="mt-0.5 size-4 shrink-0 text-[var(--color-info)]" strokeWidth={1.75} />
