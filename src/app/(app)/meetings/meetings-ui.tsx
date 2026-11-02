@@ -71,7 +71,7 @@ export function NewMeetingForm({ members }: { members: Member[] }) {
   );
 }
 
-export function AddItemForm({ meetingId, kind, members }: { meetingId: string; kind: "agenda" | "decision" | "action"; members: Member[] }) {
+export function AddItemForm({ meetingId, kind, members, bare = false }: { meetingId: string; kind: "agenda" | "decision" | "action"; members: Member[]; bare?: boolean }) {
   const [body, setBody] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [dueOn, setDueOn] = useState("");
@@ -88,8 +88,9 @@ export function AddItemForm({ meetingId, kind, members }: { meetingId: string; k
 
   const placeholder = kind === "agenda" ? "Nieuw bespreekpunt…" : kind === "decision" ? "Genomen besluit…" : "Actiepunt…";
   return (
-    <div className="flex flex-wrap items-end gap-2 border-t border-[var(--color-line)] p-3">
-      <input className="sc-input h-8 min-w-48 flex-1 py-0 text-sm" value={body} placeholder={placeholder}
+    // `bare`: zonder eigen rand/padding, zodat de oproeper de witruimte bepaalt.
+    <div className={bare ? "flex flex-wrap items-end gap-2" : "flex flex-wrap items-end gap-2 border-t border-[var(--color-line)] p-3"}>
+      <input className={`sc-input min-w-48 flex-1 text-sm ${bare ? "h-10" : "h-8 py-0"}`} value={body} placeholder={placeholder}
         onChange={(e) => setBody(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
       {kind === "action" ? (
         <>
@@ -100,7 +101,7 @@ export function AddItemForm({ meetingId, kind, members }: { meetingId: string; k
           <input type="date" className="sc-input h-8 w-32 py-0 text-xs" value={dueOn} onChange={(e) => setDueOn(e.target.value)} aria-label="Deadline" />
         </>
       ) : null}
-      <Button onClick={add} disabled={pending || !body.trim()} size="sm">
+      <Button onClick={add} disabled={pending || !body.trim()} size={bare ? "md" : "sm"}>
         {pending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Toevoegen
       </Button>
     </div>

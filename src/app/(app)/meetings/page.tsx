@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { and, asc, desc, eq } from "drizzle-orm";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, CheckCircle2, MessageSquarePlus } from "lucide-react";
 import { db } from "@/db/client";
 import { meetingItems, teamMeetings, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { listAssignableUsers } from "@/server/clients";
 import { ensureWeeklyMeeting } from "@/server/meetings";
-import { Avatar, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
-import { AddItemForm, DeleteMeetingRowButton, NewMeetingForm } from "./meetings-ui";
+import { Avatar, Badge, Card, PageHeader } from "@/components/ui";
+import { AddItemForm, NewMeetingForm } from "./meetings-ui";
 
 export const metadata: Metadata = { title: "Teammeetings" };
 export const dynamic = "force-dynamic";
@@ -42,121 +42,150 @@ export default async function MeetingsPage() {
       .where(and(eq(meetingItems.meetingId, weeklyId), eq(meetingItems.kind, "agenda")))
       .orderBy(asc(meetingItems.createdAt)),
   ]);
-  const now = Date.now();
   const w = weekly[0]!;
   const openItems = weeklyItems.filter((i) => !i.isDone);
   const agendaCount = openItems.length;
-  // Komende meetings: niet de vaste meeting, niet gearchiveerd, en nog niet voorbij.
-  const upcoming = meetings
-    .filter((m) => m.id !== weeklyId && !m.archivedAt && new Date(m.scheduledAt).getTime() >= now - 2 * 60 * 60 * 1000)
-    .reverse();
+  const nameById = new Map(members.map((m) => [m.id, m.fullName]));
   // Geweest: gearchiveerde meetings (nieuwste eerst).
   const past = meetings.filter((m) => Boolean(m.archivedAt)).slice(0, 25);
 
   return (
-    <div className="mx-auto max-w-[1000px]">
+    <div className="mx-auto max-w-[920px] space-y-8">
       <PageHeader title="Teammeetings" description="Verzamel de hele week bespreekpunten voor de vaste teammeeting; leg besluiten en actiepunten vast en koppel actiepunten direct aan Taken." />
 
       {/* Vaste wekelijkse teammeeting — met directe invoer voor bespreekpunten. */}
-      <Card padded={false} className="mb-5 overflow-hidden">
-        <Link href={`/meetings/${weeklyId}`} className="flex flex-wrap items-center gap-3 bg-[var(--color-indigo-ink)] p-5 text-white transition-opacity hover:opacity-95">
-          <CalendarClock className="size-6 shrink-0 text-[var(--color-brand-400)]" />
+      <Card padded={false} className="overflow-hidden">
+        <Link href={`/meetings/${weeklyId}`} className="flex flex-wrap items-center gap-4 bg-[var(--color-indigo-ink)] p-6 text-white transition-opacity hover:opacity-95">
+          <CalendarClock className="size-7 shrink-0 text-[var(--color-brand-400)]" />
           <div className="min-w-0 flex-1">
-            <div className="text-base font-bold tracking-tight">Vaste teammeeting · {dateTime(new Date(w.scheduledAt))}</div>
-            <div className="text-xs text-white/70">{agendaCount} bespreekpunt{agendaCount === 1 ? "" : "en"} klaar · elke week een schone lijst; na de meeting archiveert hij automatisch en staat de volgende klaar.</div>
+            <div className="text-2xs font-semibold uppercase tracking-[0.1em] text-[var(--color-brand-400)]">Vaste teammeeting</div>
+            <div className="mt-0.5 text-lg font-bold tracking-tight">{dateTime(new Date(w.scheduledAt))}</div>
+            <div className="mt-1 text-xs text-white/70">Elke week een schone lijst; na de meeting archiveert hij automatisch en staat de volgende klaar.</div>
           </div>
-          <span className="shrink-0 text-right">
-            <span className="inline-block rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium">Open de meeting →</span>
-            <span className="mt-1 block text-2xs text-white/60">om de bespreekpunten te bekijken</span>
-          </span>
+          <span className="shrink-0 rounded-full bg-white/15 px-4 py-2 text-sm font-medium">Open de meeting →</span>
         </Link>
 
-        {/* Bespreekpunten die al genoteerd zijn — met wie ze toevoegde. Zo zie je
-            in één oogopslag waar de meeting over gaat, zonder door te klikken. */}
-        <div className="px-4 pt-4">
-          <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
-            Bespreekpunten voor deze meeting{openItems.length > 0 ? ` · ${openItems.length}` : ""}
-          </p>
-          {openItems.length === 0 ? (
-            <p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">Nog geen bespreekpunten — voeg hieronder het eerste toe.</p>
-          ) : (
-            <ul className="mt-2 divide-y divide-[var(--color-line)] rounded-[var(--radius-md)] border border-[var(--color-line)]">
-              {openItems.map((i) => (
-                <li key={i.id} className="flex items-start gap-2.5 px-3 py-2.5">
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--color-brand-500)]" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm">{i.body}</span>
-                    <span className="mt-0.5 flex items-center gap-1 text-2xs text-[var(--color-ink-faint)]">
-                      {i.byName ? <Avatar name={i.byName} size={14} /> : null}
-                      door {i.byName ?? "onbekend"}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <div className="space-y-6 p-6">
+          {/* Bespreekpunten die al genoteerd zijn — met wie ze toevoegde. Zo zie je
+              in één oogopslag waar de meeting over gaat, zonder door te klikken. */}
+          <section>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-[var(--color-ink)]">Bespreekpunten voor deze meeting</h2>
+              {agendaCount > 0 ? <Badge tone="info">{agendaCount}</Badge> : null}
+            </div>
+            {openItems.length === 0 ? (
+              <p className="mt-3 rounded-[var(--radius-md)] border border-dashed border-[var(--color-line-strong)] px-4 py-5 text-center text-sm text-[var(--color-ink-muted)]">
+                Nog geen bespreekpunten — voeg hieronder het eerste toe.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {openItems.map((i) => (
+                  <li key={i.id} className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3.5">
+                    <span className="mt-2 size-2 shrink-0 rounded-full bg-[var(--color-brand-500)]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm leading-relaxed text-[var(--color-ink)]">{i.body}</p>
+                      <p className="mt-1.5 flex items-center gap-1.5 text-2xs text-[var(--color-ink-faint)]">
+                        {i.byName ? <Avatar name={i.byName} size={16} /> : null}
+                        <span>Toegevoegd door {i.byName ?? "onbekend"}</span>
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
-        {/* Duidelijke oproep + voorbeelden: wat zet je neer als bespreekpunt? */}
-        <div className="px-4 pt-3">
-          <p className="text-sm font-semibold">Voeg hieronder een nieuw bespreekpunt toe aan deze meeting</p>
-          <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
-            Heb je iets te bespreken? Voeg het de hele week door toe — dan behandelen we het samen tijdens de vaste teammeeting.
-          </p>
+          {/* Nieuw bespreekpunt toevoegen — eigen, ruim opgezet blok met duidelijke
+              kop en uitleg, zodat het direct leesbaar en uitnodigend is. */}
+          <section className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-5">
+            <div className="flex items-center gap-2">
+              <MessageSquarePlus className="size-5 shrink-0 text-[var(--color-brand-600)]" />
+              <h2 className="text-base font-semibold text-[var(--color-ink)]">Nieuw bespreekpunt toevoegen</h2>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--color-ink-muted)]">
+              Heb je iets te bespreken? Voeg het de hele week door toe — dan behandelen we het samen tijdens de vaste teammeeting.
+            </p>
+            <div className="mt-4">
+              <AddItemForm meetingId={weeklyId} kind="agenda" members={members} bare />
+            </div>
+          </section>
         </div>
-        <AddItemForm meetingId={weeklyId} kind="agenda" members={members} />
       </Card>
 
-      <div className="mb-5"><NewMeetingForm members={members} /></div>
-
-      <Card padded={false}>
-        <CardHeader title="Komende meetings" className="p-5 pb-2" />
-        {upcoming.length === 0 ? <EmptyState title="Geen extra meetings gepland" description="Naast de vaste teammeeting staat er niets ingepland." /> : (
-          <ul className="divide-y divide-[var(--color-line)]">
-            {upcoming.map((m) => <MeetingRow key={m.id} m={m} />)}
-          </ul>
-        )}
-      </Card>
-
-      {/* Geweest: automatisch gearchiveerde meetings, de dag na de meeting. */}
+      {/* Geweest: automatisch gearchiveerde meetings, de dag na de meeting. Met een
+          groen accent zodat je in één oogopslag ziet dat ze zijn geweest, plus wie
+          erbij was. */}
       {past.length > 0 ? (
-        <Card padded={false} className="mt-5">
-          <CardHeader title="Geweest" subtitle="Meetings die al zijn geweest, met hun bespreekpunten." className="p-5 pb-2" />
-          <ul className="divide-y divide-[var(--color-line)]">
-            {past.map((m) => <MeetingRow key={m.id} m={m} archived />)}
-          </ul>
-        </Card>
+        <section>
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-[var(--color-ink)]">Geweest</h2>
+            <span className="text-sm text-[var(--color-ink-muted)]">· meetings die al zijn geweest, met hun bespreekpunten</span>
+          </div>
+          <div className="space-y-3">
+            {past.map((m) => {
+              const attendees = m.participantIds.map((id) => nameById.get(id)).filter((n): n is string => Boolean(n));
+              return (
+                <Card key={m.id} padded={false} className="overflow-hidden">
+                  <Link
+                    href={`/meetings/${m.id}`}
+                    className="flex flex-wrap items-center gap-x-4 gap-y-3 border-l-4 border-[var(--color-good)] bg-[var(--color-good-soft)] px-5 py-4 transition-colors hover:brightness-[0.98]"
+                  >
+                    <CheckCircle2 className="size-5 shrink-0 text-[var(--color-good)]" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-[var(--color-ink)]">{weekdayDate(new Date(m.scheduledAt))}</span>
+                        <Badge tone="good">Bij geweest</Badge>
+                      </div>
+                      <span className="mt-0.5 block truncate text-xs text-[var(--color-ink-muted)]">
+                        {m.title} · {timeOf(new Date(m.scheduledAt))}{m.location ? ` · ${m.location}` : ""}
+                      </span>
+                    </div>
+                    <Attendees names={attendees} fallback={m.participantIds.length} />
+                    <span className="shrink-0 text-xs font-medium text-[var(--color-good)]">openen →</span>
+                  </Link>
+                  {m.summary ? (
+                    <div className="border-t border-[var(--color-line)] px-5 py-3">
+                      <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Samenvatting van besproken punten</p>
+                      <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-[var(--color-ink-muted)]">{m.summary}</p>
+                    </div>
+                  ) : null}
+                </Card>
+              );
+            })}
+          </div>
+        </section>
       ) : null}
+
+      {/* Buiten de vaste teammeeting plan je zelden iets; de optie blijft wel
+          behouden, maar bewust subtiel en onderaan. */}
+      <div className="flex items-center gap-3 border-t border-[var(--color-line)] pt-5">
+        <NewMeetingForm members={members} />
+        <span className="text-xs text-[var(--color-ink-faint)]">Alleen nodig voor een losse meeting buiten de vaste teammeeting.</span>
+      </div>
     </div>
   );
 }
 
-function MeetingRow({ m, archived = false }: { m: typeof teamMeetings.$inferSelect; archived?: boolean }) {
+/** Wie was erbij — compacte, overlappende avatars met een label, zodat je in één
+ *  oogopslag ziet wie aanwezig was. Valt terug op een telling als er geen namen
+ *  bekend zijn. */
+function Attendees({ names, fallback }: { names: string[]; fallback: number }) {
+  if (names.length === 0) {
+    if (fallback === 0) return null;
+    return <span className="shrink-0 text-xs text-[var(--color-ink-muted)]">{fallback} aanwezig</span>;
+  }
+  const shown = names.slice(0, 6);
+  const rest = names.length - shown.length;
   return (
-    <li className={`px-5 py-3 hover:bg-[var(--color-surface-2)]${archived ? " opacity-90" : ""}`}>
-      <div className="flex items-center gap-2">
-        <Link href={`/meetings/${m.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-3">
-          <span className="min-w-0">
-            {/* Geweest: de dag + datum vooraan en in het oog springend, zodat je
-                direct ziet wanneer de meeting was (bijv. "Woensdag 21 oktober 2026"). */}
-            {archived ? (
-              <span className="mb-0.5 block text-xs font-bold text-[var(--color-brand-600)]">{weekdayDate(new Date(m.scheduledAt))}</span>
-            ) : null}
-            <span className="block truncate text-sm font-medium">{m.title}</span>
-            <span className="block truncate text-xs text-[var(--color-ink-muted)]">
-              {archived ? timeOf(new Date(m.scheduledAt)) : dateTime(new Date(m.scheduledAt))}{m.location ? ` · ${m.location}` : ""} · {m.participantIds.length} deelnemers
-            </span>
+    <span className="flex shrink-0 items-center gap-2" title={`Aanwezig: ${names.join(", ")}`}>
+      <span className="flex -space-x-1.5">
+        {shown.map((n, idx) => (
+          <span key={idx} className="rounded-full ring-2 ring-[var(--color-good-soft)]">
+            <Avatar name={n} size={22} />
           </span>
-          <span className="shrink-0 text-xs text-[var(--color-brand-600)]">openen →</span>
-        </Link>
-        {archived ? null : <DeleteMeetingRowButton id={m.id} title={m.title} />}
-      </div>
-      {archived && m.summary ? (
-        <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-3 py-2">
-          <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Samenvatting van besproken punten</p>
-          <p className="mt-1 whitespace-pre-line text-xs leading-snug text-[var(--color-ink-muted)]">{m.summary}</p>
-        </div>
-      ) : null}
-    </li>
+        ))}
+      </span>
+      <span className="text-xs text-[var(--color-ink-muted)]">{names.length} aanwezig{rest > 0 ? ` (+${rest})` : ""}</span>
+    </span>
   );
 }
