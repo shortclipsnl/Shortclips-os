@@ -223,8 +223,8 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: atClient ? `${d} dag(en) te laat · wacht op klant → herinneren` : `${d} dag(en) te laat · ${v.editorName ?? "geen editor"} → afmaken`,
       href: `/videos/${v.id}`, roles: atClient ? CC : EDIT,
-      action: atClient ? "Klant herinneren aan feedback" : `${projTitle(v.clientName, v.title)} afmaken`,
-      reason: atClient ? `${d} ${d === 1 ? "dag" : "dagen"} over deadline, wacht op klant` : `${d} ${d === 1 ? "dag" : "dagen"} over deadline · ${v.editorName ?? "geen editor"}`,
+      action: atClient ? "Klant herinneren aan feedback" : "Video afmaken",
+      reason: atClient ? `${projTitle(v.clientName, v.title)} · ${d} ${d === 1 ? "dag" : "dagen"} over deadline, wacht op klant` : `${projTitle(v.clientName, v.title)} · ${d} ${d === 1 ? "dag" : "dagen"} over deadline · ${v.editorName ?? "geen editor"}`,
       priority: "hoog",
     });
   }
@@ -278,8 +278,8 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `${Number(v.days)} dag(en) klaargezet · ${v.editorName ?? "geen editor"} → intern controleren`,
       href: `/videos/${v.id}`, roles: CC,
-      action: `${projTitle(v.clientName, v.title)} controleren`,
-      reason: Number(v.days) <= 0 ? `Vandaag klaargezet door ${v.editorName ?? "de editor"}` : `${Number(v.days)} ${Number(v.days) === 1 ? "dag" : "dagen"} klaargezet door ${v.editorName ?? "de editor"}`,
+      action: "Video intern controleren",
+      reason: `${projTitle(v.clientName, v.title)} · ${Number(v.days) <= 0 ? "vandaag klaargezet" : `${Number(v.days)} ${Number(v.days) === 1 ? "dag" : "dagen"} klaargezet`} door ${v.editorName ?? "de editor"}`,
       priority: Number(v.days) >= 3 ? "hoog" : "normaal",
     });
   }
@@ -366,8 +366,8 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
       title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
       detail: `Goedgekeurd, ${daysSince(v.statusChangedAt)} dag(en) niet verstuurd → inplannen/publiceren`,
       href: `/videos/${v.id}`, roles: CC,
-      action: `${projTitle(v.clientName, v.title)} versturen of inplannen`,
-      reason: daysSince(v.statusChangedAt) <= 0 ? "Vandaag goedgekeurd" : `Goedgekeurd ${daysSince(v.statusChangedAt)} ${daysSince(v.statusChangedAt) === 1 ? "dag" : "dagen"} geleden`,
+      action: "Video versturen of inplannen",
+      reason: `${projTitle(v.clientName, v.title)} · ${daysSince(v.statusChangedAt) <= 0 ? "vandaag goedgekeurd" : `goedgekeurd ${daysSince(v.statusChangedAt)} ${daysSince(v.statusChangedAt) === 1 ? "dag" : "dagen"} geleden`}`,
       priority: daysSince(v.statusChangedAt) >= 7 ? "hoog" : "normaal",
     });
   }
@@ -380,7 +380,7 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
       title: `${p.clientName} — ${p.title}`,
       detail: `${d} dag(en) over geplande publicatie → publiceren`,
       href: p.deliverableId ? `/videos/${p.deliverableId}` : "/calendar", roles: CC,
-      action: `${p.title} publiceren`, reason: `${d} ${d === 1 ? "dag" : "dagen"} over de geplande datum`,
+      action: "Video publiceren", reason: `${p.title} · ${d} ${d === 1 ? "dag" : "dagen"} over de geplande datum`,
       priority: d >= 3 ? "hoog" : "normaal",
     });
   }
