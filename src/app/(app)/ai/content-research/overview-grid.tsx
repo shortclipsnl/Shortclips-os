@@ -61,7 +61,9 @@ export function OverviewGrid({ clients, canWrite }: { clients: OverviewClient[];
 
               <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
                 <LinkButton href={`/ai/content-research/${c.id}?tab=ideeen`} variant="secondary" size="sm">Bekijk ideeën</LinkButton>
-                {canWrite ? <StartResearchButton clientId={c.id} running={c.running} variant="ghost" /> : null}
+                {/* Status is leidend: alleen actieve klanten kunnen nieuw onderzoek
+                    starten. Inactieve klanten houden hun bestaande ideeën. */}
+                {canWrite && c.active ? <StartResearchButton clientId={c.id} running={c.running} variant="ghost" /> : null}
               </div>
             </Card>
           ))}

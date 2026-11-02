@@ -52,6 +52,12 @@ export async function startResearch(clientId: string): Promise<ActionResult & { 
   try {
     const viewer = await requirePermission("content_research:write");
     assertClientAccess(viewer, clientId);
+    // Status is leidend: voor inactieve klanten (paused/churned) wordt géén nieuw
+    // onderzoek gestart. Bestaande onderzoeken en ideeën blijven gewoon bestaan.
+    const [c] = await db.select({ status: clients.status }).from(clients).where(eq(clients.id, clientId)).limit(1);
+    if (c && (c.status === "paused" || c.status === "churned")) {
+      return { ok: false, message: "Deze klant staat op inactief — er wordt geen nieuw onderzoek gestart. Zet de klant weer op actief in Klantbeheer." };
+    }
     if (!aiConfigured()) return { ok: false, message: "Er is nog geen AI-sleutel ingesteld (ANTHROPIC_API_KEY)." };
     if (await hasActiveRun(clientId)) return { ok: false, message: "Er loopt al een onderzoek voor deze klant." };
 
