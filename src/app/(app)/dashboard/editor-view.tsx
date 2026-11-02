@@ -8,6 +8,7 @@ import { Card, CardHeader, ClientLogo, EmptyState, Stat, TeamAvatar } from "@/co
 import { pct, plural, relativeDays } from "@/lib/format";
 import { isFirstVersionPending } from "@/lib/edit-deadline";
 import { EDIT_PHASE_META } from "@/lib/statuses";
+import { AgendaConnect } from "./agenda-connect";
 import { buildEditorGreeting } from "@/lib/editor-greeting";
 import { AvailabilityBox } from "./availability-box";
 import { DeliveredCelebration } from "./delivered-celebration";
@@ -102,6 +103,9 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
           </p>
         </div>
       ) : null}
+
+      {/* Koppel je eigen Google Agenda: al je projecten + deadlines automatisch. */}
+      <AgendaConnect />
 
       {/* Wat komt er aan — in één oogopslag wat er op je bord staat en wat te laat is. */}
       <div>

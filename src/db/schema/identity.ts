@@ -42,6 +42,9 @@ export const users = pgTable(
      * klantaccount nooit buiten de eigen klant kan kijken.
      */
     clientId: uuid("client_id"),
+    /** Geheim token voor de persoonlijke iCal-agendafeed (editor). Uniek, random;
+     *  opnieuw genereren trekt de oude abonnementslink in. */
+    icalToken: varchar("ical_token", { length: 64 }),
     locale: varchar("locale", { length: 8 }).notNull().default("nl"),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     failedLoginCount: integer("failed_login_count").notNull().default(0),
@@ -59,6 +62,7 @@ export const users = pgTable(
     unique("users_email_unique").on(t.email),
     index("users_client_idx").on(t.clientId),
     index("users_role_idx").on(t.primaryRole),
+    index("users_ical_token_idx").on(t.icalToken),
   ],
 );
 

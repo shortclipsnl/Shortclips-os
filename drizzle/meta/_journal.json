@@ -610,6 +610,13 @@
       "when": 1793632054059,
       "tag": "0086_big_scream",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1793633357304,
+      "tag": "0087_chilly_the_captain",
+      "breakpoints": true
     }
   ]
 }
