@@ -18,7 +18,7 @@ import { env } from "@/lib/env";
  * ------------------------------------------------------------------ */
 
 /** Afgeronde/gepubliceerde statussen horen niet meer in de agenda. */
-const DONE_STATUSES = ["approved", "ready_to_publish", "scheduled", "published", "analysis_available"];
+const DONE_STATUSES = ["approved", "ready_to_publish", "scheduled", "published", "analysis_available"] as const;
 
 function newToken(): string {
   return randomBytes(24).toString("base64url"); // 32 tekens, url-veilig
@@ -71,7 +71,7 @@ async function editorFeedRows(userId: string): Promise<FeedRow[]> {
         eq(deliverables.editorId, userId),
         isNull(deliverables.deletedAt),
         isNotNull(deliverables.dueOn),
-        notInArray(deliverables.status, DONE_STATUSES),
+        notInArray(deliverables.status, [...DONE_STATUSES]),
       ),
     );
   return rows as FeedRow[];
