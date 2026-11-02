@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Download } from "lucide-react";
 import { requireOwner } from "@/server/auth/context";
 import { aiConfigured } from "@/server/ai/client";
 import { listMentorConversations, listMentorMemories } from "@/server/actions/mentor";
@@ -23,6 +24,16 @@ export default async function MentorPage() {
 
   return (
     <div className="mx-auto max-w-[1200px]">
+      {/* Volledige export van alle mentor-inhoud (gesprekken, adviezen, geheugen)
+          als huisstijl-PDF — downloadbaar om te bewaren of te archiveren. */}
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+        <a
+          href="/api/ai/mentor/export/pdf"
+          className="inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3.5 py-2 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"
+        >
+          <Download className="size-4" /> Exporteer alles als PDF
+        </a>
+      </div>
       <MentorChat conversations={conversations} memories={memories} aiReady={aiConfigured()} firstName={firstName} />
     </div>
   );
