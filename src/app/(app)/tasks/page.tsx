@@ -51,9 +51,10 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     resolvedByName: h.resolvedById ? nameById.get(h.resolvedById) ?? null : null,
   }));
 
-  // Eerste bezoek (geen ?persoon): meteen je eigen taken tonen i.p.v. "Kies een
-  // persoon". De knop "Iedereen" stuurt een lege ?persoon= en houdt het overzicht.
-  const persoon = spPersoon === undefined && office.some((u) => u.id === viewer.id) ? viewer.id : spPersoon;
+  // Eerste bezoek (geen ?persoon): voor IEDEREEN meteen de eigen taken tonen
+  // i.p.v. "Kies een persoon". De knop "Iedereen" stuurt een lege ?persoon= en
+  // houdt het overzicht.
+  const persoon = spPersoon === undefined ? viewer.id : spPersoon;
   // Open overdrachtspunten (voor het aantal op de kleine "Overdracht"-kaart).
   const handoverOpen = handover.filter((h) => !h.resolvedAt).length;
 
@@ -62,6 +63,11 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
   // Personenrij: het kernteam in de vaste volgorde (Jarno, Milou, Jiska, Rutger).
   const core = [...office].sort((a, b) => coreStaffRank(a.email) - coreStaffRank(b.email));
+  // Staat de viewer zelf niet in het kernteam (bijv. een editor), zet 'm dan
+  // vooraan als eigen chip — zo ziet iedereen z'n eigen taken en kan die er na
+  // "Iedereen" weer naartoe.
+  const inCore = core.some((u) => u.id === viewer.id);
+  const persons = inCore ? core : [{ id: viewer.id, fullName: `${viewer.fullName} (jij)` }, ...core];
 
   // Taken voor de geselecteerde weergave ophalen. De automatisch gegenereerde
   // AI-verbeterpunten (source "automation" + entiteit "ai_insight") blijven hier
@@ -94,7 +100,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   }
 
   const selected = persoon && persoon !== "algemeen" && persoon !== "overdracht" ? team.find((u) => u.id === persoon) : null;
-  const selectedLabel = selected ? selected.fullName : persoon === "algemeen" ? "Verdelen onder team" : persoon === "overdracht" ? "Overdracht" : null;
+  // Label voor de kop: ook als de viewer zelf niet in de toewijsbare lijst staat,
+  // tonen we bij de eigen weergave netjes "Taken van <jij>".
+  const selectedLabel = selected ? selected.fullName : persoon === viewer.id ? viewer.fullName : persoon === "algemeen" ? "Verdelen onder team" : persoon === "overdracht" ? "Overdracht" : null;
 
   let buckets: { label: string; tone?: "bad" | "warn"; items: TaskItemData[] }[] = [];
   if (persoon && persoon !== "overdracht") {
@@ -126,7 +134,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       {/* Personen als primaire navigatie — eigen taken staan zo meteen bovenaan.
           Overdracht is een klein tabblad naast "Algemeen" i.p.v. een groot blok. */}
       <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-        {core.map((u) => (
+        {persons.map((u) => (
           <PersonCard key={u.id} id={u.id} name={u.fullName} count={openCountFor(u.id)} active={persoon === u.id} />
         ))}
         <PersonCard id="algemeen" name="Verdelen onder team" count={algemeenCount} active={persoon === "algemeen"} generic chip="⇢" countLabel="te verdelen" />
@@ -141,7 +149,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           <QuickTaskLines
             key={`qt-${persoon ?? "none"}`}
             users={userOptions}
-            defaultAssignee={selected?.id ?? (persoon === "algemeen" ? undefined : office.some((u) => u.id === viewer.id) ? viewer.id : undefined)}
+            defaultAssignee={selected?.id ?? (persoon === "algemeen" ? undefined : persoon === viewer.id ? viewer.id : undefined)}
           />
         </div>
       ) : null}
