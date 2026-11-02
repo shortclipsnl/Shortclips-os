@@ -8,7 +8,7 @@
  */
 export const CLIENT_ALIASES: Record<string, string[]> = {
   // Frame.io-projectnaam / agenda-titel die afwijkt van de klantnaam.
-  "shades-by-erik-kuster": ["shades by eric kuster", "buildings group", "buildingsgroup"],
+  "shades-by-erik-kuster": ["shades by eric kuster", "shades by erik kuster", "buildings group", "buildingsgroup"],
   "marco-van-beek-premium-cars": ["marco van beek"],
   "benz-collector-sneek": ["benz collector museum", "benz collector", "benzcollector"],
   "donker-groep": ["donkergroen", "donker groen"],
