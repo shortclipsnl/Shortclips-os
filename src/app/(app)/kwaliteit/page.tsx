@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { isOwner, requireInternal } from "@/server/auth/context";
+import { requireInternal } from "@/server/auth/context";
 import { getAttentionBoard } from "@/server/attention";
 import { AttentionBoard } from "./attention-board";
 
@@ -20,7 +20,7 @@ export default async function AttentionPage() {
         items={items}
         team={team}
         viewerId={viewer.id}
-        defaultScope={isOwner(viewer) || !team.some((t) => t.id === viewer.id) ? "all" : "mine"}
+        defaultScope="mine"
       />
     </div>
   );
