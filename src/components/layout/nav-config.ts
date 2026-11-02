@@ -55,7 +55,6 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/dashboard", label: "Vandaag", icon: "LayoutDashboard" },
       { href: "/tasks", label: "Taken", icon: "CircleCheck", permissions: ["tasks:read"], match: "/tasks" },
       { href: "/kwaliteit", label: "Aandachtspunten", icon: "ShieldCheck", match: "/kwaliteit" },
-      { href: "/ai/mentor", label: "AI Mentor", icon: "Brain", ownerOnly: true, match: "/ai/mentor" },
     ],
   },
   {
