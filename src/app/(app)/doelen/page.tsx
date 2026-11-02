@@ -17,7 +17,7 @@ export default async function DoelenPage() {
   const owner = isOwner(viewer);
 
   return (
-    <div className="mx-auto max-w-[1100px]">
+    <div className="mx-auto max-w-[1240px]">
       <PageHeader
         title="Doelen"
         description={`Q4 2026 · 1 okt - 31 dec · week ${overview.weekOfQuarter} van ${overview.totalWeeks} · ${overview.quarterPct}% van het kwartaal voorbij`}

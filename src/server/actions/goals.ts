@@ -8,6 +8,7 @@ import { goalMilestones, goals, goalUpdates } from "@/db/schema";
 import { ForbiddenError, requireInternal, requireOwner } from "@/server/auth/context";
 import { recomputeAllGoals, recomputeAndNotify } from "@/server/goals/recompute";
 import { seedGoals } from "@/server/goals/seed";
+import { Q4_END, Q4_START } from "@/server/goals/catalog";
 
 export type GoalActionResult = { ok: boolean; message?: string };
 
@@ -124,6 +125,72 @@ export async function archiveGoal(goalId: string): Promise<GoalActionResult> {
     await db.update(goals).set({ archived: true, updatedAt: new Date() }).where(eq(goals.id, goalId));
     revalidateGoals();
     return { ok: true };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+const detailsSchema = z.object({
+  title: z.string().trim().min(3, "Geef het doel een omschrijving.").max(240),
+  target: z.number().finite().min(0).nullable().optional(),
+});
+
+/** Omschrijving en/of doelwaarde van een doel aanpassen (alleen Jarno). */
+export async function updateGoalDetails(goalId: string, input: { title: string; target?: number | null }): Promise<GoalActionResult> {
+  try {
+    await requireOwner();
+    const parsed = detailsSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Ongeldige invoer." };
+    const [goal] = await db.select({ id: goals.id, type: goals.type }).from(goals).where(eq(goals.id, goalId)).limit(1);
+    if (!goal) return { ok: false, message: "Doel niet gevonden." };
+    const patch: Partial<typeof goals.$inferInsert> = { title: parsed.data.title, updatedAt: new Date() };
+    // Mijlpaaldoelen rekenen met hun stappen, niet met een doelwaarde.
+    if (parsed.data.target !== undefined && goal.type !== "milestone") {
+      patch.target = parsed.data.target != null ? String(parsed.data.target) : null;
+    }
+    await db.update(goals).set(patch).where(eq(goals.id, goalId));
+    await recomputeAndNotify(goalId);
+    revalidateGoals();
+    return { ok: true, message: "Doel bijgewerkt." };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+const createSchema = z.object({
+  pillar: z.enum(["sales", "productie", "team", "systemen"]),
+  title: z.string().trim().min(3, "Geef het doel een omschrijving.").max(240),
+  target: z.number().finite().min(0).nullable().optional(),
+});
+
+/** Nieuw handmatig doel toevoegen aan een pijler (alleen Jarno). Loopt t/m het
+ *  einde van het lopende kwartaal en start op "nog niet bijgewerkt". */
+export async function createGoal(input: { pillar: string; title: string; target?: number | null }): Promise<GoalActionResult> {
+  try {
+    await requireOwner();
+    const parsed = createSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Ongeldige invoer." };
+    const existing = await db.select({ sortOrder: goals.sortOrder }).from(goals).where(eq(goals.pillar, parsed.data.pillar));
+    const nextOrder = existing.reduce((m, r) => Math.max(m, r.sortOrder), 0) + 1;
+    const [row] = await db
+      .insert(goals)
+      .values({
+        pillar: parsed.data.pillar,
+        title: parsed.data.title,
+        type: "count",
+        source: "manual",
+        target: parsed.data.target != null ? String(parsed.data.target) : null,
+        startDate: Q4_START,
+        endDate: Q4_END,
+        visibility: "team",
+        sortOrder: nextOrder,
+      })
+      .returning({ id: goals.id });
+    if (row) await recomputeAndNotify(row.id);
+    revalidateGoals();
+    return { ok: true, message: "Doel toegevoegd." };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;
