@@ -23,6 +23,7 @@
  * Draait op de actieve driver (PGlite lokaal, Postgres/Supabase in productie)
  * en wordt bij elke deploy uitgevoerd via vercel-build.
  */
+import { sql } from "drizzle-orm";
 import { db, rawClient } from "../src/db/client";
 import { permissions, rolePermissions, roles } from "../src/db/schema";
 import {
@@ -77,6 +78,17 @@ async function main() {
   const missingSet = new Set<string>(missing);
   const links: Array<{ roleId: string; permissionId: string }> = [];
 
+  // Hoeveel rechten heeft elke rol nu? Nodig voor stap 4b: een systeemrol die
+  // het merendeel van zijn standaardrechten mist, is nooit goed geïnitialiseerd
+  // (bijv. een later toegevoegde rol zoals operational_manager: stap 3 voegde de
+  // rol toe, maar de toen al bestaande rechten werden niet toegekend omdat ze die
+  // run niet "nieuw" waren — zo'n rol houdt maar een handjevol rechten over).
+  const permCounts = await db
+    .select({ roleId: rolePermissions.roleId, n: sql<number>`count(*)::int` })
+    .from(rolePermissions)
+    .groupBy(rolePermissions.roleId);
+  const countByRoleId = new Map(permCounts.map((r) => [r.roleId, r.n]));
+
   // 4a. Eigenaar: altijd elk recht. onConflictDoNothing laat bestaande links staan,
   //     dus dit voegt alleen de ontbrekende toe en raakt verder niets aan.
   const ownerRoleId = roleByKey.get("owner");
@@ -87,14 +99,23 @@ async function main() {
     }
   }
 
-  // 4b. Overige rollen: standaardrechten toekennen, maar alleen voor rechten die
-  //     in deze run nieuw zijn, zodat handmatige aanpassingen behouden blijven.
+  // 4b. Overige rollen: standaardrechten toekennen. Normaal alleen voor rechten
+  //     die in deze run nieuw zijn, zodat handmatige aanpassingen (Instellingen →
+  //     Rollen) behouden blijven. Uitzondering: mist de rol het MERENDEEL van zijn
+  //     standaardrechten, dan is hij nooit goed geïnitialiseerd en krijgt hij zijn
+  //     VOLLEDIGE standaardset. Een bewust uitgeklede rol houdt juist bijna al zijn
+  //     rechten; de grens op de helft scheidt "nooit ingesteld" (bijv. een later
+  //     toegevoegde rol met 2/41) van "handmatig aangepast" (bijv. 38/41). Zo heelt
+  //     dit later toegevoegde rollen automatisch zonder curatie te overschrijven.
   for (const def of ROLE_DEFINITIONS) {
     if (def.key === "owner") continue;
     const roleId = roleByKey.get(def.key);
     if (!roleId) continue;
-    for (const perm of permissionsForRole(def.key)) {
-      if (!missingSet.has(perm)) continue; // bestaande rechten niet aanraken
+    const defaults = permissionsForRole(def.key);
+    const have = countByRoleId.get(roleId) ?? 0;
+    const uninitialised = have * 2 < defaults.length; // minder dan de helft aanwezig
+    for (const perm of defaults) {
+      if (!uninitialised && !missingSet.has(perm)) continue; // bestaande rechten niet aanraken
       const permissionId = permByKey.get(perm);
       if (permissionId) links.push({ roleId, permissionId });
     }
