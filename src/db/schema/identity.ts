@@ -54,6 +54,14 @@ export const users = pgTable(
      *  beschikbaar is. Door de persoon zelf in te vullen op Vandaag, zodat het
      *  team er rekening mee kan houden. */
     availabilityNote: text("availability_note"),
+    /** Gestructureerde beschikbaarheid: per item een periode (datum, van–tot of
+     *  terugkerend) plus wat er geldt. Door de persoon zelf ingevuld op Vandaag.
+     *  availabilityNote wordt hieruit afgeleid (leesbare tekst) zodat de team- en
+     *  capaciteitsoverzichten ongewijzigd blijven werken. */
+    availabilityPeriods: jsonb("availability_periods")
+      .notNull()
+      .default(sql`'[]'::jsonb`)
+      .$type<{ id: string; from: string | null; to: string | null; label: string | null; note: string }[]>(),
     settings: jsonb("settings").notNull().default(sql`'{}'::jsonb`),
     ...timestamps,
     ...softDelete,

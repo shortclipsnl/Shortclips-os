@@ -20,6 +20,7 @@ const EMPTY = {
   coordinatorId: "",
   videographerId: "",
   monthlyVideoQuota: "0",
+  contentFocus: "",
   monthlyRevenue: "",
   startedOn: "",
   notes: "",

@@ -300,6 +300,13 @@ export async function setClientEditor(clientId: string, editorName: string | nul
 const CLIENT_STATUSES = ["prospect", "onboarding", "active", "paused", "churned"] as const;
 type ClientStatus = (typeof CLIENT_STATUSES)[number];
 
+/** Soort content dat we voor de klant maken. */
+export const CONTENT_FOCUSES = ["organisch", "advertentie", "beide"] as const;
+export type ContentFocus = (typeof CONTENT_FOCUSES)[number];
+function cleanContentFocus(v: string | null | undefined): ContentFocus | null {
+  return CONTENT_FOCUSES.includes((v ?? "") as ContentFocus) ? (v as ContentFocus) : null;
+}
+
 export type ClientInput = {
   name: string;
   legalName?: string | null;
@@ -312,6 +319,7 @@ export type ClientInput = {
   coordinatorId?: string | null;
   videographerId?: string | null;
   monthlyVideoQuota?: number;
+  contentFocus?: string | null;
   monthlyRevenue?: string | null;
   startedOn?: string | null;
   notes?: string | null;
@@ -456,6 +464,7 @@ export async function createClient(input: ClientInput): Promise<ActionResult> {
         coordinatorId: input.coordinatorId || null,
         videographerId: input.videographerId || null,
         monthlyVideoQuota: input.monthlyVideoQuota ?? 0,
+        contentFocus: cleanContentFocus(input.contentFocus),
         monthlyRevenue: clean(input.monthlyRevenue) ?? undefined,
         startedOn: clean(input.startedOn) ?? undefined,
         notes: clean(input.notes),
@@ -546,6 +555,7 @@ export async function updateClient(slug: string, input: ClientInput): Promise<Ac
         coordinatorId: input.coordinatorId || null,
         videographerId: input.videographerId || null,
         monthlyVideoQuota: input.monthlyVideoQuota ?? 0,
+        contentFocus: cleanContentFocus(input.contentFocus),
         ...(newRevenue !== null ? { monthlyRevenue: newRevenue } : {}),
         startedOn: newStarted,
         notes: clean(input.notes),

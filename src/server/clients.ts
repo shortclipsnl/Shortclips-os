@@ -386,6 +386,7 @@ export async function getClientForEdit(viewer: Viewer, slug: string) {
       coordinatorId: clients.coordinatorId,
       videographerId: clients.videographerId,
       monthlyVideoQuota: clients.monthlyVideoQuota,
+      contentFocus: clients.contentFocus,
       monthlyRevenue: clients.monthlyRevenue,
       startedOn: clients.startedOn,
       notes: clients.notes,

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, Download, ExternalLink, Info, Scissors } from "lucide-react";
+import { ArrowLeft, BookOpen, Clapperboard, Download, ExternalLink, FileText, Film, Info, Scissors, Send } from "lucide-react";
 import { Card, ClientLogo, EmptyState } from "@/components/ui";
 import { requireInternal } from "@/server/auth/context";
-import { getClientLibraryDetail } from "@/server/client-library";
+import { CONTENT_FOCUS_LABEL, getClientLibraryDetail } from "@/server/client-library";
 import { EditingGuideUpload } from "./editing-guide-upload";
 
 export const metadata: Metadata = { title: "Klantinformatie" };
@@ -22,8 +22,9 @@ export default async function KlantInfoPage({ params }: { params: Promise<{ slug
   const viewer = await requireInternal();
   const detail = await getClientLibraryDetail(viewer, slug);
   if (!detail) notFound();
-  const { client, overDeKlant, richtlijnen, editingAandachtspunten, guide, canManage } = detail;
+  const { client, overDeKlant, richtlijnen, editingAandachtspunten, afspraken, guide, canManage } = detail;
   const guideUrl = `/api/editing-guide/${client.id}`;
+  const contentFocusLabel = client.contentFocus ? CONTENT_FOCUS_LABEL[client.contentFocus] ?? client.contentFocus : null;
 
   return (
     <div className="mx-auto max-w-[1000px]">
@@ -41,7 +42,38 @@ export default async function KlantInfoPage({ params }: { params: Promise<{ slug
         </div>
       </div>
 
-      {/* A. Over de klant */}
+      {/* A. Contract & afspraken — in één oogopslag wat er per maand speelt. */}
+      <Card className="mb-4">
+        <h2 className="mb-3 flex items-center gap-1.5 text-base font-bold text-[var(--color-ink)]"><FileText className="size-4" /> Contract &amp; afspraken</h2>
+        <div className="grid gap-2.5 sm:grid-cols-3">
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3">
+            <div className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]"><Film className="size-3.5" /> Shorts per maand</div>
+            <div className="mt-1 text-lg font-bold text-[var(--color-ink)]">{client.monthlyVideoQuota > 0 ? client.monthlyVideoQuota : "—"}</div>
+          </div>
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3">
+            <div className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]"><Clapperboard className="size-3.5" /> Soort content</div>
+            <div className="mt-1 text-sm font-semibold text-[var(--color-ink)]">{contentFocusLabel ?? <span className="font-normal text-[var(--color-ink-faint)]">Nog niet ingesteld</span>}</div>
+          </div>
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3">
+            <div className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]"><Send className="size-3.5" /> Plaatsen</div>
+            <div className="mt-1 text-sm font-semibold text-[var(--color-ink)]">{client.weHandlePosting ? "Shortclips plaatst" : "Klant plaatst zelf"}</div>
+          </div>
+        </div>
+        {client.sector ? (
+          <div className="mt-3 text-sm text-[var(--color-ink-muted)]"><span className="font-semibold text-[var(--color-ink)]">Branche:</span> {client.sector}</div>
+        ) : null}
+        {afspraken.length ? (
+          <div className="mt-3">
+            <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]"><Scissors className="size-3.5" /> Vaste montageafspraken</div>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--color-ink-muted)]">
+              {afspraken.map((a, i) => <li key={i}>{a}</li>)}
+            </ul>
+          </div>
+        ) : null}
+        <p className="mt-3 text-xs text-[var(--color-ink-faint)]">Deze gegevens komen rechtstreeks uit Klantenbeheer en blijven automatisch actueel.</p>
+      </Card>
+
+      {/* B. Over de klant */}
       <Card className="mb-4">
         <h2 className="mb-2 flex items-center gap-1.5 text-base font-bold text-[var(--color-ink)]"><Info className="size-4" /> Over de klant</h2>
         {client.description ? <p className="text-sm leading-relaxed text-[var(--color-ink-muted)]">{client.description}</p> : null}

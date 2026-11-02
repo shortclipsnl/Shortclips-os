@@ -27,6 +27,7 @@ type Draft = {
   coordinatorId: string;
   videographerId: string;
   monthlyVideoQuota: string;
+  contentFocus: string;
   monthlyRevenue: string;
   startedOn: string;
   notes: string;
@@ -76,6 +77,7 @@ export function ClientForm({
       coordinatorId: draft.coordinatorId || null,
       videographerId: draft.videographerId || null,
       monthlyVideoQuota: Number(draft.monthlyVideoQuota) || 0,
+      contentFocus: draft.contentFocus || null,
       monthlyRevenue: draft.monthlyRevenue || null,
       startedOn: draft.startedOn || null,
       notes: draft.notes,
@@ -131,10 +133,21 @@ export function ClientForm({
         </Field>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Field label="Shorts per maand">
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label="Shorts per maand" hint="Standaard aantal shorts uit het contract.">
           <input className="sc-input" type="number" min={0} value={draft.monthlyVideoQuota} onChange={(e) => set("monthlyVideoQuota", e.target.value)} />
         </Field>
+        <Field label="Soort content" hint="Zichtbaar in de editorsportalen per klant.">
+          <select className="sc-input" value={draft.contentFocus} onChange={(e) => set("contentFocus", e.target.value)}>
+            <option value="">— Nog niet ingesteld —</option>
+            <option value="organisch">Organische video&apos;s</option>
+            <option value="advertentie">Advertentievideo&apos;s</option>
+            <option value="beide">Beide</option>
+          </select>
+        </Field>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
         <Field label="Status">
           <select className="sc-input" value={draft.status} onChange={(e) => set("status", e.target.value)}>
             {STATUS_OPTIONS.map((s) => (

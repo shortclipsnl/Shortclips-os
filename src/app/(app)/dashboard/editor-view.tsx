@@ -201,7 +201,7 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
       ) : null}
 
       {/* Beschikbaarheid: zelf aangeven wanneer je niet beschikbaar bent. */}
-      <AvailabilityBox note={data.availabilityNote} />
+      <AvailabilityBox note={data.availabilityNote} periods={data.availabilityPeriods} />
 
       {/* Contactpersonen bij ShortClips — Milou links, Jiska rechts. Allebei via
           WhatsApp bereikbaar (of via de WhatsApp-groep). Met vaste vrije dag,

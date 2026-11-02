@@ -2,9 +2,15 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { BookOpen, Search } from "lucide-react";
+import { BookOpen, Clapperboard, Film, Search } from "lucide-react";
 import { ClientLogo } from "@/components/ui";
 import type { MyClient } from "@/server/client-library";
+
+const CONTENT_FOCUS_SHORT: Record<string, string> = {
+  organisch: "Organisch",
+  advertentie: "Advertentie",
+  beide: "Organisch + ad",
+};
 
 function fmtDate(d: Date | string | null) {
   if (!d) return null;
@@ -53,6 +59,16 @@ export function MijnKlantenGrid({ clients }: { clients: MyClient[] }) {
               </div>
               {c.description ? <p className="mt-2 line-clamp-2 text-xs text-[var(--color-ink-muted)]">{c.description}</p> : null}
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                {c.monthlyVideoQuota > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-neutral-soft)] px-2 py-0.5 text-2xs font-medium text-[var(--color-ink-muted)]">
+                    <Film className="size-3" /> {c.monthlyVideoQuota}/mnd
+                  </span>
+                ) : null}
+                {c.contentFocus ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-brand-50)] px-2 py-0.5 text-2xs font-medium text-[var(--color-brand-700)]">
+                    <Clapperboard className="size-3" /> {CONTENT_FOCUS_SHORT[c.contentFocus] ?? c.contentFocus}
+                  </span>
+                ) : null}
                 <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-medium ${c.hasGuide ? "bg-[var(--color-good-soft)] text-[#1d6b4c]" : "bg-[var(--color-neutral-soft)] text-[var(--color-ink-faint)]"}`}>
                   <BookOpen className="size-3" /> {c.hasGuide ? "Editing Guide" : "Geen guide"}
                 </span>

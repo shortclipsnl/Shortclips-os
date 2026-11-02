@@ -35,8 +35,16 @@ const CATEGORY_LABEL: Record<string, string> = {
 export type MyClient = {
   id: string; name: string; slug: string; logoUrl: string | null; color: string | null;
   sector: string | null; description: string | null;
+  monthlyVideoQuota: number; contentFocus: string | null;
   hasGuide: boolean; guideUpdatedAt: Date | null; richtlijnenCount: number;
   lastUpdated: Date | null;
+};
+
+/** Leesbaar label voor het soort content ("organisch" | "advertentie" | "beide"). */
+export const CONTENT_FOCUS_LABEL: Record<string, string> = {
+  organisch: "Organische video's",
+  advertentie: "Advertentievideo's",
+  beide: "Organisch + advertentie",
 };
 
 /** Mag deze gebruiker de bibliotheek beheren (Editing Guide uploaden)? */
@@ -82,7 +90,9 @@ export async function listMyClients(viewer: Viewer): Promise<MyClient[]> {
   const rows = await db
     .select({
       id: clients.id, name: clients.name, slug: clients.slug, logoUrl: clients.logoUrl,
-      color: clients.color, sector: clients.sector, description: clients.description, updatedAt: clients.updatedAt,
+      color: clients.color, sector: clients.sector, description: clients.description,
+      monthlyVideoQuota: clients.monthlyVideoQuota, contentFocus: clients.contentFocus,
+      updatedAt: clients.updatedAt,
     })
     .from(clients)
     .where(whereClient)
@@ -111,6 +121,8 @@ export async function listMyClients(viewer: Viewer): Promise<MyClient[]> {
     return {
       id: c.id, name: c.name, slug: c.slug, logoUrl: c.logoUrl, color: c.color, sector: c.sector,
       description: c.description,
+      monthlyVideoQuota: c.monthlyVideoQuota ?? 0,
+      contentFocus: c.contentFocus ?? null,
       hasGuide: guideByClient.has(c.id),
       guideUpdatedAt,
       richtlijnenCount: knByClient.get(c.id) ?? 0,
@@ -134,10 +146,16 @@ export async function getLatestEditingGuide(clientId: string): Promise<GuideMeta
 
 export type KnowledgeItem = { category: string; categoryLabel: string; title: string; body: string; isPinned: boolean };
 export type ClientLibraryDetail = {
-  client: { id: string; name: string; slug: string; logoUrl: string | null; color: string | null; sector: string | null; website: string | null; description: string | null; attentionNotes: string | null };
+  client: {
+    id: string; name: string; slug: string; logoUrl: string | null; color: string | null;
+    sector: string | null; website: string | null; description: string | null; attentionNotes: string | null;
+    monthlyVideoQuota: number; contentFocus: string | null; weHandlePosting: boolean;
+  };
   overDeKlant: KnowledgeItem[];
   richtlijnen: KnowledgeItem[];
   editingAandachtspunten: string[];
+  /** Vaste montageafspraken en instructies (uit het communicatieprofiel). */
+  afspraken: string[];
   guide: GuideMeta | null;
   canManage: boolean;
 };
@@ -151,6 +169,7 @@ export async function getClientLibraryDetail(viewer: Viewer, slug: string): Prom
     .select({
       id: clients.id, name: clients.name, slug: clients.slug, logoUrl: clients.logoUrl, color: clients.color,
       sector: clients.sector, website: clients.website, description: clients.description, attentionNotes: clients.attentionNotes,
+      monthlyVideoQuota: clients.monthlyVideoQuota, contentFocus: clients.contentFocus, weHandlePosting: clients.weHandlePosting,
     })
     .from(clients)
     .where(and(eq(clients.slug, slug), isNull(clients.deletedAt)))
@@ -166,7 +185,8 @@ export async function getClientLibraryDetail(viewer: Viewer, slug: string): Prom
       .from(clientKnowledge)
       .where(and(eq(clientKnowledge.clientId, client.id), isNull(clientKnowledge.deletedAt)))
       .orderBy(desc(clientKnowledge.isPinned)),
-    db.select({ editingProfile: clientAiProfiles.editingProfile }).from(clientAiProfiles).where(eq(clientAiProfiles.clientId, client.id)).limit(1),
+    db.select({ editingProfile: clientAiProfiles.editingProfile, communicationProfile: clientAiProfiles.communicationProfile })
+      .from(clientAiProfiles).where(eq(clientAiProfiles.clientId, client.id)).limit(1),
     getLatestEditingGuide(client.id),
   ]);
 
@@ -177,12 +197,18 @@ export async function getClientLibraryDetail(viewer: Viewer, slug: string): Prom
   const overDeKlant = knowledge.filter((k) => ABOUT_CATEGORIES.includes(k.category)).map(toItem);
   const ep = (profile[0]?.editingProfile ?? {}) as { aandachtspunten?: unknown };
   const editingAandachtspunten = Array.isArray(ep.aandachtspunten) ? (ep.aandachtspunten as unknown[]).map(String).filter(Boolean) : [];
+  // Vaste montageafspraken/instructies uit het communicatieprofiel (vrije tekst → regels).
+  const cp = (profile[0]?.communicationProfile ?? {}) as { afspraken?: unknown };
+  const afspraken = typeof cp.afspraken === "string"
+    ? cp.afspraken.split(/\r?\n/).map((s) => s.replace(/^[-*•\s]+/, "").trim()).filter(Boolean)
+    : Array.isArray(cp.afspraken) ? (cp.afspraken as unknown[]).map(String).map((s) => s.trim()).filter(Boolean) : [];
 
   return {
     client,
     overDeKlant,
     richtlijnen,
     editingAandachtspunten,
+    afspraken,
     guide,
     canManage: canManageLibrary(viewer),
   };

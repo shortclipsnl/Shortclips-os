@@ -35,6 +35,7 @@ export default async function EditClientPage({
     coordinatorId: client.coordinatorId ?? "",
     videographerId: client.videographerId ?? "",
     monthlyVideoQuota: String(client.monthlyVideoQuota ?? 0),
+    contentFocus: client.contentFocus ?? "",
     monthlyRevenue: client.monthlyRevenue ?? "",
     startedOn: client.startedOn ?? "",
     notes: client.notes ?? "",

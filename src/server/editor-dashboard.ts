@@ -113,7 +113,7 @@ export async function getEditorDashboard(viewer: Viewer) {
       limit 200
     `),
 
-    db.select({ note: users.availabilityNote }).from(users).where(eq(users.id, viewer.id)).limit(1),
+    db.select({ note: users.availabilityNote, periods: users.availabilityPeriods }).from(users).where(eq(users.id, viewer.id)).limit(1),
 
     // Vaste contactpersonen bij ShortClips voor de editor: Milou en Jiska. Op
     // e-mail opgehaald (niet op rol), want Jiska is geen projectcoördinator maar
@@ -216,6 +216,7 @@ export async function getEditorDashboard(viewer: Viewer) {
     branding,
     deliveredByMonth,
     availabilityNote: meRows[0]?.note ?? null,
+    availabilityPeriods: meRows[0]?.periods ?? [],
     contacts,
     stats: {
       delivered,

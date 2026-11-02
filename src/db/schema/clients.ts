@@ -56,6 +56,10 @@ export const clients = pgTable(
     }),
     /** Afspraken uit het contract, gedenormaliseerd voor snelle dashboards. */
     monthlyVideoQuota: integer("monthly_video_quota").notNull().default(0),
+    /** Soort content dat we voor deze klant maken: "organisch" | "advertentie" |
+     *  "beide". Centraal in Klantenbeheer ingevuld; de editorsportalen tonen dit
+     *  automatisch per klant. Leeg = nog niet ingesteld. */
+    contentFocus: varchar("content_focus", { length: 16 }),
     /** Plaatst Shortclips de content voor deze klant (true), of post de klant
      *  dat zelf (false)? Bij false geen inplannen/publiceren-signalen in
      *  Kwaliteit & Aandachtspunten, en zichtbaar in de contentplanning. */
