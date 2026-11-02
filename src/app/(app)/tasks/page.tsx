@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ListChecks } from "lucide-react";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, handoverNotes, tasks, users } from "@/db/schema";
@@ -104,28 +105,27 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   // tonen we bij de eigen weergave netjes "Taken van <jij>".
   const selectedLabel = selected ? selected.fullName : persoon === viewer.id ? viewer.fullName : persoon === "algemeen" ? "Verdelen onder team" : persoon === "overdracht" ? "Overdracht" : null;
 
-  let buckets: { label: string; tone?: "bad" | "warn"; items: TaskItemData[] }[] = [];
+  // Open taken in twee kolommen: Klantcontact apart, al het overige werk samen
+  // als "Werkzaamheden" (voorheen Scripting + Overige taken). Afgerond en
+  // gearchiveerd eronder, op volle breedte.
+  let klantcontact: TaskItemData[] = [];
+  let werkzaamheden: TaskItemData[] = [];
+  let afgerond: TaskItemData[] = [];
+  let gearchiveerd: TaskItemData[] = [];
   if (persoon && persoon !== "overdracht") {
     const assigneeCond = persoon === "algemeen" ? isNull(tasks.assigneeId) : eq(tasks.assigneeId, persoon);
     const [open, done, archived] = await Promise.all([
       fetchTasks(and(isNull(tasks.deletedAt), inArray(tasks.status, [...OPEN]), assigneeCond, scopeToClients(viewer, tasks.clientId))),
-      // Afgerond maar nog niet gearchiveerd (recent): blijft in beeld.
       fetchTasks(and(isNull(tasks.deletedAt), eq(tasks.status, "done"), isNull(tasks.archivedAt), assigneeCond, scopeToClients(viewer, tasks.clientId))),
-      // Gearchiveerd (automatisch na 7 dagen klaar) — blijft terugvindbaar.
       fetchTasks(and(isNull(tasks.deletedAt), isNotNull(tasks.archivedAt), assigneeCond, scopeToClients(viewer, tasks.clientId))),
     ]);
-    // Openstaande taken groeperen per soort: zo staat scripting apart van
-    // klantcontact en overige taken, in plaats van één lange lijst.
     const o = open as TaskItemData[];
-    const byCat = (cat: string) => o.filter((t) => (t.category || "overig") === cat);
-    buckets = [
-      { label: "Scripting", items: byCat("scripting") },
-      { label: "Klantcontact", items: byCat("klantcontact") },
-      { label: "Overige taken", items: byCat("overig") },
-      { label: "Afgerond", items: (done as TaskItemData[]).slice(0, 20) },
-      { label: `Gearchiveerd (${archived.length})`, items: (archived as TaskItemData[]).slice(0, 30) },
-    ];
+    klantcontact = o.filter((t) => (t.category || "overig") === "klantcontact");
+    werkzaamheden = o.filter((t) => (t.category || "overig") !== "klantcontact");
+    afgerond = (done as TaskItemData[]).slice(0, 20);
+    gearchiveerd = (archived as TaskItemData[]).slice(0, 30);
   }
+  const openTotal = klantcontact.length + werkzaamheden.length;
 
   return (
     <div className="mx-auto max-w-[1100px]">
@@ -161,27 +161,57 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           <EmptyState title="Kies een persoon" description="Klik hierboven op een teamlid of op Algemeen om de taken te zien." />
         </Card>
       ) : (
-        <div className="space-y-5">
-          {buckets.map((b) =>
-            b.items.length === 0 ? null : (
-              <div key={b.label}>
-                <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                  <span className={b.tone === "bad" ? "text-[var(--color-bad)]" : b.tone === "warn" ? "text-[var(--color-warn)]" : undefined}>{b.label}</span>
-                  <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-xs font-medium text-[var(--color-ink-muted)]">{b.items.length}</span>
-                </h2>
-                <Card padded={false}>
-                  <ul className="divide-y divide-[var(--color-line)]">
-                    {b.items.map((t) => <TaskItem key={t.id} task={t} users={userOptions} canWrite={canWrite} celebrateName={viewer.fullName.split(" ")[0] ?? ""} />)}
-                  </ul>
-                </Card>
-              </div>
-            ),
-          )}
-          {buckets.every((b) => b.items.length === 0) ? (
+        <div className="space-y-4">
+          {/* Gekleurde balk die direct opvalt — meteen onder het invoerveld. */}
+          <div className="flex items-center gap-2.5 rounded-[var(--radius-md)] bg-gradient-to-r from-[var(--color-indigo-ink)] to-[var(--color-brand-600)] px-4 py-3 text-white">
+            <ListChecks className="size-5 shrink-0" />
+            <span className="font-semibold tracking-tight">
+              {persoon === viewer.id ? "Mijn taken voor vandaag" : persoon === "algemeen" ? "Nog te verdelen" : `Taken van ${selectedLabel}`}
+            </span>
+            <span className="ml-auto rounded-full bg-white/20 px-2.5 py-0.5 text-sm font-bold tabular-nums">{openTotal}</span>
+          </div>
+
+          {openTotal === 0 && afgerond.length === 0 && gearchiveerd.length === 0 ? (
             <Card><EmptyState title="Geen taken" description="Er staat niets open voor deze weergave." /></Card>
           ) : null}
+
+          {/* Twee kolommen: Klantcontact links, Werkzaamheden rechts. Op mobiel
+              netjes onder elkaar. */}
+          {openTotal > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <TaskColumn title="Klantcontact" accent="var(--color-info)" items={klantcontact} users={userOptions} canWrite={canWrite} celebrateName={viewer.fullName.split(" ")[0] ?? ""} />
+              <TaskColumn title="Werkzaamheden" accent="var(--color-brand-500)" items={werkzaamheden} users={userOptions} canWrite={canWrite} celebrateName={viewer.fullName.split(" ")[0] ?? ""} />
+            </div>
+          ) : null}
+
+          {afgerond.length > 0 ? <TaskColumn title="Afgerond" accent="var(--color-good)" items={afgerond} users={userOptions} canWrite={canWrite} celebrateName="" /> : null}
+          {gearchiveerd.length > 0 ? <TaskColumn title={`Gearchiveerd (${gearchiveerd.length})`} accent="var(--color-ink-faint)" items={gearchiveerd} users={userOptions} canWrite={canWrite} celebrateName="" /> : null}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Eén kolom/blok met een gekleurde koptitel en de taakregels (of "niets open"). */
+function TaskColumn({ title, accent, items, users, canWrite, celebrateName }: {
+  title: string; accent: string; items: TaskItemData[]; users: { id: string; fullName: string }[]; canWrite: boolean; celebrateName: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+        <span className="size-2 shrink-0 rounded-full" style={{ background: accent }} />
+        {title}
+        <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-xs font-medium text-[var(--color-ink-muted)]">{items.length}</span>
+      </h2>
+      <Card padded={false}>
+        {items.length === 0 ? (
+          <p className="px-4 py-7 text-center text-sm text-[var(--color-ink-faint)]">Niets open</p>
+        ) : (
+          <ul className="divide-y divide-[var(--color-line)]">
+            {items.map((t) => <TaskItem key={t.id} task={t} users={users} canWrite={canWrite} celebrateName={celebrateName} />)}
+          </ul>
+        )}
+      </Card>
     </div>
   );
 }
