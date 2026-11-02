@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Search } from "lucide-react";
+import { Check, Loader2, Search, Users } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { setClientStatus } from "@/server/actions/clients";
@@ -88,40 +88,54 @@ export function ClientsBoard({ clients, viewerId, defaultPod = "alle", coveringN
         </div>
       ) : null}
 
-      {/* Verantwoordelijke-filter: klik op een teamlid om diens klanten te zien. */}
+      {/* Verantwoordelijke-filter: grotere, goed aanklikbare avatars zodat je in
+          één oogopslag ziet wie verantwoordelijk is. Klik om op die persoon te
+          filteren; de geselecteerde springt eruit (navy + ring + vinkje). */}
       {coordinators.length > 0 ? (
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="mr-0.5 text-xs text-[var(--color-ink-faint)]">Verantwoordelijke</span>
-          <button
-            type="button"
-            onClick={() => setPerson(null)}
-            aria-pressed={person === null}
-            className={person === null
-              ? "inline-flex items-center gap-1.5 rounded-full bg-[var(--color-indigo-ink)] px-3 py-1 text-xs font-semibold text-white"
-              : "inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] px-3 py-1 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}
-          >
-            Iedereen
-            <span className={`rounded-full px-1.5 text-2xs font-semibold ${person === null ? "bg-white/20" : "bg-[var(--color-surface-2)]"}`}>{clients.length}</span>
-          </button>
-          {coordinators.map((p) => {
-            const active = person === p.id;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setPerson(active ? null : p.id)}
-                aria-pressed={active}
-                title={active ? "Filter uitzetten" : `Toon klanten van ${p.name}`}
-                className={active
-                  ? "inline-flex items-center gap-1.5 rounded-full bg-[var(--color-indigo-ink)] py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-white"
-                  : "inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-strong)] py-0.5 pl-0.5 pr-2.5 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}
-              >
-                <TeamAvatar name={p.name} avatarUrl={p.avatar} size={30} />
-                {firstName(p.name)}{p.id === viewerId ? " (jij)" : ""}
-                <span className={`rounded-full px-1.5 text-2xs font-semibold ${active ? "bg-white/20" : "bg-[var(--color-surface-2)]"}`}>{p.count}</span>
-              </button>
-            );
-          })}
+        <div className="mb-4">
+          <p className="mb-2 text-xs font-medium text-[var(--color-ink-faint)]">Verantwoordelijke — klik om te filteren</p>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setPerson(null)}
+              aria-pressed={person === null}
+              className={`inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 text-sm font-medium transition ${person === null
+                ? "bg-[var(--color-indigo-ink)] text-white ring-2 ring-[var(--color-brand-400)]"
+                : "border border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"}`}
+            >
+              <Users className="size-5 shrink-0" strokeWidth={1.75} />
+              Iedereen
+              <span className={`rounded-full px-1.5 text-2xs font-semibold ${person === null ? "bg-white/20" : "bg-[var(--color-surface-2)]"}`}>{clients.length}</span>
+            </button>
+            {coordinators.map((p) => {
+              const sel = person === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setPerson(sel ? null : p.id)}
+                  aria-pressed={sel}
+                  title={sel ? "Filter uitzetten" : `Toon klanten van ${p.name}`}
+                  className={`inline-flex min-h-[44px] items-center gap-2.5 rounded-full py-1 pl-1 pr-4 text-sm font-medium transition ${sel
+                    ? "bg-[var(--color-indigo-ink)] text-white ring-2 ring-[var(--color-brand-400)]"
+                    : "border border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"}`}
+                >
+                  <span className="relative shrink-0">
+                    <span className={`block overflow-hidden rounded-full ${sel ? "ring-2 ring-white/80" : "ring-1 ring-[var(--color-line)]"}`}>
+                      <TeamAvatar name={p.name} avatarUrl={p.avatar} size={40} />
+                    </span>
+                    {sel ? (
+                      <span className="absolute -bottom-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-[var(--color-good)] ring-2 ring-[var(--color-indigo-ink)]">
+                        <Check className="size-2.5 text-white" strokeWidth={3} />
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="whitespace-nowrap">{firstName(p.name)}{p.id === viewerId ? " (jij)" : ""}</span>
+                  <span className={`rounded-full px-1.5 text-2xs font-semibold ${sel ? "bg-white/20" : "bg-[var(--color-surface-2)]"}`}>{p.count}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : null}
 
