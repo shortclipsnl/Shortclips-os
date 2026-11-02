@@ -23,7 +23,7 @@ function statusTone(s: string): "good" | "warn" | "info" | "neutral" {
 }
 
 export default async function SalesResearchPage() {
-  await requirePermission("ai:read");
+  await requirePermission("ai:sales_research");
   const recent = await listResearch();
 
   return (

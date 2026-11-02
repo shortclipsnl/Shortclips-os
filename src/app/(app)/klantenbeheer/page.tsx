@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ExternalLink, FileText, Video } from "lucide-react";
-import { requireManageClients } from "@/server/auth/context";
+import { requireOperationalManager } from "@/server/auth/context";
 import { listClientsAdmin } from "@/server/clients";
 import { listPortalClients, type PortalStatus } from "@/server/portal-admin";
 import { emailConfigured } from "@/server/email";
@@ -49,7 +49,7 @@ export default async function KlantenPage({
 }: {
   searchParams: Promise<{ tab?: string; status?: string }>;
 }) {
-  const viewer = await requireManageClients();
+  const viewer = await requireOperationalManager();
   const params = await searchParams;
   const tab: "overzicht" | "portalen" = params.tab === "portalen" ? "portalen" : "overzicht";
 
@@ -73,7 +73,7 @@ export default async function KlantenPage({
 
 /* ----------------------------------------------------- Tab: overzicht */
 
-async function OverzichtTab({ viewer, status }: { viewer: Awaited<ReturnType<typeof requireManageClients>>; status?: string }) {
+async function OverzichtTab({ viewer, status }: { viewer: Awaited<ReturnType<typeof requireOperationalManager>>; status?: string }) {
   const all = await listClientsAdmin(viewer);
   const filterKey = status ?? "actief";
   const rows =
@@ -168,7 +168,7 @@ async function OverzichtTab({ viewer, status }: { viewer: Awaited<ReturnType<typ
 
 /* ------------------------------------------------------ Tab: portalen */
 
-async function PortalenTab({ viewer }: { viewer: Awaited<ReturnType<typeof requireManageClients>> }) {
+async function PortalenTab({ viewer }: { viewer: Awaited<ReturnType<typeof requireOperationalManager>> }) {
   const { rows, totals } = await listPortalClients(viewer);
   const mail = emailConfigured();
 

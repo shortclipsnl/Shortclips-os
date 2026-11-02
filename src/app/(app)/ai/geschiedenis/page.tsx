@@ -13,7 +13,7 @@ const TOOL_LABEL: Record<string, string> = { caption: "Caption", briefing: "Brie
 const TOOL_HREF: Record<string, string> = { caption: "/ai/caption", briefing: "/ai/briefing", message: "/ai/bericht" };
 
 export default async function GeschiedenisPage() {
-  const viewer = await requirePermission("ai:read");
+  const viewer = await requirePermission("ai:history_read");
 
   const [outputs, research] = await Promise.all([
     db

@@ -87,7 +87,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/ai/content-research", label: "Content Research", icon: "Lightbulb", permissions: ["content_research:read"], match: "/ai/content-research" },
       // Editor Briefing maak je centraal vanaf de Editing-pagina.
       { href: "/ai-editor", label: "AI Editor", icon: "Clapperboard", permissions: ["ai_editor:read"], match: "/ai-editor" },
-      { href: "/ai/geschiedenis", label: "AI-geschiedenis", icon: "History", permissions: ["ai:read"], match: "/ai/geschiedenis" },
+      { href: "/ai/geschiedenis", label: "AI-geschiedenis", icon: "History", permissions: ["ai:history_read"], match: "/ai/geschiedenis" },
       // Voor het team pas zichtbaar zodra de R2-opslag is ingesteld (zie layout).
       { href: "/transfer", label: "Bestanden versturen", icon: "Send", permissions: ["transfer:read"], match: "/transfer" },
     ],
@@ -115,7 +115,7 @@ export const NAVIGATION: NavGroup[] = [
     items: [
       { href: "/leads", label: "Leads", icon: "Target", ownerOnly: true, match: "/leads" },
       { href: "/offertes", label: "Offertes", icon: "FileSignature", quotesAccess: true, match: "/offertes" },
-      { href: "/ai/bedrijfsonderzoek", label: "Sales Research", icon: "Search", permissions: ["ai:read"], match: "/ai/bedrijfsonderzoek" },
+      { href: "/ai/bedrijfsonderzoek", label: "Sales Research", icon: "Search", permissions: ["ai:sales_research"], match: "/ai/bedrijfsonderzoek" },
     ],
   },
   {
@@ -137,7 +137,7 @@ export const NAVIGATION: NavGroup[] = [
     title: "Beheer",
     accent: "var(--color-ink-faint)",
     items: [
-      { href: "/klantenbeheer", label: "Klantbeheer", icon: "UserCog", manageClients: true, match: "/klantenbeheer" },
+      { href: "/klantenbeheer", label: "Klantbeheer", icon: "UserCog", manageOperations: true, match: "/klantenbeheer" },
       { href: "/settings/portaal", label: "Klantportaal", icon: "SlidersHorizontal", manageOperations: true, match: "/settings/portaal" },
       { href: "/settings/integrations", label: "Koppelingen", icon: "Plug", manageOperations: true, match: "/settings/integrations" },
       { href: "/settings/agendas", label: "Agenda's", icon: "CalendarRange", ownerOnly: true, match: "/settings/agendas" },

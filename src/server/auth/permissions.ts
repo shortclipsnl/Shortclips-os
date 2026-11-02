@@ -65,6 +65,8 @@ export const PERMISSIONS = {
   // AI
   "ai:read": "AI-inzichten bekijken",
   "ai:run": "AI-analyses starten",
+  "ai:history_read": "AI-geschiedenis bekijken",
+  "ai:sales_research": "Sales Research (bedrijfsonderzoek) bekijken",
 
   // Video Intelligence
   "video_intelligence:read": "Video Intelligence-analyses bekijken",
@@ -183,6 +185,8 @@ export const ROLE_DEFINITIONS: Array<{
       "integrations:write",
       "automations:read",
       "audit:read",
+      // Sales Research behoudt Milou; AI-geschiedenis bewust niet.
+      "ai:sales_research",
     ],
   },
   {
@@ -221,6 +225,8 @@ export const ROLE_DEFINITIONS: Array<{
       "ai_editor:run",
       "integrations:read",
       "automations:read",
+      "ai:history_read",
+      "ai:sales_research",
     ],
   },
   {
