@@ -12,32 +12,42 @@ import type { EditorBriefing } from "@/server/actions/ai-tools";
 
 export type BriefingStatus = "geen" | "bezig" | "klaar" | "bijgewerkt_script" | "mislukt";
 
-const normTitle = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+// Volledig defensief: AI-gegenereerde briefings kunnen velden missen of een
+// verkeerd type hebben. Nooit een harde crash (undefined.toLowerCase e.d.) die de
+// hele Editing-pagina zou omleggen.
+const normTitle = (s: unknown) => String(s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+const cleanLines = (arr: unknown): string[] =>
+  (Array.isArray(arr) ? arr : []).map((p) => (typeof p === "string" ? p.trim() : "")).filter(Boolean);
+const cleanText = (s: unknown): string => (typeof s === "string" ? s.trim() : "");
 
 /**
  * Bouwt de leesbare editor-briefingtekst voor één video uit de automatisch
  * gegenereerde briefing van de opname: de projectomschrijving + algemene
  * aandachtspunten, plus de specifieke punten van de short die bij deze video
  * hoort (gematcht op titel). Zo staat de briefing automatisch klaar in de kolom.
+ * Fout-/leeg-bestendig: bij een rcommelige briefing geeft 'ie gewoon "" terug.
  */
 function buildVideoBriefingText(content: EditorBriefing | null, videoTitle: string): string {
-  if (!content) return "";
+  if (!content || typeof content !== "object") return "";
   const intro = content.projectIntro;
-  const shorts = content.shorts ?? [];
+  const shorts = Array.isArray(content.shorts) ? content.shorts : [];
   const vt = normTitle(videoTitle);
   const short =
-    shorts.find((s) => normTitle(s.titel) === vt) ??
-    shorts.find((s) => vt && (normTitle(s.titel).includes(vt) || vt.includes(normTitle(s.titel)))) ??
+    shorts.find((s) => s && normTitle(s.titel) === vt) ??
+    (vt ? shorts.find((s) => s && (normTitle(s.titel).includes(vt) || vt.includes(normTitle(s.titel)))) : undefined) ??
     null;
 
   const parts: string[] = [];
-  if (intro?.omschrijving?.trim()) parts.push(intro.omschrijving.trim());
-  const algemeen = (intro?.algemeneAandachtspunten ?? []).filter((p) => p && p.trim());
+  const omschrijving = cleanText(intro?.omschrijving);
+  if (omschrijving) parts.push(omschrijving);
+  const algemeen = cleanLines(intro?.algemeneAandachtspunten);
   if (algemeen.length) parts.push(`Algemene aandachtspunten:\n${algemeen.map((p) => `• ${p}`).join("\n")}`);
   if (short) {
-    const block: string[] = [`Deze video — ${short.titel}`];
-    if (short.omschrijving?.trim()) block.push(short.omschrijving.trim());
-    const punten = (short.aandachtspunten ?? []).filter((p) => p && p.trim());
+    const titel = cleanText(short.titel);
+    const block: string[] = [titel ? `Deze video — ${titel}` : "Deze video"];
+    const so = cleanText(short.omschrijving);
+    if (so) block.push(so);
+    const punten = cleanLines(short.aandachtspunten);
     if (punten.length) block.push(punten.map((p) => `• ${p}`).join("\n"));
     parts.push(block.join("\n"));
   }
@@ -238,15 +248,19 @@ export async function listEditorBoard(
   const dayIds = [...new Set(rows.map((r) => r.productionDayId).filter((x): x is string => !!x))];
   const briefingByDay = new Map<string, { content: EditorBriefing | null; status: BriefingStatus }>();
   if (dayIds.length) {
-    const bsets = await db
-      .select({ productionDayId: briefingSets.productionDayId, status: briefingSets.status, content: briefingSets.content })
-      .from(briefingSets)
-      .where(and(isNull(briefingSets.deletedAt), inArray(briefingSets.productionDayId, dayIds)));
-    for (const b of bsets) {
-      briefingByDay.set(b.productionDayId, {
-        content: (b.content as unknown as EditorBriefing) ?? null,
-        status: (b.status as BriefingStatus) ?? "geen",
-      });
+    try {
+      const bsets = await db
+        .select({ productionDayId: briefingSets.productionDayId, status: briefingSets.status, content: briefingSets.content })
+        .from(briefingSets)
+        .where(and(isNull(briefingSets.deletedAt), inArray(briefingSets.productionDayId, dayIds)));
+      for (const b of bsets) {
+        briefingByDay.set(b.productionDayId, {
+          content: (b.content as unknown as EditorBriefing) ?? null,
+          status: (b.status as BriefingStatus) ?? "geen",
+        });
+      }
+    } catch {
+      // Briefings zijn een extraatje in de kolom — nooit het hele bord laten vallen.
     }
   }
 
@@ -327,10 +341,14 @@ export async function listEditorBoard(
       frameUrl: r.frameUrl,
       briefing: r.briefing,
       autoBriefing: (() => {
-        const b = r.productionDayId ? briefingByDay.get(r.productionDayId) : undefined;
-        if (!b || b.status === "geen" || b.status === "mislukt") return null;
-        const text = buildVideoBriefingText(b.content, r.title);
-        return text || null;
+        try {
+          const b = r.productionDayId ? briefingByDay.get(r.productionDayId) : undefined;
+          if (!b || b.status === "geen" || b.status === "mislukt") return null;
+          const text = buildVideoBriefingText(b.content, r.title);
+          return text || null;
+        } catch {
+          return null;
+        }
       })(),
       briefingStatus: (r.productionDayId ? briefingByDay.get(r.productionDayId)?.status : undefined) ?? "geen",
       openComments: Number(r.openComments ?? 0),
