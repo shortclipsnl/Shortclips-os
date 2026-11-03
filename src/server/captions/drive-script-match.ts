@@ -176,6 +176,14 @@ export async function matchDriveScriptsForShoots(shoots: ShootForMatch[]): Promi
     const decision = decideBestMatch(candidates);
 
     if (!decision) {
+      // Geen geldige (klant-matchende) kandidaat. Stond er eerder wél een
+      // automatische koppeling/suggestie — bijv. een verkeerd gekoppeld script van
+      // een andere klant — dan halen we die nu weg, zodat de captions/briefing 'm
+      // niet meer gebruiken. Alleen opruimen als Drive echt bestanden had (niet bij
+      // een lege/haperende sync), en nooit een door mensen bevestigde koppeling.
+      if (prior && clientFiles.length > 0) {
+        await db.delete(shootScriptSources).where(eq(shootScriptSources.productionDayId, shoot.productionDayId));
+      }
       outcomes.push({ productionDayId: shoot.productionDayId, linked: 0, suggested: 0 });
       continue;
     }
