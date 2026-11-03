@@ -148,16 +148,20 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <span className="mr-0.5 text-xs text-[var(--color-ink-faint)]">Scriptschrijver</span>
           <button type="button" onClick={() => setWriter("alle")}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium ${writer === "alle" ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
+            className={`inline-flex min-h-[44px] items-center rounded-full px-4 text-sm font-medium transition ${writer === "alle" ? "bg-[var(--color-indigo-ink)] text-white" : "border border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"}`}>
             Iedereen
           </button>
+          {/* Grote avatars, zelfde pill-stijl als de personenfilter op de
+              klantenpagina — zo herken je het team in één oogopslag. */}
           {writerOptions.map((w) => {
             const active = writer === w.id;
             return (
               <button key={w.id} type="button" title={w.fullName} aria-pressed={active}
                 onClick={() => setWriter(active ? "alle" : w.id)}
-                className={`flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-3 text-xs font-medium transition ${active ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"}`}>
-                <TeamAvatar name={w.fullName} avatarUrl={w.avatarUrl} size={26} />
+                className={`inline-flex min-h-[44px] items-center gap-2.5 rounded-full py-1 pl-1 pr-4 text-sm font-medium transition ${active ? "bg-[var(--color-indigo-ink)] text-white" : "border border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"}`}>
+                <span className={`block shrink-0 overflow-hidden rounded-full ${active ? "ring-2 ring-white/80" : "ring-1 ring-[var(--color-line)]"}`}>
+                  <TeamAvatar name={w.fullName} avatarUrl={w.avatarUrl} size={40} />
+                </span>
                 {w.fullName.split(" ")[0]}
               </button>
             );

@@ -470,6 +470,10 @@ export const calendarEvents = pgTable(
     /** Google Meet-link (hangoutLink) voor online meetings. */
     meetLink: text("meet_link"),
     status: varchar("status", { length: 24 }),
+    /** Handmatig "weggegooid" uit de koppel-/controlelijst (prullenbak): een
+     *  afspraak die géén opname is maar wel zo geclassificeerd werd. Blijft bij de
+     *  sync behouden (onConflict raakt deze kolom niet aan) zodat 'ie niet terugkomt. */
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
     matchConfidence: varchar("match_confidence", { length: 16 }).notNull().default("none"),
     matchReason: text("match_reason"),
     matchedBy: jsonb("matched_by").notNull().default(sql`'[]'::jsonb`),

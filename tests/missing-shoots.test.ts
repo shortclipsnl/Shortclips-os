@@ -35,11 +35,18 @@ describe("missingShootAppointments", () => {
       { ...base, externalId: "m5", kind: "opname", clientId: null, title: "Afgezegde opname", startsAt: soon(9), status: "cancelled", matchConfidence: "none" },
       // 6. "overig" met shorts maar alleen interne gasten → MAG NIET (geen externe).
       { ...base, externalId: "m6", kind: "overig", clientId: null, title: "4 shorts intern bespreken", startsAt: soon(10), status: "confirmed", matchConfidence: "none", attendees: [{ email: "jarno@shortclips.nl" }] },
+      // 7. Beschikbaarheidsmarkering met het woord "opname" in de titel, als opname
+      //    geclassificeerd, geen externe gast → MAG NIET (geen opnamedag).
+      { ...base, externalId: "m7", kind: "opname", clientId: null, title: "Beschikbaar voor opnames", startsAt: soon(11), status: "confirmed", matchConfidence: "none" },
+      // 8. Kantoor-/beschikbaarheidsnotitie → MAG NIET.
+      { ...base, externalId: "m8", kind: "opname", clientId: null, title: "SHORTCLIPS OPEN, ALLEEN KANTOORWERK > INDIEN KAN EEN OPNAME", startsAt: soon(12), status: "confirmed", matchConfidence: "none" },
+      // 9. Opname herkend zonder klant, maar handmatig weggegooid (prullenbak) → MAG NIET.
+      { ...base, externalId: "m9", kind: "opname", clientId: null, title: "Opnamedag weggegooid", startsAt: soon(13), status: "confirmed", matchConfidence: "none", dismissedAt: new Date() },
     ]);
   });
   afterAll(async () => { await closeDatabase(); });
 
-  it("toont herkende opnames zonder klant en mogelijk gemiste opnames, maar geen gewone meetings of gekoppelde opnames", async () => {
+  it("toont herkende opnames zonder klant en mogelijk gemiste opnames, maar geen gewone meetings, gekoppelde opnames, beschikbaarheidsmarkeringen of weggegooide afspraken", async () => {
     const rows = await missingShootAppointments(50);
     const ids = rows.map((r) => r.externalId).sort();
     expect(ids).toEqual(["m1", "m2"]);

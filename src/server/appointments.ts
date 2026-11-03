@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, eq, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { calendarEvents, clients } from "@/db/schema";
-import { hasShortsCount, isInternalEmail } from "@/server/integrations/calendar-matching";
+import { hasShortsCount, isInternalEmail, titleLooksInternal } from "@/server/integrations/calendar-matching";
 
 export type Appointment = typeof calendarEvents.$inferSelect;
 
@@ -102,6 +102,11 @@ export type UnmatchedAppointment = Appointment;
  *   2. Mogelijk gemiste opname: niet als opname geclassificeerd (overig/meeting)
  *      maar met een aantal shorts in de titel én een externe gast.
  * Venster: 7 dagen terug (net gemiste) t/m 120 dagen vooruit.
+ *
+ * Nooit getoond: handmatig weggegooide afspraken (prullenbak, `dismissedAt`), en
+ * beschikbaarheids-/kantoormarkeringen die toevallig het woord "opname" bevatten
+ * ("Beschikbaar voor opnames", "Shortclips open, alleen kantoorwerk > indien kan
+ * een opname") — die zijn geen opnamedag.
  */
 export async function missingShootAppointments(limit = 50): Promise<UnmatchedAppointment[]> {
   const from = new Date(Date.now() - 7 * 86_400_000);
@@ -112,6 +117,7 @@ export async function missingShootAppointments(limit = 50): Promise<UnmatchedApp
     .where(
       and(
         isNull(calendarEvents.clientId),
+        isNull(calendarEvents.dismissedAt),
         inArray(calendarEvents.kind, ["opname", "overig", "meeting"]),
         gte(calendarEvents.startsAt, from),
         lte(calendarEvents.startsAt, to),
@@ -121,14 +127,18 @@ export async function missingShootAppointments(limit = 50): Promise<UnmatchedApp
     .orderBy(asc(calendarEvents.startsAt))
     .limit(200);
 
-  // Opname herkend → altijd tonen. Anders alleen als het er écht als opname
-  // uitziet (aantal shorts in de titel + een externe gast), zodat we geen
-  // gewone meetings als "ontbrekende opname" tonen.
   const out = rows.filter((r) => {
+    const attendees = (r.attendees ?? []) as Array<{ email?: string | null }>;
+    const hasExternal = attendees.some((a) => a.email && !isInternalEmail(a.email));
+    // Beschikbaarheids-/kantoormarkering zonder externe gast → geen opname, ook al
+    // staat 'ie (nog) als "opname" opgeslagen (de re-sync corrigeert dit later).
+    if (!hasExternal && titleLooksInternal(r.title)) return false;
+    // Opname herkend → altijd tonen. Anders alleen als het er écht als opname
+    // uitziet (aantal shorts in de titel + een externe gast), zodat we geen
+    // gewone meetings als "ontbrekende opname" tonen.
     if (r.kind === "opname") return true;
     if (!hasShortsCount(r.title)) return false;
-    const attendees = (r.attendees ?? []) as Array<{ email?: string | null }>;
-    return attendees.some((a) => a.email && !isInternalEmail(a.email));
+    return hasExternal;
   });
   return out.slice(0, limit);
 }
@@ -146,6 +156,7 @@ export async function unmatchedAppointments(limit = 100): Promise<UnmatchedAppoi
     .where(
       and(
         isNull(calendarEvents.clientId),
+        isNull(calendarEvents.dismissedAt),
         ne(calendarEvents.kind, "intern"),
         gte(calendarEvents.startsAt, since),
         // Geannuleerde/verwijderde afspraken horen niet in de controlelijst.

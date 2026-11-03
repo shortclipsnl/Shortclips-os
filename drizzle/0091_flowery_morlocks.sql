@@ -1,0 +1,1 @@
+ALTER TABLE "calendar_events" ADD COLUMN "dismissed_at" timestamp with time zone;

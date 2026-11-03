@@ -183,3 +183,46 @@ export async function linkAppointmentToClient(
     throw error;
   }
 }
+
+/**
+ * Een afspraak uit de koppel-/controlelijst weggooien (prullenbak): geen opname,
+ * maar wel zo geclassificeerd (bijv. "Beschikbaar voor opnames", "Shortclips open
+ * — kantoorwerk"). We markeren 'm als weggegooid (`dismissedAt`) i.p.v. hard te
+ * verwijderen, zodat de volgende Google-sync 'm niet opnieuw toevoegt. De afspraak
+ * zelf in Google Agenda blijft ongemoeid.
+ */
+export async function dismissAppointment(eventId: string): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("clients:write");
+    if (!eventId) return { ok: false, message: "Geen afspraak gekozen." };
+
+    const [event] = await db
+      .select({ id: calendarEvents.id, title: calendarEvents.title, clientId: calendarEvents.clientId })
+      .from(calendarEvents)
+      .where(eq(calendarEvents.id, eventId))
+      .limit(1);
+    if (!event) return { ok: false, message: "Afspraak niet gevonden." };
+    // Een al gekoppelde opname gooi je niet via deze weg weg (voorkomt ongelukken).
+    if (event.clientId) return { ok: false, message: "Deze afspraak is aan een klant gekoppeld — ontkoppel 'm eerst." };
+
+    await db
+      .update(calendarEvents)
+      .set({ dismissedAt: new Date(), updatedAt: new Date() })
+      .where(eq(calendarEvents.id, eventId));
+
+    await auditLog({
+      viewer,
+      action: "calendar.appointment_dismissed",
+      entityType: "calendar_event",
+      entityId: eventId,
+      changes: { title: event.title },
+    });
+
+    revalidatePath("/settings/integrations");
+    revalidatePath("/productions");
+    return { ok: true, message: "Uit de lijst gehaald." };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}

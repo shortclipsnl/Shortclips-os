@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Link2, Loader2 } from "lucide-react";
-import { linkAppointmentToClient } from "@/server/actions/appointments";
+import { Check, Link2, Loader2, Trash2 } from "lucide-react";
+import { dismissAppointment, linkAppointmentToClient } from "@/server/actions/appointments";
 import { Badge, EmptyState, ErrorNote } from "@/components/ui";
 
 export type ReviewRow = {
@@ -73,6 +73,18 @@ function ReviewRowItem({ row, clients }: { row: ReviewRow; clients: ClientOption
     });
   }
 
+  // Prullenbak: afspraken die geen opname zijn (beschikbaarheid/kantoorwerk) uit de
+  // lijst halen, zodat ze niet terug blijven komen. De afspraak in Google blijft.
+  function dismiss() {
+    if (!window.confirm(`"${row.title ?? "Deze afspraak"}" uit de lijst halen? De afspraak blijft in Google Agenda staan, maar verschijnt hier niet meer.`)) return;
+    setErr(null);
+    start(async () => {
+      const res = await dismissAppointment(row.id);
+      if (res.ok) router.refresh();
+      else setErr(res.message ?? "Weghalen mislukt.");
+    });
+  }
+
   if (done) {
     return (
       <tr>
@@ -124,6 +136,17 @@ function ReviewRowItem({ row, clients }: { row: ReviewRow; clients: ClientOption
           >
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Link2 className="size-3.5" />}
             Koppelen
+          </button>
+          {/* Prullenbak: geen opname? Haal 'm uit de lijst (komt niet terug). */}
+          <button
+            type="button"
+            onClick={dismiss}
+            disabled={pending}
+            title="Geen opname — uit de lijst halen"
+            aria-label="Uit de lijst halen"
+            className="inline-flex items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] p-1.5 text-[var(--color-ink-muted)] hover:border-[var(--color-bad)] hover:text-[var(--color-bad)] disabled:opacity-60"
+          >
+            <Trash2 className="size-4" />
           </button>
         </div>
         {err ? <div className="mt-1.5"><ErrorNote>{err}</ErrorNote></div> : null}

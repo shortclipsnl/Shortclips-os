@@ -95,7 +95,18 @@ const INTERNAL_TITLE_PATTERNS: RegExp[] = [
   /day in the life/i,
   /verjaardag/i, /tandarts/i, /\blunch/i,
   /mee met opname/i, /mee\s*filmen/i,
+  // Beschikbaarheids-/kantoormarkeringen: bevatten vaak het woord "opname" ("nog
+  // wel opnames", "indien kan een opname", "beschikbaar voor opnames") maar zijn
+  // GEEN opnamedag. Zonder deze zouden ze als opname in de koppel-lijst belanden.
+  /beschikbaar/i, /kantoorwerk/i, /shortclips\s*open/i, /nog\s*wel\s*opname/i,
+  /indien\b[^]*\bopname/i,
 ];
+
+/** Alleen de titel-toets uit {@link isInternalAppointment} (zonder agenda-/
+ *  deelnemercontext). Handig om al opgeslagen rijen op hun titel te beoordelen. */
+export function titleLooksInternal(title?: string | null): boolean {
+  return INTERNAL_TITLE_PATTERNS.some((p) => p.test(title ?? ""));
+}
 
 export function isInternalAppointment(
   event: CalendarEvent,
