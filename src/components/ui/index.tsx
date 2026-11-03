@@ -185,6 +185,7 @@ export function Stat({
   icon,
   delta,
   emphasis = false,
+  compact = false,
   onClick,
   active = false,
 }: {
@@ -199,6 +200,8 @@ export function Stat({
   delta?: { value: number; suffix?: string; goodWhenUp?: boolean } | null;
   /** Grotere nadruk voor het belangrijkste/urgente blok. */
   emphasis?: boolean;
+  /** Compactere tegel (minder padding, kleiner getal) — voor dichte filterrijen. */
+  compact?: boolean;
   /** Maakt de tegel klikbaar (bijv. als filter). Negeert `href`. */
   onClick?: () => void;
   /** Toont de tegel als actief geselecteerd (alleen met `onClick`). */
@@ -231,8 +234,8 @@ export function Stat({
           </span>
         ) : null}
       </div>
-      <div className="mt-1.5 flex items-baseline gap-2">
-        <p className={cn("font-semibold tabular-nums", emphasis ? "text-3xl" : "text-2xl", toned ? a.value : "text-[var(--color-ink)]")}>
+      <div className={cn("flex items-baseline gap-2", compact ? "mt-1" : "mt-1.5")}>
+        <p className={cn("font-semibold tabular-nums", compact ? "text-xl" : emphasis ? "text-3xl" : "text-2xl", toned ? a.value : "text-[var(--color-ink)]")}>
           {value}
         </p>
         {deltaEl}
@@ -244,7 +247,7 @@ export function Stat({
   );
 
   const style = toned ? { borderLeft: `3px solid ${a.bar}` } : undefined;
-  const cls = cn("sc-card p-4", toned && a.bg);
+  const cls = cn("sc-card", compact ? "p-3" : "p-4", toned && a.bg);
 
   if (onClick) {
     return (

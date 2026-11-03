@@ -111,7 +111,11 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
   const [status, setStatus] = useState<string>((SCRIPTING_ORDER as readonly string[]).includes(defaultStatus ?? "") ? defaultStatus! : "alle");
   const [client, setClient] = useState<string>("alle");
   // Filter op scriptschrijver via de profielfoto's bovenaan (Milou / Jarno / Jiska).
-  const [writer, setWriter] = useState<string>("alle");
+  // Standaard meteen op "Mijn scripts" als de viewer zelf opnames heeft — zo ziet
+  // Milou/Jiska/Jarno direct hun eigen werk; met één klik switch je naar Iedereen.
+  // Heb je zelf niks (bijv. geen scriptschrijver), dan begin je bij "Iedereen".
+  const hasOwnScripts = viewerId ? rows.some((r) => r.scriptWriterId === viewerId) : false;
+  const [writer, setWriter] = useState<string>(hasOwnScripts ? viewerId! : "alle");
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {

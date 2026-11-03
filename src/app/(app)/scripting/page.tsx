@@ -53,11 +53,11 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
       {/* Klikbare statusblokken: openen direct de bijbehorende filter hieronder.
           Bewust urgentie-eerst: "Deadline nadert" en "Te laat" links (waar je als
           eerste naar kijkt), daarna het ruimere overzicht rechts. */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Deadline nadert" value={String(stats.deadlineSoon)} tone={stats.deadlineSoon > 0 ? "lime" : "good"} icon={<AlarmClock />} hint="binnen 7 dagen" href="/scripting?filter=nadert" />
-        <Stat label="Te laat" value={String(stats.late)} tone={stats.late > 0 ? "bad" : "good"} icon={<AlertTriangle />} href="/scripting?filter=te-laat" />
-        <Stat label="Aankomende opnames" value={String(stats.upcoming)} tone="info" icon={<CalendarClock />} href="/scripting?filter=alle" />
-        <Stat label="Nog niet afgerond" value={String(stats.notDone)} tone={stats.notDone > 0 ? "warn" : "good"} icon={<FileClock />} href="/scripting?filter=niet-afgerond" />
+      <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <Stat compact label="Deadline nadert" value={String(stats.deadlineSoon)} tone={stats.deadlineSoon > 0 ? "lime" : "good"} icon={<AlarmClock />} hint="binnen 7 dagen" href="/scripting?filter=nadert" />
+        <Stat compact label="Te laat" value={String(stats.late)} tone={stats.late > 0 ? "bad" : "good"} icon={<AlertTriangle />} href="/scripting?filter=te-laat" />
+        <Stat compact label="Aankomende opnames" value={String(stats.upcoming)} tone="info" icon={<CalendarClock />} href="/scripting?filter=alle" />
+        <Stat compact label="Nog niet afgerond" value={String(stats.notDone)} tone={stats.notDone > 0 ? "warn" : "good"} icon={<FileClock />} href="/scripting?filter=niet-afgerond" />
       </div>
 
       {/* Compacte kwaliteitscheck — zichtbaar precies waar scripts worden
