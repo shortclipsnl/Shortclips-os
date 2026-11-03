@@ -1,7 +1,8 @@
 import "server-only";
-import { and, asc, eq, gte, isNull, lte, ne, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { calendarEvents, clients } from "@/db/schema";
+import { hasShortsCount, isInternalEmail } from "@/server/integrations/calendar-matching";
 
 export type Appointment = typeof calendarEvents.$inferSelect;
 
@@ -91,6 +92,46 @@ export async function nextShootForClient(clientId: string): Promise<Appointment 
 }
 
 export type UnmatchedAppointment = Appointment;
+
+/**
+ * Opnames uit de gekoppelde Google-agenda's die (nog) NIET in de
+ * opnameplanning staan — zodat niets stilletjes verdwijnt en het team ze
+ * direct op de Opnameplanning kan koppelen:
+ *   1. Als opname herkend, maar geen klant gekoppeld (komt niet in de planning
+ *      omdat een opnamedag een klant vereist).
+ *   2. Mogelijk gemiste opname: niet als opname geclassificeerd (overig/meeting)
+ *      maar met een aantal shorts in de titel én een externe gast.
+ * Venster: 7 dagen terug (net gemiste) t/m 120 dagen vooruit.
+ */
+export async function missingShootAppointments(limit = 50): Promise<UnmatchedAppointment[]> {
+  const from = new Date(Date.now() - 7 * 86_400_000);
+  const to = new Date(Date.now() + 120 * 86_400_000);
+  const rows = await db
+    .select()
+    .from(calendarEvents)
+    .where(
+      and(
+        isNull(calendarEvents.clientId),
+        inArray(calendarEvents.kind, ["opname", "overig", "meeting"]),
+        gte(calendarEvents.startsAt, from),
+        lte(calendarEvents.startsAt, to),
+        or(isNull(calendarEvents.status), ne(calendarEvents.status, "cancelled")),
+      ),
+    )
+    .orderBy(asc(calendarEvents.startsAt))
+    .limit(200);
+
+  // Opname herkend → altijd tonen. Anders alleen als het er écht als opname
+  // uitziet (aantal shorts in de titel + een externe gast), zodat we geen
+  // gewone meetings als "ontbrekende opname" tonen.
+  const out = rows.filter((r) => {
+    if (r.kind === "opname") return true;
+    if (!hasShortsCount(r.title)) return false;
+    const attendees = (r.attendees ?? []) as Array<{ email?: string | null }>;
+    return attendees.some((a) => a.email && !isInternalEmail(a.email));
+  });
+  return out.slice(0, limit);
+}
 
 /**
  * Afspraken zonder (zekere) klant — voor de review in het beheer. Dit is waar

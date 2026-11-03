@@ -11,7 +11,7 @@ import {
   productionDays,
   users,
 } from "@/db/schema";
-import { ForbiddenError, requireOwner } from "@/server/auth/context";
+import { ForbiddenError, requirePermission } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
@@ -34,7 +34,10 @@ export async function linkAppointmentToClient(
   clientId: string,
 ): Promise<ActionResult<{ clientName: string }>> {
   try {
-    const viewer = await requireOwner();
+    // Koppelen mag door iedereen die klanten beheert (owner, operationeel
+    // beheerder, projectcoördinator) — niet alleen de eigenaar, zodat het team
+    // een ontbrekende opname zelf direct op de planning kan zetten.
+    const viewer = await requirePermission("clients:write");
     if (!eventId || !clientId) return { ok: false, message: "Kies een klant." };
 
     const [event] = await db

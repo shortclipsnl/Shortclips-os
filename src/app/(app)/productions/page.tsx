@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarCheck } from "lucide-react";
+import { asc, isNull } from "drizzle-orm";
+import { db } from "@/db/client";
+import { clients as clientsTable } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { getDefaultVideographer, getMonthShootStats, getShootOverview, nextShootPerClient, shootsInRange } from "@/server/productions";
 import { listAssignableUsers } from "@/server/clients";
+import { missingShootAppointments } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { Badge, Card, ClientLogo, PageHeader, Stat, TeamAvatar } from "@/components/ui";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { SCRIPTING_STATUS } from "@/lib/statuses";
 import { ShootAgenda, type AgendaShoot } from "./shoot-agenda";
 import { VideographerCell, type PersonOption } from "./prod-cells";
+import { AppointmentReview, type ReviewRow } from "@/app/(app)/settings/integrations/appointment-review";
 
 export const metadata: Metadata = { title: "Opnameplanning" };
 export const dynamic = "force-dynamic";
@@ -38,6 +43,25 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
     canAssign ? listAssignableUsers() : Promise.resolve([]),
     getDefaultVideographer(),
   ]);
+
+  // Ontbrekende opnames uit Google Agenda (herkend maar geen klant, of mogelijk
+  // gemist) — zodat ze zichtbaar zijn en in één klik te koppelen. Alleen voor wie
+  // klanten mag beheren (die kan koppelen); anderen zien de beheer-review/melding.
+  const canLink = viewer.permissions.has("clients:write");
+  const [missingShoots, linkClients] = canLink
+    ? await Promise.all([
+        missingShootAppointments(50),
+        db.select({ id: clientsTable.id, name: clientsTable.name }).from(clientsTable).where(isNull(clientsTable.deletedAt)).orderBy(asc(clientsTable.name)),
+      ])
+    : [[] as Awaited<ReturnType<typeof missingShootAppointments>>, [] as { id: string; name: string }[]];
+  const missingRows: ReviewRow[] = missingShoots.map((a) => ({
+    id: a.id,
+    title: a.title,
+    when: formatDateTime(a.startsAt),
+    calendarName: a.calendarName,
+    color: "var(--color-ink-faint)",
+    matchConfidence: a.matchConfidence,
+  }));
 
   // Videograaf is altijd Rutger, Jarno of een freelance videograaf (rol
   // "videographer") — de rest van het team draait geen opnames. Alleen die
@@ -85,6 +109,25 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
           tone={next ? "warn" : "neutral"}
         />
       </div>
+
+      {/* Mogelijk ontbrekende opnames uit Google Agenda: herkend maar nog niet
+          gekoppeld, of mogelijk gemist. In één klik aan een klant koppelen →
+          verschijnt direct als opname in de planning. Alleen zichtbaar als er
+          daadwerkelijk iets te koppelen is. */}
+      {canLink && missingRows.length > 0 ? (
+        <Card className="mb-4 border-[var(--color-warn)]/40 bg-[var(--color-warn-soft)]/40">
+          <div className="flex items-center gap-2">
+            <CalendarCheck className="size-4 text-[var(--color-warn)]" />
+            <h2 className="text-sm font-bold text-[var(--color-ink)]">
+              {missingRows.length} opname{missingRows.length === 1 ? "" : "s"} uit Google Agenda nog niet in de planning
+            </h2>
+          </div>
+          <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
+            Deze afspraken staan wél in Google Agenda, maar konden niet automatisch aan een klant worden gekoppeld. Koppel ze hier in één klik — daarna verschijnen ze meteen als opname in de planning en op de editing-boards.
+          </p>
+          <AppointmentReview rows={missingRows} clients={linkClients} />
+        </Card>
+      ) : null}
 
       {overview.perVideographer.length > 0 ? (
         <div className="mb-4">
