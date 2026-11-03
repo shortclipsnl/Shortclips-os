@@ -117,7 +117,11 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
     permissions: perms,
     clientScope,
     isPortalUser: user.primaryRole === "client",
-    isEditorOnly: user.primaryRole === "editor" && !perms.has("clients:read_all"),
+    // Kernteam (Jarno/Milou/Jiska/Rutger) is nooit "editor-only", ook niet als hun
+    // hoofdrol toevallig op "editor" staat: zij sturen de productie aan en moeten
+    // het volledige editing-board zien en bewerken (downloadlink + script), niet
+    // alleen hun eigen toegewezen video's.
+    isEditorOnly: user.primaryRole === "editor" && !perms.has("clients:read_all") && !isCoreStaff(user.email),
   };
 });
 
@@ -315,6 +319,10 @@ export async function viewerForUser(userId: string): Promise<Viewer | null> {
     permissions: perms,
     clientScope,
     isPortalUser: user.primaryRole === "client",
-    isEditorOnly: user.primaryRole === "editor" && !perms.has("clients:read_all"),
+    // Kernteam (Jarno/Milou/Jiska/Rutger) is nooit "editor-only", ook niet als hun
+    // hoofdrol toevallig op "editor" staat: zij sturen de productie aan en moeten
+    // het volledige editing-board zien en bewerken (downloadlink + script), niet
+    // alleen hun eigen toegewezen video's.
+    isEditorOnly: user.primaryRole === "editor" && !perms.has("clients:read_all") && !isCoreStaff(user.email),
   };
 }
