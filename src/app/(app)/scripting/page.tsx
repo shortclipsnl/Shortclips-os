@@ -112,7 +112,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
 
       {/* key op de actieve filter: zo herstart het board met de juiste filter
           zodra je op een blok bovenin klikt (anders blijft de begin-filter staan). */}
-      <ScriptingBoard key={`${filter ?? "alle"}:${statusFilter ?? "alle"}`} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} defaultStatus={statusFilter} />
+      <ScriptingBoard key={`${filter ?? "alle"}:${statusFilter ?? "alle"}`} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} defaultStatus={statusFilter} viewerId={viewer.id} viewerName={viewer.fullName} />
 
       {/* Vaste verantwoordelijke per klant — zodat in één oogopslag duidelijk is
           wie standaard de scripts van welke klant op zich neemt. Deze persoon

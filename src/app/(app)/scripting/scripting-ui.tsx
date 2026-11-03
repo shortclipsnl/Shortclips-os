@@ -106,7 +106,7 @@ const FLAG_COLOR: Record<string, string> = {
   done: "var(--color-good)",
 };
 
-export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, defaultFilter, defaultStatus }: { rows: ScriptingRow[]; clientOptions: string[]; writerOptions: WriterOption[]; canWrite: boolean; defaultFilter?: string; defaultStatus?: string }) {
+export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, defaultFilter, defaultStatus, viewerId, viewerName }: { rows: ScriptingRow[]; clientOptions: string[]; writerOptions: WriterOption[]; canWrite: boolean; defaultFilter?: string; defaultStatus?: string; viewerId?: string; viewerName?: string }) {
   const [filter, setFilter] = useState<string>(FILTERS.some((f) => f.key === defaultFilter) ? defaultFilter! : "alle");
   const [status, setStatus] = useState<string>((SCRIPTING_ORDER as readonly string[]).includes(defaultStatus ?? "") ? defaultStatus! : "alle");
   const [client, setClient] = useState<string>("alle");
@@ -147,6 +147,22 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
       {writerOptions.length > 0 ? (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <span className="mr-0.5 text-xs text-[var(--color-ink-faint)]">Scriptschrijver</span>
+          {/* "Mijn scripts": één klik → alleen de opnames waar jíj de verantwoordelijke
+              scriptschrijver bent. Zo ziet iedereen meteen zijn eigen werk. */}
+          {viewerId ? (() => {
+            const me = writerOptions.find((w) => w.id === viewerId);
+            const active = writer === viewerId;
+            return (
+              <button type="button" onClick={() => setWriter(active ? "alle" : viewerId)} aria-pressed={active}
+                title="Alleen de scripts waar jij verantwoordelijk voor bent"
+                className={`inline-flex min-h-[44px] items-center gap-2.5 rounded-full py-1 pl-1 pr-4 text-sm font-semibold transition ${active ? "bg-[var(--color-brand-600)] text-white" : "border border-[var(--color-brand-300)] text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)]"}`}>
+                <span className={`block shrink-0 overflow-hidden rounded-full ring-2 ${active ? "ring-white/80" : "ring-[var(--color-brand-200)]"}`}>
+                  <TeamAvatar name={me?.fullName ?? viewerName ?? "Ik"} avatarUrl={me?.avatarUrl ?? null} size={40} />
+                </span>
+                Mijn scripts
+              </button>
+            );
+          })() : null}
           <button type="button" onClick={() => setWriter("alle")}
             className={`inline-flex min-h-[44px] items-center rounded-full px-4 text-sm font-medium transition ${writer === "alle" ? "bg-[var(--color-indigo-ink)] text-white" : "border border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"}`}>
             Iedereen
