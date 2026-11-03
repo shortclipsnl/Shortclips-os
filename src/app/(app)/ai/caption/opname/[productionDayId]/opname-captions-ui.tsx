@@ -12,6 +12,8 @@ import {
 import { Badge, Button, Card, ErrorNote } from "@/components/ui";
 import { CopyButton } from "../../../_shared";
 import { CAPTION_STATUS, type CaptionListStatus } from "../../caption-status";
+import { DriveScriptPicker } from "../../drive-script-picker";
+import { ExternalLink, HardDrive } from "lucide-react";
 
 const PLATFORMS = "Instagram · TikTok · Facebook · YouTube Shorts";
 
@@ -40,6 +42,12 @@ type Detail = {
     errorMessage: string | null;
     checkedByName: string | null;
     checkedAt: string | null;
+  } | null;
+  driveSource: {
+    status: "gekoppeld" | "suggestie" | "afgewezen";
+    fileName: string;
+    url: string | null;
+    matchReason: string | null;
   } | null;
   items: Item[];
 };
@@ -119,6 +127,34 @@ export function OpnameCaptions({ detail }: { detail: Detail }) {
           ) : null}
         </div>
         {err ? <div className="mt-3"><ErrorNote>{err}</ErrorNote></div> : null}
+      </Card>
+
+      {/* Scriptbron uit Google Drive: welke PDF voedt de captions, met de optie om
+          een ander/nieuwer script te kiezen of de laatste versie opnieuw op te halen. */}
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <HardDrive className="size-4 shrink-0 text-[var(--color-brand-600)]" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Scriptbron (Google Drive)</p>
+              {detail.driveSource?.status === "gekoppeld" ? (
+                <p className="truncate text-xs text-[var(--color-ink-muted)]">
+                  Captions gemaakt uit: <span className="font-medium text-[var(--color-ink)]">{detail.driveSource.fileName}</span>
+                  {detail.driveSource.url ? (
+                    <a href={detail.driveSource.url} target="_blank" rel="noopener noreferrer" className="ml-1.5 inline-flex items-center gap-0.5 text-[var(--color-brand-600)] hover:underline">
+                      openen <ExternalLink className="size-3" />
+                    </a>
+                  ) : null}
+                </p>
+              ) : (
+                <p className="text-xs text-[var(--color-ink-muted)]">
+                  Nog geen script uit Drive gekoppeld — kies de juiste PDF zodat de captions automatisch gemaakt worden.
+                </p>
+              )}
+            </div>
+          </div>
+          <DriveScriptPicker productionDayId={detail.productionDayId} variant="button" hasCoupledSource={detail.driveSource?.status === "gekoppeld"} />
+        </div>
       </Card>
 
       {/* Lege/bezig/mislukt-toestanden */}

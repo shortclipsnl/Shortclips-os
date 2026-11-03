@@ -7,6 +7,7 @@ import { ArrowRight, CalendarDays, Check, CheckCircle2, Clapperboard, HardDrive,
 import { Badge, Card, ClientLogo, Stat } from "@/components/ui";
 import { confirmDriveScriptSource, dismissDriveScriptSource } from "@/server/actions/captions";
 import { CAPTION_STATUS, type CaptionListStatus } from "./caption-status";
+import { DriveScriptPicker } from "./drive-script-picker";
 
 export type ShootCaptionRow = {
   productionDayId: string;
@@ -169,10 +170,11 @@ export function ShootCaptionsOverview({ rows, stats }: { rows: ShootCaptionRow[]
                 <div className="hidden items-center gap-3 text-xs text-[var(--color-ink-muted)] sm:flex">
                   <span>{r.captionCount} caption{r.captionCount === 1 ? "" : "s"}</span>
                 </div>
-                {r.driveStatus === "gekoppeld" ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-info-soft)] px-2 py-0.5 text-2xs font-medium text-[#0060a8]" title={`Script uit Google Drive gekoppeld${r.driveFileName ? `: ${r.driveFileName}` : ""}`}>
-                    <HardDrive className="size-3" /> Script uit Drive
-                  </span>
+                {/* Script uit Drive kiezen/opnieuw ophalen — klik opent de kiezer
+                    met de script-PDF's van de klant. Bij een suggestie blijft de
+                    bevestig-knop hieronder leidend. */}
+                {r.driveStatus !== "suggestie" ? (
+                  <DriveScriptPicker productionDayId={r.productionDayId} variant="chip" hasCoupledSource={r.driveStatus === "gekoppeld"} />
                 ) : null}
                 <Badge tone={st.tone}>{st.label}</Badge>
                 {canOpen ? (

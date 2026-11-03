@@ -66,6 +66,57 @@ async function candidateFilesByClient(clientIds: string[]): Promise<Map<string, 
   return result;
 }
 
+/** Eén kandidaat-script-PDF uit Drive, voor de handmatige kiezer. */
+export type DriveScriptCandidate = {
+  externalId: string;
+  name: string;
+  path: string | null;
+  url: string | null;
+  modifiedAt: string | null;
+};
+
+/**
+ * Alle kandidaat-script-PDF's van één klant uit de gesynchroniseerde Drive-map,
+ * nieuwste eerst — voor het handmatig kiezen van de juiste PDF in de Caption Maker.
+ */
+export async function driveScriptCandidatesForClient(clientId: string): Promise<DriveScriptCandidate[]> {
+  const rows = await db
+    .select({
+      externalId: files.externalId,
+      name: files.name,
+      path: files.path,
+      url: files.externalUrl,
+      modifiedAt: files.modifiedAt,
+    })
+    .from(files)
+    .where(
+      and(
+        eq(files.clientId, clientId),
+        eq(files.isFolder, false),
+        isNull(files.deletedAt),
+        or(
+          eq(files.category, "Scripts"),
+          sql`lower(${files.path}) like '%script%'`,
+          sql`lower(${files.name}) like '%script%'`,
+        ),
+        or(
+          eq(files.mimeType, "application/pdf"),
+          sql`lower(${files.name}) like '%.pdf'`,
+        ),
+      ),
+    );
+  return rows
+    .filter((r): r is typeof r & { externalId: string } => Boolean(r.externalId))
+    .map((r) => ({
+      externalId: r.externalId,
+      name: r.name,
+      path: r.path ?? null,
+      url: r.url ?? null,
+      modifiedAt: r.modifiedAt ? r.modifiedAt.toISOString() : null,
+    }))
+    .sort((a, b) => (b.modifiedAt ?? "").localeCompare(a.modifiedAt ?? ""));
+}
+
 export type ShootForMatch = {
   productionDayId: string;
   clientId: string;

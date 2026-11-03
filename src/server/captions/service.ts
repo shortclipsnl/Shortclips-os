@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq, gte, isNull, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { captionItems, captionSets, clients, productionDays, shootScriptSources, users } from "@/db/schema";
+import { captionItems, captionSets, clients, files, productionDays, shootScriptSources, users } from "@/db/schema";
 import { assertClientAccess, scopeToClients, type Viewer } from "@/server/auth/context";
 import { shootHasReviewPdf } from "@/server/captions/generate";
 
@@ -157,6 +157,13 @@ export type ShootCaptionsDetail = {
     checkedByName: string | null;
     checkedAt: string | null;
   } | null;
+  /** De script-PDF uit Google Drive die nu de bron is (als die gekoppeld is). */
+  driveSource: {
+    status: "gekoppeld" | "suggestie" | "afgewezen";
+    fileName: string;
+    url: string | null;
+    matchReason: string | null;
+  } | null;
   items: CaptionItem[];
 };
 
@@ -201,6 +208,22 @@ export async function getShootCaptions(viewer: Viewer, productionDayId: string):
 
   const withPdf = await shootHasReviewPdf([productionDayId]);
 
+  // Huidige Drive-scriptbron (als die gekoppeld/voorgesteld is), met de Drive-link.
+  const [driveRow] = await db
+    .select({
+      status: shootScriptSources.status,
+      fileName: shootScriptSources.fileName,
+      matchReason: shootScriptSources.matchReason,
+      url: files.externalUrl,
+    })
+    .from(shootScriptSources)
+    .leftJoin(
+      files,
+      and(eq(files.externalId, shootScriptSources.fileExternalId), eq(files.clientId, day.clientId), isNull(files.deletedAt)),
+    )
+    .where(eq(shootScriptSources.productionDayId, productionDayId))
+    .limit(1);
+
   return {
     productionDayId,
     clientId: day.clientId,
@@ -208,6 +231,15 @@ export async function getShootCaptions(viewer: Viewer, productionDayId: string):
     scheduledOn: day.scheduledOn,
     title: day.title,
     hasPdf: withPdf.has(productionDayId),
+    driveSource:
+      driveRow && driveRow.status !== "afgewezen"
+        ? {
+            status: driveRow.status as "gekoppeld" | "suggestie" | "afgewezen",
+            fileName: driveRow.fileName,
+            url: driveRow.url ?? null,
+            matchReason: driveRow.matchReason ?? null,
+          }
+        : null,
     set: set
       ? {
           id: set.id,

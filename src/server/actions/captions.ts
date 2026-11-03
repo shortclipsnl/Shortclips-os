@@ -7,10 +7,13 @@ import { captionItems, captionSets, clients, productionDays, shootScriptSources 
 import { assertClientAccess, ForbiddenError, requirePermission } from "@/server/auth/context";
 import { ensureCaptionsForShoot } from "@/server/captions/run";
 import { shootReviewPdf } from "@/server/captions/generate";
-import { matchDriveScriptsForShoots } from "@/server/captions/drive-script-match";
+import { matchDriveScriptsForShoots, driveScriptCandidatesForClient, type DriveScriptCandidate } from "@/server/captions/drive-script-match";
 import { regenerateOneCaption } from "@/server/actions/ai-tools";
 
 export type CaptionActionResult = { ok: boolean; message?: string };
+export type DriveScriptListResult =
+  | { ok: true; candidates: DriveScriptCandidate[]; currentFileExternalId: string | null }
+  | { ok: false; message: string };
 
 /** Laadt een caption-item met de klant van de bijbehorende opname (voor scope). */
 async function loadItem(itemId: string) {
@@ -189,6 +192,104 @@ export async function dismissDriveScriptSource(productionDayId: string): Promise
       .where(eq(shootScriptSources.productionDayId, productionDayId));
     revalidatePath("/ai/caption");
     return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/**
+ * De beschikbare script-PDF's van de klant uit Google Drive, plus welke nu
+ * gekoppeld is — voor de handmatige kiezer in de Caption Maker.
+ */
+export async function listShootDriveScripts(productionDayId: string): Promise<DriveScriptListResult> {
+  try {
+    const viewer = await requirePermission("ai:read");
+    const clientId = await shootClientId(productionDayId);
+    if (!clientId) return { ok: false, message: "Opname niet gevonden." };
+    assertClientAccess(viewer, clientId);
+
+    const [candidates, [current]] = await Promise.all([
+      driveScriptCandidatesForClient(clientId),
+      db
+        .select({ fileExternalId: shootScriptSources.fileExternalId, status: shootScriptSources.status })
+        .from(shootScriptSources)
+        .where(eq(shootScriptSources.productionDayId, productionDayId))
+        .limit(1),
+    ]);
+    return {
+      ok: true,
+      candidates,
+      currentFileExternalId: current && current.status === "gekoppeld" ? current.fileExternalId : null,
+    };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Handmatig de juiste script-PDF uit Google Drive aan een opname koppelen: het
+ * team klikt de PDF aan die de captions moet voeden. We zetten 'm als bevestigde
+ * bron (status "gekoppeld"), wissen de oude inhoud-hash zodat de nieuwe PDF zeker
+ * opnieuw wordt verwerkt, en genereren de captions meteen opnieuw. Zo horen de
+ * captions altijd bij het gekozen script — ook als er later een andere/ nieuwere
+ * PDF gekozen wordt.
+ */
+export async function setShootDriveScript(productionDayId: string, fileExternalId: string): Promise<CaptionActionResult> {
+  try {
+    const viewer = await requirePermission("ai:read");
+    const clientId = await shootClientId(productionDayId);
+    if (!clientId) return { ok: false, message: "Opname niet gevonden." };
+    assertClientAccess(viewer, clientId);
+    if (!fileExternalId) return { ok: false, message: "Geen bestand gekozen." };
+
+    // Alleen een script-PDF van déze klant mag gekoppeld worden.
+    const candidates = await driveScriptCandidatesForClient(clientId);
+    const chosen = candidates.find((c) => c.externalId === fileExternalId);
+    if (!chosen) return { ok: false, message: "Dit bestand hoort niet bij deze klant." };
+
+    const now = new Date();
+    await db
+      .insert(shootScriptSources)
+      .values({
+        productionDayId,
+        clientId,
+        status: "gekoppeld",
+        confidence: "hoog",
+        fileExternalId: chosen.externalId,
+        fileName: chosen.name.slice(0, 400),
+        filePath: chosen.path,
+        matchReason: `Handmatig gekozen door ${viewer.fullName.split(" ")[0]}`,
+        contentHash: null,
+        matchedAt: now,
+        confirmedAt: now,
+        confirmedById: viewer.id,
+      })
+      .onConflictDoUpdate({
+        target: shootScriptSources.productionDayId,
+        set: {
+          status: "gekoppeld",
+          confidence: "hoog",
+          fileExternalId: chosen.externalId,
+          fileName: chosen.name.slice(0, 400),
+          filePath: chosen.path,
+          matchReason: `Handmatig gekozen door ${viewer.fullName.split(" ")[0]}`,
+          // Inhoud-hash wissen: de nieuwe/ andere PDF moet zeker (opnieuw) verwerkt worden.
+          contentHash: null,
+          confirmedAt: now,
+          confirmedById: viewer.id,
+          updatedAt: now,
+        },
+      });
+
+    // Captions meteen (opnieuw) genereren op basis van de gekozen PDF.
+    const res = await ensureCaptionsForShoot(productionDayId, { force: true });
+    revalidatePath("/ai/caption");
+    revalidatePath(`/ai/caption/opname/${productionDayId}`);
+    if (res.ok) return { ok: true, message: "Script gekoppeld — captions worden gemaakt." };
+    if (res.reason === "no_pdf") return { ok: false, message: "De PDF kon niet uit Drive worden geladen." };
+    return { ok: true, message: "Script gekoppeld." };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
