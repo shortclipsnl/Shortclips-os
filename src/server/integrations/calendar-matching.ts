@@ -27,6 +27,7 @@ export type AppointmentKind =
   | "scriptbespreking"
   | "evaluatie"
   | "publicatie"
+  | "meeting"
   | "intern"
   | "overig";
 
@@ -152,6 +153,28 @@ export function classifyAppointment(title?: string | null, calendarSummary?: str
 /** Een "aantal shorts/video's" in de titel (bijv. "8 shorts"), los van het woord opname. */
 export function hasShortsCount(text?: string | null): boolean {
   return SHORTS_COUNT.test(text ?? "");
+}
+
+/**
+ * Kleur-id's uit Google Agenda die het team voor meetings gebruikt: paars.
+ * "1" = Lavender (lichtpaars), "3" = Grape (donkerpaars). Beide tellen als paars.
+ */
+export const MEETING_COLOR_IDS = new Set(["1", "3"]);
+
+/** Trefwoorden die wijzen op een meeting/afspraak (online, info, op locatie, klant). */
+const MEETING_TITLE = /\b(meeting|overleg|bespreking|afspraak|kennismaking\w*|kennismaak|intake|informatie\w*|infosessie|online|call|belafspraak|teams|zoom|google\s*meet|locatie|op\s*locatie)\b/i;
+
+/**
+ * Is dit een meeting/afspraak (geen opname/publicatie)? Paarse kleur, een
+ * Google Meet-link, of een meeting-trefwoord in de titel. Bewust ALLEEN
+ * bedoeld om een "overig"-afspraak op te waarderen naar "meeting"; de
+ * aanroeper beslist dat opname/publicatie/intern/script/evaluatie voorgaan.
+ */
+export function isMeetingAppointment(event: CalendarEvent, calendarSummary?: string | null): boolean {
+  if (event.colorId && MEETING_COLOR_IDS.has(event.colorId)) return true;
+  if (event.hangoutLink) return true;
+  const text = `${event.summary ?? ""} ${calendarSummary ?? ""}`;
+  return MEETING_TITLE.test(text);
 }
 
 // Harde niet-opname-signalen: deze woorden duiden écht op een overleg/publicatie,

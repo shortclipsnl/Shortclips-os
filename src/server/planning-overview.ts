@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, contentCalendar, deliverables, leaveRequests, productionDays, teamMeetings, users } from "@/db/schema";
+import { calendarEvents, clients, contentCalendar, deliverables, leaveRequests, productionDays, teamMeetings, users } from "@/db/schema";
 import { scopeToClients, type Viewer } from "@/server/auth/context";
 
 /**
@@ -12,7 +12,17 @@ import { scopeToClients, type Viewer } from "@/server/auth/context";
  */
 
 export type PlanItem = { id: string; kind: "opname" | "oplevering" | "publicatie"; date: string; clientName: string; clientColor: string | null; clientLogo: string | null; title: string; person: string | null; href: string };
-export type PlanMeeting = { id: string; title: string; date: string; time: string; location: string | null };
+export type PlanMeeting = {
+  id: string; title: string; date: string; time: string; location: string | null;
+  /** Herkomst: "google" (Google Agenda) of "intern" (vaste teammeeting). */
+  source: "google" | "intern";
+  meetLink: string | null;
+  attendees: string[];
+  clientName: string | null;
+  clientColor: string | null;
+  clientLogo: string | null;
+  href: string;
+};
 export type PlanWeek = {
   key: string; label: string; weekNumber: number; startOn: string; endOn: string;
   opnames: PlanItem[]; opleveringen: PlanItem[]; publicaties: PlanItem[]; meetings: PlanMeeting[];
@@ -61,7 +71,7 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
   const startIso = iso(start);
   const endIso = iso(end);
 
-  const [shootRows, deliverableRows, pubRows, leaveRows, meetingRows] = await Promise.all([
+  const [shootRows, deliverableRows, pubRows, leaveRows, meetingRows, meetingEventRows] = await Promise.all([
     db.select({ id: productionDays.id, date: productionDays.scheduledOn, clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl, person: users.fullName })
       .from(productionDays)
       .innerJoin(clients, eq(clients.id, productionDays.clientId))
@@ -87,13 +97,65 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
     db.select({ id: teamMeetings.id, title: teamMeetings.title, scheduledAt: teamMeetings.scheduledAt, location: teamMeetings.location })
       .from(teamMeetings)
       .where(and(gte(teamMeetings.scheduledAt, start), lte(teamMeetings.scheduledAt, end))),
+
+    // Google Agenda-meetings: paarse/afspraak-events (meeting) plus
+    // scriptbesprekingen en evaluaties — zodat álle relevante afspraken in de
+    // Weekplanning onder Meetings verschijnen, met tijd, locatie, deelnemers en
+    // Google Meet-link. Geannuleerde events vallen weg.
+    db.select({
+      id: calendarEvents.id, title: calendarEvents.title, startsAt: calendarEvents.startsAt,
+      allDay: calendarEvents.allDay, location: calendarEvents.location, meetLink: calendarEvents.meetLink,
+      htmlLink: calendarEvents.htmlLink, attendees: calendarEvents.attendees, clientId: calendarEvents.clientId,
+      clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl,
+    })
+      .from(calendarEvents)
+      .leftJoin(clients, eq(clients.id, calendarEvents.clientId))
+      .where(and(
+        inArray(calendarEvents.kind, ["meeting", "scriptbespreking", "evaluatie"]),
+        sql`${calendarEvents.status} is distinct from 'cancelled'`,
+        gte(calendarEvents.startsAt, start),
+        lte(calendarEvents.startsAt, end),
+        scopeToClients(viewer, calendarEvents.clientId),
+      )),
   ]);
 
-  // Meetings voorbewerken: datum (voor week-bucketing) + tijd.
-  const meetings = meetingRows.map((m) => {
-    const when = new Date(m.scheduledAt);
-    return { id: m.id, title: m.title, date: iso(when), time: when.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }), location: m.location };
-  });
+  // Deelnemersnamen uit de opgeslagen attendees (jsonb) halen.
+  const attendeeNames = (raw: unknown): string[] => {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((a) => {
+        const o = (a ?? {}) as { displayName?: string | null; email?: string | null };
+        const name = o.displayName?.trim() || o.email?.split("@")[0]?.trim() || "";
+        return name;
+      })
+      .filter(Boolean)
+      .slice(0, 12);
+  };
+
+  // Meetings voorbewerken: datum (voor week-bucketing) + tijd. Zowel de interne
+  // vaste teammeeting als de Google Agenda-afspraken, in één lijst.
+  const meetings: PlanMeeting[] = [
+    ...meetingRows.map((m): PlanMeeting => {
+      const when = new Date(m.scheduledAt);
+      return {
+        id: m.id, title: m.title, date: iso(when),
+        time: when.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }),
+        location: m.location, source: "intern", meetLink: null, attendees: [],
+        clientName: null, clientColor: null, clientLogo: null, href: `/meetings/${m.id}`,
+      };
+    }),
+    ...meetingEventRows.map((m): PlanMeeting => {
+      const when = new Date(m.startsAt);
+      return {
+        id: m.id, title: m.title ?? "Meeting", date: iso(when),
+        time: m.allDay ? "" : when.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }),
+        location: m.location, source: "google", meetLink: m.meetLink,
+        attendees: attendeeNames(m.attendees),
+        clientName: m.clientName, clientColor: m.clientColor, clientLogo: m.clientLogo,
+        href: m.meetLink || m.htmlLink || "/calendar",
+      };
+    }),
+  ];
 
   const result: PlanWeek[] = [];
   for (let w = 0; w < weeks; w++) {

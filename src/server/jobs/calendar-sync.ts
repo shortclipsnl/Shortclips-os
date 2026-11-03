@@ -28,6 +28,7 @@ import {
 import {
   classifyAppointment,
   isInternalAppointment,
+  isMeetingAppointment,
   matchEvent,
   strongShootSignal,
   type ClientMatcher,
@@ -266,6 +267,11 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
             const durationMinutes = startsAt && endsAt ? Math.round((endsAt.getTime() - startsAt.getTime()) / 60000) : null;
             if (strongShootSignal(ev.summary, { durationMinutes, allDay, hasClient: true })) kind = "opname";
           }
+          // Meeting-herkenning: een nog niet-geclassificeerde afspraak (overig) die
+          // paars is, een Google Meet-link heeft of een meeting-trefwoord bevat,
+          // wordt een "meeting" — zodat online meetings, informatiemeetings,
+          // klantafspraken en afspraken op locatie in de Weekplanning verschijnen.
+          if (kind === "overig" && isMeetingAppointment(ev, cal.summary)) kind = "meeting";
           if (clientId) matched++;
           else if (kind !== "intern") needsReview++;
 
@@ -287,6 +293,8 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
               displayName: a.displayName ?? null,
             })),
             htmlLink: ev.htmlLink ?? null,
+            colorId: ev.colorId ?? null,
+            meetLink: ev.hangoutLink ?? null,
             status: ev.status ?? null,
             matchConfidence: match.confidence,
             matchReason: match.reason,
@@ -325,6 +333,8 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
               allDay: sql`excluded.all_day`,
               attendees: sql`excluded.attendees`,
               htmlLink: sql`excluded.html_link`,
+              colorId: sql`excluded.color_id`,
+              meetLink: sql`excluded.meet_link`,
               status: sql`excluded.status`,
               candidates: sql`excluded.candidates`,
               syncedAt: sql`excluded.synced_at`,

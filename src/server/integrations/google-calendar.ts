@@ -57,6 +57,8 @@ export type CalendarEvent = {
   organizer?: { email?: string; displayName?: string };
   htmlLink?: string;
   hangoutLink?: string;
+  /** Kleur-id uit Google Agenda (string "1".."11"); "3" = Grape/paars. */
+  colorId?: string;
   recurringEventId?: string;
   created?: string;
   updated?: string;

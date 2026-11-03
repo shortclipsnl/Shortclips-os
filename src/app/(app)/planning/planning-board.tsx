@@ -2,11 +2,15 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Camera, CheckCircle2, Palmtree, Presentation, Send } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, Palmtree, Presentation, Send, Video } from "lucide-react";
 import { ClientLogo } from "@/components/ui";
 
 type PlanItem = { id: string; kind: "opname" | "oplevering" | "publicatie"; date: string; clientName: string; clientColor: string | null; clientLogo: string | null; title: string; person: string | null; href: string };
-type PlanMeeting = { id: string; title: string; date: string; time: string; location: string | null };
+type PlanMeeting = {
+  id: string; title: string; date: string; time: string; location: string | null;
+  source: "google" | "intern"; meetLink: string | null; attendees: string[];
+  clientName: string | null; clientColor: string | null; clientLogo: string | null; href: string;
+};
 type PlanWeek = { key: string; label: string; weekNumber: number; startOn: string; endOn: string; opnames: PlanItem[]; opleveringen: PlanItem[]; publicaties: PlanItem[]; meetings: PlanMeeting[]; conflicts: Array<{ editor: string; count: number }>; leave: Array<{ name: string; startOn: string; endOn: string }> };
 
 type Kind = "opname" | "oplevering" | "publicatie" | "meeting";
@@ -30,6 +34,10 @@ type AgendaItem = {
   clientName: string | null;
   clientColor: string | null;
   clientLogo: string | null;
+  /** Externe link (Google Meet/afspraak) → in nieuw tabblad openen. */
+  external?: boolean;
+  /** Er is een Google Meet-link bij deze meeting. */
+  hasMeet?: boolean;
 };
 
 const todayIso = new Date().toLocaleDateString("en-CA");
@@ -76,8 +84,21 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
       if (kinds.opname) w.opnames.filter((i) => matchesClient(i.clientName)).forEach((i) => push(i.date, toItem(i, "opname")));
       if (kinds.oplevering) w.opleveringen.filter((i) => matchesClient(i.clientName)).forEach((i) => push(i.date, toItem(i, "oplevering")));
       if (kinds.publicatie) w.publicaties.filter((i) => matchesClient(i.clientName)).forEach((i) => push(i.date, toItem(i, "publicatie")));
-      if (kinds.meeting && client === "alle") {
-        w.meetings.forEach((m) => push(m.date, { id: m.id, kind: "meeting", main: m.title, sub: m.location, time: m.time, href: "/meetings", clientName: null, clientColor: null, clientLogo: null }));
+      if (kinds.meeting) {
+        // Meetings met een klant volgen het klantfilter; meetings zonder klant
+        // (interne/algemene afspraken) tonen we alleen bij "alle klanten".
+        w.meetings
+          .filter((m) => (m.clientName ? matchesClient(m.clientName) : client === "alle"))
+          .forEach((m) => {
+            const sub = [m.clientName, m.location, m.attendees.length ? `${m.attendees.length} deelnemer${m.attendees.length === 1 ? "" : "s"}` : null]
+              .filter(Boolean)
+              .join(" · ") || null;
+            push(m.date, {
+              id: m.id, kind: "meeting", main: m.title, sub, time: m.time, href: m.href,
+              clientName: m.clientName, clientColor: m.clientColor, clientLogo: m.clientLogo,
+              external: m.source === "google", hasMeet: Boolean(m.meetLink),
+            });
+          });
       }
       // Toon altijd de hele werkweek (ma–vr), ook dagen zonder items, zodat
       // je ziet dat er bijv. op donderdag niets gepland staat. Weekenddagen
@@ -164,6 +185,7 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
                         ) : null}
                         {d.items.map((it) => (
                           <Link key={`${it.kind}-${it.id}`} href={it.href}
+                            {...(it.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                             className="flex items-center gap-2 rounded-[var(--radius-sm)] border-l-[3px] bg-[var(--color-surface)] px-2 py-1 text-xs hover:bg-[var(--color-surface-sunken)]"
                             style={{ borderLeftColor: KIND_COLOR[it.kind] }}>
                             <KindIcon kind={it.kind} />
@@ -172,6 +194,7 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
                               <span className="font-semibold">{it.main}</span>
                               {it.sub ? <span className="text-[var(--color-ink-muted)]"> · {it.sub}</span> : null}
                             </span>
+                            {it.hasMeet ? <Video className="size-3.5 shrink-0 text-[var(--color-violet)]" aria-label="Google Meet" /> : null}
                             {it.time ? <span className="shrink-0 tabular-nums text-[var(--color-ink-faint)]">{it.time}</span> : null}
                           </Link>
                         ))}

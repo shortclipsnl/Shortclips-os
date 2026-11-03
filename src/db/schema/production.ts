@@ -464,6 +464,11 @@ export const calendarEvents = pgTable(
     allDay: boolean("all_day").notNull().default(false),
     attendees: jsonb("attendees").notNull().default(sql`'[]'::jsonb`),
     htmlLink: text("html_link"),
+    /** Kleur-id uit Google Agenda (bijv. "3" = Grape/paars). Stuurt de
+     *  meeting-herkenning aan: paarse afspraken zijn meetings. */
+    colorId: varchar("color_id", { length: 8 }),
+    /** Google Meet-link (hangoutLink) voor online meetings. */
+    meetLink: text("meet_link"),
     status: varchar("status", { length: 24 }),
     matchConfidence: varchar("match_confidence", { length: 16 }).notNull().default("none"),
     matchReason: text("match_reason"),
