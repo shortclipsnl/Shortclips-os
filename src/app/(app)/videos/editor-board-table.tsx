@@ -3,13 +3,13 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, ClipboardList, Download, FileText, Loader2, MessageSquare, Pencil, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ClipboardList, Download, FileText, Loader2, MessageSquare, Pencil, RefreshCw, Sparkles, Upload, X } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { editorColor, editorDisplayName, firstNameKey } from "@/lib/editors";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase, type VideoStage } from "@/lib/statuses";
-import { askEditorQuestion, assignEditor, attachBriefingToProject, changeVideoStatus, clearBriefingFromProject, createVideoScriptUploadUrl, deleteVideoScript, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts, uploadVideoScript } from "@/server/actions/videos";
+import { askEditorQuestion, assignEditor, attachBriefingToProject, changeVideoStatus, clearBriefingFromProject, createVideoScriptUploadUrl, deleteVideoScript, regenerateVideoBriefing, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts, uploadVideoScript } from "@/server/actions/videos";
 import { fileToBase64 } from "../ai/_shared";
 import type { EditorBoardVideo } from "@/server/editor-board";
 
@@ -33,7 +33,7 @@ const PHASE_TO_STATUS: Record<EditPhase, VideoStage> = {
 };
 
 // Kolombreedtes — gelijk voor kop en rijen zodat alles uitlijnt.
-const GRID = "minmax(140px,1.4fr) 120px minmax(150px,1.3fr) 150px minmax(120px,1fr) 64px minmax(120px,1fr) minmax(110px,1fr)";
+const GRID = "minmax(140px,1.4fr) 120px minmax(150px,1.3fr) 150px minmax(120px,1fr) 64px minmax(120px,1fr) minmax(110px,1fr) minmax(150px,1.4fr)";
 
 function fmtShort(d: string): string {
   const [y, m, day] = d.split("-").map(Number);
@@ -168,7 +168,7 @@ export function EditorBoardTable({
       ) : null}
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <div className="min-w-[1050px]">
+        <div className="min-w-[1210px]">
           <div className="grid items-center gap-px border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]" style={{ gridTemplateColumns: GRID }}>
             <span className="px-1">Item</span>
             <span className="px-1 text-center">Editor</span>
@@ -178,6 +178,7 @@ export function EditorBoardTable({
             <span className="px-1 text-center">Shorts</span>
             <span className="px-1 text-center">Links shorts</span>
             <span className="px-1 text-center">Script</span>
+            <span className="px-1 text-center">Editor briefing</span>
           </div>
 
           {EDIT_PHASE_ORDER.map((ph) => {
@@ -287,9 +288,8 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, viewerId, phaseColo
 
   return (
     <div className="grid items-stretch gap-px border-b border-[var(--color-line)] bg-[var(--color-surface)] text-sm hover:bg-[var(--color-surface-sunken)]/40" style={{ gridTemplateColumns: GRID }}>
-      {/* Item (klant) + "Vraag stellen"-knop voor de editor, met daaronder het
-          editor-briefing-krumpje: centraal bij de opdracht, zodat de editor 'm
-          hier leest (niet meer los in de AI-tools). */}
+      {/* Item (klant) + "Vraag stellen"-knop voor de editor. De editor-briefing
+          staat nu in een eigen kolom (rechts). */}
       <div className="flex flex-col justify-center gap-1 px-2.5 py-2" style={{ boxShadow: `inset 4px 0 0 ${phaseColor}` }}>
         <div className="flex items-center gap-1.5">
           <Link href={`/videos/${v.id}`} className="flex min-w-0 flex-1 items-center gap-2.5 font-medium hover:underline">
@@ -298,7 +298,6 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, viewerId, phaseColo
           </Link>
           <AskButton videoId={v.id} />
         </div>
-        <BriefingCell v={v} canEdit={canEdit} run={run} pending={pending} />
       </div>
 
       {/* Editor */}
@@ -363,68 +362,119 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, viewerId, phaseColo
       <div className="relative flex items-center justify-center px-1">
         <ScriptUploadCell v={v} canEdit={filesEditable} run={run} pending={pending} />
       </div>
+
+      {/* Editor briefing — automatisch uit de script-PDF, bewerkbaar. */}
+      <div className="flex items-center justify-center px-1 py-1">
+        <BriefingCell v={v} canEdit={canEdit} run={run} pending={pending} />
+      </div>
     </div>
   );
 }
 
-/** Editor-briefing als krumpje direct bij de opdracht: de editor opent 'm hier en
- *  leest centraal bij de opname wat de bedoeling is. Wie het bord mag bewerken
- *  (coördinator/eigenaar) kan de briefing hier ook toevoegen of aanpassen. */
+/**
+ * Editor-briefing in een eigen kolom: automatisch gegenereerd uit de script-PDF
+ * van de opname (`autoBriefing`), en bewerkbaar. Een handmatige bewerking
+ * (`briefing`) is een override die in de weergave wint; "Terug naar automatisch"
+ * zet 'm weer op de AI-versie. Zo hoeft het team niets handmatig te maken, maar
+ * kan het de briefing wel bijschaven.
+ */
 function BriefingCell({ v, canEdit, run, pending }: { v: EditorBoardVideo; canEdit: boolean; run: (fn: () => Promise<unknown>) => void; pending: boolean }) {
+  const manual = v.briefing?.trim() ? v.briefing : "";
+  const auto = v.autoBriefing?.trim() ? v.autoBriefing : "";
+  const effective = manual || auto;
+  const isManual = !!manual;
+  const busy = v.briefingStatus === "bezig";
+
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(v.briefing ?? "");
-  const has = !!(v.briefing && v.briefing.trim());
+  const [val, setVal] = useState(effective);
 
-  // Niets te lezen en niet te bewerken → geen ruis in de cel.
-  if (!has && !canEdit) return null;
+  // Niets te tonen en niet te bewerken → geen ruis in de cel.
+  if (!effective && !canEdit) return <span className="text-2xs text-[var(--color-ink-faint)]">—</span>;
 
   const close = () => { setOpen(false); setEditing(false); };
+  const openRead = () => { setEditing(false); setOpen((o) => !o); };
 
   return (
     <span className="relative inline-flex">
-      {has ? (
-        <button type="button" onClick={() => { setEditing(false); setOpen((o) => !o); }} title="Editor-briefing lezen"
-          className="inline-flex items-center gap-1 rounded-full bg-[var(--color-brand-50)] px-2 py-0.5 text-2xs font-semibold text-[var(--color-brand-700)] hover:brightness-95">
-          <ClipboardList className="size-3" /> Briefing
+      {effective ? (
+        <button type="button" onClick={openRead} title="Editor-briefing lezen"
+          className="inline-flex max-w-full items-center gap-1 rounded-full bg-[var(--color-brand-50)] px-2 py-0.5 text-2xs font-semibold text-[var(--color-brand-700)] hover:brightness-95">
+          <ClipboardList className="size-3 shrink-0" />
+          <span className="truncate">Briefing</span>
+          <span className={`shrink-0 rounded-full px-1 text-[9px] font-bold uppercase ${isManual ? "bg-[var(--color-warn-soft)] text-[#8a5300]" : "bg-[var(--color-info-soft)] text-[#0060a8]"}`}>
+            {isManual ? "aangepast" : "auto"}
+          </span>
         </button>
+      ) : busy ? (
+        <span className="inline-flex items-center gap-1 text-2xs text-[var(--color-ink-faint)]"><Loader2 className="size-3 animate-spin" /> wordt gemaakt…</span>
       ) : (
-        <button type="button" onClick={() => { setVal(""); setEditing(true); setOpen(true); }}
+        <button type="button" onClick={() => { setEditing(false); setOpen(true); }}
           className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--color-line-strong)] px-2 py-0.5 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
-          <ClipboardList className="size-3" /> + briefing
+          <Sparkles className="size-3" /> Briefing
         </button>
       )}
       {open ? (
         <>
           <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={close} />
-          <div className="absolute left-0 top-full z-20 mt-1 w-72 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2.5 shadow-[var(--shadow-raised)]">
-            <p className="mb-1.5 flex items-center gap-1 text-2xs font-semibold text-[var(--color-ink-muted)]"><ClipboardList className="size-3" /> Editor-briefing</p>
+          <div className="absolute right-0 top-full z-20 mt-1 w-80 max-w-[85vw] rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2.5 shadow-[var(--shadow-raised)]">
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <ClipboardList className="size-3 text-[var(--color-ink-muted)]" />
+              <span className="text-2xs font-semibold text-[var(--color-ink-muted)]">Editor-briefing</span>
+              {effective && !editing ? (
+                <span className={`ml-auto rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${isManual ? "bg-[var(--color-warn-soft)] text-[#8a5300]" : "bg-[var(--color-info-soft)] text-[#0060a8]"}`}>
+                  {isManual ? "handmatig aangepast" : "automatisch uit script"}
+                </span>
+              ) : null}
+            </div>
+
             {editing ? (
               <>
-                <textarea autoFocus value={val} onChange={(e) => setVal(e.target.value)} rows={7}
-                  placeholder="Wat moet de editor weten voor deze opname? Stijl, hooks, muziek, do's &amp; don'ts…"
+                <textarea autoFocus value={val} onChange={(e) => setVal(e.target.value)} rows={8}
+                  placeholder="Wat moet de editor weten? Stijl, hooks, muziek, do's &amp; don'ts…"
                   className="sc-input w-full resize-none py-1 text-xs" />
                 <div className="mt-1.5 flex items-center justify-end gap-1.5">
-                  {has ? (
-                    <button type="button" onClick={() => { run(() => clearBriefingFromProject(v.id)); close(); }}
-                      className="mr-auto rounded px-2 py-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-bad)]">Verwijderen</button>
-                  ) : null}
-                  <button type="button" onClick={() => { setVal(v.briefing ?? ""); if (has) setEditing(false); else close(); }}
+                  <button type="button" onClick={() => { setVal(effective); setEditing(false); if (!effective) close(); }}
                     className="rounded px-2 py-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleren</button>
                   <button type="button" disabled={pending || !val.trim()} onClick={() => { run(() => attachBriefingToProject({ videoId: v.id, briefing: val.trim() })); close(); }}
                     className="rounded bg-[var(--color-ink)] px-2.5 py-1 text-2xs font-semibold text-white disabled:opacity-50">Opslaan</button>
                 </div>
               </>
-            ) : (
+            ) : effective ? (
               <>
-                <div className="max-h-56 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-[var(--color-ink)]">{v.briefing}</div>
+                <div className="max-h-60 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-[var(--color-ink)]">{effective}</div>
                 {canEdit ? (
-                  <div className="mt-2 flex justify-end">
-                    <button type="button" onClick={() => { setVal(v.briefing ?? ""); setEditing(true); }}
+                  <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
+                    {isManual && auto ? (
+                      <button type="button" onClick={() => { run(() => clearBriefingFromProject(v.id)); close(); }}
+                        className="mr-auto rounded px-2 py-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Terug naar automatisch</button>
+                    ) : v.hasShoot ? (
+                      <button type="button" disabled={pending} onClick={() => { run(() => regenerateVideoBriefing(v.id)); close(); }}
+                        className="mr-auto inline-flex items-center gap-1 rounded px-2 py-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+                        <RefreshCw className="size-3" /> Opnieuw uit script
+                      </button>
+                    ) : null}
+                    <button type="button" onClick={() => { setVal(effective); setEditing(true); }}
                       className="inline-flex items-center gap-1 rounded px-2 py-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"><Pencil className="size-3" /> Aanpassen</button>
                   </div>
                 ) : null}
               </>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-2xs text-[var(--color-ink-muted)]">Nog geen briefing. Genereer &apos;m automatisch uit de script-PDF, of schrijf zelf iets.</p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {v.hasShoot ? (
+                    <button type="button" disabled={pending} onClick={() => { run(() => regenerateVideoBriefing(v.id)); close(); }}
+                      className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-2.5 py-1 text-2xs font-semibold text-white hover:brightness-110 disabled:opacity-50">
+                      <Sparkles className="size-3" /> Genereer uit script
+                    </button>
+                  ) : null}
+                  <button type="button" onClick={() => { setVal(""); setEditing(true); }}
+                    className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2.5 py-1 text-2xs font-medium hover:bg-[var(--color-surface-sunken)]">
+                    <Pencil className="size-3" /> Zelf schrijven
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </>

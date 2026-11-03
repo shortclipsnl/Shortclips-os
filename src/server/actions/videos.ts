@@ -708,6 +708,39 @@ export async function attachBriefingToProject(input: { videoId: string; briefing
   }
 }
 
+/**
+ * De editor-briefing (opnieuw) automatisch uit de script-PDF van de opname
+ * genereren. Zo hoeft het team niets handmatig te doen: de briefing staat na het
+ * genereren bewerkbaar in de kolom en is gekoppeld aan de opname + de PDF. Een
+ * eventuele handmatige override (`deliverables.briefing`) blijft gewoon staan en
+ * wint in de weergave.
+ */
+export async function regenerateVideoBriefing(videoId: string): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("videos:write");
+    const [v] = await db
+      .select({ clientId: deliverables.clientId, productionDayId: deliverables.productionDayId })
+      .from(deliverables)
+      .where(and(eq(deliverables.id, videoId), isNull(deliverables.deletedAt)))
+      .limit(1);
+    if (!v) return { ok: false, message: "Project niet gevonden." };
+    assertClientAccess(viewer, v.clientId);
+    if (!v.productionDayId) return { ok: false, message: "Deze video heeft geen gekoppelde opname met script." };
+
+    const { ensureBriefingForShoot } = await import("@/server/briefing/run");
+    const res = await ensureBriefingForShoot(v.productionDayId, { force: true });
+    revalidatePath("/videos");
+    revalidatePath(`/videos/${videoId}`);
+    if (res.ok) return { ok: true, message: "Editor-briefing uit het script gegenereerd." };
+    if (res.reason === "no_pdf") return { ok: false, message: "Er staat nog geen script-PDF klaar voor deze opname." };
+    if (res.reason === "unchanged") return { ok: true, message: "Briefing is al actueel." };
+    return { ok: false, message: res.message ?? "Genereren mislukt." };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
 /** De gekoppelde editingbriefing weer verwijderen (krumpje weg bij de opdracht). */
 export async function clearBriefingFromProject(videoId: string): Promise<ActionResult> {
   try {

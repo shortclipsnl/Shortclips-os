@@ -1,12 +1,48 @@
 import "server-only";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, deliverables, users } from "@/db/schema";
+import { inArray } from "drizzle-orm";
+import { briefingSets, clients, deliverables, users } from "@/db/schema";
 import { scopeToClients, type Viewer } from "@/server/auth/context";
 import { subWorkingDays, workingDaysUntil } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { EDITOR_LEAD_DAYS, internalDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
 import { type EditPhase, type VideoStage } from "@/lib/statuses";
+import type { EditorBriefing } from "@/server/actions/ai-tools";
+
+export type BriefingStatus = "geen" | "bezig" | "klaar" | "bijgewerkt_script" | "mislukt";
+
+const normTitle = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+
+/**
+ * Bouwt de leesbare editor-briefingtekst voor één video uit de automatisch
+ * gegenereerde briefing van de opname: de projectomschrijving + algemene
+ * aandachtspunten, plus de specifieke punten van de short die bij deze video
+ * hoort (gematcht op titel). Zo staat de briefing automatisch klaar in de kolom.
+ */
+function buildVideoBriefingText(content: EditorBriefing | null, videoTitle: string): string {
+  if (!content) return "";
+  const intro = content.projectIntro;
+  const shorts = content.shorts ?? [];
+  const vt = normTitle(videoTitle);
+  const short =
+    shorts.find((s) => normTitle(s.titel) === vt) ??
+    shorts.find((s) => vt && (normTitle(s.titel).includes(vt) || vt.includes(normTitle(s.titel)))) ??
+    null;
+
+  const parts: string[] = [];
+  if (intro?.omschrijving?.trim()) parts.push(intro.omschrijving.trim());
+  const algemeen = (intro?.algemeneAandachtspunten ?? []).filter((p) => p && p.trim());
+  if (algemeen.length) parts.push(`Algemene aandachtspunten:\n${algemeen.map((p) => `• ${p}`).join("\n")}`);
+  if (short) {
+    const block: string[] = [`Deze video — ${short.titel}`];
+    if (short.omschrijving?.trim()) block.push(short.omschrijving.trim());
+    const punten = (short.aandachtspunten ?? []).filter((p) => p && p.trim());
+    if (punten.length) block.push(punten.map((p) => `• ${p}`).join("\n"));
+    parts.push(block.join("\n"));
+  }
+  return parts.join("\n\n").trim();
+}
 
 /**
  * Editing-board voor een editor, op basis van de video's (deliverables) die aan
@@ -50,7 +86,12 @@ export type EditorBoardVideo = {
   statusChangedAt: string;
   currentVersion: number;
   frameUrl: string | null;
+  /** Handmatige briefing (override) — als die is ingevuld/aangepast. */
   briefing: string | null;
+  /** Automatisch uit de script-PDF gegenereerde briefing voor deze video. */
+  autoBriefing: string | null;
+  /** Status van de automatische briefing van de opname. */
+  briefingStatus: BriefingStatus;
   openComments: number;
   /** Link naar het script (interne scriptpagina, geüpload bestand of externe link). */
   scriptHref: string | null;
@@ -184,6 +225,23 @@ export async function listEditorBoard(
     )
     .limit(400);
 
+  // Automatische editor-briefings van de betrokken opnames in bulk ophalen, zodat
+  // elke video zijn briefing (uit de PDF) automatisch in de kolom krijgt.
+  const dayIds = [...new Set(rows.map((r) => r.productionDayId).filter((x): x is string => !!x))];
+  const briefingByDay = new Map<string, { content: EditorBriefing | null; status: BriefingStatus }>();
+  if (dayIds.length) {
+    const bsets = await db
+      .select({ productionDayId: briefingSets.productionDayId, status: briefingSets.status, content: briefingSets.content })
+      .from(briefingSets)
+      .where(and(isNull(briefingSets.deletedAt), inArray(briefingSets.productionDayId, dayIds)));
+    for (const b of bsets) {
+      briefingByDay.set(b.productionDayId, {
+        content: (b.content as unknown as EditorBriefing) ?? null,
+        status: (b.status as BriefingStatus) ?? "geen",
+      });
+    }
+  }
+
   return rows.map((r) => {
     const workdaysToDeadline = r.dueOn ? workingDaysUntil(today, r.dueOn, holidays) : null;
     const status = r.status as VideoStage;
@@ -257,6 +315,13 @@ export async function listEditorBoard(
       currentVersion: Number(r.currentVersion ?? 0),
       frameUrl: r.frameUrl,
       briefing: r.briefing,
+      autoBriefing: (() => {
+        const b = r.productionDayId ? briefingByDay.get(r.productionDayId) : undefined;
+        if (!b || b.status === "geen" || b.status === "mislukt") return null;
+        const text = buildVideoBriefingText(b.content, r.title);
+        return text || null;
+      })(),
+      briefingStatus: (r.productionDayId ? briefingByDay.get(r.productionDayId)?.status : undefined) ?? "geen",
       openComments: Number(r.openComments ?? 0),
       scriptHref,
       scriptFileId: r.dayScriptFileId,
