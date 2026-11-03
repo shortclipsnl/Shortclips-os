@@ -111,14 +111,30 @@ export function EditorBoardTable({
   }, [videos]);
   const activeTotal = useMemo(() => videos.filter((v) => v.phase !== "afgerond").length, [videos]);
 
+  // Teamfilter: de vaste verantwoordelijke (coördinator) per klant. Zo kunnen
+  // Milou/Jiska/Jarno op hun eigen klanten filteren en zien hoe ver de editing staat.
+  const teamGroups = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; avatar: string | null; count: number }>();
+    for (const v of videos) {
+      if (!v.coordinatorId || !v.coordinatorName) continue;
+      const g = map.get(v.coordinatorId) ?? { id: v.coordinatorId, name: v.coordinatorName, avatar: v.coordinatorAvatar, count: 0 };
+      if (v.phase !== "afgerond") g.count += 1;
+      map.set(v.coordinatorId, g);
+    }
+    return [...map.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [videos]);
+
   const activeGroup = groups.find((g) => g.key === editor) ?? null;
+  const coordMatch = editor.startsWith("coord:") ? editor.slice(6) : null;
   const shown = editor === "alle"
     ? videos
     : editor === "geen"
       ? videos.filter((v) => !v.editorId)
-      : activeGroup
-        ? videos.filter((v) => v.editorId && activeGroup.ids.has(v.editorId))
-        : videos;
+      : coordMatch
+        ? videos.filter((v) => v.coordinatorId === coordMatch)
+        : activeGroup
+          ? videos.filter((v) => v.editorId && activeGroup.ids.has(v.editorId))
+          : videos;
   const geenCount = videos.filter((v) => !v.editorId && v.phase !== "afgerond").length;
 
   const byPhase = useMemo(() => {
@@ -139,30 +155,58 @@ export function EditorBoardTable({
 
   return (
     <div>
-      {/* Editor-tabs bovenaan: Hoofdtabel + per editor met foto en aantal. */}
+      {/* Filters bovenaan: per editor (rij 1) én per verantwoordelijke/coördinator
+          (rij 2), zodat zowel editors als het team (Milou/Jiska/Jarno) op hun eigen
+          werk kunnen filteren. Avatars even groot als op de klanten-/scriptingpagina. */}
       {showTabs ? (
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <TextTab active={editor === "alle"} onClick={() => setEditor("alle")}>
-          Hoofdtabel <span className="opacity-70">· {activeTotal}</span>
-        </TextTab>
-        {groups.map((g) => {
-          const on = editor === g.key;
-          return (
-            <button key={g.key} type="button" onClick={() => setEditor(g.key)}
-              className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3.5 text-sm font-semibold transition ${on ? "bg-[var(--color-surface)] text-[var(--color-ink)] shadow-[var(--shadow-card)]" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
-              style={on ? { borderColor: g.color, boxShadow: `0 0 0 2px ${g.color}` } : undefined}>
-              <span className="rounded-full p-[2px]" style={{ background: on ? g.color : "transparent" }}>
-                <TeamAvatar name={g.name} size={36} />
-              </span>
-              {g.displayName}
-              <span className="grid min-w-5 place-items-center rounded-full px-1 text-2xs font-bold text-white" style={{ background: g.color }}>{counts.get(g.key) ?? 0}</span>
-            </button>
-          );
-        })}
-        {geenCount > 0 ? (
-          <TextTab active={editor === "geen"} onClick={() => setEditor("geen")}>
-            Geen editor <span className="opacity-70">· {geenCount}</span>
+      <div className="mb-3 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-0.5 hidden text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)] sm:inline">Editor</span>
+          <TextTab active={editor === "alle"} onClick={() => setEditor("alle")}>
+            Hoofdtabel <span className="opacity-70">· {activeTotal}</span>
           </TextTab>
+          {groups.map((g) => {
+            const on = editor === g.key;
+            return (
+              <button key={g.key} type="button" onClick={() => setEditor(on ? "alle" : g.key)}
+                className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3.5 text-sm font-semibold transition ${on ? "bg-[var(--color-surface)] text-[var(--color-ink)] shadow-[var(--shadow-card)]" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+                style={on ? { borderColor: g.color, boxShadow: `0 0 0 2px ${g.color}` } : undefined}>
+                <span className="rounded-full p-[2px]" style={{ background: on ? g.color : "transparent" }}>
+                  <TeamAvatar name={g.name} size={40} />
+                </span>
+                {g.displayName}
+                <span className="grid min-w-5 place-items-center rounded-full px-1 text-2xs font-bold text-white" style={{ background: g.color }}>{counts.get(g.key) ?? 0}</span>
+              </button>
+            );
+          })}
+          {geenCount > 0 ? (
+            <TextTab active={editor === "geen"} onClick={() => setEditor("geen")}>
+              Geen editor <span className="opacity-70">· {geenCount}</span>
+            </TextTab>
+          ) : null}
+        </div>
+
+        {/* Rij 2 — verantwoordelijke per klant (coördinator): klik je eigen foto en
+            je ziet alleen jouw klanten, met hoeveel er in editing staan. */}
+        {teamGroups.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-0.5 hidden text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)] sm:inline">Klanten van</span>
+            {teamGroups.map((t) => {
+              const on = editor === `coord:${t.id}`;
+              return (
+                <button key={t.id} type="button" onClick={() => setEditor(on ? "alle" : `coord:${t.id}`)}
+                  title={`Alleen de klanten van ${t.name}`}
+                  className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3.5 text-sm font-semibold transition ${on ? "border-[var(--color-brand-500)] bg-[var(--color-surface)] text-[var(--color-ink)] shadow-[var(--shadow-card)]" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+                  style={on ? { boxShadow: "0 0 0 2px var(--color-brand-500)" } : undefined}>
+                  <span className="rounded-full p-[2px]" style={{ background: on ? "var(--color-brand-500)" : "transparent" }}>
+                    <TeamAvatar name={t.name} avatarUrl={t.avatar} size={40} />
+                  </span>
+                  {t.name.split(" ")[0]}
+                  <span className="grid min-w-5 place-items-center rounded-full bg-[var(--color-brand-600)] px-1 text-2xs font-bold text-white">{t.count}</span>
+                </button>
+              );
+            })}
+          </div>
         ) : null}
       </div>
       ) : null}

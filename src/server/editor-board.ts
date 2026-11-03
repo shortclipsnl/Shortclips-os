@@ -77,6 +77,11 @@ export type EditorBoardVideo = {
   clientSlug: string;
   clientColor: string | null;
   clientLogo: string | null;
+  /** De vaste verantwoordelijke (coördinator) van de klant — voor de teamfilter,
+   *  zodat Milou/Jiska/Jarno hun eigen klanten op het bord kunnen zien. */
+  coordinatorId: string | null;
+  coordinatorName: string | null;
+  coordinatorAvatar: string | null;
   editorId: string | null;
   editorName: string | null;
   plannedShorts: number | null;
@@ -158,6 +163,9 @@ export async function listEditorBoard(
       clientSlug: clients.slug,
       clientColor: clients.color,
       clientLogo: clients.logoUrl,
+      coordinatorId: clients.coordinatorId,
+      coordinatorName: sql<string | null>`(select cu.full_name from users cu where cu.id = clients.coordinator_id limit 1)`,
+      coordinatorAvatar: sql<string | null>`(select cu.avatar_url from users cu where cu.id = clients.coordinator_id limit 1)`,
       editorId: deliverables.editorId,
       editorName: users.fullName,
       plannedShorts: deliverables.plannedShorts,
@@ -303,6 +311,9 @@ export async function listEditorBoard(
       clientSlug: r.clientSlug,
       clientColor: r.clientColor,
       clientLogo: r.clientLogo,
+      coordinatorId: r.coordinatorId ?? null,
+      coordinatorName: r.coordinatorName ?? null,
+      coordinatorAvatar: r.coordinatorAvatar ?? null,
       editorId: r.editorId,
       editorName: r.editorName,
       plannedShorts: r.plannedShorts === null ? null : Number(r.plannedShorts),
