@@ -300,9 +300,14 @@ export async function setClientEditor(clientId: string, editorName: string | nul
 const CLIENT_STATUSES = ["prospect", "onboarding", "active", "paused", "churned"] as const;
 type ClientStatus = (typeof CLIENT_STATUSES)[number];
 
-/** Soort content dat we voor de klant maken. */
-export const CONTENT_FOCUSES = ["organisch", "advertentie", "beide"] as const;
-export type ContentFocus = (typeof CONTENT_FOCUSES)[number];
+/** Soort content dat we voor de klant maken.
+ *  LET OP: dit is een `"use server"`-bestand — daaruit mogen alléén async
+ *  functions geëxporteerd worden. Een `export const` (array/object) laat Next
+ *  de volledige server-action-laag crashen ("A use server file can only export
+ *  async functions, found object"), waardoor élke actie app-breed de melding
+ *  "Er ging iets mis" geeft. Daarom module-lokaal houden. */
+const CONTENT_FOCUSES = ["organisch", "advertentie", "beide"] as const;
+type ContentFocus = (typeof CONTENT_FOCUSES)[number];
 function cleanContentFocus(v: string | null | undefined): ContentFocus | null {
   return CONTENT_FOCUSES.includes((v ?? "") as ContentFocus) ? (v as ContentFocus) : null;
 }
