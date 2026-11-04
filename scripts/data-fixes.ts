@@ -31,6 +31,11 @@ async function main() {
   const notClients = [
     "unive%", "univé%", "trif%", "%storiesje%", "%chatgpt%",
     "%oosteruterke%", "%oosterúterke%", "brita%", "%stitch society%", "%stitch soc%",
+    // Echte klanten, maar niet (meer) actief voor resultaten — op verzoek uit de
+    // "nog te koppelen"-lijst gehaald. Blijven elders gewoon bestaan en kunnen per
+    // klant weer aangezet worden (klantpagina → tonen op resultaten).
+    "%studsociety%", "%stud society%", "%kerstbomen thuisbezorgd%",
+    "%shades by eric kuster%", "%campernet%",
   ];
   const hide = await db.execute(sql`
     UPDATE clients
