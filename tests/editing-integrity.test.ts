@@ -160,5 +160,6 @@ describe("Editing-integriteit", () => {
     expect(classifyAppointment("Evaluatie 2027 - Koops Chalets na opname", "Team Shortclips afspraken")).not.toBe("opname");
     expect(classifyAppointment("9:00 - HEGRO Opnamesessie", "Team Shortclips afspraken")).toBe("opname");
     expect(classifyAppointment("9:00 Koops opnamesessie ", "Team Shortclips afspraken")).toBe("opname");
+    expect(classifyAppointment("9:00 - Kerstbomenthuisbezorgd - Shortsopname - Shortclips", "Team Shortclips afspraken")).toBe("opname");
   });
 });

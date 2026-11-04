@@ -134,7 +134,8 @@ const TYPE_RULES: Array<{ kind: AppointmentKind; pattern: RegExp }> = [
   // "opnamesessie", "opnamessie", "sessie", maar ook shoot/draaidag/filmen.
   // opname\w* vangt alle opname-varianten (de oude \bopname\b miste juist
   // "opnamesessie"). "sessie" los wordt ook als opname gelezen.
-  { kind: "opname", pattern: /\b(opname\w*|draaidag|shoot ?day|shoot|filmdag|filmen|sessie)\b/i },
+  // \w*opname\w* vangt ook samenstellingen als "Shortsopname" of "Videoopname".
+  { kind: "opname", pattern: /\b(\w*opname\w*|draaidag|shoot ?day|shoot|filmdag|filmen|sessie)\b/i },
   // script\w* vangt "script", "scripts", "scriptbespreking", "scriptoverleg",
   // "scripten" — de oude \bscript\b miste juist het meervoud "scripts".
   { kind: "scriptbespreking", pattern: /\b(script\w*|conceptbespreking)\b/i },
