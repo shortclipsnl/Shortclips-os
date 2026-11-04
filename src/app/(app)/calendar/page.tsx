@@ -4,6 +4,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { contentCalendar } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
+import { isCoreStaff } from "@/server/core-staff";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { listCalendar, monthGrid, type CalendarItem } from "@/server/calendar";
 import { listClients } from "@/server/clients";
@@ -47,6 +48,23 @@ export default async function CalendarPage({
   // Google Agenda op de achtergrond verversen als de laatste sync >1u geleden is.
   await syncCalendarIfStale();
   const canWriteCal = viewer.permissions.has("calendar:write");
+
+  // Publicatiecheck extra benadrukken tijdens het postmoment: voor het kernteam
+  // (Jarno, Milou, Jiska, Rutger) staat de check op werkdagen tussen 15:00 en
+  // 17:00 (Amsterdam) automatisch volledig open met een groene omlijning, zodat
+  // ze 'm op het moment van publiceren sowieso zien.
+  const amsParts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Amsterdam",
+    weekday: "short",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const amsHour = Number(amsParts.find((p) => p.type === "hour")?.value ?? "0");
+  const amsWeekday = amsParts.find((p) => p.type === "weekday")?.value ?? "";
+  const inPostingWindow =
+    ["Mon", "Tue", "Wed", "Thu", "Fri"].includes(amsWeekday) && amsHour >= 15 && amsHour < 17;
+  const emphasizePublicatiecheck = isCoreStaff(viewer.email) && inPostingWindow;
+
   const params = await searchParams;
 
   const now = new Date();
@@ -249,6 +267,8 @@ export default async function CalendarPage({
           title="Publicatiecheck — controleer dit vóór je publiceert"
           icon={<ListChecks className="size-4" />}
           tone="info"
+          defaultOpen={emphasizePublicatiecheck}
+          highlight={emphasizePublicatiecheck}
           items={[
             <><strong className="font-semibold text-[var(--color-ink)]">Video:</strong> juiste versie, goedgekeurd, beeld en geluid in orde.</>,
             <><strong className="font-semibold text-[var(--color-ink)]">Caption:</strong> klopt, zonder typefouten, met de juiste toon en hashtags.</>,

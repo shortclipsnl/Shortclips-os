@@ -565,6 +565,7 @@ export function GuidelineNote({
   icon,
   tone = "info",
   defaultOpen = false,
+  highlight = false,
   items,
   footer,
   children,
@@ -573,6 +574,8 @@ export function GuidelineNote({
   icon?: ReactNode;
   tone?: Tone;
   defaultOpen?: boolean;
+  /** Extra nadruk: groene omlijning rond de hele kaart (bv. tijdens het postmoment). */
+  highlight?: boolean;
   items?: ReactNode[];
   footer?: ReactNode;
   children?: ReactNode;
@@ -580,8 +583,8 @@ export function GuidelineNote({
   return (
     <details
       open={defaultOpen}
-      className="group sc-card overflow-hidden"
-      style={{ boxShadow: `inset 3px 0 0 ${GUIDELINE_ACCENT[tone]}` }}
+      className={`group sc-card overflow-hidden${highlight ? " ring-2 ring-[var(--color-good)]" : ""}`}
+      style={{ boxShadow: `inset 3px 0 0 ${highlight ? "var(--color-good)" : GUIDELINE_ACCENT[tone]}` }}
     >
       <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-sm font-semibold text-[var(--color-ink)] [&::-webkit-details-marker]:hidden">
         {icon ? <span className="shrink-0 text-[var(--color-ink-muted)]">{icon}</span> : null}
