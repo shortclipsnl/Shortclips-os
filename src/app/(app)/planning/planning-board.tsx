@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Camera, CheckCircle2, Palmtree, Presentation, Send, Video } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, ChevronDown, Palmtree, Presentation, Send, Video } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 
 type Responsible = { coordinatorId: string | null; coordinatorName: string | null; coordinatorAvatar: string | null };
@@ -62,6 +62,9 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
   const [client, setClient] = useState("alle");
   const [coordinator, setCoordinator] = useState("alle");
   const [kinds, setKinds] = useState<Record<Kind, boolean>>({ opname: true, oplevering: true, publicatie: true, meeting: true });
+  // Dagen die in de huidige week al geweest zijn, staan standaard ingeklapt —
+  // zo valt vandaag op en leidt wat al is gebeurd niet meer af.
+  const [showPast, setShowPast] = useState(false);
 
   // Teamfilter: de vaste verantwoordelijke (coördinator) per klant, afgeleid uit
   // alle items — zodat je op Milou/Jiska/Jarno/Rutger kunt filteren en ziet wie
@@ -192,7 +195,14 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
       </div>
 
       <div className="space-y-4">
-        {view.map((w) => (
+        {view.map((w) => {
+          const isCurrentWeek = w.startOn <= todayIso && todayIso <= w.endOn;
+          // In de huidige week: dagen vóór vandaag zijn "geweest" en gaan onder
+          // een inklapbare, gedimde balk; de rest (vandaag + verder) blijft staan.
+          const pastDays = isCurrentWeek ? w.days.filter((d) => d.date < todayIso) : [];
+          const shownDays = isCurrentWeek ? w.days.filter((d) => d.date >= todayIso) : w.days;
+          const pastCount = pastDays.reduce((n, d) => n + d.items.length, 0);
+          return (
           <div key={w.key} className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)]">
             <WeekHeader w={w} count={w.total} color={weekBarColor(w)}>
               {w.conflicts.map((c) => (
@@ -211,54 +221,76 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
               <p className="px-4 py-3 text-xs text-[var(--color-ink-faint)]">Niets gepland in deze week.</p>
             ) : (
               <ul className="divide-y divide-[var(--color-line)]">
-                {w.days.map((d) => {
-                  const isToday = d.date === todayIso;
-                  return (
-                    <li
-                      key={d.date}
-                      className={`flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:gap-3 ${
-                        isToday
-                          ? "bg-[var(--color-brand-50)] shadow-[inset_4px_0_0_var(--color-brand-600)]"
-                          : d.items.length === 0
-                            ? "bg-[var(--color-surface-sunken)]/40"
-                            : ""
-                      }`}
+                {pastDays.length > 0 ? (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => setShowPast((v) => !v)}
+                      aria-expanded={showPast}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-[var(--color-ink-faint)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink-muted)]"
                     >
-                      {/* Daglabel — vandaag valt extra op met een gevulde pil + gekleurde rij. */}
-                      <div className={`flex shrink-0 items-center gap-1.5 pt-0.5 text-xs font-bold capitalize sm:w-36 ${isToday ? "text-[var(--color-brand-700)]" : d.items.length === 0 ? "text-[var(--color-ink-faint)]" : "text-[var(--color-ink)]"}`}>
-                        {dayLabel(d.date)}
-                        {isToday ? <span className="rounded-full bg-[var(--color-brand-600)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Vandaag</span> : null}
-                      </div>
-                      {/* Items van die dag */}
-                      <div className="min-w-0 flex-1 space-y-1">
-                        {d.items.length === 0 ? (
-                          <span className="text-xs text-[var(--color-ink-faint)]">—</span>
-                        ) : null}
-                        {d.items.map((it) => (
-                          <Link key={`${it.kind}-${it.id}`} href={it.href}
-                            {...(it.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                            className="flex items-center gap-2 rounded-[var(--radius-sm)] border-l-[3px] bg-[var(--color-surface)] px-2 py-1 text-xs hover:bg-[var(--color-surface-sunken)]"
-                            style={{ borderLeftColor: KIND_COLOR[it.kind] }}>
-                            <KindIcon kind={it.kind} />
-                            {it.clientName ? <ClientLogo name={it.clientName} logoUrl={it.clientLogo} color={it.clientColor} size={16} /> : null}
-                            <span className="min-w-0 flex-1 truncate">
-                              <span className="font-semibold">{it.main}</span>
-                              {it.sub ? <span className="text-[var(--color-ink-muted)]"> · {it.sub}</span> : null}
-                            </span>
-                            {it.hasMeet ? <Video className="size-3.5 shrink-0 text-[var(--color-violet)]" aria-label="Google Meet" /> : null}
-                            {it.time ? <span className="shrink-0 tabular-nums text-[var(--color-ink-faint)]">{it.time}</span> : null}
-                          </Link>
-                        ))}
-                      </div>
-                    </li>
-                  );
-                })}
+                      <ChevronDown className={`size-3.5 shrink-0 transition-transform ${showPast ? "" : "-rotate-90"}`} />
+                      <span className="capitalize">{pastDays.length === 1 ? dayLabel(pastDays[0]!.date) : rangeLabel(pastDays[0]!.date, pastDays[pastDays.length - 1]!.date)}</span>
+                      <span>· al geweest</span>
+                      {pastCount > 0 ? <span className="grid min-w-5 place-items-center rounded-full bg-[var(--color-surface-sunken)] px-1 text-2xs font-semibold tabular-nums text-[var(--color-ink-muted)]">{pastCount}</span> : null}
+                      <span className="ml-auto text-2xs uppercase tracking-wide">{showPast ? "verbergen" : "tonen"}</span>
+                    </button>
+                  </li>
+                ) : null}
+                {showPast ? pastDays.map((d) => <DayRow key={d.date} d={d} past />) : null}
+                {shownDays.map((d) => <DayRow key={d.date} d={d} />)}
               </ul>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
+  );
+}
+
+/** Eén dag-rij in de weekagenda. `past` dimt een dag die al geweest is. */
+function DayRow({ d, past }: { d: { date: string; items: AgendaItem[] }; past?: boolean }) {
+  const isToday = d.date === todayIso;
+  return (
+    <li
+      className={`flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:gap-3 ${
+        isToday
+          ? "bg-[var(--color-brand-50)] shadow-[inset_4px_0_0_var(--color-brand-600)]"
+          : past
+            ? "opacity-55"
+            : d.items.length === 0
+              ? "bg-[var(--color-surface-sunken)]/40"
+              : ""
+      }`}
+    >
+      {/* Daglabel — vandaag valt extra op met een gevulde pil + gekleurde rij. */}
+      <div className={`flex shrink-0 items-center gap-1.5 pt-0.5 text-xs font-bold capitalize sm:w-36 ${isToday ? "text-[var(--color-brand-700)]" : d.items.length === 0 ? "text-[var(--color-ink-faint)]" : "text-[var(--color-ink)]"}`}>
+        {dayLabel(d.date)}
+        {isToday ? <span className="rounded-full bg-[var(--color-brand-600)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Vandaag</span> : null}
+      </div>
+      {/* Items van die dag */}
+      <div className="min-w-0 flex-1 space-y-1">
+        {d.items.length === 0 ? (
+          <span className="text-xs text-[var(--color-ink-faint)]">—</span>
+        ) : null}
+        {d.items.map((it) => (
+          <Link key={`${it.kind}-${it.id}`} href={it.href}
+            {...(it.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+            className="flex items-center gap-2 rounded-[var(--radius-sm)] border-l-[3px] bg-[var(--color-surface)] px-2 py-1 text-xs hover:bg-[var(--color-surface-sunken)]"
+            style={{ borderLeftColor: KIND_COLOR[it.kind] }}>
+            <KindIcon kind={it.kind} />
+            {it.clientName ? <ClientLogo name={it.clientName} logoUrl={it.clientLogo} color={it.clientColor} size={16} /> : null}
+            <span className="min-w-0 flex-1 truncate">
+              <span className="font-semibold">{it.main}</span>
+              {it.sub ? <span className="text-[var(--color-ink-muted)]"> · {it.sub}</span> : null}
+            </span>
+            {it.hasMeet ? <Video className="size-3.5 shrink-0 text-[var(--color-violet)]" aria-label="Google Meet" /> : null}
+            {it.time ? <span className="shrink-0 tabular-nums text-[var(--color-ink-faint)]">{it.time}</span> : null}
+          </Link>
+        ))}
+      </div>
+    </li>
   );
 }
 
