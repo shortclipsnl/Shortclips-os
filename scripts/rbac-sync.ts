@@ -131,6 +131,15 @@ async function main() {
     ["videographer", "video_intelligence:read"],
     ["videographer", "video_intelligence:run"],
     ["finance", "video_intelligence:run"],
+    // Het contentteam (o.a. Jiska, Rutger) stuurt de editing aan: edit-fases
+    // wijzigen (videos:write), editors toewijzen (videos:assign) en intern
+    // afronden/goedkeuren (videos:approve). Deze rechten zijn later aan de rol
+    // toegevoegd; stap 4b kent bestaande rechten niet met terugwerkende kracht
+    // toe, dus zonder deze baseline houdt content_creator in productie z'n oude,
+    // beperkte set en kan het team de fase op het editing-board niet wijzigen.
+    ["content_creator", "videos:write"],
+    ["content_creator", "videos:assign"],
+    ["content_creator", "videos:approve"],
   ];
   for (const [roleKey, permKey] of BASELINE_GRANTS) {
     const roleId = roleByKey.get(roleKey);
