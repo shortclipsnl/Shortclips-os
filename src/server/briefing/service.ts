@@ -14,7 +14,11 @@ export type ShootBriefing = {
   content: EditorBriefing | null;
 };
 
-const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+// Null-safe: AI-gegenereerde briefings kunnen een short zonder titel of een
+// verkeerd veldtype bevatten — nooit undefined.toLowerCase() laten crashen.
+const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+const asArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+const cleanStrings = (v: unknown): string[] => asArray<unknown>(v).filter((x): x is string => typeof x === "string" && x.trim() !== "");
 
 /** Volledige briefing van een opname (intern). Hard gescoopt op klanttoegang. */
 export async function getBriefingForShoot(viewer: Viewer, productionDayId: string): Promise<ShootBriefing | null> {
@@ -83,27 +87,27 @@ export async function getBriefingForVideo(viewer: Viewer, videoId: string): Prom
   if (!set) return null;
 
   const content = (set.content as unknown as EditorBriefing) ?? null;
-  const intro = content?.projectIntro;
-  const shorts = content?.shorts ?? [];
+  const intro = content && typeof content === "object" ? content.projectIntro : undefined;
+  const shorts = asArray<{ titel?: string; aandachtspunten?: unknown }>(content?.shorts);
   // Short bij deze video zoeken. Eerst exact op de scripttitel (de sleutel waarop
   // de shorts zijn benoemd), dan exact op de videotitel, dan bevat-elkaar als
-  // terugval voor "(vN)"-achtervoegsels.
+  // terugval voor "(vN)"-achtervoegsels. s kan null/zonder titel zijn → norm vangt dat.
   const st = v.scriptTitle ? norm(v.scriptTitle) : "";
   const vt = norm(v.title);
   const match =
-    (st ? shorts.find((s) => norm(s.titel) === st) : undefined) ??
-    shorts.find((s) => norm(s.titel) === vt) ??
-    (st ? shorts.find((s) => norm(s.titel).includes(st) || st.includes(norm(s.titel))) : undefined) ??
-    shorts.find((s) => vt && (norm(s.titel).includes(vt) || vt.includes(norm(s.titel)))) ??
+    (st ? shorts.find((s) => s && norm(s.titel) === st) : undefined) ??
+    shorts.find((s) => s && norm(s.titel) === vt) ??
+    (st ? shorts.find((s) => s && (norm(s.titel).includes(st) || st.includes(norm(s.titel)))) : undefined) ??
+    shorts.find((s) => s && vt && (norm(s.titel).includes(vt) || vt.includes(norm(s.titel)))) ??
     null;
 
   return {
     productionDayId: v.productionDayId,
     videoTitle: v.title,
     status: (set.status as BriefingStatus) ?? "geen",
-    projectOmschrijving: intro?.omschrijving ?? "",
-    algemeneAandachtspunten: intro?.algemeneAandachtspunten ?? [],
-    videoAandachtspunten: match?.aandachtspunten ?? [],
-    aantalShorts: intro?.aantalShorts ?? shorts.length,
+    projectOmschrijving: typeof intro?.omschrijving === "string" ? intro.omschrijving : "",
+    algemeneAandachtspunten: cleanStrings(intro?.algemeneAandachtspunten),
+    videoAandachtspunten: cleanStrings(match?.aandachtspunten),
+    aantalShorts: typeof intro?.aantalShorts === "number" ? intro.aantalShorts : shorts.length,
   };
 }

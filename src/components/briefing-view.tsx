@@ -40,7 +40,14 @@ export function BriefingView({
     );
   }
 
-  const specifiek = briefing.shorts.filter((s) => s.aandachtspunten.length > 0);
+  // Null-safe: AI-briefings kunnen ontbrekende velden of verkeerde types hebben.
+  // Nooit laten crashen (dat legt het hele scherm om) — hooguit minder tonen.
+  const shorts = (Array.isArray(briefing.shorts) ? briefing.shorts : []).filter((s) => s && typeof s === "object");
+  const algemeen = (Array.isArray(briefing.projectIntro?.algemeneAandachtspunten) ? briefing.projectIntro!.algemeneAandachtspunten : [])
+    .filter((a): a is string => typeof a === "string" && a.trim() !== "");
+  const punten = (s: { aandachtspunten?: unknown }) =>
+    (Array.isArray(s.aandachtspunten) ? s.aandachtspunten : []).filter((a): a is string => typeof a === "string" && a.trim() !== "");
+  const specifiek = shorts.filter((s) => punten(s).length > 0);
 
   return (
     <div className="space-y-4 px-5 py-4">
@@ -53,19 +60,19 @@ export function BriefingView({
         ) : null}
       </div>
 
-      {briefing.projectIntro.algemeneAandachtspunten.length > 0 ? (
+      {algemeen.length > 0 ? (
         <div>
           <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Algemene aandachtspunten</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
-            {briefing.projectIntro.algemeneAandachtspunten.map((a, i) => <li key={i}>{a}</li>)}
+            {algemeen.map((a, i) => <li key={i}>{a}</li>)}
           </ul>
         </div>
       ) : null}
 
       <div>
-        <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{`Overzicht video's (${briefing.shorts.length})`}</p>
+        <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{`Overzicht video's (${shorts.length})`}</p>
         <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-sm">
-          {briefing.shorts.map((s, i) => <li key={i}>{s.titel || `Video ${i + 1}`}</li>)}
+          {shorts.map((s, i) => <li key={i}>{(typeof s.titel === "string" && s.titel) || `Video ${i + 1}`}</li>)}
         </ol>
       </div>
 
@@ -75,8 +82,8 @@ export function BriefingView({
           <div className="mt-1 space-y-1.5 text-sm">
             {specifiek.map((s, i) => (
               <div key={i}>
-                <span className="font-medium">{s.titel}:</span>{" "}
-                <span className="text-[var(--color-ink-muted)]">{s.aandachtspunten.join(" · ")}</span>
+                <span className="font-medium">{(typeof s.titel === "string" && s.titel) || `Video ${i + 1}`}:</span>{" "}
+                <span className="text-[var(--color-ink-muted)]">{punten(s).join(" · ")}</span>
               </div>
             ))}
           </div>
