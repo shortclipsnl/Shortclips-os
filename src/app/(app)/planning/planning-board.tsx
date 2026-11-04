@@ -3,14 +3,15 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Camera, CheckCircle2, Palmtree, Presentation, Send, Video } from "lucide-react";
-import { ClientLogo } from "@/components/ui";
+import { ClientLogo, TeamAvatar } from "@/components/ui";
 
-type PlanItem = { id: string; kind: "opname" | "oplevering" | "publicatie"; date: string; clientName: string; clientColor: string | null; clientLogo: string | null; title: string; person: string | null; href: string };
+type Responsible = { coordinatorId: string | null; coordinatorName: string | null; coordinatorAvatar: string | null };
+type PlanItem = { id: string; kind: "opname" | "oplevering" | "publicatie"; date: string; clientName: string; clientColor: string | null; clientLogo: string | null; title: string; person: string | null; href: string } & Responsible;
 type PlanMeeting = {
   id: string; title: string; date: string; time: string; location: string | null;
   source: "google" | "intern"; meetLink: string | null; attendees: string[];
   clientName: string | null; clientColor: string | null; clientLogo: string | null; href: string;
-};
+} & Responsible;
 type PlanWeek = { key: string; label: string; weekNumber: number; startOn: string; endOn: string; opnames: PlanItem[]; opleveringen: PlanItem[]; publicaties: PlanItem[]; meetings: PlanMeeting[]; conflicts: Array<{ editor: string; count: number }>; leave: Array<{ name: string; startOn: string; endOn: string }> };
 
 type Kind = "opname" | "oplevering" | "publicatie" | "meeting";
@@ -34,6 +35,8 @@ type AgendaItem = {
   clientName: string | null;
   clientColor: string | null;
   clientLogo: string | null;
+  /** Vaste verantwoordelijke (coördinator) van de klant — voor de teamfilter. */
+  coordinatorId: string | null;
   /** Externe link (Google Meet/afspraak) → in nieuw tabblad openen. */
   external?: boolean;
   /** Er is een Google Meet-link bij deze meeting. */
@@ -57,11 +60,29 @@ function addDaysIso(d: string, n: number) {
 
 export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; clientOptions: string[] }) {
   const [client, setClient] = useState("alle");
+  const [coordinator, setCoordinator] = useState("alle");
   const [kinds, setKinds] = useState<Record<Kind, boolean>>({ opname: true, oplevering: true, publicatie: true, meeting: true });
+
+  // Teamfilter: de vaste verantwoordelijke (coördinator) per klant, afgeleid uit
+  // alle items — zodat je op Milou/Jiska/Jarno/Rutger kunt filteren en ziet wie
+  // waar verantwoordelijk voor is (wie wat moet uploaden).
+  const teamGroups = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; avatar: string | null; count: number }>();
+    for (const w of weeks) {
+      for (const i of [...w.opnames, ...w.opleveringen, ...w.publicaties, ...w.meetings]) {
+        if (!i.coordinatorId || !i.coordinatorName) continue;
+        const g = map.get(i.coordinatorId) ?? { id: i.coordinatorId, name: i.coordinatorName, avatar: i.coordinatorAvatar, count: 0 };
+        g.count += 1;
+        map.set(i.coordinatorId, g);
+      }
+    }
+    return [...map.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [weeks]);
 
   // Per week de items per dag bundelen (agenda-weergave).
   const view = useMemo(() => {
     const matchesClient = (name: string | null) => client === "alle" || name === client;
+    const matchesCoord = (id: string | null) => coordinator === "alle" || id === coordinator;
     const toItem = (i: PlanItem, kind: Kind): AgendaItem => ({
       id: i.id,
       kind,
@@ -72,6 +93,7 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
       clientName: i.clientName,
       clientColor: i.clientColor,
       clientLogo: i.clientLogo,
+      coordinatorId: i.coordinatorId,
     });
 
     return weeks.map((w) => {
@@ -81,14 +103,14 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
         list.push(item);
         byDate.set(date, list);
       };
-      if (kinds.opname) w.opnames.filter((i) => matchesClient(i.clientName)).forEach((i) => push(i.date, toItem(i, "opname")));
-      if (kinds.oplevering) w.opleveringen.filter((i) => matchesClient(i.clientName)).forEach((i) => push(i.date, toItem(i, "oplevering")));
-      if (kinds.publicatie) w.publicaties.filter((i) => matchesClient(i.clientName)).forEach((i) => push(i.date, toItem(i, "publicatie")));
+      if (kinds.opname) w.opnames.filter((i) => matchesClient(i.clientName) && matchesCoord(i.coordinatorId)).forEach((i) => push(i.date, toItem(i, "opname")));
+      if (kinds.oplevering) w.opleveringen.filter((i) => matchesClient(i.clientName) && matchesCoord(i.coordinatorId)).forEach((i) => push(i.date, toItem(i, "oplevering")));
+      if (kinds.publicatie) w.publicaties.filter((i) => matchesClient(i.clientName) && matchesCoord(i.coordinatorId)).forEach((i) => push(i.date, toItem(i, "publicatie")));
       if (kinds.meeting) {
-        // Meetings met een klant volgen het klantfilter; meetings zonder klant
-        // (interne/algemene afspraken) tonen we alleen bij "alle klanten".
+        // Meetings met een klant volgen het klant- én teamfilter; meetings zonder
+        // klant (interne/algemene afspraken) tonen we alleen bij "alle".
         w.meetings
-          .filter((m) => (m.clientName ? matchesClient(m.clientName) : client === "alle"))
+          .filter((m) => (m.clientName ? matchesClient(m.clientName) : client === "alle") && (m.coordinatorId ? matchesCoord(m.coordinatorId) : coordinator === "alle"))
           .forEach((m) => {
             const sub = [m.clientName, m.location, m.attendees.length ? `${m.attendees.length} deelnemer${m.attendees.length === 1 ? "" : "s"}` : null]
               .filter(Boolean)
@@ -96,6 +118,7 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
             push(m.date, {
               id: m.id, kind: "meeting", main: m.title, sub, time: m.time, href: m.href,
               clientName: m.clientName, clientColor: m.clientColor, clientLogo: m.clientLogo,
+              coordinatorId: m.coordinatorId,
               external: m.source === "google", hasMeet: Boolean(m.meetLink),
             });
           });
@@ -110,10 +133,38 @@ export function PlanningBoard({ weeks, clientOptions }: { weeks: PlanWeek[]; cli
       const total = days.reduce((n, d) => n + d.items.length, 0);
       return { ...w, days, total };
     });
-  }, [weeks, client, kinds]);
+  }, [weeks, client, coordinator, kinds]);
 
   return (
     <div>
+      {/* Teamfilter — wie is verantwoordelijk voor welke klant. Zelfde grote
+          avatars als op de klanten-/scripting-/editingpagina; één klik toont
+          alleen de planning van die persoon zijn klanten. */}
+      {teamGroups.length > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="mr-0.5 hidden text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)] sm:inline">Klanten van</span>
+          <button type="button" onClick={() => setCoordinator("alle")}
+            className={`inline-flex min-h-[44px] items-center rounded-full px-4 text-sm font-medium transition ${coordinator === "alle" ? "bg-[var(--color-indigo-ink)] text-white" : "border border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"}`}>
+            Iedereen
+          </button>
+          {teamGroups.map((t) => {
+            const on = coordinator === t.id;
+            return (
+              <button key={t.id} type="button" onClick={() => setCoordinator(on ? "alle" : t.id)}
+                title={`Alleen de klanten van ${t.name}`}
+                className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3.5 text-sm font-semibold transition ${on ? "border-[var(--color-brand-500)] bg-[var(--color-surface)] text-[var(--color-ink)] shadow-[var(--shadow-card)]" : "border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+                style={on ? { boxShadow: "0 0 0 2px var(--color-brand-500)" } : undefined}>
+                <span className="rounded-full p-[2px]" style={{ background: on ? "var(--color-brand-500)" : "transparent" }}>
+                  <TeamAvatar name={t.name} avatarUrl={t.avatar} size={40} />
+                </span>
+                {t.name.split(" ")[0]}
+                <span className="grid min-w-5 place-items-center rounded-full bg-[var(--color-brand-600)] px-1 text-2xs font-bold text-white">{t.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Klik om te tonen of verbergen:</span>
         <div className="flex flex-wrap gap-1.5">

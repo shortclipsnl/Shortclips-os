@@ -11,7 +11,9 @@ import { scopeToClients, type Viewer } from "@/server/auth/context";
  * gescoopt; puur lezen uit bestaande tabellen.
  */
 
-export type PlanItem = { id: string; kind: "opname" | "oplevering" | "publicatie"; date: string; clientName: string; clientColor: string | null; clientLogo: string | null; title: string; person: string | null; href: string };
+/** De vaste verantwoordelijke (coördinator) van de klant — voor de teamfilter. */
+export type PlanResponsible = { coordinatorId: string | null; coordinatorName: string | null; coordinatorAvatar: string | null };
+export type PlanItem = { id: string; kind: "opname" | "oplevering" | "publicatie"; date: string; clientName: string; clientColor: string | null; clientLogo: string | null; title: string; person: string | null; href: string } & PlanResponsible;
 export type PlanMeeting = {
   id: string; title: string; date: string; time: string; location: string | null;
   /** Herkomst: "google" (Google Agenda) of "intern" (vaste teammeeting). */
@@ -22,7 +24,7 @@ export type PlanMeeting = {
   clientColor: string | null;
   clientLogo: string | null;
   href: string;
-};
+} & PlanResponsible;
 export type PlanWeek = {
   key: string; label: string; weekNumber: number; startOn: string; endOn: string;
   opnames: PlanItem[]; opleveringen: PlanItem[]; publicaties: PlanItem[]; meetings: PlanMeeting[];
@@ -71,20 +73,28 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
   const startIso = iso(start);
   const endIso = iso(end);
 
+  // De vaste verantwoordelijke (coördinator) per klant — meegeven aan elk item
+  // zodat de Weekplanning op "wie is verantwoordelijk" kan filteren.
+  const coordSelect = {
+    coordinatorId: clients.coordinatorId,
+    coordinatorName: sql<string | null>`(select cu.full_name from users cu where cu.id = clients.coordinator_id limit 1)`,
+    coordinatorAvatar: sql<string | null>`(select cu.avatar_url from users cu where cu.id = clients.coordinator_id limit 1)`,
+  };
+
   const [shootRows, deliverableRows, pubRows, leaveRows, meetingRows, meetingEventRows] = await Promise.all([
-    db.select({ id: productionDays.id, date: productionDays.scheduledOn, clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl, person: users.fullName })
+    db.select({ id: productionDays.id, date: productionDays.scheduledOn, clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl, person: users.fullName, ...coordSelect })
       .from(productionDays)
       .innerJoin(clients, eq(clients.id, productionDays.clientId))
       .leftJoin(users, eq(users.id, productionDays.videographerId))
       .where(and(isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled"), gte(productionDays.scheduledOn, startIso), lte(productionDays.scheduledOn, endIso), scopeToClients(viewer, productionDays.clientId))),
 
-    db.select({ id: deliverables.id, date: deliverables.dueOn, title: deliverables.title, clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl, person: users.fullName })
+    db.select({ id: deliverables.id, date: deliverables.dueOn, title: deliverables.title, clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl, person: users.fullName, ...coordSelect })
       .from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
       .leftJoin(users, eq(users.id, deliverables.editorId))
       .where(and(isNull(deliverables.deletedAt), sql`${deliverables.dueOn} is not null`, gte(deliverables.dueOn, startIso), lte(deliverables.dueOn, endIso), sql`${deliverables.status} not in ('published','analysis_available')`, scopeToClients(viewer, deliverables.clientId))),
 
-    db.select({ id: contentCalendar.id, date: contentCalendar.scheduledOn, title: contentCalendar.title, clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl })
+    db.select({ id: contentCalendar.id, date: contentCalendar.scheduledOn, title: contentCalendar.title, clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl, ...coordSelect })
       .from(contentCalendar)
       .innerJoin(clients, eq(clients.id, contentCalendar.clientId))
       .where(and(isNull(contentCalendar.deletedAt), gte(contentCalendar.scheduledOn, startIso), lte(contentCalendar.scheduledOn, endIso), scopeToClients(viewer, contentCalendar.clientId))),
@@ -106,7 +116,7 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
       id: calendarEvents.id, title: calendarEvents.title, startsAt: calendarEvents.startsAt,
       allDay: calendarEvents.allDay, location: calendarEvents.location, meetLink: calendarEvents.meetLink,
       htmlLink: calendarEvents.htmlLink, attendees: calendarEvents.attendees, clientId: calendarEvents.clientId,
-      clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl,
+      clientName: clients.name, clientColor: clients.color, clientLogo: clients.logoUrl, ...coordSelect,
     })
       .from(calendarEvents)
       .leftJoin(clients, eq(clients.id, calendarEvents.clientId))
@@ -132,6 +142,12 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
       .slice(0, 12);
   };
 
+  // Coördinator-velden van een rij overnemen (of leeg voor items zonder klant).
+  const coord = (r: PlanResponsible): PlanResponsible => ({
+    coordinatorId: r.coordinatorId ?? null, coordinatorName: r.coordinatorName ?? null, coordinatorAvatar: r.coordinatorAvatar ?? null,
+  });
+  const noCoord: PlanResponsible = { coordinatorId: null, coordinatorName: null, coordinatorAvatar: null };
+
   // Meetings voorbewerken: datum (voor week-bucketing) + tijd. Zowel de interne
   // vaste teammeeting als de Google Agenda-afspraken, in één lijst.
   const meetings: PlanMeeting[] = [
@@ -141,7 +157,7 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
         id: m.id, title: m.title, date: iso(when),
         time: when.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }),
         location: m.location, source: "intern", meetLink: null, attendees: [],
-        clientName: null, clientColor: null, clientLogo: null, href: `/meetings/${m.id}`,
+        clientName: null, clientColor: null, clientLogo: null, href: `/meetings/${m.id}`, ...noCoord,
       };
     }),
     ...meetingEventRows.map((m): PlanMeeting => {
@@ -152,7 +168,7 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
         location: m.location, source: "google", meetLink: m.meetLink,
         attendees: attendeeNames(m.attendees),
         clientName: m.clientName, clientColor: m.clientColor, clientLogo: m.clientLogo,
-        href: m.meetLink || m.htmlLink || "/calendar",
+        href: m.meetLink || m.htmlLink || "/calendar", ...coord(m),
       };
     }),
   ];
@@ -164,9 +180,9 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
     const s = iso(wStart), e = iso(wEnd);
     const inWeek = (d: string | null) => Boolean(d && d >= s && d <= e);
 
-    const opnames: PlanItem[] = shootRows.filter((r) => inWeek(r.date)).map((r) => ({ id: r.id, kind: "opname", date: r.date, clientName: r.clientName, clientColor: r.clientColor, clientLogo: r.clientLogo, title: "Opname", person: r.person, href: `/productions/${r.id}` }));
-    const opleveringen: PlanItem[] = deliverableRows.filter((r) => inWeek(r.date)).map((r) => ({ id: r.id, kind: "oplevering", date: r.date!, clientName: r.clientName, clientColor: r.clientColor, clientLogo: r.clientLogo, title: r.title, person: r.person, href: `/videos/${r.id}` }));
-    const publicaties: PlanItem[] = pubRows.filter((r) => inWeek(r.date)).map((r) => ({ id: r.id, kind: "publicatie", date: r.date, clientName: r.clientName, clientColor: r.clientColor, clientLogo: r.clientLogo, title: r.title, person: null, href: `/calendar` }));
+    const opnames: PlanItem[] = shootRows.filter((r) => inWeek(r.date)).map((r) => ({ id: r.id, kind: "opname", date: r.date, clientName: r.clientName, clientColor: r.clientColor, clientLogo: r.clientLogo, title: "Opname", person: r.person, href: `/productions/${r.id}`, ...coord(r) }));
+    const opleveringen: PlanItem[] = deliverableRows.filter((r) => inWeek(r.date)).map((r) => ({ id: r.id, kind: "oplevering", date: r.date!, clientName: r.clientName, clientColor: r.clientColor, clientLogo: r.clientLogo, title: r.title, person: r.person, href: `/videos/${r.id}`, ...coord(r) }));
+    const publicaties: PlanItem[] = pubRows.filter((r) => inWeek(r.date)).map((r) => ({ id: r.id, kind: "publicatie", date: r.date, clientName: r.clientName, clientColor: r.clientColor, clientLogo: r.clientLogo, title: r.title, person: null, href: `/calendar`, ...coord(r) }));
 
     // Conflict: editor met te veel opleveringen in deze week.
     const byEditor = new Map<string, number>();
