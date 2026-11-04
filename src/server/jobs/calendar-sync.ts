@@ -266,6 +266,8 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
       }
 
       const toUpsert: (typeof calendarEvents.$inferInsert)[] = [];
+      let unreachable = 0;
+      let lastError = "";
 
       for (const cal of calendars) {
         // Eén onbereikbare agenda (verwijderd, hernoemd of toegang ingetrokken)
@@ -278,6 +280,8 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
           events = await source.listEvents(cal.id, { timeMin, timeMax });
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);
+          unreachable++;
+          lastError = msg;
           ctx.log(`Agenda "${cal.summary}" overgeslagen (niet bereikbaar): ${msg}`);
           // Punt 7: duidelijke melding als één agenda niet synchroniseert, zodat
           // het team het meteen kan oplossen (de andere agenda's gaan door). Eén
@@ -362,6 +366,26 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
             updatedAt: new Date(),
           });
         }
+      }
+
+      // Géén enkele agenda bereikbaar (bijv. verlopen Google-token): dan is dit
+      // geen geslaagde sync. Eén duidelijke melding en de job op "mislukt", in
+      // plaats van stil "succes" met verouderde opnames in het portaal.
+      if (calendars.length > 0 && unreachable === calendars.length) {
+        const tokenIssue = /token/i.test(lastError);
+        const dayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+        await notify({
+          roles: ["owner"],
+          level: "critical",
+          type: "calendar_sync_down",
+          title: "Google Agenda-koppeling ligt plat",
+          body: tokenIssue
+            ? "De Google-toegang is verlopen (token vernieuwen mislukt). Opnames, afspraken en publicaties worden niet meer bijgewerkt. Maak een nieuw Google-token aan (scripts/google-refresh-token.mjs) en zet het als GOOGLE_REFRESH_TOKEN in Vercel."
+            : `Geen enkele agenda kon worden opgehaald: ${lastError}`.slice(0, 300),
+          href: "/settings/integrations",
+          dedupeKey: `calendar_sync_down:${dayKey}`,
+        }).catch(() => {});
+        throw new Error(`Geen enkele agenda bereikbaar: ${lastError}`);
       }
 
       // In bulk wegschrijven: upsert op (source, agenda, externalId), in blokken
