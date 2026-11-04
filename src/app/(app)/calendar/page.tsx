@@ -51,19 +51,24 @@ export default async function CalendarPage({
   const canWriteCal = viewer.permissions.has("calendar:write");
 
   // Publicatiecheck extra benadrukken tijdens het postmoment: voor het kernteam
-  // (Jarno, Milou, Jiska, Rutger) staat de check op werkdagen tussen 15:00 en
+  // (Jarno, Milou, Jiska, Rutger) staat de check op werkdagen tussen 14:30 en
   // 17:00 (Amsterdam) automatisch volledig open met een groene omlijning, zodat
   // ze 'm op het moment van publiceren sowieso zien.
   const amsParts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Amsterdam",
     weekday: "short",
     hour: "2-digit",
+    minute: "2-digit",
     hour12: false,
   }).formatToParts(new Date());
   const amsHour = Number(amsParts.find((p) => p.type === "hour")?.value ?? "0");
+  const amsMinute = Number(amsParts.find((p) => p.type === "minute")?.value ?? "0");
   const amsWeekday = amsParts.find((p) => p.type === "weekday")?.value ?? "";
+  const amsMinutesOfDay = amsHour * 60 + amsMinute;
   const inPostingWindow =
-    ["Mon", "Tue", "Wed", "Thu", "Fri"].includes(amsWeekday) && amsHour >= 15 && amsHour < 17;
+    ["Mon", "Tue", "Wed", "Thu", "Fri"].includes(amsWeekday) &&
+    amsMinutesOfDay >= 14 * 60 + 30 &&
+    amsMinutesOfDay < 17 * 60;
   const emphasizePublicatiecheck = isCoreStaff(viewer.email) && inPostingWindow;
 
   const params = await searchParams;
