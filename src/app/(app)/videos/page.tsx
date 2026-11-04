@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, ClipboardList } from "lucide-react";
 import { requireInternal, isOwner } from "@/server/auth/context";
-import { assignMissingEditorsIfStale } from "@/server/jobs/calendar-sync";
+import { assignMissingEditorsIfStale, mergeDuplicateShootsIfStale } from "@/server/jobs/calendar-sync";
 import { isCoreStaff } from "@/server/core-staff";
 import { getVideoHighlights, listEditorOptions, listVideos } from "@/server/videos";
 import { listEditingProjects } from "@/server/editing-board";
@@ -68,6 +68,9 @@ export default async function VideosPage({
   // klant koppelen, zodat het board klopt en editors hun projecten in de
   // planning hebben. Idempotent; alleen het kantoorteam triggert dit.
   await assignMissingEditorsIfStale();
+  // Dubbele opnamedagen (zelfde klant + datum, uit meerdere agenda's) opruimen,
+  // zodat het editing-board niet dubbel/driedubbel volloopt. Draait ná de response.
+  await mergeDuplicateShootsIfStale();
 
   const [rows, highlights, editors, editingProjects, clientList] = await Promise.all([
     listVideos(viewer, {

@@ -850,3 +850,26 @@ export async function assignMissingEditorsIfStale(maxAgeMinutes = 30): Promise<v
     /* nooit de pagina breken door deze check */
   }
 }
+
+/**
+ * Ruimt dubbele opnamedagen op (klant + datum) als dat langer dan `maxAgeMinutes`
+ * geleden is, ná de response. Draait los van de Google-sync, zodat het
+ * editing-board (en de opnameplanning) zichzelf opruimt bij bezoek — ook als
+ * Google even niet bereikbaar is. Idempotent en cheap als er niets dubbel staat.
+ */
+export async function mergeDuplicateShootsIfStale(maxAgeMinutes = 5): Promise<void> {
+  try {
+    const last = await getNumberSetting("jobs.merge_shoots_last_ms", 0);
+    if (Date.now() - last < maxAgeMinutes * 60_000) return;
+    await setNumberSetting("jobs.merge_shoots_last_ms", Date.now(), { category: "jobs" });
+    after(async () => {
+      try {
+        await mergeDuplicateShoots();
+      } catch {
+        /* nooit de pagina breken */
+      }
+    });
+  } catch {
+    /* nooit de pagina breken door deze check */
+  }
+}

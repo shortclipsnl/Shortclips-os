@@ -3,7 +3,7 @@ import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import { inArray } from "drizzle-orm";
-import { briefingSets, clients, deliverables, users } from "@/db/schema";
+import { briefingSets, clients, deliverables, productionDays, users } from "@/db/schema";
 
 // Tweede users-alias voor de vaste verantwoordelijke (coördinator) van de klant,
 // zodat we die via één JOIN meenemen i.p.v. een subquery per rij (sneller board).
@@ -190,14 +190,10 @@ export async function listEditorBoard(
       footageUrl: deliverables.footageUrl,
       driveFolderId: deliverables.driveFolderId,
       frameUrl: deliverables.frameUrl,
-      // Beeldmateriaal- en scriptlink van de gekoppelde opname (fallback):
-      // daar zet de coördinator de downloadlink en het script ook neer.
-      dayFootageUrl: sql<string | null>`(
-        select pd.footage_url from production_days pd where pd.id = deliverables.production_day_id limit 1
-      )`,
-      dayScriptUrl: sql<string | null>`(
-        select pd.script_url from production_days pd where pd.id = deliverables.production_day_id limit 1
-      )`,
+      // Beeldmateriaal- en scriptlink + opnamedatum van de gekoppelde opnamedag,
+      // nu via één JOIN i.p.v. drie subqueries per rij (sneller board).
+      dayFootageUrl: productionDays.footageUrl,
+      dayScriptUrl: productionDays.scriptUrl,
       dayScriptFileId: sql<string | null>`(
         select f.id from edit_project_files f
         where f.production_day_id = deliverables.production_day_id and f.kind = 'script'
@@ -211,9 +207,7 @@ export async function listEditorBoard(
       productionDayId: deliverables.productionDayId,
       // De ECHTE opnamedatum uit de gekoppelde opnamedag (nooit verzonnen): is er
       // geen gekoppelde opname, dan blijft dit null → "Opnamedatum nog niet bekend".
-      dayScheduledOn: sql<string | null>`(
-        select to_char(pd.scheduled_on, 'YYYY-MM-DD') from production_days pd where pd.id = deliverables.production_day_id limit 1
-      )`,
+      dayScheduledOn: productionDays.scheduledOn,
       openComments: sql<number>`(
         select count(*) from review_threads rt
         where rt.deliverable_id = deliverables.id
@@ -224,6 +218,7 @@ export async function listEditorBoard(
     .innerJoin(clients, eq(clients.id, deliverables.clientId))
     .leftJoin(users, eq(users.id, deliverables.editorId))
     .leftJoin(coordUser, eq(coordUser.id, clients.coordinatorId))
+    .leftJoin(productionDays, eq(productionDays.id, deliverables.productionDayId))
     .where(
       and(
         isNull(deliverables.deletedAt),
