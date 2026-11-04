@@ -1,6 +1,6 @@
 import "server-only";
 import { after } from "next/server";
-import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { env } from "@/lib/env";
 import {
@@ -138,6 +138,63 @@ export type CalendarSyncOptions = {
   windowDaysBack?: number;
   windowDaysForward?: number;
 };
+
+/**
+ * Ontdubbelt opnamedagen: dezelfde opname kon eerder (door een titel-/tijd-
+ * verschil per agenda) als meerdere production_days belanden. Per klant + datum
+ * houden we er één over — de opnamedag met editwerk, anders de oudste — en de
+ * lege, onbewerkte duplicaten voegen we samen: hun agenda-koppelingen wijzen we
+ * naar de behouden opname, en hun auto-aangemaakte (nog lege) editing-opdracht +
+ * de opnamedag zelf zetten we op verwijderd (soft-delete, omkeerbaar). Een
+ * duplicaat waar al aan geëdit is, blijft staan — nooit editwerk weggooien.
+ */
+export async function mergeDuplicateShoots(): Promise<number> {
+  const groups = await db
+    .select({ clientId: productionDays.clientId, scheduledOn: productionDays.scheduledOn })
+    .from(productionDays)
+    .where(and(isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled")))
+    .groupBy(productionDays.clientId, productionDays.scheduledOn)
+    .having(sql`count(*) > 1`);
+  if (groups.length === 0) return 0;
+
+  let merged = 0;
+  for (const g of groups) {
+    const pds = await db
+      .select({ id: productionDays.id })
+      .from(productionDays)
+      .where(and(eq(productionDays.clientId, g.clientId), eq(productionDays.scheduledOn, g.scheduledOn), isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled")))
+      .orderBy(asc(productionDays.createdAt));
+    if (pds.length < 2) continue;
+    const ids = pds.map((p) => p.id);
+
+    // Per opnamedag: is er al editwerk (een niet-lege, niet-verwijderde opdracht)?
+    const dels = await db
+      .select({ pdId: deliverables.productionDayId, status: deliverables.status, currentVersion: deliverables.currentVersion, footageUrl: deliverables.footageUrl, frameUrl: deliverables.frameUrl, id: deliverables.id })
+      .from(deliverables)
+      .where(and(inArray(deliverables.productionDayId, ids), isNull(deliverables.deletedAt)));
+    const hasWork = new Set<string>();
+    const emptyDelByPd = new Map<string, string[]>();
+    for (const d of dels) {
+      if (!d.pdId) continue;
+      const empty = d.status === "recorded" && (d.currentVersion ?? 0) === 0 && !d.footageUrl && !d.frameUrl;
+      if (empty) { const list = emptyDelByPd.get(d.pdId) ?? []; list.push(d.id); emptyDelByPd.set(d.pdId, list); }
+      else hasWork.add(d.pdId);
+    }
+
+    const canonical = pds.find((p) => hasWork.has(p.id)) ?? pds[0]!;
+    for (const p of pds) {
+      if (p.id === canonical.id || hasWork.has(p.id)) continue; // behouden of met werk → laat staan
+      await db.update(calendarMappings)
+        .set({ entityId: canonical.id, lastSyncedAt: new Date() })
+        .where(and(eq(calendarMappings.entityType, "calendar_shoot"), eq(calendarMappings.entityId, p.id)));
+      const emptyIds = emptyDelByPd.get(p.id) ?? [];
+      if (emptyIds.length) await db.update(deliverables).set({ deletedAt: new Date(), updatedAt: new Date() }).where(inArray(deliverables.id, emptyIds));
+      await db.update(productionDays).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(productionDays.id, p.id));
+      merged++;
+    }
+  }
+  return merged;
+}
 
 /**
  * Haalt afspraken op uit de ingestelde agenda's, koppelt ze aan de juiste
@@ -454,6 +511,11 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
       const rutgerId = vgRows.find((r) => r.email.toLowerCase() === "rutger@shortclips.nl")?.id ?? null;
       const jarnoId = vgRows.find((r) => r.email.toLowerCase() === "jarno@shortclips.nl")?.id ?? null;
 
+      // Eerst bestaande duplicaten (van vóór de klant+datum-dedup) opruimen, zodat
+      // we per klant+datum op één opnamedag verder werken. Faalt zacht — de
+      // ontdubbeling mag de sync nooit breken.
+      try { await mergeDuplicateShoots(); } catch { /* ontdubbeling overslaan */ }
+
       let shoots = 0;
       const seenShoot = new Map<string, string>(); // dedup-sleutel → productionDayId
       for (const ev of shootEvents) {
@@ -462,7 +524,11 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         const startTime = ev.allDay
           ? null
           : `${ev.startsAt.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" })}:00`;
-        const dedupKey = `${ev.clientId}|${scheduledOn}|${(ev.title ?? "opnamedag").trim().toLowerCase()}|${startTime ?? "allday"}`;
+        // Eén opname per klant per dag. Dezelfde opname staat vaak in meerdere
+        // gekoppelde agenda's (ieder teamlid heeft 'm), soms met een iets andere
+        // titel of tijd — dat is NOOIT een tweede opname. Daarom dedupen we puur op
+        // klant + datum, zodat er niet per agenda een duplicaat ontstaat.
+        const dedupKey = `${ev.clientId}|${scheduledOn}`;
         const base = {
           clientId: ev.clientId,
           title: ev.title ?? "Opnamedag",
