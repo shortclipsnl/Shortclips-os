@@ -3,10 +3,10 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, Loader2, MessageSquareText, UserPlus, ScrollText, ExternalLink, ArrowUpRight, FileText, X } from "lucide-react";
+import { AlarmClock, AlertTriangle, CalendarClock, ChevronDown, FileClock, Loader2, MessageSquareText, UserPlus, ScrollText, ExternalLink, ArrowUpRight, FileText, X } from "lucide-react";
 import { setScriptingNote, setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS, SCRIPT_STATUS } from "@/lib/statuses";
-import { ClientLogo, TeamAvatar } from "@/components/ui";
+import { ClientLogo, Stat, TeamAvatar } from "@/components/ui";
 import type { ScriptingRow, WriterOption, LinkedScript } from "@/server/scripting";
 import { PortalSendCell } from "./portal-send";
 
@@ -146,6 +146,20 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
       .map((g) => ({ ...g, rows: [...g.rows].sort((x, y) => x.daysToShoot - y.daysToShoot) }));
   }, [filtered]);
 
+  // De statusblokken rekenen mee met de scriptschrijver-keuze: op "Mijn scripts"
+  // zie je alleen jouw eigen deadlines/te laat/opnames — niet de teamtotalen.
+  // (Status- en klantfilter tellen hier bewust niet mee; de blokken zijn zélf de
+  // bovenliggende filters.)
+  const scopeCounts = useMemo(() => {
+    const scope = writer === "alle" ? rows : rows.filter((r) => r.scriptWriterId === writer);
+    return {
+      upcoming: scope.length,
+      notDone: scope.filter((r) => !r.done).length,
+      deadlineSoon: scope.filter((r) => r.flag === "amber").length,
+      late: scope.filter((r) => r.flag === "red").length,
+    };
+  }, [rows, writer]);
+
   return (
     <div>
       {writerOptions.length > 0 ? (
@@ -188,6 +202,14 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
           })}
         </div>
       ) : null}
+
+      {/* Statusblokken — klikbaar als filter, en per scriptschrijver (Mijn scripts). */}
+      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <Stat compact label="Deadline nadert" value={String(scopeCounts.deadlineSoon)} tone={scopeCounts.deadlineSoon > 0 ? "lime" : "good"} icon={<AlarmClock />} hint="binnen 7 dagen" onClick={() => setFilter("nadert")} active={filter === "nadert"} />
+        <Stat compact label="Te laat" value={String(scopeCounts.late)} tone={scopeCounts.late > 0 ? "bad" : "good"} icon={<AlertTriangle />} onClick={() => setFilter("te-laat")} active={filter === "te-laat"} />
+        <Stat compact label="Aankomende opnames" value={String(scopeCounts.upcoming)} tone="info" icon={<CalendarClock />} onClick={() => setFilter("alle")} active={filter === "alle"} />
+        <Stat compact label="Nog niet afgerond" value={String(scopeCounts.notDone)} tone={scopeCounts.notDone > 0 ? "warn" : "good"} icon={<FileClock />} onClick={() => setFilter("niet-afgerond")} active={filter === "niet-afgerond"} />
+      </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-1">

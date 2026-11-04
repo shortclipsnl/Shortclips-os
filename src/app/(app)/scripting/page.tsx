@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarClock, FileClock, AlarmClock, AlertTriangle, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { requireInternal, isOwner } from "@/server/auth/context";
 import { listScripting } from "@/server/scripting";
 import { upcomingScriptAppointments } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
-import { Card, CardHeader, ClientLogo, GuidelineNote, PageHeader, Stat, TeamAvatar } from "@/components/ui";
+import { Card, CardHeader, ClientLogo, GuidelineNote, PageHeader, TeamAvatar } from "@/components/ui";
 import { IntegrationNotice } from "@/components/integration-notice";
 import { ScriptingBoard } from "./scripting-ui";
 
@@ -21,7 +21,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
   await syncCalendarIfStale();
   const canWrite = viewer.permissions.has("scripts:write");
   const canUseGenerator = viewer.permissions.has("ai:read");
-  const { rows, stats, clientOptions, writerOptions, clientResponsibles } = await listScripting(viewer);
+  const { rows, clientOptions, writerOptions, clientResponsibles } = await listScripting(viewer);
   const scriptAppts = await upcomingScriptAppointments();
   // Scriptverantwoordelijke per klant (slug → naam/foto), om bij elke script
   // meeting automatisch te tonen wie die doet.
@@ -50,15 +50,9 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
         <IntegrationNotice provider="google_drive" isOwner={isOwner(viewer)} what="scripts uit Drive" />
       </div>
 
-      {/* Klikbare statusblokken: openen direct de bijbehorende filter hieronder.
-          Bewust urgentie-eerst: "Deadline nadert" en "Te laat" links (waar je als
-          eerste naar kijkt), daarna het ruimere overzicht rechts. */}
-      <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <Stat compact label="Deadline nadert" value={String(stats.deadlineSoon)} tone={stats.deadlineSoon > 0 ? "lime" : "good"} icon={<AlarmClock />} hint="binnen 7 dagen" href="/scripting?filter=nadert" />
-        <Stat compact label="Te laat" value={String(stats.late)} tone={stats.late > 0 ? "bad" : "good"} icon={<AlertTriangle />} href="/scripting?filter=te-laat" />
-        <Stat compact label="Aankomende opnames" value={String(stats.upcoming)} tone="info" icon={<CalendarClock />} href="/scripting?filter=alle" />
-        <Stat compact label="Nog niet afgerond" value={String(stats.notDone)} tone={stats.notDone > 0 ? "warn" : "good"} icon={<FileClock />} href="/scripting?filter=niet-afgerond" />
-      </div>
+      {/* De statusblokken (Deadline nadert / Te laat / Aankomende / Nog niet
+          afgerond) staan nu IN het board, zodat ze meebewegen met de
+          scriptschrijver-keuze ("Mijn scripts" = alleen je eigen aantallen). */}
 
       {/* Compacte kwaliteitscheck — zichtbaar precies waar scripts worden
           geschreven en gecontroleerd. Standaard dicht, één klik open. */}
