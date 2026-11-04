@@ -1,9 +1,10 @@
 import "server-only";
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import { deliverables, productionDays } from "@/db/schema";
 import { addWorkingDays, daysBetween, subWorkingDays } from "@/lib/workdays";
 import { runJob } from "./runner";
+import { mergeDuplicateDeliverables } from "@/server/editing/integrity";
 
 /**
  * Koppelt video's automatisch aan de juiste opnamedag. Hoge zekerheid wordt
@@ -25,7 +26,10 @@ export async function runLinkSuggestions() {
     const days = await db
       .select({ id: productionDays.id, clientId: productionDays.clientId, scheduledOn: productionDays.scheduledOn })
       .from(productionDays)
-      .where(isNull(productionDays.deletedAt));
+      // Geannuleerde opnames nooit als koppeldoel gebruiken: anders hangt een
+      // project aan een opname die niet doorgaat (en ontstaat er een dubbel
+      // project zodra de afspraak opnieuw wordt ingepland).
+      .where(and(isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled")));
     const daysByClient = new Map<string, { id: string; scheduledOn: string }[]>();
     for (const d of days) {
       if (!d.scheduledOn) continue;
@@ -130,7 +134,7 @@ export async function runLinkSuggestions() {
       const [day] = await db
         .select({ on: productionDays.scheduledOn })
         .from(productionDays)
-        .where(and(eq(productionDays.id, r.suggested), isNull(productionDays.deletedAt)))
+        .where(and(eq(productionDays.id, r.suggested), isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled")))
         .limit(1);
       if (!day) continue; // Voorgestelde opname bestaat niet meer → laat staan voor controle.
       const dueOn = day.on && r.dueOnSource !== "manual" ? addWorkingDays(day.on, 14) : undefined;
@@ -148,6 +152,10 @@ export async function runLinkSuggestions() {
       applied++;
     }
 
-    ctx.log(`${applied} video's automatisch gekoppeld, ${ctx.counters.updated - applied} suggesties voor controle.`);
+    // Een gekoppelde video kan op een opname landen die al een editing-project
+    // heeft (bijv. Monday-import naast het project uit de agenda). Direct
+    // samenvoegen, zodat er per opname één project blijft.
+    const merged = applied > 0 ? await mergeDuplicateDeliverables() : null;
+    ctx.log(`${applied} video's automatisch gekoppeld, ${ctx.counters.updated - applied} suggesties voor controle.${merged?.merged ? ` ${merged.merged} dubbele projecten samengevoegd.` : ""}`);
   });
 }

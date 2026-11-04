@@ -151,13 +151,22 @@ const TYPE_RULES: Array<{ kind: AppointmentKind; pattern: RegExp }> = [
 const SHORTS_COUNT = /\b\d+\s*(shorts?|video'?s?|reels?|clips?)\b/i;
 // ... maar niet als de titel juist een overleg/afstemming of een publicatie is
 // (dan gaat het over shorts, maar is het geen opnamedag).
+// Overleg-woorden die een afspraak over een opname tot meeting maken, ook als het
+// woord "opname" erin staat.
+const MEETING_ABOUT_SHOOT = /\b(evaluatie\w*|meeting|overleg|bespreking|kennismaking\w*|call|kick\s*-?\s*off)\b/i;
 const NOT_A_SHOOT = /\b(meeting|overleg|call|bespreking|afstem\w*|strategie|kick\s*-?\s*off|evaluatie|online|upload\w*|geupload|plaatsen|posten|gepost|publicatie\w*)\b/i;
 
 export function classifyAppointment(title?: string | null, calendarSummary?: string | null): AppointmentKind {
   if (calendarSummary && /content\s*uploaden/i.test(calendarSummary)) return "publicatie";
   const text = `${title ?? ""} ${calendarSummary ?? ""}`;
   if (SHORTS_COUNT.test(text) && !NOT_A_SHOOT.test(text)) return "opname";
-  for (const rule of TYPE_RULES) if (rule.pattern.test(text)) return rule.kind;
+  for (const rule of TYPE_RULES) {
+    // "Evaluatie meeting Hegro tijdens opname" of "Evaluatie 2027 - Koops na
+    // opname" noemen de opname wel, maar zijn zelf een overleg. Zo'n afspraak
+    // mag geen opnamedag (en geen editing-project) worden.
+    if (rule.kind === "opname" && MEETING_ABOUT_SHOOT.test(text)) continue;
+    if (rule.pattern.test(text)) return rule.kind;
+  }
   return "overig";
 }
 

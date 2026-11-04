@@ -37,6 +37,7 @@ import { MissingCredentialsError } from "@/server/integrations/types";
 import { aliasesForSlug } from "@/server/integrations/client-aliases";
 import { listEnabledCouplings } from "@/server/calendar-couplings";
 import { runJob } from "./runner";
+import { editorIdsByKey, mergeDuplicateDeliverables } from "@/server/editing/integrity";
 
 /**
  * Publieke e-mailproviders mogen nooit als "klantdomein" gelden — anders zou
@@ -433,7 +434,25 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
             .from(calendarMappings)
             .where(and(eq(calendarMappings.entityType, "calendar_shoot"), eq(calendarMappings.itemId, row.id)))
             .limit(1);
-          if (map?.entityId) {
+          // Dezelfde opname kan via meerdere afspraken binnenkomen (gedeelde of
+          // dubbele afspraak). Alleen annuleren als er géén andere, nog actieve
+          // afspraak meer naar deze opnamedag wijst — anders zou het verwijderen
+          // van één kopie de echte opname (en het editwerk) wegtrekken.
+          const stillActive = map?.entityId
+            ? await db
+                .select({ id: calendarEvents.id })
+                .from(calendarMappings)
+                .innerJoin(calendarEvents, sql`${calendarEvents.id}::text = ${calendarMappings.itemId}`)
+                .where(and(
+                  eq(calendarMappings.entityType, "calendar_shoot"),
+                  eq(calendarMappings.entityId, map.entityId),
+                  ne(calendarEvents.id, row.id),
+                  sql`${calendarEvents.status} is distinct from 'cancelled'`,
+                  eq(calendarEvents.kind, "opname"),
+                ))
+                .limit(1)
+            : [];
+          if (map?.entityId && stillActive.length === 0) {
             await db.update(productionDays).set({ status: "cancelled", updatedAt: new Date() }).where(eq(productionDays.id, map.entityId));
             // De automatisch aangemaakte, nog niet gestarte editing-opdracht van
             // deze opname ook intrekken (editwerk dat al loopt blijft staan).
@@ -491,9 +510,7 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
 
       // Vaste editor per klant → user-id, zodat nieuwe opnames automatisch bij de
       // juiste editor op het board komen (op basis van clients.editorName).
-      const editorUsers = await db.select({ id: users.id, fullName: users.fullName }).from(users).where(and(eq(users.primaryRole, "editor"), eq(users.status, "active")));
-      const editorByKey = new Map<string, string>();
-      for (const e of editorUsers) { const k = firstNameKey(e.fullName); if (k && !editorByKey.has(k)) editorByKey.set(k, e.id); }
+      const editorByKey = await editorIdsByKey();
       const clientEditorRows = await db.select({ id: clients.id, editorName: clients.editorName }).from(clients).where(isNull(clients.deletedAt));
       const editorByClient = new Map<string, string>();
       for (const c of clientEditorRows) { if (c.editorName) { const uid = editorByKey.get(firstNameKey(c.editorName)); if (uid) editorByClient.set(c.id, uid); } }
@@ -549,6 +566,19 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         // (andere agenda, zelfde opname), dan de bestaande koppeling, anders nieuw.
         let targetPdId = seenShoot.get(dedupKey) ?? map?.entityId ?? null;
         const alreadyCounted = seenShoot.has(dedupKey);
+        // Nog geen doel? Dan eerst een bestaande opnamedag van deze klant op deze
+        // datum zoeken vóór we een nieuwe aanmaken. Zonder deze stap maakte een
+        // nieuwe (of opnieuw aangemaakte) afspraak een tweede opnamedag naast de
+        // bestaande — de bron van de dubbele opnames en projecten.
+        if (!targetPdId) {
+          const [existingDay] = await db
+            .select({ id: productionDays.id })
+            .from(productionDays)
+            .where(and(eq(productionDays.clientId, ev.clientId), eq(productionDays.scheduledOn, scheduledOn), isNull(productionDays.deletedAt)))
+            .orderBy(sql`case when ${productionDays.status} = 'cancelled' then 1 else 0 end`, asc(productionDays.createdAt))
+            .limit(1);
+          if (existingDay) targetPdId = existingDay.id;
+        }
 
         if (targetPdId) {
           // Oude waarden vóór de update, om een verplaatsing te herkennen.
@@ -597,7 +627,10 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
             }
           }
         } else {
-          const [created] = await db.insert(productionDays).values(base).returning({ id: productionDays.id });
+          const [created] = await db
+            .insert(productionDays)
+            .values({ ...base, editorId: editorByClient.get(ev.clientId) ?? null })
+            .returning({ id: productionDays.id });
           targetPdId = created!.id;
         }
         seenShoot.set(dedupKey, targetPdId);
@@ -658,6 +691,14 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
 
         if (!alreadyCounted) shoots++;
       }
+
+      // Na de opnames: dubbele opnamedagen (bijv. door een verzette afspraak die op
+      // een bestaande datum landt) en dubbele editing-projecten per opname opruimen.
+      try {
+        const mergedDays = await mergeDuplicateShoots();
+        const r = await mergeDuplicateDeliverables();
+        if (mergedDays || r.merged || r.aligned) ctx.log(`Opgeschoond: ${mergedDays} dubbele opnamedagen, ${r.merged} dubbele editing-projecten, ${r.aligned} editor-correcties.`);
+      } catch { /* opschonen mag de sync nooit breken */ }
 
       // Publicatie-afspraken (agenda "Klant Content uploaden") → contentplanning.
       // De titel is de post, de omschrijving bevat de caption. Alleen met een
@@ -806,9 +847,7 @@ export async function syncCalendarIfStale(maxAgeMinutes = 5): Promise<void> {
  * zodat elke editor zijn eigen projecten in de planning heeft.
  */
 export async function assignMissingEditors(): Promise<number> {
-  const editorUsers = await db.select({ id: users.id, fullName: users.fullName }).from(users).where(and(eq(users.primaryRole, "editor"), eq(users.status, "active")));
-  const editorByKey = new Map<string, string>();
-  for (const e of editorUsers) { const k = firstNameKey(e.fullName); if (k && !editorByKey.has(k)) editorByKey.set(k, e.id); }
+  const editorByKey = await editorIdsByKey();
   const clientRows = await db.select({ id: clients.id, editorName: clients.editorName }).from(clients).where(isNull(clients.deletedAt));
 
   let changed = 0;
@@ -865,6 +904,7 @@ export async function mergeDuplicateShootsIfStale(maxAgeMinutes = 5): Promise<vo
     after(async () => {
       try {
         await mergeDuplicateShoots();
+        await mergeDuplicateDeliverables();
       } catch {
         /* nooit de pagina breken */
       }

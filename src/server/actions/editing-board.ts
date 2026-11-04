@@ -1,9 +1,11 @@
 "use server";
 
+import { propagateProjectEditor } from "@/server/editing/integrity";
+
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { deliverables, productionDays } from "@/db/schema";
+import { productionDays } from "@/db/schema";
 import { assertClientAccess, ForbiddenError, requirePermission } from "@/server/auth/context";
 import { clearEditScript, createEditScriptUploadTarget, replaceEditScript } from "@/server/editing/script-file";
 import { auditLog } from "@/server/audit";
@@ -64,16 +66,8 @@ export async function setProjectEditor(id: string, editorId: string | null): Pro
     if (!project) return { ok: false, message: "Project niet gevonden." };
     assertClientAccess(viewer, project.clientId);
 
-    await db
-      .update(productionDays)
-      .set({ editorId, updatedAt: new Date() })
-      .where(eq(productionDays.id, id));
-
-    // Shorts van deze opname meeverhuizen naar de nieuwe editor.
-    await db
-      .update(deliverables)
-      .set({ editorId, updatedAt: new Date() })
-      .where(and(eq(deliverables.productionDayId, id), isNull(deliverables.deletedAt)));
+    // Opnamedag + alle projecten van deze opname via de centrale doorzetting.
+    await propagateProjectEditor(id, editorId);
 
     await auditLog({
       viewer,

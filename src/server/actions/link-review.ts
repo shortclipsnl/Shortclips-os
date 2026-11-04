@@ -1,5 +1,7 @@
 "use server";
 
+import { mergeDuplicateDeliverables } from "@/server/editing/integrity";
+
 import { revalidatePath } from "next/cache";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -42,6 +44,9 @@ async function applyLink(deliverableId: string, productionDayId: string): Promis
       updatedAt: new Date(),
     })
     .where(eq(deliverables.id, deliverableId));
+  // Eén project per opname: landt deze video op een opname die al een project
+  // heeft, dan direct samenvoegen.
+  await mergeDuplicateDeliverables();
 }
 
 /** Voorgestelde koppeling bevestigen. */
