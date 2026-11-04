@@ -25,10 +25,10 @@ export default function GlobalError({
       /ChunkLoadError|Loading chunk \S+ failed|dynamically imported module|importing a module script failed|hydrat/i.test(msg);
     if (!looksLikeVersionSkew) return;
     try {
-      const KEY = "sc_skew_reload_at";
-      const last = Number(sessionStorage.getItem(KEY) || 0);
-      if (Date.now() - last > 20_000) {
-        sessionStorage.setItem(KEY, String(Date.now()));
+      // Hooguit ÉÉN automatische herlaad per sessie (geen herlaad-lus).
+      const KEY = "sc_skew_reloaded";
+      if (!sessionStorage.getItem(KEY)) {
+        sessionStorage.setItem(KEY, "1");
         window.location.reload();
       }
     } catch { /* opslag geblokkeerd → gewoon de foutpagina tonen */ }

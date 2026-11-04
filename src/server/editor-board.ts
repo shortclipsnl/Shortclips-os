@@ -1,8 +1,13 @@
 import "server-only";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import { inArray } from "drizzle-orm";
 import { briefingSets, clients, deliverables, users } from "@/db/schema";
+
+// Tweede users-alias voor de vaste verantwoordelijke (coördinator) van de klant,
+// zodat we die via één JOIN meenemen i.p.v. een subquery per rij (sneller board).
+const coordUser = alias(users, "coord_user");
 import { scopeToClients, type Viewer } from "@/server/auth/context";
 import { subWorkingDays, workingDaysUntil } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
@@ -174,8 +179,8 @@ export async function listEditorBoard(
       clientColor: clients.color,
       clientLogo: clients.logoUrl,
       coordinatorId: clients.coordinatorId,
-      coordinatorName: sql<string | null>`(select cu.full_name from users cu where cu.id = clients.coordinator_id limit 1)`,
-      coordinatorAvatar: sql<string | null>`(select cu.avatar_url from users cu where cu.id = clients.coordinator_id limit 1)`,
+      coordinatorName: coordUser.fullName,
+      coordinatorAvatar: coordUser.avatarUrl,
       editorId: deliverables.editorId,
       editorName: users.fullName,
       plannedShorts: deliverables.plannedShorts,
@@ -218,6 +223,7 @@ export async function listEditorBoard(
     .from(deliverables)
     .innerJoin(clients, eq(clients.id, deliverables.clientId))
     .leftJoin(users, eq(users.id, deliverables.editorId))
+    .leftJoin(coordUser, eq(coordUser.id, clients.coordinatorId))
     .where(
       and(
         isNull(deliverables.deletedAt),
