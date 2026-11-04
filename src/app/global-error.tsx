@@ -16,6 +16,22 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("[shortclips-os] global", error);
+    // Zie error.tsx: automatisch vers herladen bij een versie-mismatch (oude
+    // chunks na een nieuwe deploy), met een sessie-guard tegen herlaad-loops.
+    if (typeof window === "undefined") return;
+    const msg = `${error?.message ?? ""} ${error?.name ?? ""}`;
+    const looksLikeVersionSkew =
+      /Minified React error #(418|419|420|421|422|423|424|425|441)\b/i.test(msg) ||
+      /ChunkLoadError|Loading chunk \S+ failed|dynamically imported module|importing a module script failed|hydrat/i.test(msg);
+    if (!looksLikeVersionSkew) return;
+    try {
+      const KEY = "sc_skew_reload_at";
+      const last = Number(sessionStorage.getItem(KEY) || 0);
+      if (Date.now() - last > 20_000) {
+        sessionStorage.setItem(KEY, String(Date.now()));
+        window.location.reload();
+      }
+    } catch { /* opslag geblokkeerd → gewoon de foutpagina tonen */ }
   }, [error]);
 
   return (
