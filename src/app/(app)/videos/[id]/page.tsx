@@ -24,6 +24,8 @@ import {
 } from "@/lib/format";
 import { videoPhase, stageOverdue } from "@/lib/statuses";
 import { getQcChecklist } from "@/server/qc";
+import { getOrCreatePublicationChecks } from "@/server/publication-checks";
+import { PublicationChecklistPanel } from "./publication-checklist";
 import { StatusControl, EditorPicker } from "./status-control";
 import { CommentForm, ResolveButton } from "./comment-form";
 import { QcPanel } from "./qc-panel";
@@ -59,6 +61,9 @@ export default async function VideoPage({
   const qc = await getQcChecklist(viewer, id);
   const autoBriefing = await getBriefingForVideo(viewer, id);
   const canWriteVideo = viewer.permissions.has("videos:write");
+  // Publicatie-checklist: alleen zinvol zodra de video gepubliceerd is.
+  const pubChecks = detail.video.status === "published" ? await getOrCreatePublicationChecks(id) : [];
+  const canEditPubCheck = ["owner", "admin", "operational_manager", "project_coordinator", "content_creator"].includes(viewer.primaryRole);
 
   const days = daysSince(v.statusChangedAt);
   const late = stageOverdue(v.status, days);
@@ -118,6 +123,11 @@ export default async function VideoPage({
 
           {/* Kwaliteitscontrole */}
           {detail.canSeeInternal ? <QcPanel items={qc.items} canWrite={canWriteVideo} /> : null}
+
+          {/* Publicatiecheck — ná publicatie nalopen of de post goed staat. */}
+          {detail.canSeeInternal && detail.video.status === "published" ? (
+            <PublicationChecklistPanel items={pubChecks} canEdit={canEditPubCheck} />
+          ) : null}
 
           {/* Feedback */}
           {detail.canSeeInternal ? (

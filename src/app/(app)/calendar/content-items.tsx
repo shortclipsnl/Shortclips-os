@@ -21,6 +21,8 @@ export type ContentItemLite = {
   contentType: string | null;
   platforms: string[];
   deliverableId: string | null;
+  /** Voortgang van de publicatiecheck (alleen bij gepubliceerde video's). */
+  pubCheck?: { done: number; total: number } | null;
 };
 
 const hasCaption = (c: string | null) => !!(c && c.trim().length > 0);
@@ -83,6 +85,19 @@ export function ContentChip({ item, color, today = false }: { item: ContentItemL
               <PlatformIcon key={p} platform={p} size={12} title={PLATFORM[p]?.label} />
             ))}
             <span className="truncate text-2xs text-[var(--color-ink-faint)]">{item.clientName}</span>
+            {item.pubCheck ? (
+              <span
+                className="ml-auto shrink-0 rounded px-1 py-px text-[8px] font-bold leading-none"
+                style={
+                  item.pubCheck.done >= item.pubCheck.total
+                    ? { background: "var(--color-good)", color: "#fff" }
+                    : { background: "var(--color-warn-soft)", color: "#8a5300" }
+                }
+                title={`Publicatiecheck: ${item.pubCheck.done}/${item.pubCheck.total} afgevinkt`}
+              >
+                ✓{item.pubCheck.done}/{item.pubCheck.total}
+              </span>
+            ) : null}
           </span>
         </span>
       </button>

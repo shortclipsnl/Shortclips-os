@@ -346,6 +346,32 @@ export const qcChecks = pgTable(
 );
 
 /* ------------------------------------------------------------------ *
+ * Publicatie-checklist — controle ná publicatie, zodat (o.a. Milou/Jiska)
+ * kan nalopen of de post goed is uitgevoerd. Eén rij per controlepunt per
+ * video; template wordt lui aangemaakt zodra de video gepubliceerd is.
+ * Los van qc_checks (dat is de controle vóór oplevering aan de klant).
+ * ------------------------------------------------------------------ */
+export const publicationChecks = pgTable(
+  "publication_checks",
+  {
+    id: pk(),
+    deliverableId: uuid("deliverable_id")
+      .notNull()
+      .references(() => deliverables.id, { onDelete: "cascade" }),
+    label: varchar("label", { length: 200 }).notNull(),
+    done: boolean("done").notNull().default(false),
+    doneById: uuid("done_by_id").references(() => users.id, { onDelete: "set null" }),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [
+    unique("publication_checks_unique").on(t.deliverableId, t.label),
+    index("publication_checks_deliverable_idx").on(t.deliverableId),
+  ],
+);
+
+/* ------------------------------------------------------------------ *
  * Relaties
  * ------------------------------------------------------------------ */
 

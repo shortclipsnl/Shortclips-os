@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import { contentCalendar } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { isCoreStaff } from "@/server/core-staff";
+import { getPublicationCheckSummaries } from "@/server/publication-checks";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { listCalendar, monthGrid, type CalendarItem } from "@/server/calendar";
 import { listClients } from "@/server/clients";
@@ -187,6 +188,18 @@ export default async function CalendarPage({
   const today = new Date().toISOString().slice(0, 10);
   const asList = params.weergave === "lijst";
 
+  // Voortgang van de publicatiecheck per gepubliceerde video, voor de indicator
+  // op de content-items. Zelfde trigger als op de videopagina: deliverable
+  // (videoStatus) is "published".
+  const pubCheckIds = [...new Set(
+    [...items, ...weekItems]
+      .filter((i) => i.videoStatus === "published" && i.deliverableId)
+      .map((i) => i.deliverableId as string),
+  )];
+  const pubCheckSummaries = await getPublicationCheckSummaries(pubCheckIds);
+  const pubCheckFor = (i: CalendarItem) =>
+    i.videoStatus === "published" && i.deliverableId ? pubCheckSummaries.get(i.deliverableId) ?? null : null;
+
   // CalendarItem → het lichte item dat ContentChip verwacht.
   const toChipItem = (i: CalendarItem) => ({
     id: i.id,
@@ -201,6 +214,7 @@ export default async function CalendarPage({
     contentType: i.contentType,
     platforms: (i.platforms as string[]) ?? [],
     deliverableId: i.deliverableId,
+    pubCheck: pubCheckFor(i),
   });
 
   const dLabel = (d: string) => {
@@ -470,6 +484,7 @@ export default async function CalendarPage({
                       contentType: i.contentType,
                       platforms: (i.platforms as string[]) ?? [],
                       deliverableId: i.deliverableId,
+                      pubCheck: pubCheckFor(i),
                     }}
                   />
                   {canWriteCal ? (
@@ -565,6 +580,7 @@ export default async function CalendarPage({
                           contentType: i.contentType,
                           platforms: (i.platforms as string[]) ?? [],
                           deliverableId: i.deliverableId,
+                          pubCheck: pubCheckFor(i),
                         }}
                       />
                     ))}
