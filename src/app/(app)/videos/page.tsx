@@ -119,7 +119,7 @@ export default async function VideosPage({
           >
             <ClipboardList className="size-4" /> Editor briefing maken
           </Link>
-          <span className="text-xs text-[var(--color-ink-muted)]">Maak per video een duidelijke briefing en koppel 'm direct aan de opdracht, zodat je editors precies weten wat de bedoeling is.</span>
+          <span className="text-xs text-[var(--color-ink-muted)]">Maak per video een duidelijke briefing en koppel &apos;m direct aan de opdracht, zodat je editors precies weten wat de bedoeling is.</span>
         </div>
       ) : null}
 
