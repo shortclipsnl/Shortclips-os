@@ -254,10 +254,13 @@ export const ROLE_DEFINITIONS: Array<{
       "ai_editor:read",
       "ai_editor:run",
       // Het contentteam (o.a. Jiska, Rutger) stuurt ook de editing aan: fases,
-      // prioriteit en deadlines wijzigen (videos:write) en editors toewijzen
-      // (videos:assign), net als de projectcoördinator.
+      // prioriteit en deadlines wijzigen (videos:write), editors toewijzen
+      // (videos:assign) en een video intern afronden/goedkeuren — de fase
+      // "Afgerond" (videos:approve) — net als de projectcoördinator. Publiceren
+      // (live zetten) blijft bij de coördinator/eigenaar: géén videos:publish.
       "videos:write",
       "videos:assign",
+      "videos:approve",
     ],
   },
   {
