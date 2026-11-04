@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ExternalLink, FileText, HardDrive, Loader2, RefreshCw, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ExternalLink, FileText, Folder, HardDrive, Loader2, RefreshCw, X } from "lucide-react";
 import {
   listShootDriveScripts,
   regenerateShootCaptions,
@@ -16,6 +16,20 @@ function fmtDate(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
   return isNaN(d.getTime()) ? "" : d.toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/**
+ * Leidt de sessie-map af uit het Drive-pad. Het pad bevat het bestand als laatste
+ * segment (…/Sessie/script.pdf), dus de sessie is de map eromheen. Zo groeperen we
+ * de PDF's per opname/sessie in plaats van één lange, onleesbare lijst.
+ */
+function sessionOf(path: string | null): { key: string; label: string } {
+  if (!path) return { key: "__overig__", label: "Overig" };
+  const idx = path.lastIndexOf("/");
+  const dir = idx > 0 ? path.slice(0, idx) : "";
+  const segs = dir.split("/").filter(Boolean);
+  const label = segs.length ? segs[segs.length - 1]! : "Overig";
+  return { key: dir || "__root__", label };
 }
 
 /**
@@ -42,6 +56,44 @@ export function DriveScriptPicker({
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
+
+  function toggleFolder(key: string) {
+    setOpenFolders((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  }
+
+  // PDF's groeperen per sessie-map (nieuwste map eerst; binnen een map nieuwste PDF eerst).
+  const groups = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; files: Candidate[]; newest: string | null; hasCurrent: boolean }>();
+    for (const c of candidates) {
+      const { key, label } = sessionOf(c.path);
+      let g = map.get(key);
+      if (!g) { g = { key, label, files: [], newest: null, hasCurrent: false }; map.set(key, g); }
+      g.files.push(c);
+      if (c.modifiedAt && (!g.newest || c.modifiedAt > g.newest)) g.newest = c.modifiedAt;
+      if (c.externalId === current) g.hasCurrent = true;
+    }
+    const arr = [...map.values()];
+    for (const g of arr) g.files.sort((a, b) => (b.modifiedAt ?? "").localeCompare(a.modifiedAt ?? ""));
+    arr.sort((a, b) => (b.newest ?? "").localeCompare(a.newest ?? ""));
+    return arr;
+  }, [candidates, current]);
+
+  // Handig startpunt: de map met het huidige script staat open; is er maar één map,
+  // dan die. De rest blijft dicht zodat het overzicht scanbaar is.
+  useEffect(() => {
+    if (groups.length === 0) { setOpenFolders(new Set()); return; }
+    const toOpen = new Set<string>();
+    const cur = groups.find((g) => g.hasCurrent);
+    if (cur) toOpen.add(cur.key);
+    else if (groups.length === 1) toOpen.add(groups[0]!.key);
+    setOpenFolders(toOpen);
+  }, [groups]);
 
   async function load() {
     setLoading(true);
@@ -139,8 +191,8 @@ export function DriveScriptPicker({
 
             <div className="p-4">
               <p className="mb-3 text-xs text-[var(--color-ink-muted)]">
-                Kies de juiste script-PDF uit de Drive-map van deze klant. De captions worden meteen op basis van dat
-                script (opnieuw) gemaakt. Staat er later een nieuwe versie in Drive? Klik dan op <strong>Opnieuw uit Drive</strong>.
+                Kies eerst de <strong>sessie-map</strong> en daarna de juiste script-PDF. De captions worden meteen op
+                basis van dat script (opnieuw) gemaakt. Staat er later een nieuwe versie in Drive? Klik dan op <strong>Opnieuw uit Drive</strong>.
               </p>
 
               {loading ? (
@@ -153,52 +205,82 @@ export function DriveScriptPicker({
                   en of het bestand een PDF in een &ldquo;Scripts&rdquo;-map is.
                 </p>
               ) : (
-                <ul className="space-y-1.5">
-                  {candidates.map((c) => {
-                    const isCurrent = c.externalId === current;
-                    const isBusy = busyId === c.externalId;
+                <div className="space-y-1.5">
+                  {groups.map((g) => {
+                    const isOpen = openFolders.has(g.key);
                     return (
-                      <li
-                        key={c.externalId}
-                        className={`flex items-center gap-2.5 rounded-[var(--radius-md)] border px-3 py-2 ${isCurrent ? "border-[var(--color-brand-400)] bg-[var(--color-brand-50)]" : "border-[var(--color-line)] bg-[var(--color-surface)]"}`}
-                      >
-                        <FileText className="size-4 shrink-0 text-[var(--color-brand-600)]" strokeWidth={1.75} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-[var(--color-ink)]">{c.name}</p>
-                          <p className="truncate text-2xs text-[var(--color-ink-faint)]">
-                            {c.path ? `${c.path} · ` : ""}{c.modifiedAt ? `gewijzigd ${fmtDate(c.modifiedAt)}` : "datum onbekend"}
-                          </p>
-                        </div>
-                        {c.url ? (
-                          <a
-                            href={c.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Openen in Google Drive"
-                            className="shrink-0 rounded p-1 text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
-                          >
-                            <ExternalLink className="size-3.5" />
-                          </a>
-                        ) : null}
-                        {isCurrent ? (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-good-soft)] px-2 py-0.5 text-2xs font-semibold text-[#1d6b4c]">
-                            <Check className="size-3" /> In gebruik
+                      <div key={g.key} className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)]">
+                        {/* Sessie-map: klik om de PDF's eronder te tonen/verbergen. */}
+                        <button
+                          type="button"
+                          onClick={() => toggleFolder(g.key)}
+                          aria-expanded={isOpen}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[var(--color-surface-sunken)]"
+                        >
+                          {isOpen ? <ChevronDown className="size-4 shrink-0 text-[var(--color-ink-faint)]" /> : <ChevronRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />}
+                          <Folder className="size-4 shrink-0 text-[var(--color-brand-600)]" />
+                          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--color-ink)]">{g.label}</span>
+                          {g.hasCurrent ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-good-soft)] px-2 py-0.5 text-2xs font-semibold text-[#1d6b4c]">
+                              <Check className="size-3" /> in gebruik
+                            </span>
+                          ) : null}
+                          <span className="shrink-0 text-2xs tabular-nums text-[var(--color-ink-faint)]">
+                            {g.files.length} PDF{g.files.length === 1 ? "" : "'s"}{g.newest ? ` · ${fmtDate(g.newest)}` : ""}
                           </span>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={pending}
-                            onClick={() => choose(c.externalId)}
-                            className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-2.5 py-1 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-50"
-                          >
-                            {isBusy ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                            Gebruik voor captions
-                          </button>
-                        )}
-                      </li>
+                        </button>
+                        {isOpen ? (
+                          <ul className="divide-y divide-[var(--color-line)] border-t border-[var(--color-line)]">
+                            {g.files.map((c) => {
+                              const isCurrent = c.externalId === current;
+                              const isBusy = busyId === c.externalId;
+                              return (
+                                <li
+                                  key={c.externalId}
+                                  className={`flex items-center gap-2.5 px-3 py-2 ${isCurrent ? "bg-[var(--color-brand-50)]" : "bg-[var(--color-surface)]"}`}
+                                >
+                                  <FileText className="size-4 shrink-0 text-[var(--color-brand-600)]" strokeWidth={1.75} />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium text-[var(--color-ink)]">{c.name}</p>
+                                    <p className="truncate text-2xs text-[var(--color-ink-faint)]">
+                                      {c.modifiedAt ? `gewijzigd ${fmtDate(c.modifiedAt)}` : "datum onbekend"}
+                                    </p>
+                                  </div>
+                                  {c.url ? (
+                                    <a
+                                      href={c.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      title="Openen in Google Drive"
+                                      className="shrink-0 rounded p-1 text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
+                                    >
+                                      <ExternalLink className="size-3.5" />
+                                    </a>
+                                  ) : null}
+                                  {isCurrent ? (
+                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-good-soft)] px-2 py-0.5 text-2xs font-semibold text-[#1d6b4c]">
+                                      <Check className="size-3" /> In gebruik
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      disabled={pending}
+                                      onClick={() => choose(c.externalId)}
+                                      className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-brand-600)] px-2.5 py-1 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-50"
+                                    >
+                                      {isBusy ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                                      Gebruik voor captions
+                                    </button>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
+                      </div>
                     );
                   })}
-                </ul>
+                </div>
               )}
 
               {err ? <p className="mt-3 text-xs font-medium text-[var(--color-bad)]">{err}</p> : null}
