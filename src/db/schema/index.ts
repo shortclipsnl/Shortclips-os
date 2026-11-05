@@ -25,3 +25,4 @@ export * from "./quotes";
 export * from "./ai-editor";
 export * from "./transfer";
 export * from "./content-research";
+export * from "./client-documents";

@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clientAiProfiles,
-  clientEditingGuides,
+  clientDocuments,
   clientKnowledge,
   clients,
   deliverables,
@@ -101,11 +101,13 @@ export async function listMyClients(viewer: Viewer): Promise<MyClient[]> {
   const ids = rows.map((r) => r.id);
 
   // Per-klant aanvullende cijfers in losse grouped queries (vermijdt zware joins).
+  // Editing Guide uit de centrale bron (client_documents), dezelfde als op
+  // Klanten en in de Klantenbibliotheek.
   const guideRows = await db
-    .select({ clientId: clientEditingGuides.clientId, laatste: sql<string>`max(${clientEditingGuides.createdAt})` })
-    .from(clientEditingGuides)
-    .where(and(inArray(clientEditingGuides.clientId, ids), isNull(clientEditingGuides.deletedAt)))
-    .groupBy(clientEditingGuides.clientId);
+    .select({ clientId: clientDocuments.clientId, laatste: sql<string>`max(${clientDocuments.createdAt})` })
+    .from(clientDocuments)
+    .where(and(inArray(clientDocuments.clientId, ids), eq(clientDocuments.kind, "editing_guide"), isNull(clientDocuments.deletedAt)))
+    .groupBy(clientDocuments.clientId);
   const guideByClient = new Map(guideRows.map((g) => [g.clientId, g.laatste ? new Date(g.laatste) : null]));
 
   const knRows = await db
@@ -131,17 +133,20 @@ export async function listMyClients(viewer: Viewer): Promise<MyClient[]> {
   });
 }
 
-export type GuideMeta = { id: string; fileName: string; sizeBytes: number; updatedAt: Date };
+export type GuideMeta = { id: string; fileName: string; sizeBytes: number; updatedAt: Date; variant: string };
 
-/** De meest recente Editing Guide van een klant (metadata, zonder de bytes). */
+/**
+ * De meest recente Editing Guide van een klant (metadata, zonder de bytes), uit
+ * de centrale bron. De oude tabel client_editing_guides wordt niet meer gebruikt.
+ */
 export async function getLatestEditingGuide(clientId: string): Promise<GuideMeta | null> {
   const [g] = await db
-    .select({ id: clientEditingGuides.id, fileName: clientEditingGuides.fileName, sizeBytes: clientEditingGuides.sizeBytes, updatedAt: clientEditingGuides.createdAt })
-    .from(clientEditingGuides)
-    .where(and(eq(clientEditingGuides.clientId, clientId), isNull(clientEditingGuides.deletedAt)))
-    .orderBy(desc(clientEditingGuides.createdAt))
+    .select({ id: clientDocuments.id, fileName: clientDocuments.fileName, sizeBytes: clientDocuments.sizeBytes, updatedAt: clientDocuments.createdAt, variant: clientDocuments.variant })
+    .from(clientDocuments)
+    .where(and(eq(clientDocuments.clientId, clientId), eq(clientDocuments.kind, "editing_guide"), isNull(clientDocuments.deletedAt)))
+    .orderBy(desc(clientDocuments.createdAt))
     .limit(1);
-  return g ? { id: g.id, fileName: g.fileName, sizeBytes: g.sizeBytes, updatedAt: g.updatedAt as Date } : null;
+  return g ? { id: g.id, fileName: g.fileName, sizeBytes: g.sizeBytes, updatedAt: g.updatedAt as Date, variant: g.variant } : null;
 }
 
 export type KnowledgeItem = { category: string; categoryLabel: string; title: string; body: string; isPinned: boolean };

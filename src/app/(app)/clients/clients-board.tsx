@@ -7,6 +7,7 @@ import { Check, Loader2, Search, Users } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { setClientStatus } from "@/server/actions/clients";
+import { ClientDocButtons, type DocButtonSlot } from "@/components/client-docs/doc-buttons";
 
 export type BoardClient = {
   id: string;
@@ -22,6 +23,8 @@ export type BoardClient = {
   inProduction: number;
   shortsPerMonth: number;
   monthlyRevenue: number | null;
+  /** Klanten Guide + Editing Guide uit de centrale bron. */
+  docs: DocButtonSlot[];
 };
 
 /** Kleine gekleurde chip voor scanbaarheid. */
@@ -202,7 +205,8 @@ function ClientCard({ c }: { c: BoardClient }) {
     });
 
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5 hover:shadow-[var(--shadow-raised)]">
+    <div className="min-w-0 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5 hover:shadow-[var(--shadow-raised)]">
+    <div className="flex min-w-0 items-center gap-3">
       <Link href={`/clients/${c.slug}`} className="flex min-w-0 flex-1 items-center gap-3">
         <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={52} />
         <span className="min-w-0 flex-1">
@@ -235,6 +239,9 @@ function ClientCard({ c }: { c: BoardClient }) {
         )}
         {stopped ? "Niet actief" : "Actief"}
       </button>
+    </div>
+      {/* De twee vaste PDF's van deze klant, direct te openen. */}
+      {c.docs.length > 0 ? <ClientDocButtons slots={c.docs} size="xs" className="mt-2 pl-[64px]" /> : null}
     </div>
   );
 }

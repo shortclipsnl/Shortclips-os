@@ -59,6 +59,9 @@ import { FinanceMonths } from "./finance-months";
 import { GenerateReportButton, ReportPublishToggle } from "./report-actions";
 import { AgreementOverridesEditor } from "./agreement-overrides";
 import { getClientAgreementOverrides, getPortalSettings } from "@/server/portal-settings";
+import { canManageClientDocs, getCurrentDocs, toSlots, visibleKinds } from "@/server/client-documents";
+import { ClientDocButtons } from "@/components/client-docs/doc-buttons";
+import { ClientDocsPanel } from "@/components/client-docs/docs-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +93,9 @@ export default async function ClientPage({
   // hier automatisch meelopen.
   const editingProjects = await listEditingProjects(viewer, { clientId: c.id });
   const canEditClient = viewer.permissions.has("clients:write");
+  // Klanten Guide + Editing Guide uit de centrale bron (zelfde als Klantenbibliotheek).
+  const docSlots = toSlots((await getCurrentDocs([c.id])).get(c.id), { kinds: visibleKinds(viewer) });
+  const canManageDocs = canManageClientDocs(viewer);
 
   // Klantspecifieke afspraken (alleen voor wie klanten mag bewerken).
   const [agreementGeneral, agreementOverrides] = canEditClient
@@ -174,6 +180,10 @@ export default async function ClientPage({
               {c.description ? (
                 <p className="mt-1.5 max-w-xl text-sm leading-snug text-[var(--color-ink)]">{c.description}</p>
               ) : null}
+              <ClientDocButtons
+                slots={docSlots.map((s) => ({ kind: s.kind, label: s.label, url: s.doc?.url ?? null }))}
+                className="mt-3"
+              />
             </div>
           </div>
           <div className="flex items-start gap-4">
@@ -254,6 +264,7 @@ export default async function ClientPage({
             const cur = f?.externalId && f.externalId !== "manual" ? `https://next.frame.io/project/${f.externalId}` : null;
             return <ClientFrameLink clientId={c.id} current={cur} />;
           })() : null}
+          {canManageDocs ? <ClientDocsPanel clientId={c.id} slots={docSlots} /> : null}
           <OverviewTab hub={hub} publishedThisMonth={publishedThisMonth} nextShoot={nextShoot} activeVideos={activeVideos.length} canEditClient={canEditClient} />
           {canEditClient && agreementGeneral ? (
             <Card padded={false}>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireInternal } from "@/server/auth/context";
 import { listClients } from "@/server/clients";
 import { coveringForUser } from "@/server/leave-cover";
+import { getCurrentDocs, toSlots, visibleKinds } from "@/server/client-documents";
 import { LinkButton, PageHeader } from "@/components/ui";
 import { ClientsBoard, type BoardClient } from "./clients-board";
 
@@ -13,6 +14,9 @@ const STOPPED = new Set(["paused", "churned"]);
 export default async function ClientsPage() {
   const viewer = await requireInternal();
   const all = await listClients(viewer);
+  // Klanten Guide + Editing Guide per klant, uit de centrale bron.
+  const docsByClient = await getCurrentDocs(all.map((c) => c.id));
+  const kinds = visibleKinds(viewer);
   const canWrite = viewer.permissions.has("clients:write");
   // Maandprijs is financieel → uitsluitend voor de eigenaar (finance:read).
   const canSeeRevenue = viewer.permissions.has("finance:read");
@@ -31,6 +35,7 @@ export default async function ClientsPage() {
     inProduction: Number(c.inProduction),
     shortsPerMonth: Number(c.monthlyVideoQuota),
     monthlyRevenue: canSeeRevenue ? Number(c.monthlyRevenue ?? 0) : null,
+    docs: toSlots(docsByClient.get(c.id), { kinds }).map((s) => ({ kind: s.kind, label: s.label, url: s.doc?.url ?? null })),
   }));
 
   const activeCount = clients.filter((c) => !STOPPED.has(c.status)).length;

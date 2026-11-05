@@ -5,7 +5,7 @@ import { ArrowLeft, BookOpen, Clapperboard, Download, ExternalLink, FileText, Fi
 import { Card, ClientLogo, EmptyState } from "@/components/ui";
 import { requireInternal } from "@/server/auth/context";
 import { CONTENT_FOCUS_LABEL, getClientLibraryDetail } from "@/server/client-library";
-import { EditingGuideUpload } from "./editing-guide-upload";
+import { ClientDocUpload } from "@/components/client-docs/doc-upload";
 
 export const metadata: Metadata = { title: "Klantinformatie" };
 export const dynamic = "force-dynamic";
@@ -23,7 +23,8 @@ export default async function KlantInfoPage({ params }: { params: Promise<{ slug
   const detail = await getClientLibraryDetail(viewer, slug);
   if (!detail) notFound();
   const { client, overDeKlant, richtlijnen, editingAandachtspunten, afspraken, guide, canManage } = detail;
-  const guideUrl = `/api/editing-guide/${client.id}`;
+  // Vaste link naar de centrale bron (zelfde PDF als op Klanten en in de Klantenbibliotheek).
+  const guideUrl = `/api/klantdocumenten/${client.id}/editing_guide${guide?.variant ? `?v=${encodeURIComponent(guide.variant)}` : ""}`;
   const contentFocusLabel = client.contentFocus ? CONTENT_FOCUS_LABEL[client.contentFocus] ?? client.contentFocus : null;
 
   return (
@@ -110,10 +111,10 @@ export default async function KlantInfoPage({ params }: { params: Promise<{ slug
             {guide ? (
               <>
                 <a href={guideUrl} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"><ExternalLink className="size-4" /> Openen</a>
-                <a href={`${guideUrl}?download=1`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"><Download className="size-4" /> Downloaden</a>
+                <a href={`${guideUrl}${guideUrl.includes("?") ? "&" : "?"}download=1`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"><Download className="size-4" /> Downloaden</a>
               </>
             ) : null}
-            {canManage ? <EditingGuideUpload clientId={client.id} hasGuide={Boolean(guide)} /> : null}
+            {canManage ? <ClientDocUpload clientId={client.id} kind="editing_guide" variant={guide?.variant ?? ""} label="Editing Guide" hasDoc={Boolean(guide)} /> : null}
           </div>
         </div>
         {guide ? (

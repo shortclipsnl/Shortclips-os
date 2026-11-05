@@ -10,6 +10,8 @@ import { videoEmbedUrl, type PMDoc } from "@/lib/kennisbank-doc";
 import { CourseOutline } from "./outline";
 import { CompleteButton } from "./complete-button";
 import { LessonEditorLoader } from "./editor-loader";
+import { getChapterClientDocs } from "@/server/client-documents";
+import { ClientDocButtons } from "@/components/client-docs/doc-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +43,9 @@ export default async function CoursePage({
   const completed = idx >= 0 ? detail.lessonOrder[idx]!.completed : false;
   const editing = manage && sp.bewerk === "1" && lesson;
   const embed = lesson?.videoUrl ? videoEmbedUrl(lesson.videoUrl) : null;
+  // Klantenbibliotheek: lessen in een klanthoofdstuk tonen bovenaan de twee
+  // vaste guides van die klant (centrale bron, altijd de nieuwste versie).
+  const clientDocs = lesson ? await getChapterClientDocs(viewer, lesson.chapterId) : null;
 
   const outline = (
     <>
@@ -116,6 +121,18 @@ export default async function CoursePage({
                 </div>
               </header>
 
+              {clientDocs ? (
+                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface-2)] px-3 py-2.5">
+                  <span className="text-xs font-semibold text-[var(--color-ink-muted)]">Documenten {clientDocs.clientName}</span>
+                  <ClientDocButtons slots={clientDocs.slots.map((s) => ({ kind: s.kind, label: s.label, url: s.doc?.url ?? null }))} />
+                  {manage ? (
+                    <Link href={`/clients/${clientDocs.clientSlug}`} className="ml-auto text-xs text-[var(--color-ink-muted)] underline hover:text-[var(--color-ink)]">
+                      Vervangen via Klanten
+                    </Link>
+                  ) : null}
+                </div>
+              ) : null}
+
               {manage && !lesson.isPublished ? (
                 <p className="mt-3 rounded-md bg-[var(--color-warn-soft)] px-3 py-2 text-sm text-[var(--color-ink)]">Concept: deze les is nog niet zichtbaar voor het team.</p>
               ) : null}
@@ -152,15 +169,18 @@ export default async function CoursePage({
                   <ul className="mt-2 space-y-2">
                     {lesson.resources.map((r, i) => {
                       const href = r.assetId ? `/api/kennisbank/assets/${r.assetId}` : r.url ?? "#";
+                      // Vaste link naar een klantguide (centrale bron) gedraagt zich als bestand.
+                      const isFile = Boolean(r.assetId) || (r.url ?? "").startsWith("/api/klantdocumenten/");
+                      const downloadHref = r.assetId ? `${href}?download=1` : `${href}${href.includes("?") ? "&" : "?"}download=1`;
                       return (
                         <li key={i} className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--color-line)] px-3 py-2">
-                          {r.assetId ? <FileText className="h-4 w-4 shrink-0 text-[var(--color-ink-muted)]" /> : <Link2 className="h-4 w-4 shrink-0 text-[var(--color-ink-muted)]" />}
+                          {isFile ? <FileText className="h-4 w-4 shrink-0 text-[var(--color-ink-muted)]" /> : <Link2 className="h-4 w-4 shrink-0 text-[var(--color-ink-muted)]" />}
                           <a href={href} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--color-brand-700)] hover:underline">
                             {r.title}
                           </a>
                           {r.fileName ? <span className="hidden text-xs text-[var(--color-ink-faint)] sm:inline">{r.fileName}</span> : null}
-                          {r.assetId ? (
-                            <a href={`${href}?download=1`} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)]" aria-label={`${r.title} downloaden`}>
+                          {isFile ? (
+                            <a href={downloadHref} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)]" aria-label={`${r.title} downloaden`}>
                               <Download className="h-3.5 w-3.5" /> Download
                             </a>
                           ) : null}

@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { pk, softDelete, timestamps } from "./_shared";
 import { users } from "./identity";
+import { clients } from "./clients";
 
 /* ------------------------------------------------------------------ *
  * Shortclips Kennisbank (vervanger van de Skool Classroom)
@@ -127,6 +128,10 @@ export const kbChapters = pgTable(
     title: varchar("title", { length: 300 }).notNull(),
     /** Positie binnen de cursus (gedeeld met losse lessen op cursusniveau). */
     sortOrder: integer("sort_order").notNull().default(0),
+    /** Klanthoofdstuk (Klantenbibliotheek): de klant waar dit hoofdstuk over gaat.
+     *  Bij een gekoppelde klant toont elke les de Klanten Guide- en Editing
+     *  Guide-knop uit de centrale bron (client_documents). */
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
     sourceRef: text("source_ref"),
     updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
