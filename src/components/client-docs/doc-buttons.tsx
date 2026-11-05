@@ -40,10 +40,12 @@ export function ClientDocButtons({ slots, size = "sm", className = "" }: { slots
             target="_blank"
             rel="noopener noreferrer"
             title={`${s.label} openen (PDF)`}
+            // Editing Guide: tekstkleur van het thema (licht = navy, donker = lichte tekst),
+            // zodat de omlijnde knop in beide modi duidelijk opvalt.
             className={`inline-flex items-center whitespace-nowrap rounded-full font-semibold transition hover:opacity-90 ${pad} ${
               s.kind === "klanten_guide"
                 ? "bg-[var(--color-indigo-ink)] text-white"
-                : "border border-[var(--color-indigo-ink)] bg-[var(--color-surface)] text-[var(--color-indigo-ink)]"
+                : "border border-[var(--color-ink)] bg-[var(--color-surface)] text-[var(--color-ink)]"
             }`}
           >
             <Icon className={icon} strokeWidth={1.75} />
