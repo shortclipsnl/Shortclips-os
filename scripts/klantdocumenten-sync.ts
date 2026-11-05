@@ -185,7 +185,19 @@ async function syncLibrary(bySlug: Map<string, { id: string; name: string }>) {
     const seen = new Set<string>();
     const dedup = after.filter((r) => { const k = r.assetId ?? r.url ?? r.title; if (seen.has(k)) return false; seen.add(k); return true; });
 
-    if (JSON.stringify(dedup) === JSON.stringify(before)) continue;
+    // Postgres (jsonb) sorteert sleutels anders, dus vergelijken op inhoud.
+    const canon = (rs: KbResource[]) => JSON.stringify(rs.map((r) => Object.fromEntries(Object.entries(r).filter(([, v]) => v != null).sort(([a], [b]) => a.localeCompare(b)))));
+    // Oude Skool-migratiemeldingen ("kon nog niet worden overgezet") zijn
+    // achterhaald: guides komen uit de centrale bron, dode bijlagen zijn hieronder
+    // met een eigen notitie verwijderd.
+    const cleanedNotes = (l.migrationNotes ?? "").replace(/Bijlage "[^"]*"(?: \([^)]*\))? kon nog niet uit Skool worden overgezet\.\s*/g, "").trim() || null;
+    if (canon(dedup) === canon(before)) {
+      if (cleanedNotes !== (l.migrationNotes ?? null)) {
+        console.log(`  ✎ ${l.title}: achterhaalde migratiemelding opgeschoond`);
+        if (!DRY) await db.update(kbLessons).set({ migrationNotes: cleanedNotes, updatedAt: sql`now()` }).where(eq(kbLessons.id, l.id));
+      }
+      continue;
+    }
     console.log(`  ✎ ${l.title}: ${before.length} → ${dedup.length} bijlage(n)${removed.length ? ` · dood verwijderd: ${removed.join("; ")}` : ""}`);
     if (DRY) continue;
     const note = removed.length
@@ -194,7 +206,7 @@ async function syncLibrary(bySlug: Map<string, { id: string; name: string }>) {
     await db.insert(kbLessonRevisions).values({ lessonId: l.id, title: l.title, content: l.content, videoUrl: l.videoUrl, resources: before, note: "Voor klantdocumenten-sync (nov 2026)" });
     await db.update(kbLessons).set({
       resources: dedup,
-      migrationNotes: note ? [l.migrationNotes, note].filter(Boolean).join(" ") : l.migrationNotes,
+      migrationNotes: [cleanedNotes, note].filter(Boolean).join(" ") || null,
       updatedAt: sql`now()`,
     }).where(eq(kbLessons.id, l.id));
   }
