@@ -163,7 +163,22 @@ const schema = z.object({
   MAIL_FROM: z.string().optional(),
 });
 
-const parsed = schema.safeParse(process.env);
+// Basis-URL bepalen vóór validatie. Volgorde:
+//  1. Expliciete APP_URL (eigen/custom domein) wint altijd.
+//  2. Op Vercel: de stabiele, canonieke productie-URL (VERCEL_PROJECT_PRODUCTION_URL)
+//     — niet VERCEL_URL, want die verandert per deploy en is onbruikbaar voor
+//     webhooks die bij Google/Frame.io geregistreerd staan. Alleen als die
+//     ontbreekt vallen we terug op VERCEL_URL.
+//  3. Lokaal: de zod-default (http://localhost:3000).
+// Zonder dit bleef APP_URL in productie op localhost:3000 staan, waardoor de
+// webhook-adressen naar localhost wezen en realtime-webhooks nooit binnenkwamen.
+const rawEnv: NodeJS.ProcessEnv = { ...process.env };
+if (!rawEnv.APP_URL) {
+  const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  if (vercelHost) rawEnv.APP_URL = `https://${vercelHost}`;
+}
+
+const parsed = schema.safeParse(rawEnv);
 
 if (!parsed.success) {
   const details = parsed.error.issues
