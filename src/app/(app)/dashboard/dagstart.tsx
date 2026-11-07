@@ -195,12 +195,12 @@ function Column({
       <div className={`flex items-center gap-2.5 px-4 py-3 text-white ${accent}`}>
         <span className="opacity-90">{icon}</span>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[15px] font-bold leading-tight tracking-tight">{title}</h2>
+          <h2 className="text-[15px] font-bold leading-tight tracking-tight">{title}</h2>
           <p className="truncate text-xs text-white/70">{cap(date)}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {urgentOpen > 0 ? (
-            <span className="rounded-full bg-[var(--color-bad)] px-2 py-0.5 text-xs font-bold" title="Urgent of te laat">{urgentOpen} urgent</span>
+            <span className="rounded-full bg-[var(--color-bad)] px-2 py-0.5 text-xs font-bold" title="Urgent of te laat">{urgentOpen}<span className="hidden 2xl:inline"> urgent</span></span>
           ) : null}
           <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-sm font-bold tabular-nums" title="Openstaand">{open.length}</span>
         </div>
