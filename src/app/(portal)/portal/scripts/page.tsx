@@ -147,7 +147,7 @@ export default async function PortalScriptsPage() {
             </p>
             <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">
               {deadlines[0] ? <>Graag uiterlijk <strong className="text-[var(--color-ink)]">{dayLabel(deadlines[0]).toLowerCase()}</strong>. </> : null}
-              Binnen {settings.feedbackDaysScripts * 24} uur reageren houdt de opnamedag op schema.
+              Binnen {settings.feedbackDaysScripts} {settings.feedbackDaysScripts === 1 ? "werkdag" : "werkdagen"} reageren houdt de opnamedag op schema.
             </p>
           </div>
           {firstAction ? (
