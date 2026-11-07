@@ -8,6 +8,7 @@ import { ReportList } from "./report-list";
 
 export const metadata: Metadata = { title: "AI Maandrapportages" };
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export default async function MaandrapportagesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const viewer = await requireReportsAccess();

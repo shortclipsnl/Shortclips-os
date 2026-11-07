@@ -202,6 +202,17 @@ describe("generatie, wachtrij, feedback en versies", () => {
     ids.reportActief = actief.id;
   });
 
+  it("stopt na herhaaldelijk vastlopen en meldt eerlijk 'mislukt'", async () => {
+    const { eq } = await import("drizzle-orm");
+    const [r] = await db.insert(s.clientReports).values({ clientId: ids.kopie!, period: "2026-09", title: "x", status: "analyse_bezig", startedAt: new Date(Date.now() - 3600 * 1000), kwaliteit: { vastgelopen: 2 } }).returning({ id: s.clientReports.id });
+    const { runReportQueue } = await import("@/server/jobs/report-monthly");
+    await runReportQueue();
+    const [after] = await db.select().from(s.clientReports).where(eq(s.clientReports.id, r!.id));
+    expect(after!.status).toBe("mislukt");
+    expect(after!.errorMessage).toContain("vast");
+    await db.delete(s.clientReports).where(eq(s.clientReports.id, r!.id));
+  });
+
   it("neemt feedback mee in de volgende generatie en bewaart versies", async () => {
     const { ensureMonthlyReport } = await import("@/server/reports/run");
     await db.insert(s.monthlyReportFeedback).values({ reportId: ids.reportActief!, authorId: ids.jarno, body: "Meer nadruk op rondleidingen", versionNumber: 1 });

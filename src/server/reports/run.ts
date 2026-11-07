@@ -98,6 +98,7 @@ export async function ensureMonthlyReport(
     summary,
     ontbrekendeGegevens: res.ontbrekend as unknown as Record<string, unknown>,
     generatedAt: new Date(),
+    kwaliteit: {},
     startedAt: null,
     errorMessage: null,
     updatedAt: new Date(),

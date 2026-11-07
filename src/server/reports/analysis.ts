@@ -218,16 +218,24 @@ export async function generateMonthlyAnalysis(
     feedbackVanControleur: opts.feedback && opts.feedback.length ? opts.feedback : null,
   };
 
-  const prompt = {
-    system: SYSTEM,
-    user: `Analyseer deze klant over de maand en geef de volledige maandanalyse. Data (JSON):\n${JSON.stringify(dataBlock)}`,
-    maxTokens: 16000,
+  // Twee kleinere AI-aanroepen parallel (klantdeel en intern teamdeel) in plaats
+  // van één lange: zo blijft de generatie ruim binnen de maximale looptijd van
+  // een serverfunctie. Een herkansing alleen als daar nog tijd voor is.
+  type Raw = Partial<MonthlyAnalysis> & { analyse?: ClientInsights["analysis"] };
+  const data = JSON.stringify(dataBlock);
+  const started = Date.now();
+  const ask = async (deel: string) => {
+    const input = { system: SYSTEM, user: `${deel}\n\nData (JSON):\n${data}`, maxTokens: 8000 };
+    let r = await runJsonPrompt<Raw>(input);
+    if (!r.ok && r.reason === "error" && Date.now() - started < 90_000) r = await runJsonPrompt<Raw>(input);
+    return r;
   };
-  let res = await runJsonPrompt<Partial<MonthlyAnalysis> & { analyse?: ClientInsights["analysis"] }>(prompt);
-  // Eén herkansing bij een onleesbaar antwoord (komt af en toe voor bij lange JSON).
-  if (!res.ok && res.reason === "error") res = await runJsonPrompt<Partial<MonthlyAnalysis> & { analyse?: ClientInsights["analysis"] }>(prompt);
-  if (!res.ok) return { ok: false, reason: res.reason === "no_provider" ? "no_provider" : "error", message: res.error };
-
+  const [klantRes, internRes] = await Promise.all([
+    ask("Analyseer deze klant over de maand. Geef ALLEEN de klantvelden (topVideos, besteHooks, besteFormats, mindereVideos, analysis, maandvergelijking, conclusies, kansen, verbeterpunten, aandachtspunten, strategischeActies) en zet \"intern\" op {}."),
+    ask("Analyseer deze klant over de maand voor het interne team. Geef ALLEEN het veld \"intern\" volledig ingevuld; laat alle andere velden leeg ([] of {})."),
+  ]);
+  if (!klantRes.ok) return { ok: false, reason: klantRes.reason === "no_provider" ? "no_provider" : "error", message: klantRes.error };
+  const res = { ...klantRes, data: { ...(klantRes.data ?? {}), intern: internRes.ok ? internRes.data?.intern : undefined } as Raw };
   const raw = res.data ?? {};
   const a = raw.analysis ?? raw.analyse ?? { watWerkt: [], watMinder: [], ontwikkelingen: [] };
   const analysis: MonthlyAnalysis = {
