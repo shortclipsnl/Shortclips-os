@@ -69,7 +69,7 @@ export function WerkdagBalk({
   const focusTone: Record<string, string> = {
     bad: "border-[var(--color-bad)] bg-[var(--color-bad-soft)]",
     warn: "border-[var(--color-warn)] bg-[var(--color-warn-soft)]",
-    info: "border-[var(--color-brand-700)] bg-[#eaf0fd]",
+    info: "border-[var(--color-brand-700)] bg-[var(--color-brand-700)]/10",
     neutral: "border-[var(--color-indigo-ink)]/30 bg-[var(--color-surface-sunken)]",
   };
 

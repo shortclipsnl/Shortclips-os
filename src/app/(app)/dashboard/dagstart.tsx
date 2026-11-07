@@ -20,6 +20,7 @@ const CAT_LABEL: Record<WorkCategory, string> = {
 
 const nlDay = (s: string, opts: Intl.DateTimeFormatOptions = { weekday: "long", day: "numeric", month: "long" }) =>
   new Date(`${s}T12:00:00Z`).toLocaleDateString("nl-NL", { ...opts, timeZone: "UTC" });
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const shortDay = (s: string) => nlDay(s, { weekday: "short", day: "numeric", month: "short" });
 const dayDiff = (a: string, b: string) => Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000);
 
@@ -39,10 +40,10 @@ export type DagstartProps = {
 
 type Tone = "bad" | "warn" | "info" | "good" | "neutral";
 const TONE: Record<Tone, { bar: string; pill: string }> = {
-  bad: { bar: "border-l-[var(--color-bad)]", pill: "bg-[var(--color-bad-soft)] text-[#a3271c]" },
-  warn: { bar: "border-l-[var(--color-warn)]", pill: "bg-[var(--color-warn-soft)] text-[#9a5c00]" },
-  info: { bar: "border-l-[var(--color-brand-700)]", pill: "bg-[#eaf0fd] text-[var(--color-brand-700)]" },
-  good: { bar: "border-l-[var(--color-good)]", pill: "bg-[var(--color-good-soft)] text-[var(--color-good)]" },
+  bad: { bar: "border-l-[var(--color-bad)]", pill: "bg-[var(--color-bad)]/12 text-[var(--color-bad)]" },
+  warn: { bar: "border-l-[var(--color-warn)]", pill: "bg-[var(--color-warn)]/14 text-[var(--color-warn)]" },
+  info: { bar: "border-l-[var(--color-brand-700)]", pill: "bg-[var(--color-brand-700)]/14 text-[var(--color-brand-700)]" },
+  good: { bar: "border-l-[var(--color-good)]", pill: "bg-[var(--color-good)]/14 text-[var(--color-good)]" },
   neutral: { bar: "border-l-[var(--color-line-strong)]", pill: "bg-[var(--color-neutral-soft)] text-[var(--color-ink-muted)]" },
 };
 
@@ -180,7 +181,7 @@ function Column({
         <span className="opacity-90">{icon}</span>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[15px] font-bold leading-tight tracking-tight">{title}</h2>
-          <p className="truncate text-xs capitalize text-white/70">{date}</p>
+          <p className="truncate text-xs text-white/70">{cap(date)}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {urgentOpen > 0 ? (
