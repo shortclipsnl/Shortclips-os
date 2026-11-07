@@ -5,14 +5,14 @@
  */
 export const TEAM_WORKDAY = { start: "08:30", end: "17:00" } as const;
 
-export type DagritmeItem = { from: string; to?: string; label: string };
+export type DagritmeItem = { from: string; to?: string; label: string; detail?: string };
 
-/** Vaste momenten op de dag — als markeringen op de werkdagbalk. */
+/** Het vaste dagritme van het kantoorteam (Dagindeling-blok + markeringen op de werkdagbalk). */
 export const DAGRITME: DagritmeItem[] = [
-  { from: "08:30", to: "09:00", label: "Dagstart" },
-  { from: "12:30", to: "13:00", label: "Pauze" },
-  { from: "13:00", to: "13:30", label: "Wat moet er vandaag echt af?" },
-  { from: "16:45", to: "17:00", label: "To-do voor morgen klaarzetten" },
+  { from: "08:30", to: "09:00", label: "Dagstart", detail: "Samen de dag doornemen: wat staat er op de planning en wat heeft prioriteit." },
+  { from: "12:30", to: "13:00", label: "Pauze", detail: "Even weg van het scherm, tot 13:00." },
+  { from: "13:00", to: "13:30", label: "Wat moet er vandaag echt af?", detail: "Check de belangrijkste deadlines en stem af waar nodig." },
+  { from: "16:45", label: "To-do-lijst voor morgen maken", detail: "Zet klaar wat morgen als eerste moet, zodat je direct kunt starten." },
 ];
 
 export const toMinutes = (hhmm: string) => {

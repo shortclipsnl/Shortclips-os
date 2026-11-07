@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, CalendarDays, Check, ChevronDown, Hourglass, Loader2, Sunrise } from "lucide-react";
+import { CalendarCheck, CalendarClock, CalendarDays, Check, ChevronDown, Hourglass, Loader2, Sunrise } from "lucide-react";
+import { DAGRITME } from "@/lib/werkdag";
+import { Dagindeling } from "./dagindeling";
 import { Card } from "@/components/ui";
 import { setTaskStatus } from "@/server/actions/tasks";
 import type { DoneItem, WaitingItem, WorkCategory, WorkItem } from "@/server/werkoverzicht";
@@ -112,7 +114,19 @@ export function Dagstart(p: DagstartProps) {
         focus={focus}
       />
 
-      <div className="grid items-start gap-4 lg:grid-cols-3">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+      {/* Dagindeling: het vaste dagritme, loopt live mee (geweest = groen). */}
+      <Card padded={false} className="overflow-hidden ring-1 ring-[var(--color-good)]/20 xl:sticky xl:top-4 xl:order-2">
+        <div className="flex items-center gap-2.5 bg-[var(--color-good)] px-4 py-3 text-white">
+          <CalendarClock className="size-4.5 shrink-0 opacity-90" />
+          <div className="min-w-0">
+            <h2 className="truncate text-[15px] font-bold leading-tight tracking-tight">Dagindeling</h2>
+            <p className="truncate text-xs text-white/75">Het dagritme, geweest wordt groen.</p>
+          </div>
+        </div>
+        <Dagindeling items={DAGRITME} />
+      </Card>
+      <div className="grid items-start gap-4 lg:grid-cols-3 xl:order-1">
         <Column
           col="today"
           icon={<Sunrise className="size-4.5" />}
@@ -148,6 +162,7 @@ export function Dagstart(p: DagstartProps) {
           ].filter(Boolean).join(" · ") || null}
           {...rowProps}
         />
+      </div>
       </div>
 
       <WaitingStrip items={p.waiting} isSelf={p.isSelf} personName={p.personName} />

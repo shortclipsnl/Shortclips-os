@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
+import { TEAM_WORKDAY } from "@/lib/werkdag";
 
 export type ScheduleItem = { from: string; to?: string; label: string; detail?: string };
 
@@ -11,8 +12,8 @@ const toMin = (hhmm: string) => {
 };
 
 /** Begin en einde van de werkdag — de lijn loopt hier tussen op. */
-const DAY_START = "08:00";
-const DAY_END = "17:00";
+const DAY_START = TEAM_WORKDAY.start;
+const DAY_END = TEAM_WORKDAY.end;
 
 function nowMinutesAmsterdam(): number {
   const t = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Amsterdam" });
@@ -29,9 +30,10 @@ export function Dagindeling({ items }: { items: ScheduleItem[] }) {
   // server). Daarna elke 30s verversen zodat de lijn vanzelf oploopt.
   const [nowMin, setNowMin] = useState<number | null>(null);
   useEffect(() => {
-    setNowMin(nowMinutesAmsterdam());
-    const id = setInterval(() => setNowMin(nowMinutesAmsterdam()), 30_000);
-    return () => clearInterval(id);
+    const tick = () => setNowMin(nowMinutesAmsterdam());
+    const first = setTimeout(tick, 0);
+    const id = setInterval(tick, 30_000);
+    return () => { clearTimeout(first); clearInterval(id); };
   }, []);
 
   const dayStart = toMin(DAY_START);
