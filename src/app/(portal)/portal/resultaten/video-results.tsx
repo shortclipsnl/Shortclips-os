@@ -131,7 +131,7 @@ export function VideoResults({ videos }: { videos: PortalTopVideo[] }) {
                         <div className="line-clamp-2 max-w-[340px] font-semibold leading-snug">{v.title}</div>
                         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
                           <PlatformTag p={v.platform} />
-                          <span className="text-[12px] text-[var(--color-ink-faint)]">{dateNl(v.publishedAt)}</span>
+                          {v.publishedAt ? <span className="text-[12px] text-[var(--color-ink-faint)]">{dateNl(v.publishedAt)}</span> : null}
                           {rank === 1 ? <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--st-green)]"><Trophy className="size-3.5" /> Best presterend</span> : null}
                           {v.url ? <a href={v.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--sc-accent)] hover:underline">Bekijken <ExternalLink className="size-3" /></a> : null}
                         </div>
@@ -165,7 +165,7 @@ export function VideoResults({ videos }: { videos: PortalTopVideo[] }) {
               <Thumb v={v} rank={rank} />
               <div className="min-w-0 flex-1">
                 <div className="line-clamp-2 text-[14px] font-semibold leading-snug">{v.title}</div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-2.5"><PlatformTag p={v.platform} /><span className="text-[12px] text-[var(--color-ink-faint)]">{dateNl(v.publishedAt)}</span></div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2.5"><PlatformTag p={v.platform} />{v.publishedAt ? <span className="text-[12px] text-[var(--color-ink-faint)]">{dateNl(v.publishedAt)}</span> : null}</div>
                 <div className="mt-2 grid grid-cols-4 gap-1.5">
                   {stats.map(([l, n]) => (
                     <div key={l}>

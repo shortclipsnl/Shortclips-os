@@ -44,7 +44,7 @@ const COMPARE_ROWS: Array<{ k: "views" | "reach" | "followerGrowth" | "published
   { k: "views", label: "Weergaven" },
   { k: "reach", label: "Bereik" },
   { k: "followerGrowth", label: "Nieuwe volgers" },
-  { k: "publishedVideos", label: "Gepubliceerde video's" },
+  { k: "publishedVideos", label: "Geplaatste posts" },
 ];
 
 const PERIOD_LABEL: Record<string, string> = {
@@ -126,7 +126,7 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
             <Kpi hero icon={<Eye className="size-4" />} label="Totale weergaven" value={r.metrics.views} pct={r.deltas.views} />
             <Kpi icon={<BarChart3 className="size-4" />} label="Bereik" value={r.metrics.reach} pct={r.deltas.reach} />
             <Kpi icon={<Users className="size-4" />} label="Nieuwe volgers" value={r.metrics.followerGrowth} prefix={r.metrics.followerGrowth > 0 ? "+" : ""} pct={r.deltas.followerGrowth} />
-            <Kpi icon={<Film className="size-4" />} label="Video's geplaatst" value={r.metrics.publishedVideos} pct={r.deltas.publishedVideos} />
+            <Kpi icon={<Film className="size-4" />} label="Posts geplaatst" value={r.metrics.publishedVideos} pct={r.deltas.publishedVideos} />
           </div>
           {secondary.length > 0 ? (
             <div className="grid grid-cols-2 gap-[14px] lg:grid-cols-4">

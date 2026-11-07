@@ -471,11 +471,11 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
                count(distinct measured_on)::int pdays
         from daily_metrics where client_id = ${clientId} and measured_on between ${prevStartIso} and ${prevEndIso}
       ), pubcur as (
-        select count(distinct deliverable_id)::int c from publications
+        select count(distinct coalesce(deliverable_id, id))::int c from publications
         where client_id = ${clientId} and status = 'published' and published_at is not null
           and published_at::date between ${startIso} and ${endIso}
       ), pubprev as (
-        select count(distinct deliverable_id)::int c from publications
+        select count(distinct coalesce(deliverable_id, id))::int c from publications
         where client_id = ${clientId} and status = 'published' and published_at is not null
           and published_at::date between ${prevStartIso} and ${prevEndIso}
       )

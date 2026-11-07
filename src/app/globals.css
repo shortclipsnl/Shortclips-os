@@ -288,6 +288,9 @@ body {
    ========================================================================= */
 .portal-studio {
   color-scheme: light;
+  /* Tekstkleur op het portaal zelf, zodat ingebedde voorbeeldweergaven (intern,
+     ook in donkere modus) niet de interne tekstkleur erven. */
+  color: var(--color-ink);
   min-height: 100vh;
   background: var(--color-canvas);
   /* Lichte huisstijl-tokens EXPLICIET op het portaal zelf, zodat de portaal-
