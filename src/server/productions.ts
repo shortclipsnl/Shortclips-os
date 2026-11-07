@@ -1,8 +1,9 @@
 import "server-only";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, gte, isNull, lt, lte, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
+  clientPackages,
   clients,
   deliverables,
   productionChecklistItems,
@@ -316,4 +317,169 @@ export async function listVideographerOptions(): Promise<{ id: string; fullName:
     order by u.full_name
   `);
   return ((res as unknown as { rows?: { id: string; fullName: string }[] }).rows ?? []);
+}
+
+/* ----------------------- Nog niet ingepland ----------------------- */
+
+/** Prioriteit van een klant zonder volgende opname, van urgent naar rustig. */
+export type UnplannedPriority = "eerste" | "achterstallig" | "nu" | "binnenkort";
+
+export type UnplannedClient = {
+  clientId: string;
+  clientName: string;
+  clientSlug: string;
+  clientColor: string | null;
+  clientLogo: string | null;
+  /** Laatste (niet-geannuleerde) opname vóór vandaag, of null als er nog nooit één was. */
+  lastShootOn: string | null;
+  /** Ritme in dagen tussen opnames (pakket → historie → standaard 30). */
+  intervalDays: number;
+  /** Waar het ritme vandaan komt, voor de uitleg in de lijst. */
+  intervalSource: "pakket" | "historie" | "standaard";
+  /** Gewenste periode voor de volgende opname [from, to] (YYYY-MM-DD). */
+  windowFrom: string | null;
+  windowTo: string | null;
+  /** Uiterste datum om in te plannen: 14 dagen vóór de gewenste opname,
+   *  zodat er tijd is voor scripting (fase start op −14d). */
+  planBy: string | null;
+  priority: UnplannedPriority;
+  /** Dagen te laat t.o.v. de gewenste opnamedatum (alleen bij achterstallig). */
+  daysLate: number;
+};
+
+const PRIORITY_ORDER: Record<UnplannedPriority, number> = { eerste: 0, achterstallig: 1, nu: 2, binnenkort: 3 };
+const SCRIPTING_LEAD_DAYS = 14;
+const WINDOW_HALF_DAYS = 7;
+
+function addDaysIso(iso: string, n: number): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function daysBetween(aIso: string, bIso: string): number {
+  return Math.round((Date.parse(`${bIso}T12:00:00Z`) - Date.parse(`${aIso}T12:00:00Z`)) / 86_400_000);
+}
+function toIso(v: unknown): string {
+  return v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10);
+}
+
+/**
+ * Actieve klanten zonder ingeplande volgende opname. Een klant verdwijnt hier
+ * automatisch uit zodra er een opnamedag op of na vandaag staat (ook als die
+ * via de Google Agenda-sync binnenkomt). Respecteert de klantscope van de
+ * viewer, dus iedereen ziet alleen klanten waar hij/zij toegang toe heeft.
+ *
+ * Gewenste periode: laatste opname + ritme (± 7 dagen). Het ritme komt uit het
+ * actieve pakket (opnamedagen per maand), anders uit de mediane tussenpoos van
+ * minimaal 3 eerdere opnamemomenten, anders standaard maandelijks.
+ */
+export async function unplannedClients(viewer: Viewer): Promise<UnplannedClient[]> {
+  const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+
+  const candidates = await db
+    .select({
+      id: clients.id,
+      name: clients.name,
+      slug: clients.slug,
+      color: clients.color,
+      logo: clients.logoUrl,
+    })
+    .from(clients)
+    .where(
+      and(
+        isNull(clients.deletedAt),
+        eq(clients.status, "active"),
+        sql`(${clients.endedOn} is null or ${clients.endedOn} > ${todayIso})`,
+        sql`not exists (
+          select 1 from production_days pd
+          where pd.client_id = ${clients.id} and pd.deleted_at is null
+            and pd.status <> 'cancelled' and pd.scheduled_on >= ${todayIso}
+        )`,
+        scopeToClients(viewer, clients.id),
+      ),
+    );
+  if (candidates.length === 0) return [];
+
+  const ids = candidates.map((c) => c.id);
+  const [history, packages] = await Promise.all([
+    db
+      .select({ clientId: productionDays.clientId, scheduledOn: productionDays.scheduledOn })
+      .from(productionDays)
+      .where(
+        and(
+          isNull(productionDays.deletedAt),
+          ne(productionDays.status, "cancelled"),
+          lt(productionDays.scheduledOn, todayIso),
+          inArray(productionDays.clientId, ids),
+        ),
+      )
+      .orderBy(desc(productionDays.scheduledOn)),
+    db
+      .select({ clientId: clientPackages.clientId, shootDays: clientPackages.shootDaysPerMonth })
+      .from(clientPackages)
+      .where(and(eq(clientPackages.isActive, true), inArray(clientPackages.clientId, ids))),
+  ]);
+
+  const pastByClient = new Map<string, string[]>();
+  for (const h of history) {
+    const list = pastByClient.get(h.clientId) ?? [];
+    const iso = toIso(h.scheduledOn);
+    // Meerdaagse opnames (dagen binnen 3 dagen van elkaar) tellen als één
+    // opnamemoment; max 7 recente momenten. Lijst is aflopend gesorteerd.
+    const prev = list[list.length - 1];
+    if ((!prev || daysBetween(iso, prev) > 3) && list.length < 7) list.push(iso);
+    pastByClient.set(h.clientId, list);
+  }
+  const shootDaysByClient = new Map<string, number>();
+  for (const p of packages) shootDaysByClient.set(p.clientId, Math.max(shootDaysByClient.get(p.clientId) ?? 0, Number(p.shootDays ?? 0)));
+
+  const out: UnplannedClient[] = candidates.map((c) => {
+    const past = pastByClient.get(c.id) ?? [];
+    const last = past[0] ?? null;
+
+    let intervalDays = 30;
+    let intervalSource: UnplannedClient["intervalSource"] = "standaard";
+    const perMonth = shootDaysByClient.get(c.id) ?? 0;
+    if (perMonth > 0) {
+      intervalDays = Math.round(30 / perMonth);
+      intervalSource = "pakket";
+    } else if (past.length >= 3) {
+      // Pas vanaf 3 opnamemomenten is de historie betrouwbaar genoeg; geclamped
+      // op 2 weken t/m 2 maanden zodat één uitschieter het ritme niet bepaalt.
+      const gaps = past.slice(0, -1).map((d, i) => daysBetween(past[i + 1]!, d)).sort((a, b) => a - b);
+      const median = gaps[Math.floor(gaps.length / 2)]!;
+      intervalDays = Math.min(60, Math.max(14, median));
+      intervalSource = "historie";
+    }
+
+    if (!last) {
+      return {
+        clientId: c.id, clientName: c.name, clientSlug: c.slug, clientColor: c.color, clientLogo: c.logo,
+        lastShootOn: null, intervalDays, intervalSource,
+        windowFrom: null, windowTo: null, planBy: null, priority: "eerste", daysLate: 0,
+      };
+    }
+
+    const due = addDaysIso(last, intervalDays);
+    const windowFrom = addDaysIso(due, -WINDOW_HALF_DAYS);
+    const windowTo = addDaysIso(due, WINDOW_HALF_DAYS);
+    const planBy = addDaysIso(due, -SCRIPTING_LEAD_DAYS);
+    const daysLate = Math.max(0, daysBetween(due, todayIso));
+    const priority: UnplannedPriority = due < todayIso ? "achterstallig" : planBy <= todayIso ? "nu" : "binnenkort";
+
+    return {
+      clientId: c.id, clientName: c.name, clientSlug: c.slug, clientColor: c.color, clientLogo: c.logo,
+      lastShootOn: last, intervalDays, intervalSource, windowFrom, windowTo, planBy, priority, daysLate,
+    };
+  });
+
+  // Eerst de urgentste: nooit gefilmd → achterstallig (langst te laat eerst) →
+  // nu inplannen → binnenkort (vroegste gewenste datum eerst).
+  return out.sort(
+    (a, b) =>
+      PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] ||
+      b.daysLate - a.daysLate ||
+      (a.windowFrom ?? "").localeCompare(b.windowFrom ?? "") ||
+      a.clientName.localeCompare(b.clientName, "nl"),
+  );
 }
