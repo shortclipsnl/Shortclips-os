@@ -28,7 +28,6 @@ export type InternPdfInput = {
 
 const GREEN = "#12a150";
 const HOOKS_PER_PAGE = 10;
-const CARDS_PER_PAGE = 2;
 
 /** Vaste kleur per type hook, zodat je het patroon in één blik ziet. */
 const HOOK_KLEUR: Record<string, string> = {
@@ -128,6 +127,67 @@ const CSS = `
   .end .tips b { display: block; color: #8fe0b0; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
 `;
 
+const ROL_KLEUR: Record<string, { bg: string; soft: string; fg: string }> = {
+  script: { bg: "#00003b", soft: "#e9e9f3", fg: "#fff" },
+  opname: { bg: GREEN, soft: "#e6f6ec", fg: "#fff" },
+  montage: { bg: "#e2a400", soft: "#fff4d6", fg: "#00003b" },
+  pm: { bg: "#4a4a66", soft: "#eef0f5", fg: "#fff" },
+};
+
+const CSS2 = `
+  .vp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 12px; }
+  .vp-head .rk { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #5d5d78; }
+  .vp-head .tt { font-size: 16px; font-weight: 700; color: #00003b; line-height: 1.3; margin-top: 2px; }
+  .vp-head .mt { font-size: 9.5px; color: #5d5d78; margin-top: 3px; }
+  .vp-head .verdict { font-size: 11px; padding: 5px 14px; }
+  .vp-grid { display: grid; grid-template-columns: 170px 1fr; gap: 16px; }
+  .vp-img { position: relative; width: 170px; height: 302px; border-radius: 14px; background: #00003b center/cover no-repeat; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 26px; overflow: hidden; }
+  .vp-img .ov { position: absolute; left: 8px; top: 8px; } .vp-img .ov .ht-chip { font-size: 9px; padding: 3px 8px; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .vp-img .du { position: absolute; right: 8px; bottom: 8px; background: rgba(0,0,59,.88); color: #fff; font-size: 11px; font-weight: 700; border-radius: 7px; padding: 3px 8px; }
+  .big4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .big4 > div { background: #00003b; color: #fff; border-radius: 12px; padding: 10px 12px; }
+  .big4 b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.15; }
+  .big4 span { font-size: 9px; opacity: .75; }
+  .big4 em { display: inline-block; margin-top: 4px; font-style: normal; font-size: 9px; font-weight: 700; border-radius: 99px; padding: 1px 8px; background: rgba(255,255,255,.14); }
+  .big4 em.up { background: ${GREEN}; color: #fff; }
+  .big4 .kb { height: 7px; margin: 5px 0 3px; }
+  .small4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; text-align: center; }
+  .small4 > div { background: #f4f5f9; border-radius: 10px; padding: 7px 4px; }
+  .small4 b { display: block; font-size: 15px; color: #00003b; font-variant-numeric: tabular-nums; }
+  .small4 span { font-size: 8px; color: #5d5d78; }
+  .hc2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 8px; margin-top: 12px; }
+  .hc2 .hookbox, .hc2 .ctabox { padding: 9px 12px; } .hc2 .t { font-size: 11.5px; }
+  .ins { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .ins > div { border-radius: 12px; padding: 9px 12px; }
+  .ins .ok { background: #e6f6ec; } .ins .nok { background: #fdeee6; }
+  .ins .h { font-size: 8.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; }
+  .ins .ok .h { color: ${GREEN}; } .ins .nok .h { color: #c2410c; }
+  .ins ul { margin: 0; padding-left: 14px; } .ins li { font-size: 10px; margin: 3px 0; }
+  .kg { margin-top: 8px; font-size: 10px; color: #3d3d58; background: #f4f5f9; border-radius: 10px; padding: 7px 12px; }
+  .lesb { margin-top: 8px; background: #00003b; color: #fff; border-radius: 12px; padding: 10px 14px; font-size: 12px; font-weight: 600; }
+  .lesb .h { font-size: 8.5px; letter-spacing: .12em; text-transform: uppercase; color: #8fe0b0; margin-bottom: 3px; font-weight: 700; }
+  .bh { margin-top: 8px; border: 2px dashed #e2a400; border-radius: 12px; padding: 8px 12px; }
+  .bh .t { font-weight: 700; color: #00003b; font-size: 11.5px; margin-top: 2px; }
+  .rl3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .rl3 > div { border-radius: 12px; overflow: hidden; background: var(--soft); }
+  .rl3 .h { background: var(--bg); color: var(--fg); font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 5px 10px; }
+  .rl3 .b { padding: 8px 10px; font-size: 10px; line-height: 1.4; color: #14143c; }
+  .rol2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .rb { border-radius: 14px; overflow: hidden; background: var(--soft); page-break-inside: avoid; }
+  .rb .h { background: var(--bg); color: var(--fg); padding: 9px 14px; display: flex; justify-content: space-between; align-items: baseline; }
+  .rb .h b { font-size: 13px; } .rb .h span { font-size: 9px; opacity: .85; }
+  .rb ol { list-style: none; margin: 0; padding: 8px 12px 4px; counter-reset: a; }
+  .rb ol li { counter-increment: a; position: relative; padding: 6px 0 6px 30px; font-size: 10.5px; font-weight: 600; color: #00003b; border-bottom: 1px solid rgba(0,0,59,.08); }
+  .rb ol li:last-child { border-bottom: 0; }
+  .rb ol li::before { content: counter(a); position: absolute; left: 0; top: 5px; width: 20px; height: 20px; border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .rb ol li small { display: block; font-weight: 400; color: #5d5d78; font-size: 9px; margin-top: 1px; }
+  .rb .vt { display: inline-block; background: #fff; border: 1px solid rgba(0,0,59,.2); border-radius: 5px; font-size: 8px; font-weight: 700; padding: 0 5px; margin-left: 5px; vertical-align: 1px; color: #00003b; }
+  .rb .uv { padding: 2px 12px 10px; }
+  .rb .uv .lbl { display: block; margin: 4px 0 3px; }
+  .rb .uv div.r { font-size: 9.5px; padding: 2px 0; color: #3d3d58; }
+  .rb .leeg { padding: 10px 14px; font-size: 10px; color: #5d5d78; }
+`;
+
 const ROL_LABEL: Record<string, string> = { script: "Script", opname: "Opname", montage: "Montage", pm: "Projectmanager" };
 
 function fullMonth(period: string): string {
@@ -192,45 +252,58 @@ function hookPages(videos: InternVideo[], meta: string, maand: string): string {
   return pages.join("");
 }
 
-/** Kijktijd in verhouding tot de lengte van de video. */
-function kijktijdCel(v: InternVideo): string {
-  const k = v.gemKijktijdSec;
-  if (typeof k !== "number") return `<div class="hl"><b>–</b><span>gem. kijktijd</span></div>`;
-  if (typeof v.duurSec === "number" && v.duurSec > 0) {
-    const p = Math.max(2, Math.min(100, Math.round((k / v.duurSec) * 100)));
-    return `<div class="hl"><b>${Math.round(k)} van ${Math.round(v.duurSec)} s</b><div class="kb"><div style="width:${p}%"></div></div><span>gem. kijktijd</span></div>`;
-  }
-  return `<div class="hl"><b>${Math.round(k)} s</b><span>gem. kijktijd</span></div>`;
-}
+const rolVars = (rol: string) => { const k = ROL_KLEUR[rol] ?? ROL_KLEUR.pm!; return `--bg:${k.bg};--soft:${k.soft};--fg:${k.fg}`; };
+const fmtX = (n: number) => `${String(Math.round(n * 10) / 10).replace(".", ",")}×`;
 
-/** Per video een kaart: grote miniatuur met type hook en duur, cijfers, hook en CTA, oordeel en les per discipline. */
+/** Per video een eigen pagina: grote cijferblokken, hook en CTA, inzichten, les en wat elke rol meeneemt. */
 function videoCards(videos: InternVideo[], meta: string): string {
   if (videos.length === 0) return "";
-  const card = (v: InternVideo, i: number) => {
+  const gemViews = videos.reduce((s, v) => s + v.views, 0) / videos.length;
+  const interPct = (v: InternVideo) => (v.views > 0 ? ((v.likes + v.reacties + v.shares + v.saves) / v.views) * 100 : null);
+  const metPct = videos.map(interPct).filter((x): x is number => x != null);
+  const gemInter = metPct.length ? metPct.reduce((s, x) => s + x, 0) / metPct.length : null;
+  return videos.map((v, i) => {
     const a = v.analyse;
     const h = hookOf(v);
     const c = ctaOf(v);
+    const idx = gemViews > 0 ? v.views / gemViews : null;
+    const ip = interPct(v);
     const overlay = `${a?.hookType ? `<div class="ov">${hookChip(a.hookType)}</div>` : ""}${typeof v.duurSec === "number" ? `<div class="du">${Math.round(v.duurSec)} s</div>` : ""}`;
-    const les3 = a && (a.script || a.opname || a.montage)
-      ? `<div class="les3"><div><span class="lbl">Script</span>${esc(a.script || "–")}</div><div><span class="lbl">Opname</span>${esc(a.opname || "–")}</div><div><span class="lbl">Montage</span>${esc(a.montage || "–")}</div></div>`
-      : v.les ? `<div class="why">${esc(v.les)}</div>` : "";
-    return `<div class="vc ${a?.oordeel ?? ""}">${thumbDiv("big", v, overlay)}<div style="min-width:0">
-      <div class="top"><div><div class="tt">#${i + 1} ${esc(firstLine(v.titel) || "Video")}</div><div class="mt">${esc(platDate(v))}</div></div>${a ? `<span class="verdict ${a.oordeel}">${esc(a.oordeel)}</span>` : ""}</div>
-      <div class="sts"><div class="hl"><b>${nf(v.views)}</b><span>weergaven</span></div>${kijktijdCel(v)}<div class="hl"><b>${pctv(v.uitkijkPct)}</b><span>bekeken</span></div><div><b>${nf(v.likes)}</b><span>likes</span></div><div><b>${nf(v.reacties)}</b><span>reacties</span></div><div><b>${nf(v.shares)}</b><span>shares</span></div><div><b>${nf(v.saves)}</b><span>saves</span></div></div>
-      <div class="hc">
-        <div class="hookbox"><div class="bx-h"><span class="lbl">Hook · ${esc(h.bron)}</span>${hookChip(a?.hookType)}</div><div class="t">${esc(h.text)}</div></div>
-        <div class="ctabox${c.type === "geen" ? " geen" : ""}"><div class="bx-h"><span class="lbl">Call to action${c.bron ? ` · ${esc(c.bron)}` : ""}</span>${ctaChip(c.type)}</div><div class="t">${c.text ? esc(c.text) : "Geen oproep in deze video"}</div></div>
-      </div>
-      ${a?.waarom ? `<div class="why"><b>Waarom:</b> ${esc(a.waarom)}</div>` : ""}
-      ${les3}
-    </div></div>`;
-  };
-  const pages: string[] = [];
-  for (let start = 0; start < videos.length; start += CARDS_PER_PAGE) {
-    const chunk = videos.slice(start, start + CARDS_PER_PAGE).map((v, k) => card(v, start + k)).join("");
-    pages.push(`<section class="page">${topBar(meta)}${start === 0 ? `<h1>Per video: wat leren we</h1><p class="lead">Per video de hook, de call to action, de kijktijd ten opzichte van de lengte en wat we meenemen naar script, opname en montage.</p>` : ""}${chunk}</section>`);
-  }
-  return pages.join("");
+    const k = v.gemKijktijdSec;
+    const kijk = typeof k === "number"
+      ? typeof v.duurSec === "number" && v.duurSec > 0
+        ? `<div><b>${Math.round(k)} van ${Math.round(v.duurSec)} s</b><div class="kb"><div style="width:${Math.max(2, Math.min(100, Math.round((k / v.duurSec) * 100)))}%"></div></div><span>gemiddelde kijktijd</span></div>`
+        : `<div><b>${Math.round(k)} s</b><span>gemiddelde kijktijd</span></div>`
+      : `<div><b>–</b><span>kijktijd niet gemeten</span></div>`;
+    const big4 = `<div class="big4">
+      <div><b>${nf(v.views)}</b><span>weergaven</span><br/>${idx != null ? `<em class="${idx >= 1 ? "up" : ""}">${fmtX(idx)} maandgemiddelde</em>` : ""}</div>
+      ${kijk}
+      <div><b>${pctv(v.uitkijkPct)}</b><span>van de video bekeken</span></div>
+      <div><b>${ip != null ? pctv(ip) : "–"}</b><span>interactiepercentage</span><br/>${ip != null && gemInter != null ? `<em class="${ip >= gemInter ? "up" : ""}">maandgem. ${pctv(gemInter)}</em>` : ""}</div>
+    </div>
+    <div class="small4"><div><b>${nf(v.likes)}</b><span>likes</span></div><div><b>${nf(v.reacties)}</b><span>reacties</span></div><div><b>${nf(v.shares)}</b><span>shares</span></div><div><b>${nf(v.saves)}</b><span>saves</span></div></div>`;
+    const ins = a && ((a.watWerkte ?? []).length || (a.watBeter ?? []).length)
+      ? `<div class="ins"><div class="ok"><div class="h">Wat werkte</div>${(a.watWerkte ?? []).length ? `<ul>${(a.watWerkte ?? []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<div style="font-size:10px">–</div>`}</div><div class="nok"><div class="h">Wat kan beter</div>${(a.watBeter ?? []).length ? `<ul>${(a.watBeter ?? []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<div style="font-size:10px">–</div>`}</div></div>`
+      : a?.waarom ? `<div class="kg"><b>Waarom:</b> ${esc(a.waarom)}</div>` : "";
+    const rl = (rol: string, label: string, txt: string | undefined) => `<div style="${rolVars(rol)}"><div class="h">${label}</div><div class="b">${esc(txt || "Geen aanpassing nodig.")}</div></div>`;
+    const rl3 = a && (a.script || a.opname || a.montage)
+      ? `<div class="rl3">${rl("script", "Script", a.script)}${rl("opname", "Opname", a.opname)}${rl("montage", "Montage", a.montage)}</div>`
+      : v.les ? `<div class="kg">${esc(v.les)}</div>` : "";
+    return `<section class="page">${topBar(meta)}${i === 0 ? `<h1>Per video: wat leren we</h1>` : ""}
+      <div class="vp-head"><div><div class="rk">Video ${i + 1} van ${videos.length} · ${esc(platDate(v))}</div><div class="tt">${esc(firstLine(v.titel) || "Video")}</div></div>${a ? `<span class="verdict ${a.oordeel}">${esc(a.oordeel)}</span>` : ""}</div>
+      <div class="vp-grid">${thumbDiv("vp-img", v, overlay)}<div style="min-width:0">${big4}
+        <div class="hc2">
+          <div class="hookbox"><div class="bx-h"><span class="lbl">Hook · ${esc(h.bron)}</span>${hookChip(a?.hookType)}</div><div class="t">${esc(h.text)}</div></div>
+          <div class="ctabox${c.type === "geen" ? " geen" : ""}"><div class="bx-h"><span class="lbl">Call to action${c.bron ? ` · ${esc(c.bron)}` : ""}</span>${ctaChip(c.type)}</div><div class="t">${c.text ? esc(c.text) : "Geen oproep in deze video"}</div></div>
+        </div>
+      </div></div>
+      ${ins}
+      ${a?.kijkgedrag ? `<div class="kg"><b>Kijkgedrag:</b> ${esc(a.kijkgedrag)}</div>` : ""}
+      ${a?.les ? `<div class="lesb"><div class="h">Les voor het team</div>${esc(a.les)}</div>` : ""}
+      ${a?.betereHook ? `<div class="bh"><span class="lbl">Sterkere hook voor een volgende video</span><div class="t">${esc(a.betereHook)}</div></div>` : ""}
+      ${rl3}
+    </section>`;
+  }).join("");
 }
 
 /** Maandkaarten: per maand de kerncijfers naast elkaar, huidige maand donker. */
@@ -296,12 +369,23 @@ export function renderInternReportHtml(input: InternPdfInput): string {
     ? `<div class="dst"><div class="dsc go"><div class="h">Doorgaan</div>${lst(i.doorgaan)}</div><div class="dsc stop"><div class="h">Stoppen of minder</div>${lst(i.stoppen)}</div><div class="dsc test"><div class="h">Testen</div>${lst(i.testen)}</div></div>`
     : "";
 
-  const perRol = (rol: string, extra: string[] | undefined, wie: string) => {
-    const acties = (i?.acties ?? []).filter((x) => x.rol === rol).map((x) => `<li>${esc(x.actie)}${x.waarom ? `<small>${esc(x.waarom)}</small>` : ""}</li>`);
-    const items = [...acties, ...(extra ?? []).map((x) => `<li>${esc(x)}</li>`)];
-    return `<div class="rc"><div class="h"><b>${esc(ROL_LABEL[rol] ?? rol)}</b><span>${esc(wie)}</span></div>${items.length ? `<ul>${items.join("")}</ul>` : `<div class="leeg">Geen specifieke punten.</div>`}</div>`;
+  const videoNr = new Map(videos.map((x, n) => [x.key, n + 1]));
+  const vidRef = (ref: string | undefined) => {
+    const m = /(\d+)/.exec(ref ?? "");
+    const nr = ref && videoNr.has(ref) ? videoNr.get(ref) : m ? Number(m[1]) : null;
+    return nr && nr <= videos.length ? `<span class="vt">video #${nr}</span>` : "";
   };
-  const rollen = i ? `<div class="rol">${perRol("script", i.scripts, "scriptschrijvers")}${perRol("opname", i.opnames, "videografen")}${perRol("montage", i.montage, "editors")}${perRol("pm", [], pmName ? `verantwoordelijk: ${pmName}` : "projectmanager")}</div>` : "";
+  const perRol = (rol: string, extra: string[] | undefined, wie: string) => {
+    const acties = (i?.acties ?? []).filter((x) => x.rol === rol).map((x) => `<li>${esc(x.actie)}${vidRef(x.video)}${x.waarom ? `<small>${esc(x.waarom)}</small>` : ""}</li>`);
+    const items = [...acties, ...(extra ?? []).map((x) => `<li>${esc(x)}</li>`)];
+    const uitVideos = rol === "pm" ? [] : videos
+      .map((x, n) => ({ n: n + 1, t: x.analyse ? (x.analyse as Record<string, unknown>)[rol] as string : "", o: x.analyse?.oordeel }))
+      .filter((x) => x.t && x.o !== "stoppen")
+      .slice(0, 6);
+    return `<div class="rb" style="${rolVars(rol)}"><div class="h"><b>${esc(ROL_LABEL[rol] ?? rol)}</b><span>${esc(wie)}</span></div>${items.length ? `<ol>${items.join("")}</ol>` : `<div class="leeg">Geen specifieke acties.</div>`}${uitVideos.length ? `<div class="uv"><span class="lbl">Uit de video's</span>${uitVideos.map((x) => `<div class="r"><b>#${x.n}</b> ${esc(x.t)}</div>`).join("")}</div>` : ""}</div>`;
+  };
+  const rollenA = i ? `<div class="rol2">${perRol("script", i.scripts, "scriptschrijvers")}${perRol("opname", i.opnames, "videografen")}</div>` : "";
+  const rollenB = i ? `<div class="rol2">${perRol("montage", i.montage, "editors")}${perRol("pm", [], pmName ? `verantwoordelijk: ${pmName}` : "projectmanager")}</div>` : "";
 
   const beperkingen = [...new Set([...(i?.dataBeperkingen ?? []), ...ontbrekend])].map((x) => `<li>${esc(x)}</li>`).join("");
   const beoordeling = [
@@ -348,11 +432,16 @@ export function renderInternReportHtml(input: InternPdfInput): string {
 
   ${videoCards(videos, meta)}
 
-  ${rollen ? `<section class="page">
+  ${rollenA ? `<section class="page">
     ${topBar(meta)}
     <h1>Acties per rol voor ${esc(volgende)}</h1>
-    <p class="lead">Wie past wat toe bij de volgende scripts, opnames en montages. Vink af wat gedaan is.</p>
-    ${rollen}
+    <p class="lead">Per rol genummerd, met de video waar de actie uit komt. Daaronder de lessen uit de afzonderlijke video's.</p>
+    ${rollenA}
+  </section>
+  <section class="page">
+    ${topBar(meta)}
+    <h1>Acties per rol (vervolg)</h1>
+    ${rollenB}
   </section>` : ""}
 
   <section class="page">
@@ -385,5 +474,5 @@ export function renderInternReportHtml(input: InternPdfInput): string {
     <div class="foot">Interne teamrapportage ${esc(periodLabel)} · ${esc(clientName)} · Shortclips</div>
   </section>`;
 
-  return docShell(`Intern teamrapport ${clientName} ${periodLabel}`, CLIENT_CSS + CSS, body);
+  return docShell(`Intern teamrapport ${clientName} ${periodLabel}`, CLIENT_CSS + CSS + CSS2, body);
 }
