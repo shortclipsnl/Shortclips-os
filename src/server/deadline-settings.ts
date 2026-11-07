@@ -10,8 +10,6 @@ import { getNumberSetting, setNumberSetting } from "@/server/app-settings";
 export type DeadlineSettingKey =
   | "deadline.editorSoonDays"
   | "deadline.taskSoonDays"
-  | "deadline.clientFeedbackDays"
-  | "deadline.scriptFeedbackDays"
   | "deadline.escalateCoordinatorDays"
   | "deadline.escalateOwnerDays";
 
@@ -40,20 +38,6 @@ export const DEADLINE_SETTING_DEFS: DeadlineSettingDef[] = [
     description: "Zoveel dagen vóór de taakdeadline krijgt de taakhouder een herinnering.",
     unit: "dagen",
     default: 2, min: 0, max: 14,
-  },
-  {
-    key: "deadline.clientFeedbackDays",
-    label: "Klantfeedback op video",
-    description: "Na zoveel dagen zonder feedback op een video krijgt de klant een herinnering en de coördinator een opvolgsignaal.",
-    unit: "dagen",
-    default: 3, min: 1, max: 30,
-  },
-  {
-    key: "deadline.scriptFeedbackDays",
-    label: "Klantfeedback op script",
-    description: "Na zoveel dagen zonder feedback op een script krijgt de klant een herinnering.",
-    unit: "dagen",
-    default: 3, min: 1, max: 30,
   },
   {
     key: "deadline.escalateCoordinatorDays",

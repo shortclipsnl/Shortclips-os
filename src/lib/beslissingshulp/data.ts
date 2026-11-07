@@ -724,7 +724,7 @@ export const BESLIS: BeslisData = {
       "niveau": "g",
       "eigenaar": "cc",
       "waarom": "Herinneren en publicatie verschuiven doe je zelf.",
-      "situatie": "De klant reageert niet binnen [[72 uur]] op een opgeleverde video.",
+      "situatie": "De klant reageert niet binnen [[3 werkdagen]] op een opgeleverde video.",
       "stappen": [
         "Stuur een herinnering met de geplande publicatiedatum.",
         "Geen reactie na [[2 werkdagen]]: bel.",
@@ -737,7 +737,7 @@ export const BESLIS: BeslisData = {
       "vastleggen": "Herinneringen en publicatieplanning.",
       "afgerond": "De video is goedgekeurd.",
       "klantbericht": "Hoi [naam], heb je de video al kunnen bekijken? Als ik je akkoord uiterlijk [dag] heb, plaatsen we hem op [datum]. Dank je!",
-      "zoekwoorden": "72 uur, geen feedback, reageert niet, video niet goedgekeurd, wacht op akkoord, goedkeuring video"
+      "zoekwoorden": "3 werkdagen, 72 uur, geen feedback, reageert niet, video niet goedgekeurd, wacht op akkoord, goedkeuring video"
     },
     {
       "id": "fout-in-video",

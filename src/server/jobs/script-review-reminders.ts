@@ -1,10 +1,13 @@
 import "server-only";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, productionDays, scriptReviews, users } from "@/db/schema";
 import { notify } from "@/server/notifications";
 import { portalEmailHtml, sendEmail } from "@/server/email";
 import { getFeedbackDays } from "@/server/portal-settings";
+import { amsterdamDay, isClientFeedbackOverdue } from "@/lib/client-feedback";
+import { addWorkingDays } from "@/lib/workdays";
+import { nlHolidaySet } from "@/lib/holidays";
 import { env } from "@/lib/env";
 import { runJob } from "./runner";
 
@@ -26,7 +29,7 @@ function fmtDate(iso: string | null): string {
 /**
  * Herinnert klanten die nog geen feedback/akkoord hebben gegeven op scripts die
  * ter controle staan (status "klaar voor controle" of "opnieuw ter controle") en
- * die al minstens 3 dagen openstaan. Eén herinnering per review per week (dedupe).
+ * waarvan de feedbacktermijn (in werkdagen) bijna of al verstreken is. Eén herinnering per review per week (dedupe).
  * In-app + e-mail (env-gated). Zodra de klant iets doet, verandert de status en
  * stopt de herinnering vanzelf.
  */
@@ -37,9 +40,11 @@ export async function runScriptReviewReminders() {
     // is (±1 dag van tevoren), of — als er geen deadline staat — na de ingestelde
     // termijn aan stilte.
     const { scripts: feedbackDays } = await getFeedbackDays();
-    const rows = await db
+    const candidates = await db
       .select({
         id: scriptReviews.id,
+        feedbackDeadline: scriptReviews.feedbackDeadline,
+        updatedAt: scriptReviews.updatedAt,
         clientId: scriptReviews.clientId,
         clientName: clients.name,
         shootOn: productionDays.scheduledOn,
@@ -52,11 +57,17 @@ export async function runScriptReviewReminders() {
       .where(and(
         isNull(scriptReviews.deletedAt),
         inArray(scriptReviews.status, ["klaar_controle", "opnieuw_controle"]),
-        sql`(
-          (${scriptReviews.feedbackDeadline} is not null and ${scriptReviews.feedbackDeadline} <= now() + interval '1 day')
-          or (${scriptReviews.feedbackDeadline} is null and ${scriptReviews.updatedAt} < now() - (${Math.max(1, feedbackDays)} * interval '1 day'))
-        )`,
       ));
+    // Herinneren zodra de deadline (al in werkdagen gezet) morgen of eerder is,
+    // of, zonder deadline, als de feedbacktermijn in WERKDAGEN verstreken is.
+    const holidays = nlHolidaySet();
+    const today = amsterdamDay(new Date());
+    const tomorrow = addWorkingDays(today, 1, holidays);
+    const rows = candidates.filter((r) =>
+      r.feedbackDeadline
+        ? amsterdamDay(r.feedbackDeadline as Date | string) <= tomorrow
+        : isClientFeedbackOverdue(r.updatedAt as Date | string, feedbackDays, today, holidays),
+    );
     ctx.counters.processed = rows.length;
 
     for (const r of rows) {

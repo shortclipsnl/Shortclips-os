@@ -5,7 +5,8 @@ import { clients, deliverables, scripts, tasks, deadlineMisses, users } from "@/
 import { scopeToClients, type Viewer } from "@/server/auth/context";
 import { nlHolidaySet } from "@/lib/holidays";
 import { internalDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
-import { getDeadlineSettings } from "@/server/deadline-settings";
+import { getFeedbackDays } from "@/server/portal-settings";
+import { isClientFeedbackOverdue, workdaysAtClient } from "@/lib/client-feedback";
 
 const FV_STAGES = ["recorded", "footage_upload", "awaiting_editor", "editing", "editor_revision"] as const;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -40,7 +41,6 @@ export type MorningOverview = {
 export async function getMorningOverview(viewer: Viewer): Promise<MorningOverview> {
   const t = today();
   const holidays = nlHolidaySet();
-  const settings = await getDeadlineSettings();
 
   // Video's in de eerste-versie-fase: interne deadline in JS berekenen.
   const dels = await db
@@ -58,19 +58,20 @@ export async function getMorningOverview(viewer: Viewer): Promise<MorningOvervie
   }
   overdue.sort((a, b) => b.daysLate - a.daysLate);
 
-  // Video's die op klantfeedback wachten (langer dan de ingestelde termijn).
-  const feedbackDays = settings["deadline.clientFeedbackDays"];
-  const atClientRows = await db
+  // Video's die op klantfeedback wachten, langer dan de feedbacktermijn. Die
+  // termijn telt in WERKDAGEN (portaalinstellingen, per klant overschrijfbaar).
+  const { videos: feedbackDays } = await getFeedbackDays();
+  const atClientCandidates = await db
     .select({ id: deliverables.id, title: deliverables.title, since: deliverables.statusChangedAt, clientName: clients.name })
     .from(deliverables)
     .innerJoin(clients, eq(clients.id, deliverables.clientId))
     .where(and(
       isNull(deliverables.deletedAt),
       inArray(deliverables.status, ["client_review", "client_revision"]),
-      sql`${deliverables.statusChangedAt} < now() - (${feedbackDays} * interval '1 day')`,
       scopeToClients(viewer, deliverables.clientId) ?? undefined,
     ))
     .orderBy(asc(deliverables.statusChangedAt));
+  const atClientRows = atClientCandidates.filter((r) => isClientFeedbackOverdue(r.since as Date | string, feedbackDays, t, holidays));
 
   // Eigen openstaande taken vandaag of te laat.
   const myTaskRows = await db
@@ -124,8 +125,8 @@ export async function getMorningOverview(viewer: Viewer): Promise<MorningOvervie
     topOverdue: overdue.slice(0, 4),
     overdueList: overdue.map((o) => ({ id: o.id, label: o.label, sub: `${o.daysLate} ${o.daysLate === 1 ? "dag" : "dagen"} te laat`, href: `/videos/${o.id}` })),
     atClientList: atClientRows.map((r) => {
-      const days = Math.max(0, dayDiff(t, toDay(r.since)));
-      return { id: r.id, label: `${r.clientName} — ${r.title}`, sub: `${days} ${days === 1 ? "dag" : "dagen"} bij de klant`, href: `/videos/${r.id}` };
+      const days = workdaysAtClient(r.since as Date | string, t, holidays);
+      return { id: r.id, label: `${r.clientName} — ${r.title}`, sub: `${days} ${days === 1 ? "werkdag" : "werkdagen"} bij de klant`, href: `/videos/${r.id}` };
     }),
     myOpenTasksList: myTaskRows.map((r) => ({
       id: r.id, label: r.title,

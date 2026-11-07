@@ -22,6 +22,8 @@ import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { editorDeadline, internalDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
 import { getDeadlineSettings } from "@/server/deadline-settings";
+import { getPortalSettingsForClient } from "@/server/portal-settings";
+import { isClientFeedbackOverdue } from "@/lib/client-feedback";
 import { deadlineMisses } from "@/db/schema";
 import { runJob } from "./runner";
 import { runScriptingTaskSync } from "@/server/scripting-tasks";
@@ -39,7 +41,6 @@ const day = (offset: number) => {
  */
 export async function runDailySignals() {
   return runJob("system", "signals.daily", {}, async (ctx) => {
-    const settings = await getDeadlineSettings();
     // 1. Contracten die binnen 60 dagen aflopen
     const expiring = await db
       .select({
@@ -130,14 +131,28 @@ export async function runDailySignals() {
     }
     ctx.log(`${tierContracts.length} contracten op een mijlpaal (45/28/7/0 dagen)`);
 
-    // 2. Video's die te lang op klantfeedback wachten (instelbare termijn, default 3 dagen)
-    const clientFeedbackDays = settings["deadline.clientFeedbackDays"];
-    const stale = await db
+    // 2. Video's die te lang op klantfeedback wachten. Termijn in WERKDAGEN uit
+    //    de portaalinstellingen (per klant overschrijfbaar), nooit in uren: een
+    //    video die vrijdag naar de klant gaat, telt het weekend niet mee.
+    const fbHolidays = nlHolidaySet();
+    const fbToday = day(0);
+    const fbTermCache = new Map<string, { videos: number; scripts: number }>();
+    const feedbackTerm = async (clientId: string) => {
+      let t = fbTermCache.get(clientId);
+      if (!t) {
+        const ps = await getPortalSettingsForClient(clientId);
+        t = { videos: ps.feedbackDaysVideos, scripts: ps.feedbackDaysScripts };
+        fbTermCache.set(clientId, t);
+      }
+      return t;
+    };
+    const videoCandidates = await db
       .select({
         id: deliverables.id,
         clientId: deliverables.clientId,
         title: deliverables.title,
         coordinatorId: clients.coordinatorId,
+        since: deliverables.statusChangedAt,
       })
       .from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
@@ -145,9 +160,13 @@ export async function runDailySignals() {
         and(
           isNull(deliverables.deletedAt),
           inArray(deliverables.status, ["client_review", "client_revision"]),
-          lt(deliverables.statusChangedAt, sql`now() - (${clientFeedbackDays} * interval '1 day')`),
         ),
       );
+    const stale: Array<(typeof videoCandidates)[number] & { termDays: number }> = [];
+    for (const v of videoCandidates) {
+      const term = (await feedbackTerm(v.clientId)).videos;
+      if (isClientFeedbackOverdue(v.since as Date | string, term, fbToday, fbHolidays)) stale.push({ ...v, termDays: term });
+    }
 
     for (const video of stale) {
       ctx.counters.processed++;
@@ -159,7 +178,7 @@ export async function runDailySignals() {
         data: {
           // Stabiele marker voor de regels; de exacte termijn is instelbaar.
           awaitingClientStale: true,
-          awaitingClientDays: clientFeedbackDays,
+          awaitingClientDays: video.termDays,
           // Dag-gebaseerde sleutel voor de klantmelding: elke dag dat het blijft
           // openstaan krijgt de klant opnieuw een herinnering (stopt zodra hij
           // reageert). `to` stuurt de notify-dedup; de opvolgtaak van de
@@ -171,16 +190,16 @@ export async function runDailySignals() {
         },
       });
     }
-    ctx.log(`${stale.length} video's wachten te lang op de klant (>${clientFeedbackDays}d)`);
+    ctx.log(`${stale.length} video's wachten langer dan de feedbacktermijn (werkdagen) op de klant`);
 
-    // 2b. Scripts die te lang op klantcontrole wachten (instelbare termijn, default 3 dagen)
-    const scriptFeedbackDays = settings["deadline.scriptFeedbackDays"];
-    const staleScripts = await db
+    // 2b. Scripts die te lang op klantcontrole wachten (zelfde regel: werkdagen).
+    const scriptCandidates = await db
       .select({
         id: scripts.id,
         clientId: scripts.clientId,
         title: scripts.title,
         coordinatorId: clients.coordinatorId,
+        since: scripts.updatedAt,
       })
       .from(scripts)
       .innerJoin(clients, eq(clients.id, scripts.clientId))
@@ -188,9 +207,13 @@ export async function runDailySignals() {
         and(
           isNull(scripts.deletedAt),
           eq(scripts.status, "client_review"),
-          lt(scripts.updatedAt, sql`now() - (${scriptFeedbackDays} * interval '1 day')`),
         ),
       );
+    const staleScripts: Array<(typeof scriptCandidates)[number] & { termDays: number }> = [];
+    for (const sc of scriptCandidates) {
+      const term = (await feedbackTerm(sc.clientId)).scripts;
+      if (isClientFeedbackOverdue(sc.since as Date | string, term, fbToday, fbHolidays)) staleScripts.push({ ...sc, termDays: term });
+    }
 
     for (const script of staleScripts) {
       ctx.counters.processed++;
@@ -201,7 +224,7 @@ export async function runDailySignals() {
         entityId: script.id,
         data: {
           awaitingClientScriptStale: true,
-          awaitingClientScriptDays: scriptFeedbackDays,
+          awaitingClientScriptDays: script.termDays,
           // Dag-gebaseerde klantmelding (zie toelichting bij de video-variant).
           to: day(0),
           title: `Script wacht op klant: ${script.title}`,
@@ -210,7 +233,7 @@ export async function runDailySignals() {
         },
       });
     }
-    ctx.log(`${staleScripts.length} scripts wachten te lang op de klant (>${scriptFeedbackDays}d)`);
+    ctx.log(`${staleScripts.length} scripts wachten langer dan de feedbacktermijn (werkdagen) op de klant`);
 
     // 3. Vervallen facturen
     const overdue = await db

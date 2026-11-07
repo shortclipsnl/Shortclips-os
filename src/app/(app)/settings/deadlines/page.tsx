@@ -19,7 +19,7 @@ export default async function DeadlineSettingsPage() {
       />
       <DeadlinesForm defs={DEADLINE_SETTING_DEFS} initial={current} />
       <p className="mt-4 text-xs text-[var(--color-ink-muted)]">
-        De kernberekening van de deadlines zelf (interne deadline = opname + 7 werkdagen, klantdeadline = opname + 14 werkdagen) blijft vast; deze pagina stuurt de <strong>herinnerings- en escalatietermijnen</strong>. Wijzigingen gelden vanaf de eerstvolgende controle (elke nacht automatisch).
+        De kernberekening van de deadlines zelf (interne deadline = opname + 7 werkdagen, klantdeadline = opname + 14 werkdagen) blijft vast; deze pagina stuurt de <strong>herinnerings- en escalatietermijnen</strong>. Wijzigingen gelden vanaf de eerstvolgende controle (elke nacht automatisch). De feedbacktermijn van de klant (in werkdagen) stel je in bij Instellingen &gt; Klantportaal; die geldt zowel in het portaal van de klant als voor de herinneringen.
       </p>
     </div>
   );
