@@ -127,8 +127,14 @@ export async function linkMetricoolBrands(triggeredById?: string, source: Source
   );
 }
 
-/** Welke daily_metrics-kolom bij welke Metricool-metric (+ subject) hoort. */
-const METRIC_MAP = [
+type MetricSpec = { field: string; subject: string; metric: string; sign?: 1 | -1 };
+
+/**
+ * Welke daily_metrics-kolom bij welke Metricool-metric (+ subject) hoort, per
+ * netwerk. Elk netwerk heeft in de Metricool-API eigen metricnamen; met alleen
+ * de Instagram-namen kwam er voor TikTok niets binnen.
+ */
+const METRIC_MAP_INSTAGRAM: MetricSpec[] = [
   { field: "views", subject: "account", metric: "views" },
   { field: "reach", subject: "account", metric: "reach" },
   { field: "engagements", subject: "account", metric: "postsInteractions" },
@@ -141,7 +147,31 @@ const METRIC_MAP = [
   { field: "saves", subject: "reels", metric: "saved" },
   { field: "watchSeconds", subject: "reels", metric: "ig_reels_video_view_total_time" },
   { field: "videoViews", subject: "reels", metric: "videoviews" },
-] as const;
+];
+const METRIC_MAP_TIKTOK: MetricSpec[] = [
+  { field: "views", subject: "account", metric: "video_views" },
+  { field: "followerDelta", subject: "account", metric: "followers_delta_count" },
+  { field: "followers", subject: "account", metric: "followers_count" },
+  { field: "likes", subject: "account", metric: "likes" },
+  { field: "comments", subject: "account", metric: "comments" },
+  { field: "shares", subject: "account", metric: "shares" },
+  // Interacties = likes + reacties + shares (TikTok kent geen aparte totaalmetric).
+  { field: "engagements", subject: "account", metric: "likes" },
+  { field: "engagements", subject: "account", metric: "comments" },
+  { field: "engagements", subject: "account", metric: "shares" },
+];
+const METRIC_MAP_FACEBOOK: MetricSpec[] = [
+  // Bewust geen paginabrede weergaven (page_media_view): die tellen ook
+  // advertenties mee. Facebook-weergaven komen uit de cijfers per reel/post.
+  { field: "engagements", subject: "account", metric: "postsInteractions" },
+  { field: "followerDelta", subject: "account", metric: "page_daily_follows_unique" },
+  { field: "followerDelta", subject: "account", metric: "page_daily_unfollows_unique", sign: -1 },
+];
+const METRIC_MAP: Record<string, MetricSpec[]> = {
+  Instagram: METRIC_MAP_INSTAGRAM,
+  Tiktok: METRIC_MAP_TIKTOK,
+  Facebook: METRIC_MAP_FACEBOOK,
+};
 
 type DayAgg = {
   views: number; reach: number; engagements: number; followerDelta: number; followers: number;
@@ -215,9 +245,9 @@ export async function pullMetricoolMetrics(
             r[field] += value;
             perDay.set(date, r);
           };
-          for (const { field, subject, metric } of METRIC_MAP) {
+          for (const { field, subject, metric, sign } of METRIC_MAP[network] ?? []) {
             const points = await source.timeline(blogId, userId, network, subject, metric, fromISO, toISO);
-            for (const p of points) add(p.date, field as keyof DayAgg, p.value);
+            for (const p of points) add(p.date, field as keyof DayAgg, p.value * (sign ?? 1));
           }
           if (perDay.size === 0) continue;
           const platform = NETWORK_PLATFORM[network];
@@ -278,7 +308,7 @@ const POST_SUBJECTS: Record<string, string[]> = {
   Instagram: ["reels", "posts"],
   Tiktok: ["posts"],
   Youtube: ["posts"],
-  Facebook: ["posts"],
+  Facebook: ["reels", "posts"],
   Linkedin: ["posts"],
 };
 

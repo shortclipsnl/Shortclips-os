@@ -16,9 +16,6 @@ export type ReportPdfInput = {
 
 const GREEN = "#12a150";
 const GREEN_SOFT = "#e6f6ec";
-const RED = "#d64a3b";
-const RED_SOFT = "#fdecea";
-const AMBER = "#c98a12";
 
 /** Extra opmaak voor de klantversie: scanbaar, donkerblauwe tegels, kleur voor groei en daling. */
 const CSS = `
@@ -28,13 +25,12 @@ const CSS = `
   .kt .l { font-size: 10px; opacity: .75; margin-top: 2px; }
   .pill { display: inline-flex; align-items: center; gap: 3px; border-radius: 99px; padding: 2px 8px; font-size: 9px; font-weight: 600; margin-top: 8px; }
   .pill.up { background: ${GREEN_SOFT}; color: ${GREEN}; }
-  .pill.down { background: ${RED_SOFT}; color: ${RED}; }
+  .pill.down { background: rgba(255,255,255,.14); color: #fff; }
   .pill.flat { background: rgba(255,255,255,.14); color: #fff; }
   .pill.na { background: rgba(255,255,255,.10); color: rgba(255,255,255,.7); }
   .hl { display: grid; gap: 8px; }
   .hlc { display: flex; gap: 10px; align-items: flex-start; border-radius: 12px; padding: 11px 13px; background: #f4f5f9; border-left: 4px solid #00003b; }
   .hlc.pos { background: ${GREEN_SOFT}; border-left-color: ${GREEN}; }
-  .hlc.neg { background: #fff6e6; border-left-color: ${AMBER}; }
   .hlc .ic { font-weight: 700; font-size: 13px; line-height: 1.2; }
   .soft { background: #f4f5f9; border-radius: 12px; padding: 13px 15px; font-size: 11px; }
   .soft p { margin: 0 0 6px; } .soft p:last-child { margin: 0; }
@@ -46,7 +42,7 @@ const CSS = `
   .cmp td:last-child { border-radius: 0 10px 10px 0; }
   .cmp td.cur { background: #00003b; color: #fff; font-weight: 700; }
   .dp { display: inline-block; min-width: 64px; text-align: center; border-radius: 99px; padding: 3px 9px; font-size: 10px; font-weight: 700; }
-  .dp.up { background: ${GREEN_SOFT}; color: ${GREEN}; } .dp.down { background: ${RED_SOFT}; color: ${RED}; } .dp.flat, .dp.na { background: #e9eaf1; color: #5d5d78; }
+  .dp.up { background: ${GREEN_SOFT}; color: ${GREEN}; } .dp.down { background: #e9eaf1; color: #3d3d58; } .dp.flat, .dp.na { background: #e9eaf1; color: #5d5d78; }
   .avg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
   .avgc { border: 1px solid #e3e4ee; border-radius: 12px; padding: 11px 13px; }
   .avgc .h { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: #5d5d78; font-weight: 600; margin-bottom: 6px; }
@@ -104,6 +100,18 @@ const CSS = `
   .vs div:first-child { background: #00003b; color: #fff; }
   .vs b { display: block; font-size: 10.5px; font-variant-numeric: tabular-nums; }
   .vs span { font-size: 7.5px; opacity: .75; }
+  .pf { border: 1px solid #e3e4ee; border-radius: 14px; padding: 4px 14px; }
+  .pfr { display: grid; grid-template-columns: 82px 1fr 150px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid #eef0f5; }
+  .pfr:last-child { border-bottom: 0; }
+  .pfn { font-weight: 700; color: #00003b; font-size: 11px; }
+  .pfn small { display: block; font-weight: 500; color: #5d5d78; font-size: 8.5px; }
+  .pfb { height: 14px; background: #eef0f5; border-radius: 99px; overflow: hidden; }
+  .pfb div { height: 100%; background: #00003b; border-radius: 99px; }
+  .pfr.first .pfb div { background: ${GREEN}; }
+  .pfs { font-size: 8.5px; color: #5d5d78; margin-top: 4px; }
+  .pfv { text-align: right; }
+  .pfv b { font-size: 15px; color: #00003b; font-variant-numeric: tabular-nums; display: block; }
+  .pfv .dp { margin-top: 3px; min-width: 0; font-size: 8.5px; padding: 1px 7px; }
   .end { background: #00003b; color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 0 24mm; }
   .end img { width: 130px; margin-bottom: 36px; }
   .end h1 { color: #fff; font-size: 30px; margin: 0 0 12px; }
@@ -171,6 +179,25 @@ function videoPages(videos: NonNullable<ReportPdfInput["videos"]>, maand: string
   return pages.join("");
 }
 
+function platformBlock(list: NonNullable<ReportMetrics["platforms"]>, vorige: string): string {
+  const shown = list.filter((p) => p.views > 0 || p.engagements > 0 || p.videos > 0);
+  if (shown.length === 0) return "";
+  const total = shown.reduce((s, p) => s + p.views, 0);
+  const rows = shown.map((p, i) => {
+    const share = total > 0 ? Math.round((p.views / total) * 100) : 0;
+    const gemeten = p.views > 0;
+    const delta = gemeten && p.viewsVorigeMaand && p.viewsVorigeMaand > 0 ? Math.round(((p.views - p.viewsVorigeMaand) / p.viewsVorigeMaand) * 1000) / 10 : null;
+    const stats = [
+      p.reach > 0 ? `${nf(p.reach)} bereik` : "",
+      p.engagements > 0 ? `${nf(p.engagements)} interacties` : "",
+      p.followerGrowth !== 0 ? `${signed(p.followerGrowth)} volgers` : "",
+      p.videos > 0 ? `${p.videos} ${p.videos === 1 ? "video" : "video's"}` : "",
+    ].filter(Boolean).join(" · ");
+    return `<div class="pfr${i === 0 && gemeten ? " first" : ""}"><div class="pfn">${esc(PLATFORM[p.platform] ?? p.platform)}${gemeten ? `<small>${share}% van alle weergaven</small>` : ""}</div><div><div class="pfb"><div style="width:${gemeten ? Math.max(2, share) : 0}%"></div></div>${stats ? `<div class="pfs">${esc(stats)}</div>` : ""}</div><div class="pfv">${gemeten ? `<b>${nf(p.views)}</b><span style="font-size:8.5px;color:#5d5d78">weergaven</span><br/>${delta === null ? "" : deltaPill(delta, "dp", ` vs ${vorige}`)}` : `<span style="font-size:9px;color:#5d5d78">Weergaven worden voor dit platform niet via de koppeling gemeten</span>`}</div></div>`;
+  }).join("");
+  return `<h2>Weergaven per platform</h2><div class="pf">${rows}</div>`;
+}
+
 /**
  * Klantversie van de maandrapportage (PDF 1): professioneel, scanbaar en
  * deelbaar. Bevat nooit interne analyse, kwaliteitscontrole of feedback.
@@ -187,6 +214,8 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
   const vorige = prev ? fullMonth(prev.maand) : "vorige maand";
   const volgende = cur ? nextMonthName(cur.maand) : "volgende maand";
   const meta = `${esc(clientName)}<br/>Maandrapportage ${esc(periodLabel)}`;
+  // Vangnet: doelstellingen afspreken met de klant hoort niet in de klantversie.
+  const geenDoel = (t: string) => !/doelstelling|doelen afspreken|kpi/i.test(t);
 
   const kpi = (label: string, value: string, delta: number | null | undefined, showDelta = true) =>
     `<div class="kt"><div class="v">${value}</div><div class="l">${esc(label)}</div>${showDelta ? deltaPill(delta, "pill", ` vs ${vorige}`) : ""}</div>`;
@@ -195,9 +224,20 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
     ? klanttekst.trim().split(/\n{2,}/).map((p) => `<p>${esc(p)}</p>`).join("")
     : `<p>${esc("We hebben de resultaten van deze maand bekeken en onze aanpak voor volgende maand bepaald.")}</p>`;
 
-  // Hoogtepunten: positieve signalen en aandachtspunten (geen interne actiepunten).
-  const highlights = (a?.aandachtspunten ?? []).filter((p) => p.type === "positief" || p.type === "aandachtspunt").slice(0, 3)
-    .map((p) => `<div class="hlc ${p.type === "positief" ? "pos" : "neg"}"><div class="ic" style="color:${p.type === "positief" ? GREEN : AMBER}">${p.type === "positief" ? "▲" : "●"}</div><div>${esc(p.tekst)}</div></div>`).join("");
+  // Hoogtepunten: alleen de positieve signalen. Dalingen staan feitelijk in de
+  // cijfers en de vergelijking, maar worden niet extra uitgelicht.
+  const highlights = [
+    ...(a?.aandachtspunten ?? []).filter((p) => p.type === "positief").map((p) => p.tekst),
+    ...(a?.analysis?.watWerkt ?? []).map((f) => f.punt),
+  ].filter(Boolean)
+    // Geen dubbele punten: twee teksten met grotendeels dezelfde getallen gelden als één.
+    .filter((tekst, i, all) => {
+      const nums = (x: string) => new Set(x.match(/\d+/g) ?? []);
+      const mine = nums(tekst);
+      return !all.slice(0, i).some((prev) => { const p = nums(prev); return [...mine].filter((n) => p.has(n)).length >= 2; });
+    })
+    .slice(0, 3)
+    .map((tekst) => `<div class="hlc pos"><div class="ic" style="color:${GREEN}">▲</div><div>${esc(tekst)}</div></div>`).join("");
 
   // Vergelijking met de vorige maand, rij voor rij.
   const cmpRows = cur && prevOk ? ([
@@ -225,7 +265,7 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
     ? `<div class="eng">${engagement.map(([l, n]) => `<div class="engc"><div class="v">${nf(n)}</div><div class="l">${esc(l)}</div></div>`).join("")}</div>`
     : "";
 
-  const ontwikkelingen = [...(a?.analysis?.ontwikkelingen ?? []), ...(a?.maandvergelijking ?? [])].filter(Boolean).slice(0, 4)
+  const ontwikkelingen = [...(a?.analysis?.ontwikkelingen ?? []), ...(a?.maandvergelijking ?? [])].filter(Boolean).filter(geenDoel).slice(0, 3)
     .map((x, i) => `<div class="devc"><div class="n">${i + 1}</div><div>${esc(x)}</div></div>`).join("");
 
   const topVideos = (a?.topVideos ?? []).slice(0, 3).map((x, i) => {
@@ -235,10 +275,10 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
   }).join("");
   const watWerkt = (a?.analysis?.watWerkt ?? []).slice(0, 4).map((f) => `<li>${esc(f.punt)}</li>`).join("");
 
-  const conclusies = (a?.conclusies ?? []).slice(0, 4).map((c) => `<li>${esc(c)}</li>`).join("");
-  const steps = (a?.strategischeActies ?? []).slice(0, 3).map((x, i) =>
+  const conclusies = (a?.conclusies ?? []).filter(geenDoel).slice(0, 4).map((c) => `<li>${esc(c)}</li>`).join("");
+  const steps = (a?.strategischeActies ?? []).filter((x) => geenDoel(`${x.titel} ${x.waarom ?? ""}`)).slice(0, 3).map((x, i) =>
     `<div class="step"><div class="sn">Stap ${i + 1}</div><div class="st">${esc(x.titel)}</div>${x.waarom ? `<div class="sw">${esc(x.waarom)}</div>` : ""}</div>`).join("");
-  const kansen = (a?.kansen ?? []).slice(0, 3).map((k) => `<div class="kans"><div class="t">${esc(k.titel)}</div><div class="s">${esc(k.toelichting)}</div></div>`).join("");
+  const kansen = (a?.kansen ?? []).filter((k) => geenDoel(`${k.titel} ${k.toelichting}`)).slice(0, 3).map((k) => `<div class="kans"><div class="t">${esc(k.titel)}</div><div class="s">${esc(k.toelichting)}</div></div>`).join("");
 
   const viewsChart = barChart(historie, "views", (n) => nf(n));
   const engChart = barChart(historie, "engagements", (n) => nf(n));
@@ -264,6 +304,7 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
       ${kpi("Gepubliceerde video's", nf(t.posts), vm?.videos)}
       ${kpi("Weergaven per video", t.avgPerPost != null ? nf(t.avgPerPost) : "–", vm?.viewsPerVideo)}
     </div>
+    ${platformBlock(t.platforms ?? [], vorige)}
     ${highlights ? `<h2>In het kort</h2><div class="hl">${highlights}</div>` : ""}
     <h2>Samenvatting</h2>
     <div class="soft">${persoonlijk}</div>

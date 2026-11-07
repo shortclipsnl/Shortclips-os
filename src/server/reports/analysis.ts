@@ -7,7 +7,7 @@ import { SHORTCLIPS_IDENTITY } from "@/server/ai/identity";
 import { getClientReport } from "@/server/client-report";
 import type { ClientInsights, Finding, Recommendation, TopVideo, HookInzicht, FormatInzicht, MindereVideo } from "@/server/insights";
 import { loadStrategyProfile, strategyToText } from "./strategy";
-import { buildVergelijking, formatStats, monthSeries, type FormatStat, type MaandCijfers, type Vergelijking } from "./metrics";
+import { buildVergelijking, formatStats, monthSeries, platformSplit, type FormatStat, type MaandCijfers, type PlatformCijfers, type Vergelijking } from "./metrics";
 
 /* ---------------- Periode-helpers (Europe/Amsterdam) ---------------- */
 
@@ -79,6 +79,8 @@ export type ReportMetrics = Awaited<ReturnType<typeof getClientReport>>["totals"
   historie?: MaandCijfers[];
   vergelijking?: Vergelijking;
   formats?: FormatStat[];
+  /** Cijfers per platform (Instagram, TikTok, Facebook, ...) in de maand. */
+  platforms?: PlatformCijfers[];
   /** Alle video's van de maand met hun eigen cijfers (voor het video-overzicht). */
   videos?: ReportVideo[];
   /** Bron van het aantal video's. */
@@ -206,6 +208,7 @@ export async function generateMonthlyAnalysis(
     const m = mapVideo(v);
     return { key: `v${i + 1}`, id: String(v.pub_id), titel: m.titel, datum: m.datum, platform: v.platform ? String(v.platform) : null, url: m.url, views: m.views, likes: m.likes, reacties: m.reacties, shares: m.shares, saves: m.saves, gemKijktijdSec: m.gemKijktijdSec };
   });
+  totals.platforms = await platformSplit(client.id, period);
   totals.historie = historie;
   totals.vergelijking = vergelijking;
   totals.formats = formats;
@@ -222,7 +225,7 @@ export async function generateMonthlyAnalysis(
     maand: periodLabel(period),
     doelstelling: strategyToText(strategy) || "Niet ingesteld",
     cijfers: { ...report.totals, posts: totals.posts, avgPerPost: totals.avgPerPost },
-    perPlatform: report.perPlatform,
+    perPlatform: totals.platforms,
     historie,
     vergelijking,
     formatPrestaties: formats,

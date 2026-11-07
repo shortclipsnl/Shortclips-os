@@ -137,29 +137,33 @@ const firstStr = (...vals: unknown[]): string | null => {
 
 /** Metricool-post/reel (meerdere vormen) → genormaliseerde MetricoolPost. */
 function normalizePost(r: Record<string, unknown>): MetricoolPost | null {
-  const externalId = firstStr(r.reelId, r.contentId, r.postId, r.id, r.mediaId);
+  // Veldnamen verschillen per netwerk: Instagram (reels/posts), TikTok
+  // (videoId, viewCount, ...) en Facebook-reels (reelId, blueReelsPlayCount, ...).
+  const externalId = firstStr(r.reelId, r.videoId, r.contentId, r.postId, r.id, r.mediaId);
   if (!externalId) return null;
-  const pub = r.publishedAt as { dateTime?: string } | string | undefined;
+  const pub = (r.publishedAt ?? r.created ?? r.createTime) as { dateTime?: string } | string | undefined;
   const publishedAt = typeof pub === "string" ? pub : (pub?.dateTime ?? null);
-  const duration = firstNum(r.durationSeconds, r.duration) || null;
-  const avgWatch = r.averageWatchTime != null ? num(r.averageWatchTime) : null;
+  const duration = firstNum(r.durationSeconds, r.duration, r.length) || null;
+  const avgWatchRaw = r.averageWatchTime ?? r.averageTimeWatched ?? r.postVideoAvgTimeWatchedSeconds;
+  const avgWatch = avgWatchRaw != null ? num(avgWatchRaw) : null;
   let completion: number | null = null;
-  if (avgWatch != null && duration && duration > 0) completion = Math.min(1, avgWatch / duration);
+  if (r.fullVideoWatchedRate != null) completion = Math.max(0, Math.min(1, num(r.fullVideoWatchedRate)));
+  else if (avgWatch != null && duration && duration > 0) completion = Math.min(1, avgWatch / duration);
   else if (r.reelsSkipRate != null) completion = Math.max(0, Math.min(1, 1 - num(r.reelsSkipRate) / 100));
   return {
     externalId,
-    url: firstStr(r.url, r.postUrl, r.link),
-    caption: firstStr(r.content, r.text, r.caption, r.title),
-    thumbnailUrl: firstStr(r.imageUrl, r.thumbnailUrl, r.picture, r.image),
+    url: firstStr(r.url, r.postUrl, r.link, r.shareUrl, r.reelUrl),
+    caption: firstStr(r.content, r.text, r.caption, r.title, r.videoDescription, r.description),
+    thumbnailUrl: firstStr(r.imageUrl, r.thumbnailUrl, r.coverImageUrl, r.picture, r.image),
     publishedAt,
-    views: firstNum(r.views, r.impressionsTotal, r.impressions, r.videoViews),
+    views: firstNum(r.views, r.viewCount, r.blueReelsPlayCount, r.impressionsTotal, r.impressions, r.videoViews),
     reach: firstNum(r.reach),
-    likes: firstNum(r.likes),
-    comments: firstNum(r.comments),
-    shares: firstNum(r.shares),
+    likes: firstNum(r.likes, r.likeCount, r.postVideoReactions),
+    comments: firstNum(r.comments, r.commentCount),
+    shares: firstNum(r.shares, r.shareCount),
     saves: firstNum(r.saved, r.saves, r.saveCount),
     avgWatchSeconds: avgWatch,
-    watchTimeSeconds: firstNum(r.videoViewTotalTime, r.watchTime),
+    watchTimeSeconds: firstNum(r.videoViewTotalTime, r.watchTime, r.totalTimeWatched, r.postVideoViewTimeSeconds),
     durationSeconds: duration,
     completionRate: completion,
   };

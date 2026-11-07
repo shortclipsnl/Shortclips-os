@@ -5,7 +5,7 @@ import { clientReports, clients, monthlyReportFeedback, monthlyReportReads, mont
 import { assertClientAccess, ForbiddenError, requireInternal, scopeToClients, type Viewer } from "@/server/auth/context";
 import { periodLabel } from "./analysis";
 import { checkReportQuality, type Beoordeling, type QualityIssue } from "./quality";
-import { duplicateIssue, findDuplicateMetricClients, monthVideos, thumbnailsFor, type MaandCijfers, type MonthVideo, type Vergelijking } from "./metrics";
+import { duplicateIssue, findDuplicateMetricClients, monthVideos, platformSplit, thumbnailsFor, type MaandCijfers, type MonthVideo, type Vergelijking } from "./metrics";
 import type { MonthlyAnalysis } from "./analysis";
 
 export type ReportStatus =
@@ -433,7 +433,9 @@ export async function loadReportPdfData(reportId: string): Promise<ReportPdfData
   if (!r) return null;
   const analysis = r.analysis && Object.keys(r.analysis).length ? (r.analysis as unknown as MonthlyAnalysis) : null;
   const b = (r.beoordeling ?? {}) as Beoordeling;
-  const totals = (r.metrics ?? {}) as Record<string, unknown>;
+  const totals = { ...((r.metrics ?? {}) as Record<string, unknown>) };
+  // Platformverdeling: opgeslagen bij de generatie, anders live (oudere rapporten).
+  if (!Array.isArray(totals.platforms)) totals.platforms = await platformSplit(r.clientId, r.period);
   // Video's: opgeslagen bij de generatie, anders (oudere rapporten) live opgehaald.
   const stored = Array.isArray(totals.videos) ? (totals.videos as MonthVideo[]) : null;
   const vids = stored ?? await monthVideos(r.clientId, r.period);
@@ -447,7 +449,7 @@ export async function loadReportPdfData(reportId: string): Promise<ReportPdfData
     logoUrl: r.logoUrl,
     period: r.period,
     periodLabel: periodLabel(r.period),
-    totals: (r.metrics ?? {}) as Record<string, unknown>,
+    totals,
     analysis,
     klanttekst: b.klanttekst ?? "",
     beoordeling: b,

@@ -264,3 +264,52 @@ export async function thumbnailsFor(ids: string[]): Promise<Map<string, string>>
   const res = await db.execute(sql`select id, thumbnail_data from publications where thumbnail_data is not null and id in (${sql.join(uuids.map((u) => sql`${u}::uuid`), sql`, `)})`);
   return new Map(rows<{ id: string; thumbnail_data: string }>(res).map((r) => [String(r.id), r.thumbnail_data]));
 }
+
+export type PlatformCijfers = {
+  platform: string;
+  views: number; reach: number; engagements: number; followerGrowth: number; videos: number;
+  /** Weergaven van dezelfde platform in de vorige maand (null = geen meting). */
+  viewsVorigeMaand: number | null;
+};
+
+/** Cijfers per platform voor een kalendermaand, met weergaven van de maand ervoor. */
+export async function platformSplit(clientId: string, period: string): Promise<PlatformCijfers[]> {
+  const from = `${period}-01`;
+  const to = monthEnd(period);
+  const prev = shiftPeriod(period, -1);
+  const [cur, prv, pubs, vidViews] = await Promise.all([
+    db.execute(sql`
+      select platform::text platform, coalesce(sum(views),0)::bigint views, coalesce(sum(reach),0)::bigint reach,
+             coalesce(sum(engagements),0)::bigint engagements, coalesce(sum(follower_delta),0)::int follower_growth
+      from daily_metrics where client_id = ${clientId} and platform is not null and measured_on >= ${from} and measured_on <= ${to}
+      group by 1`),
+    db.execute(sql`
+      select platform::text platform, coalesce(sum(views),0)::bigint views, count(*)::int dagen
+      from daily_metrics where client_id = ${clientId} and platform is not null and measured_on >= ${`${prev}-01`} and measured_on <= ${monthEnd(prev)}
+      group by 1`),
+    db.execute(sql`
+      select platform::text platform, count(*)::int videos from publications
+      where client_id = ${clientId} and deleted_at is null and status = 'published' and published_at is not null
+        and published_at >= ${from}::date and published_at < (${to}::date + 1)
+      group by 1`),
+    // Weergaven uit de cijfers per video (voor platforms zonder accountweergaven, zoals Facebook).
+    db.execute(sql`
+      with pm as (select publication_id, max(views) views from social_metrics where client_id = ${clientId} group by publication_id)
+      select p.platform::text platform, coalesce(sum(pm.views),0)::bigint views
+      from publications p join pm on pm.publication_id = p.id
+      where p.client_id = ${clientId} and p.deleted_at is null and p.published_at >= ${from}::date and p.published_at < (${to}::date + 1)
+      group by 1`),
+  ]);
+  const vidMap = new Map(rows<Record<string, unknown>>(vidViews).map((r) => [String(r.platform), n(r.views)]));
+  const prevMap = new Map(rows<Record<string, unknown>>(prv).map((r) => [String(r.platform), n(r.views)]));
+  const pubMap = new Map(rows<Record<string, unknown>>(pubs).map((r) => [String(r.platform), n(r.videos)]));
+  const list = rows<Record<string, unknown>>(cur).map((r) => {
+    const p = String(r.platform);
+    // Geen accountweergaven gemeten? Dan de som van de video's van die maand.
+    const views = n(r.views) > 0 ? n(r.views) : (vidMap.get(p) ?? 0);
+    return { platform: p, views, reach: n(r.reach), engagements: n(r.engagements), followerGrowth: n(r.follower_growth), videos: pubMap.get(p) ?? 0, viewsVorigeMaand: prevMap.has(p) ? prevMap.get(p)! : null };
+  });
+  // Platforms met video's maar zonder dagcijfers ook tonen (eerlijk: geen meting).
+  for (const [p, v] of pubMap) if (!list.some((x) => x.platform === p)) list.push({ platform: p, views: vidMap.get(p) ?? 0, reach: 0, engagements: 0, followerGrowth: 0, videos: v, viewsVorigeMaand: prevMap.get(p) ?? null });
+  return list.sort((a, b) => b.views - a.views || b.engagements - a.engagements);
+}
