@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ClipboardList } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { requireInternal, isOwner } from "@/server/auth/context";
 import { assignMissingEditorsIfStale, mergeDuplicateShootsIfStale } from "@/server/jobs/calendar-sync";
 import { isCoreStaff } from "@/server/core-staff";
@@ -108,20 +108,6 @@ export default async function VideosPage({
         title="Editing"
         description={`${editingProjects.length} projecten · ${rows.length} video's in productie`}
       />
-
-      {/* Editor briefing maken — centraal op de Editing-pagina (links), met een
-          korte uitleg. Vanaf hier koppel je 'm direct aan de juiste opdracht. */}
-      {viewer.permissions.has("ai:read") ? (
-        <div className="-mt-2 mb-5 flex flex-wrap items-center gap-3">
-          <Link
-            href="/ai/briefing"
-            className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90"
-          >
-            <ClipboardList className="size-4" /> Editor briefing maken
-          </Link>
-          <span className="text-xs text-[var(--color-ink-muted)]">Maak per video een duidelijke briefing en koppel &apos;m direct aan de opdracht, zodat je editors precies weten wat de bedoeling is.</span>
-        </div>
-      ) : null}
 
       {showAllBoard ? (
         <section className="mb-6">

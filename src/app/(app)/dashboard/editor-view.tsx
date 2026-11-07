@@ -142,7 +142,7 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
         {/* Binnenkort beschikbaar — nog in te plannen of wachten op beeld. Krijgt
             een eigen gekleurde kop zodat het duidelijk opvalt naast "Jouw video's". */}
         <Card padded={false} className="overflow-hidden">
-          <div className="flex items-center gap-2.5 px-5 py-3.5 text-white" style={{ background: "linear-gradient(90deg, var(--color-brand-600), var(--color-info))" }}>
+          <div className="flex items-center gap-2.5 px-5 py-3.5 text-white" style={{ background: EDIT_PHASE_META.te_plannen.color }}>
             <CalendarClock className="size-5 shrink-0" />
             <div className="min-w-0">
               <div className="text-base font-bold tracking-tight">Binnenkort beschikbaar</div>
@@ -344,7 +344,7 @@ function VideoRow({ v }: { v: EditorBoardVideo }) {
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium">{v.title}</span>
             <span className="block truncate text-xs text-[var(--color-ink-muted)]">
-              {v.clientName} · <span style={{ color: phaseMeta.color }} className="font-medium">{phaseMeta.label}</span>
+              {v.clientName} · <span style={{ background: phaseMeta.color }} className="inline-block rounded-full px-2 py-px text-2xs font-semibold text-white align-middle">{phaseMeta.label}</span>
             </span>
             {/* Wacht op beeld? Toon de échte opnamedatum uit de opnameplanning,
                 zodat de editor weet wanneer de beelden komen. Nooit verzonnen. */}

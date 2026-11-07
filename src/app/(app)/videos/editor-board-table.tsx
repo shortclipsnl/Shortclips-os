@@ -3,12 +3,13 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, ClipboardList, Download, FileText, Loader2, MessageSquare, Pencil, RefreshCw, Sparkles, Upload, X } from "lucide-react";
+import { ClipboardList, Download, FileText, Loader2, MessageSquare, Pencil, RefreshCw, Sparkles, Upload, X } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { editorColor, editorDisplayName, firstNameKey } from "@/lib/editors";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase, type VideoStage } from "@/lib/statuses";
+import { EditPhaseHeader } from "@/components/edit-phase-header";
 import { askEditorQuestion, assignEditor, attachBriefingToProject, changeVideoStatus, clearBriefingFromProject, createVideoScriptUploadUrl, deleteVideoScript, regenerateVideoBriefing, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts, uploadVideoScript } from "@/server/actions/videos";
 import { fileToBase64 } from "../ai/_shared";
 import type { EditorBoardVideo } from "@/server/editor-board";
@@ -231,13 +232,7 @@ export function EditorBoardTable({
             const open = !collapsed.has(ph);
             return (
               <div key={ph}>
-                <button type="button" onClick={() => toggle(ph)}
-                  className="flex w-full items-center gap-2 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2.5 py-2 text-left"
-                  style={{ boxShadow: `inset 4px 0 0 ${meta.color}` }}>
-                  <span style={{ color: meta.color }}>{open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</span>
-                  <span className="text-sm font-bold" style={{ color: meta.color }}>{meta.label}</span>
-                  <span className="rounded-full px-2 py-0.5 text-2xs font-bold tabular-nums" style={{ background: `color-mix(in srgb, ${meta.color} 15%, var(--color-surface))`, color: meta.color }}>{list.length}</span>
-                </button>
+                <EditPhaseHeader label={meta.label} color={meta.color} count={list.length} open={open} onToggle={() => toggle(ph)} />
                 {open ? (
                   list.length > 0 ? (
                     list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} canEditFiles={canEditFiles} viewerId={viewerId} phaseColor={meta.color} editorView={editorView} />)
