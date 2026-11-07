@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, CalendarClock, CalendarDays, Check, ChevronDown, Hourglass, Loader2, Sunrise } from "lucide-react";
+import { CalendarCheck, CalendarClock, Check, ChevronDown, Hourglass, Loader2, Sunrise } from "lucide-react";
 import { DAGRITME } from "@/lib/werkdag";
 import { Dagindeling } from "./dagindeling";
 import { Card } from "@/components/ui";
 import { setTaskStatus } from "@/server/actions/tasks";
 import type { DoneItem, WaitingItem, WorkCategory, WorkItem } from "@/server/werkoverzicht";
-import { WerkdagBalk, type Focus } from "./werkdag-balk";
 
 const CAT_LABEL: Record<WorkCategory, string> = {
   klantcontact: "Klantcontact",
@@ -50,7 +49,7 @@ const TONE: Record<Tone, { bar: string; pill: string }> = {
 };
 
 /** Kleur + label van één taakkaart, afhankelijk van de kolom. */
-function toneOf(i: WorkItem, col: "today" | "next" | "week", today: string): { tone: Tone; label: string } {
+function toneOf(i: WorkItem, col: "today" | "week", today: string): { tone: Tone; label: string } {
   if (i.state === "late") return { tone: "bad", label: `${i.daysLate} ${i.daysLate === 1 ? "dag" : "dagen"} te laat` };
   if (i.urgent) return { tone: "bad", label: "Urgent" };
   if (i.status === "bezig") return { tone: "info", label: "Bezig" };
@@ -61,9 +60,9 @@ function toneOf(i: WorkItem, col: "today" | "next" | "week", today: string): { t
 }
 
 /**
- * Vandaag-pagina: bovenaan de werkdagbalk (tijd, voortgang, wat nu eerst),
- * daaronder drie kolommen — Vandaag, Eerstvolgende werkdag en Deze week
- * afronden. Elk item staat in precies één kolom, urgent staat bovenaan, taken
+ * Vandaag-pagina, persoonlijk per medewerker: "Wat moet ik vandaag afronden?",
+ * "Wat moet ik deze week afronden?" en rechts de eigen Dagindeling die live
+ * meeloopt. Elk item staat in precies één kolom, urgent staat bovenaan, taken
  * zijn direct af te vinken en details klappen pas open bij aanklikken.
  */
 export function Dagstart(p: DagstartProps) {
@@ -83,79 +82,47 @@ export function Dagstart(p: DagstartProps) {
     });
   };
 
-  // Wat heeft nu prioriteit: het bovenste open item van vandaag (of, buiten
-  // werktijd/in het weekend, van de eerstvolgende werkdag).
-  const focus: Focus = useMemo(() => {
-    const pool = [...p.columns.today, ...p.columns.next];
-    const first = pool.find((i) => !(i.taskId && done.has(i.taskId)));
-    if (!first) return null;
-    const col = p.columns.today.includes(first) ? "today" : "next";
-    const t = toneOf(first, col, p.today);
-    return {
-      title: first.title,
-      clientName: first.clientName,
-      reason: `${t.label}${first.detail ? ` · ${first.detail}` : ""}`,
-      href: first.href,
-      tone: t.tone === "good" ? "neutral" : t.tone,
-    };
-  }, [p.columns, p.today, done]);
-
   const rowProps = { done, busy, onComplete: complete, today: p.today };
+  const first = p.personName.split(" ")[0];
+  const wie = p.isSelf ? "ik" : first;
+  // In het weekend gaat "vandaag" over de eerstvolgende werkdag.
+  const dagWoord = p.todayIsWorkday ? "vandaag" : nlDay(p.nextDay, { weekday: "long" });
   const weekLabel = `t/m ${shortDay(p.weekEnd)}`;
 
   return (
     <div className="space-y-5">
-      <WerkdagBalk
-        start={p.workday.start}
-        end={p.workday.end}
-        isWorkday={p.todayIsWorkday}
-        offToday={p.workday.offToday}
-        nextDayLabel={nlDay(p.nextDay)}
-        focus={focus}
-      />
-
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
       {/* Dagindeling: het vaste dagritme, loopt live mee (geweest = groen). */}
-      <Card padded={false} className="overflow-hidden ring-1 ring-[var(--color-good)]/20 xl:sticky xl:top-4 xl:order-2">
+      <Card padded={false} className="overflow-hidden ring-1 ring-[var(--color-good)]/20 lg:sticky lg:top-4 lg:order-2">
         <div className="flex items-center gap-2.5 bg-[var(--color-good)] px-4 py-3 text-white">
           <CalendarClock className="size-4.5 shrink-0 opacity-90" />
           <div className="min-w-0">
-            <h2 className="truncate text-[15px] font-bold leading-tight tracking-tight">Dagindeling</h2>
+            <h2 className="truncate text-[15px] font-bold leading-tight tracking-tight">Dagindeling {first}</h2>
             <p className="truncate text-xs text-white/75">Het dagritme, geweest wordt groen.</p>
           </div>
         </div>
         <Dagindeling items={DAGRITME} />
       </Card>
-      <div className="grid items-start gap-4 lg:grid-cols-3 xl:order-1">
+      <div className="grid items-start gap-4 md:grid-cols-2 lg:order-1">
         <Column
           col="today"
           icon={<Sunrise className="size-4.5" />}
-          title="Vandaag"
-          date={p.todayIsWorkday ? nlDay(p.today) : `${nlDay(p.today)} · geen werkdag`}
+          title={`Wat moet ${wie} ${dagWoord} afronden?`}
+          date={p.todayIsWorkday ? nlDay(p.today) : nlDay(p.nextDay)}
           accent="bg-[var(--color-indigo-ink)]"
           items={p.columns.today}
-          empty={p.todayIsWorkday ? "Alles voor vandaag is af. Pak iets uit Deze week afronden." : "Geen werkdag. Niets dat te laat is."}
+          empty={`Alles voor ${dagWoord} is af. Pak iets uit de weeklijst.`}
           doneToday={p.done.today}
-          {...rowProps}
-        />
-        <Column
-          col="next"
-          icon={<CalendarDays className="size-4.5" />}
-          title="Eerstvolgende werkdag"
-          date={nlDay(p.nextDay)}
-          accent="bg-[var(--color-indigo-soft)]"
-          items={p.columns.next}
-          empty={`Nog niets met een deadline op ${nlDay(p.nextDay, { weekday: "long" })}.`}
           {...rowProps}
         />
         <Column
           col="week"
           icon={<CalendarCheck className="size-4.5" />}
-          title="Deze week afronden"
+          title={`Wat moet ${wie} deze week afronden?`}
           date={weekLabel}
           accent="bg-[var(--color-indigo-mist)]"
           items={p.columns.week}
-          empty={p.nextDay > p.weekEnd ? "De werkweek is rond. Alles voor vandaag staat links." : "Geen andere deadlines meer deze week."}
+          empty="Geen andere deadlines meer deze week."
           footer={[
             p.done.weekCount > 0 ? `${p.done.weekCount} afgerond deze week` : null,
             p.laterCount > 0 ? `${p.laterCount} later of lage prioriteit op Taken` : null,
@@ -175,7 +142,7 @@ const SHOW = 8;
 function Column({
   col, icon, title, date, accent, items, empty, footer, doneToday, done, busy, onComplete, today,
 }: {
-  col: "today" | "next" | "week"; icon: React.ReactNode; title: string; date: string; accent: string;
+  col: "today" | "week"; icon: React.ReactNode; title: string; date: string; accent: string;
   items: WorkItem[]; empty: string; footer?: string | null; doneToday?: DoneItem[];
   done: Set<string>; busy: string | null; onComplete: (id: string) => void; today: string;
 }) {
@@ -258,7 +225,7 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 function TaskCard({
   item: i, col, done, busy, onComplete, today,
 }: {
-  item: WorkItem; col: "today" | "next" | "week"; done: Set<string>; busy: string | null; onComplete: (id: string) => void; today: string;
+  item: WorkItem; col: "today" | "week"; done: Set<string>; busy: string | null; onComplete: (id: string) => void; today: string;
 }) {
   const [open, setOpen] = useState(false);
   const isDone = i.taskId ? done.has(i.taskId) : false;
