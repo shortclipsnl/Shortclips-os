@@ -286,7 +286,7 @@ function TaskCard({
         <div className="space-y-1 border-t border-[var(--color-line)] px-2.5 py-2 pl-[38px] text-xs text-[var(--color-ink-muted)]">
           {i.detail ? <p className="leading-snug">{i.detail}</p> : null}
           <p>
-            {CAT_LABEL[i.category]} · {i.source === "taak" ? "Taak" : i.source === "signaal" ? "Aandachtspunt" : "Opname"}
+            {i.source === "taak" ? "Taak" : i.source === "signaal" ? "Aandachtspunt" : "Opname"}{i.source !== "opname" ? ` · ${CAT_LABEL[i.category]}` : ""}
             {i.due ? ` · deadline ${nlDay(i.due, { weekday: "long", day: "numeric", month: "long" })}` : " · geen vaste deadline"}
           </p>
           <Link href={i.href ?? "/tasks"} className="inline-block font-semibold text-[var(--color-ink)] hover:underline">Openen →</Link>
