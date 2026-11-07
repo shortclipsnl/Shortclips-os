@@ -99,7 +99,7 @@ Strikte regels:
 - Als "feedbackVanControleur" is meegegeven: verwerk die opmerkingen in deze versie, zonder de regels hierboven te breken.
 
 Twee doelgroepen:
-1. De klantversie (topVideos, analysis, maandvergelijking, conclusies, kansen, strategischeActies): helder, positief waar het kan, eerlijk waar het moet, zonder vakjargon.
+1. De klantversie (topVideos, analysis, maandvergelijking, conclusies, kansen, strategischeActies, aandachtspunten): helder, zonder vakjargon, en opbouwend. Begin met wat goed ging. Benoem een tegenvaller hooguit één keer, feitelijk en kort, en direct gekoppeld aan wat we eraan doen; gebruik geen alarmerende woorden zoals 'zwak', 'slecht' of 'teleurstellend' en herhaal een daling niet in meerdere velden. Verzwijg niets en maak niets mooier dan de cijfers. Stel in de klantvelden NOOIT voor om met de klant doelstellingen, doelen of KPI's af te spreken of vast te leggen; dat doen we niet. Schrijf strategischeActies en kansen als wat Shortclips gaat doen in de content.
 2. De interne teamversie (veld "intern"): voor projectmanagers, scriptschrijvers en videografen. Diep, concreet en leerbaar. Scheid ALTIJD wat gemeten is ("gemeten": alleen cijfers/feiten uit de data) van de mogelijke verklaring ("verklaring": jouw interpretatie, nooit als bewezen gepresenteerd tenzij de cijfers het hard maken). Een verklaring over retentie, hookkracht of montage is zonder retentiedata altijd "hypothese".
 
 Geef UITSLUITEND één geldig JSON-object (geen markdown, geen tekst eromheen, geen dubbele aanhalingstekens binnen waarden, geen letterlijke regeleinden binnen waarden, geen trailing komma's), exact dit formaat:
