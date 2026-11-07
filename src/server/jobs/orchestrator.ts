@@ -17,6 +17,7 @@ import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
 import { runProfitabilitySignals } from "./profitability-signals";
 import { runContentHealthSignals } from "./content-health-signals";
+import { runRetentionTasks } from "./retention";
 import { runScriptReviewReminders } from "./script-review-reminders";
 import {
   pullFrameComments,
@@ -113,6 +114,8 @@ export async function runNightlySync() {
   // Contentgezondheidscheck per klant: urgente aandachtspunten → taken voor de
   // coördinator + overbelasting-melding voor de eigenaar (na alle signalen hierboven).
   results.push(await step("content_health.signals", () => runContentHealthSignals()));
+  // Klantbehoud: taken bij teruglopende resultaten en naderende contractmomenten.
+  results.push(await step("retention.tasks", () => runRetentionTasks()));
   results.push(await step("reminders.script_todo", () => runScriptTodoReminders()));
   // De oude, rumoerige "reminders.post_shoot_todo" is vervangen door de gerichte
   // reminders.post_shoot-job (eigen cron, 08:45 werkdagen, alleen Milou/Jiska, met

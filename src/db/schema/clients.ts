@@ -180,6 +180,11 @@ export const contracts = pgTable(
       .default("0"),
     documentFileId: uuid("document_file_id"),
     notes: text("notes"),
+    /** Gecontroleerd door een medewerker (tegen de getekende overeenkomst). Zolang
+     *  dit leeg is, gelden de standaardwaarden (opzegtermijn, verlenging) als
+     *  onzeker en vraagt de klantbehoud-signalering eerst om controle. */
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    verifiedById: uuid("verified_by_id").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
     ...softDelete,
   },
@@ -357,3 +362,53 @@ export const clientAgreementOverrides = pgTable("client_agreement_overrides", {
   updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
   ...timestamps,
 });
+
+/* ------------------------------------------------------------------ *
+ * Klantfeedback — klachten en signalen van ontevredenheid
+ * ------------------------------------------------------------------ */
+
+/**
+ * Geregistreerde klantfeedback die ertoe doet voor klantbehoud. Normale
+ * correcties (ondertitel aanpassen) horen hier niet; die lopen via Frame.io en
+ * de scriptcontrole. Elke registratie heeft een eigenaar, een vervolgactie en
+ * een deadline, en blijft zichtbaar op Aandachtspunten tot hij is opgelost.
+ *
+ * `kind`: correctie | aandacht | ernstig (zie src/lib/client-retention.ts).
+ * `status`: open | opgepakt | opgelost.
+ */
+export const clientFeedback = pgTable(
+  "client_feedback",
+  {
+    id: pk(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    source: varchar("source", { length: 16 }).notNull().default("overig"),
+    kind: varchar("kind", { length: 12 }).notNull(),
+    category: varchar("category", { length: 16 }).notNull().default("overig"),
+    /** Korte samenvatting in eigen woorden. */
+    summary: varchar("summary", { length: 240 }).notNull(),
+    /** Letterlijke tekst van de klant (optioneel). */
+    quote: text("quote"),
+    /** Afgesproken vervolgactie. */
+    followUp: text("follow_up").notNull(),
+    dueOn: date("due_on").notNull(),
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    status: varchar("status", { length: 12 }).notNull().default("open"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedById: uuid("resolved_by_id").references(() => users.id, { onDelete: "set null" }),
+    /** Wat er is gedaan om het op te lossen. */
+    resolution: text("resolution"),
+    /** Voorstel van de herkenning (soort/onderwerp/gevonden woorden), ter controle. */
+    suggestion: jsonb("suggestion"),
+    /** Gezet als dit uit een binnengekomen opmerking (Frame.io/script) is herkend. */
+    sourceRef: varchar("source_ref", { length: 200 }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+    ...softDelete,
+  },
+  (t) => [
+    index("client_feedback_client_idx").on(t.clientId, t.status),
+    index("client_feedback_open_idx").on(t.status, t.kind),
+  ],
+);

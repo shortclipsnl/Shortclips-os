@@ -9,7 +9,7 @@ import { listEditingProjects } from "@/server/editing";
 import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { getReviewQueue } from "@/server/videos";
 import { listScripting } from "@/server/scripting";
-import { getScreenData } from "@/server/screen";
+import { getRetentionSignals, RETENTION_CATEGORIES } from "@/server/client-retention";
 import { integrationHealth } from "@/server/integrations/registry";
 import { countOpenLinkSuggestions } from "@/server/link-review";
 import { VIDEO_WAITING_ON, type VideoStage } from "@/lib/statuses";
@@ -56,6 +56,8 @@ export type QualityItem = {
   ownerId?: string | null;
   /** Gebundelde punten (bijv. 5 deadlines in gevaar) — één regel met deze lijst. */
   kids?: { label: string; sub: string; href?: string }[];
+  /** Concrete deadline (YYYY-MM-DD), waar bekend. */
+  dueOn?: string;
 };
 
 export type AttentionPriority = "hoog" | "normaal" | "laag";
@@ -76,14 +78,18 @@ const GROUP_OF: Record<string, QualityGroup> = {
   "Video klaar maar niet verstuurd": "klant",
   "Video niet gepubliceerd": "klant",
   "Klant vraagt aandacht": "klant",
-  "Resultaten vallen terug": "klant",
+  [RETENTION_CATEGORIES.resultaten]: "klant",
+  [RETENTION_CATEGORIES.feedback]: "klant",
+  [RETENTION_CATEGORIES.ernstig]: "klant",
+  [RETENTION_CATEGORIES.beoordelen]: "klant",
+  [RETENTION_CATEGORIES.contract]: "overig",
+  [RETENTION_CATEGORIES.gegevens]: "overig",
   "Opname voorbereiden": "planning",
   "Geen opname gepland": "planning",
   "Planning onvoldoende gevuld": "planning",
   "Achter op afspraak": "planning",
   "Koppeling werkt niet": "overig",
   "Koppeling te bevestigen": "overig",
-  "Contract loopt af": "overig",
   "Doel achter": "overig",
   "Doel risico": "overig",
   "Stand ontbreekt": "overig",
@@ -96,7 +102,7 @@ const AREA_OF: Record<QualityGroup, AttentionArea> = {
   scripting: "script", editing: "editing", klant: "klant", planning: "opname", overig: "overig",
 };
 const areaOf = (category: string): AttentionArea =>
-  category === "Resultaten vallen terug" ? "resultaat" : AREA_OF[groupOf(category)];
+  category === RETENTION_CATEGORIES.resultaten ? "resultaat" : AREA_OF[groupOf(category)];
 
 /**
  * Wie pakt welk punt op? Vaste verdeling, zodat niemand alles krijgt:
@@ -110,7 +116,9 @@ const TO_RUTGER = new Set([
   "Opname voorbereiden", "Eerste versie verwacht", "Video wacht op controle", "Video over deadline",
   "Editor moet opleveren", "Feedback niet verwerkt",
 ]);
-const TO_JARNO = new Set(["Contract loopt af", "Koppeling werkt niet", "Koppeling te bevestigen"]);
+// Contractmomenten gaan niet meer standaard naar Jarno: de klantbehoud-signalen
+// (src/server/client-retention.ts) bepalen zelf de verantwoordelijke.
+const TO_JARNO = new Set(["Koppeling werkt niet", "Koppeling te bevestigen"]);
 
 type PartialItem = Omit<QualityItem, "action" | "reason" | "priority" | "area"> &
   Partial<Pick<QualityItem, "action" | "reason" | "priority" | "area">>;
@@ -137,7 +145,7 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
   const [
     data, projects, shootDeadlines, reviewQueue, scripting,
     missingVersion, missingData, clientRevision, readyNotSent, overduePublish,
-    openLinks, integrations, screen,
+    openLinks, integrations, retention,
   ] = await Promise.all([
     getDashboard(viewer),
     listEditingProjects(viewer),
@@ -192,9 +200,9 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
     // Owner-only bronnen.
     owner ? countOpenLinkSuggestions() : Promise.resolve(0),
     owner ? integrationHealth() : Promise.resolve([]),
-    // Achterblijvende klanten (resultaten vallen terug): ook voor coördinatoren,
-    // niet alleen de eigenaar — het is een analysesignaal, geen financiële data.
-    getScreenData(30, opts).catch(() => null),
+    // Klantbehoud: teruglopende resultaten, klachten, contractmomenten en
+    // ontbrekende gegevens, met eigen verantwoordelijke (incl. vervanging).
+    getRetentionSignals(viewer.clientScope).catch((e) => { console.error("[klantbehoud]", e); return []; }),
   ]);
 
   const items: PartialItem[] = [];
@@ -385,19 +393,10 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
     });
   }
 
-  // #13 Resultaten vallen terug — klantresultaten dalen opvallend.
-  if (screen) {
-    for (const c of (screen.laggards ?? []).filter((x) => (x.growthPct ?? 0) <= -25)) {
-      items.push({
-        id: `drop-${c.slug}`, clientName: c.name, severity: "oranje", category: "Resultaten vallen terug",
-        title: c.name,
-        detail: `Weergaven ${c.growthPct}% t.o.v. vorige periode → resultaten bekijken`,
-        href: `/analytics/${c.slug}`, roles: COORD,
-        action: "Daling weergaven bekijken", reason: `Weergaven ${c.growthPct}% t.o.v. vorige periode`,
-        priority: (c.growthPct ?? 0) <= -50 ? "normaal" : "laag",
-      });
-    }
-  }
+  // #13 Klantbehoud — vervangt de oude "Resultaten vallen terug" (alleen
+  // weergaven, zonder datacontrole) en "Contract loopt af" (einddatum i.p.v.
+  // opzegdeadline, standaard naar Jarno). Zie src/server/client-retention.ts.
+  for (const r of retention) items.push(r);
 
   // (#14 "Planning onvoldoende gevuld" is verwijderd — zie de planning op /planning.)
 
@@ -417,19 +416,6 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
   // (Planning & capaciteit staat niet meer op deze pagina — "achter op de
   //  maandafspraak" en "klanten zonder geplande opname" gaven te veel ruis die
   //  het team niet oppakte. De planning zelf bewaak je op /productions en /planning.)
-
-  // Aflopende contracten (vooruitkijken).
-  for (const c of data.contracts.slice(0, 6)) {
-    const d = daysUntil(c.endsOn);
-    items.push({
-      id: `contract-${c.id}`, clientName: c.clientName, severity: d < 30 ? "oranje" : "blauw", category: "Contract loopt af",
-      title: c.clientName, detail: `Over ${d} dagen · ${c.autoRenew ? "verlengt automatisch" : "verlengt niet"}`,
-      href: `/clients/${c.clientSlug}?tab=contract`, roles: COORD,
-      action: c.autoRenew ? "Automatische verlenging checken" : "Verlengingsgesprek plannen",
-      reason: `Contract eindigt over ${d} dagen · ${c.autoRenew ? "verlengt automatisch" : "verlengt niet"}`,
-      priority: c.autoRenew ? "laag" : d < 30 ? "hoog" : "normaal",
-    });
-  }
 
   // (Doelen-signalen staan niet meer op deze pagina: ze hebben hun eigen
   //  Doelen-pagina en gaven hier te veel ruis die het team niet gebruikte.)
@@ -469,7 +455,8 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
       priority: it.priority ?? sevToPrio[it.severity],
       area: it.area ?? areaOf(it.category),
       group: groupOf(it.category),
-      ownerId: routeOwner(it),
+      // Klantbehoud-signalen hebben hun eigen verantwoordelijke (incl. vervanging).
+      ownerId: it.ownerId !== undefined ? it.ownerId : routeOwner(it),
       clientLogoUrl: c?.logoUrl ?? null,
       clientColor: c?.color ?? null,
     };
@@ -525,7 +512,8 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
   const sameKind = new Map<string, QualityItem[]>();
   const merged: QualityItem[] = [];
   for (const it of out) {
-    if (!it.clientName || it.kids?.length) { merged.push(it); continue; }
+    // Klantbehoud-punten niet samenvoegen: elk heeft een eigen opvolging.
+    if (!it.clientName || it.kids?.length || it.id.startsWith("retentie-")) { merged.push(it); continue; }
     const k = `${it.category}|${it.clientName}|${it.ownerId ?? ""}`;
     sameKind.set(k, [...(sameKind.get(k) ?? []), it]);
   }

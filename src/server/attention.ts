@@ -32,6 +32,8 @@ export type AttentionItem = {
   href: string | null;
   kids: { label: string; sub: string; href?: string }[];
   manual: boolean;
+  /** Concrete deadline (YYYY-MM-DD), waar bekend. */
+  dueOn: string | null;
 };
 export type TeamMember = { id: string; name: string; initials: string; role: string };
 
@@ -85,7 +87,9 @@ export async function getAttentionBoard(viewer: Viewer, opts: { trusted?: boolea
     const st = byKey.get(s.id);
     let status = (st?.status ?? "open") as AttentionStatus;
     // Afgerond, maar het probleem is er na een paar dagen nog steeds → weer open.
-    if (status === "klaar" && st?.doneAt && now - st.doneAt.getTime() > REOPEN_AFTER_DAYS * 864e5) {
+    // Klantbehoud-punten niet: die zijn per maand/fase en zijn met een vastgelegde
+    // actie afgerond; heropenen zou een dagelijkse herhaling geven.
+    if (status === "klaar" && st?.doneAt && !s.id.startsWith("retentie-") && now - st.doneAt.getTime() > REOPEN_AFTER_DAYS * 864e5) {
       status = "open";
       reopen.push(s.id);
     }
@@ -94,7 +98,7 @@ export async function getAttentionBoard(viewer: Viewer, opts: { trusted?: boolea
       action: s.action, reason: s.reason, why: s.detail, priority: s.priority, area: s.area,
       ownerId: st?.assigneeId ?? s.ownerId ?? null, status,
       since: (st?.createdAt ?? new Date()).toISOString(), doneAt: status === "klaar" ? st?.doneAt?.toISOString() ?? null : null,
-      notes: st?.notes ?? [], href: s.href, kids: s.kids ?? [], manual: false,
+      notes: st?.notes ?? [], href: s.href, kids: s.kids ?? [], manual: false, dueOn: s.dueOn ?? null,
     });
   }
 
@@ -116,7 +120,7 @@ export async function getAttentionBoard(viewer: Viewer, opts: { trusted?: boolea
       priority: (r.priority as AttentionPriority) ?? "normaal", area: (r.category as AttentionArea) ?? "overig",
       ownerId: r.assigneeId, status: r.status as AttentionStatus, since: r.createdAt.toISOString(),
       doneAt: r.doneAt?.toISOString() ?? null, notes: r.notes ?? [],
-      href: manual && logo ? `/clients/${logo.slug}` : null, kids: [], manual,
+      href: manual && logo ? `/clients/${logo.slug}` : null, kids: [], manual, dueOn: null,
     });
   }
 

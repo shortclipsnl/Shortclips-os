@@ -25,7 +25,30 @@ export type BoardClient = {
   monthlyRevenue: number | null;
   /** Klanten Guide + Editing Guide uit de centrale bron. */
   docs: DocButtonSlot[];
+  /** Klantgezondheid (tevredenheid) en, apart, het contractmoment. */
+  health?: { status: "gezond" | "aandacht" | "direct"; reasons: string[]; commercial: { label: string; tone: "neutraal" | "aandacht" | "urgent" } | null } | null;
 };
+
+const HEALTH = {
+  gezond: { label: "Gezond", dot: "var(--color-good)", cls: "bg-[var(--color-good-soft)] text-[#1d6b4c]" },
+  aandacht: { label: "Aandacht nodig", dot: "var(--color-warn)", cls: "bg-[var(--color-warn-soft)] text-[#8a5300]" },
+  direct: { label: "Directe aandacht", dot: "var(--color-bad)", cls: "bg-[var(--color-bad-soft)] text-[#a3271c]" },
+} as const;
+
+/** Status met de redenen als tooltip (de hele kaart linkt al naar de klant). */
+function HealthChip({ h }: { h: NonNullable<BoardClient["health"]> }) {
+  const s = HEALTH[h.status];
+  return (
+    <>
+      <span title={h.reasons.join("\n")} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-medium ${s.cls}`}>
+        <span className="size-1.5 rounded-full" style={{ background: s.dot }} />{s.label}
+      </span>
+      {h.commercial ? (
+        <span title="Contractmoment (commercieel, staat los van tevredenheid)" className={`inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-medium ${h.commercial.tone === "urgent" ? "bg-[var(--color-bad-soft)] text-[#a3271c]" : h.commercial.tone === "aandacht" ? "bg-[var(--color-warn-soft)] text-[#8a5300]" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>{h.commercial.label}</span>
+      ) : null}
+    </>
+  );
+}
 
 /** Kleine gekleurde chip voor scanbaarheid. */
 function Chip({ children, tone }: { children: React.ReactNode; tone: "blue" | "indigo" | "amber" | "grey" | "green" }) {
@@ -212,6 +235,7 @@ function ClientCard({ c }: { c: BoardClient }) {
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">{c.name}</span>
           <span className="mt-1 flex flex-wrap items-center gap-1">
+            {c.health && !stopped ? <HealthChip h={c.health} /> : null}
             <Chip tone="blue">{c.shortsPerMonth > 0 ? `${c.shortsPerMonth} shorts/mnd` : "shorts ?"}</Chip>
             {c.inProduction > 0 ? <Chip tone="amber">{c.inProduction} lopend</Chip> : null}
             {c.nextShoot ? <Chip tone="green">opname {formatDate(c.nextShoot)}</Chip> : null}

@@ -5,6 +5,7 @@ import { attentionStates, users } from "@/db/schema";
 import { viewerForUser } from "@/server/auth/context";
 import { getAttentionBoard } from "@/server/attention";
 import { notify } from "@/server/notifications";
+import { runRetentionEscalations } from "./retention";
 
 /**
  * Persoonlijke meldingen voor aandachtspunten. Alleen voor punten die vandaag
@@ -20,8 +21,10 @@ export async function runAttentionNotify() {
   if (!viewer) return { ok: false, error: "Viewer niet op te bouwen." };
 
   const { items } = await getAttentionBoard(viewer, { trusted: true });
+  // Klantbehoud: kritieke punten die niet worden opgepakt, één keer escaleren.
+  const escalated = await runRetentionEscalations(items).catch(() => 0);
   const due = items.filter((i) => i.priority === "hoog" && i.status !== "klaar" && i.ownerId && !i.manual);
-  if (!due.length) return { ok: true, sent: 0 };
+  if (!due.length) return { ok: true, sent: 0, escalated };
 
   const rows = await db.select({ key: attentionStates.signalKey, notifiedAt: attentionStates.notifiedAt })
     .from(attentionStates).where(inArray(attentionStates.signalKey, due.map((d) => d.key)));
@@ -56,5 +59,5 @@ export async function runAttentionNotify() {
     await db.update(attentionStates).set({ notifiedAt: new Date() })
       .where(inArray(attentionStates.signalKey, list.map((i) => i.key)));
   }
-  return { ok: true, sent };
+  return { ok: true, sent, escalated };
 }

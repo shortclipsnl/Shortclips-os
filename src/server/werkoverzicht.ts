@@ -134,7 +134,7 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
       items: (await getQualityOverview(person, { trusted: true })).items.map((s) => ({
         key: s.id, clientName: s.clientName ?? null, clientLogoUrl: null, clientColor: null, action: s.action, reason: s.reason,
         why: s.detail, priority: s.priority, area: s.area, ownerId: s.ownerId ?? null, status: "open" as const,
-        since: new Date().toISOString(), doneAt: null, notes: [], href: s.href, kids: [], manual: false,
+        since: new Date().toISOString(), doneAt: null, notes: [], href: s.href, kids: [], manual: false, dueOn: s.dueOn ?? null,
       })) as AttentionItem[],
     })),
     db.select({ id: clients.id, name: clients.name }).from(clients)

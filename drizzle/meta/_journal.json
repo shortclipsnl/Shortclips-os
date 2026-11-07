@@ -708,6 +708,13 @@
       "when": 1794055959770,
       "tag": "0100_publicatie_duur",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1794059456311,
+      "tag": "0101_klantbehoud_signalen",
+      "breakpoints": true
     }
   ]
 }

@@ -5,6 +5,8 @@ import { coveringForUser } from "@/server/leave-cover";
 import { getCurrentDocs, toSlots, visibleKinds } from "@/server/client-documents";
 import { LinkButton, PageHeader } from "@/components/ui";
 import { ClientsBoard, type BoardClient } from "./clients-board";
+import { getRetentionOverview, retentionContext } from "@/server/client-retention";
+import { isEditorRole } from "@/server/auth/context";
 
 export const metadata: Metadata = { title: "Klanten" };
 export const dynamic = "force-dynamic";
@@ -21,6 +23,11 @@ export default async function ClientsPage() {
   // Maandprijs is financieel → uitsluitend voor de eigenaar (finance:read).
   const canSeeRevenue = viewer.permissions.has("finance:read");
 
+  // Klantgezondheid alleen voor het team (niet voor editors), alleen actieve klanten.
+  const health = isEditorRole(viewer)
+    ? new Map()
+    : new Map((await getRetentionOverview(await retentionContext(), all.map((c) => c.id)).catch(() => [])).map((r) => [r.clientId, r]));
+
   const clients: BoardClient[] = all.map((c) => ({
     id: c.id,
     slug: c.slug,
@@ -36,6 +43,7 @@ export default async function ClientsPage() {
     shortsPerMonth: Number(c.monthlyVideoQuota),
     monthlyRevenue: canSeeRevenue ? Number(c.monthlyRevenue ?? 0) : null,
     docs: toSlots(docsByClient.get(c.id), { kinds }).map((s) => ({ kind: s.kind, label: s.label, url: s.doc?.url ?? null })),
+    health: health.get(c.id) ? { status: health.get(c.id)!.health.status, reasons: health.get(c.id)!.health.reasons, commercial: health.get(c.id)!.commercial } : null,
   }));
 
   const activeCount = clients.filter((c) => !STOPPED.has(c.status)).length;

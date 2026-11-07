@@ -1,5 +1,5 @@
 import "server-only";
-import { notify } from "@/server/notifications";
+import { notifyTechnical } from "@/server/notification-digest";
 import { integrationHealth } from "@/server/integrations/registry";
 import { runJob } from "./runner";
 
@@ -28,15 +28,10 @@ export async function runIntegrationHealthCheck() {
       if (!h.configured) continue;
       if (h.status === "error" || h.status === "stale" || h.status === "never_synced") {
         const reason = STATUS_REASON[h.status] ?? "vraagt aandacht";
-        const sent = await notify({
-          roles: ["owner", "operational_manager"],
-          level: h.status === "error" ? "critical" : "warning",
-          type: "integration_health",
-          title: `Koppeling ${h.spec.name} vraagt aandacht`,
-          body: `${h.spec.name} ${reason}.${h.lastErrorMessage ? ` ${h.lastErrorMessage}` : ""}`.slice(0, 300),
-          href: "/settings/integrations",
-          dedupeKey: `integration_health:${h.spec.provider}:${h.status}:${dayKey}`,
-        });
+        // In de dagbundel technische storingen, alleen voor de eigenaar: het
+        // operationele team kan een koppeling niet zelf herstellen.
+        void dayKey;
+        const sent = await notifyTechnical(`${h.spec.name} ${reason}`, h.status === "error" ? "critical" : "warning");
         if (sent > 0) ctx.counters.updated++;
       }
     }

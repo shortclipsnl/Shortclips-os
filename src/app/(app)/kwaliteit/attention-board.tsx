@@ -315,6 +315,11 @@ export function AttentionBoard({ items: initial, team, viewerId, defaultScope }:
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <h2 className="mb-2 mt-2 text-lg font-semibold leading-snug text-[var(--color-ink)]">{i.action}</h2>
+          {i.dueOn ? (
+            <p className={`mb-2 text-xs font-medium ${i.status !== "klaar" && i.dueOn < new Date().toISOString().slice(0, 10) ? "text-[var(--color-bad)]" : "text-[var(--color-ink-muted)]"}`}>
+              Deadline: {new Date(`${i.dueOn}T12:00:00Z`).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" })}
+            </p>
+          ) : null}
           <p className="mb-4 text-sm leading-relaxed text-[var(--color-ink-muted)]">{i.why.replace(/ → .*$/, "")}</p>
           {i.kids.length ? (
             <ul className="mb-4 divide-y divide-[var(--color-line)] rounded-[var(--radius-md)] border border-[var(--color-line)] text-sm">
@@ -331,7 +336,7 @@ export function AttentionBoard({ items: initial, team, viewerId, defaultScope }:
             <div className="flex-1 text-sm">{owner?.name ?? "Niet toegewezen"}<span className="block text-xs text-[var(--color-ink-muted)]">{owner?.role}</span></div>
             <button type="button" onClick={(e) => setAssignFor({ key: i.key, rect: e.currentTarget.getBoundingClientRect() })} className="text-sm font-medium text-[var(--color-violet)]">Wijzigen</button>
           </div>
-          <p className="mb-2 mt-4 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Notities</p>
+          <p className="mb-2 mt-4 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{/^retentie-(resultaten|feedback|contract)-/.test(i.key) ? "Verbeteractie of afspraak (nodig om af te ronden)" : "Notities"}</p>
           <NoteBox onSave={(text) => { patch(i.key, { notes: [...i.notes, { at: new Date().toISOString(), userId: viewerId, name: member(viewerId)?.name ?? "Ik", text }] }); run(() => addAttentionNote({ key: i.key, text })); }} />
           {i.notes.length ? (
             <ul className="mt-2 space-y-1.5 text-xs">

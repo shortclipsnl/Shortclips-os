@@ -1,4 +1,5 @@
 import "server-only";
+import { notifyTechnical } from "@/server/notification-digest";
 import { after } from "next/server";
 import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -286,18 +287,10 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
           // Punt 7: duidelijke melding als één agenda niet synchroniseert, zodat
           // het team het meteen kan oplossen (de andere agenda's gaan door). Eén
           // melding per agenda per dag.
-          const dayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
-          await notify({
-            // Technische melding: alleen naar de eigenaar/beheerder, niet naar
-            // het operationele team (die kan er zelf niets mee).
-            roles: ["owner"],
-            level: "critical",
-            type: "calendar_agenda_unreachable",
-            title: `Agenda synchroniseert niet: ${cal.summary}`,
-            body: `De agenda "${cal.summary}" kon niet worden opgehaald en is overgeslagen. Opnames uit deze agenda ontbreken mogelijk in de planning. ${msg}`.slice(0, 300),
-            href: "/settings/agendas",
-            dedupeKey: `calendar_unreachable:${cal.id}:${dayKey}`,
-          }).catch(() => {});
+          // Technische storing: in de dagbundel van de eigenaar, één regel per
+          // agenda. Agenda-ID's (lange codes) worden ingekort tot iets leesbaars.
+          const calName = /^[0-9a-f]{20,}/i.test(cal.summary) || cal.summary.includes("@group.calendar") ? `agenda ${cal.summary.slice(0, 8)}…` : `agenda "${cal.summary}"`;
+          await notifyTechnical(`Google Agenda: ${calName} niet bereikbaar, opnames daaruit ontbreken mogelijk`, "critical").catch(() => {});
           continue;
         }
         ctx.log(`Agenda "${cal.summary}": ${events.length} afspraken`);

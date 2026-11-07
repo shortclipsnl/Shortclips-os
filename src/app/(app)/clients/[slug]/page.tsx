@@ -9,7 +9,7 @@ import {
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
-import { requireInternal } from "@/server/auth/context";
+import { isEditorRole, requireInternal } from "@/server/auth/context";
 import { getClientHub, type ClientHub } from "@/server/clients";
 import { listEditingProjects, type EditingProject } from "@/server/editing-board";
 import { PostingToggle } from "./posting-toggle";
@@ -58,6 +58,7 @@ import { ClientTabs, type TabDef } from "./tabs";
 import { FinanceMonths } from "./finance-months";
 import { GenerateReportButton, ReportPublishToggle } from "./report-actions";
 import { AgreementOverridesEditor } from "./agreement-overrides";
+import { RetentionTab } from "./retention-tab";
 import { getClientAgreementOverrides, getPortalSettings } from "@/server/portal-settings";
 import { canManageClientDocs, getCurrentDocs, toSlots, visibleKinds } from "@/server/client-documents";
 import { ClientDocButtons } from "@/components/client-docs/doc-buttons";
@@ -150,6 +151,8 @@ export default async function ClientPage({
     ...(hub.knowledge.length > 0 ? [{ key: "kennis", label: "Klantkennis", count: hub.knowledge.length }] : []),
     ...(hub.files.length > 0 ? [{ key: "documenten", label: "Documenten" }] : []),
     { key: "contacten", label: "Contactpersoon", count: hub.contacts.length },
+    // Klantbehoud (tevredenheid, resultatentrend, klachten, contractmoment): alleen voor het team.
+    ...(!isEditorRole(viewer) && (c.status === "active" || c.status === "onboarding") ? [{ key: "klantbehoud", label: "Klantbehoud" }] : []),
     ...(hub.canSeeFinance ? [{ key: "financieel", label: "Financieel" }, { key: "contract", label: "Contract & facturatie" }] : []),
     ...(hub.insights.length > 0 ? [{ key: "inzichten", label: "AI-inzichten", count: hub.insights.length }] : []),
     ...(hub.integrations.length > 0 ? [{ key: "koppelingen", label: "Koppelingen" }] : []),
@@ -285,6 +288,7 @@ export default async function ClientPage({
       {active === "kennis" ? <KnowledgeTab hub={hub} /> : null}
       {active === "documenten" ? <FilesTab hub={hub} /> : null}
       {active === "contacten" ? <ContactsTab hub={hub} /> : null}
+      {active === "klantbehoud" ? <RetentionTab clientId={c.id} /> : null}
       {active === "financieel" && hub.canSeeFinance ? <FinanceTab hub={hub} /> : null}
       {active === "contract" && hub.canSeeFinance ? <ContractTab hub={hub} /> : null}
       {active === "inzichten" ? <InsightsTab hub={hub} /> : null}

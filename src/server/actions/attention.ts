@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { attentionStates, clients, type AttentionNote } from "@/db/schema";
+import { attentionStates, clientFeedback, clients, type AttentionNote } from "@/db/schema";
 import { requireTeamMember } from "@/server/auth/context";
 import { notify, clearByDedupe } from "@/server/notifications";
 import { listAttentionTeam } from "@/server/attention";
@@ -27,6 +27,13 @@ export async function setAttentionStatus(input: { key: string; status: "open" | 
     const k = key.parse(input.key);
     const status = z.enum(["open", "bezig", "klaar"]).parse(input.status);
     await ensureRow(k);
+    // Klantbehoud: afronden kan pas als de verbeteractie of afspraak is vastgelegd.
+    // Zo blijft altijd terug te lezen wat er met een signaal is gedaan.
+    const retention = /^retentie-(resultaten|feedback|contract)-/.test(k);
+    const [row] = await db.select({ notes: attentionStates.notes }).from(attentionStates).where(eq(attentionStates.signalKey, k)).limit(1);
+    if (retention && status === "klaar" && !(row?.notes ?? []).length) {
+      return { ok: false, message: "Leg eerst als notitie vast welke verbeteractie of afspraak er is, dan kun je afronden." };
+    }
     await db.update(attentionStates).set({
       status,
       doneAt: status === "klaar" ? new Date() : null,
@@ -36,6 +43,16 @@ export async function setAttentionStatus(input: { key: string; status: "open" | 
       updatedAt: new Date(),
     }).where(eq(attentionStates.signalKey, k));
     if (status === "klaar") await clearByDedupe(dedupe(k));
+    // Een klacht die hier wordt opgepakt of afgerond, loopt mee in de registratie.
+    const fb = k.match(/^retentie-feedback-([0-9a-f-]{36})$/);
+    if (fb) {
+      const last = (row?.notes ?? []).at(-1)?.text ?? null;
+      await db.update(clientFeedback).set(
+        status === "klaar"
+          ? { status: "opgelost", resolvedAt: new Date(), resolvedById: viewer.id, resolution: last, updatedAt: new Date() }
+          : { status: status === "bezig" ? "opgepakt" : "open", resolvedAt: null, resolvedById: null, updatedAt: new Date() },
+      ).where(eq(clientFeedback.id, fb[1]));
+    }
     revalidatePath(PATH);
     return { ok: true };
   } catch (e) {

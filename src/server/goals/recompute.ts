@@ -1,4 +1,5 @@
 import "server-only";
+import { notifyDigest } from "@/server/notification-digest";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { goalMilestones, goals, goalSnapshots, goalUpdates, users } from "@/db/schema";
@@ -80,6 +81,14 @@ export async function recomputeGoal(goalId: string, now = new Date(), opts: { sn
   return { changed, from, to: status, goal: { ...goal, status, current: String(current) } };
 }
 
+/** Ontbrekende standen: één gebundelde melding per dag, niet één per doel. */
+function notifyGoalStand(title: string, now: Date) {
+  return notifyDigest({
+    roles: ["owner"], digest: "goal_stand", type: "goal_stand_ontbreekt", level: "info", href: "/doelen", line: title, now,
+    title: (n) => (n === 1 ? "Stand van 1 doel ontbreekt" : `Stand van ${n} doelen ontbreekt`),
+  });
+}
+
 /** Meldingen bij een statuswissel. Doelen hebben geen eigenaar; meldingen gaan
  *  naar Jarno (eigenaarsrol), die het overzicht bewaakt. Bij "gehaald" ook het team. */
 async function notifyStatusChange(goal: GoalRecord, to: GoalStatus, now: Date): Promise<void> {
@@ -92,7 +101,7 @@ async function notifyStatusChange(goal: GoalRecord, to: GoalStatus, now: Date): 
   } else if (to === "achter") {
     await notify({ roles: ["owner"], type: "goal_achter", level: "critical", title: `Doel achter: ${title}`, body: "Dit doel loopt achter op schema en vraagt directe actie.", href, dedupeKey: `goal_achter:${goal.id}:${dayKey}` });
   } else if (to === "niet_bijgewerkt") {
-    await notify({ roles: ["owner"], type: "goal_stand_ontbreekt", level: "info", title: `Stand ontbreekt: ${title}`, body: "Werk de stand van dit doel even bij.", href, dedupeKey: `goal_stand:${goal.id}:${dayKey}` });
+    await notifyGoalStand(title, now);
   } else if (to === "gehaald") {
     await notify({ roles: ["owner", "operational_manager", "project_coordinator", "content_creator", "videographer"], type: "goal_gehaald", level: "success", title: `Doel gehaald: ${title}`, body: "Dit doel is gehaald. Mooi werk, team.", href, dedupeKey: `goal_gehaald:${goal.id}` });
   }
@@ -122,7 +131,8 @@ export async function recomputeAllGoals(now = new Date()): Promise<{ processed: 
     } else if (isMonday && r.to === "niet_bijgewerkt") {
       // Maandagochtend-herinnering (wekelijks, los van een wissel).
       const weekKey = now.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
-      await notify({ roles: ["owner"], type: "goal_stand_ontbreekt", level: "info", title: `Stand ontbreekt: ${r.goal.title}`, body: "Werk de stand van dit doel even bij.", href: "/doelen", dedupeKey: `goal_stand_ma:${r.goal.id}:${weekKey}` });
+      void weekKey;
+      await notifyGoalStand(r.goal.title, now);
     }
   }
   return { processed: all.length, changed };

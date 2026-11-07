@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { integrationConnections, syncJobs } from "@/db/schema";
 import { logError } from "@/server/audit";
-import { notify } from "@/server/notifications";
+import { notifyTechnical } from "@/server/notification-digest";
 import type { Provider } from "@/server/integrations/types";
 import { IntegrationError, MissingCredentialsError } from "@/server/integrations/types";
 
@@ -20,20 +20,13 @@ const PROVIDER_LABEL: Record<string, string> = {
   metricool: "Metricool",
 };
 
-/** Eén melding per koppeling per dag bij een echte sync-fout (geen configuratie-
- *  tekort). De verantwoordelijke (eigenaar) ziet het direct en kan het oplossen. */
+/** Echte sync-fout (geen configuratietekort): komt in de dagbundel technische
+ *  storingen van de eigenaar, één regel per koppeling. De foutdetails staan in
+ *  het logboek op de integratiepagina. */
 async function notifySyncFailure(provider: Provider, message: string): Promise<void> {
+  void message;
   const label = PROVIDER_LABEL[provider] ?? provider;
-  const dayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
-  await notify({
-    roles: ["owner"],
-    level: "critical",
-    type: "sync_failed",
-    title: `Koppeling ${label} synchroniseert niet`,
-    body: `De laatste synchronisatie is mislukt: ${message}`.slice(0, 300),
-    href: "/settings/integrations",
-    dedupeKey: `sync_failed:${provider}:${dayKey}`,
-  });
+  await notifyTechnical(`${label} synchroniseert niet`, "critical");
 }
 
 export type JobContext = {
