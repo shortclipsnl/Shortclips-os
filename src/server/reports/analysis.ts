@@ -126,7 +126,9 @@ Geef UITSLUITEND één geldig JSON-object (geen markdown, geen tekst eromheen, g
 
 Opmerkingen over datakwaliteit, ontbrekende metingen of koppelingsproblemen horen uitsluitend in intern.dataBeperkingen, nooit in de klantvelden. Noem in de klantvelden ook geen interne werkpunten zoals een ontbrekende doelstelling.
 
-Houd het compact: elk tekstveld maximaal 30 woorden, elke lijst maximaal 4 items (acties maximaal 6). Liever kort en concreet dan volledig.
+Verwijs in teksten naar een video met (een deel van) de titel, nooit alleen met de sleutel zoals v1 of v2.
+
+Houd het compact: elk tekstveld maximaal 25 woorden, elke lijst maximaal 3 items (acties maximaal 6, videoInzichten en videoLessen één per video). In "intern" zijn "gemeten" en "verklaring" maximaal 20 woorden. Liever kort en concreet dan volledig; een afgekapt antwoord is onbruikbaar.
 
 Aanvullend: "aandachtspunten" = max 3 belangrijkste signalen van deze maand. "strategischeActies" = max 3 concrete acties voor volgende maand. "conclusies" = 2 tot 4 korte conclusies voor de klant. "videoInzichten" = voor ELKE video uit "alleVideos" één inzicht van maximaal 15 woorden, gekoppeld via "key": wat deze video sterk maakte of wat we ervan meenemen, opbouwend geformuleerd en alleen gebaseerd op de cijfers, titel en eventuele hook/format. "kansen" = 2 tot 3 kansen/aanbevelingen voor de komende maand. "verbeterpunten" mag NOOIT leeg zijn. In "intern": "acties" = 3 tot 6 concrete acties voor de komende maand, elk met de rol die het uitvoert; "dataBeperkingen" = wat we NIET konden meten en dus niet weten. "doorgaan", "stoppen" en "testen" = elk 2 tot 4 korte, concrete punten voor het team (wat blijven we doen, waar stoppen we mee of doen we minder, wat proberen we volgende maand), geschreven als opdracht. "videoLessen" = voor ELKE video uit "alleVideos" één interne les van maximaal 20 woorden, gekoppeld via "key": wat het team van deze video leert voor script, opname of montage; eerlijk, ook als de video tegenviel. Laat een interne lijst leeg ([]) als de data er niets over zegt, in plaats van iets te verzinnen.`;
 
@@ -253,15 +255,15 @@ export async function generateMonthlyAnalysis(
   type Raw = Partial<MonthlyAnalysis> & { analyse?: ClientInsights["analysis"] };
   const data = JSON.stringify(dataBlock);
   const started = Date.now();
-  const ask = async (deel: string) => {
-    const input = { system: SYSTEM, user: `${deel}\n\nData (JSON):\n${data}`, maxTokens: 10000 };
+  const ask = async (deel: string, maxTokens: number) => {
+    const input = { system: SYSTEM, user: `${deel}\n\nData (JSON):\n${data}`, maxTokens };
     let r = await runJsonPrompt<Raw>(input);
     if (!r.ok && r.reason === "error" && Date.now() - started < 90_000) r = await runJsonPrompt<Raw>(input);
     return r;
   };
   const [klantRes, internRes] = await Promise.all([
-    ask("Analyseer deze klant over de maand. Geef ALLEEN de klantvelden (topVideos, besteHooks, besteFormats, mindereVideos, analysis, maandvergelijking, conclusies, kansen, videoInzichten, verbeterpunten, aandachtspunten, strategischeActies) en zet \"intern\" op {}."),
-    ask("Analyseer deze klant over de maand voor het interne team (projectmanagers, scriptschrijvers, videografen). Antwoord met precies dit JSON-object: {\"intern\":{...}} met alle velden van \"intern\" uit het formaat volledig ingevuld. Geef geen andere velden."),
+    ask("Analyseer deze klant over de maand. Geef ALLEEN de klantvelden (topVideos, besteHooks, besteFormats, mindereVideos, analysis, maandvergelijking, conclusies, kansen, videoInzichten, verbeterpunten, aandachtspunten, strategischeActies) en zet \"intern\" op {}.", 16000),
+    ask("Analyseer deze klant over de maand voor het interne team (projectmanagers, scriptschrijvers, videografen). Antwoord met precies dit JSON-object: {\"intern\":{...}} met alle velden van \"intern\" uit het formaat volledig ingevuld. Geef geen andere velden.", 20000),
   ]);
   if (!klantRes.ok) return { ok: false, reason: klantRes.reason === "no_provider" ? "no_provider" : "error", message: klantRes.error };
   // Het model geeft het interne deel soms zonder de "intern"-omhulling terug.
@@ -296,7 +298,17 @@ export async function generateMonthlyAnalysis(
     return { ok: false, reason: "error", message: "De AI-analyse leverde geen bruikbare uitkomst op." };
   }
 
-  return { ok: true, analysis, totals, ontbrekend, model: res.model };
+  return { ok: true, analysis: replaceVideoKeys(analysis), totals, ontbrekend, model: res.model };
+}
+
+/** Vangnet: "v2" in een tekst wordt "video #2" (zelfde nummering als het video-overzicht). */
+function replaceVideoKeys<T>(value: T, field?: string): T {
+  if (typeof value === "string") return (field === "key" ? value : value.replace(/\bv(\d{1,2})\b/g, "video #$1")) as T;
+  if (Array.isArray(value)) return value.map((v) => replaceVideoKeys(v)) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, replaceVideoKeys(v, k)])) as T;
+  }
+  return value;
 }
 
 function normalizeIntern(v: unknown): InternAnalyse {

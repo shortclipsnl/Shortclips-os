@@ -123,8 +123,15 @@ export function renderInternReportHtml(input: InternPdfInput): string {
     <p class="lead">De belangrijkste lessen uit ${esc(maand)}, vertaald naar wat we volgende maand doen.</p>
     ${i?.kern ? `<div class="kern"><div class="h">De kern</div>${esc(i.kern)}</div>` : ""}
     ${dst ? `<h2>Doorgaan, stoppen, testen</h2>${dst}` : ""}
-    ${rollen ? `<h2>Acties per rol</h2>${rollen}` : `<p class="lead">De interne analyse ontbreekt nog. Gebruik 'AI opnieuw' op de controlepagina.</p>`}
+    ${rollen ? "" : `<p class="lead">De interne analyse ontbreekt nog. Gebruik 'AI opnieuw' op de controlepagina.</p>`}
   </section>
+
+  ${rollen ? `<section class="page">
+    ${topBar(meta)}
+    <h1>Acties per rol</h1>
+    <p class="lead">Wie past wat toe bij de volgende scripts, opnames en montages. Vink af wat gedaan is.</p>
+    ${rollen}
+  </section>` : ""}
 
   <section class="page">
     ${topBar(meta)}
