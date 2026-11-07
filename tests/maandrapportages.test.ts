@@ -324,10 +324,13 @@ describe("PDF's", () => {
     expect(klant).not.toContain("Rondleidingen werken"); // interne kern
     expect(klant).not.toContain("Mogelijke verklaring");
     expect(klant).not.toContain("Sterke opening");
-    const intern = renderInternReportHtml({ clientName: d.clientName, periodLabel: d.periodLabel, pmName: d.pmName, statusLabel: "Goedgekeurd", approvedAt: d.approvedAt, totals: d.totals as never, analysis: d.analysis, beoordeling: d.beoordeling, ontbrekend: d.ontbrekend });
-    expect(intern).toContain("Gemeten (feit)");
-    expect(intern).toContain("Mogelijke verklaring");
-    expect(intern).toContain("Sterke opening");
+    const intern = renderInternReportHtml({ clientName: d.clientName, periodLabel: d.periodLabel, pmName: d.pmName, statusLabel: "Goedgekeurd", approvedAt: d.approvedAt, totals: d.totals as never, analysis: d.analysis, beoordeling: d.beoordeling, ontbrekend: d.ontbrekend, videos: d.videos });
+    // Interne versie is opgebouwd rond de video's: hook-overzicht en een kaart per video.
+    expect(intern).toContain("Rondleidingen werken");
+    expect(intern).toContain("Hooks van oktober");
+    expect(intern).toContain("Per video: wat leren we");
+    expect(intern).toContain("data:image/jpeg;base64,AAAA");
+    expect(intern).toContain("Gem. kijktijd");
     expect(intern).toContain("niet delen met de klant");
     expect(intern).toContain("Geen retentiedata");
   });

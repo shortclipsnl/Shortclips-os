@@ -221,6 +221,10 @@ export function formatStats(videos: Array<{ format: string | null; views: number
 export type MonthVideo = {
   key: string; id: string; titel: string; datum: string | null; platform: string | null; url: string | null;
   views: number; likes: number; reacties: number; shares: number; saves: number; gemKijktijdSec: number | null;
+  /** Uitkijkpercentage 0-100 (alleen als het platform dit levert). */
+  uitkijkPct?: number | null;
+  /** Hook uit het gekoppelde script, als die er is. */
+  scriptHook?: string | null;
 };
 
 /**
@@ -233,16 +237,17 @@ export async function monthVideos(clientId: string, period: string, limit = 40):
   const res = await db.execute(sql`
     with pm as (
       select publication_id, max(views) views, max(likes) likes, max(comments) comments,
-             max(shares) shares, max(saves) saves, max(avg_watch_seconds) avg_watch
+             max(shares) shares, max(saves) saves, max(avg_watch_seconds) avg_watch, max(completion_rate) completion
       from social_metrics where client_id = ${clientId} group by publication_id
     )
-    select p.id, p.platform, left(coalesce(d.title, p.caption), 140) as titel,
+    select p.id, p.platform, sc.hook as script_hook, pm.completion, left(coalesce(d.title, p.caption), 140) as titel,
            to_char(coalesce(d.published_at, p.published_at), 'YYYY-MM-DD') as datum, p.external_url as url,
            coalesce(pm.views,0)::int views, coalesce(pm.likes,0)::int likes, coalesce(pm.comments,0)::int comments,
            coalesce(pm.shares,0)::int shares, coalesce(pm.saves,0)::int saves, pm.avg_watch
     from publications p
     join pm on pm.publication_id = p.id
     left join deliverables d on d.id = p.deliverable_id and d.deleted_at is null
+    left join scripts sc on sc.id = d.script_id and sc.deleted_at is null
     where p.client_id = ${clientId} and p.deleted_at is null
       and coalesce(p.published_at, d.published_at)::date >= ${from}
       and coalesce(p.published_at, d.published_at)::date <= ${to}
@@ -254,6 +259,8 @@ export async function monthVideos(clientId: string, period: string, limit = 40):
     platform: v.platform ? String(v.platform) : null, url: v.url ? String(v.url) : null,
     views: n(v.views), likes: n(v.likes), reacties: n(v.comments), shares: n(v.shares), saves: n(v.saves),
     gemKijktijdSec: v.avg_watch != null ? Math.round(Number(v.avg_watch)) : null,
+    uitkijkPct: v.completion != null ? Math.round(Number(v.completion) * 1000) / 10 : null,
+    scriptHook: v.script_hook ? String(v.script_hook) : null,
   }));
 }
 

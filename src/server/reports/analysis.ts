@@ -40,6 +40,18 @@ export type MaandAandachtspunt = { type: "positief" | "aandachtspunt" | "actie_n
 export type StrategischeActie = { titel: string; waarom: string };
 /** Eén intern inzicht: wat gemeten is, los van de mogelijke verklaring. */
 export type InternInzicht = { titel: string; gemeten: string; verklaring: string; zekerheid: string };
+export type VideoAnalyse = {
+  key: string;
+  hook: string;
+  /** Waar de hook vandaan komt: script (zeker) of caption (afgeleid). */
+  hookBron: "script" | "caption";
+  hookType: string;
+  oordeel: "herhalen" | "aanpassen" | "stoppen";
+  waarom: string;
+  script: string;
+  opname: string;
+  montage: string;
+};
 export type InternActie = { actie: string; rol: "script" | "opname" | "montage" | "pm" | string; waarom: string };
 /** Verdieping voor de interne teamrapportage (nooit in de klantversie). */
 export type InternAnalyse = {
@@ -62,8 +74,10 @@ export type InternAnalyse = {
   stoppen?: string[];
   /** Wat we volgende maand gaan testen. */
   testen?: string[];
-  /** Interne les per video, gekoppeld via de sleutel uit metrics.videos. */
+  /** Interne les per video, gekoppeld via de sleutel uit metrics.videos (oudere rapporten). */
   videoLessen?: Array<{ key: string; les: string }>;
+  /** Per video: hook, oordeel en wat het team ervan leert (script/opname/montage). */
+  videoAnalyses?: VideoAnalyse[];
 };
 export type MonthlyAnalysis = ClientInsights & {
   aandachtspunten: MaandAandachtspunt[];
@@ -80,6 +94,7 @@ export type MonthlyAnalysis = ClientInsights & {
 export type ReportVideo = {
   key: string; id: string; titel: string; datum: string | null; platform: string | null; url: string | null;
   views: number; likes: number; reacties: number; shares: number; saves: number; gemKijktijdSec: number | null;
+  uitkijkPct?: number | null; scriptHook?: string | null;
 };
 
 /** Extra cijfers die bij een maandrapport worden opgeslagen (in `metrics`). */
@@ -122,7 +137,7 @@ Twee doelgroepen:
 2. De interne teamversie (veld "intern"): voor projectmanagers, scriptschrijvers en videografen. Diep, concreet en leerbaar. Scheid ALTIJD wat gemeten is ("gemeten": alleen cijfers/feiten uit de data) van de mogelijke verklaring ("verklaring": jouw interpretatie, nooit als bewezen gepresenteerd tenzij de cijfers het hard maken). Een verklaring over retentie, hookkracht of montage is zonder retentiedata altijd "hypothese".
 
 Geef UITSLUITEND één geldig JSON-object (geen markdown, geen tekst eromheen, geen dubbele aanhalingstekens binnen waarden, geen letterlijke regeleinden binnen waarden, geen trailing komma's), exact dit formaat:
-{"topVideos":[{"titel":"","waarom":"","cijfers":"","zekerheid":"bewezen|waarschijnlijk|hypothese"}],"besteHooks":[{"hook":"","waarom":"","zekerheid":""}],"besteFormats":[{"format":"","waarom":"","zekerheid":""}],"mindereVideos":[{"titel":"","les":""}],"analysis":{"watWerkt":[{"punt":"","zekerheid":""}],"watMinder":[{"punt":"","zekerheid":""}],"ontwikkelingen":[""]},"maandvergelijking":[""],"conclusies":[""],"kansen":[{"titel":"","toelichting":""}],"videoInzichten":[{"key":"v1","inzicht":""}],"verbeterpunten":[{"titel":"","waarom":"","wat":"","hoeMeten":"","zekerheid":""}],"aandachtspunten":[{"type":"positief|aandachtspunt|actie_nodig","tekst":""}],"strategischeActies":[{"titel":"","waarom":""}],"intern":{"kern":"","besteVideos":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"hooks":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"onderwerpen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"tegenvallers":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"videostructuur":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"formatsVaker":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"vermijdenOfAanpassen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"scripts":[""],"opnames":[""],"montage":[""],"acties":[{"actie":"","rol":"script|opname|montage|pm","waarom":""}],"doorgaan":[""],"stoppen":[""],"testen":[""],"videoLessen":[{"key":"v1","les":""}],"dataBeperkingen":[""]}}
+{"topVideos":[{"titel":"","waarom":"","cijfers":"","zekerheid":"bewezen|waarschijnlijk|hypothese"}],"besteHooks":[{"hook":"","waarom":"","zekerheid":""}],"besteFormats":[{"format":"","waarom":"","zekerheid":""}],"mindereVideos":[{"titel":"","les":""}],"analysis":{"watWerkt":[{"punt":"","zekerheid":""}],"watMinder":[{"punt":"","zekerheid":""}],"ontwikkelingen":[""]},"maandvergelijking":[""],"conclusies":[""],"kansen":[{"titel":"","toelichting":""}],"videoInzichten":[{"key":"v1","inzicht":""}],"verbeterpunten":[{"titel":"","waarom":"","wat":"","hoeMeten":"","zekerheid":""}],"aandachtspunten":[{"type":"positief|aandachtspunt|actie_nodig","tekst":""}],"strategischeActies":[{"titel":"","waarom":""}],"intern":{"kern":"","besteVideos":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"hooks":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"onderwerpen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"tegenvallers":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"videostructuur":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"formatsVaker":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"vermijdenOfAanpassen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"scripts":[""],"opnames":[""],"montage":[""],"acties":[{"actie":"","rol":"script|opname|montage|pm","waarom":""}],"doorgaan":[""],"stoppen":[""],"testen":[""],"videoAnalyses":[{"key":"v1","hook":"","hookBron":"script|caption","hookType":"vraag|getal of bedrag|probleem|belofte|nieuws|statement|anders","oordeel":"herhalen|aanpassen|stoppen","waarom":"","script":"","opname":"","montage":""}],"dataBeperkingen":[""]}}
 
 Opmerkingen over datakwaliteit, ontbrekende metingen of koppelingsproblemen horen uitsluitend in intern.dataBeperkingen, nooit in de klantvelden. Noem in de klantvelden ook geen interne werkpunten zoals een ontbrekende doelstelling.
 
@@ -130,7 +145,7 @@ Verwijs in teksten naar een video met (een deel van) de titel, nooit alleen met 
 
 Houd het compact: elk tekstveld maximaal 25 woorden, elke lijst maximaal 3 items (acties maximaal 6, videoInzichten en videoLessen één per video). In "intern" zijn "gemeten" en "verklaring" maximaal 20 woorden. Liever kort en concreet dan volledig; een afgekapt antwoord is onbruikbaar.
 
-Aanvullend: "aandachtspunten" = max 3 belangrijkste signalen van deze maand. "strategischeActies" = max 3 concrete acties voor volgende maand. "conclusies" = 2 tot 4 korte conclusies voor de klant. "videoInzichten" = voor ELKE video uit "alleVideos" één inzicht van maximaal 15 woorden, gekoppeld via "key": wat deze video sterk maakte of wat we ervan meenemen, opbouwend geformuleerd en alleen gebaseerd op de cijfers, titel en eventuele hook/format. "kansen" = 2 tot 3 kansen/aanbevelingen voor de komende maand. "verbeterpunten" mag NOOIT leeg zijn. In "intern": "acties" = 3 tot 6 concrete acties voor de komende maand, elk met de rol die het uitvoert; "dataBeperkingen" = wat we NIET konden meten en dus niet weten. "doorgaan", "stoppen" en "testen" = elk 2 tot 4 korte, concrete punten voor het team (wat blijven we doen, waar stoppen we mee of doen we minder, wat proberen we volgende maand), geschreven als opdracht. "videoLessen" = voor ELKE video uit "alleVideos" één interne les van maximaal 20 woorden, gekoppeld via "key": wat het team van deze video leert voor script, opname of montage; eerlijk, ook als de video tegenviel. Laat een interne lijst leeg ([]) als de data er niets over zegt, in plaats van iets te verzinnen.`;
+Aanvullend: "aandachtspunten" = max 3 belangrijkste signalen van deze maand. "strategischeActies" = max 3 concrete acties voor volgende maand. "conclusies" = 2 tot 4 korte conclusies voor de klant. "videoInzichten" = voor ELKE video uit "alleVideos" één inzicht van maximaal 15 woorden, gekoppeld via "key": wat deze video sterk maakte of wat we ervan meenemen, opbouwend geformuleerd en alleen gebaseerd op de cijfers, titel en eventuele hook/format. "kansen" = 2 tot 3 kansen/aanbevelingen voor de komende maand. "verbeterpunten" mag NOOIT leeg zijn. In "intern": "acties" = 3 tot 6 concrete acties voor de komende maand, elk met de rol die het uitvoert; "dataBeperkingen" = wat we NIET konden meten en dus niet weten. "doorgaan", "stoppen" en "testen" = elk 2 tot 4 korte, concrete punten voor het team (wat blijven we doen, waar stoppen we mee of doen we minder, wat proberen we volgende maand), geschreven als opdracht. "videoAnalyses" = voor ELKE video uit "alleVideos" één analyse, gekoppeld via "key". "hook": de opening van de video; gebruik "hookUitScript" als die er is (hookBron "script"), anders de waarschijnlijke opening afgeleid uit de eerste zin van titelOfCaption (hookBron "caption"), maximaal 15 woorden. "oordeel": herhalen (sterk, vaker doen), aanpassen (idee goed, uitvoering beter) of stoppen. "waarom": maximaal 20 woorden, gebaseerd op weergaven, interacties en kijktijd/uitkijkpercentage als die er zijn, vergeleken met de andere video's van de maand. "script", "opname", "montage": elk maximaal 15 woorden, wat het team bij de volgende video anders of hetzelfde doet; leeg laten ("") als er niets zinnigs over te zeggen is. Kijktijd en uitkijkpercentage alleen gebruiken als ze in de data staan. Laat een interne lijst leeg ([]) als de data er niets over zegt, in plaats van iets te verzinnen.`;
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 const num = (v: unknown) => Number(v ?? 0);
@@ -216,7 +231,7 @@ export async function generateMonthlyAnalysis(
   }
   totals.videos = withCijfers.slice(0, 40).map((v, i) => {
     const m = mapVideo(v);
-    return { key: `v${i + 1}`, id: String(v.pub_id), titel: m.titel, datum: m.datum, platform: v.platform ? String(v.platform) : null, url: m.url, views: m.views, likes: m.likes, reacties: m.reacties, shares: m.shares, saves: m.saves, gemKijktijdSec: m.gemKijktijdSec };
+    return { key: `v${i + 1}`, id: String(v.pub_id), titel: m.titel, datum: m.datum, platform: v.platform ? String(v.platform) : null, url: m.url, views: m.views, likes: m.likes, reacties: m.reacties, shares: m.shares, saves: m.saves, gemKijktijdSec: m.gemKijktijdSec, uitkijkPct: m.uitkijkpercentage, scriptHook: m.hook };
   });
   totals.platforms = await platformSplit(client.id, period);
   totals.historie = historie;
@@ -242,7 +257,7 @@ export async function generateMonthlyAnalysis(
     feitelijkeObservaties: report.observations,
     videosDezeMaand: monthTitles,
     perVideoCijfersBeschikbaar: perVideoBeschikbaar,
-    alleVideos: (totals.videos ?? []).map((v) => ({ key: v.key, titel: v.titel, datum: v.datum, platform: v.platform, weergaven: v.views, likes: v.likes, reacties: v.reacties, shares: v.shares, saves: v.saves })),
+    alleVideos: (totals.videos ?? []).map((v) => ({ key: v.key, titelOfCaption: v.titel, datum: v.datum, platform: v.platform, weergaven: v.views, likes: v.likes, reacties: v.reacties, shares: v.shares, saves: v.saves, gemKijktijdSec: v.gemKijktijdSec, uitkijkpercentage: v.uitkijkPct ?? null, hookUitScript: v.scriptHook ?? null })),
     topVideos: perVideoBeschikbaar ? withCijfers.slice(0, 8).map(mapVideo) : [],
     mindereVideos: perVideoBeschikbaar && withCijfers.length > 3 ? withCijfers.slice(-4).reverse().map(mapVideo) : [],
     vorigeMaandAnalyse: opts.priorSummary ?? null,
@@ -344,5 +359,21 @@ function normalizeIntern(v: unknown): InternAnalyse {
     videoLessen: arr<Record<string, unknown>>(o.videoLessen)
       .map((x) => ({ key: String(x.key ?? ""), les: String(x.les ?? "").slice(0, 200) }))
       .filter((x) => /^v\d+$/.test(x.key) && x.les),
+    videoAnalyses: arr<Record<string, unknown>>(o.videoAnalyses)
+      .map((x) => {
+        const oordeel = String(x.oordeel ?? "").toLowerCase();
+        return {
+          key: String(x.key ?? ""),
+          hook: String(x.hook ?? "").slice(0, 200),
+          hookBron: (String(x.hookBron ?? "") === "script" ? "script" : "caption") as "script" | "caption",
+          hookType: String(x.hookType ?? "").slice(0, 40),
+          oordeel: (oordeel === "herhalen" || oordeel === "stoppen" ? oordeel : "aanpassen") as VideoAnalyse["oordeel"],
+          waarom: String(x.waarom ?? "").slice(0, 240),
+          script: String(x.script ?? "").slice(0, 200),
+          opname: String(x.opname ?? "").slice(0, 200),
+          montage: String(x.montage ?? "").slice(0, 200),
+        };
+      })
+      .filter((x) => /^v\d+$/.test(x.key)),
   };
 }

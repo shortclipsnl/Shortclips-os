@@ -6,7 +6,7 @@ import { assertClientAccess, ForbiddenError, requireInternal, scopeToClients, ty
 import { periodLabel } from "./analysis";
 import { checkReportQuality, type Beoordeling, type QualityIssue } from "./quality";
 import { duplicateIssue, findDuplicateMetricClients, monthVideos, platformSplit, thumbnailsFor, type MaandCijfers, type MonthVideo, type Vergelijking } from "./metrics";
-import type { MonthlyAnalysis } from "./analysis";
+import type { MonthlyAnalysis, VideoAnalyse } from "./analysis";
 
 export type ReportStatus =
   | "gegevens_verzamelen" | "analyse_bezig" | "klaar_voor_controle" | "aanpassing_nodig" | "goedgekeurd" | "gepubliceerd" | "mislukt";
@@ -412,7 +412,7 @@ export type ReportPdfData = {
   ontbrekend: string[];
   approvedAt: string | null;
   /** Video's van de maand met miniatuur en (als beschikbaar) het AI-inzicht per video. */
-  videos: Array<MonthVideo & { thumb: string | null; inzicht: string | null; les: string | null }>;
+  videos: Array<MonthVideo & { thumb: string | null; inzicht: string | null; les: string | null; analyse: VideoAnalyse | null }>;
 };
 
 /** Ruwe gegevens voor de PDF-opbouw (zonder viewer-scoping — de route scoopt). */
@@ -442,8 +442,9 @@ export async function loadReportPdfData(reportId: string): Promise<ReportPdfData
   const thumbs = await thumbnailsFor(vids.map((v) => v.id));
   const inzichten = new Map((stored && analysis?.videoInzichten ? analysis.videoInzichten : []).map((x) => [x.key, x.inzicht]));
   const lessen = new Map((stored && analysis?.intern?.videoLessen ? analysis.intern.videoLessen : []).map((x) => [x.key, x.les]));
+  const analyses = new Map((stored && analysis?.intern?.videoAnalyses ? analysis.intern.videoAnalyses : []).map((x) => [x.key, x]));
   return {
-    videos: vids.map((v) => ({ ...v, thumb: thumbs.get(v.id) ?? null, inzicht: inzichten.get(v.key) ?? null, les: lessen.get(v.key) ?? null })),
+    videos: vids.map((v) => ({ ...v, thumb: thumbs.get(v.id) ?? null, inzicht: inzichten.get(v.key) ?? null, les: lessen.get(v.key) ?? null, analyse: analyses.get(v.key) ?? null })),
     clientId: r.clientId,
     status: r.status as ReportStatus,
     clientName: r.clientName,
