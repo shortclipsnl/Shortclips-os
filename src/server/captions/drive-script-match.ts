@@ -55,6 +55,10 @@ async function candidateFilesByClient(clientIds: string[]): Promise<Map<string, 
           eq(files.mimeType, "application/pdf"),
           sql`lower(${files.name}) like '%.pdf'`,
         ),
+        // Geen macOS-restbestanden ("._naam.pdf") of Office-lockbestanden: die
+        // lijken op het echte script maar bevatten geen leesbare PDF.
+        sql`${files.name} not like '.\\_%' escape '\\'`,
+        sql`${files.name} not like '~$%'`,
       ),
     );
   for (const r of rows) {
@@ -103,6 +107,10 @@ export async function driveScriptCandidatesForClient(clientId: string): Promise<
           eq(files.mimeType, "application/pdf"),
           sql`lower(${files.name}) like '%.pdf'`,
         ),
+        // Geen macOS-restbestanden ("._naam.pdf") of Office-lockbestanden: die
+        // lijken op het echte script maar bevatten geen leesbare PDF.
+        sql`${files.name} not like '.\\_%' escape '\\'`,
+        sql`${files.name} not like '~$%'`,
       ),
     );
   return rows

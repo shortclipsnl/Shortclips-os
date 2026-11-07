@@ -107,3 +107,16 @@ describe("Drive-script koppeling", () => {
     expect(src?.status).toBe("afgewezen");
   });
 });
+
+describe("macOS-restbestanden", () => {
+  it("koppelt nooit een '._'-bestand, ook als de naam perfect past", async () => {
+    const clientId = await makeClient("gamma-junk", "Gamma");
+    const dayId = await makeShoot(clientId, "2026-11-06", "Opnamedag Gamma");
+    await makeScriptFile(clientId, "drive-junk", "._Scripts Gamma 06-11.pdf");
+    const [outcome] = await matchDriveScriptsForShoots([
+      { productionDayId: dayId, clientId, scheduledOn: "2026-11-06", title: "Opnamedag Gamma", clientName: "Gamma" },
+    ]);
+    expect(outcome?.linked).toBe(0);
+    expect(outcome?.suggested).toBe(0);
+  });
+});
