@@ -1,6 +1,8 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { editorMayOpenPath } from "@/lib/editor-routes";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -129,7 +131,27 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
 export async function requireViewer(): Promise<Viewer> {
   const viewer = await getViewer();
   if (!viewer) redirect("/login");
+  await enforceEditorRoute(viewer);
   return viewer;
+}
+
+/**
+ * Editors mogen alleen hun eigen pagina's openen (allowlist in lib/editor-routes).
+ * Dit staat hier, in de gebruikerscheck die elke pagina als eerste doet, en niet
+ * alleen in de layout: Next rendert layout en pagina parallel, dus een redirect
+ * in de layout houdt niet tegen dat de pagina zijn data al ophaalt en meestuurt.
+ * Het pad komt uit de proxy (x-sc-pathname); API-routes doen hun eigen controle.
+ */
+async function enforceEditorRoute(viewer: Viewer): Promise<void> {
+  if (!isEditorRole(viewer)) return;
+  let path = "";
+  try {
+    path = (await headers()).get("x-sc-pathname") ?? "";
+  } catch {
+    return; // buiten een request (bv. job): niets te bewaken
+  }
+  if (!path || path.startsWith("/api/")) return;
+  if (!editorMayOpenPath(path)) redirect("/dashboard");
 }
 
 /** Interne gebruiker: klantaccounts horen in het portaal, niet in de OS-app. */
