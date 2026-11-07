@@ -1,12 +1,27 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, files, productionDays, shootScriptSources } from "@/db/schema";
+import { captionSets, clients, files, productionDays, shootScriptSources } from "@/db/schema";
 import { assertClientAccess, ForbiddenError, requireInternal, requirePermission } from "@/server/auth/context";
 import { buildDriveSessions, isScriptPdf, sessionMatchesShoot, type DriveEntry, type DriveSession } from "@/lib/drive-sessions";
 import { syncScriptingTasks } from "@/server/scripting-tasks";
+import { scriptVersionInfo } from "@/server/script-versions";
+import { ensureCaptionsForShoot } from "@/server/captions/run";
+
+/** Captions op basis van de (nieuw) gekoppelde PDF opnieuw maken, ná de response. */
+function refreshCaptionsLater(productionDayId: string) {
+  after(async () => {
+    try {
+      await ensureCaptionsForShoot(productionDayId);
+    } catch (error) {
+      // De uurlijkse versiecontrole probeert het opnieuw.
+      console.error("[scripting-drive] captions bijwerken mislukt", error);
+    }
+  });
+}
 
 /**
  * Scripts uit Google Drive koppelen op de scriptingpagina, in drie stappen:
@@ -32,7 +47,11 @@ export type DriveSessionsResult =
       clientName: string;
       scheduledOn: string;
       sessions: SessionView[];
-      linked: { externalId: string; name: string; sessionName: string | null; url: string | null } | null;
+      linked: { externalId: string; name: string; sessionName: string | null; sessionId: string | null; url: string | null } | null;
+      /** Nieuwere PDF's in dezelfde map die niet automatisch gekoppeld zijn (andere variant). */
+      newerInFolder: Array<{ externalId: string; name: string; modifiedAt: string | null }>;
+      /** Stand van de captions van deze opname. */
+      captions: { status: string; generatedAt: string | null } | null;
       canWrite: boolean;
     }
   | { ok: false; message: string };
@@ -89,14 +108,21 @@ export async function listScriptingDriveSessions(productionDayId: string): Promi
     if (!day) return { ok: false, message: "Opname niet gevonden." };
     assertClientAccess(viewer, day.clientId);
 
-    const [entries, [src]] = await Promise.all([
+    const [entries, [src], versions, [cap]] = await Promise.all([
       loadScriptEntries(day.clientId),
       db
         .select({ fileExternalId: shootScriptSources.fileExternalId, fileName: shootScriptSources.fileName, status: shootScriptSources.status })
         .from(shootScriptSources)
         .where(eq(shootScriptSources.productionDayId, productionDayId))
         .limit(1),
+      scriptVersionInfo([productionDayId]),
+      db
+        .select({ status: captionSets.status, generatedAt: captionSets.generatedAt })
+        .from(captionSets)
+        .where(and(eq(captionSets.productionDayId, productionDayId), isNull(captionSets.deletedAt)))
+        .limit(1),
     ]);
+    const version = versions.get(productionDayId);
     const linkedId = src && src.status === "gekoppeld" ? src.fileExternalId : null;
     const sessions = buildDriveSessions(entries).map((s) => ({
       ...s,
@@ -112,8 +138,13 @@ export async function listScriptingDriveSessions(productionDayId: string): Promi
       scheduledOn: day.scheduledOn,
       sessions,
       linked: linkedId && src
-        ? { externalId: linkedId, name: linkedPdf?.name ?? src.fileName, sessionName: linkedSession?.name ?? null, url: linkedPdf?.url ?? null }
+        ? { externalId: linkedId, name: linkedPdf?.name ?? src.fileName, sessionName: linkedSession?.name ?? null, sessionId: linkedSession?.id ?? null, url: linkedPdf?.url ?? null }
         : null,
+      // Een zekere nieuwere versie wordt door de versiecontrole zelf gekoppeld;
+      // hier alleen de overige nieuwere PDF's als hint (plus een nog niet
+      // verwerkte zekere versie, zodat die direct zichtbaar is).
+      newerInFolder: version ? [...(version.upgradeTo ? [version.upgradeTo] : []), ...version.otherNewer].map((f) => ({ externalId: f.externalId, name: f.name, modifiedAt: f.modifiedAt })) : [],
+      captions: cap ? { status: cap.status, generatedAt: cap.generatedAt ? (cap.generatedAt instanceof Date ? cap.generatedAt : new Date(cap.generatedAt as unknown as string)).toISOString() : null } : null,
       canWrite: viewer.permissions.has("scripts:write"),
     };
   } catch (error) {
@@ -155,12 +186,14 @@ export async function linkScriptingDrivePdf(productionDayId: string, fileExterna
 
     // Sessienaam in de taakomschrijving bijwerken.
     await syncScriptingTasks([productionDayId]).catch(() => undefined);
+    // Captions direct opnieuw maken op basis van deze versie.
+    refreshCaptionsLater(productionDayId);
 
     revalidatePath("/scripting");
     revalidatePath("/ai/caption");
     revalidatePath(`/ai/caption/opname/${productionDayId}`);
     revalidatePath("/tasks");
-    return { ok: true, message: "PDF gekoppeld aan deze opname." };
+    return { ok: true, message: "PDF gekoppeld. De captions worden op basis van deze versie opnieuw gemaakt." };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
@@ -183,10 +216,13 @@ export async function unlinkScriptingDrivePdf(productionDayId: string): Promise<
       .set({ status: "afgewezen", confirmedAt: new Date(), confirmedById: viewer.id, updatedAt: new Date() })
       .where(eq(shootScriptSources.productionDayId, productionDayId));
     await syncScriptingTasks([productionDayId]).catch(() => undefined);
+    // Staat er nog een scriptcontrole-PDF in het portaal, dan worden de
+    // captions daarop gebaseerd. Zonder bron blijven de huidige captions staan.
+    refreshCaptionsLater(productionDayId);
     revalidatePath("/scripting");
     revalidatePath("/ai/caption");
     revalidatePath("/tasks");
-    return { ok: true, message: "Koppeling verwijderd." };
+    return { ok: true, message: "Koppeling verwijderd. Kies hieronder de nieuwe versie." };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;

@@ -2,7 +2,8 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, scriptReviewVersions, scriptReviews, shootScriptSources } from "@/db/schema";
+import { clients, files, scriptReviewVersions, scriptReviews, shootScriptSources } from "@/db/schema";
+import { newestSource } from "@/lib/script-versions";
 import { drive } from "@/server/integrations/drive";
 import { runJsonPrompt, type AiDoc } from "@/server/ai/client";
 import { SHORTCLIPS_IDENTITY } from "@/server/ai/identity";
@@ -131,10 +132,14 @@ export type ShootPdf = {
 
 /**
  * Haalt de script-PDF van een opname op als bron voor de captions, met een
- * sha256-hash voor wijzigingsdetectie. Volgorde:
- *  1. De laatste scriptcontrole-PDF uit het portaal (als die er is);
- *  2. anders de automatisch gekoppelde script-PDF uit Google Drive
- *     (shoot_script_sources, status "gekoppeld").
+ * sha256-hash voor wijzigingsdetectie. Bronnen:
+ *  - de laatste scriptcontrole-PDF uit het klantportaal;
+ *  - de gekoppelde script-PDF uit Google Drive (shoot_script_sources,
+ *    status "gekoppeld").
+ * Staan ze er allebei, dan wint de NIEUWSTE: een later gekoppelde of in Drive
+ * bijgewerkte PDF gaat vóór een oudere portaalversie, en andersom. Zo zijn de
+ * captions altijd gebaseerd op de laatste versie van het script. Lukt het
+ * ophalen van de gekozen bron niet, dan valt hij terug op de andere.
  * Geeft null als er (nog) geen bruikbare PDF voor deze opname is.
  */
 export async function shootReviewPdf(productionDayId: string): Promise<ShootPdf | null> {
@@ -143,34 +148,65 @@ export async function shootReviewPdf(productionDayId: string): Promise<ShootPdf 
     .from(scriptReviews)
     .where(and(eq(scriptReviews.productionDayId, productionDayId), isNull(scriptReviews.deletedAt)))
     .limit(1);
+  const [version] = review
+    ? await db
+        .select({
+          id: scriptReviewVersions.id,
+          fileName: scriptReviewVersions.fileName,
+          dataBase64: scriptReviewVersions.dataBase64,
+          storagePath: scriptReviewVersions.storagePath,
+          createdAt: scriptReviewVersions.createdAt,
+        })
+        .from(scriptReviewVersions)
+        .where(eq(scriptReviewVersions.reviewId, review.id))
+        .orderBy(desc(scriptReviewVersions.versionNumber))
+        .limit(1)
+    : [];
 
-  if (review) {
-    const [version] = await db
-      .select({
-        id: scriptReviewVersions.id,
-        fileName: scriptReviewVersions.fileName,
-        dataBase64: scriptReviewVersions.dataBase64,
-        storagePath: scriptReviewVersions.storagePath,
-      })
-      .from(scriptReviewVersions)
-      .where(eq(scriptReviewVersions.reviewId, review.id))
-      .orderBy(desc(scriptReviewVersions.versionNumber))
-      .limit(1);
-    if (version) {
-      let pdfBase64 = version.dataBase64 ?? undefined;
-      if (!pdfBase64 && version.storagePath) {
-        const buf = await downloadScriptPdf(version.storagePath);
-        if (buf) pdfBase64 = buf.toString("base64");
-      }
-      if (pdfBase64) {
-        const hash = createHash("sha256").update(pdfBase64).digest("hex");
-        return { reviewVersionId: version.id, pdfBase64, hash, fileName: version.fileName, origin: "review" };
-      }
+  const driveAt = await driveVersionAt(productionDayId);
+  const first = newestSource(version ? { createdAt: toIso(version.createdAt)! } : null, driveAt);
+  if (!first) return null;
+
+  const fromReview = async (): Promise<ShootPdf | null> => {
+    if (!version) return null;
+    let pdfBase64 = version.dataBase64 ?? undefined;
+    if (!pdfBase64 && version.storagePath) {
+      const buf = await downloadScriptPdf(version.storagePath);
+      if (buf) pdfBase64 = buf.toString("base64");
     }
-  }
+    if (!pdfBase64) return null;
+    const hash = createHash("sha256").update(pdfBase64).digest("hex");
+    return { reviewVersionId: version.id, pdfBase64, hash, fileName: version.fileName, origin: "review" };
+  };
+  const fromDrive = () => (driveAt ? driveSourcedPdf(productionDayId) : Promise.resolve(null));
 
-  // Terugval: automatisch gekoppelde script-PDF uit Google Drive.
-  return driveSourcedPdf(productionDayId);
+  return first === "drive"
+    ? (await fromDrive()) ?? (await fromReview())
+    : (await fromReview()) ?? (await fromDrive());
+}
+
+function toIso(d: Date | string | null | undefined): string | null {
+  if (!d) return null;
+  const x = d instanceof Date ? d : new Date(d);
+  return isNaN(x.getTime()) ? null : x.toISOString();
+}
+
+/**
+ * "Versiemoment" van de gekoppelde Drive-PDF: het laatste van koppelen (door
+ * het team of de versiecontrole) en de laatste wijziging van het bestand in
+ * Drive. Null als er geen gekoppelde Drive-PDF is.
+ */
+async function driveVersionAt(productionDayId: string): Promise<string | null> {
+  const [src] = await db
+    .select({ confirmedAt: shootScriptSources.confirmedAt, fileModifiedAt: files.modifiedAt })
+    .from(shootScriptSources)
+    .leftJoin(files, and(eq(files.externalId, shootScriptSources.fileExternalId), eq(files.clientId, shootScriptSources.clientId)))
+    .where(and(eq(shootScriptSources.productionDayId, productionDayId), eq(shootScriptSources.status, "gekoppeld")))
+    .limit(1);
+  if (!src) return null;
+  const moments = [toIso(src.confirmedAt), toIso(src.fileModifiedAt)].filter((x): x is string => Boolean(x)).sort();
+  // Gekoppeld maar nog nooit bevestigd en geen bestandsdatum: oudste denkbare moment.
+  return moments.at(-1) ?? "1970-01-01T00:00:00.000Z";
 }
 
 /** Download de gekoppelde Drive-script-PDF van een opname (status "gekoppeld"). */

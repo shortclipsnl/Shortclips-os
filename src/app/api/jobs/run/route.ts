@@ -16,6 +16,7 @@ import {
 } from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { runScriptingTaskSync } from "@/server/scripting-tasks";
+import { runScriptVersionSync } from "@/server/script-versions";
 import { runFrequentSync, runNightlySync } from "@/server/jobs/orchestrator";
 import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
 import { runContentOnlineNotifications } from "@/server/jobs/content-online-notify";
@@ -102,6 +103,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
     return res;
   },
   "scripting.task_sync": runScriptingTaskSync,
+  // Altijd de nieuwste scriptversie: nieuwere Drive-versie koppelen en captions bijwerken.
+  "scripts.version_sync": runScriptVersionSync,
   "shoots.reconcile": runShootReconciliation,
   "metricool.link_brands": linkMetricoolBrands,
   "metricool.pull_metrics": pullMetricoolMetrics,

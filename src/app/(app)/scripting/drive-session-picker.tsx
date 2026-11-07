@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowUpRight, Check, ChevronLeft, ChevronRight, FileText, Folder, FolderOpen, HardDrive, Link2, Loader2, Unlink } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, ChevronLeft, ChevronRight, FilePlus2, FileText, Folder, FolderOpen, HardDrive, Link2, Loader2, RefreshCw, Sparkles, Unlink } from "lucide-react";
+import Link from "next/link";
 import {
   linkScriptingDrivePdf,
   listScriptingDriveSessions,
@@ -16,6 +17,19 @@ type Loaded = Extract<DriveSessionsResult, { ok: true }>;
 function fmtLong(d: string) {
   const [y, m, day] = d.split("-").map(Number);
   return new Date(y!, (m ?? 1) - 1, day).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+}
+const CAPTION_LABEL: Record<string, string> = {
+  bezig: "Captions worden gemaakt",
+  klaar_controle: "Captions klaar om te controleren",
+  gedeeltelijk: "Captions deels klaar",
+  bijgewerkt_script: "Captions bijgewerkt op nieuwe versie",
+  gecontroleerd: "Captions gecontroleerd",
+  mislukt: "Captions maken mislukt",
+};
+function fmtDateTime(iso: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? "" : d.toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 function fmtShortDate(iso: string | null) {
   if (!iso) return "";
@@ -77,6 +91,15 @@ export function DriveSessionPicker({ productionDayId }: { productionDayId: strin
     return out;
   }, [sessions]);
 
+  /** Direct naar de sessie van de gekoppelde PDF (om een nieuwere versie te kiezen). */
+  function openLinkedSession(preselect?: string) {
+    const id = data?.linked?.sessionId;
+    if (!id) return;
+    setSessionId(id);
+    setPdfId(preselect ?? null);
+    setMsg(null);
+  }
+
   function openSession(s: SessionView) {
     if (s.pdfs.length === 0) return;
     setSessionId(s.id);
@@ -134,10 +157,39 @@ export function DriveSessionPicker({ productionDayId }: { productionDayId: strin
                 </a>
               ) : null}
               {data.canWrite ? (
-                <button type="button" onClick={unlink} disabled={pending} className="inline-flex shrink-0 items-center gap-1 text-2xs font-semibold text-[var(--color-ink-muted)] hover:text-[var(--color-bad)] disabled:opacity-50" title="Koppeling verwijderen">
-                  <Unlink className="size-3" /> Ontkoppelen
-                </button>
+                <>
+                  <button type="button" onClick={() => openLinkedSession()} disabled={pending} className="inline-flex shrink-0 items-center gap-1 text-2xs font-semibold text-[var(--color-brand-600)] hover:underline disabled:opacity-50" title="Een nieuwere versie uit Drive koppelen">
+                    <RefreshCw className="size-3" /> Nieuwe versie kiezen
+                  </button>
+                  <button type="button" onClick={unlink} disabled={pending} className="inline-flex shrink-0 items-center gap-1 text-2xs font-semibold text-[var(--color-ink-muted)] hover:text-[var(--color-bad)] disabled:opacity-50" title="Koppeling verwijderen">
+                    <Unlink className="size-3" /> Ontkoppelen
+                  </button>
+                </>
               ) : null}
+            </div>
+          ) : null}
+          {data.linked ? (
+            <p className="-mt-1.5 mb-3 flex items-center gap-1.5 px-1 text-2xs text-[var(--color-ink-muted)]">
+              <Sparkles className="size-3 shrink-0" />
+              {data.captions
+                ? <>{CAPTION_LABEL[data.captions.status] ?? "Captions"}{data.captions.generatedAt && data.captions.status !== "bezig" ? ` · ${fmtDateTime(data.captions.generatedAt)}` : ""}</>
+                : "Captions worden op basis van deze versie gemaakt"}
+              <Link href={`/ai/caption/opname/${productionDayId}`} className="ml-1 font-semibold text-[var(--color-brand-600)] hover:underline">Bekijk captions</Link>
+            </p>
+          ) : null}
+          {data.linked && data.newerInFolder.length > 0 && data.canWrite ? (
+            <div className="mb-3 rounded-[var(--radius-sm)] border border-[var(--color-warn)]/50 bg-[var(--color-warn-soft)] px-3 py-2">
+              <p className="mb-1 flex items-center gap-1.5 text-2xs font-semibold text-[#8a5300]">
+                <FilePlus2 className="size-3.5" /> Nieuwere PDF in dezelfde sessie
+              </p>
+              <ul className="space-y-1">
+                {data.newerInFolder.map((f) => (
+                  <li key={f.externalId} className="flex items-center gap-2 text-2xs">
+                    <span className="min-w-0 flex-1 truncate text-[var(--color-ink)]">{f.name} <span className="text-[var(--color-ink-muted)]">· {fmtShortDate(f.modifiedAt)}</span></span>
+                    <button type="button" onClick={() => openLinkedSession(f.externalId)} className="shrink-0 font-semibold text-[var(--color-brand-600)] hover:underline">Bekijk en koppel</button>
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : null}
           {msg ? <p className="mb-2 text-2xs font-medium text-[var(--color-good)]">{msg}</p> : null}

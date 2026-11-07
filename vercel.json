@@ -26,6 +26,7 @@
     { "path": "/api/jobs/run?job=leads.sync_mailbox", "schedule": "0 7-20 * * *" },
     { "path": "/api/jobs/run?job=captions.auto_generate", "schedule": "15 7-20 * * *" },
     { "path": "/api/jobs/run?job=captions.link_drive_scripts", "schedule": "35 7-20 * * *" },
+    { "path": "/api/jobs/run?job=scripts.version_sync", "schedule": "50 7-20 * * *" },
     { "path": "/api/jobs/run?job=briefing.auto_generate", "schedule": "25 7-20 * * *" },
     { "path": "/api/jobs/run?job=transfers.cleanup", "schedule": "30 3 * * *" },
     { "path": "/api/jobs/run?job=content_research.weekly", "schedule": "*/20 4-8 * * 1" },
