@@ -104,6 +104,10 @@ describe("regels", () => {
     expect(r.state).toBe("ok");
     expect(r.platforms[0].note).toMatch(/meer video's geplaatst/);
   });
+  it("minder bereik maar meer weergaven per video: geen signaal", () => {
+    const r = evaluateResults({ today: TODAY, daily: daily(0.45), videos: vids(6, 6500, 5000), hasIntegration: true });
+    expect(r.state).toBe("ok");
+  });
   it("te weinig video's of meetdagen: geen oordeel", () => {
     const r = evaluateResults({ today: TODAY, daily: daily(0.5), videos: vids(2, 1000, 5000), hasIntegration: true });
     expect(r.state).toBe("onvoldoende_data");

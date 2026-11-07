@@ -207,7 +207,12 @@ export function evaluateResults(input: {
     if (folPrev >= 10) changes.push({ key: "volgers", label: "Nieuwe volgers", cur: folCur, prev: folPrev, pct: pctChange(folCur, folPrev) });
 
     const declined = changes.filter((c) => c.pct <= -cfg.dropPct);
-    const core = declined.some((c) => c.key === "bereik" || c.key === "weergaven");
+    // Een daling telt alleen als de andere kernstatistiek niet tegelijk stijgt:
+    // minder bereik maar meer weergaven per video is geen achteruitgang.
+    const reachC = changes.find((c) => c.key === "bereik");
+    const viewsC = changes.find((c) => c.key === "weergaven");
+    const core = declined.some((c) =>
+      (c.key === "bereik" && !(viewsC && viewsC.pct > 0)) || (c.key === "weergaven" && !(reachC && reachC.pct > 0)));
     // Veel meer video's geplaatst? Dan daalt het gemiddelde per video vanzelf.
     // Alleen een signaal als ook het totale bereik/de totale weergaven dalen.
     const moreVideos = vCur.length >= vPrev.length * 1.5;
@@ -411,8 +416,10 @@ export function clientHealth(input: {
 export function commercialFollowUp(m: ContractMoment): { label: string; tone: "neutraal" | "aandacht" | "urgent" } | null {
   if (m.stage === null || m.decisionDate === null) return null;
   const when = m.decisionLabel === "opzegdeadline" ? "Opzegdeadline" : "Einddatum";
-  if (m.stage === "voorbij") return { label: `${when} gepasseerd`, tone: "urgent" };
-  return { label: `${when} over ${m.daysToDecision} dagen`, tone: m.stage === 14 ? "urgent" : m.stage === 30 ? "aandacht" : "neutraal" };
+  const unsure = m.issues.includes("Contractgegevens nog niet gecontroleerd");
+  // Op ongecontroleerde gegevens geen rood: eerst controleren.
+  if (m.stage === "voorbij") return unsure ? { label: `${when} gepasseerd? Contract controleren`, tone: "neutraal" } : { label: `${when} gepasseerd`, tone: "urgent" };
+  return { label: `${when} over ${m.daysToDecision} dagen${unsure ? " (niet gecontroleerd)" : ""}`, tone: m.stage === 14 ? "urgent" : m.stage === 30 ? "aandacht" : "neutraal" };
 }
 
 /* ------------------------------------------------------------------ *
