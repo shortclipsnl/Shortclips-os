@@ -105,6 +105,8 @@ Twee doelgroepen:
 Geef UITSLUITEND één geldig JSON-object (geen markdown, geen tekst eromheen, geen dubbele aanhalingstekens binnen waarden, geen letterlijke regeleinden binnen waarden, geen trailing komma's), exact dit formaat:
 {"topVideos":[{"titel":"","waarom":"","cijfers":"","zekerheid":"bewezen|waarschijnlijk|hypothese"}],"besteHooks":[{"hook":"","waarom":"","zekerheid":""}],"besteFormats":[{"format":"","waarom":"","zekerheid":""}],"mindereVideos":[{"titel":"","les":""}],"analysis":{"watWerkt":[{"punt":"","zekerheid":""}],"watMinder":[{"punt":"","zekerheid":""}],"ontwikkelingen":[""]},"maandvergelijking":[""],"conclusies":[""],"kansen":[{"titel":"","toelichting":""}],"verbeterpunten":[{"titel":"","waarom":"","wat":"","hoeMeten":"","zekerheid":""}],"aandachtspunten":[{"type":"positief|aandachtspunt|actie_nodig","tekst":""}],"strategischeActies":[{"titel":"","waarom":""}],"intern":{"kern":"","besteVideos":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"hooks":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"onderwerpen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"tegenvallers":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"videostructuur":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"formatsVaker":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"vermijdenOfAanpassen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"scripts":[""],"opnames":[""],"montage":[""],"acties":[{"actie":"","rol":"script|opname|montage|pm","waarom":""}],"dataBeperkingen":[""]}}
 
+Houd het compact: elk tekstveld maximaal 30 woorden, elke lijst maximaal 4 items (acties maximaal 6). Liever kort en concreet dan volledig.
+
 Aanvullend: "aandachtspunten" = max 3 belangrijkste signalen van deze maand. "strategischeActies" = max 3 concrete acties voor volgende maand. "conclusies" = 2 tot 4 korte conclusies voor de klant. "kansen" = 2 tot 3 kansen/aanbevelingen voor de komende maand. "verbeterpunten" mag NOOIT leeg zijn. In "intern": "acties" = 3 tot 6 concrete acties voor de komende maand, elk met de rol die het uitvoert; "dataBeperkingen" = wat we NIET konden meten en dus niet weten. Laat een interne lijst leeg ([]) als de data er niets over zegt, in plaats van iets te verzinnen.`;
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
@@ -232,10 +234,12 @@ export async function generateMonthlyAnalysis(
   };
   const [klantRes, internRes] = await Promise.all([
     ask("Analyseer deze klant over de maand. Geef ALLEEN de klantvelden (topVideos, besteHooks, besteFormats, mindereVideos, analysis, maandvergelijking, conclusies, kansen, verbeterpunten, aandachtspunten, strategischeActies) en zet \"intern\" op {}."),
-    ask("Analyseer deze klant over de maand voor het interne team. Geef ALLEEN het veld \"intern\" volledig ingevuld; laat alle andere velden leeg ([] of {})."),
+    ask("Analyseer deze klant over de maand voor het interne team (projectmanagers, scriptschrijvers, videografen). Antwoord met precies dit JSON-object: {\"intern\":{...}} met alle velden van \"intern\" uit het formaat volledig ingevuld. Geef geen andere velden."),
   ]);
   if (!klantRes.ok) return { ok: false, reason: klantRes.reason === "no_provider" ? "no_provider" : "error", message: klantRes.error };
-  const res = { ...klantRes, data: { ...(klantRes.data ?? {}), intern: internRes.ok ? internRes.data?.intern : undefined } as Raw };
+  // Het model geeft het interne deel soms zonder de "intern"-omhulling terug.
+  const internData = internRes.ok ? ((internRes.data as Raw | undefined)?.intern ?? (internRes.data as unknown)) : undefined;
+  const res = { ...klantRes, data: { ...(klantRes.data ?? {}), intern: internData } as Raw };
   const raw = res.data ?? {};
   const a = raw.analysis ?? raw.analyse ?? { watWerkt: [], watMinder: [], ontwikkelingen: [] };
   const analysis: MonthlyAnalysis = {
@@ -256,6 +260,8 @@ export async function generateMonthlyAnalysis(
     kansen: arr<{ titel: string; toelichting: string }>(raw.kansen).slice(0, 3),
     intern: normalizeIntern(raw.intern),
   };
+  const internLeeg = !analysis.intern || (!analysis.intern.kern && analysis.intern.acties.length === 0 && analysis.intern.besteVideos.length === 0);
+  if (internLeeg) ontbrekend.push("De interne teamanalyse kon deze keer niet worden opgesteld. Gebruik 'AI opnieuw' om het opnieuw te proberen.");
   if (analysis.verbeterpunten.length === 0 && analysis.analysis.watWerkt.length === 0 && analysis.analysis.watMinder.length === 0) {
     return { ok: false, reason: "error", message: "De AI-analyse leverde geen bruikbare uitkomst op." };
   }
