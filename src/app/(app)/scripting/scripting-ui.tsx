@@ -369,11 +369,16 @@ function ScriptsCell({ row }: { row: ScriptingRow }) {
   const klaar = row.scripts.filter((s) => s.status === "approved" || s.status === "ready_to_shoot").length;
   // De knop is "gevuld" zodra er gekoppelde scripts óf een gekoppelde PDF is.
   const heeftIets = n > 0 || Boolean(pdf);
+  // Final zonder script of PDF: Rutger en de editor hebben dan niets om mee te
+  // werken. Duidelijk markeren in plaats van stil "Koppel script-PDF".
+  const finalZonderScript = row.status === "final" && !heeftIets;
   const label = n > 0
     ? `${n} script${n === 1 ? "" : "s"}${klaar > 0 ? ` · ${klaar} klaar` : ""}`
     : pdf
       ? "PDF gekoppeld"
-      : "Koppel script-PDF";
+      : finalZonderScript
+        ? "Final, maar geen PDF"
+        : "Koppel script-PDF";
 
   return (
     <>
@@ -381,7 +386,7 @@ function ScriptsCell({ row }: { row: ScriptingRow }) {
         type="button"
         onClick={() => setOpen(true)}
         title={pdf ? `Gekoppelde PDF: ${pdf.name}${pdf.sessionName ? ` (${pdf.sessionName})` : ""}` : "Bekijk de scripts van deze opname en koppel een script-PDF uit Google Drive"}
-        className={`flex w-[150px] items-center gap-1.5 rounded-[var(--radius-sm)] border px-2 py-1.5 text-left text-xs font-medium hover:border-[var(--color-brand-500)] ${heeftIets ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)] text-[var(--color-ink)]" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)]"}`}
+        className={`flex w-[150px] items-center gap-1.5 rounded-[var(--radius-sm)] border px-2 py-1.5 text-left text-xs font-medium hover:border-[var(--color-brand-500)] ${heeftIets ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)] text-[var(--color-ink)]" : finalZonderScript ? "border-[var(--color-bad)]/40 bg-[var(--color-bad-soft)] text-[#a3271c]" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)]"}`}
       >
         {pdf && n === 0 ? <FileCheck2 className="size-4 shrink-0 text-[var(--color-good)]" /> : <ScrollText className={`size-4 shrink-0 ${heeftIets ? "text-[var(--color-brand-600)]" : "text-[var(--color-ink-faint)]"}`} />}
         <span className="min-w-0">
