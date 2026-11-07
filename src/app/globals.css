@@ -320,8 +320,30 @@ body {
   --shadow-card: 0 1px 2px rgba(0, 0, 59, 0.04), 0 1px 3px rgba(0, 0, 59, 0.06);
   --shadow-raised: 0 2px 4px rgba(0, 0, 59, 0.05), 0 8px 24px rgba(0, 0, 59, 0.08);
   --shadow-pop: 0 8px 16px rgba(0, 0, 59, 0.08), 0 24px 48px rgba(0, 0, 59, 0.14);
-  /* Hulp-tokens voor de portaalcomponenten, gekoppeld aan de huisstijl-tokens. */
-  --sc-accent: var(--color-brand-600);
+  /* Hulp-tokens voor de portaalcomponenten, gekoppeld aan de huisstijl-tokens.
+     Accent = diep merkblauw (geen lichtblauw): rustig, premium en goed leesbaar. */
+  --sc-accent: var(--color-brand-700);
+  /* Hoofdactie: navy met wit (huisstijl). Actie van de klant nodig: diep oranje. */
+  --sc-cta: #00003b;
+  --sc-cta-hover: #1a1a4c;
+  --sc-cta-ink: #ffffff;
+  --sc-act: #c2410c;
+  --sc-act-hover: #9a3412;
+  --sc-act-ink: #ffffff;
+  /* Functionele statuskleuren (tekst op de zachte achtergrond), AA-contrast. */
+  --st-green: #17784c;
+  --st-green-bg: #e3f4ec;
+  --st-orange: #b4470b;
+  --st-orange-bg: #fdeedd;
+  --st-blue: #1b55c9;
+  --st-blue-bg: #e6eefc;
+  --st-red: #b42318;
+  --st-red-bg: #fdeceb;
+  --st-grey: #5b5b74;
+  --st-grey-bg: #efeee9;
+  /* Huidige week / vandaag: subtiel accent. */
+  --sc-now-bg: #f1f5fe;
+  --sc-now-line: #b9cdf6;
   --sc-line: var(--color-line);
   --sc-fill: var(--color-surface-sunken);
   --sc-fill-strong: var(--color-surface-2);
@@ -368,8 +390,26 @@ body {
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.45);
   --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.55);
   --shadow-pop: 0 8px 16px rgba(0, 0, 0, 0.5), 0 24px 48px rgba(0, 0, 0, 0.65);
-  /* Accent iets lichter op donker, zodat het leesbaar blijft. */
-  --sc-accent: var(--color-brand-400);
+  /* Accent lichter op donker, zodat het leesbaar blijft. */
+  --sc-accent: #7aa7ff;
+  --sc-cta: #f3f3fb;
+  --sc-cta-hover: #ffffff;
+  --sc-cta-ink: #0a0b16;
+  --sc-act: #f08a3c;
+  --sc-act-hover: #f6a25f;
+  --sc-act-ink: #1a0d02;
+  --st-green: #62d6a0;
+  --st-green-bg: rgba(46, 154, 110, 0.18);
+  --st-orange: #ffb067;
+  --st-orange-bg: rgba(240, 138, 60, 0.18);
+  --st-blue: #8fb6ff;
+  --st-blue-bg: rgba(91, 141, 255, 0.18);
+  --st-red: #ff9b91;
+  --st-red-bg: rgba(229, 72, 59, 0.2);
+  --st-grey: #a8aac6;
+  --st-grey-bg: rgba(255, 255, 255, 0.07);
+  --sc-now-bg: #141d3a;
+  --sc-now-line: #34508f;
 }
 
 /* Portaal-logo: navy woordmerk op licht (standaard), wit op donker. */
@@ -377,6 +417,14 @@ body {
 .portal-studio .pl-light { display: block; }
 :root[data-portal-theme="dark"] .portal-studio .pl-light { display: none; }
 :root[data-portal-theme="dark"] .portal-studio .pl-dark { display: block; }
+/* Portaalknoppen: één duidelijke hoofdactie, een opvallende actie-knop als de
+   klant iets moet doen, en rustige secundaire knoppen. */
+.portal-studio .sc-btn-cta { background: var(--sc-cta); color: var(--sc-cta-ink); }
+.portal-studio .sc-btn-cta:hover { background: var(--sc-cta-hover); }
+.portal-studio .sc-btn-act { background: var(--sc-act); color: var(--sc-act-ink); box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--sc-act) 70%, transparent); }
+.portal-studio .sc-btn-act:hover { background: var(--sc-act-hover); }
+/* Secundaire knop in donker: iets lichtere rand zodat hij zichtbaar blijft. */
+:root[data-portal-theme="dark"] .portal-studio .sc-btn-soft { border-color: var(--color-line-strong); }
 /* Verticale 9:16 shorts-cover */
 .sc-short {
   position: relative;

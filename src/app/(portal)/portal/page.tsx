@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Bell, CalendarRange, Camera, Check, ClipboardCheck, Clock, ExternalLink, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
+import { ArrowRight, Bell, CalendarRange, Camera, Check, ClipboardCheck, Clock, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalContact, getPortalData, getPortalFrameUrl, getPortalPackageProgress } from "@/server/portal";
+import { getPortalContact, getPortalData, getPortalPackageProgress } from "@/server/portal";
+import { getPortalFrameLibrary } from "@/server/portal-frame";
+import { StatusPill, portalBtn } from "@/components/portal/status-pill";
 import { CLIENT_ACTION_STATUSES, listPortalScriptReviews } from "@/server/script-review";
 import { buttonClass, ClientLogo, TeamAvatar } from "@/components/ui";
 import { compact, formatDate, num } from "@/lib/format";
@@ -35,7 +37,7 @@ function dateFromIso(iso: string): Date {
  *  en opnames eruit springen — gelijk aan het interne platform (geen oranje). */
 function DateChip({ date }: { date: Date }) {
   return (
-    <div className="flex size-[58px] shrink-0 flex-col items-center justify-center rounded-[14px] bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] text-white shadow-[0_6px_16px_-6px_rgba(27,95,224,0.6)]">
+    <div className="flex size-[58px] shrink-0 flex-col items-center justify-center rounded-[14px] bg-[var(--sc-cta)] text-[var(--sc-cta-ink)] shadow-[0_6px_16px_-6px_rgba(27,95,224,0.6)]">
       <span className="text-xl font-bold leading-none tabular-nums">{date.getDate()}</span>
       <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/85">
         {date.toLocaleDateString("nl-NL", { month: "short", timeZone: TZ })}
@@ -70,7 +72,7 @@ function PlanCard({
       style={accent && date ? { boxShadow: "inset 3px 0 0 var(--sc-accent)", background: "linear-gradient(180deg, rgba(25,168,255,0.1), rgba(255,255,255,0.02))" } : undefined}
     >
       <div className={`flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider ${accent && date ? "text-[var(--sc-accent)]" : "text-[var(--color-ink-faint)]"}`}>
-        <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]">{icon}</span>
+        <span className="grid size-7 place-items-center rounded-lg bg-[var(--st-blue-bg)] text-[var(--sc-accent)]">{icon}</span>
         {label}
       </div>
       {date ? (
@@ -124,19 +126,19 @@ function scriptStatusMeta(status: string): { label: string; tone: "action" | "re
 }
 
 const SCRIPT_TONE: Record<"action" | "ready" | "done" | "prep", string> = {
-  action: "bg-[rgba(25,168,255,0.18)] text-[#19a8ff]",
-  ready: "bg-[#2fd27a]/15 text-[#1a9956]",
+  action: "bg-[var(--st-blue-bg)] text-[var(--sc-accent)]",
+  ready: "bg-[var(--st-green-bg)] text-[var(--st-green)]",
   done: "bg-[var(--sc-fill-strong)] text-[var(--color-ink-muted)]",
   prep: "bg-[var(--sc-fill)] text-[var(--color-ink-muted)]",
 };
 
 export default async function PortalPage() {
   const viewer = await requirePortal();
-  const [data, contact, scriptReviews, frameUrl, pkg] = await Promise.all([
+  const [data, contact, scriptReviews, lib, pkg] = await Promise.all([
     getPortalData(viewer),
     getPortalContact(viewer),
     listPortalScriptReviews(viewer),
-    getPortalFrameUrl(viewer),
+    getPortalFrameLibrary(viewer),
     getPortalPackageProgress(viewer),
   ]);
 
@@ -145,7 +147,11 @@ export default async function PortalPage() {
   // Openstaande acties: scripts ter controle + video's ter beoordeling.
   const actionableScripts = scriptReviews.filter((r) => CLIENT_ACTION_STATUSES.includes(r.status));
   const scriptActions = actionableScripts.length;
-  const videoActions = data.awaitingApproval.length;
+  // Video's: sessies in de bibliotheek die op feedback wachten (anders de losse
+  // akkoordverzoeken van het team).
+  const waitingSessions = lib.sessions.filter((x) => x.status?.key === "feedback");
+  const videoActions = Math.max(waitingSessions.length, data.awaitingApproval.length);
+  const newestSession = lib.sessions.find((x) => x.key !== "los") ?? null;
   const openActions = scriptActions + videoActions;
   // Eerstvolgende opnamedatum onder de te-controleren scripts → als deadline-hint.
   const soonestScriptShoot = actionableScripts.map((r) => r.shootOn).filter((d): d is string => !!d).sort()[0] ?? null;
@@ -167,34 +173,68 @@ export default async function PortalPage() {
   const scriptTime = scriptMeeting && !scriptMeeting.allDay && scriptDate ? timeOf(scriptDate) : null;
 
   // 3 — Video's: hoeveel wachten er op beoordeling (subtiele, relevante hint).
-  const pendingReview = data.awaitingApproval.length + (data.scriptsToReview?.length ?? 0);
+  const pendingReview = videoActions;
 
   // 4 — Resultaten (laatste 30 dagen, uit de gekoppelde cijfers) + totaal online.
   const m = data.metrics;
   const online = data.published.length;
   const hasMetrics = m.views + m.reach + m.engagements > 0;
 
+  // Naam voor de begroeting: de persoon als die een eigen naam heeft, anders
+  // de klantnaam (gedeelde bedrijfslogins heten vaak zoals het bedrijf).
+  const personal = viewer.fullName?.trim() ?? "";
+  const greetName = personal && personal.toLowerCase() !== companyName.toLowerCase() && !/\b(b\.?v\.?|bv)\b/i.test(personal)
+    ? personal.split(/\s+/)[0]!
+    : companyName;
+
+  type Glance = { key: string; href: string; icon: React.ReactNode; label: string; value: string; sub?: string; tone?: "orange" };
+  const glance: Glance[] = [];
+  if (shootDate) glance.push({ key: "shoot", href: "/portal/planning", icon: <Camera className="size-3.5" />, label: "Volgende opnamedag", value: fullDate(shootDate), sub: [shootTime ? `vanaf ${shootTime}` : null, shoot?.locationName ?? null].filter(Boolean).join(" · ") || undefined });
+  if (scriptActions > 0) glance.push({ key: "scripts", href: "/portal/scripts", icon: <FileText className="size-3.5" />, label: "Scripts", value: `${scriptActions} ${scriptActions === 1 ? "wacht" : "wachten"} op feedback`, sub: soonestScriptShoot ? `vóór de opname van ${formatDate(soonestScriptShoot)}` : undefined, tone: "orange" });
+  if (waitingSessions.length > 0) {
+    const n = waitingSessions.reduce((a, x) => a + x.videos.length, 0);
+    glance.push({ key: "videos", href: "/portal/videos", icon: <Film className="size-3.5" />, label: "Video's klaar", value: `${n} video${n === 1 ? "" : "'s"} klaar voor feedback`, sub: waitingSessions.map((x) => x.title).join(", "), tone: "orange" });
+  } else if (newestSession) {
+    glance.push({ key: "videos", href: `/portal/videos?sessie=${encodeURIComponent(newestSession.key)}`, icon: <Film className="size-3.5" />, label: "Nieuwste video's", value: newestSession.title, sub: `${newestSession.videos.length} video${newestSession.videos.length === 1 ? "" : "'s"}` });
+  }
+  if (nextPub) glance.push({ key: "pub", href: "/portal/content", icon: <CalendarRange className="size-3.5" />, label: "Eerstvolgende publicatie", value: fullDate(dateFromIso(nextPub.scheduledOn)), sub: nextPub.title });
+  if (hasMetrics) glance.push({ key: "res", href: "/portal/resultaten", icon: <Eye className="size-3.5" />, label: "Laatste resultaten", value: `${compact(m.views)} weergaven`, sub: "afgelopen 30 dagen" });
+
   return (
     <div className="flex flex-col gap-[22px]">
-      {/* 1 — Persoonlijke welkomstsectie */}
+      {/* 1 — Persoonlijke welkomst */}
       <section className="flex items-start gap-4 px-0.5 pt-1">
         <ClientLogo name={companyName} logoUrl={data.client.logoUrl} color={data.client.color} size={56} />
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Welkom bij Shortclips</p>
-          <h1 className="text-[30px] font-bold tracking-tight">{companyName}</h1>
-          <p className="mt-1.5 text-[14px] text-[var(--color-ink-muted)]">Je persoonlijke omgeving. Hieronder zie je in één oogopslag wat er speelt.</p>
+          <h1 className="text-[26px] font-bold leading-tight tracking-tight sm:text-[30px]">Hey {greetName}, welkom in jouw Shortclips portaal!</h1>
+          <p className="mt-1.5 max-w-2xl text-[14px] leading-relaxed text-[var(--color-ink-muted)]">
+            Dit is jouw persoonlijke omgeving voor onze samenwerking. Hier vind je jouw scripts, video&apos;s, contentplanning, resultaten en alle belangrijke afspraken overzichtelijk op één plek.
+          </p>
         </div>
       </section>
+
+      {/* In één oogopslag: alleen wat er echt is */}
+      {glance.length > 0 ? (
+        <section aria-label="Belangrijk voor jou" className={`grid gap-3 sm:grid-cols-2 ${glance.length >= 4 ? "lg:grid-cols-4" : glance.length === 3 ? "lg:grid-cols-3" : ""} ${glance.length === 5 ? "xl:grid-cols-5" : ""}`}>
+          {glance.map((g) => (
+            <Link key={g.key} href={g.href} className="sc-glass group flex flex-col gap-1.5 p-4 transition-shadow hover:shadow-[var(--shadow-raised)]" style={g.tone === "orange" ? { boxShadow: "inset 0 3px 0 var(--sc-act)" } : undefined}>
+              <span className="flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">{g.icon} {g.label}</span>
+              <span className={`text-[16px] font-bold leading-snug ${g.tone === "orange" ? "text-[var(--st-orange)]" : ""}`}>{g.value}</span>
+              {g.sub ? <span className="text-[12.5px] text-[var(--color-ink-muted)]">{g.sub}</span> : null}
+            </Link>
+          ))}
+        </section>
+      ) : null}
 
       <h2 className="px-0.5 text-[12px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Aan jou</h2>
 
       {/* Actie nodig — alleen tonen als er echt iets van de klant wordt verwacht */}
       {openActions > 0 ? (
-        <section className="sc-glass sc-glow p-5" style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.12), rgba(255,255,255,0.03))" }}>
+        <section className="sc-glass p-5" style={{ boxShadow: "inset 4px 0 0 var(--sc-act)" }}>
           <div className="flex items-center gap-2">
-            <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.18)] text-[#19a8ff]"><Bell className="size-4" /></span>
+            <Bell className="size-4 text-[var(--st-orange)]" />
             <h2 className="text-[15px] font-bold">Actie nodig</h2>
-            <span className="rounded-full bg-[rgba(25,168,255,0.18)] px-2 py-0.5 text-2xs font-bold text-[#19a8ff]">{openActions}</span>
+            <StatusPill tone="orange">{openActions} open</StatusPill>
           </div>
           <div className="mt-3 flex flex-col gap-2">
             {scriptActions > 0 ? (
@@ -210,15 +250,15 @@ export default async function PortalPage() {
             {videoActions > 0 ? (
               <Link href="/portal/videos" className="flex items-center gap-3 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-3 transition-colors hover:border-[var(--sc-line)]">
                 <Play className="size-4 shrink-0 text-[var(--sc-accent)]" fill="currentColor" />
-                <span className="min-w-0 flex-1 text-sm font-medium">{videoActions} video{videoActions === 1 ? "" : "'s"} wacht op jouw beoordeling</span>
+                <span className="min-w-0 flex-1 text-sm font-medium">{waitingSessions.length > 0 ? `${waitingSessions.length} opnamesessie${waitingSessions.length === 1 ? "" : "s"} ${waitingSessions.length === 1 ? "wacht" : "wachten"} op jouw feedback` : `${videoActions} video${videoActions === 1 ? "" : "'s"} wacht op jouw beoordeling`}</span>
                 <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
               </Link>
             ) : null}
           </div>
         </section>
       ) : (
-        <section className="sc-glass flex items-center gap-3 p-5" style={{ background: "linear-gradient(180deg, rgba(47,210,122,0.08), rgba(255,255,255,0.02))" }}>
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[rgba(47,210,122,0.16)] text-[#2fd27a]"><Check className="size-4" /></span>
+        <section className="sc-glass flex items-center gap-3 p-5">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--st-green-bg)] text-[var(--st-green)]"><Check className="size-4" /></span>
           <div>
             <p className="text-[14.5px] font-semibold">Alles loopt, jij hoeft niets te doen</p>
             <p className="text-[13px] text-[var(--color-ink-muted)]">Er wacht op dit moment niets op je. Zodra er iets klaarstaat om te controleren of te beoordelen, zie je het hier.</p>
@@ -254,7 +294,7 @@ export default async function PortalPage() {
       {shootDate && shootScripts.length > 0 ? (
         <section className="sc-glass p-5">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-            <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><FileText className="size-[18px]" strokeWidth={1.9} /></span>
+            <span className="grid size-7 place-items-center rounded-lg bg-[var(--st-blue-bg)] text-[var(--sc-accent)]"><FileText className="size-[18px]" strokeWidth={1.9} /></span>
             Scripts voor deze opnamedag
             <span className="rounded-full bg-[var(--sc-fill-strong)] px-2 py-0.5 text-2xs font-bold text-[var(--color-ink-muted)]">{shootScripts.length}</span>
           </div>
@@ -278,7 +318,7 @@ export default async function PortalPage() {
 
       {/* Voorbereidingsherinnering — alleen als er een opname aankomt */}
       {shootDate ? (
-        <Link href="/portal/planning#voorbereiding" className="group flex items-center gap-3 rounded-[14px] border border-[#2e90fa]/25 bg-[rgba(46,144,250,0.06)] px-4 py-3 transition-colors hover:border-[var(--sc-accent)]">
+        <Link href="/portal/planning#voorbereiding" className="group flex items-center gap-3 rounded-[14px] border border-[var(--sc-line)] bg-[var(--st-blue-bg)] px-4 py-3 transition-colors hover:border-[var(--sc-accent)]">
           <ClipboardCheck className="size-5 shrink-0 text-[var(--sc-accent)]" />
           <span className="min-w-0 flex-1 text-[13.5px]"><span className="font-semibold">Bereid je opname voor</span> <span className="text-[var(--color-ink-muted)]">bekijk de checklist en de dagindeling.</span></span>
           <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-muted)] transition-transform group-hover:translate-x-0.5" />
@@ -289,30 +329,24 @@ export default async function PortalPage() {
 
       {/* 3 — Directe toegang tot de video's: rechtstreeks naar de Frame.io-omgeving
           van de klant als die is ingesteld, anders naar de videopagina in het portaal. */}
-      <a
-        href={frameUrl ?? "/portal/videos"}
-        {...(frameUrl ? { target: "_blank", rel: "noreferrer" } : {})}
-        className="sc-glass sc-glow group flex flex-wrap items-center gap-4 p-5 transition-colors hover:border-[var(--sc-line)]"
-        style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.1), rgba(255,255,255,0.03))" }}
+      <Link
+        href="/portal/videos"
+        className="sc-glass group flex flex-wrap items-center gap-4 p-5 transition-shadow hover:shadow-[var(--shadow-raised)]"
       >
-        <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.16)] text-[var(--sc-accent)]">
+        <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[var(--st-blue-bg)] text-[var(--st-blue)]">
           <Film className="size-6" strokeWidth={1.8} />
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-[17px] font-semibold">Bekijk jouw video&apos;s</h2>
           <p className="mt-0.5 text-[13.5px] text-[var(--color-ink-muted)]">
-            {frameUrl ? "Je video's staan in Frame.io; daar bekijk je ze en geef je feedback." : "Bekijk alle opnamesessies en video's van jouw bedrijf."}
-            {pendingReview > 0 ? (
-              <span className="ml-1 font-medium text-[#19a8ff]">
-                {pendingReview} {pendingReview === 1 ? "wacht" : "wachten"} op jouw beoordeling.
-              </span>
-            ) : null}
+            {lib.totalVideos > 0 ? `${lib.sessions.length} opnamesessies · ${lib.totalVideos} video's, direct af te spelen.` : "Bekijk alle opnamesessies en video's van jouw bedrijf."}
+            {pendingReview > 0 ? <span className="ml-1 font-semibold text-[var(--st-orange)]">{pendingReview === 1 ? "1 sessie wacht" : `${pendingReview} sessies wachten`} op jouw feedback.</span> : null}
           </p>
         </div>
-        <span className={`${buttonClass({ variant: "accent", size: "md" })} shrink-0`}>
-          {frameUrl ? <><Play className="size-4" fill="currentColor" /> Open in Frame.io <ExternalLink className="size-4" /></> : <><Play className="size-4" fill="currentColor" /> Bekijk video&apos;s <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" /></>}
+        <span className={`${pendingReview > 0 ? portalBtn.act : portalBtn.cta} shrink-0`}>
+          <Play className="size-4" fill="currentColor" /> {pendingReview > 0 ? "Bekijk & beoordeel" : "Bekijk video's"} <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
         </span>
-      </a>
+      </Link>
 
       {/* Eerstvolgende publicatie + snelkoppeling naar de volledige contentplanning */}
       <div className="grid gap-[18px] sm:grid-cols-2">
@@ -342,8 +376,8 @@ export default async function PortalPage() {
               : "Jullie plaatsen de video's zelf; wij leveren ze kant-en-klaar aan."}
           </p>
         </section>
-        <Link href="/portal/planning" className="sc-glass group flex items-center gap-4 p-5 transition-colors hover:border-[var(--sc-line)]">
-          <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><CalendarRange className="size-6" strokeWidth={1.8} /></span>
+        <Link href="/portal/content" className="sc-glass group flex items-center gap-4 p-5 transition-colors hover:border-[var(--sc-line)]">
+          <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[var(--st-blue-bg)] text-[var(--sc-accent)]"><CalendarRange className="size-6" strokeWidth={1.8} /></span>
           <div className="min-w-0 flex-1">
             <h2 className="text-[16px] font-semibold">Jouw contentplanning</h2>
             <p className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">Bekijk wanneer welke video online komt.</p>
@@ -391,7 +425,7 @@ export default async function PortalPage() {
         ) : (
           <div className="sc-glass flex flex-wrap items-center justify-between gap-4 p-5">
             <div className="flex items-center gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><Film className="size-5" /></span>
+              <span className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-[var(--st-blue-bg)] text-[var(--sc-accent)]"><Film className="size-5" /></span>
               <div>
                 <div className="text-[17px] font-bold tabular-nums leading-none">{num(online)} video&apos;s online</div>
                 <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">Zodra je content online staat, zie je hier je weergaven, bereik en interacties.</p>

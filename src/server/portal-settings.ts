@@ -28,6 +28,8 @@ export type PortalSettings = {
   reviewAutoApproveDays: number;
   extraContentNote: string;
   rawFootageFee: string;
+  /** Standaard levertermijn van de video's na de opnamedag (werkdagen). */
+  deliveryWorkdays: number;
 };
 
 export const PORTAL_SETTINGS_DEFAULTS: PortalSettings = {
@@ -47,6 +49,7 @@ export const PORTAL_SETTINGS_DEFAULTS: PortalSettings = {
   reviewAutoApproveDays: 5,
   extraContentNote: "Extra video's kunnen tijdens een opnamedag worden opgenomen wanneer de planning dit toelaat. Dit geldt uitsluitend voor short video content en wordt aanvullend gefactureerd volgens het geldende tarief.",
   rawFootageFee: "€ 450 per opnamedag, binnen 90 dagen",
+  deliveryWorkdays: 14,
 };
 
 const K = {
@@ -66,13 +69,14 @@ const K = {
   reviewAutoApproveDays: "portal.review_auto_approve_days",
   extraContentNote: "portal.extra_content_note",
   rawFootageFee: "portal.raw_footage_fee",
+  deliveryWorkdays: "portal.delivery_workdays",
 } as const;
 
 export async function getPortalSettings(): Promise<PortalSettings> {
   const d = PORTAL_SETTINGS_DEFAULTS;
   const [
     feedbackDaysScripts, feedbackDaysVideos, cancelNoticeDays, cancelFee, cancelLateNote, reshootFee, extraFeedbackFee, travelCost, responseTime,
-    contractTerm, billingNote, shootDuration, reviewDays, reviewAutoApproveDays, extraContentNote, rawFootageFee,
+    contractTerm, billingNote, shootDuration, reviewDays, reviewAutoApproveDays, extraContentNote, rawFootageFee, deliveryWorkdays,
   ] = await Promise.all([
     getNumberSetting(K.feedbackDaysScripts, d.feedbackDaysScripts),
     getNumberSetting(K.feedbackDaysVideos, d.feedbackDaysVideos),
@@ -90,10 +94,11 @@ export async function getPortalSettings(): Promise<PortalSettings> {
     getNumberSetting(K.reviewAutoApproveDays, d.reviewAutoApproveDays),
     getStringSetting(K.extraContentNote, d.extraContentNote),
     getStringSetting(K.rawFootageFee, d.rawFootageFee),
+    getNumberSetting(K.deliveryWorkdays, d.deliveryWorkdays),
   ]);
   return {
     feedbackDaysScripts, feedbackDaysVideos, cancelNoticeDays, cancelFee, cancelLateNote, reshootFee, extraFeedbackFee, travelCost, responseTime,
-    contractTerm, billingNote, shootDuration, reviewDays, reviewAutoApproveDays, extraContentNote, rawFootageFee,
+    contractTerm, billingNote, shootDuration, reviewDays, reviewAutoApproveDays, extraContentNote, rawFootageFee, deliveryWorkdays,
   };
 }
 
@@ -101,10 +106,10 @@ export async function getPortalSettings(): Promise<PortalSettings> {
 export const OVERRIDABLE_KEYS: Array<keyof PortalSettings> = [
   "feedbackDaysScripts", "feedbackDaysVideos", "cancelNoticeDays", "cancelFee", "cancelLateNote",
   "reshootFee", "extraFeedbackFee", "travelCost", "responseTime", "contractTerm", "billingNote",
-  "shootDuration", "reviewDays", "reviewAutoApproveDays", "extraContentNote", "rawFootageFee",
+  "shootDuration", "reviewDays", "reviewAutoApproveDays", "extraContentNote", "rawFootageFee", "deliveryWorkdays",
 ];
 
-const NUMBER_KEYS = new Set<keyof PortalSettings>(["feedbackDaysScripts", "feedbackDaysVideos", "cancelNoticeDays", "reviewDays", "reviewAutoApproveDays"]);
+const NUMBER_KEYS = new Set<keyof PortalSettings>(["feedbackDaysScripts", "feedbackDaysVideos", "cancelNoticeDays", "reviewDays", "reviewAutoApproveDays", "deliveryWorkdays"]);
 
 /** De afwijkende afspraak-velden voor één klant (leeg object = geen afwijkingen). */
 export async function getClientAgreementOverrides(clientId: string): Promise<Partial<PortalSettings>> {
@@ -158,5 +163,6 @@ export async function savePortalSettings(input: PortalSettings, updatedById?: st
     num(K.reviewAutoApproveDays, input.reviewAutoApproveDays),
     str(K.extraContentNote, input.extraContentNote),
     str(K.rawFootageFee, input.rawFootageFee),
+    num(K.deliveryWorkdays, input.deliveryWorkdays),
   ]);
 }

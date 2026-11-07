@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { contentCalendar } from "@/db/schema";
+import { clients, contentCalendar } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 import { cleanPlanningTitle } from "@/lib/portal-status";
 
@@ -14,6 +14,8 @@ export type PortalContentPost = {
   status: string;
   /** Staat de post online (gepubliceerd)? Dan tonen we 'm groen. */
   isOnline: boolean;
+  /** Omslagafbeelding als die in de planning staat (anders null). */
+  coverUrl: string | null;
 };
 
 export type PortalContentWeek = {
@@ -27,6 +29,8 @@ export type PortalContentWeek = {
 export type PortalContentPlanning = {
   /** Heeft het team de contentplanning met het portaal gedeeld? */
   shared: boolean;
+  /** Plaatst Shortclips de video's (true) of de klant zelf (false)? */
+  weHandlePosting: boolean;
   weeks: PortalContentWeek[];
   total: number;
 };
@@ -59,7 +63,9 @@ function weekLabel(mondayIso: string): string {
  */
 export async function getPortalContentPlanning(viewer: Viewer): Promise<PortalContentPlanning> {
   const clientId = viewer.clientId;
-  if (!clientId) return { shared: false, weeks: [], total: 0 };
+  if (!clientId) return { shared: false, weHandlePosting: true, weeks: [], total: 0 };
+  const [cl] = await db.select({ we: clients.weHandlePosting }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  const weHandlePosting = cl?.we ?? true;
 
   // Is er überhaupt al iets met deze klant gedeeld? Zo niet: "wordt voorbereid".
   const [sharedRow] = await db
@@ -67,7 +73,7 @@ export async function getPortalContentPlanning(viewer: Viewer): Promise<PortalCo
     .from(contentCalendar)
     .where(and(eq(contentCalendar.clientId, clientId), isNull(contentCalendar.deletedAt), eq(contentCalendar.clientApproved, true)));
   const sharedCount = Number(sharedRow?.n ?? 0);
-  if (sharedCount === 0) return { shared: false, weeks: [], total: 0 };
+  if (sharedCount === 0) return { shared: false, weHandlePosting, weeks: [], total: 0 };
 
   const from = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
   const rows = await db
@@ -78,6 +84,7 @@ export async function getPortalContentPlanning(viewer: Viewer): Promise<PortalCo
       scheduledAt: contentCalendar.scheduledAt,
       platforms: contentCalendar.platforms,
       status: contentCalendar.status,
+      coverUrl: contentCalendar.coverUrl,
     })
     .from(contentCalendar)
     .where(and(
@@ -98,6 +105,7 @@ export async function getPortalContentPlanning(viewer: Viewer): Promise<PortalCo
       platforms: Array.isArray(r.platforms) ? (r.platforms as string[]) : [],
       status: r.status,
       isOnline: r.status === "published",
+      coverUrl: r.coverUrl ?? null,
     };
     const wk = mondayOf(r.scheduledOn);
     const list = byWeek.get(wk);
@@ -132,5 +140,5 @@ export async function getPortalContentPlanning(viewer: Viewer): Promise<PortalCo
     weeks.push({ weekStart: wk, label: weekLabel(wk), posts: byWeek.get(wk) ?? [] });
   }
 
-  return { shared: true, weeks, total: rows.length };
+  return { shared: true, weHandlePosting, weeks, total: rows.length };
 }

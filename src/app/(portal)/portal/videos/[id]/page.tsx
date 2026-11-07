@@ -109,7 +109,7 @@ export default async function PortalVideoDetailPage({
               <span className="text-xs text-[var(--color-ink-muted)]">{view.sublabel}</span>
             ) : null}
             {dl ? (
-              <span className={`text-xs font-medium ${dl.urgent ? "text-[#19a8ff]" : "text-[var(--color-ink-muted)]"}`}>
+              <span className={`text-xs font-medium ${dl.urgent ? "text-[var(--sc-accent)]" : "text-[var(--color-ink-muted)]"}`}>
                 {dl.text}
               </span>
             ) : null}
@@ -172,7 +172,7 @@ export default async function PortalVideoDetailPage({
           </div>
         </Card>
       ) : inFeedback ? (
-        <Card className="flex items-start gap-3 border-[rgba(46,144,250,0.35)] bg-[rgba(25,168,255,0.07)]">
+        <Card className="flex items-start gap-3 border-[rgba(46,144,250,0.35)] bg-[var(--st-blue-bg)]">
           <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[var(--sc-accent)]" />
           <div>
             <p className="text-sm font-semibold text-[var(--color-ink)]">

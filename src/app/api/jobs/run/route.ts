@@ -1,3 +1,4 @@
+import { frameLibraryCoverage, syncFrameLibrary } from "@/server/jobs/frameio-library";
 import { NextResponse } from "next/server";
 import { runFinanceSyncHealth } from "@/server/jobs/finance-sync";
 import { timingSafeEqual } from "node:crypto";
@@ -95,6 +96,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "frameio.pull_deliverables": pullFrameDeliverables,
   "frameio.normalize_imported": normalizeImportedFrameDeliverables,
   "frameio.list_projects": listFrameProjects,
+  "frameio.sync_library": syncFrameLibrary,
+  "frameio.library_coverage": frameLibraryCoverage,
   // Na de agenda-sync ook de scriptingtaken bijwerken: verplaatste of vervallen
   // opnames passen zo binnen het uur hun taak (deadline/afsluiten) aan.
   "calendar.sync": async () => {

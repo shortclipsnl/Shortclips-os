@@ -201,7 +201,7 @@ export class FrameService {
 
   async listProjects(): Promise<FrameProject[]> {
     const result = await this.request<Page<FrameProject>>(
-      `/accounts/${this.requireAccount()}/projects`,
+      `/accounts/${this.requireAccount()}/projects?page_size=100`,
     );
     return unwrap(result);
   }
@@ -219,6 +219,45 @@ export class FrameService {
       `/accounts/${this.requireAccount()}/folders/${folderId}/children`,
     );
     return unwrap(result);
+  }
+
+  /**
+   * Alle items in een map, over alle pagina's heen (Frame geeft standaard een
+   * beperkte pagina terug). Met `metadata` komen o.a. Duration en Comment Count
+   * mee; version stacks leveren hun nieuwste versie in `head_version`.
+   */
+  async listFolderChildrenAll(folderId: string, opts: { metadata?: boolean } = {}): Promise<FrameFile[]> {
+    const out: FrameFile[] = [];
+    let path: string | null =
+      `/accounts/${this.requireAccount()}/folders/${folderId}/children?page_size=100${opts.metadata ? "&include=metadata" : ""}`;
+    for (let page = 0; path && page < 20; page++) {
+      const res: { data?: FrameFile[]; links?: { next?: string | null } } = await this.request(path);
+      out.push(...(res.data ?? []));
+      const next = res.links?.next ?? null;
+      // `next` is een volledige of relatieve URL; we hebben het pad ná /v4 nodig.
+      path = next ? next.replace(/^https?:\/\/[^/]+/, "").replace(/^\/v4/, "") : null;
+    }
+    return out;
+  }
+
+  /** Ondertekende afspeel-URL (H.264 mp4, "efficient"-proxy) van een bestand. */
+  async getFilePlayback(fileId: string): Promise<string | null> {
+    const res = await this.request<{ data?: FrameFile } | FrameFile>(
+      `/accounts/${this.requireAccount()}/files/${fileId}?include=media_links.efficient,media_links.high_quality`,
+    );
+    const file = (res as { data?: FrameFile }).data ?? (res as FrameFile);
+    const links = file.media_links as { efficient?: { download_url?: string; url?: string }; high_quality?: { download_url?: string; url?: string } } | undefined;
+    return links?.efficient?.download_url ?? links?.efficient?.url ?? links?.high_quality?.download_url ?? null;
+  }
+
+  /** Thumbnail in hoge kwaliteit (valt terug op de gewone). */
+  async getFileThumbnailHq(fileId: string): Promise<string | null> {
+    const res = await this.request<{ data?: FrameFile } | FrameFile>(
+      `/accounts/${this.requireAccount()}/files/${fileId}?include=media_links.thumbnail_high_quality,media_links.thumbnail`,
+    );
+    const file = (res as { data?: FrameFile }).data ?? (res as FrameFile);
+    const links = file.media_links as { thumbnail_high_quality?: { url?: string }; thumbnail?: { url?: string } } | undefined;
+    return links?.thumbnail_high_quality?.url ?? links?.thumbnail?.url ?? null;
   }
 
   async getFile(fileId: string): Promise<FrameFile> {

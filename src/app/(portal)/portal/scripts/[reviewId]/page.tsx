@@ -17,11 +17,11 @@ export const dynamic = "force-dynamic";
  * meteen duidelijk is wat aandacht nodig heeft. Labels zijn klantgericht.
  */
 const PORTAL_STATUS: Record<ScriptReviewStatus, { label: string; cls: string; dot: string }> = {
-  klaar_controle:   { label: "Klaar voor controle",   cls: "bg-[#ff6a00] text-white", dot: "bg-white" },
-  opnieuw_controle: { label: "Opnieuw ter controle",  cls: "bg-[#ff6a00] text-white", dot: "bg-white" },
-  feedback_gegeven: { label: "Feedback ontvangen",    cls: "bg-[rgba(46,144,250,0.15)] text-[#1b6fe8]", dot: "bg-[#1b6fe8]" },
-  wordt_aangepast:  { label: "Wordt aangepast",       cls: "bg-[rgba(46,144,250,0.15)] text-[#1b6fe8]", dot: "bg-[#1b6fe8]" },
-  goedgekeurd:      { label: "Goedgekeurd door klant", cls: "bg-[rgba(47,210,122,0.18)] text-[#1d8a52]", dot: "bg-[#2fd27a]" },
+  klaar_controle:   { label: "Klaar voor controle",   cls: "bg-[var(--sc-act)] text-[var(--sc-act-ink)]", dot: "bg-white" },
+  opnieuw_controle: { label: "Opnieuw ter controle",  cls: "bg-[var(--sc-act)] text-[var(--sc-act-ink)]", dot: "bg-white" },
+  feedback_gegeven: { label: "Feedback ontvangen",    cls: "bg-[var(--st-blue-bg)] text-[var(--st-blue)]", dot: "bg-[#1b6fe8]" },
+  wordt_aangepast:  { label: "Wordt aangepast",       cls: "bg-[var(--st-blue-bg)] text-[var(--st-blue)]", dot: "bg-[#1b6fe8]" },
+  goedgekeurd:      { label: "Goedgekeurd door klant", cls: "bg-[var(--st-green-bg)] text-[var(--st-green)]", dot: "bg-[var(--st-green)]" },
 };
 
 /** Splitst een opmerking-body in een eventueel aangestreept citaat ("> …") en de tekst. */
@@ -73,7 +73,7 @@ export default async function PortalScriptReviewPage({ params }: { params: Promi
           </span>
         </div>
         {review.status !== "goedgekeurd" && review.feedbackDeadline ? (
-          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[rgba(25,168,255,0.14)] px-3 py-1 text-[13px] font-semibold text-[#19a8ff]">
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--st-blue-bg)] px-3 py-1 text-[13px] font-semibold text-[var(--sc-accent)]">
             <CalendarClock className="size-4" /> Wacht op jouw feedback · geef je reactie vóór {new Date(review.feedbackDeadline).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" })}
           </p>
         ) : null}
@@ -130,7 +130,7 @@ export default async function PortalScriptReviewPage({ params }: { params: Promi
                     <li key={t.id} className="rounded-[12px] border border-[var(--sc-line)] bg-[var(--color-surface)] p-3">
                       <div className="flex items-center justify-between gap-2 text-[11.5px] text-[var(--color-ink-faint)]">
                         <span>{t.pageNumber ? `Pagina ${t.pageNumber}` : "Algemeen"}{t.versionNumber ? ` · versie ${t.versionNumber}` : ""}</span>
-                        {t.isResolved ? <span className="inline-flex items-center gap-1 text-[#2fd27a]"><CheckCircle2 className="size-3.5" /> Verwerkt</span> : null}
+                        {t.isResolved ? <span className="inline-flex items-center gap-1 text-[var(--st-green)]"><CheckCircle2 className="size-3.5" /> Verwerkt</span> : null}
                       </div>
                       {parsed.quote ? (
                         <p className="mt-1.5 border-l-2 border-[#ff6a00] bg-[rgba(255,106,0,0.08)] px-2 py-1 text-[12px] italic leading-snug text-[var(--color-ink-muted)]">“{parsed.quote}”</p>

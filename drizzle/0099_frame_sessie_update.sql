@@ -1,0 +1,1 @@
+ALTER TABLE "frame_assets" ADD COLUMN "session_updated_at" timestamp with time zone;

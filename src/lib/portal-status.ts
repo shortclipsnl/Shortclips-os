@@ -49,9 +49,9 @@ export function clientStatusView(status: string): ClientStatusView {
 export function statusToneClass(tone: Tone | string): string {
   switch (tone) {
     case "warn": return "bg-[var(--color-warn-soft)] text-[#ffb020]";
-    case "good": case "lime": return "bg-[var(--color-good-soft)] text-[#2fd27a]";
+    case "good": case "lime": return "bg-[var(--color-good-soft)] text-[var(--st-green)]";
     case "ink": case "neutral": return "bg-white/10 text-[var(--color-ink-muted)]";
-    default: return "bg-[var(--color-info-soft)] text-[#4bc4ff]";
+    default: return "bg-[var(--color-info-soft)] text-[var(--st-blue)]";
   }
 }
 

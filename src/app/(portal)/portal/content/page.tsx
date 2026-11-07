@@ -1,45 +1,86 @@
 import type { Metadata } from "next";
-import { CalendarDays, CheckCircle2, Clock } from "lucide-react";
+import { CalendarDays, Clock, Radio } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContentPlanning, type PortalContentPost } from "@/server/portal-content";
+import { StatusPill, type StatusTone } from "@/components/portal/status-pill";
 import { PLATFORM } from "@/lib/statuses";
 
 export const metadata: Metadata = { title: "Contentplanning" };
 export const dynamic = "force-dynamic";
 
 const TZ = "Europe/Amsterdam";
-const WEEKDAYS_SHORT = ["ma", "di", "wo", "do", "vr", "za", "zo"];
 
-/** De 7 dagen (ma–zo) van de week die op `mondayIso` begint, als YYYY-MM-DD. */
-function daysOfWeek(mondayIso: string): string[] {
-  const base = new Date(`${mondayIso}T12:00:00Z`);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(base);
-    d.setUTCDate(base.getUTCDate() + i);
-    return d.toISOString().slice(0, 10);
-  });
+function mondayOf(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+function addDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+/** ISO-weeknummer. */
+function weekNumber(iso: string): number {
+  const d = new Date(`${iso}T12:00:00Z`);
+  const day = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - day + 3);
+  const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  return 1 + Math.round(((d.getTime() - firstThu.getTime()) / 86_400_000 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
+}
+function weekday(iso: string): string {
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString("nl-NL", { weekday: "short", timeZone: "UTC" }).replace(".", "");
+}
+function dayMonth(iso: string): string {
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString("nl-NL", { day: "numeric", month: "long", timeZone: "UTC" });
 }
 
-function dayNumber(iso: string): number {
-  return new Date(`${iso}T12:00:00`).getDate();
+/** Status in klanttaal, afhankelijk van wie publiceert. */
+function statusOf(p: PortalContentPost, weHandle: boolean): { tone: StatusTone; label: string } {
+  if (p.isOnline) return { tone: "green", label: weHandle ? "Online" : "Geplaatst" };
+  if (p.status === "scheduled" || p.status === "ready") return weHandle ? { tone: "blue", label: "Ingepland" } : { tone: "orange", label: "Klaar om te plaatsen" };
+  return { tone: "grey", label: "In voorbereiding" };
 }
 
-/** Statuslabel + kleur: online (groen), ingepland (blauw) of in voorbereiding. */
-function statusMeta(post: PortalContentPost): { label: string; tone: "online" | "planned" | "prep"; color: string } {
-  if (post.isOnline) return { label: "Staat online", tone: "online", color: "#2fd27a" };
-  if (post.status === "scheduled" || post.status === "ready") return { label: "Ingepland", tone: "planned", color: "var(--sc-accent)" };
-  return { label: "In voorbereiding", tone: "prep", color: "var(--color-ink-faint)" };
-}
-
-/** Kleine platformstippen (max 4) in de kleur van het kanaal. */
-function PlatformDots({ platforms }: { platforms: string[] }) {
+function PlatformChips({ platforms }: { platforms: string[] }) {
   if (platforms.length === 0) return null;
   return (
-    <span className="flex shrink-0 items-center gap-0.5">
-      {platforms.slice(0, 4).map((p) => (
-        <span key={p} className="size-1.5 rounded-full" title={PLATFORM[p]?.label ?? p} style={{ background: PLATFORM[p]?.color ?? "var(--color-ink-faint)" }} />
+    <div className="flex flex-wrap gap-1.5">
+      {platforms.map((p) => (
+        <span key={p} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--sc-line)] bg-[var(--color-surface)] px-2 py-0.5 text-[11.5px] font-medium text-[var(--color-ink-muted)]">
+          <span className="size-2 rounded-full ring-1 ring-[var(--sc-line)]" style={{ background: PLATFORM[p]?.color ?? "var(--color-ink-faint)" }} />
+          {PLATFORM[p]?.label ?? p}
+        </span>
       ))}
-    </span>
+    </div>
+  );
+}
+
+function PostCard({ post, weHandle, isToday }: { post: PortalContentPost; weHandle: boolean; isToday: boolean }) {
+  const st = statusOf(post, weHandle);
+  return (
+    <article className="flex gap-3.5 rounded-[14px] border border-[var(--sc-line)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
+      <div className={`flex w-12 shrink-0 flex-col items-center justify-center rounded-[12px] py-2 ${isToday ? "bg-[var(--sc-cta)] text-[var(--sc-cta-ink)]" : "bg-[var(--sc-fill)]"}`}>
+        <span className={`text-[11px] font-semibold uppercase ${isToday ? "opacity-80" : "text-[var(--color-ink-muted)]"}`}>{weekday(post.scheduledOn)}</span>
+        <span className="text-[19px] font-bold leading-tight tabular-nums">{new Date(`${post.scheduledOn}T12:00:00Z`).getUTCDate()}</span>
+      </div>
+      {post.coverUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={post.coverUrl} alt="" className="h-[72px] w-[44px] shrink-0 rounded-[8px] object-cover" />
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug">{post.title}</h3>
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[12.5px] text-[var(--color-ink-muted)]">
+          <span>{dayMonth(post.scheduledOn)}</span>
+          {post.scheduledAt ? <span className="inline-flex items-center gap-1"><Clock className="size-3" /> {post.scheduledAt} uur</span> : null}
+          {isToday ? <span className="font-semibold text-[var(--sc-accent)]">Vandaag</span> : null}
+        </p>
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <StatusPill tone={st.tone}>{st.label}</StatusPill>
+          <PlatformChips platforms={post.platforms} />
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -47,126 +88,91 @@ export default async function PortalContentPage() {
   const viewer = await requirePortal();
   const data = await getPortalContentPlanning(viewer);
   const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
+  const thisMonday = mondayOf(todayIso);
+  const nextMonday = addDays(thisMonday, 7);
+  const weHandle = data.weHandlePosting;
 
-  // Maandag van deze en volgende week, zodat de koppen "Deze week" / "Volgende
-  // week" tonen en de planning daarna duidelijk doorloopt.
-  const nowUtc = new Date(`${todayIso}T12:00:00Z`);
-  const mondayOffset = (nowUtc.getUTCDay() + 6) % 7;
-  const thisMondayDate = new Date(nowUtc);
-  thisMondayDate.setUTCDate(nowUtc.getUTCDate() - mondayOffset);
-  const thisMonday = thisMondayDate.toISOString().slice(0, 10);
-  const nextMondayDate = new Date(thisMondayDate);
-  nextMondayDate.setUTCDate(thisMondayDate.getUTCDate() + 7);
-  const nextMonday = nextMondayDate.toISOString().slice(0, 10);
+  const thisWeek = data.weeks.find((w) => w.weekStart === thisMonday);
+  const upcoming = data.weeks.flatMap((w) => w.posts).filter((p) => p.scheduledOn >= todayIso && !p.isOnline);
 
   return (
-    <div className="flex flex-col gap-[22px]">
-      {/* Kop */}
-      <div className="px-0.5 pt-1">
-        <h1 className="text-[26px] font-bold tracking-tight">Contentplanning</h1>
-        <p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">
-          Je hele week in beeld: op welke dag welke video online komt, en op welke kanalen. Wat al live staat is groen.
-        </p>
-      </div>
-
-      {/* Legenda met de kleuren, zodat de agenda meteen te lezen is */}
-      {data.shared && data.weeks.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-[var(--color-ink-muted)]">
-          <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[#2fd27a]" /> Staat online</span>
-          <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[var(--sc-accent)]" /> Ingepland</span>
-          <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[var(--color-ink-faint)]" /> In voorbereiding</span>
+    <div className="flex flex-col gap-7">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-[26px] font-bold tracking-tight">Contentplanning</h1>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Welke video wanneer online komt, en op welke kanalen.</p>
         </div>
-      ) : null}
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--sc-line)] bg-[var(--color-surface)] px-3 py-1.5 text-[12.5px] text-[var(--color-ink-muted)]">
+          <Radio className="size-3.5 text-[var(--sc-accent)]" />
+          {weHandle ? "Shortclips plaatst je video's" : "Je plaatst de video's zelf"}
+        </span>
+      </div>
 
       {!data.shared ? (
         <section className="sc-glass flex items-start gap-3 p-5">
           <CalendarDays className="size-5 shrink-0 text-[var(--sc-accent)]" />
           <div>
             <p className="text-sm font-semibold">Je contentplanning wordt voorbereid</p>
-            <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">
-              Zodra wij de planning met je delen, zie je hier precies welke post wanneer online komt.
-            </p>
+            <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">Zodra wij de planning met je delen, zie je hier precies welke video wanneer online komt.</p>
           </div>
         </section>
-      ) : data.weeks.length === 0 ? (
-        <section className="sc-glass p-5 text-sm text-[var(--color-ink-muted)]">
-          Er staat op dit moment nog geen content ingepland. Je ziet het hier zodra wij de planning hebben gevuld.
-        </section>
       ) : (
-        <div className="flex flex-col gap-6">
-          {data.weeks.map((week) => {
-            const days = daysOfWeek(week.weekStart);
-            const isThisWeek = week.weekStart === thisMonday;
-            const isNextWeek = week.weekStart === nextMonday;
-            const weekTitle = isThisWeek ? "Deze week" : isNextWeek ? "Volgende week" : `Week van ${week.label}`;
-            return (
-              <section key={week.weekStart}>
-                <div className="mb-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <h2 className="text-[13px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-                    {weekTitle}
-                  </h2>
-                  {/* Datumbereik erbij als de kop een naam is, zodat je altijd de datum ziet. */}
-                  {isThisWeek || isNextWeek ? <span className="text-[12px] text-[var(--color-ink-faint)]">· {week.label}</span> : null}
-                  {isThisWeek ? <span className="rounded-full bg-[var(--sc-accent)]/15 px-2 py-0.5 text-[11px] font-semibold text-[var(--sc-accent)]">Nu</span> : null}
-                </div>
+        <>
+          {/* Kerncijfers: deze week en wat er nog komt */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="sc-glass p-4">
+              <div className="text-[28px] font-bold leading-none tabular-nums">{thisWeek?.posts.length ?? 0}</div>
+              <div className="mt-1.5 text-[12.5px] text-[var(--color-ink-muted)]">video&apos;s deze week</div>
+            </div>
+            <div className="sc-glass p-4">
+              <div className="text-[28px] font-bold leading-none tabular-nums">{upcoming.length}</div>
+              <div className="mt-1.5 text-[12.5px] text-[var(--color-ink-muted)]">{weHandle ? "nog ingepland" : "nog te plaatsen"}</div>
+            </div>
+            <div className="sc-glass col-span-2 p-4 sm:col-span-1">
+              <div className="text-[15px] font-semibold leading-snug">{upcoming[0] ? `${weekday(upcoming[0].scheduledOn)} ${dayMonth(upcoming[0].scheduledOn)}${upcoming[0].scheduledAt ? ` · ${upcoming[0].scheduledAt}` : ""}` : "Nog niets gepland"}</div>
+              <div className="mt-1.5 text-[12.5px] text-[var(--color-ink-muted)]">eerstvolgende publicatie</div>
+            </div>
+          </div>
 
-                {/* Weekagenda: 7 dagen (ma–zo) als kolommen op desktop, gestapeld op
-                    mobiel. Lege dagen blijven zichtbaar, zodat je de hele week ziet. */}
-                <div className="sc-glass overflow-hidden p-0">
-                  <div className="grid grid-cols-1 gap-px bg-[var(--sc-line)] sm:grid-cols-7">
-                    {days.map((dayIso, i) => {
-                      const isToday = dayIso === todayIso;
-                      const posts = week.posts.filter((p) => p.scheduledOn === dayIso);
-                      return (
-                        <div key={dayIso} className="flex min-h-[112px] min-w-0 flex-col bg-[var(--color-surface)]">
-                          {/* Dagkop */}
-                          <div className={`flex items-baseline justify-between px-2.5 pt-2.5 pb-1.5 ${isToday ? "bg-[var(--sc-accent)] text-white" : ""}`}>
-                            <span className="text-[12px] font-bold capitalize">{WEEKDAYS_SHORT[i]}</span>
-                            <span className={`text-[11px] tabular-nums ${isToday ? "text-white/85" : "text-[var(--color-ink-faint)]"}`}>
-                              {dayNumber(dayIso)}
-                              {isToday ? " · vandaag" : ""}
-                            </span>
-                          </div>
-                          {/* Posts van die dag */}
-                          <div className="flex flex-1 flex-col gap-1.5 px-2 pb-2.5 pt-1">
-                            {posts.length === 0 ? (
-                              <span className="px-1 py-1 text-[11px] text-[var(--color-ink-faint)]">—</span>
-                            ) : (
-                              posts.map((post) => {
-                                const st = statusMeta(post);
-                                return (
-                                  <div
-                                    key={post.id}
-                                    className="rounded-[10px] border-l-[3px] bg-[var(--sc-fill)] px-2 py-1.5"
-                                    style={{ borderLeftColor: st.color }}
-                                  >
-                                    <div className="flex items-center gap-1.5">
-                                      <PlatformDots platforms={post.platforms} />
-                                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold leading-tight">{post.title}</span>
-                                    </div>
-                                    <div className="mt-0.5 flex items-center gap-1 text-[10.5px] text-[var(--color-ink-muted)]">
-                                      {st.tone === "online" ? <CheckCircle2 className="size-3 text-[#2fd27a]" /> : <Clock className="size-3" />}
-                                      {post.scheduledAt ? `${post.scheduledAt} · ` : ""}{st.label}
-                                    </div>
-                                  </div>
-                                );
-                              })
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </section>
-            );
-          })}
-        </div>
+          <div className="flex flex-col gap-5">
+            {data.weeks.map((week) => {
+              const isThis = week.weekStart === thisMonday;
+              const isNext = week.weekStart === nextMonday;
+              const isPast = week.weekStart < thisMonday;
+              const name = isThis ? "Deze week" : isNext ? "Volgende week" : `Week ${weekNumber(week.weekStart)}`;
+              return (
+                <section
+                  key={week.weekStart}
+                  className={`rounded-[18px] p-4 sm:p-5 ${isThis ? "border-2 border-[var(--sc-now-line)] bg-[var(--sc-now-bg)]" : "border border-[var(--sc-line)] bg-[var(--sc-fill)]"} ${isPast ? "opacity-75" : ""}`}
+                  aria-current={isThis ? "date" : undefined}
+                >
+                  <header className="mb-3.5 flex flex-wrap items-baseline justify-between gap-2">
+                    <div className="flex flex-wrap items-baseline gap-x-2.5">
+                      <h2 className={`font-bold tracking-tight ${isThis ? "text-[20px]" : "text-[17px]"}`}>{name}</h2>
+                      <span className="text-[13px] text-[var(--color-ink-muted)]">{isThis || isNext ? `week ${weekNumber(week.weekStart)} · ` : ""}{week.label}</span>
+                    </div>
+                    <span className="text-[12.5px] font-medium text-[var(--color-ink-muted)]">
+                      {week.posts.length === 0 ? "Geen publicaties" : `${week.posts.length} ${week.posts.length === 1 ? "publicatie" : "publicaties"}`}
+                    </span>
+                  </header>
+                  {week.posts.length === 0 ? (
+                    <p className="text-[13px] text-[var(--color-ink-faint)]">Deze week staat er niets gepland.</p>
+                  ) : (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {week.posts.map((p) => <PostCard key={p.id} post={p} weHandle={weHandle} isToday={p.scheduledOn === todayIso} />)}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </>
       )}
 
-      <footer className="flex items-center gap-1.5 pt-1 text-xs text-[var(--color-ink-faint)]">
-        <Clock className="size-3.5" /> Zodra een video online staat, krijg je er automatisch bericht van.
-      </footer>
+      <p className="flex items-center gap-1.5 text-xs text-[var(--color-ink-faint)]">
+        <Clock className="size-3.5" />
+        {weHandle ? "Zodra een video online staat, krijg je er automatisch bericht van." : "De video's staan klaar op de geplande dag; plaats ze bij voorkeur op het aangegeven tijdstip."}
+      </p>
     </div>
   );
 }

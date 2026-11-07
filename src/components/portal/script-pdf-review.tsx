@@ -82,7 +82,7 @@ export function ScriptPdfReview({
   return (
     <div className="flex flex-col">
       {canAnnotate ? (
-        <div className="mb-3 flex items-start gap-2.5 rounded-[12px] border border-[#2e90fa]/30 bg-[rgba(46,144,250,0.08)] p-3 text-[13px]">
+        <div className="mb-3 flex items-start gap-2.5 rounded-[12px] border border-[var(--sc-line)] bg-[var(--st-blue-bg)] p-3 text-[13px]">
           <MessageSquarePlus className="mt-0.5 size-4 shrink-0 text-[var(--sc-accent)]" />
           <span className="text-[var(--color-ink-muted)]">
             <strong className="text-[var(--color-ink)]">Selecteer een zin</strong> in het script (of tik op een plek) om daar direct feedback aan te koppelen. Je opmerkingen verschijnen in de kolom hiernaast — klik daar op <strong className="text-[var(--color-ink)]">Feedback doorgeven</strong> om ze in te dienen.
@@ -270,14 +270,14 @@ function Pin({ index, pin, open, onToggle }: { index: number; pin: ReviewPin; op
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onToggle(); }}
-        className={`grid size-6 place-items-center rounded-full text-[11px] font-bold text-white shadow-[0_2px_8px_rgba(0,0,0,0.5)] ring-2 ring-white/70 ${pin.isResolved ? "bg-[#2fd27a]" : "bg-[#ff6a00]"}`}
+        className={`grid size-6 place-items-center rounded-full text-[11px] font-bold text-white shadow-[0_2px_8px_rgba(0,0,0,0.5)] ring-2 ring-white/70 ${pin.isResolved ? "bg-[var(--st-green)]" : "bg-[#ff6a00]"}`}
         title="Opmerking bekijken"
       >
         {pin.isResolved ? <Check className="size-3.5" /> : index}
       </button>
       {open ? (
         <div className="absolute left-1/2 top-7 z-30 w-64 max-w-[72vw] -translate-x-1/2 rounded-[12px] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3 text-left shadow-[var(--shadow-raised,0_12px_30px_-8px_rgba(0,0,0,0.6))]" onClick={(e) => e.stopPropagation()}>
-          {pin.isResolved ? <div className="mb-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-[#2fd27a]"><Check className="size-3.5" /> Verwerkt</div> : null}
+          {pin.isResolved ? <div className="mb-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--st-green)]"><Check className="size-3.5" /> Verwerkt</div> : null}
           {pin.comments.map((c) => (
             <div key={c.id} className="mb-2 last:mb-0">
               <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--color-ink)]">{stripQuote(c.body)}</p>
@@ -312,7 +312,7 @@ function NewComment({ reviewId, pageNumber, x, y, quote, onClose }: { reviewId: 
 
   return (
     <div className="absolute z-40 -translate-y-1/2" style={{ left: `${x * 100}%`, top: `${y * 100}%` }} onClick={(e) => e.stopPropagation()}>
-      <span className="absolute -left-1.5 -top-1.5 grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[#ff6a00] text-white ring-2 ring-white/70"><MessageSquarePlus className="size-3.5" /></span>
+      <span className="absolute -left-1.5 -top-1.5 grid size-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[var(--sc-act)] text-[var(--sc-act-ink)] ring-2 ring-white/70"><MessageSquarePlus className="size-3.5" /></span>
       <div className={`w-72 max-w-[80vw] rounded-[12px] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3 shadow-[0_12px_30px_-8px_rgba(0,0,0,0.6)] ${alignRight ? "-translate-x-full -ml-2" : "ml-2"}`}>
         <div className="mb-1.5 flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{quote ? "Feedback op deze zin" : "Opmerking"} · pagina {pageNumber}</span>

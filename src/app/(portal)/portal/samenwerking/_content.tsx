@@ -52,7 +52,7 @@ export function OpnamedagContent() {
             {i < SHOOT_STEPS.length - 1 ? (
               <span className="absolute left-[15px] top-8 h-full w-px bg-[var(--sc-fill-strong)]" aria-hidden />
             ) : null}
-            <span className="z-10 grid size-8 shrink-0 place-items-center rounded-full border border-[#2e90fa]/40 bg-[rgba(25,168,255,0.12)] text-[12px] font-bold text-[var(--sc-accent)]">
+            <span className="z-10 grid size-8 shrink-0 place-items-center rounded-full border border-[var(--sc-line)] bg-[var(--st-blue-bg)] text-[12px] font-bold text-[var(--sc-accent)]">
               {String(i + 1).padStart(2, "0")}
             </span>
             <div className="pt-0.5">
@@ -64,8 +64,8 @@ export function OpnamedagContent() {
         ))}
       </ol>
       <div className="mt-6 grid gap-3.5 sm:grid-cols-2">
-        <div className="rounded-[14px] border border-[#2fd27a]/30 bg-[rgba(47,210,122,0.06)] p-4">
-          <div className="flex items-center gap-2 text-[14px] font-semibold"><Clock className="size-4 text-[#2fd27a]" /> Jullie tijdsbesteding</div>
+        <div className="rounded-[14px] border border-[#2fd27a]/30 bg-[var(--st-green-bg)] p-4">
+          <div className="flex items-center gap-2 text-[14px] font-semibold"><Clock className="size-4 text-[var(--st-green)]" /> Jullie tijdsbesteding</div>
           <p className="mt-1.5 text-[13px] text-[var(--color-ink-muted)]">Alleen de presentator is de hele dag nodig. Collega&apos;s die kort in beeld komen plannen we op een vast moment in.</p>
         </div>
         <div className="rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4">
@@ -106,11 +106,11 @@ export function RolverdelingContent() {
         </table>
       </div>
       <div className="mt-6 grid gap-3.5 sm:grid-cols-2">
-        <div className="rounded-[14px] border border-[#2fd27a]/30 bg-[rgba(47,210,122,0.06)] p-5">
-          <div className="flex items-center gap-2 text-[14px] font-semibold"><Users className="size-4 text-[#2fd27a]" /> Wat wij van jullie nodig hebben</div>
+        <div className="rounded-[14px] border border-[#2fd27a]/30 bg-[var(--st-green-bg)] p-5">
+          <div className="flex items-center gap-2 text-[14px] font-semibold"><Users className="size-4 text-[var(--st-green)]" /> Wat wij van jullie nodig hebben</div>
           <ul className="mt-3 flex flex-col gap-2">
             {NEED_FROM_YOU.map((n) => (
-              <li key={n} className="flex gap-2 text-[13px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> {n}</li>
+              <li key={n} className="flex gap-2 text-[13px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[var(--st-green)]" /> {n}</li>
             ))}
           </ul>
         </div>
@@ -185,7 +185,7 @@ export function TeamContent({
       </div>
 
       {/* Feedback-kanaal: video's altijd via de videopagina (Frame), niet via WhatsApp */}
-      <div className="flex items-start gap-3 rounded-[14px] border border-[#2e90fa]/25 bg-[rgba(46,144,250,0.06)] p-4">
+      <div className="flex items-start gap-3 rounded-[14px] border border-[var(--sc-line)] bg-[var(--st-blue-bg)] p-4">
         <MessageSquareText className="mt-0.5 size-5 shrink-0 text-[var(--sc-accent)]" />
         <p className="text-[13.5px] text-[var(--color-ink-muted)]">
           <span className="font-semibold text-[var(--color-ink)]">Feedback op video&apos;s?</span> Geef die altijd via de{" "}

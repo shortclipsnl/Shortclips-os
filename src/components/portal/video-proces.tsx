@@ -28,11 +28,11 @@ export function VideoProces({ extraFeedbackFee }: { extraFeedbackFee: string }) 
         {STEPS.map((step, i) => (
           <li key={step.n} className="relative flex gap-4 pb-6 last:pb-0">
             {i < STEPS.length - 1 ? <span className="absolute left-[15px] top-8 h-full w-px bg-[var(--sc-fill-strong)]" aria-hidden /> : null}
-            <span className="z-10 grid size-8 shrink-0 place-items-center rounded-full border border-[#2e90fa]/40 bg-[rgba(25,168,255,0.12)] text-[12px] font-bold text-[var(--sc-accent)]">{step.n}</span>
+            <span className="z-10 grid size-8 shrink-0 place-items-center rounded-full border border-[var(--sc-line)] bg-[var(--st-blue-bg)] text-[12px] font-bold text-[var(--sc-accent)]">{step.n}</span>
             <div className="pt-0.5">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[15px] font-semibold">{step.title}</span>
-                {step.badge ? <span className="rounded-full bg-[#2fd27a]/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[#2fd27a]">{step.badge}</span> : null}
+                {step.badge ? <span className="rounded-full bg-[var(--st-green-bg)] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--st-green)]">{step.badge}</span> : null}
               </div>
               {step.body === "FEEDBACK" ? (
                 <p className="mt-0.5 text-[13.5px] text-[var(--color-ink-muted)]">
@@ -48,7 +48,7 @@ export function VideoProces({ extraFeedbackFee }: { extraFeedbackFee: string }) 
 
       <div className="mt-2 grid gap-3 sm:grid-cols-2">
         <div className="rounded-[14px] border border-[#ff6a00]/30 bg-[rgba(255,106,0,0.06)] p-4">
-          <div className="flex items-center gap-2 text-[14px] font-semibold text-[#ff6a00]"><AlertCircle className="size-4" /> Spoed nodig?</div>
+          <div className="flex items-center gap-2 text-[14px] font-semibold text-[var(--st-orange)]"><AlertCircle className="size-4" /> Spoed nodig?</div>
           <p className="mt-1.5 text-[13px] text-[var(--color-ink-muted)]">Spoedlevering is mogelijk tegen een extra vergoeding en alleen wanneer de planning het toelaat. Meld het bij voorkeur vóór de opnamedag.</p>
         </div>
         <div className="rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4">

@@ -7,6 +7,7 @@
     { "path": "/api/jobs/run?job=meetings.roll_over", "schedule": "0 4 * * *" },
     { "path": "/api/jobs/run?job=portal.notify_clients", "schedule": "0 8 * * *" },
     { "path": "/api/jobs/run?job=sync.frequent", "schedule": "0 12 * * *" },
+    { "path": "/api/jobs/run?job=frameio.sync_library", "schedule": "40 6-18/2 * * *" },
     { "path": "/api/jobs/run?job=sync.nightly", "schedule": "0 3 * * *" },
     { "path": "/api/jobs/run?job=reminders.daily_todo&slot=winter", "schedule": "30 12 * * *" },
     { "path": "/api/jobs/run?job=reminders.daily_todo&slot=zomer", "schedule": "30 11 * * *" },

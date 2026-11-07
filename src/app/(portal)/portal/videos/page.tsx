@@ -1,190 +1,210 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Check, ExternalLink, MessageSquareText, Play, Video as VideoIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, ExternalLink, Film, FolderOpen, MessageSquareText } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalFrameUrl, getPortalVideos } from "@/server/portal";
+import { getPortalVideos } from "@/server/portal";
+import { getPortalFrameLibrary, type PortalFrameSession } from "@/server/portal-frame";
 import { getPortalSettingsForClient } from "@/server/portal-settings";
-import { CoverImage } from "@/components/portal/cover-image";
+import { FrameVideoGrid } from "@/components/portal/frame-video-grid";
+import { StatusPill, portalBtn, type StatusTone } from "@/components/portal/status-pill";
 import { VideoProces } from "@/components/portal/video-proces";
-import { buttonClass } from "@/components/ui";
 import { formatDateFull } from "@/lib/format";
-import { clientStatusView, statusToneClass } from "@/lib/portal-status";
-import { videoCover } from "../cover";
+import { deadlineText } from "@/lib/portal-status";
+import { SessionApprove } from "./session-approve";
 
 export const metadata: Metadata = { title: "Video's" };
 export const dynamic = "force-dynamic";
 
-type Row = {
-  id: string;
-  title: string;
-  status: string;
-  frameAssetId: string | null;
-  frameUrl: string | null;
-  thumbnailUrl: string | null;
-  publishedAt: Date | null;
-  statusChangedAt: Date | null;
-  productionDayId: string | null;
-  sessionDate: string | null;
-  sessionTitle: string | null;
+const TONE: Record<NonNullable<PortalFrameSession["status"]>["key"], StatusTone> = {
+  feedback: "orange",
+  verwerken: "blue",
+  productie: "blue",
+  goedgekeurd: "green",
+  online: "green",
 };
 
-type SessionGroup = { key: string; date: string | null; title: string | null; videos: Row[]; frameUrl: string | null };
-
-/** Video's groeperen per opnamesessie, zodat de klant per sessie (6–8 video's)
- *  in één keer in Frame kan beoordelen i.p.v. per losse video te klikken. */
-function groupBySession(rows: Row[]): SessionGroup[] {
-  const map = new Map<string, SessionGroup>();
-  for (const v of rows) {
-    const key = v.productionDayId ?? "los";
-    let g = map.get(key);
-    if (!g) { g = { key, date: v.sessionDate, title: v.sessionTitle, videos: [], frameUrl: null }; map.set(key, g); }
-    g.videos.push(v);
-    if (!g.frameUrl && v.frameUrl) g.frameUrl = v.frameUrl;
-  }
-  return [...map.values()].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+function overdue(s: PortalFrameSession): boolean {
+  return !!s.feedbackDeadline && new Date(s.feedbackDeadline).getTime() < new Date().setHours(0, 0, 0, 0);
 }
 
-function Tile({ v }: { v: Row }) {
-  const view = clientStatusView(v.status);
-  const s = { label: view.label, cls: statusToneClass(view.tone) };
-  const cover = v.frameAssetId ? `/api/frame/thumb/${v.id}` : null;
+function SessionStatus({ s }: { s: PortalFrameSession }) {
+  if (!s.status) return null;
+  if (s.status.key === "feedback" && overdue(s)) return <StatusPill tone="red">Feedbacktermijn verstreken</StatusPill>;
+  return <StatusPill tone={TONE[s.status.key]}>{s.status.label}</StatusPill>;
+}
+
+function sessionSub(s: PortalFrameSession): string {
+  const parts: string[] = [];
+  if (s.shootDate) parts.push(`Opname ${formatDateFull(s.shootDate)}`);
+  parts.push(`${s.videos.length} video${s.videos.length === 1 ? "" : "'s"}`);
+  return parts.join(" · ");
+}
+
+/** Sessiekaart in het overzicht: omslag (eerste video), titel, status, aantal. */
+function SessionCard({ s }: { s: PortalFrameSession }) {
+  const covers = s.videos.slice(0, 3);
+  const attention = s.status?.key === "feedback";
   return (
-    <Link href={`/portal/videos/${v.id}`} className="group block">
-      <article
-        className="sc-short transition-transform duration-200 group-hover:-translate-y-0.5"
-        style={{ background: videoCover(v.title) }}
-      >
-        {cover ? <CoverImage src={cover} /> : null}
-        <span className={`absolute left-2.5 top-2.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${s.cls}`}>{s.label}</span>
-        <span className="sc-play"><Play className="size-[18px] translate-x-0.5" fill="currentColor" /></span>
-      </article>
-      <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-snug text-[var(--color-ink)] group-hover:text-[#9fdcff]">{v.title}</p>
+    <Link
+      href={`/portal/videos?sessie=${encodeURIComponent(s.key)}`}
+      className={`sc-glass group flex flex-col overflow-hidden p-0 transition-shadow hover:shadow-[var(--shadow-raised)] ${attention ? "ring-2 ring-[var(--sc-act)]/50" : ""}`}
+    >
+      <div className="grid h-40 grid-cols-3 gap-px bg-[var(--sc-line)]">
+        {covers.map((v) => (
+          <div key={v.id} className="relative overflow-hidden bg-[var(--sc-fill-strong)]">
+            <span className="absolute inset-0 grid place-items-center text-[var(--color-ink-faint)]"><Film className="size-5" strokeWidth={1.5} /></span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/api/portal/frame/${v.id}/thumb`} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" />
+          </div>
+        ))}
+        {Array.from({ length: Math.max(0, 3 - covers.length) }).map((_, i) => <div key={i} className="bg-[var(--sc-fill)]" />)}
+      </div>
+      <div className="flex flex-1 flex-col gap-2 p-4">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-[15.5px] font-semibold leading-snug">{s.title}</h3>
+          <ArrowRight className="mt-0.5 size-4 shrink-0 text-[var(--color-ink-faint)] transition-transform group-hover:translate-x-0.5" />
+        </div>
+        <p className="text-[12.5px] text-[var(--color-ink-muted)]">{sessionSub(s)}</p>
+        <div className="mt-auto pt-1"><SessionStatus s={s} /></div>
+      </div>
     </Link>
   );
 }
 
-/** Eén opnamesessie met al z'n te beoordelen video's en één Frame-link. */
-function SessionCard({ g }: { g: SessionGroup }) {
-  const header = g.date ? `Opname ${formatDateFull(g.date)}` : g.title ?? "Losse video's";
-  return (
-    <div className="sc-glass p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-[15px] font-semibold">{header}</h3>
-          <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-muted)]">{g.videos.length} video&apos;s wachten op je akkoord</p>
-        </div>
-        {g.frameUrl ? (
-          <a href={g.frameUrl} target="_blank" rel="noreferrer" className={`${buttonClass({ variant: "accent", size: "sm" })} shrink-0`}>
-            Beoordeel deze sessie in Frame <ExternalLink className="size-3.5" />
-          </a>
-        ) : null}
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
-        {g.videos.map((v) => <Tile key={v.id} v={v} />)}
-      </div>
-    </div>
-  );
-}
-
-function Group({ title, subtitle, rows, max }: { title: string; subtitle?: string; rows: Row[]; max?: number }) {
-  if (rows.length === 0) return null;
-  return (
-    <section>
-      <div className="mb-3.5">
-        <h2 className="text-base font-semibold">{title}</h2>
-        {subtitle ? <p className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">{subtitle}</p> : null}
-      </div>
-      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
-        {rows.slice(0, max ?? rows.length).map((v) => <Tile key={v.id} v={v} />)}
-      </div>
-    </section>
-  );
-}
-
-export default async function PortalVideosPage() {
+export default async function PortalVideosPage({ searchParams }: { searchParams: Promise<{ sessie?: string }> }) {
   const viewer = await requirePortal();
-  const [data, settings, frameUrl] = await Promise.all([getPortalVideos(viewer), getPortalSettingsForClient(viewer.clientId ?? ""), getPortalFrameUrl(viewer)]);
+  const { sessie } = await searchParams;
+  const [lib, legacy, settings] = await Promise.all([
+    getPortalFrameLibrary(viewer),
+    getPortalVideos(viewer),
+    getPortalSettingsForClient(viewer.clientId ?? ""),
+  ]);
 
+  const waiting = lib.sessions.filter((s) => s.status?.key === "feedback");
+  // Akkoordverzoeken van het team die (nog) niet aan een Frame-sessie hangen.
+  const linkedApprove = new Set(lib.sessions.map((s) => s.approveId).filter(Boolean));
+  const looseActions = legacy.actieNodig.filter((v) => !linkedApprove.has(v.id));
+
+  const selected = sessie ? lib.sessions.find((s) => s.key === sessie) ?? null : null;
+
+  /* ---------------- Detail: één opnamesessie ---------------- */
+  if (selected) {
+    const dl = selected.status?.key === "feedback" ? deadlineText(selected.feedbackDeadline ? new Date(selected.feedbackDeadline) : null) : null;
+    return (
+      <div className="flex flex-col gap-6">
+        <Link href="/portal/videos" className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+          <ArrowLeft className="size-4" /> Alle opnamesessies
+        </Link>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-[26px] font-bold tracking-tight">{selected.title}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2.5 text-[13px] text-[var(--color-ink-muted)]">
+              <SessionStatus s={selected} />
+              <span>{sessionSub(selected)}</span>
+            </div>
+          </div>
+        </div>
+
+        {selected.status?.key === "feedback" ? (
+          <section className="sc-glass flex flex-wrap items-center justify-between gap-4 p-5" style={{ boxShadow: "inset 4px 0 0 var(--sc-act)" }}>
+            <div className="min-w-0 max-w-xl">
+              <p className="text-[15px] font-semibold">Deze video&apos;s wachten op jouw feedback</p>
+              <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">
+                Bekijk de video&apos;s hieronder. Alles goed? Keur ze in één keer goed. Wil je iets aangepast hebben, geef het dan gebundeld door{lib.reviewUrl ? " in Frame, met tijdcode bij de video" : " aan je contactpersoon"}.
+              </p>
+              {dl ? <p className={`mt-1.5 text-[13px] font-semibold ${dl.urgent ? "text-[var(--st-orange)]" : "text-[var(--color-ink)]"}`}>{dl.text}</p> : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {selected.approveId ? <SessionApprove deliverableId={selected.approveId} /> : null}
+              {lib.reviewUrl ? (
+                <a href={lib.reviewUrl} target="_blank" rel="noreferrer" className={portalBtn.soft}>
+                  <MessageSquareText className="size-4" /> Feedback geven in Frame <ExternalLink className="size-3.5" />
+                </a>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        <FrameVideoGrid videos={selected.videos} />
+      </div>
+    );
+  }
+
+  /* ---------------- Overzicht: alle opnamesessies ---------------- */
   return (
     <div className="flex flex-col gap-7">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-[25px] font-bold tracking-tight">Video&apos;s</h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Bekijk je video&apos;s, geef feedback in Frame en zie wat er online staat.</p>
+          <h1 className="text-[26px] font-bold tracking-tight">Video&apos;s</h1>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+            Al je video&apos;s per opnamesessie, rechtstreeks uit onze videobibliotheek. Klik op een sessie om de video&apos;s te bekijken.
+          </p>
         </div>
-        {frameUrl ? (
-          <a href={frameUrl} target="_blank" rel="noreferrer" className={`${buttonClass({ variant: "accent", size: "sm" })} shrink-0`}>
-            <ExternalLink className="size-4" /> Open alles in Frame.io
+        {lib.reviewUrl ? (
+          <a href={lib.reviewUrl} target="_blank" rel="noreferrer" className={portalBtn.soft}>
+            <ExternalLink className="size-4" /> Openen in Frame
           </a>
         ) : null}
       </div>
 
-      {data.totaal === 0 ? (
-        <div className="sc-glass grid place-items-center gap-2 p-14 text-center">
-          <VideoIcon className="size-7 text-[var(--color-ink-faint)]" strokeWidth={1.5} />
-          <p className="text-sm font-medium">Nog geen video&apos;s</p>
-          <p className="text-[13px] text-[var(--color-ink-muted)]">Zodra we video&apos;s opleveren, verschijnen ze hier.</p>
-        </div>
+      {/* Wat er van de klant verwacht wordt, bovenaan */}
+      {waiting.length > 0 || looseActions.length > 0 ? (
+        <section className="sc-glass p-5" style={{ boxShadow: "inset 4px 0 0 var(--sc-act)" }}>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <StatusPill tone="orange">Actie nodig</StatusPill>
+            <h2 className="text-[16px] font-semibold">
+              {waiting.length + looseActions.length === 1 ? "Er wacht 1 sessie op jouw feedback" : `Er wachten ${waiting.length + looseActions.length} sessies op jouw feedback`}
+            </h2>
+          </div>
+          <div className="mt-3 flex flex-col gap-2">
+            {waiting.map((s) => {
+              const dl = deadlineText(s.feedbackDeadline ? new Date(s.feedbackDeadline) : null);
+              return (
+                <Link key={s.key} href={`/portal/videos?sessie=${encodeURIComponent(s.key)}`} className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-3 hover:bg-[var(--sc-fill-strong)]">
+                  <FolderOpen className="size-4 shrink-0 text-[var(--st-orange)]" />
+                  <span className="min-w-0 flex-1 text-[14px] font-semibold">{s.title} <span className="font-normal text-[var(--color-ink-muted)]">· {s.videos.length} video&apos;s</span></span>
+                  {dl ? <span className={`text-[12.5px] ${dl.urgent ? "font-semibold text-[var(--st-orange)]" : "text-[var(--color-ink-muted)]"}`}>{dl.text}</span> : null}
+                  <span className={portalBtn.act + " h-9"}>Bekijk &amp; beoordeel <ArrowRight className="size-4" /></span>
+                </Link>
+              );
+            })}
+            {looseActions.map((v) => (
+              <Link key={v.id} href={`/portal/videos/${v.id}`} className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-3 hover:bg-[var(--sc-fill-strong)]">
+                <Film className="size-4 shrink-0 text-[var(--st-orange)]" />
+                <span className="min-w-0 flex-1 text-[14px] font-semibold">{v.sessionDate ? `Opname ${formatDateFull(v.sessionDate)}` : v.title}</span>
+                <span className={portalBtn.act + " h-9"}>Beoordelen <ArrowRight className="size-4" /></span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : lib.sessions.length > 0 ? (
+        <section className="sc-glass flex items-center gap-3 p-4 text-[14px]">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--st-green-bg)] text-[var(--st-green)]"><Check className="size-4" /></span>
+          Er wacht nu niets op jouw feedback. Je kunt alle video&apos;s hieronder terugkijken.
+        </section>
+      ) : null}
+
+      {lib.sessions.length === 0 ? (
+        <section className="sc-glass grid place-items-center gap-2 p-14 text-center">
+          <Film className="size-7 text-[var(--color-ink-faint)]" strokeWidth={1.5} />
+          <p className="text-sm font-semibold">Nog geen video&apos;s in je bibliotheek</p>
+          <p className="max-w-md text-[13px] text-[var(--color-ink-muted)]">
+            Zodra de video&apos;s van je eerste opnamesessie klaarstaan, verschijnen ze hier automatisch per sessie.
+          </p>
+        </section>
       ) : (
-        <>
-          {/* Jouw beoordeling — het belangrijkste, bovenaan */}
-          <section>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-[18px] font-bold tracking-tight">Jouw beoordeling</h2>
-              {data.actieNodig.length > 0 ? (
-                <span className="rounded-full bg-[rgba(25,168,255,0.16)] px-2.5 py-1 text-[12px] font-semibold text-[#19a8ff]">
-                  {data.actieNodig.length} video&apos;s wachten op je akkoord
-                </span>
-              ) : null}
-            </div>
-
-            {data.actieNodig.length === 0 ? (
-              <div className="sc-glass flex items-center gap-3 p-5 text-[14px]">
-                <Check className="size-5 shrink-0 text-[#2fd27a]" />
-                <span>Je bent helemaal bij; er staat nu niets op je te wachten.</span>
-              </div>
-            ) : (
-              <>
-                {/* Zo geef je feedback — per sessie in één keer in Frame */}
-                <div className="sc-glass mb-3 flex items-start gap-3 p-4" style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.07), rgba(255,255,255,0.02))" }}>
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><MessageSquareText className="size-[18px]" /></span>
-                  <p className="text-[13.5px] leading-relaxed text-[var(--color-ink-muted)]">
-                    Je video&apos;s staan per <strong className="text-[var(--color-ink)]">opnamesessie</strong> bij elkaar. Open de sessie in <strong className="text-[var(--color-ink)]">Frame</strong> en bekijk en
-                    beoordeel alle video&apos;s van die opname <strong className="text-[var(--color-ink)]">in één keer</strong> — geef je feedback rechtstreeks in de video met tijdcode. Alles klopt? Keur ze goed.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-4">
-                  {groupBySession(data.actieNodig).map((g) => <SessionCard key={g.key} g={g} />)}
-                </div>
-              </>
-            )}
-          </section>
-
-          {/* Ingepland — goedgekeurd en klaar om online te gaan */}
-          {data.ingepland.length > 0 ? (
-            <Group title="Ingepland" subtitle={`${data.ingepland.length} video's staan klaar om online te gaan`} rows={data.ingepland} max={40} />
-          ) : null}
-
-          {/* Online — wat er live staat of gaat */}
-          <Group title="Online" subtitle={`${data.gepubliceerd.length} video's staan online`} rows={data.gepubliceerd} max={40} />
-
-          {/* In productie — bewust ingeklapt; hier hoeft de klant niets mee */}
-          {data.inProductie.length > 0 ? (
-            <details className="sc-glass p-5 [&_summary]:cursor-pointer">
-              <summary className="flex items-center gap-2 text-sm font-semibold">
-                <VideoIcon className="size-4 text-[var(--color-ink-muted)]" /> In productie ({data.inProductie.length})
-                <span className="font-normal text-[var(--color-ink-faint)]">hier zijn wij mee bezig, je hoeft nu niets te doen</span>
-              </summary>
-              <div className="mt-4 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
-                {data.inProductie.map((v) => <Tile key={v.id} v={v} />)}
-              </div>
-            </details>
-          ) : null}
-        </>
+        <section>
+          <div className="mb-3.5 flex items-baseline justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-[17px] font-semibold"><CalendarDays className="size-4 text-[var(--sc-accent)]" /> Opnamesessies</h2>
+            <span className="text-[12.5px] text-[var(--color-ink-faint)]">{lib.sessions.length} sessies · {lib.totalVideos} video&apos;s</span>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {lib.sessions.map((s) => <SessionCard key={s.key} s={s} />)}
+          </div>
+        </section>
       )}
 
-      {/* Algemene procesinfo: van beeld naar publicatie (document) */}
-      {data.totaal > 0 ? <VideoProces extraFeedbackFee={settings.extraFeedbackFee} /> : null}
+      {lib.sessions.length > 0 ? <VideoProces extraFeedbackFee={settings.extraFeedbackFee} /> : null}
     </div>
   );
 }

@@ -16,7 +16,7 @@ export function MonthlyVideoCard({ update }: { update: ClientVideoUpdate }) {
   return (
     <section className="sc-glass overflow-hidden p-0">
       <div className="flex items-center gap-2 px-5 pt-5 sm:px-6">
-        <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><Sparkles className="size-4" /></span>
+        <span className="grid size-7 place-items-center rounded-lg bg-[var(--st-blue-bg)] text-[var(--sc-accent)]"><Sparkles className="size-4" /></span>
         <div>
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Van jouw team</span>
           <h2 className="text-[17px] font-bold leading-tight">Je videoboodschap · {periodLabel(update.period)}</h2>
@@ -41,7 +41,7 @@ export function MonthlyVideoCard({ update }: { update: ClientVideoUpdate }) {
             rel="noreferrer"
             className="group flex items-center gap-4 rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4 transition-colors hover:border-[var(--sc-accent)]"
           >
-            <span className="grid size-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] text-white"><Play className="size-5" /></span>
+            <span className="grid size-12 shrink-0 place-items-center rounded-full bg-[var(--sc-cta)] text-[var(--sc-cta-ink)]"><Play className="size-5" /></span>
             <div>
               <div className="text-[15px] font-semibold">Bekijk de videoboodschap</div>
               <div className="text-[13px] text-[var(--color-ink-muted)]">Een korte uitleg van je content creator over je resultaten.</div>

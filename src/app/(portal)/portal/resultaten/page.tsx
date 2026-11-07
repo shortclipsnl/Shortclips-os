@@ -42,9 +42,9 @@ export default async function PortalResultatenPage({
       {videoUpdate ? <MonthlyVideoCard update={videoUpdate} /> : null}
 
       {visible.length > 0 ? (
-        <section className="sc-glass p-6 sm:p-7" style={{ background: "linear-gradient(180deg, rgba(25,168,255,0.07), rgba(255,255,255,0.02))" }}>
+        <section className="sc-glass p-6 sm:p-7" >
           <div className="flex items-center gap-2">
-            <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><Sparkles className="size-4" /></span>
+            <span className="grid size-7 place-items-center rounded-lg bg-[var(--st-blue-bg)] text-[var(--sc-accent)]"><Sparkles className="size-4" /></span>
             <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Van jouw team</span>
           </div>
           <h2 className="mt-2 text-[22px] font-bold tracking-tight">Wat gaan we verbeteren?</h2>
@@ -76,14 +76,14 @@ export default async function PortalResultatenPage({
       {/* Wat we met je resultaten doen — compacte uitleg (analyse & rapportage) */}
       <section className="sc-glass p-5 sm:p-6">
         <div className="flex items-center gap-2">
-          <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]"><TrendingUp className="size-4" /></span>
+          <span className="grid size-7 place-items-center rounded-lg bg-[var(--st-blue-bg)] text-[var(--sc-accent)]"><TrendingUp className="size-4" /></span>
           <h2 className="text-base font-semibold">Wat we met je resultaten doen</h2>
         </div>
         <ul className="mt-3 grid gap-2.5 sm:grid-cols-2">
-          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> We meten de prestaties en rapporteren je elke maand.</li>
-          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> We evalueren samen wat werkt en wat beter kan.</li>
-          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> We gebruiken de cijfers om je volgende content te verbeteren.</li>
-          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[#2fd27a]" /> Analyse en rapportage verzorgen wij volledig; jij hoeft niets bij te houden.</li>
+          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[var(--st-green)]" /> We meten de prestaties en rapporteren je elke maand.</li>
+          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[var(--st-green)]" /> We evalueren samen wat werkt en wat beter kan.</li>
+          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[var(--st-green)]" /> We gebruiken de cijfers om je volgende content te verbeteren.</li>
+          <li className="flex gap-2.5 text-[13.5px] text-[var(--color-ink-muted)]"><Check className="mt-0.5 size-4 shrink-0 text-[var(--st-green)]" /> Analyse en rapportage verzorgen wij volledig; jij hoeft niets bij te houden.</li>
         </ul>
       </section>
     </div>

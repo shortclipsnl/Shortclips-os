@@ -1,3 +1,4 @@
+import { syncFrameLibrary } from "./frameio-library";
 import "server-only";
 import { runProductionPhaseAdvance } from "./production-phases";
 import { runLinkSuggestions } from "./link-suggestions";
@@ -88,6 +89,8 @@ export async function runNightlySync() {
   results.push(await step("captions.link_drive_scripts", () => runCaptionDriveLink()));
   results.push(await step("frameio.pull_projects", () => pullFrameProjects()));
   results.push(await step("frameio.pull_deliverables", () => pullFrameDeliverables()));
+  // Frame.io-bibliotheek voor het klantportaal (sessiemappen, video's, thumbnails).
+  results.push(await step("frameio.sync_library", () => syncFrameLibrary(undefined, undefined, { full: true })));
   results.push(await step("calendar.sync", () => runCalendarSync()));
   // Direct ná de agenda-sync: controleer of alle opnames ook echt in de planning
   // staan en meld afwijkingen (opname zonder klant / mogelijk gemiste opname).

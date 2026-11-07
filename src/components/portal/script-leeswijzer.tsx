@@ -47,13 +47,13 @@ export function ScriptLeeswijzer({ feedbackDays }: { feedbackDays?: number }) {
       </div>
 
       {/* Dit controleer jij */}
-      <div className="mt-4 rounded-[14px] border border-[#2fd27a]/30 bg-[rgba(47,210,122,0.06)] p-5">
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#2fd27a]"><HelpCircle className="size-4" /> Dit controleer jij</div>
+      <div className="mt-4 rounded-[14px] border border-[#2fd27a]/30 bg-[var(--st-green-bg)] p-5">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--st-green)]"><HelpCircle className="size-4" /> Dit controleer jij</div>
         <h3 className="mt-1 text-[15px] font-bold">Vier vragen bij het doorlezen</h3>
         <ul className="mt-3 grid gap-2 sm:grid-cols-2">
           {CHECK.map((c, i) => (
             <li key={i} className="flex items-start gap-2 text-[13px] text-[var(--color-ink-muted)]">
-              <span className="mt-px grid size-5 shrink-0 place-items-center rounded-full bg-[#2fd27a]/20 text-[11px] font-bold text-[#2fd27a]">{i + 1}</span> {c}
+              <span className="mt-px grid size-5 shrink-0 place-items-center rounded-full bg-[var(--st-green-bg)] text-[11px] font-bold text-[var(--st-green)]">{i + 1}</span> {c}
             </li>
           ))}
         </ul>

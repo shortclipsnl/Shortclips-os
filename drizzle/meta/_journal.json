@@ -687,6 +687,20 @@
       "when": 1794048304943,
       "tag": "0097_publicatie_miniaturen",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1794049151822,
+      "tag": "0098_frame_bibliotheek",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1794049692603,
+      "tag": "0099_frame_sessie_update",
+      "breakpoints": true
     }
   ]
 }
