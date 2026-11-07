@@ -51,8 +51,9 @@ function Thumb({ id, title }: { id: string; title: string }) {
  */
 export function FrameVideoGrid({ videos }: { videos: GridVideo[] }) {
   const [open, setOpen] = useState<number | null>(null);
-  const close = useCallback(() => setOpen(null), []);
-  const step = useCallback((d: number) => setOpen((i) => (i === null ? i : (i + d + videos.length) % videos.length)), [videos.length]);
+  const [playError, setPlayError] = useState(false);
+  const close = useCallback(() => { setOpen(null); setPlayError(false); }, []);
+  const step = useCallback((d: number) => { setPlayError(false); setOpen((i) => (i === null ? i : (i + d + videos.length) % videos.length)); }, [videos.length]);
 
   useEffect(() => {
     if (open === null) return;
@@ -109,8 +110,14 @@ export function FrameVideoGrid({ videos }: { videos: GridVideo[] }) {
               controls
               autoPlay
               playsInline
+              onError={() => setPlayError(true)}
               className="max-h-[78vh] w-full rounded-[16px] bg-black"
             />
+            {playError ? (
+              <p className="rounded-[10px] bg-white/10 px-3 py-2 text-center text-[13px] text-white/90">
+                Deze video kan nu niet worden afgespeeld. Probeer het over een paar minuten opnieuw of neem contact op met je contactpersoon.
+              </p>
+            ) : null}
             {videos.length > 1 ? (
               <div className="flex items-center gap-3 text-white/80">
                 <button type="button" onClick={() => step(-1)} className="grid size-10 place-items-center rounded-full bg-white/10 hover:bg-white/20" aria-label="Vorige video"><ChevronLeft className="size-5" /></button>

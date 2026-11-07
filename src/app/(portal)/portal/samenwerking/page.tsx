@@ -64,8 +64,7 @@ export default async function PortalSamenwerkingPage() {
   const duur = profile.monthsTogether != null && profile.monthsTogether > 0
     ? `${profile.monthsTogether} ${profile.monthsTogether === 1 ? "maand" : "maanden"} samen`
     : profile.daysTogether != null ? `${profile.daysTogether} ${profile.daysTogether === 1 ? "dag" : "dagen"} samen` : null;
-  const feedbackUren = settings.feedbackDaysVideos * 24;
-  const scriptUren = settings.feedbackDaysScripts * 24;
+  const wd = (n: number) => `${n} ${n === 1 ? "werkdag" : "werkdagen"}`;
 
   return (
     <div className="flex flex-col gap-8">
@@ -141,13 +140,13 @@ export default async function PortalSamenwerkingPage() {
             Onze standaard leveringstermijn is <strong className="text-[var(--color-ink)]">{settings.deliveryWorkdays} werkdagen</strong> na de opnamedag, volgens de gemaakte afspraken.
           </Agreement>
           <Agreement icon={<MessageSquareText className="size-5" />} title="Feedback">
-            Wij hanteren een feedbacktermijn van <strong className="text-[var(--color-ink)]">{feedbackUren} uur</strong>, tenzij anders afgesproken. Per video is één gebundelde feedbackronde inbegrepen; een extra ronde kost {settings.extraFeedbackFee}.
+            Wij hanteren een feedbacktermijn van <strong className="text-[var(--color-ink)]">{wd(settings.feedbackDaysVideos)}</strong> na oplevering, tenzij anders afgesproken. Het weekend telt niet mee. Per video is één gebundelde feedbackronde inbegrepen; een extra ronde kost {settings.extraFeedbackFee}.
           </Agreement>
           <Agreement icon={<Camera className="size-5" />} title="Opnames">
             We plannen de opnamedag samen in en bereiden hem voor met scripts en een checklist. {settings.shootDuration} Kosteloos verzetten kan tot {settings.cancelNoticeDays} werkdagen vooraf.
           </Agreement>
           <Agreement icon={<FileText className="size-5" />} title="Scripts">
-            Je ontvangt de scripts vóór de opname in dit portaal. Graag binnen <strong className="text-[var(--color-ink)]">{scriptUren} uur</strong> akkoord of feedback, zodat de opnamedag op schema blijft. Na akkoord zijn grote inhoudelijke wijzigingen niet inbegrepen.
+            Je ontvangt de scripts vóór de opname in dit portaal. Graag binnen <strong className="text-[var(--color-ink)]">{wd(settings.feedbackDaysScripts)}</strong> akkoord of feedback, zodat de opnamedag op schema blijft. Na akkoord zijn grote inhoudelijke wijzigingen niet inbegrepen.
           </Agreement>
           <Agreement icon={<Radio className="size-5" />} title="Publicatie">
             {profile.weHandlePosting
