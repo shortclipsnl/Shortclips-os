@@ -4,6 +4,9 @@ import { requirePortal } from "@/server/auth/context";
 import { getPortalContentPlanning, type PortalContentPost } from "@/server/portal-content";
 import { StatusPill, type StatusTone } from "@/components/portal/status-pill";
 import { PLATFORM } from "@/lib/statuses";
+import { loadContentPlanningOverview } from "@/server/content-planning/overview";
+import { PlanningChecklist } from "@/components/portal/planning-checklist";
+import { ContentPlanningPdfButton } from "@/components/content-planning/pdf-button";
 
 export const metadata: Metadata = { title: "Contentplanning" };
 export const dynamic = "force-dynamic";
@@ -86,7 +89,10 @@ function PostCard({ post, weHandle, isToday }: { post: PortalContentPost; weHand
 
 export default async function PortalContentPage() {
   const viewer = await requirePortal();
-  const data = await getPortalContentPlanning(viewer);
+  const [data, overview] = await Promise.all([
+    getPortalContentPlanning(viewer),
+    viewer.clientId ? loadContentPlanningOverview(viewer.clientId) : Promise.resolve(null),
+  ]);
   const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
   const thisMonday = mondayOf(todayIso);
   const nextMonday = addDays(thisMonday, 7);
@@ -107,6 +113,15 @@ export default async function PortalContentPage() {
           {weHandle ? "Shortclips plaatst je video's" : "Je plaatst de video's zelf"}
         </span>
       </div>
+
+      {/* Jouw contentplanning: wat Shortclips geregeld heeft en wat er bij de
+          klant ligt, op basis van de echte status (zelfde bron als de PDF). */}
+      {data.shared && overview ? (
+        <PlanningChecklist
+          checklist={overview.checklist}
+          action={<ContentPlanningPdfButton href="/api/portal/contentplanning/pdf" className="!border-white/25 !bg-white/10 !text-white hover:!bg-white/20" />}
+        />
+      ) : null}
 
       {!data.shared ? (
         <section className="sc-glass flex items-start gap-3 p-5">

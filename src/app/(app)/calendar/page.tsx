@@ -10,6 +10,7 @@ import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { listCalendar, monthGrid, type CalendarItem } from "@/server/calendar";
 import { listClients } from "@/server/clients";
 import { SharePlanningButton } from "./share-planning";
+import { ContentPlanningPdfButton } from "@/components/content-planning/pdf-button";
 import { Badge, Card, ClientLogo, EmptyState, GuidelineNote, PageHeader } from "@/components/ui";
 import { ListChecks } from "lucide-react";
 import { formatDateFull, periodLabel } from "@/lib/format";
@@ -378,6 +379,15 @@ export default async function CalendarPage({
       {/* Goedkeuren en delen met de klant (alleen als er één klant gefilterd is). */}
       {selectedClient && canWrite ? (
         <SharePlanningButton clientId={selectedClient.id} clientName={selectedClient.name} unshared={unsharedCount} />
+      ) : null}
+
+      {/* Dezelfde contentplanning-PDF als de klant in het portaal downloadt
+          (één centrale generator, alleen gedeelde items). */}
+      {selectedClient ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <ContentPlanningPdfButton href={`/api/contentplanning/${selectedClient.id}/pdf`} label={`Contentplanning ${selectedClient.name} als PDF`} />
+          <span className="text-xs text-[var(--color-ink-muted)]">Exact de PDF die de klant ziet: alleen items die met de klant gedeeld zijn.</span>
+        </div>
       ) : null}
 
       {/* Vaste postmomenten. */}

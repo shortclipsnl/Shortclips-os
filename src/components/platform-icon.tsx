@@ -30,6 +30,9 @@ const BRAND: Record<string, { color: string; path: string }> = {
   },
 };
 
+/** Dezelfde merkpaden, voor HTML/PDF buiten React (contentplanning-PDF). */
+export const PLATFORM_ICON_PATHS: Record<string, { color: string; path: string }> = BRAND;
+
 export function PlatformIcon({
   platform,
   size = 16,
