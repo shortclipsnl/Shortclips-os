@@ -45,6 +45,7 @@ import { runAttentionNotify } from "@/server/jobs/attention-notify";
 import { runEditorStatusChecks } from "@/server/editor-status-checks";
 import { processDriveChanges, reconcileDriveFolders, runDriveSync } from "@/server/jobs/drive-sync";
 import { runDriveHealthCheck } from "@/server/integrations/drive-status";
+import { runOpsControlScheduled } from "@/server/ops-control/run";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, pullMetricoolPosts, pullMetricoolPostsRecent, runMetricoolSync } from "@/server/jobs/metricool-sync";
 import { runShootReconciliation } from "@/server/jobs/shoot-reconciliation";
@@ -166,6 +167,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "reports.process_queue": runReportQueue,
   "reports.team_notify": () => runReportTeamNotifications(),
   "attention.notify": runAttentionNotify,
+  // Operationele controle: elk kwartier op werkdagen; draait alleen om de ingestelde tijden (standaard 08:45, 13:30 stil en 15:30).
+  "ops.control": () => runOpsControlScheduled(),
   "drive.sync_all": runDriveSync,
   // Elke 2 minuten: wijzigingen uit Drive verwerken (licht als er niets is).
   "drive.sync_changes": () => processDriveChanges({ trigger: "cron", budgetMs: 100_000 }),

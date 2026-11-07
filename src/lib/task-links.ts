@@ -23,5 +23,7 @@ export function taskHref(t: { entityType: string | null; entityId: string | null
   // Maandcontrole (één taak per maand) → pagina Maandrapportages, die maand.
   const batch = parseBatchKey(t.dedupeKey);
   if (t.entityType === "report_batch" && batch) return batchHref(batch.period);
+  // Taak uit de operationele controle → direct naar het onderdeel met het probleem.
+  if (t.entityType === "ops_control_item" && t.entityId) return `/controle/${t.entityId}`;
   return null;
 }

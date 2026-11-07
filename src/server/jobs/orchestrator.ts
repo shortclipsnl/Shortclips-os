@@ -26,7 +26,7 @@ import {
   pullFrameDeliverables,
   pullFrameProjects,
 } from "./frameio-sync";
-import { runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runEditorDeadlineReminders, runEditorEscalations, recordDeadlinePerformance, runHourlySignals, runScriptTodoReminders, runTaskDeadlineReminders } from "./maintenance";
+import { runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runEditorDeadlineReminders, recordDeadlinePerformance, runHourlySignals, runScriptTodoReminders } from "./maintenance";
 import { enforcePortalAccess } from "./portal-access";
 import { runClientNotifications } from "./notifications";
 import { runDatabaseBackup } from "./backup";
@@ -95,9 +95,11 @@ export async function runNightlySync() {
   results.push(await step("profit.signals", () => runProfitabilitySignals()));
   results.push(await step("signals.daily", () => runDailySignals()));
   results.push(await step("reminders.editor_deadlines", () => runEditorDeadlineReminders()));
-  results.push(await step("reminders.task_deadlines", () => runTaskDeadlineReminders()));
+  // reminders.task_deadlines draait niet meer 's nachts: de operationele controle
+  // (08:45 en 15:30) meldt te late en vandaag-af-taken in één persoonlijk overzicht.
   // Escalatie bij uitblijvende opvolging + prestatieregistratie (gemiste deadlines).
-  results.push(await step("escalations.editor_deadlines", () => runEditorEscalations()));
+  // escalations.editor_deadlines: vervangen door de escalatie in de operationele
+  // controle (medewerker → operationeel verantwoordelijke → Jarno bij uitzonderingen).
   results.push(await step("performance.record_deadlines", () => recordDeadlinePerformance()));
   results.push(await step("signals.clients_without_shoot", () => runClientsWithoutShootSignal()));
   results.push(await step("signals.content_gap", () => runContentGapSignal()));

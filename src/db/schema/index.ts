@@ -32,3 +32,4 @@ export * from "./editor-status";
 export * from "./onboarding";
 export * from "./feedback-rounds";
 export * from "./exit-interviews";
+export * from "./ops-control";

@@ -13,8 +13,6 @@
     { "path": "/api/jobs/run?job=metricool.link_brands", "schedule": "10 4 * * *" },
     { "path": "/api/jobs/run?job=metricool.pull_metrics", "schedule": "15 4 * * *" },
     { "path": "/api/jobs/run?job=metricool.pull_posts_recent", "schedule": "25 4 * * *" },
-    { "path": "/api/jobs/run?job=reminders.daily_todo&slot=winter", "schedule": "30 12 * * *" },
-    { "path": "/api/jobs/run?job=reminders.daily_todo&slot=zomer", "schedule": "30 11 * * *" },
     { "path": "/api/jobs/run?job=reminders.next_day_todo&slot=zomer", "schedule": "45 14 * * 1-5" },
     { "path": "/api/jobs/run?job=reminders.next_day_todo&slot=winter", "schedule": "45 15 * * 1-5" },
     { "path": "/api/jobs/run?job=vrijdagcheck.notify", "schedule": "0 7 * * 5" },
@@ -45,10 +43,9 @@
     { "path": "/api/jobs/run?job=reports.team_notify", "schedule": "5 7-15 * * 1-5" },
     { "path": "/api/jobs/run?job=editors.status_checks", "schedule": "10 7-15 * * 1-5" },
     { "path": "/api/jobs/run?job=feedback.reminders", "schedule": "0 7-15 * * 1-5" },
-    { "path": "/api/jobs/run?job=attention.notify", "schedule": "0 7 * * 1-5" },
-    { "path": "/api/jobs/run?job=attention.notify", "schedule": "0 12 * * 1-5" },
     { "path": "/api/jobs/run?job=drive.sync_changes", "schedule": "*/2 * * * *" },
     { "path": "/api/jobs/run?job=drive.reconcile", "schedule": "17 * * * *" },
-    { "path": "/api/jobs/run?job=drive.health", "schedule": "*/15 * * * *" }
+    { "path": "/api/jobs/run?job=drive.health", "schedule": "*/15 * * * *" },
+    { "path": "/api/jobs/run?job=ops.control", "schedule": "*/15 5-17 * * 1-5" }
   ]
 }

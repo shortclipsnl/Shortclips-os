@@ -17,6 +17,8 @@ import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
 import { Dagstart } from "./dagstart";
 import { getContractAttention } from "@/server/contracts";
 import { ContractAttentionBlock } from "../contracten/attention-block";
+import { getOpsOverview } from "@/server/ops-control/overview";
+import { OpsControlCard } from "./ops-control-card";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
@@ -38,11 +40,12 @@ export default async function DashboardPage() {
   await syncScriptingTasksIfStale().catch(() => undefined);
 
   // Iedereen ziet uitsluitend de eigen dagstart — geen "bekijk als een ander".
-  const [data, meetings, contentItems, work] = await Promise.all([
+  const [data, meetings, contentItems, work, ops] = await Promise.all([
     getDashboard(viewer),
     listUpcomingMeetings(7),
     listCalendar(viewer, { from: contentFrom, to: contentTo }),
     getWorkOverview(viewer),
+    getOpsOverview(viewer).catch(() => null),
   ]);
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
   // Contracten die aandacht nodig hebben: uitsluitend voor de eigenaar.
@@ -132,6 +135,9 @@ export default async function DashboardPage() {
 
       {/* Contracten & Verlengingen (alleen eigenaar): alleen wat nu een actie vraagt. */}
       {contractAttention ? <ContractAttentionBlock items={contractAttention.items} toVerify={contractAttention.toVerify} compact /> : null}
+
+      {/* Operationele controle (08:45, 13:30 stil en 15:30): status per onderdeel en open punten. */}
+      {ops ? <OpsControlCard data={ops} /> : null}
 
       {/* Dagstart: werkdagbalk + Vandaag, Eerstvolgende werkdag en Deze week afronden. */}
       <Dagstart
