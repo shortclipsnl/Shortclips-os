@@ -13,6 +13,7 @@ import type { ReportDetail } from "@/server/reports/service";
 import type { InternInzicht } from "@/server/reports/analysis";
 import { STATUS_META } from "../report-list";
 import { VideoInsights, type ReviewVideo } from "./video-insights";
+import { SharePdfButton } from "./share-pdf";
 
 type Rec = { titel: string; waarom?: string; wat?: string; hoeMeten?: string; zekerheid?: string };
 type Actie = { titel: string; waarom?: string };
@@ -156,34 +157,65 @@ export function ReviewUI({
 
   return (
     <div className="space-y-4">
-      {/* Actiebalk */}
-      <div className="sc-card flex flex-wrap items-center gap-2 p-3">
-        <Badge tone={st.tone}>{st.label}</Badge>
-        {report.approvedAt ? <span className="text-xs text-[var(--color-ink-muted)]">Goedgekeurd {dt(report.approvedAt)}{report.approvedByName ? ` door ${report.approvedByName}` : ""}</span> : null}
-        <div className="ml-auto flex flex-wrap items-center gap-1.5">
-          <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Klantversie</span>
-          <Link href={pdf("klant")} target="_blank" className={buttonClass({ variant: "ghost", size: "sm" })}><FileText className="size-3.5" /> Bekijken</Link>
-          <a href={pdf("klant", true)} className={buttonClass({ variant: "ghost", size: "sm" })}><FileDown className="size-3.5" /> Download</a>
-          <span className="ml-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Intern</span>
-          <Link href={pdf("intern")} target="_blank" className={buttonClass({ variant: "ghost", size: "sm" })}><FileText className="size-3.5" /> Bekijken</Link>
-          <a href={pdf("intern", true)} className={buttonClass({ variant: "ghost", size: "sm" })}><FileDown className="size-3.5" /> Download</a>
+      {/* Twee duidelijke blokken: wat naar de klant gaat en wat voor het team is. */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="sc-card space-y-3 border-l-4 border-l-[var(--color-indigo-ink)] p-4">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-semibold text-[var(--color-ink)]">Voor de klant</p>
+              <p className="text-xs text-[var(--color-ink-muted)]">
+                {report.status === "gepubliceerd"
+                  ? `Staat in het klantportaal${report.publishedAt ? ` sinds ${dt(report.publishedAt)}` : ""}.`
+                  : approved
+                    ? "Goedgekeurd, maar staat niet (meer) in het klantportaal."
+                    : "Nog niet gedeeld. Komt automatisch in het klantportaal zodra Jarno goedkeurt."}
+              </p>
+            </div>
+            <Badge tone={st.tone}>{st.label}</Badge>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Link href={pdf("klant")} target="_blank" className={buttonClass({ variant: "ghost", size: "sm" })}><FileText className="size-3.5" /> Bekijken</Link>
+            <a href={pdf("klant", true)} className={buttonClass({ variant: "ghost", size: "sm" })}><FileDown className="size-3.5" /> Download PDF</a>
+            <SharePdfButton
+              url={pdf("klant", true)}
+              fileName={`Maandrapportage ${report.clientName} ${report.periodLabel}.pdf`}
+              text={`Hoi! Hierbij de maandrapportage van ${report.periodLabel}. Je vindt hem ook altijd terug in je klantportaal: ${typeof window !== "undefined" ? window.location.origin : ""}/portal/analyses`}
+              disabled={!approved}
+              title={approved ? "" : "Eerst goedkeuren, dan kan de klantversie gedeeld worden"}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-[var(--color-line)] pt-3">
+            {owner && !approved ? <button type="button" disabled={pending || !canApprove} title={canApprove ? "" : "Rond eerst de verplichte controlepunten af"} onClick={() => run(() => approveMonthlyReport(report.id), "Goedgekeurd en gedeeld in het klantportaal. Het team krijgt een melding om dit door te nemen.")} className={buttonClass({ variant: "primary", size: "sm" })}><Check className="size-3.5" /> Goedkeuren en delen in portaal</button> : null}
+            {!owner && canWrite && !approved ? <span className="text-xs text-[var(--color-ink-muted)]">Goedkeuren doet Jarno.</span> : null}
+            {canWrite && report.status === "goedgekeurd" ? <button type="button" disabled={pending} onClick={() => run(() => publishMonthlyReport(report.id), "De klantversie staat nu in het klantportaal.")} className={buttonClass({ variant: "primary", size: "sm" })}><Send className="size-3.5" /> Delen in portaal</button> : null}
+            {canWrite && report.status === "gepubliceerd" ? <button type="button" disabled={pending} onClick={() => run(() => unpublishMonthlyReport(report.id))} className={buttonClass({ variant: "ghost", size: "sm" })}>Uit portaal halen</button> : null}
+            {canWrite && report.status === "goedgekeurd" ? <button type="button" disabled={pending} onClick={() => run(() => requestReportChanges(report.id))} className={buttonClass({ variant: "ghost", size: "sm" })}>Terug naar aanpassen</button> : null}
+            {canWrite && !approved ? <button type="button" disabled={pending || !aiReady} onClick={() => run(() => startMonthlyReport(report.clientId, report.period, "ai_only"), "Nieuwe analyse gestart.")} className={buttonClass({ variant: "ghost", size: "sm" })}><Sparkles className="size-3.5" /> AI opnieuw</button> : null}
+          </div>
         </div>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {canWrite && !approved ? <button type="button" disabled={pending || !aiReady} onClick={() => run(() => startMonthlyReport(report.clientId, report.period, "ai_only"), "Nieuwe analyse gestart.")} className={buttonClass({ variant: "ghost", size: "sm" })}><Sparkles className="size-3.5" /> AI opnieuw</button> : null}
-        {owner && !approved ? <button type="button" disabled={pending || !canApprove} title={canApprove ? "" : "Rond eerst de verplichte controlepunten af"} onClick={() => run(() => approveMonthlyReport(report.id), "Goedgekeurd en gedeeld met de klant. Het team krijgt een melding om dit door te nemen.")} className={buttonClass({ variant: "primary", size: "sm" })}><Check className="size-3.5" /> Goedkeuren en delen met klant</button> : null}
-        {!owner && canWrite && !approved ? <span className="text-xs text-[var(--color-ink-muted)]">Goedkeuren doet Jarno.</span> : null}
-        {canWrite && report.status === "goedgekeurd" ? <>
-          <button type="button" disabled={pending} onClick={() => run(() => publishMonthlyReport(report.id), "De klantversie staat nu in het klantportaal.")} className={buttonClass({ variant: "primary", size: "sm" })}><Send className="size-3.5" /> Opnieuw delen in portaal</button>
-          <button type="button" disabled={pending} onClick={() => run(() => requestReportChanges(report.id))} className={buttonClass({ variant: "ghost", size: "sm" })}>Terug naar aanpassen</button>
-        </> : null}
-        {canWrite && report.status === "gepubliceerd" ? <button type="button" disabled={pending} onClick={() => run(() => unpublishMonthlyReport(report.id))} className={buttonClass({ variant: "secondary", size: "sm" })}>Delen met klant intrekken</button> : null}
-        {approved ? (
-          myRead?.readAt
-            ? <button type="button" disabled={pending} onClick={() => run(() => setReportRead(report.id, false))} className={buttonClass({ variant: "ghost", size: "sm", className: "ml-auto" })}><CheckCircle2 className="size-3.5 text-[var(--color-good)]" /> Doorgenomen op {dt(myRead.readAt)} · ongedaan maken</button>
-            : <button type="button" disabled={pending} onClick={() => run(() => setReportRead(report.id, true), "Gemarkeerd als doorgenomen.")} className={buttonClass({ variant: "primary", size: "sm", className: "ml-auto" })}><Eye className="size-3.5" /> Markeer als doorgenomen</button>
-        ) : null}
+        <div className="sc-card space-y-3 border-l-4 border-l-[var(--color-good)] p-4">
+          <div>
+            <p className="font-semibold text-[var(--color-ink)]">Voor het team <span className="font-normal text-[var(--color-ink-muted)]">(intern)</span></p>
+            <p className="text-xs text-[var(--color-ink-muted)]">Hooks, inzichten per video en acties per rol. Niet delen met de klant.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Link href={pdf("intern")} target="_blank" className={buttonClass({ variant: "ghost", size: "sm" })}><FileText className="size-3.5" /> Bekijken</Link>
+            <a href={pdf("intern", true)} className={buttonClass({ variant: "ghost", size: "sm" })}><FileDown className="size-3.5" /> Download PDF</a>
+            <SharePdfButton
+              url={pdf("intern", true)}
+              fileName={`Intern ${report.clientName} ${report.periodLabel}.pdf`}
+              text={`Interne maandrapportage ${report.clientName} (${report.periodLabel}). Alleen voor het team, niet doorsturen naar de klant.`}
+            />
+          </div>
+          {approved ? (
+            <div className="border-t border-[var(--color-line)] pt-3">
+              {myRead?.readAt
+                ? <button type="button" disabled={pending} onClick={() => run(() => setReportRead(report.id, false))} className={buttonClass({ variant: "ghost", size: "sm" })}><CheckCircle2 className="size-3.5 text-[var(--color-good)]" /> Doorgenomen op {dt(myRead.readAt)} · ongedaan maken</button>
+                : <button type="button" disabled={pending} onClick={() => run(() => setReportRead(report.id, true), "Gemarkeerd als doorgenomen.")} className={buttonClass({ variant: "primary", size: "sm" })}><Eye className="size-3.5" /> Markeer als doorgenomen</button>}
+            </div>
+          ) : null}
+        </div>
       </div>
       {msg ? <p className={`text-sm ${msg.ok ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}`}>{msg.text}</p> : null}
 
