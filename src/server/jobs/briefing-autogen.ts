@@ -1,19 +1,24 @@
 import "server-only";
-import { and, eq, gte, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, gte, isNull, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { briefingSets, productionDays, scriptReviews } from "@/db/schema";
+import { productionDays } from "@/db/schema";
 import { ensureBriefingForShoot } from "@/server/briefing/run";
 
-const today = () => new Date().toISOString().slice(0, 10);
 const STALE_RUNNING_MIN = 10;
 const MAX_PER_RUN = 25;
+/** Ook opnames die al geweest zijn krijgen nog een briefing (de editor start ná de opname). */
+const DAYS_BACK = 21;
+const DAYS_FORWARD = 60;
+
+const isoDay = (offsetDays: number) => new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
 
 /**
- * Inhaal-/herstelronde voor de automatische editor-briefings. Vangt gemiste
- * triggers op en herstelt mislukte generaties: voor elke aankomende opname met
- * een scriptcontrole-PDF waarvan de verwerkte versie afwijkt (of nog ontbreekt/
- * mislukt is) draait `ensureBriefingForShoot`. Ongewijzigde opnames worden
- * overgeslagen (geen AI-kosten).
+ * Automatische editor-briefings. Draait elk uur en maakt of vernieuwt de
+ * briefing voor elke opname (3 weken terug t/m 2 maanden vooruit) waaraan een
+ * script-PDF hangt — uit het klantportaal (scriptcontrole) óf de gekoppelde
+ * PDF uit Google Drive (de normale werkwijze). Kandidaat als er nog geen
+ * briefing is, de vorige mislukte, of het script daarna is bijgewerkt.
+ * Ongewijzigde opnames worden overgeslagen (geen AI-kosten).
  */
 export async function runBriefingAutoGenerate(): Promise<{
   scanned: number;
@@ -24,28 +29,40 @@ export async function runBriefingAutoGenerate(): Promise<{
   const rows = await db
     .select({
       productionDayId: productionDays.id,
-      latestVersionId: sql<string | null>`(
-        select v.id from script_review_versions v
-        where v.review_id = ${scriptReviews.id}
-        order by v.version_number desc limit 1
+      scheduledOn: productionDays.scheduledOn,
+      // Laatste wijziging van de bron: nieuwste scriptcontrole-versie of Drive-koppeling.
+      sourceAt: sql<Date | null>`greatest(
+        (select max(v.created_at) from script_review_versions v
+           join script_reviews r on r.id = v.review_id
+          where r.production_day_id = ${productionDays.id} and r.deleted_at is null),
+        (select max(coalesce(s.confirmed_at, s.matched_at)) from shoot_script_sources s
+          where s.production_day_id = ${productionDays.id} and s.status = 'gekoppeld')
       )`,
-      setStatus: briefingSets.status,
-      setSourceVersionId: briefingSets.sourceReviewVersionId,
-      setStartedAt: briefingSets.startedAt,
+      setStatus: sql<string | null>`(select b.status from briefing_sets b where b.production_day_id = ${productionDays.id} and b.deleted_at is null limit 1)`,
+      setGeneratedAt: sql<Date | null>`(select b.generated_at from briefing_sets b where b.production_day_id = ${productionDays.id} and b.deleted_at is null limit 1)`,
+      setStartedAt: sql<Date | null>`(select b.started_at from briefing_sets b where b.production_day_id = ${productionDays.id} and b.deleted_at is null limit 1)`,
     })
     .from(productionDays)
-    .innerJoin(scriptReviews, and(eq(scriptReviews.productionDayId, productionDays.id), isNull(scriptReviews.deletedAt)))
-    .leftJoin(briefingSets, and(eq(briefingSets.productionDayId, productionDays.id), isNull(briefingSets.deletedAt)))
-    .where(and(isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled"), gte(productionDays.scheduledOn, today())))
+    .where(and(
+      isNull(productionDays.deletedAt),
+      ne(productionDays.status, "cancelled"),
+      gte(productionDays.scheduledOn, isoDay(-DAYS_BACK)),
+      lte(productionDays.scheduledOn, isoDay(DAYS_FORWARD)),
+    ))
+    .orderBy(asc(productionDays.scheduledOn))
     .limit(500);
 
+  const ts = (v: Date | string | null) => (v ? new Date(v).getTime() : 0);
   const candidates = rows.filter((r) => {
-    if (!r.latestVersionId) return false;
-    if (r.setStatus === "bezig" && r.setStartedAt && (Date.now() - r.setStartedAt.getTime()) / 60000 < STALE_RUNNING_MIN) {
-      return false;
-    }
-    return !r.setStatus || r.setStatus === "mislukt" || r.setSourceVersionId !== r.latestVersionId;
+    if (!r.sourceAt) return false; // nog geen script-PDF: niets om uit te maken
+    if (r.setStatus === "bezig" && r.setStartedAt && (Date.now() - ts(r.setStartedAt)) / 60000 < STALE_RUNNING_MIN) return false;
+    if (!r.setStatus || r.setStatus === "mislukt") return true;
+    return ts(r.sourceAt) > ts(r.setGeneratedAt); // script bijgewerkt na de laatste briefing
   });
+
+  // Eerst wat het dichtst bij is: net geweest of binnenkort.
+  const today = isoDay(0);
+  candidates.sort((a, b) => Math.abs(Date.parse(String(a.scheduledOn)) - Date.parse(today)) - Math.abs(Date.parse(String(b.scheduledOn)) - Date.parse(today)));
 
   let processed = 0;
   let generated = 0;

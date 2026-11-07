@@ -1,7 +1,7 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients } from "@/db/schema";
+import { clientDocuments, clients } from "@/db/schema";
 import { runJsonPrompt, type AiDoc } from "@/server/ai/client";
 import { SHORTCLIPS_IDENTITY } from "@/server/ai/identity";
 import {
@@ -99,6 +99,21 @@ export async function generateBriefingForPdf(input: {
       ? { ok: false, reason: "no_provider", error: "Er is nog geen AI-sleutel ingesteld." }
       : { ok: false, error: res.error ?? "Genereren mislukt." };
   }
+  // Vaste punten die in elke briefing horen, los van wat de AI teruggeeft: het
+  // script volledig lezen en de Editing Guide van de klant erbij pakken.
+  const [guide] = await db
+    .select({ id: clientDocuments.id })
+    .from(clientDocuments)
+    .where(and(eq(clientDocuments.clientId, input.clientId), eq(clientDocuments.kind, "editing_guide"), isNull(clientDocuments.deletedAt)))
+    .limit(1);
+  const name = await clientName(input.clientId);
+  const vastePunten = [
+    "Lees het volledige script goed door voordat je begint en volg de volgorde, teksten en aanwijzingen daaruit.",
+    guide
+      ? `Open de Editing Guide van ${name} (knop bij de opdracht) en houd je aan de stijl die daarin staat.`
+      : `Er staat nog geen Editing Guide voor ${name}; volg de algemene Shortclips-stijl en eerdere goedgekeurde video's van deze klant.`,
+  ];
+
   // Defensief normaliseren.
   const d = res.data;
   const data: EditorBriefing = {
@@ -106,9 +121,12 @@ export async function generateBriefingForPdf(input: {
       client: String(d?.projectIntro?.client ?? "").trim(),
       aantalShorts: Number(d?.projectIntro?.aantalShorts ?? (Array.isArray(d?.shorts) ? d.shorts.length : 0)),
       omschrijving: String(d?.projectIntro?.omschrijving ?? "").trim(),
-      algemeneAandachtspunten: Array.isArray(d?.projectIntro?.algemeneAandachtspunten)
-        ? d.projectIntro.algemeneAandachtspunten.map((s) => String(s)).filter(Boolean)
-        : [],
+      algemeneAandachtspunten: [
+        ...vastePunten,
+        ...(Array.isArray(d?.projectIntro?.algemeneAandachtspunten)
+          ? d.projectIntro.algemeneAandachtspunten.map((s) => String(s)).filter(Boolean)
+          : []),
+      ],
     },
     shorts: Array.isArray(d?.shorts)
       ? d.shorts.map((s) => ({
