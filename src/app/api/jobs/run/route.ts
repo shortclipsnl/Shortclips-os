@@ -37,6 +37,7 @@ import { runMonthlyReports, runReportQueue } from "@/server/jobs/report-monthly"
 import { runReportTeamNotifications } from "@/server/reports/team";
 import { runReportReviewReminders } from "@/server/jobs/report-review-reminders";
 import { runAttentionNotify } from "@/server/jobs/attention-notify";
+import { runOpsControlScheduled } from "@/server/ops-control/run";
 import { runDriveSync } from "@/server/jobs/drive-sync";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, pullMetricoolPosts, runMetricoolSync } from "@/server/jobs/metricool-sync";
@@ -143,6 +144,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "reports.process_queue": runReportQueue,
   "reports.team_notify": () => runReportTeamNotifications(),
   "attention.notify": runAttentionNotify,
+  // Operationele controle: elk kwartier op werkdagen; draait alleen om de ingestelde tijden (standaard 09:00 en 15:00).
+  "ops.control": () => runOpsControlScheduled(),
   "drive.sync_all": runDriveSync,
   "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,

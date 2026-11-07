@@ -17,6 +17,8 @@ import { WeekPlanning, type WeekUpload } from "./week-planning";
 import { PostingReminder, type TodayPost } from "./posting-reminder";
 import { getMorningOverview } from "@/server/morning-overview";
 import { MorningOverviewCard } from "./morning-overview";
+import { getOpsOverview } from "@/server/ops-control/overview";
+import { OpsControlCard } from "./ops-control-card";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
@@ -33,13 +35,14 @@ export default async function DashboardPage() {
   contentToD.setDate(contentToD.getDate() + 14);
   const contentTo = contentToD.toISOString().slice(0, 10);
 
-  const [data, myDay, capMap, meetings, contentItems, morning] = await Promise.all([
+  const [data, myDay, capMap, meetings, contentItems, morning, ops] = await Promise.all([
     getDashboard(viewer),
     getMyDay(viewer),
     editorCapacityMap(),
     listUpcomingMeetings(7),
     listCalendar(viewer, { from: contentFrom, to: contentTo }),
     getMorningOverview(viewer),
+    getOpsOverview(viewer).catch(() => null),
   ]);
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
   // Operationeel beheer (eigenaar + operationeel beheerder): snelkoppelingen +
@@ -124,6 +127,9 @@ export default async function DashboardPage() {
           <span className="text-[var(--color-ink-muted)]">Maak de logins aan in Klantbeheer →</span>
         </Link>
       ) : null}
+
+      {/* Operationele controle (09:00 en 15:00): status per onderdeel en open punten. */}
+      {ops ? <OpsControlCard data={ops} /> : null}
 
       {/* Gebundeld ochtendoverzicht: verlopen deadlines, acties en aandachtspunten. */}
       <MorningOverviewCard data={morning} />

@@ -15,5 +15,7 @@ export function taskHref(t: { entityType: string | null; entityId: string | null
   if (t.entityType === "client_report" && t.entityId && t.dedupeKey?.startsWith("report_action:")) {
     return `/analytics/maandrapportages/${t.entityId}`;
   }
+  // Taak uit de operationele controle → direct naar het onderdeel met het probleem.
+  if (t.entityType === "ops_control_item" && t.entityId) return `/controle/${t.entityId}`;
   return null;
 }

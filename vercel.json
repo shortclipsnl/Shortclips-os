@@ -1,42 +1,141 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    { "path": "/api/jobs/run?job=calendar.sync", "schedule": "0 * * * *" },
-    { "path": "/api/jobs/run?job=goals.recompute", "schedule": "0 1 * * *" },
-    { "path": "/api/jobs/run?job=awards.recompute", "schedule": "0 2 * * *" },
-    { "path": "/api/jobs/run?job=meetings.roll_over", "schedule": "0 4 * * *" },
-    { "path": "/api/jobs/run?job=portal.notify_clients", "schedule": "0 8 * * *" },
-    { "path": "/api/jobs/run?job=sync.frequent", "schedule": "0 12 * * *" },
-    { "path": "/api/jobs/run?job=sync.nightly", "schedule": "0 3 * * *" },
-    { "path": "/api/jobs/run?job=reminders.daily_todo&slot=winter", "schedule": "30 12 * * *" },
-    { "path": "/api/jobs/run?job=reminders.daily_todo&slot=zomer", "schedule": "30 11 * * *" },
-    { "path": "/api/jobs/run?job=reminders.next_day_todo&slot=zomer", "schedule": "45 14 * * 1-5" },
-    { "path": "/api/jobs/run?job=reminders.next_day_todo&slot=winter", "schedule": "45 15 * * 1-5" },
-    { "path": "/api/jobs/run?job=vrijdagcheck.notify", "schedule": "0 7 * * 5" },
-    { "path": "/api/jobs/run?job=reminders.editor_friday_wrapup&slot=zomer", "schedule": "0 7 * * 5" },
-    { "path": "/api/jobs/run?job=reminders.editor_friday_wrapup&slot=winter", "schedule": "0 8 * * 5" },
-    { "path": "/api/jobs/run?job=reminders.cleaning_friday&slot=zomer", "schedule": "0 13 * * 5" },
-    { "path": "/api/jobs/run?job=reminders.cleaning_friday&slot=winter", "schedule": "0 14 * * 5" },
-    { "path": "/api/jobs/run?job=finance.month_reminder", "schedule": "0 8 28 * *" },
-    { "path": "/api/jobs/run?job=finance.sync_health", "schedule": "10 7 * * *" },
-    { "path": "/api/jobs/run?job=finance.weekly_summary&slot=zomer", "schedule": "45 6 * * 1" },
-    { "path": "/api/jobs/run?job=finance.weekly_summary&slot=winter", "schedule": "45 7 * * 1" },
-    { "path": "/api/jobs/run?job=reminders.post_shoot&slot=zomer", "schedule": "45 6 * * *" },
-    { "path": "/api/jobs/run?job=reminders.post_shoot&slot=winter", "schedule": "45 7 * * *" },
-    { "path": "/api/jobs/run?job=leads.sync_mailbox", "schedule": "0 7-20 * * *" },
-    { "path": "/api/jobs/run?job=captions.auto_generate", "schedule": "15 7-20 * * *" },
-    { "path": "/api/jobs/run?job=captions.link_drive_scripts", "schedule": "35 7-20 * * *" },
-    { "path": "/api/jobs/run?job=scripts.version_sync", "schedule": "50 7-20 * * *" },
-    { "path": "/api/jobs/run?job=briefing.auto_generate", "schedule": "25 7-20 * * *" },
-    { "path": "/api/jobs/run?job=transfers.cleanup", "schedule": "30 3 * * *" },
-    { "path": "/api/jobs/run?job=content_research.weekly", "schedule": "*/20 4-8 * * 1" },
-    { "path": "/api/jobs/run?job=content_research.notify", "schedule": "0 8 * * 1,2" },
-    { "path": "/api/jobs/run?job=content_research.notify", "schedule": "0 9 * * 1,2" },
-    { "path": "/api/jobs/run?job=reports.generate_monthly", "schedule": "0 6 * * *" },
-    { "path": "/api/jobs/run?job=reports.review_reminders", "schedule": "0 8 * * *" },
-    { "path": "/api/jobs/run?job=reports.process_queue", "schedule": "*/10 5-20 * * *" },
-    { "path": "/api/jobs/run?job=reports.team_notify", "schedule": "5 7-15 * * 1-5" },
-    { "path": "/api/jobs/run?job=attention.notify", "schedule": "0 7 * * 1-5" },
-    { "path": "/api/jobs/run?job=attention.notify", "schedule": "0 12 * * 1-5" }
+    {
+      "path": "/api/jobs/run?job=calendar.sync",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=goals.recompute",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=awards.recompute",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=meetings.roll_over",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=portal.notify_clients",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=sync.frequent",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=sync.nightly",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=reminders.next_day_todo&slot=zomer",
+      "schedule": "45 14 * * 1-5"
+    },
+    {
+      "path": "/api/jobs/run?job=reminders.next_day_todo&slot=winter",
+      "schedule": "45 15 * * 1-5"
+    },
+    {
+      "path": "/api/jobs/run?job=vrijdagcheck.notify",
+      "schedule": "0 7 * * 5"
+    },
+    {
+      "path": "/api/jobs/run?job=reminders.editor_friday_wrapup&slot=zomer",
+      "schedule": "0 7 * * 5"
+    },
+    {
+      "path": "/api/jobs/run?job=reminders.editor_friday_wrapup&slot=winter",
+      "schedule": "0 8 * * 5"
+    },
+    {
+      "path": "/api/jobs/run?job=reminders.cleaning_friday&slot=zomer",
+      "schedule": "0 13 * * 5"
+    },
+    {
+      "path": "/api/jobs/run?job=reminders.cleaning_friday&slot=winter",
+      "schedule": "0 14 * * 5"
+    },
+    {
+      "path": "/api/jobs/run?job=finance.month_reminder",
+      "schedule": "0 8 28 * *"
+    },
+    {
+      "path": "/api/jobs/run?job=finance.sync_health",
+      "schedule": "10 7 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=finance.weekly_summary&slot=zomer",
+      "schedule": "45 6 * * 1"
+    },
+    {
+      "path": "/api/jobs/run?job=finance.weekly_summary&slot=winter",
+      "schedule": "45 7 * * 1"
+    },
+    {
+      "path": "/api/jobs/run?job=reminders.post_shoot&slot=zomer",
+      "schedule": "45 6 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=reminders.post_shoot&slot=winter",
+      "schedule": "45 7 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=leads.sync_mailbox",
+      "schedule": "0 7-20 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=captions.auto_generate",
+      "schedule": "15 7-20 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=captions.link_drive_scripts",
+      "schedule": "35 7-20 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=scripts.version_sync",
+      "schedule": "50 7-20 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=briefing.auto_generate",
+      "schedule": "25 7-20 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=transfers.cleanup",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=content_research.weekly",
+      "schedule": "*/20 4-8 * * 1"
+    },
+    {
+      "path": "/api/jobs/run?job=content_research.notify",
+      "schedule": "0 8 * * 1,2"
+    },
+    {
+      "path": "/api/jobs/run?job=content_research.notify",
+      "schedule": "0 9 * * 1,2"
+    },
+    {
+      "path": "/api/jobs/run?job=reports.generate_monthly",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=reports.review_reminders",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=reports.process_queue",
+      "schedule": "*/10 5-20 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=reports.team_notify",
+      "schedule": "5 7-15 * * 1-5"
+    },
+    {
+      "path": "/api/jobs/run?job=ops.control",
+      "schedule": "*/15 5-18 * * 1-5"
+    }
   ]
 }

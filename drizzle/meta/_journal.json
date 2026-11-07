@@ -673,6 +673,13 @@
       "when": 1794043641781,
       "tag": "0095_bank_transacties",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1794046483580,
+      "tag": "0096_ops_control",
+      "breakpoints": true
     }
   ]
 }
