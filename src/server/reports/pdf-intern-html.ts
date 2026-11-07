@@ -135,6 +135,34 @@ const ROL_KLEUR: Record<string, { bg: string; soft: string; fg: string }> = {
 };
 
 const CSS2 = `
+  .vhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin: 4px 0 14px; }
+  .vhead .rk { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: #5d5d78; }
+  .vhead .tt { font-size: 16px; font-weight: 700; color: #00003b; line-height: 1.3; margin-top: 3px; }
+  .vhead .verdict { font-size: 10.5px; padding: 4px 13px; }
+  .vgrid { display: grid; grid-template-columns: 150px 1fr; gap: 20px; }
+  .vimg { position: relative; width: 150px; height: 266px; border-radius: 12px; background: #00003b center/cover no-repeat; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 24px; overflow: hidden; }
+  .vimg .du { position: absolute; right: 7px; bottom: 7px; background: rgba(0,0,59,.85); color: #fff; font-size: 10px; font-weight: 700; border-radius: 6px; padding: 2px 7px; }
+  .vstat { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 2px solid #00003b; border-bottom: 1px solid #e3e4ee; padding: 10px 0; }
+  .vstat > div { padding-right: 8px; }
+  .vstat .vsv { font-size: 22px; font-weight: 700; color: #00003b; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .vstat .vsv small { font-size: 12px; font-weight: 600; color: #5d5d78; }
+  .vstat .vsl { font-size: 9.5px; font-weight: 600; color: #00003b; margin-top: 3px; }
+  .vstat .vss { font-size: 8.5px; color: #5d5d78; }
+  .vsub { font-size: 9.5px; color: #5d5d78; margin-top: 6px; }
+  .vh { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #00003b; margin-bottom: 4px; }
+  .vh span { font-weight: 500; letter-spacing: 0; text-transform: none; color: #5d5d78; margin-left: 6px; }
+  .vq { border-left: 3px solid #00003b; padding: 2px 0 2px 11px; margin-top: 14px; }
+  .vq .q { font-size: 12px; font-weight: 600; color: #14143c; line-height: 1.4; }
+  .wb { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 18px; padding-top: 12px; border-top: 1px solid #e3e4ee; }
+  .wb ul { margin: 0; padding-left: 15px; } .wb li { font-size: 10.5px; margin: 4px 0; line-height: 1.4; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+  .dot.g { background: ${GREEN}; } .dot.o { background: #c2410c; }
+  .vles { margin-top: 16px; background: #00003b; color: #fff; border-radius: 12px; padding: 11px 15px; font-size: 12.5px; font-weight: 600; line-height: 1.4; }
+  .vles span { display: block; font-size: 8.5px; letter-spacing: .12em; text-transform: uppercase; opacity: .65; margin-bottom: 3px; }
+  .vnext { width: 100%; border-collapse: collapse; }
+  .vnext th { width: 80px; text-align: left; vertical-align: top; font-size: 10px; font-weight: 700; color: #00003b; padding: 7px 0; border-bottom: 1px solid #e3e4ee; background: none; text-transform: none; letter-spacing: 0; }
+  .vnext td { font-size: 10.5px; padding: 7px 0; border-bottom: 1px solid #e3e4ee; line-height: 1.4; }
+  .vtxt { font-size: 10.5px; margin-top: 14px; }
   .vp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 12px; }
   .vp-head .rk { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #5d5d78; }
   .vp-head .tt { font-size: 16px; font-weight: 700; color: #00003b; line-height: 1.3; margin-top: 2px; }
@@ -255,7 +283,7 @@ function hookPages(videos: InternVideo[], meta: string, maand: string): string {
 const rolVars = (rol: string) => { const k = ROL_KLEUR[rol] ?? ROL_KLEUR.pm!; return `--bg:${k.bg};--soft:${k.soft};--fg:${k.fg}`; };
 const fmtX = (n: number) => `${String(Math.round(n * 10) / 10).replace(".", ",")}×`;
 
-/** Per video een eigen pagina: grote cijferblokken, hook en CTA, inzichten, les en wat elke rol meeneemt. */
+/** Per video een eigen, rustige pagina in vaste leesvolgorde: cijfers, hook en CTA, werkte/beter, les, volgende keer. */
 function videoCards(videos: InternVideo[], meta: string): string {
   if (videos.length === 0) return "";
   const gemViews = videos.reduce((s, v) => s + v.views, 0) / videos.length;
@@ -268,40 +296,33 @@ function videoCards(videos: InternVideo[], meta: string): string {
     const c = ctaOf(v);
     const idx = gemViews > 0 ? v.views / gemViews : null;
     const ip = interPct(v);
-    const overlay = `${a?.hookType ? `<div class="ov">${hookChip(a.hookType)}</div>` : ""}${typeof v.duurSec === "number" ? `<div class="du">${Math.round(v.duurSec)} s</div>` : ""}`;
     const k = v.gemKijktijdSec;
-    const kijk = typeof k === "number"
-      ? typeof v.duurSec === "number" && v.duurSec > 0
-        ? `<div><b>${Math.round(k)} van ${Math.round(v.duurSec)} s</b><div class="kb"><div style="width:${Math.max(2, Math.min(100, Math.round((k / v.duurSec) * 100)))}%"></div></div><span>gemiddelde kijktijd</span></div>`
-        : `<div><b>${Math.round(k)} s</b><span>gemiddelde kijktijd</span></div>`
-      : `<div><b>–</b><span>kijktijd niet gemeten</span></div>`;
-    const big4 = `<div class="big4">
-      <div><b>${nf(v.views)}</b><span>weergaven</span><br/>${idx != null ? `<em class="${idx >= 1 ? "up" : ""}">${fmtX(idx)} maandgemiddelde</em>` : ""}</div>
-      ${kijk}
-      <div><b>${pctv(v.uitkijkPct)}</b><span>van de video bekeken</span></div>
-      <div><b>${ip != null ? pctv(ip) : "–"}</b><span>interactiepercentage</span><br/>${ip != null && gemInter != null ? `<em class="${ip >= gemInter ? "up" : ""}">maandgem. ${pctv(gemInter)}</em>` : ""}</div>
+    const kijkWaarde = typeof k === "number" ? (typeof v.duurSec === "number" ? `${Math.round(k)}<small> / ${Math.round(v.duurSec)} s</small>` : `${Math.round(k)}<small> s</small>`) : "–";
+    const stat = (waarde: string, label: string, sub: string) => `<div><div class="vsv">${waarde}</div><div class="vsl">${esc(label)}</div><div class="vss">${sub}</div></div>`;
+    const stats = `<div class="vstat">
+      ${stat(nf(v.views), "weergaven", idx != null ? `${fmtX(idx)} maandgemiddelde` : "")}
+      ${stat(kijkWaarde, "gem. kijktijd", typeof v.duurSec === "number" ? "van de lengte" : typeof k === "number" ? "" : "niet gemeten")}
+      ${stat(pctv(v.uitkijkPct), "bekeken", typeof v.uitkijkPct === "number" ? "van de video" : "niet gemeten")}
+      ${stat(ip != null ? pctv(ip) : "–", "interactie", gemInter != null ? `maandgem. ${pctv(gemInter)}` : "")}
     </div>
-    <div class="small4"><div><b>${nf(v.likes)}</b><span>likes</span></div><div><b>${nf(v.reacties)}</b><span>reacties</span></div><div><b>${nf(v.shares)}</b><span>shares</span></div><div><b>${nf(v.saves)}</b><span>saves</span></div></div>`;
-    const ins = a && ((a.watWerkte ?? []).length || (a.watBeter ?? []).length)
-      ? `<div class="ins"><div class="ok"><div class="h">Wat werkte</div>${(a.watWerkte ?? []).length ? `<ul>${(a.watWerkte ?? []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<div style="font-size:10px">–</div>`}</div><div class="nok"><div class="h">Wat kan beter</div>${(a.watBeter ?? []).length ? `<ul>${(a.watBeter ?? []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<div style="font-size:10px">–</div>`}</div></div>`
-      : a?.waarom ? `<div class="kg"><b>Waarom:</b> ${esc(a.waarom)}</div>` : "";
-    const rl = (rol: string, label: string, txt: string | undefined) => `<div style="${rolVars(rol)}"><div class="h">${label}</div><div class="b">${esc(txt || "Geen aanpassing nodig.")}</div></div>`;
-    const rl3 = a && (a.script || a.opname || a.montage)
-      ? `<div class="rl3">${rl("script", "Script", a.script)}${rl("opname", "Opname", a.opname)}${rl("montage", "Montage", a.montage)}</div>`
-      : v.les ? `<div class="kg">${esc(v.les)}</div>` : "";
+    <div class="vsub">${nf(v.likes)} likes · ${nf(v.reacties)} reacties · ${nf(v.shares)} shares · ${nf(v.saves)} saves</div>
+    ${a?.kijkgedrag ? `<div class="vsub">${esc(a.kijkgedrag)}</div>` : ""}`;
+    const lijst = (items: string[] | undefined) => (items ?? []).length ? `<ul>${(items ?? []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>–</p>`;
+    const wb = a && ((a.watWerkte ?? []).length || (a.watBeter ?? []).length)
+      ? `<div class="wb"><div><div class="vh"><i class="dot g"></i>Werkte</div>${lijst(a.watWerkte)}</div><div><div class="vh"><i class="dot o"></i>Kan beter</div>${lijst(a.watBeter)}</div></div>`
+      : a?.waarom ? `<p class="vtxt">${esc(a.waarom)}</p>` : "";
+    const rij = (label: string, txt: string | undefined) => (txt ? `<tr><th>${esc(label)}</th><td>${esc(txt)}</td></tr>` : "");
+    const volgende = a ? `${rij("Hook", a.betereHook)}${rij("Script", a.script)}${rij("Opname", a.opname)}${rij("Montage", a.montage)}` : "";
     return `<section class="page">${topBar(meta)}${i === 0 ? `<h1>Per video: wat leren we</h1>` : ""}
-      <div class="vp-head"><div><div class="rk">Video ${i + 1} van ${videos.length} · ${esc(platDate(v))}</div><div class="tt">${esc(firstLine(v.titel) || "Video")}</div></div>${a ? `<span class="verdict ${a.oordeel}">${esc(a.oordeel)}</span>` : ""}</div>
-      <div class="vp-grid">${thumbDiv("vp-img", v, overlay)}<div style="min-width:0">${big4}
-        <div class="hc2">
-          <div class="hookbox"><div class="bx-h"><span class="lbl">Hook · ${esc(h.bron)}</span>${hookChip(a?.hookType)}</div><div class="t">${esc(h.text)}</div></div>
-          <div class="ctabox${c.type === "geen" ? " geen" : ""}"><div class="bx-h"><span class="lbl">Call to action${c.bron ? ` · ${esc(c.bron)}` : ""}</span>${ctaChip(c.type)}</div><div class="t">${c.text ? esc(c.text) : "Geen oproep in deze video"}</div></div>
-        </div>
+      <div class="vhead"><div><div class="rk">Video ${i + 1} van ${videos.length} · ${esc(platDate(v))}${a?.hookType ? ` · hook: ${esc(a.hookType)}` : ""}</div><div class="tt">${esc(firstLine(v.titel) || "Video")}</div></div>${a ? `<span class="verdict ${a.oordeel}">${esc(a.oordeel)}</span>` : ""}</div>
+      <div class="vgrid">${thumbDiv("vimg", v, typeof v.duurSec === "number" ? `<div class="du">${Math.round(v.duurSec)} s</div>` : "")}<div style="min-width:0">
+        ${stats}
+        <div class="vq"><div class="vh">Hook <span>${esc(h.bron)}</span></div><div class="q">${esc(h.text)}</div></div>
+        <div class="vq"><div class="vh">Call to action <span>${c.type === "geen" ? "geen" : esc(c.type)}</span></div><div class="q">${c.text ? esc(c.text) : "Geen oproep in deze video"}</div></div>
       </div></div>
-      ${ins}
-      ${a?.kijkgedrag ? `<div class="kg"><b>Kijkgedrag:</b> ${esc(a.kijkgedrag)}</div>` : ""}
-      ${a?.les ? `<div class="lesb"><div class="h">Les voor het team</div>${esc(a.les)}</div>` : ""}
-      ${a?.betereHook ? `<div class="bh"><span class="lbl">Sterkere hook voor een volgende video</span><div class="t">${esc(a.betereHook)}</div></div>` : ""}
-      ${rl3}
+      ${wb}
+      ${a?.les ? `<div class="vles"><span>Les</span>${esc(a.les)}</div>` : ""}
+      ${volgende ? `<div class="vh" style="margin-top:14px">Volgende keer</div><table class="vnext">${volgende}</table>` : v.les ? `<p class="vtxt">${esc(v.les)}</p>` : ""}
     </section>`;
   }).join("");
 }
