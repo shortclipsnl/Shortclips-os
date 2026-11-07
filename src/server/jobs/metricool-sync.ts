@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gte, isNull } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientIntegrations, clients, dailyMetrics, publications, socialMetrics } from "@/db/schema";
 import { normalizeName } from "@/server/import";
@@ -13,6 +13,32 @@ import {
 import { runJob } from "./runner";
 
 type Source = Pick<MetricoolService, "listBrands" | "timeline">;
+
+/**
+ * Downloadt een miniatuur (max. 5 MB, 8 s) en bewaart een verkleinde kopie
+ * (180 px breed, JPEG) als data-URI van ~10-20 kB. Lukt verkleinen niet, dan
+ * alleen het origineel als dat klein genoeg is. Anders null.
+ */
+async function downloadThumbnail(url: string): Promise<string | null> {
+  if (!/^https:\/\//.test(url)) return null;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const type = (res.headers.get("content-type") ?? "").split(";")[0]!.trim();
+    if (!/^image\/(jpeg|png|webp)$/.test(type)) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length === 0 || buf.length > 5_000_000) return null;
+    try {
+      const sharp = (await import("sharp")).default;
+      const small = await sharp(buf).resize({ width: 180, withoutEnlargement: true }).jpeg({ quality: 72 }).toBuffer();
+      return `data:image/jpeg;base64,${small.toString("base64")}`;
+    } catch {
+      return buf.length <= 150_000 ? `data:${type};base64,${buf.toString("base64")}` : null;
+    }
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Koppelingen naar merken die niet (meer) in het Metricool-account bestaan
@@ -290,6 +316,7 @@ export async function pullMetricoolPosts(
       // Meetdag in Amsterdamse tijd: één social_metrics-rij per post per dag.
       const measuredOn = now.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
 
+      const thumbBudget = { left: 120 };
       const known = await knownBrandIds(source, (m, l) => ctx.log(m, l));
       for (const link of links) {
         if (await skipUnknownBrand(known, link, (m, l) => ctx.log(m, l))) continue;
@@ -313,13 +340,20 @@ export async function pullMetricoolPosts(
               const caption = p.caption ? p.caption.slice(0, 2000) : null;
               const [pub] = await db
                 .insert(publications)
-                .values({ clientId: link.clientId, platform, status: "published", publishedAt, externalPostId: p.externalId, externalUrl: p.url, caption })
+                .values({ clientId: link.clientId, platform, status: "published", publishedAt, externalPostId: p.externalId, externalUrl: p.url, caption, thumbnailUrl: p.thumbnailUrl })
                 .onConflictDoUpdate({
                   target: [publications.platform, publications.externalPostId],
-                  set: { externalUrl: p.url, caption, publishedAt, updatedAt: new Date() },
+                  set: { externalUrl: p.url, caption, publishedAt, ...(p.thumbnailUrl ? { thumbnailUrl: p.thumbnailUrl } : {}), updatedAt: new Date() },
                 })
-                .returning({ id: publications.id });
+                .returning({ id: publications.id, hasThumb: sql<boolean>`thumbnail_data is not null` });
               if (!pub) continue;
+              // Miniatuur eenmalig als kleine kopie bewaren (de bron-URL verloopt),
+              // alleen voor recente posts en met een plafond per run.
+              if (!pub.hasThumb && p.thumbnailUrl && thumbBudget.left > 0 && publishedAt && Date.now() - publishedAt.getTime() < 70 * 86400000) {
+                thumbBudget.left--;
+                const data = await downloadThumbnail(p.thumbnailUrl);
+                if (data) await db.update(publications).set({ thumbnailData: data }).where(eq(publications.id, pub.id));
+              }
               const metricValues = {
                 views: Math.max(0, Math.round(p.views)),
                 reach: Math.max(0, Math.round(p.reach)),

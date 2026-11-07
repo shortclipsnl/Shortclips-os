@@ -5,7 +5,7 @@ import { clientReports, clients, monthlyReportFeedback, monthlyReportReads, mont
 import { assertClientAccess, ForbiddenError, requireInternal, scopeToClients, type Viewer } from "@/server/auth/context";
 import { periodLabel } from "./analysis";
 import { checkReportQuality, type Beoordeling, type QualityIssue } from "./quality";
-import { duplicateIssue, findDuplicateMetricClients, type MaandCijfers, type Vergelijking } from "./metrics";
+import { duplicateIssue, findDuplicateMetricClients, monthVideos, thumbnailsFor, type MaandCijfers, type MonthVideo, type Vergelijking } from "./metrics";
 import type { MonthlyAnalysis } from "./analysis";
 
 export type ReportStatus =
@@ -411,6 +411,8 @@ export type ReportPdfData = {
   pmName: string | null;
   ontbrekend: string[];
   approvedAt: string | null;
+  /** Video's van de maand met miniatuur en (als beschikbaar) het AI-inzicht per video. */
+  videos: Array<MonthVideo & { thumb: string | null; inzicht: string | null }>;
 };
 
 /** Ruwe gegevens voor de PDF-opbouw (zonder viewer-scoping — de route scoopt). */
@@ -431,7 +433,14 @@ export async function loadReportPdfData(reportId: string): Promise<ReportPdfData
   if (!r) return null;
   const analysis = r.analysis && Object.keys(r.analysis).length ? (r.analysis as unknown as MonthlyAnalysis) : null;
   const b = (r.beoordeling ?? {}) as Beoordeling;
+  const totals = (r.metrics ?? {}) as Record<string, unknown>;
+  // Video's: opgeslagen bij de generatie, anders (oudere rapporten) live opgehaald.
+  const stored = Array.isArray(totals.videos) ? (totals.videos as MonthVideo[]) : null;
+  const vids = stored ?? await monthVideos(r.clientId, r.period);
+  const thumbs = await thumbnailsFor(vids.map((v) => v.id));
+  const inzichten = new Map((stored && analysis?.videoInzichten ? analysis.videoInzichten : []).map((x) => [x.key, x.inzicht]));
   return {
+    videos: vids.map((v) => ({ ...v, thumb: thumbs.get(v.id) ?? null, inzicht: inzichten.get(v.key) ?? null })),
     clientId: r.clientId,
     status: r.status as ReportStatus,
     clientName: r.clientName,

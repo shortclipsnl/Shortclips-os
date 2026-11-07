@@ -10,6 +10,8 @@ export type ReportPdfInput = {
   totals: Partial<ReportMetrics>;
   analysis: MonthlyAnalysis | null;
   klanttekst: string;
+  /** Alle video's van de maand (met miniatuur en inzicht), voor het video-overzicht. */
+  videos?: Array<{ titel: string; datum: string | null; platform: string | null; views: number; likes: number; reacties: number; shares: number; saves: number; thumb: string | null; inzicht: string | null }>;
 };
 
 const GREEN = "#12a150";
@@ -89,6 +91,19 @@ const CSS = `
   .kans { border-left: 4px solid ${GREEN}; background: ${GREEN_SOFT}; border-radius: 0 12px 12px 0; padding: 10px 13px; margin-bottom: 8px; }
   .kans .t { font-weight: 700; color: #00003b; }
   .kans .s { color: #3f4a45; font-size: 10px; margin-top: 2px; }
+  .vl > .vr { margin-bottom: 7px; }
+  .vr { display: grid; grid-template-columns: 40px 1fr 230px; gap: 12px; align-items: center; border: 1px solid #e3e4ee; border-radius: 12px; padding: 7px 10px 7px 7px; page-break-inside: avoid; }
+  .vr.top { border-color: ${GREEN}; }
+  .th { width: 40px; height: 71px; border-radius: 7px; background: #00003b center/cover no-repeat; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; }
+  .vr .vt { font-weight: 600; color: #00003b; font-size: 10px; line-height: 1.3; max-height: 2.6em; overflow: hidden; }
+  .vr .vm { font-size: 8.5px; color: #5d5d78; margin-top: 2px; }
+  .vr .vi { font-size: 9px; color: #12703c; margin-top: 4px; line-height: 1.35; }
+  .vr .vi::before { content: "▲ "; font-size: 7px; }
+  .vs { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr; gap: 4px; text-align: center; }
+  .vs div { background: #f4f5f9; border-radius: 7px; padding: 5px 2px 4px; }
+  .vs div:first-child { background: #00003b; color: #fff; }
+  .vs b { display: block; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  .vs span { font-size: 7.5px; opacity: .75; }
   .end { background: #00003b; color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 0 24mm; }
   .end img { width: 130px; margin-bottom: 36px; }
   .end h1 { color: #fff; font-size: 30px; margin: 0 0 12px; }
@@ -135,6 +150,25 @@ function barChart(list: MaandCijfers[], key: "views" | "engagements" | "follower
   const cols = data.map((m, i) => `<div class="col${m.maand === cur ? " cur" : m.maand === peak ? " peak" : ""}"><div class="bv">${fmt(m[key])}</div><div class="b" style="height:${Math.max(3, Math.round((vals[i]! / max) * 100))}%"></div></div>`).join("");
   const labels = data.map((m) => `<div>${esc(shortMonth(m.maand))}</div>`).join("");
   return `<div class="chart">${cols}</div><div class="labels">${labels}</div><div class="legend"><span style="--c:${GREEN}">Deze maand</span><span style="--c:#00003b">Beste eerdere maand</span><span style="--c:#b9bbd6">Overige maanden</span></div>`;
+}
+
+const PLATFORM: Record<string, string> = { instagram: "Instagram", tiktok: "TikTok", facebook: "Facebook", youtube: "YouTube", linkedin: "LinkedIn" };
+const VIDEOS_PER_PAGE = 8;
+
+function videoPages(videos: NonNullable<ReportPdfInput["videos"]>, maand: string, meta: string): string {
+  if (videos.length === 0) return "";
+  const row = (v: (typeof videos)[number], i: number) => {
+    const date = v.datum ? new Date(`${v.datum}T12:00:00Z`).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }).replace(".", "") : "";
+    const thumb = v.thumb ? `<div class="th" style="background-image:url('${v.thumb}')"></div>` : `<div class="th">▶</div>`;
+    return `<div class="vr${i < 3 ? " top" : ""}">${thumb}<div style="min-width:0"><div class="vt">${i < 3 ? `<span style="color:${GREEN}">#${i + 1}</span> ` : ""}${esc(v.titel || "Video")}</div><div class="vm">${esc([v.platform ? PLATFORM[v.platform] ?? v.platform : "", date].filter(Boolean).join(" · "))}</div>${v.inzicht ? `<div class="vi">${esc(v.inzicht)}</div>` : ""}</div><div class="vs"><div><b>${nf(v.views)}</b><span>weergaven</span></div><div><b>${nf(v.likes)}</b><span>likes</span></div><div><b>${nf(v.reacties)}</b><span>reacties</span></div><div><b>${nf(v.shares)}</b><span>shares</span></div><div><b>${nf(v.saves)}</b><span>saves</span></div></div></div>`;
+  };
+  const pages: string[] = [];
+  for (let start = 0; start < videos.length; start += VIDEOS_PER_PAGE) {
+    const chunk = videos.slice(start, start + VIDEOS_PER_PAGE);
+    const first = start === 0;
+    pages.push(`<section class="page">${topBar(meta)}<h1>${first ? `Al jullie video's van ${esc(maand)}` : `Video's van ${esc(maand)} (vervolg)`}</h1>${first ? `<p class="lead">${videos.length} ${videos.length === 1 ? "video" : "video's"} met de resultaten per video, van meeste naar minste weergaven.</p>` : ""}<div class="vl">${chunk.map((v, k) => row(v, start + k)).join("")}</div></section>`);
+  }
+  return pages.join("");
 }
 
 /**
@@ -264,6 +298,8 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
     ${topVideos || `<p class="lead">De cijfers per video zijn voor deze maand nog niet beschikbaar.</p>`}
     ${watWerkt ? `<h2>Wat werkte goed</h2><ul class="checks">${watWerkt}</ul>` : ""}
   </section>
+
+  ${videoPages(input.videos ?? [], maand, meta)}
 
   <section class="page">
     ${topBar(meta)}

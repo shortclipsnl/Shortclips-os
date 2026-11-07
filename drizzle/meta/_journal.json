@@ -680,6 +680,13 @@
       "when": 1794047102617,
       "tag": "0096_boekhoud_balansen",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1794048304943,
+      "tag": "0097_publicatie_miniaturen",
+      "breakpoints": true
     }
   ]
 }

@@ -308,8 +308,17 @@ describe("PDF's", () => {
     const { loadReportPdfData } = await import("@/server/reports/service");
     const { renderMonthlyReportHtml } = await import("@/server/reports/pdf-html");
     const { renderInternReportHtml } = await import("@/server/reports/pdf-intern-html");
+    // Eén publicatie met een opgeslagen miniatuur.
+    const { eq } = await import("drizzle-orm");
+    const [pub] = await db.select({ id: s.publications.id }).from(s.publications).where(eq(s.publications.caption, "Video 0"));
+    await db.update(s.publications).set({ thumbnailData: "data:image/jpeg;base64,AAAA" }).where(eq(s.publications.id, pub!.id));
     const d = (await loadReportPdfData(ids.reportActief!))!;
-    const klant = renderMonthlyReportHtml({ clientName: d.clientName, logoUrl: null, periodLabel: d.periodLabel, totals: d.totals as never, analysis: d.analysis, klanttekst: "Mooie maand" });
+    expect(d.videos.length).toBe(5);
+    expect(d.videos[0]!.views).toBe(1000);
+    expect(d.videos[0]!.thumb).toBe("data:image/jpeg;base64,AAAA");
+    const klant = renderMonthlyReportHtml({ clientName: d.clientName, logoUrl: null, periodLabel: d.periodLabel, totals: d.totals as never, analysis: d.analysis, klanttekst: "Mooie maand", videos: d.videos });
+    expect(klant).toContain("Al jullie video's van oktober");
+    expect(klant).toContain("data:image/jpeg;base64,AAAA");
     expect(klant).toContain("Actief BV");
     expect(klant).toContain("Twee rondleidingen per week");
     expect(klant).not.toContain("Rondleidingen werken"); // interne kern

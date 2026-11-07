@@ -143,6 +143,10 @@ export const publications = pgTable(
     externalPostId: varchar("external_post_id", { length: 200 }),
     externalUrl: text("external_url"),
     caption: text("caption"),
+    /** Miniatuur-URL zoals de bron (Metricool) die levert; verloopt vaak. */
+    thumbnailUrl: text("thumbnail_url"),
+    /** Kleine kopie van de miniatuur als data-URI, zodat rapporten die altijd hebben. */
+    thumbnailData: text("thumbnail_data"),
     failureReason: text("failure_reason"),
     ...timestamps,
     ...softDelete,

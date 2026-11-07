@@ -217,3 +217,50 @@ export function formatStats(videos: Array<{ format: string | null; views: number
     .map(([format, s]) => ({ format, videos: s.videos, views: s.views, gemViews: Math.round(s.views / s.videos), gemInteracties: Math.round(s.inter / s.videos) }))
     .sort((a, b) => b.gemViews - a.gemViews);
 }
+
+export type MonthVideo = {
+  key: string; id: string; titel: string; datum: string | null; platform: string | null; url: string | null;
+  views: number; likes: number; reacties: number; shares: number; saves: number; gemKijktijdSec: number | null;
+};
+
+/**
+ * Alle gepubliceerde video's van een klant in een kalendermaand met hun eigen
+ * (laatst gemeten) cijfers, hoogste weergaven eerst. Zelfde bron als de analyse.
+ */
+export async function monthVideos(clientId: string, period: string, limit = 40): Promise<MonthVideo[]> {
+  const from = `${period}-01`;
+  const to = monthEnd(period);
+  const res = await db.execute(sql`
+    with pm as (
+      select publication_id, max(views) views, max(likes) likes, max(comments) comments,
+             max(shares) shares, max(saves) saves, max(avg_watch_seconds) avg_watch
+      from social_metrics where client_id = ${clientId} group by publication_id
+    )
+    select p.id, p.platform, left(coalesce(d.title, p.caption), 140) as titel,
+           to_char(coalesce(d.published_at, p.published_at), 'YYYY-MM-DD') as datum, p.external_url as url,
+           coalesce(pm.views,0)::int views, coalesce(pm.likes,0)::int likes, coalesce(pm.comments,0)::int comments,
+           coalesce(pm.shares,0)::int shares, coalesce(pm.saves,0)::int saves, pm.avg_watch
+    from publications p
+    join pm on pm.publication_id = p.id
+    left join deliverables d on d.id = p.deliverable_id and d.deleted_at is null
+    where p.client_id = ${clientId} and p.deleted_at is null
+      and coalesce(p.published_at, d.published_at)::date >= ${from}
+      and coalesce(p.published_at, d.published_at)::date <= ${to}
+      and coalesce(pm.views,0) > 0
+    order by views desc
+    limit ${limit}`);
+  return rows<Record<string, unknown>>(res).map((v, i) => ({
+    key: `v${i + 1}`, id: String(v.id), titel: String(v.titel ?? ""), datum: v.datum ? String(v.datum) : null,
+    platform: v.platform ? String(v.platform) : null, url: v.url ? String(v.url) : null,
+    views: n(v.views), likes: n(v.likes), reacties: n(v.comments), shares: n(v.shares), saves: n(v.saves),
+    gemKijktijdSec: v.avg_watch != null ? Math.round(Number(v.avg_watch)) : null,
+  }));
+}
+
+/** Miniaturen (data-URI) per publicatie-id. */
+export async function thumbnailsFor(ids: string[]): Promise<Map<string, string>> {
+  const uuids = ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+  if (uuids.length === 0) return new Map();
+  const res = await db.execute(sql`select id, thumbnail_data from publications where thumbnail_data is not null and id in (${sql.join(uuids.map((u) => sql`${u}::uuid`), sql`, `)})`);
+  return new Map(rows<{ id: string; thumbnail_data: string }>(res).map((r) => [String(r.id), r.thumbnail_data]));
+}

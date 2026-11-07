@@ -53,7 +53,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       })
     : renderMonthlyReportHtml({
         clientName: data.clientName, logoUrl: data.logoUrl, periodLabel: data.periodLabel,
-        totals: data.totals as never, analysis: data.analysis, klanttekst: data.klanttekst,
+        totals: data.totals as never, analysis: data.analysis, klanttekst: data.klanttekst, videos: data.videos,
       });
   let pdf: Uint8Array;
   try {
