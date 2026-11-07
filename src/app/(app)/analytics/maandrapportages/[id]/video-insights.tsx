@@ -1,8 +1,9 @@
-import { Badge, type Tone } from "@/components/ui";
+import { EyeOff, Eye } from "lucide-react";
+import { Badge, buttonClass, type Tone } from "@/components/ui";
 import type { VideoAnalyse, VideoPunt } from "@/server/reports/analysis";
 
 export type ReviewVideo = {
-  key: string; titel: string; datum: string | null; platform: string | null;
+  key: string; id: string; titel: string; datum: string | null; platform: string | null;
   views: number; likes: number; reacties: number; shares: number; saves: number;
   gemKijktijdSec: number | null; uitkijkPct?: number | null; duurSec?: number | null;
   scriptHook?: string | null; thumb: string | null; analyse: VideoAnalyse | null;
@@ -33,7 +34,7 @@ function Punten({ titel, kleur, items }: { titel: string; kleur: string; items?:
 }
 
 /** Interne inzichten per video, in dezelfde leesvolgorde als de interne PDF. */
-export function VideoInsights({ videos }: { videos: ReviewVideo[] }) {
+export function VideoInsights({ videos, hidden = [], onToggleHidden, busy }: { videos: ReviewVideo[]; hidden?: string[]; onToggleHidden?: (id: string, hide: boolean) => void; busy?: boolean }) {
   if (videos.length === 0) return null;
   const gem = videos.reduce((s, v) => s + v.views, 0) / videos.length;
   return (
@@ -45,7 +46,17 @@ export function VideoInsights({ videos }: { videos: ReviewVideo[] }) {
         const hook = a?.hook || v.scriptHook || (v.titel || "").split(/[.!?\n]/)[0];
         const rows = a ? ([["Hook", a.betereHook], ["Script", a.script], ["Opname", a.opname], ["Montage", a.montage]] as const).filter(([, t]) => t) : [];
         return (
-          <div key={v.key} className="rounded-[var(--radius-sm)] border border-[var(--color-line)] p-4">
+          <div key={v.key} className={`rounded-[var(--radius-sm)] border p-4 ${hidden.includes(v.id) ? "border-dashed border-[var(--color-line-strong)] opacity-80" : "border-[var(--color-line)]"}`}>
+            {hidden.includes(v.id) || onToggleHidden ? (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-[var(--radius-sm)] bg-[var(--color-surface-sunken)] px-2.5 py-1.5 text-xs">
+                <span className="text-[var(--color-ink-muted)]">{hidden.includes(v.id) ? "Staat niet in de klantversie (wel in de interne versie)." : "Staat in de klantversie."}</span>
+                {onToggleHidden ? (
+                  <button type="button" disabled={busy} onClick={() => onToggleHidden(v.id, !hidden.includes(v.id))} className={buttonClass({ variant: "ghost", size: "sm" })}>
+                    {hidden.includes(v.id) ? <><Eye className="size-3.5" /> Weer tonen aan klant</> : <><EyeOff className="size-3.5" /> Niet tonen aan klant</>}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-2xs uppercase tracking-wide text-[var(--color-ink-faint)]">Video {i + 1} van {videos.length} · {v.platform ? PLATFORM[v.platform] ?? v.platform : ""}{v.datum ? ` · ${v.datum}` : ""}{a?.hookType ? ` · hook: ${a.hookType}` : ""}</p>

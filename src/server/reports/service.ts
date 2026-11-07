@@ -413,6 +413,8 @@ export type ReportPdfData = {
   approvedAt: string | null;
   /** Video's van de maand met miniatuur en (als beschikbaar) het AI-inzicht per video. */
   videos: Array<MonthVideo & { thumb: string | null; inzicht: string | null; les: string | null; analyse: VideoAnalyse | null }>;
+  /** Alleen de video's die in de klantversie mogen (zonder de handmatig verborgen video's). */
+  klantVideos: Array<MonthVideo & { thumb: string | null; inzicht: string | null; les: string | null; analyse: VideoAnalyse | null }>;
 };
 
 /** Ruwe gegevens voor de PDF-opbouw (zonder viewer-scoping — de route scoopt). */
@@ -443,8 +445,11 @@ export async function loadReportPdfData(reportId: string): Promise<ReportPdfData
   const inzichten = new Map((stored && analysis?.videoInzichten ? analysis.videoInzichten : []).map((x) => [x.key, x.inzicht]));
   const lessen = new Map((stored && analysis?.intern?.videoLessen ? analysis.intern.videoLessen : []).map((x) => [x.key, x.les]));
   const analyses = new Map((stored && analysis?.intern?.videoAnalyses ? analysis.intern.videoAnalyses : []).map((x) => [x.key, x]));
+  const alle = vids.map((v) => ({ ...v, thumb: thumbs.get(v.id) ?? null, inzicht: inzichten.get(v.key) ?? null, les: lessen.get(v.key) ?? null, analyse: analyses.get(v.key) ?? null }));
+  const verborgen = new Set(b.verborgenVideos ?? []);
   return {
-    videos: vids.map((v) => ({ ...v, thumb: thumbs.get(v.id) ?? null, inzicht: inzichten.get(v.key) ?? null, les: lessen.get(v.key) ?? null, analyse: analyses.get(v.key) ?? null })),
+    videos: alle,
+    klantVideos: alle.filter((v) => !verborgen.has(v.id)),
     clientId: r.clientId,
     status: r.status as ReportStatus,
     clientName: r.clientName,

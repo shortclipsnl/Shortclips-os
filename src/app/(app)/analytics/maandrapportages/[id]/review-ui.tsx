@@ -7,13 +7,14 @@ import { Loader2, Sparkles, FileDown, FileText, Check, RotateCcw, Save, Send, Al
 import { Badge, buttonClass, type Tone } from "@/components/ui";
 import {
   approveMonthlyReport, createReportActionTask, generatePersonalText, publishMonthlyReport, requestReportChanges,
-  saveReportAnalysis, saveReportBeoordeling, setReportRead, startMonthlyReport, unpublishMonthlyReport,
+  saveReportAnalysis, saveReportBeoordeling, setReportRead, setReportVideoHidden, startMonthlyReport, unpublishMonthlyReport,
 } from "@/server/actions/monthly-reports";
 import type { ReportDetail } from "@/server/reports/service";
 import type { InternInzicht } from "@/server/reports/analysis";
 import { STATUS_META } from "../report-list";
 import { VideoInsights, type ReviewVideo } from "./video-insights";
 import { SharePdfButton } from "./share-pdf";
+import { DictateButton } from "./dictate";
 
 type Rec = { titel: string; waarom?: string; wat?: string; hoeMeten?: string; zekerheid?: string };
 type Actie = { titel: string; waarom?: string };
@@ -86,6 +87,8 @@ export function ReviewUI({
     klanttekst: report.beoordeling.klanttekst ?? "",
   });
   const [feedback, setFeedback] = useState("");
+  const [feedbackDoel, setFeedbackDoel] = useState<"klant" | "intern" | "beide">("klant");
+  const feedbackTekst = () => (feedbackDoel === "klant" ? `[Klantversie] ${feedback.trim()}` : feedbackDoel === "intern" ? `[Intern] ${feedback.trim()}` : feedback.trim());
   const [taskFor, setTaskFor] = useState<string | null>(null);
   const [taskAssignee, setTaskAssignee] = useState<string>(report.pmId ?? "");
   const [taskDue, setTaskDue] = useState<string>("");
@@ -272,7 +275,7 @@ export function ReviewUI({
                 </div>
               ) : null}
               {!a?.intern ? <p className="text-sm text-[var(--color-ink-muted)]">Dit rapport is gemaakt voordat de interne teamanalyse bestond. Genereer de AI-analyse opnieuw om die toe te voegen.</p> : null}
-              {videos.some((v) => v.analyse) ? <VideoInsights videos={videos} /> : (
+              {videos.some((v) => v.analyse) ? <VideoInsights videos={videos} hidden={report.beoordeling.verborgenVideos ?? []} busy={pending} onToggleHidden={editable ? (id, hide) => run(() => setReportVideoHidden(report.id, id, hide), hide ? "Video staat niet meer in de klantversie." : "Video staat weer in de klantversie.") : undefined} /> : (
                 <>
                   <Insights title="Best presterende video's en waarom" list={a?.intern?.besteVideos} />
                   <Insights title="Hooks die werkten" list={a?.intern?.hooks} />
@@ -429,10 +432,16 @@ export function ReviewUI({
               <p className="flex items-center gap-2 text-sm font-semibold text-[var(--color-ink)]"><MessageSquare className="size-4" /> Feedback en aanpassingen</p>
               {!approved ? (
                 <>
-                  <textarea className="sc-input h-24 w-full text-sm" placeholder="Wat moet er aangepast worden? Bijvoorbeeld: meer nadruk op de groei in sollicitaties, toon minder stellig over de hooks." value={feedback} onChange={(e) => setFeedback(e.target.value)} />
+                  <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Voor welke versie is de feedback?">
+                    {([["klant", "Klantversie"], ["intern", "Interne versie"], ["beide", "Beide"]] as const).map(([k, l]) => (
+                      <button key={k} type="button" role="radio" aria-checked={feedbackDoel === k} onClick={() => setFeedbackDoel(k)} className={`rounded-full border px-2.5 py-1 text-xs font-medium ${feedbackDoel === k ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-ink)] text-white" : "border-[var(--color-line-strong)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}>{l}</button>
+                    ))}
+                  </div>
+                  <textarea className="sc-input h-28 w-full text-sm" placeholder={feedbackDoel === "klant" ? "Wat moet eruit of anders richting de klant? Bijvoorbeeld: noem de daling in weergaven niet, laat de Mambo-video weg, minder stellig over de hooks." : "Wat moet er anders in de interne analyse? Typ of spreek het in."} value={feedback} onChange={(e) => setFeedback(e.target.value)} />
+                  <DictateButton onText={(t) => setFeedback((p) => (p.trim() ? `${p.trim()} ${t}` : t))} />
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" disabled={pending || !feedback.trim() || !aiReady} onClick={() => run(() => requestReportChanges(report.id, feedback, true), "Feedback opgeslagen; de analyse wordt opnieuw opgesteld.", () => setFeedback(""))} className={buttonClass({ variant: "primary", size: "sm" })}><RotateCcw className="size-3.5" /> Opslaan en opnieuw genereren</button>
-                    <button type="button" disabled={pending || !feedback.trim()} onClick={() => run(() => requestReportChanges(report.id, feedback, false), "Feedback opgeslagen.", () => setFeedback(""))} className={buttonClass({ variant: "ghost", size: "sm" })}>Alleen opslaan</button>
+                    <button type="button" disabled={pending || !feedback.trim() || !aiReady} onClick={() => run(() => requestReportChanges(report.id, feedbackTekst(), true), "Feedback opgeslagen; de analyse wordt opnieuw opgesteld.", () => setFeedback(""))} className={buttonClass({ variant: "primary", size: "sm" })}><RotateCcw className="size-3.5" /> Opslaan en opnieuw genereren</button>
+                    <button type="button" disabled={pending || !feedback.trim()} onClick={() => run(() => requestReportChanges(report.id, feedbackTekst(), false), "Feedback opgeslagen.", () => setFeedback(""))} className={buttonClass({ variant: "ghost", size: "sm" })}>Alleen opslaan</button>
                   </div>
                 </>
               ) : <p className="text-xs text-[var(--color-ink-muted)]">Goedgekeurd. Zet het rapport terug naar aanpassen om nieuwe feedback te geven.</p>}

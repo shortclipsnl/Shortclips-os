@@ -1,6 +1,10 @@
 import type { MonthlyAnalysis } from "./analysis";
 
-export type Beoordeling = { positief?: string; verbeteren?: string; volgendeMaand?: string; klanttekst?: string };
+export type Beoordeling = {
+  positief?: string; verbeteren?: string; volgendeMaand?: string; klanttekst?: string;
+  /** Publicatie-id's van video's die niet in de klantversie mogen staan. */
+  verborgenVideos?: string[];
+};
 
 export type QualityIssue = {
   id: string;

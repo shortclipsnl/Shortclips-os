@@ -334,6 +334,16 @@ describe("PDF's", () => {
     expect(d.videos.length).toBe(5);
     expect(d.videos[0]!.views).toBe(1000);
     expect(d.videos[0]!.thumb).toBe("data:image/jpeg;base64,AAAA");
+    expect(d.klantVideos.length).toBe(5);
+    // Een video verbergen voor de klant: weg uit de klantversie, blijft intern zichtbaar.
+    const { eq: eq2 } = await import("drizzle-orm");
+    const [rb] = await db.select({ b: s.clientReports.beoordeling }).from(s.clientReports).where(eq2(s.clientReports.id, ids.reportActief!));
+    await db.update(s.clientReports).set({ beoordeling: { ...(rb!.b as object), verborgenVideos: [d.videos[1]!.id] } }).where(eq2(s.clientReports.id, ids.reportActief!));
+    const d2 = (await loadReportPdfData(ids.reportActief!))!;
+    expect(d2.videos.length).toBe(5);
+    expect(d2.klantVideos.map((v) => v.id)).not.toContain(d.videos[1]!.id);
+    expect(d2.klantVideos.length).toBe(4);
+    await db.update(s.clientReports).set({ beoordeling: rb!.b as object }).where(eq2(s.clientReports.id, ids.reportActief!));
     const klant = renderMonthlyReportHtml({ clientName: d.clientName, logoUrl: null, periodLabel: d.periodLabel, totals: d.totals as never, analysis: d.analysis, klanttekst: "Mooie maand", videos: d.videos });
     expect(klant).toContain("Al jullie video's van oktober");
     expect(klant).toContain("data:image/jpeg;base64,AAAA");

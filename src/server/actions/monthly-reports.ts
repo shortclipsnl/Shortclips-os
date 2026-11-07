@@ -91,13 +91,36 @@ export async function saveReportBeoordeling(reportId: string, beoordeling: Beoor
     if (!row) return { ok: false, message: "Rapport niet gevonden." };
     assertClientAccess(viewer, row.clientId);
     if (APPROVED_STATUSES.includes(row.status as ReportStatus)) return { ok: false, message: "Dit rapport is goedgekeurd. Zet het eerst terug naar aanpassen om te wijzigen." };
+    const [huidig] = await db.select({ beoordeling: clientReports.beoordeling }).from(clientReports).where(eq(clientReports.id, reportId)).limit(1);
+    const verborgen = ((huidig?.beoordeling ?? {}) as Beoordeling).verborgenVideos ?? [];
     const clean: Beoordeling = {
+      verborgenVideos: verborgen,
       positief: (beoordeling.positief ?? "").slice(0, 2000),
       verbeteren: (beoordeling.verbeteren ?? "").slice(0, 2000),
       volgendeMaand: (beoordeling.volgendeMaand ?? "").slice(0, 2000),
       klanttekst: (beoordeling.klanttekst ?? "").slice(0, 4000),
     };
     await db.update(clientReports).set({ beoordeling: clean as unknown as Record<string, unknown>, reviewedById: viewer.id, updatedAt: new Date() }).where(eq(clientReports.id, reportId));
+    revalidatePath(`/analytics/maandrapportages/${reportId}`);
+    return { ok: true };
+  });
+}
+
+/** Een video wel of niet in de klantversie tonen (de interne versie toont altijd alles). */
+export async function setReportVideoHidden(reportId: string, videoId: string, hidden: boolean): Promise<ActionResult> {
+  return guard(async () => {
+    const viewer = await requirePermission("reports:write");
+    const row = await loadReportClient(reportId);
+    if (!row) return { ok: false, message: "Rapport niet gevonden." };
+    assertClientAccess(viewer, row.clientId);
+    if (!isUuid(videoId)) return { ok: false, message: "Onbekende video." };
+    if (APPROVED_STATUSES.includes(row.status as ReportStatus)) return { ok: false, message: "Dit rapport is goedgekeurd. Zet het eerst terug naar aanpassen om te wijzigen." };
+    const [huidig] = await db.select({ beoordeling: clientReports.beoordeling }).from(clientReports).where(eq(clientReports.id, reportId)).limit(1);
+    const b = ((huidig?.beoordeling ?? {}) as Beoordeling);
+    const set = new Set(b.verborgenVideos ?? []);
+    if (hidden) set.add(videoId);
+    else set.delete(videoId);
+    await db.update(clientReports).set({ beoordeling: { ...b, verborgenVideos: [...set] } as unknown as Record<string, unknown>, updatedAt: new Date() }).where(eq(clientReports.id, reportId));
     revalidatePath(`/analytics/maandrapportages/${reportId}`);
     return { ok: true };
   });

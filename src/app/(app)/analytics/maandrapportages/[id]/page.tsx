@@ -25,7 +25,7 @@ export default async function ReportReviewPage({ params }: { params: Promise<{ i
     loadReportPdfData(report.id),
   ]);
   const videos = (pdfData?.videos ?? []).map((v) => ({
-    key: v.key, titel: v.titel, datum: v.datum, platform: v.platform, views: v.views, likes: v.likes, reacties: v.reacties,
+    key: v.key, id: v.id, titel: v.titel, datum: v.datum, platform: v.platform, views: v.views, likes: v.likes, reacties: v.reacties,
     shares: v.shares, saves: v.saves, gemKijktijdSec: v.gemKijktijdSec, uitkijkPct: v.uitkijkPct ?? null, duurSec: v.duurSec ?? null,
     scriptHook: v.scriptHook ?? null, thumb: v.thumb, analyse: v.analyse,
   }));
