@@ -22,6 +22,14 @@ function onServerless(): boolean {
 async function launch(): Promise<Browser> {
   const puppeteer = (await import("puppeteer-core")).default;
   if (onServerless()) {
+    // @sparticuz/chromium pakt zijn systeembibliotheken (o.a. libnss3) alleen
+    // uit als hij een AWS Lambda Node 20/22-runtime herkent. Vercel zet die
+    // variabelen niet, waardoor Chromium start zonder libnss3 en elke PDF met
+    // een 503 faalt. Vercel draait op dezelfde Amazon Linux 2023-basis, dus we
+    // geven de runtime door vóórdat het pakket wordt geladen.
+    if (!process.env.AWS_EXECUTION_ENV && !process.env.AWS_LAMBDA_JS_RUNTIME) {
+      process.env.AWS_LAMBDA_JS_RUNTIME = "nodejs22.x"; // AL2023-bibliotheken (Node 20+)
+    }
     const chromium = (await import("@sparticuz/chromium")).default;
     return puppeteer.launch({
       args: chromium.args,
