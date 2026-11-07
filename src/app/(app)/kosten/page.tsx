@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
 import { requireOwner } from "@/server/auth/context";
 import { getKostenData } from "@/server/kosten/load";
+import Link from "next/link";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { formatDateFull } from "@/lib/format";
 import { KostenDashboard } from "./kosten-dashboard";
 
 export const metadata: Metadata = { title: "Kosten" };
 export const dynamic = "force-dynamic";
+
+/** Ouder dan 7 dagen = niet meer als actueel presenteren. */
+function isVerouderd(datum: string | null): boolean {
+  return !!datum && Date.now() - new Date(datum).getTime() > 7 * 86_400_000;
+}
 
 export default async function KostenPage() {
   // Uitsluitend voor de eigenaar — hard afgedwongen op paginaniveau
@@ -18,8 +25,14 @@ export default async function KostenPage() {
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
         title="Kostenmonitor"
-        description="Alle afschrijvingen van de zakelijke rekening per categorie en leverancier — uitsluitend voor de eigenaar. Elke 1e van de maand automatisch uit DigiBoox."
+        description="Alle afschrijvingen van de zakelijke rekening per categorie en leverancier, uitsluitend voor de eigenaar. Bron: maandafsluiting van het Knab-afschrift."
       />
+      {heeftData && isVerouderd(data.bijgewerkt) ? (
+        <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--color-warn)]/40 bg-[var(--color-warn)]/10 p-3 text-sm">
+          Let op: deze kosten zijn voor het laatst bijgewerkt op {formatDateFull(data.bijgewerkt)}. De meest recente maand is daardoor niet compleet.{" "}
+          <Link href="/financien/maand" className="font-semibold underline">Bekijk wat ontbreekt en de losse transacties</Link>.
+        </div>
+      ) : null}
       {heeftData ? (
         <KostenDashboard data={data} />
       ) : (

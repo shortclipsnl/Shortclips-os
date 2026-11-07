@@ -26,3 +26,4 @@ export * from "./ai-editor";
 export * from "./transfer";
 export * from "./content-research";
 export * from "./client-documents";
+export * from "./bank";

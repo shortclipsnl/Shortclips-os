@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Repeat, CalendarClock, Wallet, Receipt } from "lucide-react";
 import { requireOwner } from "@/server/auth/context";
 import { getManagementFinance } from "@/server/management-finance";
+import { getSyncStatus } from "@/server/bank/maand";
+import Link from "next/link";
 import { getCapacityOverview } from "@/server/capacity";
 import { Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { compact, euro, formatDate } from "@/lib/format";
@@ -26,7 +28,7 @@ export default async function FinancienPage() {
   // Financiën is uitsluitend voor de eigenaar — hard afgedwongen op paginaniveau
   // (defense-in-depth), náást de finance:read-check in getManagementFinance.
   await requireOwner();
-  const [d, capacity] = await Promise.all([getManagementFinance(), getCapacityOverview()]);
+  const [d, capacity, sync] = await Promise.all([getManagementFinance(), getCapacityOverview(), getSyncStatus()]);
   // Omzetgrafiek: laatste 12 maanden, in volgorde. Bij voorkeur de echte
   // gefactureerde omzet uit de boekhouding (Digiboox) — die is per maand gevuld;
   // alleen als die er nog niet is vallen we terug op de contract-maandstaten.
@@ -43,6 +45,17 @@ export default async function FinancienPage() {
     <div className="mx-auto max-w-[1300px]">
       <PageHeader title="Financiën" description="Managementoverzicht — uitsluitend voor de eigenaar. Terugkerende omzet op basis van de werkelijk gefactureerde omzet uit de boekhouding (digibtw) zodra die is ingelezen; anders uit de actieve contracten." />
 
+
+      {/* Synchronisatie: per bron de laatste import, zodat oude cijfers nooit als actueel lijken. */}
+      <div className="mb-6 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3">
+        {sync.bronnen.map((b) => (
+          <span key={b.key} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line)] px-2.5 py-1 text-xs">
+            <span className="size-2 rounded-full" style={{ background: b.status === "actueel" ? "var(--color-good)" : b.status === "verouderd" ? "var(--color-warn)" : "var(--color-bad)" }} />
+            {b.naam}: {b.dataTot ? `gegevens t/m ${formatDate(b.dataTot)}` : "nog niet gekoppeld"}{b.status === "verouderd" ? " (verouderd)" : ""}
+          </span>
+        ))}
+        <Link href="/financien/maand" className="ml-auto rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-indigo-soft)]">Maandcontrole en transacties</Link>
+      </div>
       {/* Kerncijfers — groot en duidelijk bovenaan, zodat ze meteen opvallen. */}
       <h2 className="mb-2 text-base font-bold tracking-tight text-[var(--color-ink)]">Kerncijfers</h2>
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">

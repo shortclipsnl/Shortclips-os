@@ -666,6 +666,13 @@
       "when": 1794042452946,
       "tag": "0094_maandrapport_feedback_reads",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1794043641781,
+      "tag": "0095_bank_transacties",
+      "breakpoints": true
     }
   ]
 }
