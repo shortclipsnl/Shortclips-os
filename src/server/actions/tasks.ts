@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { productionDays, tasks } from "@/db/schema";
+import { productionDays, tasks, users } from "@/db/schema";
 import { SCRIPTING_TASK_PREFIX } from "@/lib/scripting-task-plan";
 import {
   assertClientAccess,
@@ -110,8 +110,41 @@ export async function createTasksBulk(input: { lines: string; assigneeId?: strin
 
     const assigneeId = input.assigneeId && /^[0-9a-f-]{36}$/i.test(input.assigneeId) ? input.assigneeId : null;
     const category = cleanCategory(input.category);
+
+    // Dubbele taken voorkomen: staat dezelfde taak al open, of is hij de
+    // afgelopen 7 dagen door iemand afgerond, dan slaan we hem over en melden
+    // we bij wie hij staat. Zo blijft er per taak één eigenaar.
+    const norm = (t: string) => t.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim();
+    const since = new Date(Date.now() - 7 * 86_400_000);
+    const existing = await db
+      .select({ title: tasks.title, status: tasks.status, who: users.fullName })
+      .from(tasks)
+      .leftJoin(users, eq(users.id, tasks.assigneeId))
+      .where(and(
+        isNull(tasks.deletedAt),
+        or(inArray(tasks.status, ["todo", "in_progress", "blocked"]), and(eq(tasks.status, "done"), gte(tasks.completedAt, since))),
+      ))
+      .limit(2000);
+    const known = new Map(existing.map((e) => [norm(e.title), e]));
+    const seen = new Set<string>();
+    const skipped: string[] = [];
+    const fresh = titles.filter((t) => {
+      const k = norm(t);
+      if (!k || seen.has(k)) return false;
+      seen.add(k);
+      const hit = known.get(k);
+      if (hit) {
+        const who = hit.who ? hit.who.split(" ")[0] : "niemand";
+        skipped.push(`"${t}" (${hit.status === "done" ? `al afgerond door ${who}` : `staat al open bij ${who}`})`);
+        return false;
+      }
+      return true;
+    });
+    const skipNote = skipped.length ? `${skipped.length} overgeslagen: ${skipped.slice(0, 3).join(", ")}${skipped.length > 3 ? " …" : ""}` : undefined;
+    if (fresh.length === 0) return { ok: false, message: skipNote ?? "Niets toe te voegen." };
+
     const inserted = await db.insert(tasks).values(
-      titles.map((title) => ({ title: title.slice(0, 240), assigneeId, category, status: "todo" as const, createdById: viewer.id })),
+      fresh.map((title) => ({ title: title.slice(0, 240), assigneeId, category, status: "todo" as const, createdById: viewer.id })),
     ).returning({ id: tasks.id });
 
     // Eén melding voor de hele batch als die aan iemand anders is toegewezen.
@@ -120,8 +153,8 @@ export async function createTasksBulk(input: { lines: string; assigneeId?: strin
         userIds: [assigneeId],
         type: "task_assigned",
         level: "info",
-        title: `${titles.length} ${titles.length === 1 ? "taak" : "taken"} toegewezen door ${viewer.fullName}`,
-        body: titles.slice(0, 5).join(" · "),
+        title: `${fresh.length} ${fresh.length === 1 ? "taak" : "taken"} toegewezen door ${viewer.fullName}`,
+        body: fresh.slice(0, 5).join(" · "),
         href: `/tasks?persoon=${assigneeId}`,
         entityType: "task",
         entityId: inserted[0].id,
@@ -131,7 +164,7 @@ export async function createTasksBulk(input: { lines: string; assigneeId?: strin
 
     revalidatePath("/tasks");
     revalidatePath("/dashboard");
-    return { ok: true, created: titles.length };
+    return { ok: true, created: fresh.length, message: skipNote };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;

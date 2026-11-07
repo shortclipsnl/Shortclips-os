@@ -100,7 +100,8 @@ export function QuickTaskLines({ users, defaultAssignee }: { users: UserOption[]
       const res = await createTasksBulk({ lines, assigneeId: assigneeId || null, category });
       if (res.ok) {
         setLines("");
-        setErr(null);
+        // Overgeslagen dubbele taken blijven zichtbaar als melding.
+        setErr(res.message ?? null);
         router.refresh();
       } else {
         setErr(res.message ?? "Mislukt");
