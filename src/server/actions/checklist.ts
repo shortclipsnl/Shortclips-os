@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { checklistChecks } from "@/db/schema";
-import { requireInternal, ForbiddenError } from "@/server/auth/context";
+import { ForbiddenError, requireTeamMember } from "@/server/auth/context";
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -17,7 +17,7 @@ function today(): string {
 /** Een dagelijks checklistonderdeel bevestigen of de bevestiging intrekken. */
 export async function toggleChecklistItem(slotKey: string): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireTeamMember();
     const onDate = today();
     const [existing] = await db
       .select({ id: checklistChecks.id })

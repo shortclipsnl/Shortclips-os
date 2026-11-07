@@ -8,6 +8,7 @@ import { Card, CardHeader, ClientLogo, EmptyState, Stat, TeamAvatar } from "@/co
 import { pct, plural, relativeDays } from "@/lib/format";
 import { EDIT_PHASE_META } from "@/lib/statuses";
 import { AgendaConnect } from "./agenda-connect";
+import { getOrCreateIcalToken, icalFeedUrl } from "@/server/editor-ical";
 import { buildEditorGreeting } from "@/lib/editor-greeting";
 import { AvailabilityBox } from "./availability-box";
 import { DeliveredCelebration } from "./delivered-celebration";
@@ -28,7 +29,12 @@ function monthLabel(ym: string): string {
  * DEADLINE (lib/edit-deadline), nooit de opleverdeadline van Shortclips aan de klant.
  */
 export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
-  const [data, board] = await Promise.all([getEditorDashboard(viewer), listEditorBoard(viewer)]);
+  const [data, board, feedToken] = await Promise.all([
+    getEditorDashboard(viewer),
+    listEditorBoard(viewer),
+    // Persoonlijke agendalink staat altijd klaar (geen aparte aanmaakstap meer).
+    getOrCreateIcalToken(viewer.id).catch(() => null),
+  ]);
   const firstName = viewer.fullName.split(" ")[0];
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
   // Opleveringen van deze maand — voor het feestmoment (confetti).
@@ -106,7 +112,7 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
       ) : null}
 
       {/* Koppel je eigen Google Agenda: al je projecten + deadlines automatisch. */}
-      <AgendaConnect />
+      <AgendaConnect initialUrl={feedToken ? icalFeedUrl(feedToken) : null} />
 
       {/* Wat komt er aan — in één oogopslag wat er op je bord staat en wat te laat is. */}
       <div>

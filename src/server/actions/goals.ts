@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { goalMilestones, goals, goalUpdates } from "@/db/schema";
-import { ForbiddenError, requireInternal, requireOwner } from "@/server/auth/context";
+import { ForbiddenError, requireOwner, requireTeamMember } from "@/server/auth/context";
 import { recomputeAllGoals, recomputeAndNotify } from "@/server/goals/recompute";
 import { seedGoals } from "@/server/goals/seed";
 import { Q4_END, Q4_START } from "@/server/goals/catalog";
@@ -37,7 +37,7 @@ const standSchema = z.object({ value: z.number().finite(), note: z.string().trim
 /** Handmatige stand bijwerken (team). Logt de update en herberekent de status. */
 export async function updateGoalStand(goalId: string, input: { value: number; note?: string }): Promise<GoalActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireTeamMember();
     const parsed = standSchema.safeParse(input);
     if (!parsed.success) return { ok: false, message: "Vul een geldige waarde in." };
     const [goal] = await db.select({ id: goals.id }).from(goals).where(eq(goals.id, goalId)).limit(1);
@@ -56,7 +56,7 @@ export async function updateGoalStand(goalId: string, input: { value: number; no
 /** Mijlpaal afvinken of terugzetten (team). Herberekent de doelstatus. */
 export async function toggleGoalMilestone(milestoneId: string, done: boolean): Promise<GoalActionResult> {
   try {
-    await requireInternal();
+    await requireTeamMember();
     const [m] = await db.select({ id: goalMilestones.id, goalId: goalMilestones.goalId }).from(goalMilestones).where(eq(goalMilestones.id, milestoneId)).limit(1);
     if (!m) return { ok: false, message: "Mijlpaal niet gevonden." };
     await db.update(goalMilestones).set({ done, doneAt: done ? new Date() : null, updatedAt: new Date() }).where(eq(goalMilestones.id, milestoneId));
@@ -73,7 +73,7 @@ export async function toggleGoalMilestone(milestoneId: string, done: boolean): P
  *  status op "gehaald"; terugzetten laat de automatische berekening weer bepalen. */
 export async function toggleGoalAchieved(goalId: string, achieved: boolean): Promise<GoalActionResult> {
   try {
-    await requireInternal();
+    await requireTeamMember();
     const [goal] = await db.select({ id: goals.id }).from(goals).where(eq(goals.id, goalId)).limit(1);
     if (!goal) return { ok: false, message: "Doel niet gevonden." };
     await db

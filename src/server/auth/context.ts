@@ -317,6 +317,19 @@ export function canManageEditingProjects(viewer: Viewer | null): boolean {
   return viewer.permissions.has("videos:write") || isCoreStaff(viewer.email);
 }
 
+/**
+ * Interne teamfuncties (aandachtspunten, meetings, checklists, doelen, inzichten,
+ * publicatiecheck): alleen Team Shortclips, nooit freelance editors. Editors
+ * kunnen die pagina's al niet openen; dit sluit ook de server-acties zelf af.
+ */
+export async function requireTeamMember(): Promise<Viewer> {
+  const viewer = await requireInternal();
+  if (isEditorRole(viewer)) {
+    throw new ForbiddenError("Dit onderdeel is alleen voor Team Shortclips.");
+  }
+  return viewer;
+}
+
 /** Server-side poort voor alle beheeracties op editingprojecten (zie hierboven). */
 export async function requireEditingManager(): Promise<Viewer> {
   const viewer = await requireInternal();

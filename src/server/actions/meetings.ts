@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { meetingItems, tasks, teamMeetings } from "@/db/schema";
-import { requireInternal, ForbiddenError } from "@/server/auth/context";
+import { ForbiddenError, requireTeamMember } from "@/server/auth/context";
 import { notify } from "@/server/notifications";
 
 export type ActionResult = { ok: boolean; message?: string; id?: string };
@@ -19,7 +19,7 @@ const meetingSchema = z.object({
 
 export async function createMeeting(input: z.input<typeof meetingSchema>): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireTeamMember();
     const parsed = meetingSchema.safeParse(input);
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
     const [created] = await db
@@ -42,7 +42,7 @@ export async function createMeeting(input: z.input<typeof meetingSchema>): Promi
 
 export async function deleteMeeting(id: string): Promise<ActionResult> {
   try {
-    await requireInternal();
+    await requireTeamMember();
     await db.delete(teamMeetings).where(eq(teamMeetings.id, id));
     revalidatePath("/meetings");
     return { ok: true };
@@ -62,7 +62,7 @@ const itemSchema = z.object({
 
 export async function addMeetingItem(input: z.input<typeof itemSchema>): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireTeamMember();
     const parsed = itemSchema.safeParse(input);
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
     await db.insert(meetingItems).values({
@@ -83,7 +83,7 @@ export async function addMeetingItem(input: z.input<typeof itemSchema>): Promise
 
 export async function toggleMeetingItem(id: string): Promise<ActionResult> {
   try {
-    await requireInternal();
+    await requireTeamMember();
     const [item] = await db.select({ isDone: meetingItems.isDone, meetingId: meetingItems.meetingId }).from(meetingItems).where(eq(meetingItems.id, id)).limit(1);
     if (!item) return { ok: false, message: "Niet gevonden." };
     await db.update(meetingItems).set({ isDone: !item.isDone, updatedAt: new Date() }).where(eq(meetingItems.id, id));
@@ -97,7 +97,7 @@ export async function toggleMeetingItem(id: string): Promise<ActionResult> {
 
 export async function deleteMeetingItem(id: string): Promise<ActionResult> {
   try {
-    await requireInternal();
+    await requireTeamMember();
     const [item] = await db.select({ meetingId: meetingItems.meetingId }).from(meetingItems).where(eq(meetingItems.id, id)).limit(1);
     await db.delete(meetingItems).where(eq(meetingItems.id, id));
     if (item) revalidatePath(`/meetings/${item.meetingId}`);
@@ -111,7 +111,7 @@ export async function deleteMeetingItem(id: string): Promise<ActionResult> {
 /** Maakt van een actiepunt een taak in het Taken-overzicht en koppelt die. */
 export async function actionItemToTask(id: string): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireTeamMember();
     const [item] = await db
       .select({ id: meetingItems.id, meetingId: meetingItems.meetingId, body: meetingItems.body, assigneeId: meetingItems.assigneeId, dueOn: meetingItems.dueOn, taskId: meetingItems.taskId })
       .from(meetingItems)

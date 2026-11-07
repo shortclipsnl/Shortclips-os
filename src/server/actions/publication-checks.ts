@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { deliverables, publicationChecks } from "@/db/schema";
-import { assertClientAccess, ForbiddenError, requireInternal } from "@/server/auth/context";
+import { assertClientAccess, ForbiddenError, requireTeamMember } from "@/server/auth/context";
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -15,7 +15,7 @@ const ALLOWED_ROLES = ["owner", "admin", "operational_manager", "project_coordin
 /** Eén checklistpunt aan/uit zetten. Legt vast wie het afvinkte en wanneer. */
 export async function togglePublicationCheck(itemId: string): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireTeamMember();
     if (!ALLOWED_ROLES.includes(viewer.primaryRole)) {
       return { ok: false, message: "Alleen het publicatieteam mag de publicatiecheck afvinken." };
     }

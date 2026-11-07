@@ -104,7 +104,7 @@ export default async function AppLayout({
       </div>
 
       {/* AI-assistent zwevend rechtsonder, voor wie 'm mag gebruiken. */}
-      {viewer.permissions.has("ai:read") ? (
+      {viewer.permissions.has("ai:read") && !editorOnly ? (
         <AssistantWidget firstName={viewer.fullName.split(" ")[0] ?? ""} aiReady={aiConfigured()} />
       ) : null}
 
@@ -113,7 +113,8 @@ export default async function AppLayout({
       <NotificationPopper viewerId={viewer.id} />
 
       {/* Eindedagmelding: elke werkdag om 16:30 een afvinklijst rechtsonder. */}
-      <EndOfDayChecklist />
+      {/* Teamchecklist (scripting, posten …) is niet voor freelance editors. */}
+      {editorOnly ? null : <EndOfDayChecklist />}
 
       {/* Award-viering bij binnenkomst (eenmalig, tot de editor opent). */}
       <CelebrationGate context={celebration} />

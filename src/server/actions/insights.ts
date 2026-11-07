@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, tasks, users } from "@/db/schema";
-import { requireInternal, requirePermission, ForbiddenError } from "@/server/auth/context";
+import { requirePermission, ForbiddenError, requireTeamMember } from "@/server/auth/context";
 import { generateClientInsights } from "@/server/insights";
 
 export type ActionResult = { ok: boolean; message?: string };
@@ -19,7 +19,7 @@ function wrap<T>(fn: () => Promise<T>) {
 /** AI-resultatenanalyse voor een klant genereren (gated op de Anthropic-sleutel). */
 export async function generateInsights(slug: string, days = 90): Promise<ActionResult> {
   return wrap(async () => {
-    await requireInternal();
+    await requireTeamMember();
     const res = await generateClientInsights(slug, days);
     revalidatePath(`/analytics/${slug}`);
     if (res.ok) return { ok: true };

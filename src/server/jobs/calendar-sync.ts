@@ -624,6 +624,11 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
               await db.update(deliverables)
                 .set({ dueOn: newDue, updatedAt: new Date() })
                 .where(and(eq(deliverables.productionDayId, targetPdId), isNull(deliverables.deletedAt), eq(deliverables.dueOnSource, "auto")));
+              // De opnamedatum op de gekoppelde projecten verhuist mee, anders blijft
+              // de oude datum op het editing-board en in de editor deadline staan.
+              await db.update(deliverables)
+                .set({ shootOn: scheduledOn, updatedAt: new Date() })
+                .where(and(eq(deliverables.productionDayId, targetPdId), isNull(deliverables.deletedAt), isNotNull(deliverables.shootOn)));
             }
             const edRows = await db.select({ editorId: deliverables.editorId }).from(deliverables)
               .where(and(eq(deliverables.productionDayId, targetPdId), isNull(deliverables.deletedAt)));

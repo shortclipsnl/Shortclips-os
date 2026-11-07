@@ -10,8 +10,9 @@ import { getMyAgendaFeed, regenerateMyAgendaFeed } from "@/server/actions/editor
  * krijgt. De link wordt pas aangemaakt bij de eerste klik (lui), en kan opnieuw
  * worden gegenereerd om de oude in te trekken.
  */
-export function AgendaConnect() {
-  const [url, setUrl] = useState<string | null>(null);
+export function AgendaConnect({ initialUrl = null }: { initialUrl?: string | null }) {
+  // De link wordt server-side al klaargezet, zodat elke editor hem meteen ziet.
+  const [url, setUrl] = useState<string | null>(initialUrl);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pending, start] = useTransition();

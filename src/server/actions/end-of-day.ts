@@ -3,7 +3,7 @@
 import { and, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { contentCalendar, tasks, productionDays, reviewThreads, scriptReviewThreads, scriptReviews, deliverables } from "@/db/schema";
-import { requireInternal, scopeToClients } from "@/server/auth/context";
+import { requireInternal, scopeToClients, isEditorRole } from "@/server/auth/context";
 import { getMorningOverview } from "@/server/morning-overview";
 import { addWorkingDays } from "@/lib/workdays";
 
@@ -20,7 +20,7 @@ export type EodChecklist = { items: EodItem[]; allGood: boolean };
  */
 export async function getEndOfDayChecklist(): Promise<{ ok: true; data: EodChecklist } | { ok: false }> {
   const viewer = await requireInternal().catch(() => null);
-  if (!viewer) return { ok: false };
+  if (!viewer || isEditorRole(viewer)) return { ok: false };
 
   const today = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
   const in7 = addWorkingDays(today, 7);

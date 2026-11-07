@@ -5,7 +5,7 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { attentionStates, clients, type AttentionNote } from "@/db/schema";
-import { requireInternal } from "@/server/auth/context";
+import { requireTeamMember } from "@/server/auth/context";
 import { notify, clearByDedupe } from "@/server/notifications";
 import { listAttentionTeam } from "@/server/attention";
 
@@ -23,7 +23,7 @@ async function ensureRow(signalKey: string) {
 /** Status zetten: open, bezig (opgepakt) of klaar (afgerond). */
 export async function setAttentionStatus(input: { key: string; status: "open" | "bezig" | "klaar" }): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireTeamMember();
     const k = key.parse(input.key);
     const status = z.enum(["open", "bezig", "klaar"]).parse(input.status);
     await ensureRow(k);
@@ -46,7 +46,7 @@ export async function setAttentionStatus(input: { key: string; status: "open" | 
 /** Toewijzen aan een teamlid. De nieuwe verantwoordelijke krijgt een melding. */
 export async function assignAttention(input: { key: string; userId: string; title: string; href?: string | null }): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireTeamMember();
     const k = key.parse(input.key);
     const team = await listAttentionTeam();
     const to = team.find((t) => t.id === input.userId);
@@ -71,7 +71,7 @@ export async function assignAttention(input: { key: string; userId: string; titl
 /** Notitie toevoegen ("klant gebeld, belt donderdag terug"). */
 export async function addAttentionNote(input: { key: string; text: string }): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireTeamMember();
     const k = key.parse(input.key);
     const text = z.string().trim().min(1).max(500).parse(input.text);
     await ensureRow(k);
@@ -98,7 +98,7 @@ const manualSchema = z.object({
 /** Handmatig aandachtspunt, voor dingen die het systeem niet zelf signaleert. */
 export async function createAttentionItem(input: z.input<typeof manualSchema>): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireTeamMember();
     const parsed = manualSchema.safeParse(input);
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
     const d = parsed.data;
