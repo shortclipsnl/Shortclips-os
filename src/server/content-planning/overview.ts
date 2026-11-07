@@ -1,9 +1,9 @@
 import "server-only";
 import { and, asc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, contentCalendar, deliverables, scripts } from "@/db/schema";
+import { clientReports, clients, contentCalendar, deliverables, scripts } from "@/db/schema";
 import { cleanPlanningTitle } from "@/lib/portal-status";
-import { buildPlanningChecklist, type Checklist } from "@/lib/content-planning-status";
+import { buildPlanningChecklist, pdfCardStates, PDF_NOT_READY, type Checklist, type ChecklistState } from "@/lib/content-planning-status";
 
 /**
  * Eén centrale lader voor "Jouw contentplanning": het statusoverzicht in het
@@ -43,6 +43,10 @@ export type ContentPlanningOverview = {
   /** Concepten die nog niet met de klant zijn gedeeld (alleen relevant voor het team). */
   unsharedCount: number;
   checklist: Checklist;
+  /** Status van de vier blokken op de PDF-pagina "Alles staat klaar." (sjabloonvolgorde). */
+  pdfCards: ChecklistState[];
+  pdfHeadline: string;
+  pdfSubline: string;
   generatedAt: Date;
 };
 
@@ -109,7 +113,7 @@ export async function loadContentPlanningOverview(clientId: string, now = new Da
       videoStatus: r.videoStatus ?? null,
     }));
 
-  const [[vids], [scr], [unshared]] = await Promise.all([
+  const [[vids], [scr], [unshared], [report]] = await Promise.all([
     db.select({ n: sql<number>`count(*)` }).from(deliverables)
       .where(and(eq(deliverables.clientId, clientId), isNull(deliverables.deletedAt), eq(deliverables.status, "client_review"))),
     db.select({ n: sql<number>`count(*)` }).from(scripts)
@@ -119,6 +123,9 @@ export async function loadContentPlanningOverview(clientId: string, now = new Da
         eq(contentCalendar.clientId, clientId), isNull(contentCalendar.deletedAt), eq(contentCalendar.clientApproved, false),
         inArray(contentCalendar.status, ["ready", "scheduled", "published"]), gte(contentCalendar.scheduledOn, fromMonday),
       )),
+    // Optimalisatie: laatst gepubliceerde maandanalyse van de klant.
+    db.select({ period: sql<string | null>`max(${clientReports.period})` }).from(clientReports)
+      .where(and(eq(clientReports.clientId, clientId), isNull(clientReports.deletedAt), eq(clientReports.status, "gepubliceerd"), eq(clientReports.periodType, "month"))),
   ]);
 
   const checklist = buildPlanningChecklist({
@@ -128,6 +135,13 @@ export async function loadContentPlanningOverview(clientId: string, now = new Da
     scriptsAwaitingClient: Number(scr?.n ?? 0),
     today,
   });
+
+  // "Recent" = de analyse van een van de laatste twee maanden is gepubliceerd.
+  const cutoff = new Date(`${today.slice(0, 7)}-15T12:00:00Z`);
+  cutoff.setUTCMonth(cutoff.getUTCMonth() - 2);
+  const recent = report?.period != null && String(report.period) >= cutoff.toISOString().slice(0, 7);
+  const pdfCards = pdfCardStates(checklist, recent ? "recent" : "none");
+  const allDone = pdfCards.every((c) => c === "done");
 
   return {
     clientId: client.id,
@@ -139,6 +153,9 @@ export async function loadContentPlanningOverview(clientId: string, now = new Da
     posts,
     unsharedCount: Number(unshared?.n ?? 0),
     checklist,
+    pdfCards,
+    pdfHeadline: allDone ? "Alles staat klaar." : PDF_NOT_READY.headline,
+    pdfSubline: allDone ? "" : PDF_NOT_READY.subline,
     generatedAt: now,
   };
 }

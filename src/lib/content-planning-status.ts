@@ -178,3 +178,20 @@ export function buildPlanningChecklist(input: ChecklistInput): Checklist {
       : "Shortclips rondt de laatste onderdelen af. Je hoeft nu niets te doen.";
   return { items, headline, subline, allDone, needsClient };
 }
+
+/**
+ * De vier blokken op de PDF-pagina "Jouw contentplanning. Alles staat klaar."
+ * in de volgorde van het sjabloon: Captions en CTA's, Publicatie en timing,
+ * Kanalen en instellingen, Optimalisatie. Zelfde bron als het portaal.
+ */
+export function pdfCardStates(c: Checklist, report: "recent" | "none"): ChecklistState[] {
+  const st = (k: ChecklistItem["key"]) => c.items.find((i) => i.key === k)?.state ?? "preparing";
+  const pub = st("publishing");
+  const timing: ChecklistState = st("dates") === "done" && (pub === "done" || pub === "na") ? "done" : "preparing";
+  return [st("captions") === "done" ? "done" : "preparing", timing, st("platforms") === "done" ? "done" : "preparing", report === "recent" ? "done" : "preparing"];
+}
+
+export const PDF_NOT_READY = {
+  headline: "Bijna alles staat klaar.",
+  subline: "Een paar onderdelen zijn nog in voorbereiding. Zodra alles klaarstaat, zie je dat hier en in je portaal.",
+};

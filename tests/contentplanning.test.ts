@@ -102,21 +102,35 @@ describe("overzicht, PDF en toegang", () => {
   it("PDF-HTML: juiste klant, geen concepten, vervolgpagina bij drukke dag, lege planning zonder verzonnen data", async () => {
     const { loadContentPlanningOverview } = await import("@/server/content-planning/overview");
     const { renderContentPlanningHtml } = await import("@/server/content-planning/pdf-html");
-    const a = renderContentPlanningHtml((await loadContentPlanningOverview(A))!);
+    const pages = (html: string, kind: string) => (html.match(new RegExp(`data-page="${kind}"`, "g")) ?? []).length;
+
+    const oa = (await loadContentPlanningOverview(A))!;
+    const a = renderContentPlanningHtml(oa);
     expect(a).toContain("A gedeelde video");
     expect(a).not.toContain("A geheim concept");
     expect(a).not.toContain("B video");
-    expect(a).toContain("Short video kalender");
-    expect(a).toContain("Alles staat klaar.");
+    expect(pages(a, "status")).toBe(1);
+    // Nog geen gepubliceerde maandanalyse → Optimalisatie niet "klaar" en de kop zegt niet dat alles klaar is.
+    expect(oa.pdfCards).toEqual(["done", "done", "done", "preparing"]);
+    expect(a).toContain("Bijna alles staat klaar.");
 
+    // Met een gepubliceerde maandanalyse van deze maand is alles klaar: pagina gelijk aan het sjabloon.
+    const period = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" }).slice(0, 7);
+    await db.insert(s.clientReports).values({ clientId: A, period, title: "Maandanalyse", status: "gepubliceerd" });
+    const oa2 = (await loadContentPlanningOverview(A))!;
+    expect(oa2.pdfCards.every((c) => c === "done")).toBe(true);
+    const a2 = renderContentPlanningHtml(oa2);
+    expect(a2).not.toContain("Bijna alles staat klaar.");
+    expect(a2).not.toContain('class="badge');
+
+    // Klant B: 9 video's op één dag → 3 kalenderpagina's voor die week (4 + 4 + 1), plus "B video".
     const b = renderContentPlanningHtml((await loadContentPlanningOverview(B))!);
     for (let i = 1; i <= 9; i++) expect(b).toContain(`B drukke dag ${i}`);
-    expect(b).toMatch(/\(2\/2\)/);
-    expect(b).not.toContain("Alles staat klaar.");
+    expect(pages(b, "kalender")).toBeGreaterThanOrEqual(3);
 
     const e = renderContentPlanningHtml((await loadContentPlanningOverview(EMPTY))!);
-    expect((e.match(/class="page cal/g) ?? []).length).toBe(1);
-    expect(e).toContain("wordt voorbereid");
+    expect(pages(e, "kalender")).toBe(1);
+    expect(e).not.toContain('class="slot"');
   });
 
   it("klantroute exporteert altijd en alleen de eigen klant", async () => {
