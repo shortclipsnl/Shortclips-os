@@ -152,19 +152,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
       ) : null}
 
-      {/* Dagstart: vandaag en deze week, per soort werk. Eén bron voor alles. */}
+      {/* Dagstart: werkdagbalk + Vandaag, Eerstvolgende werkdag en Deze week afronden. */}
       <Dagstart
         personName={work.person.fullName}
         isSelf={subject.id === viewer.id}
-        refDay={work.refDay}
-        isWeekend={work.isWeekend}
+        today={new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" })}
+        todayIsWorkday={work.todayIsWorkday}
+        nextDay={work.nextDay}
         weekEnd={work.weekEnd}
-        today={work.today}
-        week={work.week}
-        undated={work.undated}
+        columns={work.columns}
+        done={work.done}
         waiting={work.waiting}
         laterCount={work.laterCount}
-        counts={work.counts}
+        workday={work.workday}
       />
 
       {/* Weekplanning: opnames en meetings die eraan komen. */}

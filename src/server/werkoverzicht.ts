@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, deliverables, editProjectFiles, productionDays, scripts, shootScriptSources, tasks, users } from "@/db/schema";
+import { clients, deliverables, editProjectFiles, leaveRequests, productionDays, scripts, shootScriptSources, tasks, users } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 import { getAttentionBoard, type AttentionItem } from "@/server/attention";
 import { getQualityOverview } from "@/server/quality";
@@ -9,6 +9,7 @@ import { coveringForUser } from "@/server/leave-cover";
 import { taskHref } from "@/lib/task-links";
 import { nlHolidaySet } from "@/lib/holidays";
 import { addWorkingDays, subWorkingDays } from "@/lib/workdays";
+import { TEAM_WORKDAY } from "@/lib/werkdag";
 
 /**
  * Werkoverzicht per medewerker: één bron voor "Wat moet ik vandaag doen" en
@@ -51,7 +52,13 @@ export type WorkItem = {
   source: "taak" | "signaal" | "opname";
   /** Korte waarschuwing, bijv. "2 punten open" bij een opname. */
   flag: string | null;
+  /** Voortgang: open, bezig (in uitvoering) of geblokkeerd. */
+  status: "open" | "bezig" | "geblokkeerd";
+  /** Hoge/urgente prioriteit of te laat: komt bovenaan en krijgt rood. */
+  urgent: boolean;
 };
+/** Vandaag (of deze week) afgeronde taak — compact getoond. */
+export type DoneItem = { key: string; title: string; clientName: string | null; doneOn: string };
 export type WaitingItem = { key: string; kind: "video" | "script"; clientName: string; title: string; days: number; href: string };
 
 export type WorkOverview = {
@@ -66,6 +73,16 @@ export type WorkOverview = {
   waiting: WaitingItem[];
   laterCount: number;
   counts: { late: number; today: number; week: number; waiting: number };
+  /** Is vandaag zelf een werkdag (geen weekend/feestdag)? */
+  todayIsWorkday: boolean;
+  /** Eerstvolgende werkdag ná vandaag (in het weekend: maandag). */
+  nextDay: string;
+  /** Drie kolommen zonder overlap: elk item staat precies in één kolom. */
+  columns: { today: WorkItem[]; next: WorkItem[]; week: WorkItem[] };
+  /** Afgerond: vandaag (compact getoond) en het aantal deze week. */
+  done: { today: DoneItem[]; weekCount: number };
+  /** Werktijden en eventueel verlof vandaag (voor de werkdagbalk). */
+  workday: { start: string; end: string; offToday: string | null };
 };
 
 const ams = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
@@ -183,6 +200,8 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
       detail: t.status === "blocked" ? "Geblokkeerd" : null,
       clientName: t.clientName, href: taskHref({ entityType: t.entityType, entityId: t.entityId, dedupeKey: t.dedupeKey }) ?? "/tasks",
       due, state, daysLate, taskId: t.id, source: "taak", flag: null,
+      status: t.status === "in_progress" ? "bezig" : t.status === "blocked" ? "geblokkeerd" : "open",
+      urgent: urgent || state === "late",
     });
   }
 
@@ -193,7 +212,8 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
     items.push({
       key: `att-${a.key}`, category: attentionCategory(a), title: a.action, detail: a.reason,
       clientName: a.clientName, href: a.href ?? "/kwaliteit", due: null, state, daysLate: 0,
-      taskId: null, source: "signaal", flag: a.status === "bezig" ? "bezig" : null,
+      taskId: null, source: "signaal", flag: null,
+      status: a.status === "bezig" ? "bezig" : "open", urgent: a.priority === "hoog",
     });
   }
 
@@ -234,6 +254,7 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
           key: `prep-${s.id}`, category: "opname", title: `Opname ${dayLabel(on)} voorbereiden`,
           detail: missing.join(" · "), clientName: s.clientName, href: `/productions/${s.id}`,
           due: prepDue, state, daysLate, taskId: null, source: "opname", flag: `${missing.length} open`,
+          status: "open", urgent: state === "late",
         });
       }
       if (isVideographer) {
@@ -242,7 +263,8 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
           key: `shoot-${s.id}`, category: "opname", title: `Opname${time ? ` ${time}` : ""}${s.locationName ? ` · ${s.locationName}` : ""}`,
           detail: missing.length ? `Nog open: ${missing.join(" · ")}` : "Scripts final en gekoppeld · klaar voor opname",
           clientName: s.clientName, href: `/productions/${s.id}`, due: on, state, daysLate: 0,
-          taskId: null, source: "opname", flag: missing.length ? `${missing.length} open` : "klaar",
+          taskId: null, source: "opname", flag: missing.length ? `${missing.length} open` : null,
+          status: "open", urgent: false,
         });
       }
     } else if (isVideographer) {
@@ -258,6 +280,7 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
           key: `post-${s.id}`, category: "opname", title: `Na opname ${dayLabel(on)}: ${todo}`,
           detail: "Zonder beelden en editor start de editingklok niet.", clientName: s.clientName, href: `/videos`,
           due, state, daysLate, taskId: null, source: "opname", flag: null,
+          status: "open", urgent: state === "late",
         });
       }
     }
@@ -290,6 +313,84 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
 
   const [u] = await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, person.id)).limit(1);
 
+  // Drie kolommen zonder overlap. Peildatums: vandaag, de eerstvolgende werkdag
+  // ná vandaag en de vrijdag van de lopende werkweek.
+  const todayIsWorkday = refDay === today;
+  const nextDay = todayIsWorkday ? addWorkingDays(today, 1, holidays) : refDay;
+  const colOf = (i: WorkItem, fallbackUrgent: boolean): "today" | "next" | "week" | "later" => {
+    if (i.state === "late") return "today";
+    if (i.due) {
+      if (i.due <= today) return "today";
+      if (i.due <= nextDay) return todayIsWorkday || i.due === nextDay ? "next" : "today";
+      if (i.due <= weekEnd) return "week";
+      return "later";
+    }
+    if (i.state === "later") return "later";
+    // Zonder datum: urgent = vandaag (in het weekend: eerstvolgende werkdag).
+    if (fallbackUrgent) return todayIsWorkday ? "today" : "next";
+    return "week";
+  };
+  const urgentFirst = (a: WorkItem, b: WorkItem) =>
+    (a.state === "late" ? 0 : 1) - (b.state === "late" ? 0 : 1) ||
+    (a.urgent ? 0 : 1) - (b.urgent ? 0 : 1) ||
+    (a.status === "bezig" ? 0 : 1) - (b.status === "bezig" ? 0 : 1) ||
+    (a.due ?? "9999").localeCompare(b.due ?? "9999") || a.title.localeCompare(b.title);
+  const columns = { today: [] as WorkItem[], next: [] as WorkItem[], week: [] as WorkItem[] };
+  const seen = new Set<string>();
+  for (const i of items) {
+    if (seen.has(i.key)) continue; // nooit dubbel
+    seen.add(i.key);
+    const c = colOf(i, i.state === "today" && !i.due);
+    if (c !== "later") columns[c].push(i);
+  }
+  columns.today.sort(urgentFirst);
+  columns.next.sort(urgentFirst);
+  columns.week.sort(urgentFirst);
+
+  // Afgerond: eigen taken van vandaag en deze week (alleen compact getoond).
+  const mondayOf = (d: string) => {
+    const wd = weekday(d);
+    const x = new Date(`${d}T12:00:00Z`);
+    x.setUTCDate(x.getUTCDate() - (wd === 0 ? 6 : wd - 1));
+    return x.toISOString().slice(0, 10);
+  };
+  const weekStart = mondayOf(today);
+  const [doneRows, leave] = await Promise.all([
+    db
+      .select({ id: tasks.id, title: tasks.title, completedAt: tasks.completedAt, clientName: clients.name })
+      .from(tasks)
+      .leftJoin(clients, eq(clients.id, tasks.clientId))
+      .where(and(
+        inArray(tasks.assigneeId, assignees),
+        isNull(tasks.deletedAt),
+        eq(tasks.status, "done"),
+        gte(tasks.completedAt, new Date(`${weekStart}T00:00:00Z`)),
+      ))
+      .orderBy(sql`${tasks.completedAt} desc`)
+      .limit(100)
+      .catch(() => []),
+    db
+      .select({ kind: leaveRequests.kind })
+      .from(leaveRequests)
+      .where(and(
+        eq(leaveRequests.userId, person.id),
+        eq(leaveRequests.status, "approved"),
+        lte(leaveRequests.startOn, today),
+        gte(leaveRequests.endOn, today),
+      ))
+      .limit(1)
+      .catch(() => []),
+  ]);
+  const doneItems: DoneItem[] = doneRows
+    .filter((r) => r.completedAt)
+    .map((r) => ({
+      key: `done-${r.id}`,
+      title: r.title.replace(/^[^|]+\|\s*/, "").trim() || r.title,
+      clientName: r.clientName,
+      doneOn: ams(new Date(r.completedAt as Date)),
+    }))
+    .filter((d) => d.doneOn >= weekStart);
+
   return {
     person: { id: person.id, fullName: u?.fullName ?? person.fullName },
     refDay, isWeekend, weekEnd,
@@ -300,5 +401,10 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
       week: weekList.length + undated.length,
       waiting: waiting.length,
     },
+    todayIsWorkday,
+    nextDay,
+    columns,
+    done: { today: doneItems.filter((d) => d.doneOn === today), weekCount: doneItems.length },
+    workday: { start: TEAM_WORKDAY.start, end: TEAM_WORKDAY.end, offToday: leave[0]?.kind ?? null },
   };
 }
