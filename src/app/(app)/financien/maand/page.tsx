@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, ChevronLeft, ChevronRight, Landmark, Receipt, Scale, TrendingUp, Wallet } from "lucide-react";
 import { requireOwner } from "@/server/auth/context";
-import { getMaandControle, getMaandReeks, prevMonth } from "@/server/bank/maand";
+import { getMaandControle, getMaandReeks, getVermogenZakelijk, prevMonth } from "@/server/bank/maand";
 import { Card, CardHeader, PageHeader, Stat } from "@/components/ui";
 import { euro, formatDateFull, formatDateTime } from "@/lib/format";
 import { BankUpload, PrintKnop, TransactieTabel } from "./maand-ui";
@@ -40,7 +40,7 @@ export default async function MaandControlePage({ searchParams }: { searchParams
   const sp = await searchParams;
   const maand = /^\d{4}-\d{2}$/.test(sp.maand ?? "") ? sp.maand! : vorigeMaandNu();
   const volgende = prevMonth(maand, -1);
-  const [d, reeks] = await Promise.all([getMaandControle(maand), getMaandReeks(12)]);
+  const [d, reeks, v] = await Promise.all([getMaandControle(maand), getMaandReeks(12), getVermogenZakelijk()]);
   const verouderd = d.sync.bronnen.filter((b) => b.status !== "actueel");
 
   return (
@@ -110,8 +110,41 @@ export default async function MaandControlePage({ searchParams }: { searchParams
         <Stat emphasis label="Bedrijfskosten" value={euro(d.kosten.ex)} hint={<span>ex btw ({euro(d.kosten.met)} incl.) · <Badge d={d.kosten.dekking} /></span>} tone="warn" icon={<Receipt />} />
         <Stat emphasis label={d.resultaat.definitief ? "Resultaat" : "Resultaat (voorlopig)"} value={d.resultaat.bedrag == null ? "onbekend" : euro(d.resultaat.bedrag)} hint={d.resultaat.marge == null ? "omzet min bedrijfskosten" : `marge ${d.resultaat.marge}% · vóór belasting`} tone={d.resultaat.bedrag != null && d.resultaat.bedrag < 0 ? "bad" : "info"} icon={<Scale />} />
         <Stat emphasis label="Cashflow bank" value={d.bank.dekking === "ontbreekt" ? "geen data" : euro(d.bank.netto)} hint={d.bank.dekking === "ontbreekt" ? <span>geen Knab-transacties · <Badge d="ontbreekt" /></span> : <span>in {euro(d.bank.in)} · uit {euro(d.bank.uit)} · <Badge d={d.bank.dekking} /></span>} tone="info" icon={<Wallet />} />
-        <Stat emphasis label="Banksaldo einde maand" value={(() => { const s = d.bank.saldi.filter((x) => x.eindsaldo != null); return s.length ? euro(s.reduce((a, x) => a + (x.eindsaldo ?? 0), 0)) : "onbekend"; })()} hint="alle Knab-rekeningen samen; incl. btw-reserve, dus niet vrij besteedbaar" tone="info" icon={<Landmark />} />
+        <Stat emphasis label="Banksaldo einde maand" value={(() => { const s = d.bank.saldi.filter((x) => x.eindsaldo != null); return s.length ? euro(s.reduce((a, x) => a + (x.eindsaldo ?? 0), 0)) : "onbekend"; })()} hint={`${d.bank.saldi.filter((x) => x.eindsaldo != null).length} van ${d.bank.saldi.length} Knab-rekeningen met data op de laatste dag; geen vermogen, zie hieronder`} tone="info" icon={<Landmark />} />
       </div>
+
+      <Card className="mb-6">
+        <CardHeader title="Vermogen Shortclips (stand nu)" subtitle="Per post de laatst bekende stand en de bron. Banksaldo is niet hetzelfde als vermogen: gereserveerde potjes, openstaande facturen en rekeningen tellen apart." />
+        {v.waarschuwingen.length ? (
+          <ul className="mt-3 list-disc space-y-0.5 pl-5 text-sm" style={{ color: "var(--color-warn)" }}>{v.waarschuwingen.map((w) => <li key={w}>{w}</li>)}</ul>
+        ) : null}
+        <div className="mt-3 grid gap-5 lg:grid-cols-2">
+          <table className="w-full text-sm">
+            <thead><tr className="text-left text-xs text-[var(--color-ink-faint)]"><th className="py-1">Rekening</th><th className="py-1">Stand per</th><th className="py-1 text-right">Saldo</th></tr></thead>
+            <tbody>
+              {v.saldi.map((s) => (
+                <tr key={s.id} className="border-t border-[var(--color-line)]">
+                  <td className="py-1.5">{s.naam}{s.gereserveerd ? <span className="ml-1 text-2xs text-[var(--color-warn)]">gereserveerd</span> : null}<div className="text-2xs text-[var(--color-ink-faint)]">{s.bron}</div></td>
+                  <td className="py-1.5 text-xs">{formatDateFull(s.datum)}</td>
+                  <td className="py-1.5 text-right tabular-nums">{euro(s.bedrag)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <table className="w-full text-sm">
+            <tbody>
+              <tr className="border-t border-[var(--color-line)]"><td className="py-1.5">Liquide middelen zakelijk</td><td className="py-1.5 text-right tabular-nums">{euro(v.liquide)}</td></tr>
+              <tr className="border-t border-[var(--color-line)]"><td className="py-1.5">waarvan gereserveerd (btw, inkomstenbelasting)</td><td className="py-1.5 text-right tabular-nums">−{euro(v.gereserveerd)}</td></tr>
+              <tr className="border-t border-[var(--color-line)] font-semibold"><td className="py-1.5">Niet gereserveerd geld</td><td className="py-1.5 text-right tabular-nums">{euro(v.vrij)}</td></tr>
+              <tr className="border-t border-[var(--color-line)]"><td className="py-1.5">Openstaande facturen (debiteuren){v.balansDatum ? <div className="text-2xs text-[var(--color-ink-faint)]">DigiBoox, stand {formatDateFull(v.balansDatum)}</div> : null}</td><td className="py-1.5 text-right tabular-nums">{v.debiteuren == null ? "onbekend" : `+${euro(v.debiteuren)}`}</td></tr>
+              <tr className="border-t border-[var(--color-line)]"><td className="py-1.5">Nog te betalen rekeningen (crediteuren)</td><td className="py-1.5 text-right tabular-nums">{v.crediteuren == null ? "onbekend" : `−${euro(v.crediteuren)}`}</td></tr>
+              <tr className="border-t border-[var(--color-line)]"><td className="py-1.5">Btw lopend kwartaal (schatting)<div className="text-2xs text-[var(--color-ink-faint)]">21% over omzet vanaf {v.btwKwartaalVanaf} min btw in de kosten</div></td><td className="py-1.5 text-right tabular-nums">{v.btwSchatting == null ? "onbekend" : `−${euro(v.btwSchatting)}`}</td></tr>
+              <tr className="border-t border-[var(--color-line)] font-semibold"><td className="py-1.5">Werkkapitaal (indicatie)<div className="text-2xs font-normal text-[var(--color-ink-faint)]">niet gereserveerd geld + openstaande facturen − crediteuren − btw lopend kwartaal; vóór inkomstenbelasting</div></td><td className="py-1.5 text-right tabular-nums">{v.werkkapitaal == null ? "onbekend" : euro(v.werkkapitaal)}</td></tr>
+              <tr className="border-t border-[var(--color-line)] text-[var(--color-ink-muted)]"><td className="py-1.5">Btw-positie volgens boekhouding<div className="text-2xs">niet verrekend zolang er vraagposten openstaan</div></td><td className="py-1.5 text-right tabular-nums">{v.btwBoekhouding == null ? "onbekend" : euro(v.btwBoekhouding)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       <div className="mb-6 grid gap-5 lg:grid-cols-2">
         <Card>
@@ -172,7 +205,7 @@ export default async function MaandControlePage({ searchParams }: { searchParams
             <tbody>
               {reeks.map((r) => (
                 <tr key={r.maand} className={`border-t border-[var(--color-line)] ${r.maand === maand ? "font-semibold" : ""}`}>
-                  <td className="py-1.5"><Link className="capitalize hover:underline" href={`/financien/maand?maand=${r.maand}`}>{label(r.maand)}</Link></td>
+                  <td className="py-1.5"><Link className="capitalize hover:underline" href={`/financien/maand?maand=${r.maand}`}>{label(r.maand)}</Link>{r.lopend ? <span className="ml-1 text-2xs text-[var(--color-ink-faint)]">lopend</span> : null}</td>
                   <td className="py-1.5 text-right tabular-nums">{r.omzet == null ? "-" : euro(r.omzet)}</td>
                   <td className="py-1.5 text-right tabular-nums">{euro(r.kosten)}</td>
                   <td className="py-1.5 text-right tabular-nums" style={{ color: r.resultaat == null ? undefined : r.resultaat >= 0 ? "var(--color-good)" : "var(--color-bad)" }}>{r.resultaat == null ? "-" : euro(r.resultaat)}</td>

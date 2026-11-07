@@ -184,7 +184,7 @@ export function DigibooxImport() {
         </Button>
       </div>
       <p className="mt-2 text-2xs text-[var(--color-ink-faint)]">
-        Kies in Digiboox de export <strong>Mutaties</strong> (omzet/kosten per maand) en/of <strong>Winst- en verliesrekening</strong> (jaartotaal). Meerdere bestanden tegelijk mag.
+        Kies in Digiboox de export <strong>Mutaties</strong> (omzet per maand) en de export <strong>Winst- en verlies + Balans</strong> (openstaande facturen, crediteuren, btw). Meerdere bestanden tegelijk mag.
       </p>
 
       {result ? (

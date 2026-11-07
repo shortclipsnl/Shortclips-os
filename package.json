@@ -23,6 +23,7 @@
     "kb:import": "tsx scripts/kennisbank-import.ts",
     "kosten:seed": "tsx scripts/kosten-seed.ts",
     "bank:import": "tsx scripts/bank-import.ts",
+    "finance:import": "tsx scripts/finance-import.ts",
     "vi:worker": "NODE_OPTIONS=--conditions=react-server tsx scripts/vi-worker.ts",
     "ai-editor:kb": "tsx scripts/ai-editor-kb.ts",
     "ai-editor:worker": "NODE_OPTIONS=--conditions=react-server tsx scripts/ai-editor-worker.ts",

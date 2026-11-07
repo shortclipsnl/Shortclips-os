@@ -38,12 +38,12 @@ export function BankUpload() {
   return (
     <div className="mt-4 border-t border-[var(--color-line)] pt-3">
       <div className="flex flex-wrap items-center gap-3">
-        <input ref={ref} type="file" accept=".xml" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
+        <input ref={ref} type="file" accept=".xml,.csv" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
         <Button variant="secondary" onClick={() => ref.current?.click()} disabled={pending}>
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />} Knab-transacties synchroniseren
         </Button>
         <span className="text-xs text-[var(--color-ink-muted)]">
-          Knab-app: Rekening, Exporteren, formaat CAMT.053 (.xml). Meerdere rekeningen tegelijk mag. Dubbele boekingen worden automatisch overgeslagen.
+          Knab: Exporteren, formaat CAMT.053 (.xml). Revolut: afschrift als CSV (alleen zakelijke software telt mee). Meerdere bestanden tegelijk mag; dubbele boekingen worden overgeslagen.
         </span>
       </div>
       {res ? (
@@ -60,6 +60,7 @@ export function BankUpload() {
           {res.resultaten?.flatMap((r) => r.kosten.filter((k) => k.regels > 0).map((k) => (
             <div key={r.bestand + k.maand}>Kostenmonitor {k.maand}: {k.regels} regels bijgewerkt uit de transacties.</div>
           )))}
+          {res.revolut?.map((r) => <div key={"rev" + r.maand}>Revolut {r.maand}: {r.regels} zakelijke abonnementen, {r.totaal} euro.</div>)}
           {res.fouten?.map((f) => (
             <div key={f.bestand} className="text-[var(--color-bad)]">{f.bestand}: {f.fout}</div>
           ))}

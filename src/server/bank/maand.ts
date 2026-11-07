@@ -161,11 +161,21 @@ export async function getMaandControle(maand: string) {
   const bankUit = r2(-extern.filter((t) => t.bedrag < 0).reduce((a, t) => a + t.bedrag, 0));
   const intern = r2(transacties.filter((t) => t.groep === "intern").reduce((a, t) => a + t.bedrag, 0));
 
-  // Saldi aan het einde van de maand per rekening (alleen als een afschrift tot ná/op die dag loopt).
-  const saldi = [...new Set(afschriften.map((a) => a.iban))].map((iban) => {
-    const a = afschriften.filter((x) => x.iban === iban && String(x.tot) === eind).at(-1);
-    return { iban, naam: afschriften.find((x) => x.iban === iban)?.rekeningNaam ?? "", eindsaldo: a?.eindsaldo != null ? Number(a.eindsaldo) : null };
-  });
+  // Saldo aan het einde van de maand per rekening: eindsaldo van een afschrift dat
+  // de maandeinddatum bevat, min de boekingen die daarna in dat afschrift vallen.
+  const saldi = await Promise.all(
+    [...new Set(afschriften.map((a) => a.iban))].map(async (iban) => {
+      const a = afschriften.filter((x) => x.iban === iban && String(x.van) <= eind && String(x.tot) >= eind && x.eindsaldo != null).at(-1);
+      let eindsaldo: number | null = null;
+      if (a) {
+        const [na] = rows<{ s: number }>(
+          await db.execute(sql`select coalesce(sum(bedrag),0)::float s from bank_transacties where iban = ${iban} and boekdatum > ${eind} and boekdatum <= ${a.tot}`),
+        );
+        eindsaldo = r2(Number(a.eindsaldo) - (na?.s ?? 0));
+      }
+      return { iban, naam: afschriften.find((x) => x.iban === iban)?.rekeningNaam ?? "", eindsaldo };
+    }),
+  );
 
   /* ---------- Omzet (boekhouding) ---------- */
   const b = book[0];
@@ -239,7 +249,14 @@ export async function getMaandControle(maand: string) {
         ? `Geen Kostenmonitor-regels voor ${maand}.`
         : `Kosten ${maand} zijn voorlopig (laatste uitlezing ${kostenBijgewerkt}). Wordt compleet zodra het Knab-afschrift van deze maand is verwerkt.`,
     );
-  ontbreekt.push("Openstaande facturen: nog geen bron gekoppeld. Nodig: DigiBoox-export van verkoopfacturen met status.");
+  const [bal] = rows<{ peildatum: string; deb: number | null }>(
+    await db.execute(sql`select peildatum::text, (select (r->>'eind')::float from jsonb_array_elements(regels) r where r->>'code' = '1300') deb from boekhoud_balansen order by peildatum desc limit 1`),
+  );
+  ontbreekt.push(
+    bal?.deb != null
+      ? `Openstaande facturen: totaal ${Math.round(bal.deb).toLocaleString("nl-NL")} euro volgens DigiBoox (stand ${bal.peildatum}); per factuur nog niet beschikbaar. Nodig voor detail: DigiBoox-export van verkoopfacturen met status.`
+      : "Openstaande facturen: nog geen bron gekoppeld. Nodig: DigiBoox-export Balans of verkoopfacturen met status.",
+  );
 
   const resultaat = omzet != null && kostenRegelsMaand.length ? r2(omzet - kostenEx) : null;
 
@@ -288,12 +305,106 @@ export async function getMaandReeks(aantal = 12) {
     else e.uit -= bedrag;
     bank.set(t.maand, e);
   }
+  const huidig = new Date().toISOString().slice(0, 7);
   return lijst.map((r) => ({
+    lopend: r.maand >= huidig,
     maand: r.maand,
     omzet: r.omzet,
     kosten: r2(r.kosten),
-    resultaat: r.omzet != null ? r2(r.omzet - r.kosten) : null,
+    resultaat: r.omzet != null && r.maand < huidig ? r2(r.omzet - r.kosten) : null,
     bankIn: bank.has(r.maand) ? r2(bank.get(r.maand)!.in) : null,
     bankUit: bank.has(r.maand) ? r2(bank.get(r.maand)!.uit) : null,
   }));
+}
+
+/* ------------------------------------------------------------------ *
+ * Vermogen Shortclips: geen banksaldo als vermogen, maar per post de bron.
+ * ------------------------------------------------------------------ */
+
+type Saldo = { id: string; naam: string; bedrag: number; datum: string; bron: string; gereserveerd: boolean; categorie: string };
+
+export async function getVermogenZakelijk() {
+  await requirePermission("finance:read");
+  const [docs, afschriften, balansRows] = await Promise.all([
+    db.execute(sql`select path, data from vermogen_docs where path = 'v/cfg' or path like 'v/cfg/saldi/%'`),
+    db.select().from(bankAfschriften).orderBy(desc(bankAfschriften.tot)),
+    db.execute(sql`select peildatum::text, periode, regels, imported_at from boekhoud_balansen order by peildatum desc limit 1`),
+  ]);
+  const d = rows<{ path: string; data: Record<string, unknown> }>(docs);
+  type Rek = { id: string; naam: string; iban?: string; scope?: string; categorie?: string; gereserveerd?: boolean; meetellen?: boolean };
+  const cfg = (d.find((x) => x.path === "v/cfg")?.data as { rekeningen?: Rek[] } | undefined)?.rekeningen ?? [];
+  const zakelijk = cfg.filter((r) => r.scope === "zakelijk" && r.meetellen !== false);
+
+  const saldi: Saldo[] = [];
+  for (const r of zakelijk) {
+    // Laatste handmatige/screenshot-stand uit het vermogensdashboard.
+    const docsVoorRek = d
+      .filter((x) => x.path.startsWith(`v/cfg/saldi/${r.id}_`))
+      .map((x) => x.data as { datum?: string; eur?: number; bedrag?: number; bron?: string })
+      .filter((x) => x.datum)
+      .sort((a, b) => String(b.datum).localeCompare(String(a.datum)));
+    let best: Saldo | null = docsVoorRek[0]
+      ? { id: r.id, naam: r.naam, bedrag: Number(docsVoorRek[0].eur ?? docsVoorRek[0].bedrag ?? 0), datum: String(docsVoorRek[0].datum), bron: String(docsVoorRek[0].bron ?? "vermogensdashboard"), gereserveerd: !!r.gereserveerd, categorie: r.categorie ?? "" }
+      : null;
+    // Een recenter Knab-afschrift (CAMT.053) wint.
+    const af = r.iban ? afschriften.find((a) => a.iban === (r.iban ?? "").replace(/\s/g, "").toUpperCase()) : undefined;
+    if (af?.eindsaldo != null && (!best || String(af.tot) > best.datum)) {
+      best = { id: r.id, naam: r.naam, bedrag: Number(af.eindsaldo), datum: String(af.tot), bron: "Knab CAMT.053", gereserveerd: !!r.gereserveerd, categorie: r.categorie ?? "" };
+    }
+    if (best) saldi.push(best);
+  }
+
+  const balans = rows<{ peildatum: string; periode: string; regels: { code: string; label: string; begin: number | null; eind: number | null }[]; imported_at: Date }>(balansRows)[0] ?? null;
+  const g = (code: string) => balans?.regels.find((x) => x.code === code)?.eind ?? null;
+  const mollie = g("1003");
+  if (mollie != null && Math.abs(mollie) > 0.005) {
+    saldi.push({ id: "mollie", naam: "Mollie (betalingen onderweg)", bedrag: mollie, datum: balans!.peildatum, bron: "DigiBoox balans", gereserveerd: false, categorie: "" });
+  }
+
+  const liquide = r2(saldi.reduce((a, s) => a + s.bedrag, 0));
+  const gereserveerd = r2(saldi.filter((s) => s.gereserveerd).reduce((a, s) => a + s.bedrag, 0));
+  const debiteuren = g("1300");
+  const crediteuren = g("1400");
+  const btwBoekhouding = balans ? r2((g("1800") ?? 0) + (g("1802") ?? 0) + (g("1830") ?? 0) + (g("1835") ?? 0)) : null;
+  const vraagposten = g("2010");
+
+  // Schatting btw-schuld lopend kwartaal: 21% over de gefactureerde omzet (boekhouding)
+  // min de btw die in de bedrijfskosten van dat kwartaal zat (Kostenmonitor met − zonder btw).
+  const nu = new Date().toISOString().slice(0, 7);
+  const [jj, mm] = nu.split("-").map(Number);
+  const qStart = `${jj}-${String(Math.floor((mm! - 1) / 3) * 3 + 1).padStart(2, "0")}`;
+  const [q] = rows<{ omzet: number; voorbelasting: number }>(
+    await db.execute(sql`select
+      (select coalesce(sum(book_revenue),0)::float from company_finance_months where period >= ${qStart} and period <= ${nu} and book_source is not null) omzet,
+      (select coalesce(sum(met_btw - zonder_btw),0)::float from kosten_regels where maand >= ${qStart} and maand <= ${nu} and groep in ('personeel','editors','freelancers','marketing','vast','operationeel')) voorbelasting`),
+  );
+  const btwSchatting = q ? r2(q.omzet * 0.21 - q.voorbelasting) : null;
+
+  const waarschuwingen: string[] = [];
+  if (!balans) waarschuwingen.push("Nog geen DigiBoox-balans ingelezen: debiteuren, crediteuren en btw ontbreken.");
+  if (vraagposten != null && Math.abs(vraagposten) > 1000) {
+    waarschuwingen.push(
+      `In DigiBoox staat ${Math.round(vraagposten).toLocaleString("nl-NL")} euro op Vraagposten: bankmutaties die nooit zijn ingedeeld. Daardoor kloppen de winst, de btw-schuld en het ondernemingsvermogen in de boekhouding niet. Laat de boekhouder deze verwerken.`,
+    );
+  }
+  const oud = saldi.filter((s) => s.datum < new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10));
+  if (oud.length) waarschuwingen.push(`Saldo ouder dan 14 dagen: ${oud.map((s) => `${s.naam} (${s.datum})`).join(", ")}.`);
+
+  return {
+    saldi: saldi.sort((a, b) => b.bedrag - a.bedrag),
+    liquide,
+    gereserveerd,
+    vrij: r2(liquide - gereserveerd),
+    debiteuren,
+    crediteuren,
+    btwBoekhouding,
+    vraagposten,
+    balansDatum: balans?.peildatum ?? null,
+    // Indicatie: geld + openstaande facturen − rekeningen die nog betaald moeten worden.
+    // De btw-schuld uit de boekhouding is bewust NIET verrekend zolang er vraagposten openstaan.
+    btwSchatting,
+    btwKwartaalVanaf: qStart,
+    werkkapitaal: debiteuren != null && crediteuren != null ? r2(liquide - gereserveerd + debiteuren - crediteuren - (btwSchatting ?? 0)) : null,
+    waarschuwingen,
+  };
 }

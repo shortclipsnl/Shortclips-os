@@ -66,6 +66,9 @@ export function deelIn(
   }
   // Interne overboekingen eerst, zodat een bekende naam (bijv. Shortclips) nooit als kosten telt.
   if (AF_REGELS[0]!.re.test(naam) || AF_REGELS[0]!.re.test(tekst)) return AF_REGELS[0]!.i as Indeling;
+  // Belastingdienst kent meerdere soorten betalingen (loonheffing, btw, motorrijtuigenbelasting):
+  // daar beslist de omschrijving, niet de naam.
+  for (const r of AF_REGELS.slice(1, 4)) if (r.re.test(naam) || r.re.test(tekst)) return r.i as Indeling;
   const known = naam ? bekend?.get(naam) : undefined;
   if (known) return known;
   for (const r of AF_REGELS) if (r.re.test(naam) || r.re.test(tekst)) return r.i as Indeling;

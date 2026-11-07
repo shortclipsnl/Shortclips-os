@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, notLike, sql } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { bankAfschriften, bankTransacties, kostenRegels } from "../../db/schema";
 import { deelIn, norm, type Indeling, type LeverancierIndex } from "./categorie";
@@ -105,7 +105,8 @@ export async function kostenUitBank(db: Db, maanden: string[]): Promise<{ maand:
       bijgewerkt: vandaag,
     }));
     await db.transaction(async (trx) => {
-      await trx.delete(kostenRegels).where(eq(kostenRegels.maand, maand));
+      // Revolut-regels (aparte bron) blijven staan.
+      await trx.delete(kostenRegels).where(and(eq(kostenRegels.maand, maand), notLike(kostenRegels.leverancier, "% (Revolut)")));
       if (values.length) await trx.insert(kostenRegels).values(values);
     });
     out.push({ maand, regels: values.length, status: "Kostenmonitor bijgewerkt uit Knab-transacties" });

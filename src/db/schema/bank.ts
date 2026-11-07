@@ -1,4 +1,4 @@
-import { date, index, integer, numeric, pgTable, text, timestamp, unique, varchar } from "drizzle-orm/pg-core";
+import { date, index, integer, jsonb, numeric, pgTable, text, timestamp, unique, varchar } from "drizzle-orm/pg-core";
 import { pk, timestamps } from "./_shared";
 
 /* ------------------------------------------------------------------ *
@@ -69,4 +69,30 @@ export const bankAfschriften = pgTable(
     ...timestamps,
   },
   (t) => [unique("bank_afschriften_iban_periode_unique").on(t.iban, t.van, t.tot)],
+);
+
+/**
+ * Momentopname van de balans uit DigiBoox (export "Winst- en verliesrekening,
+ * Balans, Kolommenbalans"). Eén rij per importdatum; de regels staan als
+ * grootboekrekening met begin- en eindstand. Bron voor debiteuren
+ * (openstaande facturen), crediteuren, btw-positie en de controle op
+ * onverwerkte boekingen (vraagposten).
+ */
+export const boekhoudBalansen = pgTable(
+  "boekhoud_balansen",
+  {
+    id: pk(),
+    /** Datum van de export/import: de stand van de boekhouding op die dag. */
+    peildatum: date("peildatum").notNull(),
+    /** Periode zoals in de export, bijv. "01-01-2026 - 31-12-2026". */
+    periode: varchar("periode", { length: 60 }).notNull().default(""),
+    /** [{ code, label, begin, eind }] per grootboekrekening. */
+    regels: jsonb("regels").notNull(),
+    /** Jaarcijfers uit de winst- en verliesrekening, indien meegeleverd. */
+    winstVerlies: jsonb("winst_verlies"),
+    bronbestand: varchar("bronbestand", { length: 300 }).notNull().default(""),
+    importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [unique("boekhoud_balansen_peildatum_unique").on(t.peildatum)],
 );
