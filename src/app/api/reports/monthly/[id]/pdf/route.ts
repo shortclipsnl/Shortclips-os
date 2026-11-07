@@ -50,6 +50,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     ? renderInternReportHtml({
         clientName: data.clientName, periodLabel: data.periodLabel, pmName: data.pmName, statusLabel: STATUS_LABEL[data.status] ?? data.status,
         approvedAt: data.approvedAt, totals: data.totals as never, analysis: data.analysis, beoordeling: data.beoordeling, ontbrekend: data.ontbrekend,
+        videos: data.videos.map((v) => ({ ...v, inzicht: v.les })),
       })
     : renderMonthlyReportHtml({
         clientName: data.clientName, logoUrl: data.logoUrl, periodLabel: data.periodLabel,

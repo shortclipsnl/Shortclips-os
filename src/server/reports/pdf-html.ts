@@ -18,7 +18,7 @@ const GREEN = "#12a150";
 const GREEN_SOFT = "#e6f6ec";
 
 /** Extra opmaak voor de klantversie: scanbaar, donkerblauwe tegels, kleur voor groei en daling. */
-const CSS = `
+export const CLIENT_CSS = `
   .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .kt { background: #00003b; color: #fff; border-radius: 14px; padding: 14px 16px 13px; }
   .kt .v { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; line-height: 1.15; }
@@ -126,7 +126,7 @@ function dir(n: number | null | undefined): Dir {
   if (Math.abs(n) < 0.5) return "flat";
   return n > 0 ? "up" : "down";
 }
-function deltaPill(n: number | null | undefined, cls: "pill" | "dp", suffix = ""): string {
+export function deltaPill(n: number | null | undefined, cls: "pill" | "dp", suffix = ""): string {
   const d = dir(n);
   if (d === "na") return `<span class="${cls} na">geen vergelijking</span>`;
   const arrow = d === "up" ? "▲" : d === "down" ? "▼" : "■";
@@ -160,10 +160,10 @@ function barChart(list: MaandCijfers[], key: "views" | "engagements" | "follower
   return `<div class="chart">${cols}</div><div class="labels">${labels}</div><div class="legend"><span style="--c:${GREEN}">Deze maand</span><span style="--c:#00003b">Beste eerdere maand</span><span style="--c:#b9bbd6">Overige maanden</span></div>`;
 }
 
-const PLATFORM: Record<string, string> = { instagram: "Instagram", tiktok: "TikTok", facebook: "Facebook", youtube: "YouTube", linkedin: "LinkedIn" };
+export const PLATFORM: Record<string, string> = { instagram: "Instagram", tiktok: "TikTok", facebook: "Facebook", youtube: "YouTube", linkedin: "LinkedIn" };
 const VIDEOS_PER_PAGE = 8;
 
-function videoPages(videos: NonNullable<ReportPdfInput["videos"]>, maand: string, meta: string): string {
+export function videoPages(videos: NonNullable<ReportPdfInput["videos"]>, maand: string, meta: string, opts: { titel?: string; lead?: string } = {}): string {
   if (videos.length === 0) return "";
   const row = (v: (typeof videos)[number], i: number) => {
     const date = v.datum ? new Date(`${v.datum}T12:00:00Z`).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }).replace(".", "") : "";
@@ -174,12 +174,12 @@ function videoPages(videos: NonNullable<ReportPdfInput["videos"]>, maand: string
   for (let start = 0; start < videos.length; start += VIDEOS_PER_PAGE) {
     const chunk = videos.slice(start, start + VIDEOS_PER_PAGE);
     const first = start === 0;
-    pages.push(`<section class="page">${topBar(meta)}<h1>${first ? `Al jullie video's van ${esc(maand)}` : `Video's van ${esc(maand)} (vervolg)`}</h1>${first ? `<p class="lead">${videos.length} ${videos.length === 1 ? "video" : "video's"} met de resultaten per video, van meeste naar minste weergaven.</p>` : ""}<div class="vl">${chunk.map((v, k) => row(v, start + k)).join("")}</div></section>`);
+    pages.push(`<section class="page">${topBar(meta)}<h1>${first ? esc(opts.titel ?? `Al jullie video's van ${maand}`) : `${esc(opts.titel ?? `Video's van ${maand}`)} (vervolg)`}</h1>${first ? `<p class="lead">${esc(opts.lead ?? `${videos.length} ${videos.length === 1 ? "video" : "video's"} met de resultaten per video, van meeste naar minste weergaven.`)}</p>` : ""}<div class="vl">${chunk.map((v, k) => row(v, start + k)).join("")}</div></section>`);
   }
   return pages.join("");
 }
 
-function platformBlock(list: NonNullable<ReportMetrics["platforms"]>, vorige: string): string {
+export function platformBlock(list: NonNullable<ReportMetrics["platforms"]>, vorige: string): string {
   const shown = list.filter((p) => p.views > 0 || p.engagements > 0 || p.videos > 0);
   if (shown.length === 0) return "";
   const total = shown.reduce((s, p) => s + p.views, 0);
@@ -360,5 +360,5 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
     <div class="foot">Maandrapportage ${esc(periodLabel)} · ${esc(clientName)}</div>
   </section>`;
 
-  return docShell(`Maandrapportage ${clientName} ${periodLabel}`, CSS, body);
+  return docShell(`Maandrapportage ${clientName} ${periodLabel}`, CLIENT_CSS, body);
 }

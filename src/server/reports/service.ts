@@ -412,7 +412,7 @@ export type ReportPdfData = {
   ontbrekend: string[];
   approvedAt: string | null;
   /** Video's van de maand met miniatuur en (als beschikbaar) het AI-inzicht per video. */
-  videos: Array<MonthVideo & { thumb: string | null; inzicht: string | null }>;
+  videos: Array<MonthVideo & { thumb: string | null; inzicht: string | null; les: string | null }>;
 };
 
 /** Ruwe gegevens voor de PDF-opbouw (zonder viewer-scoping — de route scoopt). */
@@ -441,8 +441,9 @@ export async function loadReportPdfData(reportId: string): Promise<ReportPdfData
   const vids = stored ?? await monthVideos(r.clientId, r.period);
   const thumbs = await thumbnailsFor(vids.map((v) => v.id));
   const inzichten = new Map((stored && analysis?.videoInzichten ? analysis.videoInzichten : []).map((x) => [x.key, x.inzicht]));
+  const lessen = new Map((stored && analysis?.intern?.videoLessen ? analysis.intern.videoLessen : []).map((x) => [x.key, x.les]));
   return {
-    videos: vids.map((v) => ({ ...v, thumb: thumbs.get(v.id) ?? null, inzicht: inzichten.get(v.key) ?? null })),
+    videos: vids.map((v) => ({ ...v, thumb: thumbs.get(v.id) ?? null, inzicht: inzichten.get(v.key) ?? null, les: lessen.get(v.key) ?? null })),
     clientId: r.clientId,
     status: r.status as ReportStatus,
     clientName: r.clientName,

@@ -158,6 +158,8 @@ export async function approveMonthlyReport(reportId: string): Promise<ActionResu
     await db.update(tasks).set({ status: "done", completedAt: now, updatedAt: now }).where(and(eq(tasks.dedupeKey, `report_review:${reportId}`), isNull(tasks.deletedAt))).catch(() => undefined);
     await assignReportReaders(reportId, viewer.id);
     await auditLog({ viewer, action: "report.approved", entityType: "client_report", entityId: reportId, clientId: r.clientId });
+    // Na goedkeuring staat de klantversie automatisch in het klantportaal.
+    await publishToPortal(viewer, r);
     revalidatePath(`/analytics/maandrapportages/${reportId}`);
     revalidatePath("/analytics/maandrapportages");
     return { ok: true };
@@ -198,45 +200,49 @@ export async function requestReportChanges(reportId: string, feedback?: string, 
   });
 }
 
-/** Goedgekeurd rapport publiceren naar het klantportaal (+ klant notificeren). */
+/**
+ * Zet de klantversie in het klantportaal en laat de portaalgebruikers van deze
+ * klant weten dat de rapportage klaarstaat. Gebruikt bij goedkeuren (automatisch)
+ * en bij handmatig opnieuw delen na intrekken.
+ */
+async function publishToPortal(viewer: Awaited<ReturnType<typeof requirePermission>>, r: { id: string; clientId: string; period: string }): Promise<void> {
+  // Versiesnapshot van wat de klant te zien krijgt (traceerbaarheid).
+  await snapshotVersion(r.id, "publicatie", viewer.id);
+  await db.update(clientReports).set({ status: "gepubliceerd", isPublished: true, publishedAt: new Date(), updatedAt: new Date() }).where(eq(clientReports.id, r.id));
+  await db.update(tasks).set({ status: "done", completedAt: new Date(), updatedAt: new Date() }).where(and(eq(tasks.dedupeKey, `report_review:${r.id}`), isNull(tasks.deletedAt))).catch(() => undefined);
+
+  // Alleen de portaalgebruikers van DEZE klant notificeren (niet alle klanten).
+  const portalUsers = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.clientId, r.clientId), eq(users.primaryRole, "client"), eq(users.status, "active")));
+  if (portalUsers.length) {
+    await notify({
+      userIds: portalUsers.map((u) => u.id),
+      clientId: r.clientId,
+      type: "report_published",
+      level: "success",
+      title: "Jullie maandrapportage staat klaar!",
+      body: `We hebben de resultaten van ${periodLabel(r.period)} op een rij gezet, met de cijfers per platform en per video en onze aanpak voor volgende maand.`,
+      href: "/portal/analyses",
+      entityType: "client_report",
+      entityId: r.id,
+      dedupeKey: `report_published:${r.id}`,
+    }).catch(() => undefined);
+  }
+  await auditLog({ viewer, action: "report.published", entityType: "client_report", entityId: r.id, clientId: r.clientId });
+  await recordActivity({ clientId: r.clientId, type: "report.published", title: `Maandrapportage ${periodLabel(r.period)} gedeeld`, isClientVisible: true }).catch(() => undefined);
+}
+
+/** Goedgekeurd (en eerder ingetrokken) rapport opnieuw delen in het klantportaal. */
 export async function publishMonthlyReport(reportId: string): Promise<ActionResult> {
   return guard(async () => {
     const viewer = await requirePermission("reports:write");
     const [r] = await db.select().from(clientReports).where(eq(clientReports.id, reportId)).limit(1);
     if (!r) return { ok: false, message: "Rapport niet gevonden." };
     assertClientAccess(viewer, r.clientId);
-    if (r.status !== "goedgekeurd") return { ok: false, message: r.status === "gepubliceerd" ? "Dit rapport is al gepubliceerd." : "Keur het rapport eerst goed." };
-
-    // Versiesnapshot van wat de klant te zien krijgt (traceerbaarheid).
-    await snapshotVersion(reportId, "publicatie", viewer.id);
-
-    await db.update(clientReports).set({ status: "gepubliceerd", isPublished: true, publishedAt: new Date(), updatedAt: new Date() }).where(eq(clientReports.id, reportId));
-
-    // Controletaak sluiten.
-    await db.update(tasks).set({ status: "done", completedAt: new Date(), updatedAt: new Date() }).where(and(eq(tasks.dedupeKey, `report_review:${reportId}`), isNull(tasks.deletedAt))).catch(() => undefined);
-
-    // Alleen de portaalgebruikers van DEZE klant notificeren (niet alle klanten).
-    const portalUsers = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(and(eq(users.clientId, r.clientId), eq(users.primaryRole, "client"), eq(users.status, "active")));
-    if (portalUsers.length) {
-      await notify({
-        userIds: portalUsers.map((u) => u.id),
-        clientId: r.clientId,
-        type: "report_published",
-        level: "success",
-        title: "Jullie maandanalyse staat klaar!",
-        body: `We hebben de resultaten over ${periodLabel(r.period)} bekeken en onze belangrijkste inzichten en verbeterpunten toegevoegd.`,
-        href: "/portal/analyses",
-        entityType: "client_report",
-        entityId: reportId,
-        dedupeKey: `report_published:${reportId}`,
-      }).catch(() => undefined);
-    }
-
-    await auditLog({ viewer, action: "report.published", entityType: "client_report", entityId: reportId, clientId: r.clientId });
-    await recordActivity({ clientId: r.clientId, type: "report.published", title: `Maandrapportage ${periodLabel(r.period)} gepubliceerd`, isClientVisible: true }).catch(() => undefined);
+    if (r.status !== "goedgekeurd") return { ok: false, message: r.status === "gepubliceerd" ? "Dit rapport is al gedeeld met de klant." : "Keur het rapport eerst goed." };
+    await publishToPortal(viewer, r);
     revalidatePath(`/analytics/maandrapportages/${reportId}`);
     revalidatePath("/analytics/maandrapportages");
     return { ok: true };

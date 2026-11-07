@@ -56,6 +56,14 @@ export type InternAnalyse = {
   montage: string[];
   acties: InternActie[];
   dataBeperkingen: string[];
+  /** Wat werkt en blijven we doen. */
+  doorgaan?: string[];
+  /** Waar we mee stoppen of wat we minder doen. */
+  stoppen?: string[];
+  /** Wat we volgende maand gaan testen. */
+  testen?: string[];
+  /** Interne les per video, gekoppeld via de sleutel uit metrics.videos. */
+  videoLessen?: Array<{ key: string; les: string }>;
 };
 export type MonthlyAnalysis = ClientInsights & {
   aandachtspunten: MaandAandachtspunt[];
@@ -114,13 +122,13 @@ Twee doelgroepen:
 2. De interne teamversie (veld "intern"): voor projectmanagers, scriptschrijvers en videografen. Diep, concreet en leerbaar. Scheid ALTIJD wat gemeten is ("gemeten": alleen cijfers/feiten uit de data) van de mogelijke verklaring ("verklaring": jouw interpretatie, nooit als bewezen gepresenteerd tenzij de cijfers het hard maken). Een verklaring over retentie, hookkracht of montage is zonder retentiedata altijd "hypothese".
 
 Geef UITSLUITEND één geldig JSON-object (geen markdown, geen tekst eromheen, geen dubbele aanhalingstekens binnen waarden, geen letterlijke regeleinden binnen waarden, geen trailing komma's), exact dit formaat:
-{"topVideos":[{"titel":"","waarom":"","cijfers":"","zekerheid":"bewezen|waarschijnlijk|hypothese"}],"besteHooks":[{"hook":"","waarom":"","zekerheid":""}],"besteFormats":[{"format":"","waarom":"","zekerheid":""}],"mindereVideos":[{"titel":"","les":""}],"analysis":{"watWerkt":[{"punt":"","zekerheid":""}],"watMinder":[{"punt":"","zekerheid":""}],"ontwikkelingen":[""]},"maandvergelijking":[""],"conclusies":[""],"kansen":[{"titel":"","toelichting":""}],"videoInzichten":[{"key":"v1","inzicht":""}],"verbeterpunten":[{"titel":"","waarom":"","wat":"","hoeMeten":"","zekerheid":""}],"aandachtspunten":[{"type":"positief|aandachtspunt|actie_nodig","tekst":""}],"strategischeActies":[{"titel":"","waarom":""}],"intern":{"kern":"","besteVideos":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"hooks":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"onderwerpen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"tegenvallers":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"videostructuur":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"formatsVaker":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"vermijdenOfAanpassen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"scripts":[""],"opnames":[""],"montage":[""],"acties":[{"actie":"","rol":"script|opname|montage|pm","waarom":""}],"dataBeperkingen":[""]}}
+{"topVideos":[{"titel":"","waarom":"","cijfers":"","zekerheid":"bewezen|waarschijnlijk|hypothese"}],"besteHooks":[{"hook":"","waarom":"","zekerheid":""}],"besteFormats":[{"format":"","waarom":"","zekerheid":""}],"mindereVideos":[{"titel":"","les":""}],"analysis":{"watWerkt":[{"punt":"","zekerheid":""}],"watMinder":[{"punt":"","zekerheid":""}],"ontwikkelingen":[""]},"maandvergelijking":[""],"conclusies":[""],"kansen":[{"titel":"","toelichting":""}],"videoInzichten":[{"key":"v1","inzicht":""}],"verbeterpunten":[{"titel":"","waarom":"","wat":"","hoeMeten":"","zekerheid":""}],"aandachtspunten":[{"type":"positief|aandachtspunt|actie_nodig","tekst":""}],"strategischeActies":[{"titel":"","waarom":""}],"intern":{"kern":"","besteVideos":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"hooks":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"onderwerpen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"tegenvallers":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"videostructuur":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"formatsVaker":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"vermijdenOfAanpassen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"scripts":[""],"opnames":[""],"montage":[""],"acties":[{"actie":"","rol":"script|opname|montage|pm","waarom":""}],"doorgaan":[""],"stoppen":[""],"testen":[""],"videoLessen":[{"key":"v1","les":""}],"dataBeperkingen":[""]}}
 
 Opmerkingen over datakwaliteit, ontbrekende metingen of koppelingsproblemen horen uitsluitend in intern.dataBeperkingen, nooit in de klantvelden. Noem in de klantvelden ook geen interne werkpunten zoals een ontbrekende doelstelling.
 
 Houd het compact: elk tekstveld maximaal 30 woorden, elke lijst maximaal 4 items (acties maximaal 6). Liever kort en concreet dan volledig.
 
-Aanvullend: "aandachtspunten" = max 3 belangrijkste signalen van deze maand. "strategischeActies" = max 3 concrete acties voor volgende maand. "conclusies" = 2 tot 4 korte conclusies voor de klant. "videoInzichten" = voor ELKE video uit "alleVideos" één inzicht van maximaal 15 woorden, gekoppeld via "key": wat deze video sterk maakte of wat we ervan meenemen, opbouwend geformuleerd en alleen gebaseerd op de cijfers, titel en eventuele hook/format. "kansen" = 2 tot 3 kansen/aanbevelingen voor de komende maand. "verbeterpunten" mag NOOIT leeg zijn. In "intern": "acties" = 3 tot 6 concrete acties voor de komende maand, elk met de rol die het uitvoert; "dataBeperkingen" = wat we NIET konden meten en dus niet weten. Laat een interne lijst leeg ([]) als de data er niets over zegt, in plaats van iets te verzinnen.`;
+Aanvullend: "aandachtspunten" = max 3 belangrijkste signalen van deze maand. "strategischeActies" = max 3 concrete acties voor volgende maand. "conclusies" = 2 tot 4 korte conclusies voor de klant. "videoInzichten" = voor ELKE video uit "alleVideos" één inzicht van maximaal 15 woorden, gekoppeld via "key": wat deze video sterk maakte of wat we ervan meenemen, opbouwend geformuleerd en alleen gebaseerd op de cijfers, titel en eventuele hook/format. "kansen" = 2 tot 3 kansen/aanbevelingen voor de komende maand. "verbeterpunten" mag NOOIT leeg zijn. In "intern": "acties" = 3 tot 6 concrete acties voor de komende maand, elk met de rol die het uitvoert; "dataBeperkingen" = wat we NIET konden meten en dus niet weten. "doorgaan", "stoppen" en "testen" = elk 2 tot 4 korte, concrete punten voor het team (wat blijven we doen, waar stoppen we mee of doen we minder, wat proberen we volgende maand), geschreven als opdracht. "videoLessen" = voor ELKE video uit "alleVideos" één interne les van maximaal 20 woorden, gekoppeld via "key": wat het team van deze video leert voor script, opname of montage; eerlijk, ook als de video tegenviel. Laat een interne lijst leeg ([]) als de data er niets over zegt, in plaats van iets te verzinnen.`;
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 const num = (v: unknown) => Number(v ?? 0);
@@ -246,7 +254,7 @@ export async function generateMonthlyAnalysis(
   const data = JSON.stringify(dataBlock);
   const started = Date.now();
   const ask = async (deel: string) => {
-    const input = { system: SYSTEM, user: `${deel}\n\nData (JSON):\n${data}`, maxTokens: 8000 };
+    const input = { system: SYSTEM, user: `${deel}\n\nData (JSON):\n${data}`, maxTokens: 10000 };
     let r = await runJsonPrompt<Raw>(input);
     if (!r.ok && r.reason === "error" && Date.now() - started < 90_000) r = await runJsonPrompt<Raw>(input);
     return r;
@@ -318,5 +326,11 @@ function normalizeIntern(v: unknown): InternAnalyse {
       .filter((a) => a.actie)
       .slice(0, 8),
     dataBeperkingen: strs(o.dataBeperkingen),
+    doorgaan: strs(o.doorgaan).slice(0, 4),
+    stoppen: strs(o.stoppen).slice(0, 4),
+    testen: strs(o.testen).slice(0, 4),
+    videoLessen: arr<Record<string, unknown>>(o.videoLessen)
+      .map((x) => ({ key: String(x.key ?? ""), les: String(x.les ?? "").slice(0, 200) }))
+      .filter((x) => /^v\d+$/.test(x.key) && x.les),
   };
 }

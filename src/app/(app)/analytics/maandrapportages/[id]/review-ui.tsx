@@ -170,10 +170,10 @@ export function ReviewUI({
 
       <div className="flex flex-wrap items-center gap-2">
         {canWrite && !approved ? <button type="button" disabled={pending || !aiReady} onClick={() => run(() => startMonthlyReport(report.clientId, report.period, "ai_only"), "Nieuwe analyse gestart.")} className={buttonClass({ variant: "ghost", size: "sm" })}><Sparkles className="size-3.5" /> AI opnieuw</button> : null}
-        {owner && !approved ? <button type="button" disabled={pending || !canApprove} title={canApprove ? "" : "Rond eerst de verplichte controlepunten af"} onClick={() => run(() => approveMonthlyReport(report.id), "Goedgekeurd. Het team krijgt een melding om dit door te nemen.")} className={buttonClass({ variant: "primary", size: "sm" })}><Check className="size-3.5" /> Goedkeuren</button> : null}
+        {owner && !approved ? <button type="button" disabled={pending || !canApprove} title={canApprove ? "" : "Rond eerst de verplichte controlepunten af"} onClick={() => run(() => approveMonthlyReport(report.id), "Goedgekeurd en gedeeld met de klant. Het team krijgt een melding om dit door te nemen.")} className={buttonClass({ variant: "primary", size: "sm" })}><Check className="size-3.5" /> Goedkeuren en delen met klant</button> : null}
         {!owner && canWrite && !approved ? <span className="text-xs text-[var(--color-ink-muted)]">Goedkeuren doet Jarno.</span> : null}
         {canWrite && report.status === "goedgekeurd" ? <>
-          <button type="button" disabled={pending} onClick={() => run(() => publishMonthlyReport(report.id), "De klantversie staat nu in het klantportaal.")} className={buttonClass({ variant: "primary", size: "sm" })}><Send className="size-3.5" /> Klantversie delen in portaal</button>
+          <button type="button" disabled={pending} onClick={() => run(() => publishMonthlyReport(report.id), "De klantversie staat nu in het klantportaal.")} className={buttonClass({ variant: "primary", size: "sm" })}><Send className="size-3.5" /> Opnieuw delen in portaal</button>
           <button type="button" disabled={pending} onClick={() => run(() => requestReportChanges(report.id))} className={buttonClass({ variant: "ghost", size: "sm" })}>Terug naar aanpassen</button>
         </> : null}
         {canWrite && report.status === "gepubliceerd" ? <button type="button" disabled={pending} onClick={() => run(() => unpublishMonthlyReport(report.id))} className={buttonClass({ variant: "secondary", size: "sm" })}>Delen met klant intrekken</button> : null}
@@ -227,6 +227,16 @@ export function ReviewUI({
           {tab === "intern" ? (
             <div className="sc-card space-y-5 p-5">
               {a?.intern?.kern ? <p className="rounded-[var(--radius-sm)] bg-[var(--color-surface-sunken)] p-3 text-sm text-[var(--color-ink)]">{a.intern.kern}</p> : null}
+              {a?.intern && ((a.intern.doorgaan ?? []).length || (a.intern.stoppen ?? []).length || (a.intern.testen ?? []).length) ? (
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {([["Doorgaan", a.intern.doorgaan, "bg-[var(--color-good-soft)]"], ["Stoppen of minder", a.intern.stoppen, "bg-[var(--color-surface-sunken)]"], ["Testen", a.intern.testen, "bg-[var(--color-indigo-ink)] text-white"]] as const).map(([t, list, cls]) => (
+                    <div key={t} className={`rounded-[var(--radius-sm)] p-3 ${cls}`}>
+                      <p className="mb-1 text-2xs font-semibold uppercase tracking-wide">{t}</p>
+                      {(list ?? []).length ? <ul className="list-disc space-y-0.5 pl-4 text-sm">{(list ?? []).map((x, k) => <li key={k}>{x}</li>)}</ul> : <p className="text-xs opacity-70">Geen punten.</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {!a?.intern ? <p className="text-sm text-[var(--color-ink-muted)]">Dit rapport is gemaakt voordat de interne teamanalyse bestond. Genereer de AI-analyse opnieuw om die toe te voegen.</p> : null}
               <Insights title="Best presterende video's en waarom" list={a?.intern?.besteVideos} />
               <Insights title="Hooks die werkten" list={a?.intern?.hooks} />
