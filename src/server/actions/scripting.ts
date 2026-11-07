@@ -7,6 +7,19 @@ import { clients, productionDays } from "@/db/schema";
 import { requirePermission, assertClientAccess, ForbiddenError } from "@/server/auth/context";
 import { SCRIPTING_ORDER } from "@/lib/statuses";
 import { notify, clearByDedupe } from "@/server/notifications";
+import { syncScriptingTasks } from "@/server/scripting-tasks";
+
+/** Taak bij deze scriptsessie direct meenemen (aanmaken/bijwerken/afronden). */
+async function syncTask(productionDayId: string) {
+  try {
+    await syncScriptingTasks([productionDayId]);
+  } catch (error) {
+    // De statuswijziging zelf is gelukt; de nachtelijke/uurlijkse sync herstelt de taak.
+    console.error("[scripting] taak-sync mislukt", error);
+  }
+  revalidatePath("/tasks");
+  revalidatePath("/dashboard");
+}
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -62,6 +75,7 @@ export async function setScriptingStatus(productionDayId: string, status: string
       await clearByDedupe(dedupeKey);
     }
 
+    await syncTask(productionDayId);
     revalidatePath("/scripting");
     revalidatePath("/notifications");
     return { ok: true };
@@ -88,6 +102,7 @@ export async function setScriptingNote(productionDayId: string, note: string): P
       .update(productionDays)
       .set({ scriptingNote: trimmed || null, updatedAt: new Date() })
       .where(eq(productionDays.id, productionDayId));
+    await syncTask(productionDayId);
     revalidatePath("/scripting");
     return { ok: true };
   } catch (error) {
@@ -109,6 +124,7 @@ export async function setScriptWriter(productionDayId: string, writerId: string 
     assertClientAccess(viewer, day.clientId);
 
     await db.update(productionDays).set({ scriptWriterId: writerId, updatedAt: new Date() }).where(eq(productionDays.id, productionDayId));
+    await syncTask(productionDayId);
     revalidatePath("/scripting");
     return { ok: true };
   } catch (error) {

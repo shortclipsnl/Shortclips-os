@@ -24,6 +24,7 @@ import { internalDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
 import { getDeadlineSettings } from "@/server/deadline-settings";
 import { deadlineMisses } from "@/db/schema";
 import { runJob } from "./runner";
+import { runScriptingTaskSync } from "@/server/scripting-tasks";
 
 const day = (offset: number) => {
   const d = new Date();
@@ -1217,51 +1218,15 @@ async function ensureTask(input: {
 }
 
 /**
- * Script-herinnering als to-do: zodra een opname binnen 7 dagen valt en de
- * scripting nog niet 'final' is, krijgt de verantwoordelijke coördinator een
- * to-do "script afronden/afstemmen". Eén open taak per opname (dedupe); verdwijnt
- * vanzelf zodra hij afgevinkt wordt.
+ * Script-herinnering als to-do. Vervangen door de koppeling Scripting → Taken
+ * (`@/server/scripting-tasks`): elke scriptsessie met openstaand werk heeft daar
+ * één taak die meeloopt met de status, met de scriptdeadline en de juiste
+ * verantwoordelijke. De oude "Script afronden/afstemmen"-taken kwamen na
+ * afvinken elke dag terug en dubbelden met die koppeling. De jobnaam
+ * (reminders.script_todo) blijft bestaan, zodat bestaande planningen werken.
  */
 export async function runScriptTodoReminders() {
-  return runJob("system", "reminders.script_todo", {}, async (ctx) => {
-    const today = day(0);
-    const in7 = day(7);
-    const rows = await db
-      .select({
-        id: productionDays.id,
-        scheduledOn: productionDays.scheduledOn,
-        clientId: productionDays.clientId,
-        clientName: clients.name,
-        coordA: productionDays.coordinatorId,
-        coordB: clients.coordinatorId,
-      })
-      .from(productionDays)
-      .innerJoin(clients, eq(clients.id, productionDays.clientId))
-      .where(
-        and(
-          isNull(productionDays.deletedAt),
-          ne(productionDays.status, "cancelled"),
-          gte(productionDays.scheduledOn, today),
-          lte(productionDays.scheduledOn, in7),
-          ne(productionDays.scriptingStatus, "final"),
-        ),
-      );
-    for (const r of rows) {
-      ctx.counters.processed++;
-      const created = await ensureTask({
-        clientId: r.clientId,
-        title: `Script afronden/afstemmen — ${r.clientName} (opname ${r.scheduledOn})`,
-        assigneeId: r.coordA ?? r.coordB ?? null,
-        dueOn: today,
-        priority: "high",
-        entityType: "production_day",
-        entityId: r.id,
-        dedupeKey: `script_todo:${r.id}`,
-      });
-      if (created) ctx.counters.updated++;
-    }
-    ctx.log(`${ctx.counters.updated} script-to-do's aangemaakt`);
-  });
+  return runScriptingTaskSync();
 }
 
 /** Datum (YYYY-MM-DD) netjes in het Nederlands, bv. "12 december". */

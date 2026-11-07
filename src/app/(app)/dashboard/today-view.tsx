@@ -106,6 +106,7 @@ function DagindelingCard() {
 function todoLines(myDay: MyDay): TodoLine[] {
   return myDay.tasks.slice(0, 15).map((t) => ({
     taskId: t.id,
+    href: t.href,
     what: prettyTitle(t.title),
     action: t.clientName ? `${t.clientName} → oppakken` : "Eigen taak → oppakken",
     meta: t.dueOn ? `${dayName(t.dueOn)}${t.overdue ? " · te laat" : ""}` : "",

@@ -4,9 +4,10 @@ import { db } from "@/db/client";
 import { clients, deliverables, productionDays, tasks } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 import { coveringForUser } from "@/server/leave-cover";
+import { taskHref } from "@/lib/task-links";
 
 export type MyShoot = { id: string; clientName: string; clientColor: string | null; scheduledOn: string; startTime: string | null; locationName: string | null };
-export type MyTask = { id: string; title: string; dueOn: string | null; priority: string; clientName: string | null; overdue: boolean };
+export type MyTask = { id: string; title: string; dueOn: string | null; priority: string; clientName: string | null; overdue: boolean; href: string | null };
 export type MyVideo = { id: string; title: string; clientName: string; status: string; dueOn: string | null };
 
 /**
@@ -54,6 +55,9 @@ export async function getMyDay(viewer: Viewer): Promise<{ shoots: MyShoot[]; tas
         dueOn: tasks.dueOn,
         priority: tasks.priority,
         clientName: clients.name,
+        entityType: tasks.entityType,
+        entityId: tasks.entityId,
+        dedupeKey: tasks.dedupeKey,
       })
       .from(tasks)
       .leftJoin(clients, eq(clients.id, tasks.clientId))
@@ -98,6 +102,7 @@ export async function getMyDay(viewer: Viewer): Promise<{ shoots: MyShoot[]; tas
     priority: t.priority,
     clientName: t.clientName,
     overdue: Boolean(t.dueOn && t.dueOn < today),
+    href: taskHref(t),
   }));
 
   const shoots = shootRows.map((s) => ({ ...s }));

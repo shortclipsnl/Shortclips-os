@@ -2,10 +2,9 @@ import "server-only";
 import { and, asc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
-import { clients, productionDays, scriptReviews, scripts, users } from "@/db/schema";
+import { clients, productionDays, scriptReviews, scripts, shootScriptSources, users } from "@/db/schema";
 import { requireInternal, scopeToClients, type Viewer } from "@/server/auth/context";
 import { CORE_STAFF_EMAILS, coreStaffRank } from "@/server/core-staff";
-import { listClientDriveScriptLinks, type DriveScriptLink } from "@/server/scripts/drive-scripts";
 import { subWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 
@@ -47,8 +46,9 @@ export type ScriptingRow = {
   scriptWriterAvatar: string | null;
   /** Aan deze opname gekoppelde scripts (uit de scriptbibliotheek). */
   scripts: LinkedScript[];
-  /** Scriptbestanden van deze klant in Google Drive (automatisch gelinkt). */
-  driveScripts: DriveScriptLink[];
+  /** Script-PDF uit Google Drive die aan deze opname gekoppeld is (zelfde
+   *  koppeling als de Caption Maker), of null. */
+  linkedPdf: { name: string; sessionName: string | null } | null;
   /** Script-PDF ter controle in het klantportaal (als er al één verstuurd is). */
   reviewId: string | null;
   reviewStatus: string | null;
@@ -150,10 +150,20 @@ export async function listScripting(viewer: Viewer, opts: { trusted?: boolean } 
     scriptsByDay.set(s.productionDayId, arr);
   }
 
-  // Scriptbestanden uit Google Drive per klant (categorie "Scripts") — in één
-  // batch voor alle opnames, zodat het team de bestaande scripts meteen vanuit
-  // het platform kan openen zonder naar Drive te hoeven.
-  const driveByClient = await listClientDriveScriptLinks([...new Set(rows.map((r) => r.clientId))]);
+  // Gekoppelde script-PDF uit Drive per opname (via de sessiemap-kiezer of de
+  // Caption Maker — één gedeelde koppeling).
+  const linkRows = dayIds.length
+    ? await db
+        .select({ productionDayId: shootScriptSources.productionDayId, fileName: shootScriptSources.fileName, filePath: shootScriptSources.filePath })
+        .from(shootScriptSources)
+        .where(and(inArray(shootScriptSources.productionDayId, dayIds), eq(shootScriptSources.status, "gekoppeld")))
+    : [];
+  const linkByDay = new Map(linkRows.map((l) => {
+    const segs = (l.filePath ?? "").split("/").map((x) => x.trim()).filter(Boolean);
+    segs.pop();
+    const sessionName = segs.find((x) => /\bsessie\b/i.test(x)) ?? segs.at(-1) ?? null;
+    return [l.productionDayId, { name: l.fileName, sessionName }];
+  }));
 
   // Script-PDF's die al ter controle in het klantportaal staan (per opname).
   const reviewRows = dayIds.length
@@ -199,7 +209,7 @@ export async function listScripting(viewer: Viewer, opts: { trusted?: boolean } 
       scriptWriterName: r.scriptWriterName ?? r.coordinatorName,
       scriptWriterAvatar: r.scriptWriterAvatar ?? r.coordinatorAvatar,
       scripts: scriptsByDay.get(r.id) ?? [],
-      driveScripts: driveByClient.get(r.clientId) ?? [],
+      linkedPdf: linkByDay.get(r.id) ?? null,
       reviewId: reviewByDay.get(r.id)?.id ?? null,
       reviewStatus: reviewByDay.get(r.id)?.status ?? null,
     };

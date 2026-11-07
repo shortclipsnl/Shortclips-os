@@ -14,6 +14,7 @@ import {
   pullFrameProjects,
 } from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
+import { runScriptingTaskSync } from "@/server/scripting-tasks";
 import { runFrequentSync, runNightlySync } from "@/server/jobs/orchestrator";
 import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
 import { runContentOnlineNotifications } from "@/server/jobs/content-online-notify";
@@ -90,7 +91,14 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "frameio.pull_deliverables": pullFrameDeliverables,
   "frameio.normalize_imported": normalizeImportedFrameDeliverables,
   "frameio.list_projects": listFrameProjects,
-  "calendar.sync": runCalendarSync,
+  // Na de agenda-sync ook de scriptingtaken bijwerken: verplaatste of vervallen
+  // opnames passen zo binnen het uur hun taak (deadline/afsluiten) aan.
+  "calendar.sync": async () => {
+    const res = await runCalendarSync();
+    await runScriptingTaskSync().catch((e) => console.error("[scripting.task_sync]", e));
+    return res;
+  },
+  "scripting.task_sync": runScriptingTaskSync,
   "shoots.reconcile": runShootReconciliation,
   "metricool.link_brands": linkMetricoolBrands,
   "metricool.pull_metrics": pullMetricoolMetrics,

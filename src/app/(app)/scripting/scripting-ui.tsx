@@ -1,14 +1,15 @@
 "use client";
 
-import { Fragment, useMemo, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlarmClock, AlertTriangle, CalendarClock, ChevronDown, FileClock, Loader2, MessageSquareText, UserPlus, ScrollText, ExternalLink, ArrowUpRight, FileText, X } from "lucide-react";
+import { AlarmClock, AlertTriangle, CalendarClock, ChevronDown, FileClock, Loader2, MessageSquareText, UserPlus, ScrollText, ExternalLink, FileCheck2, X } from "lucide-react";
 import { setScriptingNote, setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS, SCRIPT_STATUS } from "@/lib/statuses";
 import { ClientLogo, Stat, TeamAvatar } from "@/components/ui";
 import type { ScriptingRow, WriterOption, LinkedScript } from "@/server/scripting";
 import { PortalSendCell } from "./portal-send";
+import { DriveSessionPicker } from "./drive-session-picker";
 
 /** Toon-kleur per status-tone, voor de kleine statuspillen van gekoppelde scripts. */
 const TONE_COLOR: Record<string, string> = {
@@ -106,16 +107,27 @@ const FLAG_COLOR: Record<string, string> = {
   done: "var(--color-good)",
 };
 
-export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, defaultFilter, defaultStatus, viewerId, viewerName }: { rows: ScriptingRow[]; clientOptions: string[]; writerOptions: WriterOption[]; canWrite: boolean; defaultFilter?: string; defaultStatus?: string; viewerId?: string; viewerName?: string }) {
-  const [filter, setFilter] = useState<string>(FILTERS.some((f) => f.key === defaultFilter) ? defaultFilter! : "alle");
-  const [status, setStatus] = useState<string>((SCRIPTING_ORDER as readonly string[]).includes(defaultStatus ?? "") ? defaultStatus! : "alle");
+export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, defaultFilter, defaultStatus, viewerId, viewerName, focusId }: { rows: ScriptingRow[]; clientOptions: string[]; writerOptions: WriterOption[]; canWrite: boolean; defaultFilter?: string; defaultStatus?: string; viewerId?: string; viewerName?: string; focusId?: string }) {
+  // Vanuit een taak (?sessie=<opname>): alle filters open, zodat de regel zeker
+  // zichtbaar is, en daarna ernaartoe scrollen en kort oplichten.
+  const focusRow = focusId ? rows.find((r) => r.id === focusId) ?? null : null;
+  const [filter, setFilter] = useState<string>(!focusRow && FILTERS.some((f) => f.key === defaultFilter) ? defaultFilter! : "alle");
+  const [status, setStatus] = useState<string>(!focusRow && (SCRIPTING_ORDER as readonly string[]).includes(defaultStatus ?? "") ? defaultStatus! : "alle");
   const [client, setClient] = useState<string>("alle");
   // Filter op scriptschrijver via de profielfoto's bovenaan (Milou / Jarno / Jiska).
   // Standaard meteen op "Mijn scripts" als de viewer zelf opnames heeft — zo ziet
   // Milou/Jiska/Jarno direct hun eigen werk; met één klik switch je naar Iedereen.
   // Heb je zelf niks (bijv. geen scriptschrijver), dan begin je bij "Iedereen".
   const hasOwnScripts = viewerId ? rows.some((r) => r.scriptWriterId === viewerId) : false;
-  const [writer, setWriter] = useState<string>(hasOwnScripts ? viewerId! : "alle");
+  const [writer, setWriter] = useState<string>(focusRow ? "alle" : hasOwnScripts ? viewerId! : "alle");
+  const focusRef = useRef<HTMLTableRowElement | null>(null);
+  const [flash, setFlash] = useState<string | null>(focusRow?.id ?? null);
+  useEffect(() => {
+    if (!focusRow) return;
+    focusRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setFlash(null), 4000);
+    return () => clearTimeout(t);
+  }, [focusRow]);
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
@@ -232,6 +244,11 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
         </div>
       </div>
 
+      {focusId && !focusRow ? (
+        <p className="mb-2 rounded-[var(--radius-sm)] bg-[var(--color-warn-soft)] px-3 py-2 text-xs text-[#8a5300]">
+          Deze scriptsessie staat niet meer in de lijst van aankomende opnames (opname is voorbij, verplaatst of vervallen).
+        </p>
+      ) : null}
       <div className="mb-2 text-xs text-[var(--color-ink-faint)]">{filtered.length} van {rows.length} opnames</div>
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
@@ -270,8 +287,9 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                   </td>
                 </tr>
                 {g.rows.map((r) => (
-                  <tr key={r.id} className="border-b border-[var(--color-line)] hover:bg-[var(--color-surface-sunken)]/40"
-                    style={{ boxShadow: `inset 3px 0 0 ${FLAG_COLOR[r.flag]}` }}>
+                  <tr key={r.id} id={`sessie-${r.id}`} ref={r.id === focusRow?.id ? focusRef : undefined}
+                    className={`scroll-mt-24 border-b border-[var(--color-line)] transition-colors duration-700 hover:bg-[var(--color-surface-sunken)]/40 ${flash === r.id ? "bg-[var(--color-brand-50)]" : ""}`}
+                    style={{ boxShadow: flash === r.id ? `inset 3px 0 0 ${FLAG_COLOR[r.flag]}, inset 0 0 0 2px var(--color-brand-500)` : `inset 3px 0 0 ${FLAG_COLOR[r.flag]}` }}>
                     <td className="px-3 py-2">
                       <Link href={`/productions/${r.id}`} className="flex items-center gap-2 font-medium hover:underline">
                         <ClientLogo name={r.clientName} logoUrl={r.clientLogo} color={r.clientColor} size={22} />
@@ -347,26 +365,29 @@ function ScriptStatusPill({ status }: { status: string }) {
 function ScriptsCell({ row }: { row: ScriptingRow }) {
   const [open, setOpen] = useState(false);
   const n = row.scripts.length;
-  const drive = row.driveScripts.length;
+  const pdf = row.linkedPdf;
   const klaar = row.scripts.filter((s) => s.status === "approved" || s.status === "ready_to_shoot").length;
-  // De knop is "gevuld" zodra er óf gekoppelde scripts óf Drive-scripts zijn.
-  const heeftIets = n > 0 || drive > 0;
+  // De knop is "gevuld" zodra er gekoppelde scripts óf een gekoppelde PDF is.
+  const heeftIets = n > 0 || Boolean(pdf);
   const label = n > 0
     ? `${n} script${n === 1 ? "" : "s"}${klaar > 0 ? ` · ${klaar} klaar` : ""}`
-    : drive > 0
-      ? `${drive} in Drive`
-      : "Bekijk scripts";
+    : pdf
+      ? "PDF gekoppeld"
+      : "Koppel script-PDF";
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title="Bekijk de scripts van deze opname (gekoppeld + in Google Drive)"
+        title={pdf ? `Gekoppelde PDF: ${pdf.name}${pdf.sessionName ? ` (${pdf.sessionName})` : ""}` : "Bekijk de scripts van deze opname en koppel een script-PDF uit Google Drive"}
         className={`flex w-[150px] items-center gap-1.5 rounded-[var(--radius-sm)] border px-2 py-1.5 text-left text-xs font-medium hover:border-[var(--color-brand-500)] ${heeftIets ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)] text-[var(--color-ink)]" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)]"}`}
       >
-        <ScrollText className={`size-4 shrink-0 ${heeftIets ? "text-[var(--color-brand-600)]" : "text-[var(--color-ink-faint)]"}`} />
-        <span className="truncate">{label}</span>
+        {pdf && n === 0 ? <FileCheck2 className="size-4 shrink-0 text-[var(--color-good)]" /> : <ScrollText className={`size-4 shrink-0 ${heeftIets ? "text-[var(--color-brand-600)]" : "text-[var(--color-ink-faint)]"}`} />}
+        <span className="min-w-0">
+          <span className="block truncate">{label}</span>
+          {pdf ? <span className="block truncate text-2xs font-normal text-[var(--color-ink-muted)]">{n > 0 ? "+ PDF · " : ""}{pdf.sessionName ?? pdf.name}</span> : null}
+        </span>
       </button>
       {open ? <ScriptsModal row={row} onClose={() => setOpen(false)} /> : null}
     </>
@@ -399,10 +420,10 @@ function ScriptsModal({ row, onClose }: { row: ScriptingRow; onClose: () => void
           <button type="button" onClick={onClose} className="shrink-0 rounded p-1 text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"><X className="size-5" /></button>
         </div>
 
-        {n === 0 && row.driveScripts.length === 0 ? (
+        {n === 0 ? (
           <div className="p-6 text-center">
             <ScrollText className="mx-auto mb-2 size-7 text-[var(--color-ink-faint)]" />
-            <p className="text-sm text-[var(--color-ink-muted)]">Er zijn nog geen scripts aan deze opname gekoppeld.</p>
+            <p className="text-sm text-[var(--color-ink-muted)]">Er zijn nog geen scripts uit de Script Generator aan deze opname gekoppeld. Een script-PDF uit Drive koppel je hieronder.</p>
             <Link href={`/ai/scriptgenerator?client=${row.clientId}`} className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-good)] px-4 py-2 text-sm font-semibold text-white hover:brightness-110">
               ✍️ Open de Script Generator voor deze opname
             </Link>
@@ -440,48 +461,11 @@ function ScriptsModal({ row, onClose }: { row: ScriptingRow; onClose: () => void
             })}
           </ul>
           ) : null}
-          {row.driveScripts.length > 0 ? <DriveScriptsSection scripts={row.driveScripts} /> : null}
           </>
         )}
+        {/* Script-PDF uit Google Drive: sessiemap → PDF → koppelen. */}
+        <DriveSessionPicker productionDayId={row.id} />
       </div>
-    </div>
-  );
-}
-
-/**
- * Scriptbestanden die automatisch uit de Google Drive-map van de klant zijn
- * opgehaald (categorie "Scripts"). Klik opent het bestand direct in Drive, zodat
- * het team de bestaande scripts meteen vanuit het platform bekijkt.
- */
-function DriveScriptsSection({ scripts }: { scripts: ScriptingRow["driveScripts"] }) {
-  return (
-    <div className="border-t border-[var(--color-line)] bg-[var(--color-surface-2)]/40 p-4">
-      <p className="mb-2 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
-        <FileText className="size-3.5" /> Scripts in Google Drive
-      </p>
-      <ul className="divide-y divide-[var(--color-line)] overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface)]">
-        {scripts.map((f, i) => {
-          const inner = (
-            <>
-              <FileText className="size-4 shrink-0 text-[var(--color-brand-600)]" strokeWidth={1.75} />
-              <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--color-ink)]">{f.name}</span>
-              {f.modifiedAt ? <span className="hidden shrink-0 text-2xs text-[var(--color-ink-faint)] sm:block">{fmtDateTime(f.modifiedAt)}</span> : null}
-              {f.url ? <ArrowUpRight className="size-3.5 shrink-0 text-[var(--color-ink-faint)]" /> : null}
-            </>
-          );
-          return (
-            <li key={`${f.name}-${i}`}>
-              {f.url ? (
-                <a href={f.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--color-surface-sunken)]/60">
-                  {inner}
-                </a>
-              ) : (
-                <span className="flex items-center gap-2.5 px-3 py-2 text-[var(--color-ink-muted)]">{inner}</span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
     </div>
   );
 }

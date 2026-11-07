@@ -10,6 +10,8 @@ import { isCoreStaff, coreStaffRank } from "@/server/core-staff";
 import { Card, EmptyState, PageHeader, TeamAvatar } from "@/components/ui";
 import { QuickTaskLines, TaskItem, type TaskItemData } from "./tasks-ui";
 import { HandoverBoard, type HandoverNote } from "./handover-board";
+import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
+import { taskHref } from "@/lib/task-links";
 
 export const metadata: Metadata = { title: "Taken" };
 export const dynamic = "force-dynamic";
@@ -20,6 +22,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const viewer = await requireInternal();
   const canWrite = viewer.permissions.has("tasks:write");
   const spPersoon = (await searchParams).persoon;
+  // Vangnet: scriptingtaken bijwerken met de actuele scriptingstatussen.
+  await syncScriptingTasksIfStale();
 
   const [team, allOpen, handoverRows] = await Promise.all([
     listAssignableUsers(),
@@ -74,8 +78,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   // AI-verbeterpunten (source "automation" + entiteit "ai_insight") blijven hier
   // buiten beeld — die horen niet in de takenlijst. Echte actiepunten en
   // handmatig doorgezette verbeterpunten blijven gewoon staan.
-  async function fetchTasks(where: ReturnType<typeof and>) {
-    return db
+  async function fetchTasks(where: ReturnType<typeof and>): Promise<TaskItemData[]> {
+    const rows = await db
       .select({
         id: tasks.id,
         title: tasks.title,
@@ -91,6 +95,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         clientSlug: clients.slug,
         clientColor: clients.color,
         clientLogo: clients.logoUrl,
+        entityType: tasks.entityType,
+        entityId: tasks.entityId,
+        dedupeKey: tasks.dedupeKey,
       })
       .from(tasks)
       .leftJoin(clients, eq(clients.id, tasks.clientId))
@@ -98,6 +105,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       .where(and(where, sql`not (${tasks.source} = 'automation' and ${tasks.entityType} = 'ai_insight')`))
       .orderBy(asc(tasks.dueOn), desc(tasks.priority))
       .limit(400);
+    // Doorklikken naar waar de taak over gaat (bijv. de scriptsessie).
+    return rows.map(({ entityType, entityId, dedupeKey, ...t }) => ({ ...t, href: taskHref({ entityType, entityId, dedupeKey }) }));
   }
 
   const selected = persoon && persoon !== "algemeen" && persoon !== "overdracht" ? team.find((u) => u.id === persoon) : null;

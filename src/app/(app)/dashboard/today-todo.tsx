@@ -8,7 +8,7 @@ import { Card, EmptyState } from "@/components/ui";
 import { setTaskStatus } from "@/server/actions/tasks";
 
 type Tone = "bad" | "warn" | "good" | "neutral";
-export type TodoLine = { taskId: string; what: string; action: string; meta: string; tone: Tone };
+export type TodoLine = { taskId: string; what: string; action: string; meta: string; tone: Tone; href?: string | null };
 
 const DOT: Record<Tone, string> = {
   bad: "bg-[var(--color-bad)]",
@@ -74,7 +74,7 @@ export function TodoCard({ lines, empty }: { lines: TodoLine[]; empty: string })
                 >
                   {busy === l.taskId ? <Loader2 className="size-3.5 animate-spin" /> : isDone ? <Check className="size-3.5" /> : null}
                 </button>
-                <Link href="/tasks" className="flex min-w-0 flex-1 items-center gap-3">
+                <Link href={l.href ?? "/tasks"} className="flex min-w-0 flex-1 items-center gap-3">
                   <span className={`size-2.5 shrink-0 rounded-full ${DOT[l.tone]}`} />
                   <span className="min-w-0 flex-1">
                     <span className={`block truncate text-sm font-medium ${isDone ? "line-through" : ""}`}>{l.what}</span>

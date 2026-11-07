@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { tasks } from "@/db/schema";
+import { productionDays, tasks } from "@/db/schema";
+import { SCRIPTING_TASK_PREFIX } from "@/lib/scripting-task-plan";
 import {
   assertClientAccess,
   ForbiddenError,
@@ -186,7 +187,7 @@ export async function updateTask(
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
 
     const [task] = await db
-      .select({ id: tasks.id, clientId: tasks.clientId, assigneeId: tasks.assigneeId, title: tasks.title })
+      .select({ id: tasks.id, clientId: tasks.clientId, assigneeId: tasks.assigneeId, title: tasks.title, entityType: tasks.entityType, entityId: tasks.entityId, dedupeKey: tasks.dedupeKey })
       .from(tasks)
       .where(eq(tasks.id, taskId))
       .limit(1);
@@ -202,6 +203,24 @@ export async function updateTask(
     if (parsed.data.dueOn !== undefined) patch.dueOn = parsed.data.dueOn || null;
 
     await db.update(tasks).set(patch).where(eq(tasks.id, taskId));
+
+    // Automatische scriptingtaak overgedragen → ook de verantwoordelijke van de
+    // scriptsessie aanpassen, anders zet de koppeling de taak weer terug. Bij
+    // "Controle Jarno" ligt het werk bewust bij Jarno; dan blijft de
+    // scriptschrijver ongemoeid.
+    if (
+      parsed.data.assigneeId !== undefined &&
+      parsed.data.assigneeId !== task.assigneeId &&
+      task.entityType === "production_day" &&
+      task.entityId &&
+      task.dedupeKey?.startsWith(SCRIPTING_TASK_PREFIX)
+    ) {
+      await db
+        .update(productionDays)
+        .set({ scriptWriterId: parsed.data.assigneeId, updatedAt: new Date() })
+        .where(and(eq(productionDays.id, task.entityId), ne(productionDays.scriptingStatus, "controle_jarno")));
+      revalidatePath("/scripting");
+    }
 
     // Overdragen aan een ander teamlid → die persoon krijgt een melding.
     if (parsed.data.assigneeId !== undefined && parsed.data.assigneeId !== task.assigneeId) {

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Copy, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Check, Copy, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { createTask, createTasksBulk, deleteTask, setTaskStatus, updateTask } from "@/server/actions/tasks";
 import { Button, ClientLogo, ErrorNote, TeamAvatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -58,6 +58,8 @@ export type TaskItemData = {
   clientSlug: string | null;
   clientColor: string | null;
   clientLogo: string | null;
+  /** Waar de taak over gaat (bijv. de scriptsessie op Scripting), of null. */
+  href?: string | null;
 };
 
 const PRIORITIES = [
@@ -344,9 +346,16 @@ export function TaskItem({
         {pending ? <Loader2 className="size-3.5 animate-spin text-[var(--color-ink-faint)]" /> : <Check className="size-3.5" strokeWidth={3} />}
       </button>
       <span className="min-w-40 flex-1">
-        <span className={cn("block text-sm font-medium", done && "text-[var(--color-ink-faint)] line-through")}>
-          {task.title}
-        </span>
+        {task.href ? (
+          <Link href={task.href} className={cn("group/tl flex w-fit items-center gap-1 text-sm font-medium hover:text-[var(--color-brand-600)] hover:underline", done && "text-[var(--color-ink-faint)] line-through")} title="Open waar deze taak over gaat">
+            {task.title}
+            <ArrowUpRight className="size-3.5 shrink-0 text-[var(--color-ink-faint)] group-hover/tl:text-[var(--color-brand-600)]" />
+          </Link>
+        ) : (
+          <span className={cn("block text-sm font-medium", done && "text-[var(--color-ink-faint)] line-through")}>
+            {task.title}
+          </span>
+        )}
         {task.clientSlug ? (
           <Link href={`/clients/${task.clientSlug}`} className="mt-0.5 inline-flex items-center gap-1 text-xs text-[var(--color-ink-muted)] hover:underline">
             <ClientLogo name={task.clientName ?? "?"} logoUrl={task.clientLogo} color={task.clientColor} size={14} />

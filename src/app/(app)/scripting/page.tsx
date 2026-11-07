@@ -5,6 +5,7 @@ import { requireInternal, isOwner } from "@/server/auth/context";
 import { listScripting } from "@/server/scripting";
 import { upcomingScriptAppointments } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
+import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
 import { Card, CardHeader, ClientLogo, GuidelineNote, PageHeader, TeamAvatar } from "@/components/ui";
 import { IntegrationNotice } from "@/components/integration-notice";
 import { ScriptingBoard } from "./scripting-ui";
@@ -14,11 +15,13 @@ export const dynamic = "force-dynamic";
 // De batch-generator (6 concepten) doet meerdere AI-aanroepen; ruim de tijd geven.
 export const maxDuration = 300;
 
-export default async function ScriptingPage({ searchParams }: { searchParams: Promise<{ filter?: string; status?: string }> }) {
+export default async function ScriptingPage({ searchParams }: { searchParams: Promise<{ filter?: string; status?: string; sessie?: string }> }) {
   const viewer = await requireInternal();
   // Scripting leest dezelfde opnames (production_days) als de opnameplanning, dus
   // ook hier de Google Agenda op de achtergrond verversen als 'ie >20 min oud is.
   await syncCalendarIfStale();
+  // Vangnet: scriptingtaken op de takenpagina gelijk houden met de statussen hier.
+  await syncScriptingTasksIfStale();
   const canWrite = viewer.permissions.has("scripts:write");
   const canUseGenerator = viewer.permissions.has("ai:read");
   const { rows, clientOptions, writerOptions, clientResponsibles } = await listScripting(viewer);
@@ -31,6 +34,8 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
   // Deep-link vanuit de controle-melding: open direct gefilterd op een status
   // (bv. "Controle Jarno"), zodat Jarno in één overzicht alles ziet dat wacht.
   const statusFilter = sp.status;
+  // Deep-link vanuit een scriptingtaak: direct naar die scriptsessie.
+  const focusId = sp.sessie;
 
   return (
     <div className="mx-auto max-w-[1200px]">
@@ -106,7 +111,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
 
       {/* key op de actieve filter: zo herstart het board met de juiste filter
           zodra je op een blok bovenin klikt (anders blijft de begin-filter staan). */}
-      <ScriptingBoard key={`${filter ?? "alle"}:${statusFilter ?? "alle"}`} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} defaultStatus={statusFilter} viewerId={viewer.id} viewerName={viewer.fullName} />
+      <ScriptingBoard key={`${filter ?? "alle"}:${statusFilter ?? "alle"}:${focusId ?? ""}`} focusId={focusId} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} defaultStatus={statusFilter} viewerId={viewer.id} viewerName={viewer.fullName} />
 
       {/* Vaste verantwoordelijke per klant — zodat in één oogopslag duidelijk is
           wie standaard de scripts van welke klant op zich neemt. Deze persoon
