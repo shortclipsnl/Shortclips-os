@@ -24,7 +24,7 @@ function fmtDay(d: string | Date | null | undefined): string {
 function fmtWhen(d: Date): string {
   const now = new Date();
   const sameDay = d.toDateString() === now.toDateString();
-  const time = d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+  const time = d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" });
   return sameDay ? `vandaag ${time}` : `${d.toLocaleDateString("nl-NL", { day: "numeric", month: "short" })} ${time}`;
 }
 const plural = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;

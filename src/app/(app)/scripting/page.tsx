@@ -100,7 +100,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
                 ) : null}
                 <span className="shrink-0 text-right text-xs tabular-nums text-[var(--color-ink-muted)]">
                   {new Date(a.startsAt).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" })}
-                  {!a.allDay ? <span className="block text-2xs text-[var(--color-ink-faint)]">{new Date(a.startsAt).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}</span> : null}
+                  {!a.allDay ? <span className="block text-2xs text-[var(--color-ink-faint)]">{new Date(a.startsAt).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" })}</span> : null}
                 </span>
               </li>
               );

@@ -23,7 +23,7 @@ function when(iso: string): string {
   const yest = new Date(today);
   yest.setDate(yest.getDate() - 1);
   const isYest = d.toDateString() === yest.toDateString();
-  const time = d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+  const time = d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" });
   if (sameDay) return `vandaag ${time}`;
   if (isYest) return `gisteren ${time}`;
   return d.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" }) + ` ${time}`;

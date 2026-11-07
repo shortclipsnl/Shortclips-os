@@ -1,28 +1,28 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireInternal, isOwner, canManageOperations } from "@/server/auth/context";
+import { requireInternal, isOwner, canManageOperations, viewerForUser } from "@/server/auth/context";
 import { portalAccessReport } from "@/server/jobs/portal-access";
 import { getDashboard } from "@/server/dashboard";
-import { getMyDay } from "@/server/my-day";
 import { listUpcomingMeetings } from "@/server/meetings";
 import { listCalendar } from "@/server/calendar";
 import { activeClientsMissingCoordinator } from "@/server/clients";
-import { editorCapacityMap } from "@/server/metrics";
 import { periodLabel } from "@/lib/format";
 import { Compass } from "lucide-react";
 import { GuidelineNote, LinkButton, TeamAvatar } from "@/components/ui";
 import { EditorDashboard } from "./editor-view";
-import { TodayView } from "./today-view";
 import { WeekPlanning, type WeekUpload } from "./week-planning";
 import { PostingReminder, type TodayPost } from "./posting-reminder";
-import { getMorningOverview } from "@/server/morning-overview";
-import { MorningOverviewCard } from "./morning-overview";
+import { getWorkOverview } from "@/server/werkoverzicht";
+import { listAttentionTeam } from "@/server/attention";
+import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
+import { Dagstart } from "./dagstart";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ persoon?: string }> }) {
   const viewer = await requireInternal();
+  const persoonParam = (await searchParams).persoon;
 
   // Editors krijgen een eigen, smaller dashboard met uitsluitend hun werk.
   if (viewer.isEditorOnly) return <EditorDashboard viewer={viewer} />;
@@ -33,13 +33,21 @@ export default async function DashboardPage() {
   contentToD.setDate(contentToD.getDate() + 14);
   const contentTo = contentToD.toISOString().slice(0, 10);
 
-  const [data, myDay, capMap, meetings, contentItems, morning] = await Promise.all([
+  // Scriptingtaken bijwerken vóór de dagstart (anders verschijnen ze pas na een
+  // bezoek aan de Takenpagina).
+  await syncScriptingTasksIfStale().catch(() => undefined);
+
+  // Eigenaar en operationeel beheer kunnen de dagstart van een collega bekijken.
+  const canViewOthers = canManageOperations(viewer);
+  const target = canViewOthers && persoonParam && persoonParam !== viewer.id ? await viewerForUser(persoonParam) : null;
+  const subject = target ?? viewer;
+
+  const [data, meetings, contentItems, work, team] = await Promise.all([
     getDashboard(viewer),
-    getMyDay(viewer),
-    editorCapacityMap(),
     listUpcomingMeetings(7),
     listCalendar(viewer, { from: contentFrom, to: contentTo }),
-    getMorningOverview(viewer),
+    getWorkOverview(subject, { trusted: Boolean(target) }),
+    canViewOthers ? listAttentionTeam() : Promise.resolve([]),
   ]);
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
   // Operationeel beheer (eigenaar + operationeel beheerder): snelkoppelingen +
@@ -71,7 +79,7 @@ export default async function DashboardPage() {
     .map((c) => ({ id: c.id, title: c.title, clientName: c.clientName, at: c.scheduledAt }));
 
   const firstName = viewer.fullName.split(" ")[0];
-  const hour = new Date().getHours();
+  const hour = Number(new Date().toLocaleString("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: "Europe/Amsterdam" }));
   const greeting = hour < 6 ? "Goedenacht" : hour < 12 ? "Goedemorgen" : hour < 18 ? "Goedemiddag" : "Goedenavond";
 
   return (
@@ -125,11 +133,39 @@ export default async function DashboardPage() {
         </Link>
       ) : null}
 
-      {/* Gebundeld ochtendoverzicht: verlopen deadlines, acties en aandachtspunten. */}
-      <MorningOverviewCard data={morning} />
+      {/* Bekijk als: eigenaar/operationeel beheer ziet de dagstart van elk kernteamlid. */}
+      {canViewOthers && team.length ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-[var(--color-ink-muted)]">Dagstart van:</span>
+          {team.map((m) => {
+            const active = m.id === subject.id;
+            return (
+              <Link
+                key={m.id}
+                href={m.id === viewer.id ? "/dashboard" : `/dashboard?persoon=${m.id}`}
+                className={`rounded-full border px-3 py-1 ${active ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-ink)] text-white" : "border-[var(--color-line)] hover:bg-[var(--color-surface-muted,#f4f5f8)]"}`}
+              >
+                {m.name}{m.id === viewer.id ? " (jij)" : ""}
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
 
-      {/* Rol-gericht: maximaal drie blokken met concrete acties. */}
-      <TodayView viewer={viewer} data={data} myDay={myDay} capMap={capMap} />
+      {/* Dagstart: vandaag en deze week, per soort werk. Eén bron voor alles. */}
+      <Dagstart
+        personName={work.person.fullName}
+        isSelf={subject.id === viewer.id}
+        refDay={work.refDay}
+        isWeekend={work.isWeekend}
+        weekEnd={work.weekEnd}
+        today={work.today}
+        week={work.week}
+        undated={work.undated}
+        waiting={work.waiting}
+        laterCount={work.laterCount}
+        counts={work.counts}
+      />
 
       {/* Weekplanning: opnames en meetings die eraan komen. */}
       <WeekPlanning shoots={weekShoots} meetings={meetings} uploads={uploads} />
