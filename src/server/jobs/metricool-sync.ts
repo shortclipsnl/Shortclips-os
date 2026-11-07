@@ -15,6 +15,33 @@ import { runJob } from "./runner";
 type Source = Pick<MetricoolService, "listBrands" | "timeline">;
 
 /**
+ * Koppelingen naar merken die niet (meer) in het Metricool-account bestaan
+ * overslaan en uitzetten. Metricool geeft voor een onbekend merk-id anders de
+ * cijfers van een ánder merk terug, waardoor klanten elkaars cijfers kregen.
+ * Uitzetten is omkeerbaar (Instellingen → Koppelingen); er wordt niets gewist.
+ */
+async function knownBrandIds(source: Pick<MetricoolService, "listBrands">, log: (m: string, level?: "warn") => void): Promise<Set<string> | null> {
+  try {
+    const brands = await source.listBrands();
+    return new Set(brands.map((b) => String(b.id)));
+  } catch {
+    log("Merkenlijst niet op te halen; merk-controle overgeslagen.", "warn");
+    return null;
+  }
+}
+
+async function skipUnknownBrand(known: Set<string> | null, link: { clientId: string; blogId: string }, log: (m: string, level?: "warn") => void): Promise<boolean> {
+  if (!known || known.has(String(link.blogId))) return false;
+  log(`Merk ${link.blogId} bestaat niet (meer) in Metricool: koppeling uitgezet, cijfers niet opgehaald.`, "warn");
+  await db
+    .update(clientIntegrations)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(and(eq(clientIntegrations.clientId, link.clientId), eq(clientIntegrations.provider, "metricool"), eq(clientIntegrations.externalId, String(link.blogId))));
+  return true;
+}
+
+
+/**
  * Koppelt Metricool-merken automatisch aan klanten op naam (+ bekende aliassen),
  * net als bij Frame.io. Eén merk → één klant.
  */
@@ -140,7 +167,9 @@ export async function pullMetricoolMetrics(
       const toISO = metricoolDate(now, true);
       const fromDate = fromISO.slice(0, 10);
 
+      const known = await knownBrandIds(source, (m, l) => ctx.log(m, l));
       for (const link of links) {
+        if (await skipUnknownBrand(known, link, (m, l) => ctx.log(m, l))) continue;
         const blogId = Number(link.blogId);
         const userId = Number((link.config as { userId?: number } | null)?.userId ?? 0);
         if (!blogId || !userId) {
@@ -261,7 +290,9 @@ export async function pullMetricoolPosts(
       // Meetdag in Amsterdamse tijd: één social_metrics-rij per post per dag.
       const measuredOn = now.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
 
+      const known = await knownBrandIds(source, (m, l) => ctx.log(m, l));
       for (const link of links) {
+        if (await skipUnknownBrand(known, link, (m, l) => ctx.log(m, l))) continue;
         const blogId = Number(link.blogId);
         const userId = Number((link.config as { userId?: number } | null)?.userId ?? 0);
         if (!blogId || !userId) {

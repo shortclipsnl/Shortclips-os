@@ -2,15 +2,18 @@
 
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientReports, clients, monthlyReportVersions, tasks, users } from "@/db/schema";
-import { requirePermission, assertClientAccess, ForbiddenError } from "@/server/auth/context";
+import { clientReports, clients, monthlyReportFeedback, monthlyReportVersions, tasks, users } from "@/db/schema";
+import { requirePermission, requireInternal, assertClientAccess, ForbiddenError, isOwner } from "@/server/auth/context";
 import { aiConfigured, runPrompt } from "@/server/ai/client";
 import { SHORTCLIPS_IDENTITY } from "@/server/ai/identity";
 import { auditLog, recordActivity } from "@/server/audit";
 import { notify } from "@/server/notifications";
-import { ensureMonthlyReport } from "@/server/reports/run";
+import { ensureMonthlyReport, snapshotVersion } from "@/server/reports/run";
+import { assignReportReaders, markRead, markUnread } from "@/server/reports/team";
+import { ACTIVE_CLIENT_STATUSES, APPROVED_STATUSES, canSeeReports, isUuid, type ReportStatus } from "@/server/reports/service";
+import { duplicateIssue, findDuplicateMetricClients } from "@/server/reports/metrics";
 import { currentMonthPeriod, previousMonthPeriod, periodLabel } from "@/server/reports/analysis";
 import { checkReportQuality, canApprove, type Beoordeling } from "@/server/reports/quality";
 import { saveStrategyProfile } from "@/server/reports/strategy";
@@ -25,6 +28,7 @@ function guard<T>(fn: () => Promise<T>): Promise<T | ActionResult> {
 }
 
 async function loadReportClient(reportId: string) {
+  if (!isUuid(reportId)) return null;
   const [row] = await db
     .select({ id: clientReports.id, clientId: clientReports.clientId, status: clientReports.status, slug: clients.slug, clientName: clients.name, period: clientReports.period })
     .from(clientReports)
@@ -42,15 +46,18 @@ export async function startMonthlyReport(clientId: string, period?: string, mode
     if (!aiConfigured()) return { ok: false, message: "Er is nog geen AI-sleutel ingesteld (ANTHROPIC_API_KEY)." };
     // Standaard de vorige kalendermaand (het rapport gaat over de afgelopen maand).
     const p = period ?? previousMonthPeriod(currentMonthPeriod());
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(p)) return { ok: false, message: "Ongeldige maand." };
+    if (p >= currentMonthPeriod()) return { ok: false, message: "Een maandrapport kan pas gemaakt worden als de maand voorbij is." };
     const now = new Date();
     // Rij vast klaarzetten zodat de UI meteen status 'analyse_bezig' toont.
-    const [existing] = await db.select({ id: clientReports.id }).from(clientReports).where(and(eq(clientReports.clientId, clientId), eq(clientReports.period, p), eq(clientReports.periodType, "month"))).limit(1);
+    const [existing] = await db.select({ id: clientReports.id, status: clientReports.status }).from(clientReports).where(and(eq(clientReports.clientId, clientId), eq(clientReports.period, p), eq(clientReports.periodType, "month"))).limit(1);
+    if (existing && APPROVED_STATUSES.includes(existing.status as ReportStatus)) return { ok: false, message: "Dit rapport is al goedgekeurd. Zet het eerst terug naar aanpassen." };
     let reportId = existing?.id;
     if (!reportId) {
       const [created] = await db.insert(clientReports).values({ clientId, periodType: "month", period: p, title: `Maandrapport ${periodLabel(p)}`, status: "analyse_bezig", startedAt: now, generatedById: viewer.id }).returning({ id: clientReports.id });
       reportId = created!.id;
     } else {
-      await db.update(clientReports).set({ status: "analyse_bezig", startedAt: now, updatedAt: now }).where(eq(clientReports.id, reportId));
+      await db.update(clientReports).set({ status: "analyse_bezig", startedAt: now, updatedAt: now, deletedAt: null }).where(eq(clientReports.id, reportId));
     }
     after(async () => {
       try { await ensureMonthlyReport(clientId, p, { force: true, triggeredById: viewer.id, mode }); } catch { /* status blijft bezig → cron pikt op */ }
@@ -69,6 +76,7 @@ export async function saveReportAnalysis(reportId: string, analysis: unknown): P
     const row = await loadReportClient(reportId);
     if (!row) return { ok: false, message: "Rapport niet gevonden." };
     assertClientAccess(viewer, row.clientId);
+    if (APPROVED_STATUSES.includes(row.status as ReportStatus)) return { ok: false, message: "Dit rapport is goedgekeurd. Zet het eerst terug naar aanpassen om te wijzigen." };
     await db.update(clientReports).set({ analysis: analysis as Record<string, unknown>, reviewedById: viewer.id, updatedAt: new Date() }).where(eq(clientReports.id, reportId));
     revalidatePath(`/analytics/maandrapportages/${reportId}`);
     return { ok: true };
@@ -82,6 +90,7 @@ export async function saveReportBeoordeling(reportId: string, beoordeling: Beoor
     const row = await loadReportClient(reportId);
     if (!row) return { ok: false, message: "Rapport niet gevonden." };
     assertClientAccess(viewer, row.clientId);
+    if (APPROVED_STATUSES.includes(row.status as ReportStatus)) return { ok: false, message: "Dit rapport is goedgekeurd. Zet het eerst terug naar aanpassen om te wijzigen." };
     const clean: Beoordeling = {
       positief: (beoordeling.positief ?? "").slice(0, 2000),
       verbeteren: (beoordeling.verbeteren ?? "").slice(0, 2000),
@@ -121,22 +130,33 @@ export async function generatePersonalText(reportId: string): Promise<ActionResu
   });
 }
 
-/** Rapport goedkeuren (alleen als de verplichte kwaliteitspunten af zijn). */
+/**
+ * Rapport goedkeuren. Alleen de eigenaar (Jarno) keurt goed, en alleen als de
+ * verplichte kwaliteitspunten af zijn. Daarna krijgt het team een leesopdracht.
+ */
 export async function approveMonthlyReport(reportId: string): Promise<ActionResult> {
   return guard(async () => {
     const viewer = await requirePermission("reports:write");
-    const [r] = await db.select().from(clientReports).where(eq(clientReports.id, reportId)).limit(1);
+    if (!isOwner(viewer)) return { ok: false, message: "Alleen Jarno kan maandrapportages goedkeuren." };
+    const [r] = await db.select().from(clientReports).where(and(eq(clientReports.id, reportId), isNull(clientReports.deletedAt))).limit(1);
     if (!r) return { ok: false, message: "Rapport niet gevonden." };
     assertClientAccess(viewer, r.clientId);
+    if (r.status !== "klaar_voor_controle" && r.status !== "aanpassing_nodig") return { ok: false, message: "Dit rapport kan in deze status niet goedgekeurd worden." };
     const issues = checkReportQuality({
       clientName: "",
       analysis: r.analysis as never,
       beoordeling: (r.beoordeling ?? {}) as Beoordeling,
       metrics: (r.metrics ?? {}) as never,
       ontbrekendeGegevens: Array.isArray(r.ontbrekendeGegevens) ? (r.ontbrekendeGegevens as string[]) : [],
+      dubbel: duplicateIssue(await findDuplicateMetricClients(r.clientId, r.period)),
     });
     if (!canApprove(issues)) return { ok: false, message: "Nog niet alle verplichte controlepunten zijn afgerond." };
-    await db.update(clientReports).set({ status: "goedgekeurd", approvedById: viewer.id, approvedAt: new Date(), updatedAt: new Date() }).where(eq(clientReports.id, reportId));
+    const now = new Date();
+    await db.update(clientReports).set({ status: "goedgekeurd", approvedById: viewer.id, approvedAt: now, reviewedById: viewer.id, updatedAt: now }).where(eq(clientReports.id, reportId));
+    await snapshotVersion(reportId, "goedkeuring", viewer.id);
+    // Controletaak is klaar; het team krijgt een leesopdracht.
+    await db.update(tasks).set({ status: "done", completedAt: now, updatedAt: now }).where(and(eq(tasks.dedupeKey, `report_review:${reportId}`), isNull(tasks.deletedAt))).catch(() => undefined);
+    await assignReportReaders(reportId, viewer.id);
     await auditLog({ viewer, action: "report.approved", entityType: "client_report", entityId: reportId, clientId: r.clientId });
     revalidatePath(`/analytics/maandrapportages/${reportId}`);
     revalidatePath("/analytics/maandrapportages");
@@ -144,15 +164,36 @@ export async function approveMonthlyReport(reportId: string): Promise<ActionResu
   });
 }
 
-/** Terug naar 'aanpassing nodig' (of concept). */
-export async function requestReportChanges(reportId: string): Promise<ActionResult> {
+/**
+ * Aanpassing vragen: optioneel met feedback (blijft bewaard). Met `regenerate`
+ * wordt de AI-analyse direct opnieuw opgesteld met de feedback erin verwerkt.
+ */
+export async function requestReportChanges(reportId: string, feedback?: string, regenerate = false): Promise<ActionResult> {
   return guard(async () => {
     const viewer = await requirePermission("reports:write");
     const row = await loadReportClient(reportId);
     if (!row) return { ok: false, message: "Rapport niet gevonden." };
     assertClientAccess(viewer, row.clientId);
+    if (row.status === "gepubliceerd") return { ok: false, message: "Trek de publicatie eerst terug voordat je aanpassingen vraagt." };
+    if (row.status === "analyse_bezig") return { ok: false, message: "De analyse wordt nog opgesteld. Probeer het zo opnieuw." };
+    const text = (feedback ?? "").trim().slice(0, 4000);
+    if (regenerate && !text) return { ok: false, message: "Schrijf eerst wat er aangepast moet worden." };
+    if (text) {
+      const [last] = await db.select({ n: monthlyReportVersions.versionNumber }).from(monthlyReportVersions).where(eq(monthlyReportVersions.reportId, reportId)).orderBy(desc(monthlyReportVersions.versionNumber)).limit(1);
+      await db.insert(monthlyReportFeedback).values({ reportId, authorId: viewer.id, body: text, versionNumber: last?.n ?? null });
+    }
     await db.update(clientReports).set({ status: "aanpassing_nodig", updatedAt: new Date() }).where(eq(clientReports.id, reportId));
+    await auditLog({ viewer, action: "report.changes_requested", entityType: "client_report", entityId: reportId, clientId: row.clientId });
+    if (regenerate) {
+      if (!aiConfigured()) return { ok: false, message: "Er is nog geen AI-sleutel ingesteld." };
+      const now = new Date();
+      await db.update(clientReports).set({ status: "analyse_bezig", startedAt: now, updatedAt: now }).where(eq(clientReports.id, reportId));
+      after(async () => {
+        try { await ensureMonthlyReport(row.clientId, row.period, { force: true, triggeredById: viewer.id, mode: "ai_only" }); } catch { /* cron pikt een vastgelopen analyse op */ }
+      });
+    }
     revalidatePath(`/analytics/maandrapportages/${reportId}`);
+    revalidatePath("/analytics/maandrapportages");
     return { ok: true };
   });
 }
@@ -164,16 +205,10 @@ export async function publishMonthlyReport(reportId: string): Promise<ActionResu
     const [r] = await db.select().from(clientReports).where(eq(clientReports.id, reportId)).limit(1);
     if (!r) return { ok: false, message: "Rapport niet gevonden." };
     assertClientAccess(viewer, r.clientId);
-    if (r.status !== "goedgekeurd" && r.status !== "gepubliceerd") return { ok: false, message: "Keur het rapport eerst goed." };
+    if (r.status !== "goedgekeurd") return { ok: false, message: r.status === "gepubliceerd" ? "Dit rapport is al gepubliceerd." : "Keur het rapport eerst goed." };
 
-    // Versiesnapshot (traceerbaarheid; latere wijziging = nieuwe versie).
-    const [last] = await db.select({ n: monthlyReportVersions.versionNumber }).from(monthlyReportVersions).where(eq(monthlyReportVersions.reportId, reportId)).orderBy(desc(monthlyReportVersions.versionNumber)).limit(1);
-    await db.insert(monthlyReportVersions).values({
-      reportId,
-      versionNumber: (last?.n ?? 0) + 1,
-      content: { analysis: r.analysis, beoordeling: r.beoordeling, strategischeActies: r.strategischeActies, aandachtspunten: r.aandachtspunten } as unknown as Record<string, unknown>,
-      approvedById: viewer.id,
-    });
+    // Versiesnapshot van wat de klant te zien krijgt (traceerbaarheid).
+    await snapshotVersion(reportId, "publicatie", viewer.id);
 
     await db.update(clientReports).set({ status: "gepubliceerd", isPublished: true, publishedAt: new Date(), updatedAt: new Date() }).where(eq(clientReports.id, reportId));
 
@@ -229,5 +264,107 @@ export async function saveClientStrategy(input: { clientId: string; primaryGoal:
     await saveStrategyProfile({ clientId: input.clientId, primaryGoal: input.primaryGoal, secondaryGoals: input.secondaryGoals.slice(0, 6), strategyNote: input.strategyNote.slice(0, 2000), updatedById: viewer.id });
     revalidatePath(`/clients`);
     return { ok: true };
+  });
+}
+
+/**
+ * Zet voor alle actieve klanten zonder (gelukt) rapport een rapport in de
+ * wachtrij. De wachtrij wordt op de achtergrond verwerkt (job
+ * reports.process_queue), zodat er nooit tientallen AI-analyses tegelijk lopen.
+ */
+export async function queueMonthlyReports(period: string): Promise<ActionResult & { queued?: number }> {
+  return guard(async () => {
+    const viewer = await requirePermission("reports:write");
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return { ok: false, message: "Ongeldige maand." };
+    if (period >= currentMonthPeriod()) return { ok: false, message: "Een maandrapport kan pas gemaakt worden als de maand voorbij is." };
+    if (!aiConfigured()) return { ok: false, message: "Er is nog geen AI-sleutel ingesteld (ANTHROPIC_API_KEY)." };
+    const active = await db.select({ id: clients.id }).from(clients).where(and(isNull(clients.deletedAt), inArray(clients.status, [...ACTIVE_CLIENT_STATUSES])));
+    let queued = 0;
+    for (const c of active) {
+      if (viewer.clientScope !== null && !viewer.clientScope.includes(c.id)) continue;
+      const [existing] = await db.select({ id: clientReports.id, status: clientReports.status, deletedAt: clientReports.deletedAt }).from(clientReports).where(and(eq(clientReports.clientId, c.id), eq(clientReports.period, period), eq(clientReports.periodType, "month"))).limit(1);
+      if (!existing) {
+        await db.insert(clientReports).values({ clientId: c.id, periodType: "month", period, title: `Maandrapport ${periodLabel(period)}`, status: "gegevens_verzamelen", generatedById: viewer.id }).onConflictDoNothing();
+        queued++;
+      } else if (existing.status === "mislukt" || existing.deletedAt) {
+        await db.update(clientReports).set({ status: "gegevens_verzamelen", errorMessage: null, deletedAt: null, updatedAt: new Date() }).where(eq(clientReports.id, existing.id));
+        queued++;
+      }
+    }
+    await auditLog({ viewer, action: "report.queue_month", entityType: "client_report", entityId: undefined, clientId: undefined });
+    revalidatePath("/analytics/maandrapportages");
+    return { ok: true, queued };
+  });
+}
+
+/** Markeer een goedgekeurd rapport als doorgenomen (of maak dat ongedaan). */
+export async function setReportRead(reportId: string, read: boolean): Promise<ActionResult> {
+  return guard(async () => {
+    const viewer = await requireInternal();
+    if (!canSeeReports(viewer)) return { ok: false, message: "Je hebt geen toegang tot maandrapportages." };
+    const row = await loadReportClient(reportId);
+    if (!row) return { ok: false, message: "Rapport niet gevonden." };
+    assertClientAccess(viewer, row.clientId);
+    if (!APPROVED_STATUSES.includes(row.status as ReportStatus)) return { ok: false, message: "Een rapport kan pas doorgenomen worden als het is goedgekeurd." };
+    if (read) await markRead(reportId, viewer.id);
+    else await markUnread(reportId, viewer.id);
+    revalidatePath(`/analytics/maandrapportages/${reportId}`);
+    revalidatePath("/analytics/maandrapportages");
+    return { ok: true };
+  });
+}
+
+/**
+ * Zet een actiepunt uit het rapport om naar een taak in de bestaande
+ * takenstructuur, met verantwoordelijke en eventueel deadline. Eén taak per
+ * actiepunt (dedupeKey), dus dubbel klikken maakt geen dubbele taak.
+ */
+export async function createReportActionTask(input: { reportId: string; key: string; title: string; description?: string; rol?: string; assigneeId: string | null; dueOn?: string | null }): Promise<ActionResult & { taskId?: string }> {
+  return guard(async () => {
+    const viewer = await requirePermission("tasks:write");
+    if (!canSeeReports(viewer)) return { ok: false, message: "Je hebt geen toegang tot maandrapportages." };
+    const row = await loadReportClient(input.reportId);
+    if (!row) return { ok: false, message: "Rapport niet gevonden." };
+    assertClientAccess(viewer, row.clientId);
+    if (!APPROVED_STATUSES.includes(row.status as ReportStatus) && !viewer.permissions.has("reports:write")) return { ok: false, message: "Rapport is nog niet goedgekeurd." };
+    const title = input.title.trim().slice(0, 200);
+    if (!title) return { ok: false, message: "Geef de taak een titel." };
+    if (!/^[a-z0-9_-]{1,40}$/i.test(input.key)) return { ok: false, message: "Ongeldig actiepunt." };
+    if (input.dueOn && !/^\d{4}-\d{2}-\d{2}$/.test(input.dueOn)) return { ok: false, message: "Ongeldige datum." };
+    const dedupeKey = `report_action:${input.reportId}:${input.key}`;
+    const [exists] = await db.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.dedupeKey, dedupeKey), isNull(tasks.deletedAt))).limit(1);
+    if (exists) return { ok: false, message: "Voor dit actiepunt bestaat al een taak." };
+    const [created] = await db.insert(tasks).values({
+      clientId: row.clientId,
+      title: `${title} (${row.clientName})`.slice(0, 240),
+      description: [`Uit de maandrapportage ${periodLabel(row.period)} van ${row.clientName}.`, input.description ?? ""].filter(Boolean).join("\n\n").slice(0, 4000),
+      // Werkzaamheden (niet klantcontact): het team voert dit zelf uit.
+      category: "overig",
+      assigneeId: input.assigneeId,
+      dueOn: input.dueOn || null,
+      entityType: "client_report",
+      entityId: input.reportId,
+      source: "manual",
+      dedupeKey,
+      createdById: viewer.id,
+    }).returning({ id: tasks.id });
+    if (input.assigneeId && input.assigneeId !== viewer.id) {
+      await notify({
+        userIds: [input.assigneeId],
+        clientId: row.clientId,
+        type: "task_assigned",
+        level: "info",
+        title: "Nieuw actiepunt uit de maandrapportage",
+        body: `${title} (${row.clientName}, ${periodLabel(row.period)})`,
+        href: `/analytics/maandrapportages/${input.reportId}`,
+        entityType: "task",
+        entityId: created!.id,
+        dedupeKey: `report_action_assigned:${created!.id}`,
+      }).catch(() => undefined);
+    }
+    await auditLog({ viewer, action: "report.action_task_created", entityType: "client_report", entityId: input.reportId, clientId: row.clientId });
+    revalidatePath(`/analytics/maandrapportages/${input.reportId}`);
+    revalidatePath("/analytics/maandrapportages");
+    return { ok: true, taskId: created!.id };
   });
 }

@@ -31,7 +31,8 @@ import { runCaptionDriveLink } from "@/server/jobs/caption-drive-link";
 import { runBriefingAutoGenerate } from "@/server/jobs/briefing-autogen";
 import { runContentResearchWeekly } from "@/server/jobs/content-research-autogen";
 import { runContentResearchNotify } from "@/server/jobs/content-research-notify";
-import { runMonthlyReports } from "@/server/jobs/report-monthly";
+import { runMonthlyReports, runReportQueue } from "@/server/jobs/report-monthly";
+import { runReportTeamNotifications } from "@/server/reports/team";
 import { runReportReviewReminders } from "@/server/jobs/report-review-reminders";
 import { runAttentionNotify } from "@/server/jobs/attention-notify";
 import { runDriveSync } from "@/server/jobs/drive-sync";
@@ -134,6 +135,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "content_research.notify": runContentResearchNotify,
   "reports.generate_monthly": runMonthlyReports,
   "reports.review_reminders": runReportReviewReminders,
+  "reports.process_queue": runReportQueue,
+  "reports.team_notify": () => runReportTeamNotifications(),
   "attention.notify": runAttentionNotify,
   "drive.sync_all": runDriveSync,
   "finance.snapshot_month": snapshotFinanceMonth,

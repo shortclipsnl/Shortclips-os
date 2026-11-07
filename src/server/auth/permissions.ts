@@ -50,6 +50,7 @@ export const PERMISSIONS = {
   "analytics:read": "Statistieken bekijken",
   "reports:read": "Rapportages bekijken",
   "reports:write": "Rapportages maken en publiceren",
+  "reports:team_read": "Goedgekeurde maandrapportages lezen en als doorgenomen markeren",
 
   // Finance — bewust strikt
   "finance:read": "Omzet, facturen en marges bekijken",
@@ -173,6 +174,7 @@ export const ROLE_DEFINITIONS: Array<{
       "analytics:read",
       "reports:read",
       "reports:write",
+      "reports:team_read",
       "team:read",
       "editors:read",
       "ai:read",
@@ -213,6 +215,7 @@ export const ROLE_DEFINITIONS: Array<{
       "analytics:read",
       "reports:read",
       "reports:write",
+      "reports:team_read",
       "team:read",
       "editors:read",
       "ai:read",
@@ -261,6 +264,8 @@ export const ROLE_DEFINITIONS: Array<{
       "videos:write",
       "videos:assign",
       "videos:approve",
+      // Goedgekeurde maandrapportages doornemen (leren van de resultaten).
+      "reports:team_read",
     ],
   },
   {
@@ -270,7 +275,7 @@ export const ROLE_DEFINITIONS: Array<{
     sortOrder: 50,
     // Videografen gebruiken Video Intelligence ook: video's toevoegen en analyses
     // bekijken (begrijpen wáárom een video werkt).
-    permissions: [...INTERNAL_BASE, "productions:write", "video_intelligence:read", "video_intelligence:run"],
+    permissions: [...INTERNAL_BASE, "productions:write", "video_intelligence:read", "video_intelligence:run", "reports:team_read"],
   },
   {
     key: "editor",

@@ -7,6 +7,7 @@ import { SHORTCLIPS_IDENTITY } from "@/server/ai/identity";
 import { getClientReport } from "@/server/client-report";
 import type { ClientInsights, Finding, Recommendation, TopVideo, HookInzicht, FormatInzicht, MindereVideo } from "@/server/insights";
 import { loadStrategyProfile, strategyToText } from "./strategy";
+import { buildVergelijking, formatStats, monthSeries, type FormatStat, type MaandCijfers, type Vergelijking } from "./metrics";
 
 /* ---------------- Periode-helpers (Europe/Amsterdam) ---------------- */
 
@@ -37,13 +38,46 @@ export function periodLabel(period: string): string {
 
 export type MaandAandachtspunt = { type: "positief" | "aandachtspunt" | "actie_nodig"; tekst: string };
 export type StrategischeActie = { titel: string; waarom: string };
+/** Eén intern inzicht: wat gemeten is, los van de mogelijke verklaring. */
+export type InternInzicht = { titel: string; gemeten: string; verklaring: string; zekerheid: string };
+export type InternActie = { actie: string; rol: "script" | "opname" | "montage" | "pm" | string; waarom: string };
+/** Verdieping voor de interne teamrapportage (nooit in de klantversie). */
+export type InternAnalyse = {
+  kern: string;
+  besteVideos: InternInzicht[];
+  hooks: InternInzicht[];
+  onderwerpen: InternInzicht[];
+  tegenvallers: InternInzicht[];
+  videostructuur: InternInzicht[];
+  formatsVaker: InternInzicht[];
+  vermijdenOfAanpassen: InternInzicht[];
+  scripts: string[];
+  opnames: string[];
+  montage: string[];
+  acties: InternActie[];
+  dataBeperkingen: string[];
+};
 export type MonthlyAnalysis = ClientInsights & {
   aandachtspunten: MaandAandachtspunt[];
   strategischeActies: StrategischeActie[];
+  /** Conclusies voor de klant (klantversie). */
+  conclusies?: string[];
+  /** Kansen en aanbevelingen voor de komende maand (klantversie). */
+  kansen?: Array<{ titel: string; toelichting: string }>;
+  intern?: InternAnalyse;
+};
+
+/** Extra cijfers die bij een maandrapport worden opgeslagen (in `metrics`). */
+export type ReportMetrics = Awaited<ReturnType<typeof getClientReport>>["totals"] & {
+  historie?: MaandCijfers[];
+  vergelijking?: Vergelijking;
+  formats?: FormatStat[];
+  /** Bron van het aantal video's. */
+  videoBron?: "publicaties" | "dagcijfers";
 };
 
 export type MonthlyAnalysisResult =
-  | { ok: true; analysis: MonthlyAnalysis; totals: Awaited<ReturnType<typeof getClientReport>>["totals"]; ontbrekend: string[]; model: string }
+  | { ok: true; analysis: MonthlyAnalysis; totals: ReportMetrics; ontbrekend: string[]; model: string }
   | { ok: false; reason: "no_provider" | "no_data" | "error"; message?: string };
 
 const SYSTEM = `${SHORTCLIPS_IDENTITY}
@@ -59,10 +93,19 @@ Strikte regels:
 - Als perVideoCijfersBeschikbaar false is: laat topVideos/besteHooks/besteFormats/mindereVideos leeg ([]) en zeg één keer dat per-video-cijfers nog niet via de koppeling beschikbaar zijn; vul wél analysis, maandvergelijking, verbeterpunten, aandachtspunten en strategischeActies uit de aggregaten.
 - Schrijf begrijpelijk Nederlands.
 
-Geef UITSLUITEND één geldig JSON-object (geen markdown, geen tekst eromheen, geen dubbele aanhalingstekens binnen waarden, geen letterlijke regeleinden binnen waarden, geen trailing komma's), exact dit formaat:
-{"topVideos":[{"titel":"","waarom":"","cijfers":"","zekerheid":"bewezen|waarschijnlijk|hypothese"}],"besteHooks":[{"hook":"","waarom":"","zekerheid":""}],"besteFormats":[{"format":"","waarom":"","zekerheid":""}],"mindereVideos":[{"titel":"","les":""}],"analysis":{"watWerkt":[{"punt":"","zekerheid":""}],"watMinder":[{"punt":"","zekerheid":""}],"ontwikkelingen":[""]},"maandvergelijking":[""],"verbeterpunten":[{"titel":"","waarom":"","wat":"","hoeMeten":"","zekerheid":""}],"aandachtspunten":[{"type":"positief|aandachtspunt|actie_nodig","tekst":""}],"strategischeActies":[{"titel":"","waarom":""}]}
+- Historische vergelijking: gebruik ALLEEN de meegeleverde velden "vergelijking" (in code berekend: t.o.v. vorige maand, gemiddelde 3 maanden, gemiddelde 6 maanden) en "historie". Staat een vergelijking op null, dan is er te weinig historie: zeg dat eerlijk en reken zelf niets uit.
+- Contentformats: vergelijk alleen op basis van "formatPrestaties". Is die lijst leeg, dan zijn formats niet gekoppeld aan video's; zeg dat en verzin geen formatvergelijking.
+- Organisch versus advertenties: deze data bevat alleen organische resultaten. Doe geen uitspraken over advertenties.
+- Als "feedbackVanControleur" is meegegeven: verwerk die opmerkingen in deze versie, zonder de regels hierboven te breken.
 
-Aanvullend: "aandachtspunten" = max 3 belangrijkste signalen van deze maand. "strategischeActies" = max 3 concrete acties voor volgende maand. "verbeterpunten" mag NOOIT leeg zijn.`;
+Twee doelgroepen:
+1. De klantversie (topVideos, analysis, maandvergelijking, conclusies, kansen, strategischeActies): helder, positief waar het kan, eerlijk waar het moet, zonder vakjargon.
+2. De interne teamversie (veld "intern"): voor projectmanagers, scriptschrijvers en videografen. Diep, concreet en leerbaar. Scheid ALTIJD wat gemeten is ("gemeten": alleen cijfers/feiten uit de data) van de mogelijke verklaring ("verklaring": jouw interpretatie, nooit als bewezen gepresenteerd tenzij de cijfers het hard maken). Een verklaring over retentie, hookkracht of montage is zonder retentiedata altijd "hypothese".
+
+Geef UITSLUITEND één geldig JSON-object (geen markdown, geen tekst eromheen, geen dubbele aanhalingstekens binnen waarden, geen letterlijke regeleinden binnen waarden, geen trailing komma's), exact dit formaat:
+{"topVideos":[{"titel":"","waarom":"","cijfers":"","zekerheid":"bewezen|waarschijnlijk|hypothese"}],"besteHooks":[{"hook":"","waarom":"","zekerheid":""}],"besteFormats":[{"format":"","waarom":"","zekerheid":""}],"mindereVideos":[{"titel":"","les":""}],"analysis":{"watWerkt":[{"punt":"","zekerheid":""}],"watMinder":[{"punt":"","zekerheid":""}],"ontwikkelingen":[""]},"maandvergelijking":[""],"conclusies":[""],"kansen":[{"titel":"","toelichting":""}],"verbeterpunten":[{"titel":"","waarom":"","wat":"","hoeMeten":"","zekerheid":""}],"aandachtspunten":[{"type":"positief|aandachtspunt|actie_nodig","tekst":""}],"strategischeActies":[{"titel":"","waarom":""}],"intern":{"kern":"","besteVideos":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"hooks":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"onderwerpen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"tegenvallers":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"videostructuur":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"formatsVaker":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"vermijdenOfAanpassen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"scripts":[""],"opnames":[""],"montage":[""],"acties":[{"actie":"","rol":"script|opname|montage|pm","waarom":""}],"dataBeperkingen":[""]}}
+
+Aanvullend: "aandachtspunten" = max 3 belangrijkste signalen van deze maand. "strategischeActies" = max 3 concrete acties voor volgende maand. "conclusies" = 2 tot 4 korte conclusies voor de klant. "kansen" = 2 tot 3 kansen/aanbevelingen voor de komende maand. "verbeterpunten" mag NOOIT leeg zijn. In "intern": "acties" = 3 tot 6 concrete acties voor de komende maand, elk met de rol die het uitvoert; "dataBeperkingen" = wat we NIET konden meten en dus niet weten. Laat een interne lijst leeg ([]) als de data er niets over zegt, in plaats van iets te verzinnen.`;
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 const num = (v: unknown) => Number(v ?? 0);
@@ -75,7 +118,7 @@ const num = (v: unknown) => Number(v ?? 0);
 export async function generateMonthlyAnalysis(
   clientId: string,
   period: string,
-  opts: { trusted?: boolean; priorSummary?: string | null } = {},
+  opts: { trusted?: boolean; priorSummary?: string | null; feedback?: string[] } = {},
 ): Promise<MonthlyAnalysisResult> {
   if (!aiConfigured()) return { ok: false, reason: "no_provider" };
 
@@ -130,31 +173,59 @@ export async function generateMonthlyAnalysis(
   // Titels van video's die deze maand live gingen (contentcontext).
   const monthTitles = withCijfers.map((v) => String(v.titel ?? "")).filter(Boolean);
 
+  // Historie en vergelijkingen: in code berekend, nooit door de AI.
+  const historie = await monthSeries(client.id, period, 6);
+  const vergelijking = buildVergelijking(historie);
+  const huidig = historie[historie.length - 1]!;
+  const formats = formatStats(withCijfers.map(mapVideo).map((v) => ({ format: v.format, views: v.views, likes: v.likes, reacties: v.reacties, shares: v.shares, saves: v.saves })));
+
+  // Aantal video's: de dagcijfers van Metricool bevatten geen publicatietelling
+  // (altijd 0). De publicatielijst is dan de betrouwbare bron.
+  const totals: ReportMetrics = { ...report.totals };
+  if (totals.posts === 0 && huidig.videos > 0) {
+    totals.posts = huidig.videos;
+    totals.avgPerPost = Math.round(totals.views / huidig.videos);
+    totals.videoBron = "publicaties";
+  } else {
+    totals.videoBron = "dagcijfers";
+  }
+  totals.historie = historie;
+  totals.vergelijking = vergelijking;
+  totals.formats = formats;
+
   // Ontbrekende gegevens markeren (eerlijkheid, sectie 5).
   const ontbrekend: string[] = [];
   if (!perVideoBeschikbaar) ontbrekend.push("Per-video cijfers zijn deze maand niet via de koppeling beschikbaar.");
-  if (report.totals.posts === 0) ontbrekend.push("Er zijn deze maand geen gepubliceerde video's geregistreerd.");
+  if (totals.posts === 0) ontbrekend.push("Er zijn deze maand geen gepubliceerde video's geregistreerd.");
+  if (huidig.meetdagen > 0 && huidig.meetdagen < 25) ontbrekend.push(`Er zijn maar voor ${huidig.meetdagen} dagen van deze maand cijfers opgehaald.`);
+  if (vergelijking.maandenHistorie < 3) ontbrekend.push(`Er is pas ${vergelijking.maandenHistorie} eerdere maand${vergelijking.maandenHistorie === 1 ? "" : "en"} met cijfers; vergelijkingen over 3 en 6 maanden zijn nog niet mogelijk.`);
 
   const dataBlock = {
     klant: client.name,
     maand: periodLabel(period),
     doelstelling: strategyToText(strategy) || "Niet ingesteld",
-    cijfers: report.totals,
+    cijfers: { ...report.totals, posts: totals.posts, avgPerPost: totals.avgPerPost },
     perPlatform: report.perPlatform,
-    perMaand: report.months,
+    historie,
+    vergelijking,
+    formatPrestaties: formats,
     feitelijkeObservaties: report.observations,
     videosDezeMaand: monthTitles,
     perVideoCijfersBeschikbaar: perVideoBeschikbaar,
     topVideos: perVideoBeschikbaar ? withCijfers.slice(0, 8).map(mapVideo) : [],
     mindereVideos: perVideoBeschikbaar && withCijfers.length > 3 ? withCijfers.slice(-4).reverse().map(mapVideo) : [],
     vorigeMaandAnalyse: opts.priorSummary ?? null,
+    feedbackVanControleur: opts.feedback && opts.feedback.length ? opts.feedback : null,
   };
 
-  const res = await runJsonPrompt<Partial<MonthlyAnalysis> & { analyse?: ClientInsights["analysis"] }>({
+  const prompt = {
     system: SYSTEM,
     user: `Analyseer deze klant over de maand en geef de volledige maandanalyse. Data (JSON):\n${JSON.stringify(dataBlock)}`,
-    maxTokens: 12000,
-  });
+    maxTokens: 16000,
+  };
+  let res = await runJsonPrompt<Partial<MonthlyAnalysis> & { analyse?: ClientInsights["analysis"] }>(prompt);
+  // Eén herkansing bij een onleesbaar antwoord (komt af en toe voor bij lange JSON).
+  if (!res.ok && res.reason === "error") res = await runJsonPrompt<Partial<MonthlyAnalysis> & { analyse?: ClientInsights["analysis"] }>(prompt);
   if (!res.ok) return { ok: false, reason: res.reason === "no_provider" ? "no_provider" : "error", message: res.error };
 
   const raw = res.data ?? {};
@@ -173,10 +244,43 @@ export async function generateMonthlyAnalysis(
     maandvergelijking: arr<string>(raw.maandvergelijking),
     aandachtspunten: arr<MaandAandachtspunt>(raw.aandachtspunten).slice(0, 3),
     strategischeActies: arr<StrategischeActie>(raw.strategischeActies).slice(0, 3),
+    conclusies: arr<string>(raw.conclusies).slice(0, 4),
+    kansen: arr<{ titel: string; toelichting: string }>(raw.kansen).slice(0, 3),
+    intern: normalizeIntern(raw.intern),
   };
   if (analysis.verbeterpunten.length === 0 && analysis.analysis.watWerkt.length === 0 && analysis.analysis.watMinder.length === 0) {
     return { ok: false, reason: "error", message: "De AI-analyse leverde geen bruikbare uitkomst op." };
   }
 
-  return { ok: true, analysis, totals: report.totals, ontbrekend, model: res.model };
+  return { ok: true, analysis, totals, ontbrekend, model: res.model };
+}
+
+function normalizeIntern(v: unknown): InternAnalyse {
+  const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const ins = (x: unknown): InternInzicht[] =>
+    arr<Record<string, unknown>>(x).map((i) => ({
+      titel: String(i.titel ?? ""),
+      gemeten: String(i.gemeten ?? ""),
+      verklaring: String(i.verklaring ?? ""),
+      zekerheid: String(i.zekerheid ?? "hypothese"),
+    })).filter((i) => i.titel);
+  const strs = (x: unknown) => arr<unknown>(x).map((t) => String(t ?? "")).filter(Boolean);
+  return {
+    kern: String(o.kern ?? ""),
+    besteVideos: ins(o.besteVideos),
+    hooks: ins(o.hooks),
+    onderwerpen: ins(o.onderwerpen),
+    tegenvallers: ins(o.tegenvallers),
+    videostructuur: ins(o.videostructuur),
+    formatsVaker: ins(o.formatsVaker),
+    vermijdenOfAanpassen: ins(o.vermijdenOfAanpassen),
+    scripts: strs(o.scripts),
+    opnames: strs(o.opnames),
+    montage: strs(o.montage),
+    acties: arr<Record<string, unknown>>(o.acties)
+      .map((a) => ({ actie: String(a.actie ?? ""), rol: String(a.rol ?? "pm"), waarom: String(a.waarom ?? "") }))
+      .filter((a) => a.actie)
+      .slice(0, 8),
+    dataBeperkingen: strs(o.dataBeperkingen),
+  };
 }

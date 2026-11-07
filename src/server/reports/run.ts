@@ -1,7 +1,7 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientReports, clients, tasks } from "@/db/schema";
+import { clientReports, clients, monthlyReportFeedback, monthlyReportVersions, tasks, users } from "@/db/schema";
 import { notify } from "@/server/notifications";
 import { recordActivity } from "@/server/audit";
 import { generateMonthlyAnalysis, periodLabel, previousMonthPeriod, type MonthlyAnalysis } from "./analysis";
@@ -75,7 +75,13 @@ export async function ensureMonthlyReport(
   }
 
   const prior = await priorSummary(clientId, period);
-  const res = await generateMonthlyAnalysis(clientId, period, { trusted: true, priorSummary: prior });
+  // Openstaande feedback van de controleur gaat mee in deze generatie.
+  const openFeedback = await db
+    .select({ id: monthlyReportFeedback.id, body: monthlyReportFeedback.body })
+    .from(monthlyReportFeedback)
+    .where(and(eq(monthlyReportFeedback.reportId, reportId), isNull(monthlyReportFeedback.resolvedInVersion)))
+    .orderBy(monthlyReportFeedback.createdAt);
+  const res = await generateMonthlyAnalysis(clientId, period, { trusted: true, priorSummary: prior, feedback: openFeedback.map((f) => f.body) });
   if (!res.ok) {
     const message = res.reason === "no_provider" ? "Er is nog geen AI-sleutel ingesteld." : res.reason === "no_data" ? "Geen resultaten in deze maand om te analyseren." : res.message ?? "Analyse mislukt.";
     await db.update(clientReports).set({ status: "mislukt", errorMessage: message.slice(0, 500), startedAt: null, updatedAt: new Date() }).where(eq(clientReports.id, reportId));
@@ -99,6 +105,28 @@ export async function ensureMonthlyReport(
   // Volledige herstart wist ook de persoonlijke beoordeling; standaard behouden we die.
   if (opts.mode === "full") patch.beoordeling = {};
   await db.update(clientReports).set(patch).where(eq(clientReports.id, reportId));
+
+  // Elke generatie wordt als versie bewaard (traceerbaar wat er veranderde).
+  const versionNumber = await snapshotVersion(reportId, "generatie", opts.triggeredById ?? null);
+  if (openFeedback.length) {
+    for (const f of openFeedback) {
+      await db.update(monthlyReportFeedback).set({ resolvedInVersion: versionNumber }).where(eq(monthlyReportFeedback.id, f.id));
+    }
+  }
+
+  // Eigenaar (controleur) één keer per maand laten weten dat er rapporten wachten.
+  const owners = await db.select({ id: users.id }).from(users).where(and(eq(users.primaryRole, "owner"), eq(users.status, "active"), isNull(users.deletedAt)));
+  if (owners.length) {
+    await notify({
+      userIds: owners.map((o) => o.id),
+      level: "info",
+      type: "report_review",
+      title: `Maandrapportages ${periodLabel(period)} wachten op controle`,
+      body: `Er staan maandrapportages over ${periodLabel(period)} klaar die je kunt controleren en goedkeuren.`,
+      href: `/analytics/maandrapportages?maand=${period}&status=wacht`,
+      dedupeKey: `report_review_owner:${period}`,
+    }).catch(() => undefined);
+  }
 
   // PM notificeren + controletaak (één open taak per rapport).
   const coordinatorId = client.coordinatorId;
@@ -136,4 +164,31 @@ export async function ensureMonthlyReport(
   await recordActivity({ clientId, type: "report.generated", title: `Maandrapportage ${periodLabel(period)} klaar voor controle`, isClientVisible: false }).catch(() => undefined);
 
   return { ok: true, reportId, status: "klaar_voor_controle" };
+}
+
+/**
+ * Slaat de huidige inhoud van een rapport op als nieuwe versie en geeft het
+ * versienummer terug. `kind`: generatie, goedkeuring of publicatie.
+ */
+export async function snapshotVersion(reportId: string, kind: "generatie" | "goedkeuring" | "publicatie", byId: string | null): Promise<number> {
+  const [r] = await db
+    .select({ analysis: clientReports.analysis, beoordeling: clientReports.beoordeling, metrics: clientReports.metrics, strategischeActies: clientReports.strategischeActies, aandachtspunten: clientReports.aandachtspunten })
+    .from(clientReports)
+    .where(eq(clientReports.id, reportId))
+    .limit(1);
+  const [last] = await db
+    .select({ n: monthlyReportVersions.versionNumber })
+    .from(monthlyReportVersions)
+    .where(eq(monthlyReportVersions.reportId, reportId))
+    .orderBy(desc(monthlyReportVersions.versionNumber))
+    .limit(1);
+  const versionNumber = (last?.n ?? 0) + 1;
+  await db.insert(monthlyReportVersions).values({
+    reportId,
+    versionNumber,
+    kind,
+    content: (r ?? {}) as unknown as Record<string, unknown>,
+    approvedById: byId,
+  });
+  return versionNumber;
 }

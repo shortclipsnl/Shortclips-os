@@ -323,9 +323,55 @@ export const monthlyReportVersions = pgTable(
     /** Snapshot van analyse + beoordeling + strategische acties bij goedkeuring. */
     content: jsonb("content").notNull().default(sql`'{}'::jsonb`),
     approvedById: uuid("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+    /** `generatie` (elke (her)generatie), `goedkeuring` of `publicatie`. */
+    kind: varchar("kind", { length: 16 }).notNull().default("publicatie"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
   },
   (t) => [index("monthly_report_versions_report_idx").on(t.reportId, t.versionNumber)],
+);
+
+/**
+ * Feedback van de controleur (Jarno) op een maandrapport. Blijft bewaard, ook
+ * na opnieuw genereren: zo is traceerbaar wat er gevraagd is en in welke versie
+ * het is verwerkt. Open feedback gaat mee in de volgende AI-generatie.
+ */
+export const monthlyReportFeedback = pgTable(
+  "monthly_report_feedback",
+  {
+    id: pk(),
+    reportId: uuid("report_id").notNull().references(() => clientReports.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    /** Versie waarop de feedback gegeven is. */
+    versionNumber: integer("version_number"),
+    /** Versie waarin de feedback is meegenomen (na opnieuw genereren). */
+    resolvedInVersion: integer("resolved_in_version"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`now()`),
+  },
+  (t) => [index("monthly_report_feedback_report_idx").on(t.reportId, t.createdAt)],
+);
+
+/**
+ * Wie een goedgekeurd maandrapport moet doornemen en of dat gebeurd is.
+ * Eén rij per rapport per medewerker (idempotent).
+ */
+export const monthlyReportReads = pgTable(
+  "monthly_report_reads",
+  {
+    id: pk(),
+    reportId: uuid("report_id").notNull().references(() => clientReports.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** Waarom deze persoon het moet lezen: coordinator, videograaf, team. */
+    reason: varchar("reason", { length: 24 }).notNull().default("team"),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().default(sql`now()`),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    lastRemindedAt: timestamp("last_reminded_at", { withTimezone: true }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (t) => [
+    unique("monthly_report_reads_unique").on(t.reportId, t.userId),
+    index("monthly_report_reads_user_idx").on(t.userId, t.readAt),
+  ],
 );
 
 /* ------------------------------------------------------------------ *
@@ -376,6 +422,8 @@ export const clientReportsRelations = relations(clientReports, ({ one, many }) =
     references: [clients.id],
   }),
   versions: many(monthlyReportVersions),
+  feedback: many(monthlyReportFeedback),
+  reads: many(monthlyReportReads),
 }));
 
 export const clientStrategyProfilesRelations = relations(clientStrategyProfiles, ({ one }) => ({

@@ -659,6 +659,13 @@
       "when": 1793866702112,
       "tag": "0093_client_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1794042452946,
+      "tag": "0094_maandrapport_feedback_reads",
+      "breakpoints": true
     }
   ]
 }

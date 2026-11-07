@@ -15,6 +15,8 @@ export type ReportForQuality = {
   beoordeling: Beoordeling | null;
   metrics: { views?: number; posts?: number; viewsGrowthPct?: number | null } | null;
   ontbrekendeGegevens: string[];
+  /** Uitkomst van de dubbele-cijfers-controle (zie metrics.ts). */
+  dubbel?: { severity: "blok" | "let_op"; label: string } | null;
 };
 
 /**
@@ -42,8 +44,11 @@ export function checkReportQuality(r: ReportForQuality): QualityIssue[] {
 
   // Data-kwaliteit.
   if ((m.views ?? 0) === 0) issues.push({ id: "views", label: "Er zijn geen weergaven geregistreerd deze maand — controleer de koppeling.", severity: "let_op" });
-  if ((m.posts ?? 0) === 0) issues.push({ id: "posts", label: "Er zijn geen gepubliceerde video's geregistreerd deze maand.", severity: "let_op" });
+  if ((m.posts ?? 0) === 0 && !(r.ontbrekendeGegevens ?? []).some((g) => g.includes("geen gepubliceerde video"))) issues.push({ id: "posts", label: "Er zijn geen gepubliceerde video's geregistreerd deze maand.", severity: "let_op" });
   if (m.viewsGrowthPct != null && Math.abs(m.viewsGrowthPct) > 1000) issues.push({ id: "groei", label: `Onwaarschijnlijke groei (${m.viewsGrowthPct}%) — controleer of de vergelijkingsperiode klopt.`, severity: "let_op" });
+
+  // Identieke cijfers als een andere klant: verkeerde koppeling.
+  if (r.dubbel) issues.push({ id: "dubbel", label: r.dubbel.label, severity: r.dubbel.severity });
 
   // Ontbrekende gegevens uit de analyse meenemen.
   for (const [i, g] of (r.ontbrekendeGegevens ?? []).entries()) {
