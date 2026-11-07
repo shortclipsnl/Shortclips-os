@@ -53,3 +53,33 @@ describe("indeling", () => {
     expect(deelIn({ bedrag: -120, tegenpartij: "Xyz Onbekend", omschrijving: "" }).groep).toBe("controle");
   });
 });
+
+import { parseRevolutAfschriftTekst, parseRevolutCsv, isZakelijkRevolut } from "../src/server/bank/revolut";
+import { itemsToLines } from "../src/lib/pdf-lines";
+
+describe("Revolut", () => {
+  const tekst = [
+    " Rekening (Betaalrekening)   €100,00   €60,00   €50,00   €90,00",
+    " 1 nov 2026   Framer   €20,00   €80,00",
+    "              Aan: Framer B.V., Amsterdam",
+    " 2 nov 2026   {xPay} geld toevoegen met {card}   €50,00   €130,00",
+    " 3 nov 2026   Albert Heijn   €40,00   €90,00",
+    "Teruggedraaid van 1 nov 2026 naar 7 nov 2026",
+    " 4 nov 2026   Uber   €10,00",
+  ].join("\n");
+  it("leest het PDF-afschrift, bepaalt in/uit via het saldo en negeert teruggedraaide posten", () => {
+    const r = parseRevolutAfschriftTekst(tekst);
+    expect(r.tx.map((t) => t.bedrag)).toEqual([-20, 50, -40]);
+    expect(r.eindsaldo).toBe(90);
+    expect(r.tx.filter(isZakelijkRevolut).map((t) => t.oms)).toEqual(["Framer"]);
+  });
+  it("leest de CSV-export", () => {
+    const csv = "Type,Product,Started Date,Completed Date,Description,Amount,Fee,Currency,State,Balance\nCARD_PAYMENT,Current,2026-11-01 10:00:00,2026-11-02 10:00:00,Claude,-21.78,0.00,EUR,COMPLETED,50.00\nCARD_PAYMENT,Current,2026-11-03 10:00:00,,Adobe,-10.00,0.00,EUR,PENDING,40.00";
+    const tx = parseRevolutCsv(csv);
+    expect(tx).toEqual([{ datum: "2026-11-02", oms: "Claude", bedrag: -21.78 }]);
+  });
+  it("zet PDF-fragmenten om naar regels", () => {
+    const txt = itemsToLines([[{ str: "1 nov 2026", x: 10, y: 700, w: 40 }, { str: "Framer", x: 100, y: 700, w: 30 }, { str: "€20,00", x: 400, y: 700.5, w: 30 }]]);
+    expect(txt.split("\n")[0]).toBe("1 nov 2026   Framer   €20,00");
+  });
+});

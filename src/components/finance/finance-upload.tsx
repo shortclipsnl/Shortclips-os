@@ -52,7 +52,36 @@ export function FinanceUpload() {
           }
         } else fd.append("files", f);
       }
-      const r: FinanceUploadResult = fd.getAll("files").length ? await importFinancieleExports(fd) : { ok: false, regels: [], fouten: [] };
+      // Volgorde: bank eerst, dan Revolut, dan DigiBoox. In porties van max. ~3,5 MB,
+      // ruim onder de uploadgrens van de hosting, zodat een jaar aan exports altijd past.
+      const rang = (f: File) => (/\.xml$/i.test(f.name) ? 0 : /revolut-tekst|\.csv$/i.test(f.name) ? 1 : 2);
+      const alle = (fd.getAll("files") as File[]).sort((a, b) => rang(a) - rang(b));
+      const porties: File[][] = [];
+      let huidig: File[] = [];
+      let grootte = 0;
+      for (const f of alle) {
+        if (huidig.length && grootte + f.size > 3_500_000) {
+          porties.push(huidig);
+          huidig = [];
+          grootte = 0;
+        }
+        huidig.push(f);
+        grootte += f.size;
+      }
+      if (huidig.length) porties.push(huidig);
+      const r: FinanceUploadResult = { ok: true, regels: [], fouten: [] };
+      for (const portie of porties) {
+        const deel = new FormData();
+        for (const f of portie) deel.append("files", f);
+        try {
+          const x = await importFinancieleExports(deel);
+          r.regels.push(...x.regels);
+          r.fouten.push(...x.fouten);
+        } catch {
+          r.fouten.push(`${portie.map((f) => f.name.replace(/\.revolut-tekst\.txt$/i, "")).join(", ")}: verwerken mislukt (verbinding of time-out). Probeer deze bestanden opnieuw; dubbele boekingen worden overgeslagen.`);
+        }
+      }
+      r.ok = r.fouten.length === 0;
       setRes({ ...r, fouten: [...fouten, ...r.fouten] });
       router.refresh();
       if (ref.current) ref.current.value = "";

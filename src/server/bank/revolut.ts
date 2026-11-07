@@ -77,7 +77,8 @@ export function parseRevolutCsv(content: string): RevolutTx[] {
     return out.map((c) => c.trim());
   };
   const head = split(lines[0]!).map((h) => h.toLowerCase());
-  const col = (...names: string[]) => head.findIndex((h) => names.includes(h));
+  // Eerste naam in de lijst heeft voorrang (voltooiingsdatum boven startdatum).
+  const col = (...names: string[]) => names.map((n) => head.indexOf(n)).find((i) => i >= 0) ?? -1;
   const iDate = col("completed date", "voltooid op", "datum voltooid", "started date", "begindatum");
   const iDesc = col("description", "beschrijving", "omschrijving");
   const iAmt = col("amount", "bedrag");

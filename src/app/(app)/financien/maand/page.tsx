@@ -10,6 +10,8 @@ import { PrintKnop, TransactieTabel } from "./maand-ui";
 
 export const metadata: Metadata = { title: "Maandcontrole" };
 export const dynamic = "force-dynamic";
+// Ruim genoeg voor het verwerken van een jaar aan exports via de knop "Exports toevoegen".
+export const maxDuration = 300;
 
 function label(ym: string) {
   const [y, m] = ym.split("-").map(Number);

@@ -4,6 +4,8 @@ import { FinanceUpload } from "@/components/finance/finance-upload";
 
 export const metadata: Metadata = { title: "Vermogen" };
 export const dynamic = "force-dynamic";
+// Ruim genoeg voor het verwerken van een jaar aan exports via de knop "Exports toevoegen".
+export const maxDuration = 300;
 
 /**
  * Vermogensdashboard binnen de dashboard-schil (sidebar + topbar blijven staan).

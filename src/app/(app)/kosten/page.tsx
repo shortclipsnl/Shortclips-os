@@ -9,6 +9,8 @@ import { KostenDashboard } from "./kosten-dashboard";
 
 export const metadata: Metadata = { title: "Kosten" };
 export const dynamic = "force-dynamic";
+// Ruim genoeg voor het verwerken van een jaar aan exports via de knop "Exports toevoegen".
+export const maxDuration = 300;
 
 /** Ouder dan 7 dagen = niet meer als actueel presenteren. */
 function isVerouderd(datum: string | null): boolean {

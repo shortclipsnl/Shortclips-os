@@ -10,6 +10,8 @@ import { RecalcButton } from "./recalc-button";
 
 export const metadata: Metadata = { title: "Winstgevendheid" };
 export const dynamic = "force-dynamic";
+// Ruim genoeg voor het verwerken van een jaar aan exports via de knop "Exports toevoegen".
+export const maxDuration = 300;
 
 const eur = (v: number) => `€${Math.round(v).toLocaleString("nl-NL")}`;
 const DOT: Record<string, string> = { good: "var(--color-good)", warn: "var(--color-warn)", bad: "var(--color-bad)" };

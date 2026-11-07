@@ -59,7 +59,7 @@ export async function getSyncStatus() {
       .where(sql`${companyFinanceMonths.bookSource} is not null`)
       .orderBy(desc(companyFinanceMonths.bookImportedAt))
       .limit(1),
-    db.select({ maand: sql<string>`max(${kostenRegels.maand})`, bijgewerkt: sql<string | null>`max(${kostenRegels.bijgewerkt})::text`, at: sql<Date | null>`max(${kostenRegels.updatedAt})` }).from(kostenRegels),
+    db.select({ maand: sql<string>`max(${kostenRegels.maand})`, bijgewerkt: sql<string | null>`max(${kostenRegels.bijgewerkt})::text`, at: sql<Date | null>`max(${kostenRegels.updatedAt})` }).from(kostenRegels).where(sql`${kostenRegels.leverancier} not like '% (Revolut)'`),
     db.select({ maand: sql<string>`max(${kostenOmzet.maand})` }).from(kostenOmzet),
   ]);
 
@@ -190,8 +190,10 @@ export async function getMaandControle(maand: string) {
   const bedrijf = kostenRegelsMaand.filter((k) => isBedrijfskostGroep(k.groep));
   const kostenEx = r2(bedrijf.reduce((a, k) => a + k.ex, 0));
   const kostenMet = r2(bedrijf.reduce((a, k) => a + k.met, 0));
-  const kostenBijgewerkt = kostenRegelsMaand.reduce<string | null>((a, k) => (k.bijgewerkt && (!a || k.bijgewerkt > a) ? k.bijgewerkt : a), null);
-  const kostenDekking: Dekking = !kostenRegelsMaand.length ? "ontbreekt" : kostenBijgewerkt && kostenBijgewerkt > eind ? "compleet" : "voorlopig";
+  // Alleen de Knab-kant bepaalt of de maand af is; Revolut-abonnementen komen er los bij.
+  const knabRegels = kostenRegelsMaand.filter((k) => !k.leverancier.endsWith(" (Revolut)"));
+  const kostenBijgewerkt = knabRegels.reduce<string | null>((a, k) => (k.bijgewerkt && (!a || k.bijgewerkt > a) ? k.bijgewerkt : a), null);
+  const kostenDekking: Dekking = !knabRegels.length ? "ontbreekt" : kostenBijgewerkt && kostenBijgewerkt > eind ? "compleet" : "voorlopig";
 
   const perCategorie = new Map<string, { categorie: string; groep: string; ex: number; met: number }>();
   for (const k of bedrijf) {

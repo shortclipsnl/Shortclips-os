@@ -23,6 +23,8 @@ function shortMonth(p: string) {
 
 export const metadata: Metadata = { title: "Financiën" };
 export const dynamic = "force-dynamic";
+// Ruim genoeg voor het verwerken van een jaar aan exports via de knop "Exports toevoegen".
+export const maxDuration = 300;
 
 export default async function FinancienPage() {
   // Financiën is uitsluitend voor de eigenaar — hard afgedwongen op paginaniveau

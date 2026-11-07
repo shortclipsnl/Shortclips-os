@@ -48,7 +48,7 @@ export async function runFinanceSyncHealth() {
     if (dag >= 4 && (!boek?.at || boek.at.slice(0, 10) <= eindVorige)) {
       problemen.push({ key: `digiboox:${vorige}`, titel: `Omzet ${vorige} uit DigiBoox is niet compleet`, tekst: "Exporteer in DigiBoox de Mutaties over dit jaar en upload die op Financiën." });
     }
-    const [kost] = rows<{ at: string | null }>(await db.execute(sql`select max(bijgewerkt)::text at from kosten_regels where maand = ${vorige}`));
+    const [kost] = rows<{ at: string | null }>(await db.execute(sql`select max(bijgewerkt)::text at from kosten_regels where maand = ${vorige} and leverancier not like '% (Revolut)'`));
     if (dag >= 4 && (!kost?.at || kost.at <= eindVorige)) {
       problemen.push({ key: `kosten:${vorige}`, titel: `Kosten ${vorige} zijn nog voorlopig`, tekst: "De maandafsluiting van de Kostenmonitor is nog niet verwerkt (wacht op het Knab-afschrift)." });
     }

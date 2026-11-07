@@ -69,7 +69,8 @@ export async function kostenUitBank(db: Db, maanden: string[]): Promise<{ maand:
     const [bestaand] = await db
       .select({ n: sql<number>`count(*)::int`, bijgewerkt: sql<string | null>`max(${kostenRegels.bijgewerkt})::text` })
       .from(kostenRegels)
-      .where(eq(kostenRegels.maand, maand));
+      // Revolut-regels zijn een aparte bron en bepalen niet of de Knab-kant van de maand af is.
+      .where(and(eq(kostenRegels.maand, maand), notLike(kostenRegels.leverancier, "% (Revolut)")));
     if (bestaand?.n && bestaand.bijgewerkt && bestaand.bijgewerkt > eind) {
       out.push({ maand, regels: 0, status: "al definitief in de Kostenmonitor, niet gewijzigd" });
       continue;
