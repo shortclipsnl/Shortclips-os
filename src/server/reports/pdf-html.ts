@@ -147,7 +147,7 @@ function nextMonthName(period: string): string {
 }
 
 /** Staafdiagram in kleur: deze maand groen, beste eerdere maand donkerblauw, overige lichter. */
-function barChart(list: MaandCijfers[], key: "views" | "engagements" | "followerGrowth", fmt: (n: number) => string): string {
+export function barChart(list: MaandCijfers[], key: "views" | "engagements" | "followerGrowth", fmt: (n: number) => string): string {
   const data = list.filter((m) => m.meetdagen > 0);
   if (data.length < 2) return "";
   const vals = data.map((m) => Math.max(0, m[key]));

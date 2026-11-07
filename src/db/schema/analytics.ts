@@ -147,6 +147,8 @@ export const publications = pgTable(
     thumbnailUrl: text("thumbnail_url"),
     /** Kleine kopie van de miniatuur als data-URI, zodat rapporten die altijd hebben. */
     thumbnailData: text("thumbnail_data"),
+    /** Lengte van de video in seconden (uit Metricool). */
+    durationSeconds: integer("duration_seconds"),
     failureReason: text("failure_reason"),
     ...timestamps,
     ...softDelete,

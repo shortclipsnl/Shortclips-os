@@ -46,6 +46,10 @@ export type VideoAnalyse = {
   /** Waar de hook vandaan komt: script (zeker) of caption (afgeleid). */
   hookBron: "script" | "caption";
   hookType: string;
+  /** Call to action aan het eind van de video of in de caption. */
+  cta?: string;
+  ctaBron?: "script" | "caption";
+  ctaType?: string;
   oordeel: "herhalen" | "aanpassen" | "stoppen";
   waarom: string;
   script: string;
@@ -94,7 +98,7 @@ export type MonthlyAnalysis = ClientInsights & {
 export type ReportVideo = {
   key: string; id: string; titel: string; datum: string | null; platform: string | null; url: string | null;
   views: number; likes: number; reacties: number; shares: number; saves: number; gemKijktijdSec: number | null;
-  uitkijkPct?: number | null; scriptHook?: string | null;
+  uitkijkPct?: number | null; scriptHook?: string | null; scriptCta?: string | null; duurSec?: number | null; caption?: string | null;
 };
 
 /** Extra cijfers die bij een maandrapport worden opgeslagen (in `metrics`). */
@@ -137,7 +141,7 @@ Twee doelgroepen:
 2. De interne teamversie (veld "intern"): voor projectmanagers, scriptschrijvers en videografen. Diep, concreet en leerbaar. Scheid ALTIJD wat gemeten is ("gemeten": alleen cijfers/feiten uit de data) van de mogelijke verklaring ("verklaring": jouw interpretatie, nooit als bewezen gepresenteerd tenzij de cijfers het hard maken). Een verklaring over retentie, hookkracht of montage is zonder retentiedata altijd "hypothese".
 
 Geef UITSLUITEND één geldig JSON-object (geen markdown, geen tekst eromheen, geen dubbele aanhalingstekens binnen waarden, geen letterlijke regeleinden binnen waarden, geen trailing komma's), exact dit formaat:
-{"topVideos":[{"titel":"","waarom":"","cijfers":"","zekerheid":"bewezen|waarschijnlijk|hypothese"}],"besteHooks":[{"hook":"","waarom":"","zekerheid":""}],"besteFormats":[{"format":"","waarom":"","zekerheid":""}],"mindereVideos":[{"titel":"","les":""}],"analysis":{"watWerkt":[{"punt":"","zekerheid":""}],"watMinder":[{"punt":"","zekerheid":""}],"ontwikkelingen":[""]},"maandvergelijking":[""],"conclusies":[""],"kansen":[{"titel":"","toelichting":""}],"videoInzichten":[{"key":"v1","inzicht":""}],"verbeterpunten":[{"titel":"","waarom":"","wat":"","hoeMeten":"","zekerheid":""}],"aandachtspunten":[{"type":"positief|aandachtspunt|actie_nodig","tekst":""}],"strategischeActies":[{"titel":"","waarom":""}],"intern":{"kern":"","besteVideos":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"hooks":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"onderwerpen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"tegenvallers":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"videostructuur":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"formatsVaker":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"vermijdenOfAanpassen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"scripts":[""],"opnames":[""],"montage":[""],"acties":[{"actie":"","rol":"script|opname|montage|pm","waarom":""}],"doorgaan":[""],"stoppen":[""],"testen":[""],"videoAnalyses":[{"key":"v1","hook":"","hookBron":"script|caption","hookType":"vraag|getal of bedrag|probleem|belofte|nieuws|statement|anders","oordeel":"herhalen|aanpassen|stoppen","waarom":"","script":"","opname":"","montage":""}],"dataBeperkingen":[""]}}
+{"topVideos":[{"titel":"","waarom":"","cijfers":"","zekerheid":"bewezen|waarschijnlijk|hypothese"}],"besteHooks":[{"hook":"","waarom":"","zekerheid":""}],"besteFormats":[{"format":"","waarom":"","zekerheid":""}],"mindereVideos":[{"titel":"","les":""}],"analysis":{"watWerkt":[{"punt":"","zekerheid":""}],"watMinder":[{"punt":"","zekerheid":""}],"ontwikkelingen":[""]},"maandvergelijking":[""],"conclusies":[""],"kansen":[{"titel":"","toelichting":""}],"videoInzichten":[{"key":"v1","inzicht":""}],"verbeterpunten":[{"titel":"","waarom":"","wat":"","hoeMeten":"","zekerheid":""}],"aandachtspunten":[{"type":"positief|aandachtspunt|actie_nodig","tekst":""}],"strategischeActies":[{"titel":"","waarom":""}],"intern":{"kern":"","besteVideos":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"hooks":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"onderwerpen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"tegenvallers":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"videostructuur":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"formatsVaker":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"vermijdenOfAanpassen":[{"titel":"","gemeten":"","verklaring":"","zekerheid":""}],"scripts":[""],"opnames":[""],"montage":[""],"acties":[{"actie":"","rol":"script|opname|montage|pm","waarom":""}],"doorgaan":[""],"stoppen":[""],"testen":[""],"videoAnalyses":[{"key":"v1","hook":"","hookBron":"script|caption","hookType":"vraag|getal of bedrag|probleem|belofte|nieuws|statement|anders","cta":"","ctaBron":"script|caption","ctaType":"reageren|DM of bellen|langskomen|volgen|link of website|delen of taggen|geen","oordeel":"herhalen|aanpassen|stoppen","waarom":"","script":"","opname":"","montage":""}],"dataBeperkingen":[""]}}
 
 Opmerkingen over datakwaliteit, ontbrekende metingen of koppelingsproblemen horen uitsluitend in intern.dataBeperkingen, nooit in de klantvelden. Noem in de klantvelden ook geen interne werkpunten zoals een ontbrekende doelstelling.
 
@@ -145,7 +149,7 @@ Verwijs in teksten naar een video met (een deel van) de titel, nooit alleen met 
 
 Houd het compact: elk tekstveld maximaal 25 woorden, elke lijst maximaal 3 items (acties maximaal 6, videoInzichten en videoLessen één per video). In "intern" zijn "gemeten" en "verklaring" maximaal 20 woorden. Liever kort en concreet dan volledig; een afgekapt antwoord is onbruikbaar.
 
-Aanvullend: "aandachtspunten" = max 3 belangrijkste signalen van deze maand. "strategischeActies" = max 3 concrete acties voor volgende maand. "conclusies" = 2 tot 4 korte conclusies voor de klant. "videoInzichten" = voor ELKE video uit "alleVideos" één inzicht van maximaal 15 woorden, gekoppeld via "key": wat deze video sterk maakte of wat we ervan meenemen, opbouwend geformuleerd en alleen gebaseerd op de cijfers, titel en eventuele hook/format. "kansen" = 2 tot 3 kansen/aanbevelingen voor de komende maand. "verbeterpunten" mag NOOIT leeg zijn. In "intern": "acties" = 3 tot 6 concrete acties voor de komende maand, elk met de rol die het uitvoert; "dataBeperkingen" = wat we NIET konden meten en dus niet weten. "doorgaan", "stoppen" en "testen" = elk 2 tot 4 korte, concrete punten voor het team (wat blijven we doen, waar stoppen we mee of doen we minder, wat proberen we volgende maand), geschreven als opdracht. "videoAnalyses" = voor ELKE video uit "alleVideos" één analyse, gekoppeld via "key". "hook": de opening van de video; gebruik "hookUitScript" als die er is (hookBron "script"), anders de waarschijnlijke opening afgeleid uit de eerste zin van titelOfCaption (hookBron "caption"), maximaal 15 woorden. "oordeel": herhalen (sterk, vaker doen), aanpassen (idee goed, uitvoering beter) of stoppen. "waarom": maximaal 20 woorden, gebaseerd op weergaven, interacties en kijktijd/uitkijkpercentage als die er zijn, vergeleken met de andere video's van de maand. "script", "opname", "montage": elk maximaal 15 woorden, wat het team bij de volgende video anders of hetzelfde doet; leeg laten ("") als er niets zinnigs over te zeggen is. Kijktijd en uitkijkpercentage alleen gebruiken als ze in de data staan. Laat een interne lijst leeg ([]) als de data er niets over zegt, in plaats van iets te verzinnen.`;
+Aanvullend: "aandachtspunten" = max 3 belangrijkste signalen van deze maand. "strategischeActies" = max 3 concrete acties voor volgende maand. "conclusies" = 2 tot 4 korte conclusies voor de klant. "videoInzichten" = voor ELKE video uit "alleVideos" één inzicht van maximaal 15 woorden, gekoppeld via "key": wat deze video sterk maakte of wat we ervan meenemen, opbouwend geformuleerd en alleen gebaseerd op de cijfers, titel en eventuele hook/format. "kansen" = 2 tot 3 kansen/aanbevelingen voor de komende maand. "verbeterpunten" mag NOOIT leeg zijn. In "intern": "acties" = 3 tot 6 concrete acties voor de komende maand, elk met de rol die het uitvoert; "dataBeperkingen" = wat we NIET konden meten en dus niet weten. "doorgaan", "stoppen" en "testen" = elk 2 tot 4 korte, concrete punten voor het team (wat blijven we doen, waar stoppen we mee of doen we minder, wat proberen we volgende maand), geschreven als opdracht. "videoAnalyses" = voor ELKE video uit "alleVideos" één analyse, gekoppeld via "key". "hook": de opening van de video; gebruik "hookUitScript" als die er is (hookBron "script"), anders de waarschijnlijke opening afgeleid uit de eerste zin van titelOfCaption (hookBron "caption"), maximaal 15 woorden. "cta": de call to action; gebruik "ctaUitScript" als die er is (ctaBron "script"), anders de oproep uit de caption (ctaBron "caption"), maximaal 12 woorden; is er geen oproep, dan cta "" en ctaType "geen". Contactgegevens, adressen en hashtags zijn geen CTA, tenzij de caption er expliciet toe oproept. "oordeel": herhalen (sterk, vaker doen), aanpassen (idee goed, uitvoering beter) of stoppen. "waarom": maximaal 20 woorden, gebaseerd op weergaven, interacties en kijktijd/uitkijkpercentage als die er zijn (kijktijd altijd in verhouding tot "duurSec" als die bekend is), vergeleken met de andere video's van de maand. "script", "opname", "montage": elk maximaal 15 woorden, wat het team bij de volgende video anders of hetzelfde doet; leeg laten ("") als er niets zinnigs over te zeggen is. Kijktijd en uitkijkpercentage alleen gebruiken als ze in de data staan. Laat een interne lijst leeg ([]) als de data er niets over zegt, in plaats van iets te verzinnen.`;
 
 const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 const num = (v: unknown) => Number(v ?? 0);
@@ -184,7 +188,7 @@ export async function generateMonthlyAnalysis(
              max(shares) shares, max(saves) saves, max(avg_watch_seconds) avg_watch, max(completion_rate) completion
       from social_metrics where client_id = ${client.id} group by publication_id
     )
-    select p.id as pub_id, p.platform as platform, left(coalesce(d.title, p.caption), 140) as titel, sc.hook as hook, sc.format as format, sc.pillar as pillar,
+    select p.id as pub_id, p.platform as platform, left(coalesce(d.title, p.caption), 140) as titel, sc.hook as hook, sc.cta as cta, p.duration_seconds as duur, left(p.caption, 700) as caption_full, sc.format as format, sc.pillar as pillar,
            to_char(coalesce(d.published_at, p.published_at), 'YYYY-MM-DD') as datum, p.external_url as url,
            coalesce(pm.views,0)::int as views, coalesce(pm.likes,0)::int as likes,
            coalesce(pm.comments,0)::int as comments, coalesce(pm.shares,0)::int as shares,
@@ -231,7 +235,7 @@ export async function generateMonthlyAnalysis(
   }
   totals.videos = withCijfers.slice(0, 40).map((v, i) => {
     const m = mapVideo(v);
-    return { key: `v${i + 1}`, id: String(v.pub_id), titel: m.titel, datum: m.datum, platform: v.platform ? String(v.platform) : null, url: m.url, views: m.views, likes: m.likes, reacties: m.reacties, shares: m.shares, saves: m.saves, gemKijktijdSec: m.gemKijktijdSec, uitkijkPct: m.uitkijkpercentage, scriptHook: m.hook };
+    return { key: `v${i + 1}`, id: String(v.pub_id), titel: m.titel, datum: m.datum, platform: v.platform ? String(v.platform) : null, url: m.url, views: m.views, likes: m.likes, reacties: m.reacties, shares: m.shares, saves: m.saves, gemKijktijdSec: m.gemKijktijdSec, uitkijkPct: m.uitkijkpercentage, scriptHook: m.hook, scriptCta: v.cta ? String(v.cta) : null, duurSec: v.duur != null ? num(v.duur) : null, caption: v.caption_full ? String(v.caption_full) : null };
   });
   totals.platforms = await platformSplit(client.id, period);
   totals.historie = historie;
@@ -257,7 +261,7 @@ export async function generateMonthlyAnalysis(
     feitelijkeObservaties: report.observations,
     videosDezeMaand: monthTitles,
     perVideoCijfersBeschikbaar: perVideoBeschikbaar,
-    alleVideos: (totals.videos ?? []).map((v) => ({ key: v.key, titelOfCaption: v.titel, datum: v.datum, platform: v.platform, weergaven: v.views, likes: v.likes, reacties: v.reacties, shares: v.shares, saves: v.saves, gemKijktijdSec: v.gemKijktijdSec, uitkijkpercentage: v.uitkijkPct ?? null, hookUitScript: v.scriptHook ?? null })),
+    alleVideos: (totals.videos ?? []).map((v) => ({ key: v.key, titelOfCaption: v.titel, datum: v.datum, platform: v.platform, weergaven: v.views, likes: v.likes, reacties: v.reacties, shares: v.shares, saves: v.saves, gemKijktijdSec: v.gemKijktijdSec, uitkijkpercentage: v.uitkijkPct ?? null, duurSec: v.duurSec ?? null, hookUitScript: v.scriptHook ?? null, ctaUitScript: v.scriptCta ?? null, caption: v.caption ?? null })),
     topVideos: perVideoBeschikbaar ? withCijfers.slice(0, 8).map(mapVideo) : [],
     mindereVideos: perVideoBeschikbaar && withCijfers.length > 3 ? withCijfers.slice(-4).reverse().map(mapVideo) : [],
     vorigeMaandAnalyse: opts.priorSummary ?? null,
@@ -367,6 +371,9 @@ function normalizeIntern(v: unknown): InternAnalyse {
           hook: String(x.hook ?? "").slice(0, 200),
           hookBron: (String(x.hookBron ?? "") === "script" ? "script" : "caption") as "script" | "caption",
           hookType: String(x.hookType ?? "").slice(0, 40),
+          cta: String(x.cta ?? "").slice(0, 160),
+          ctaBron: (String(x.ctaBron ?? "") === "script" ? "script" : "caption") as "script" | "caption",
+          ctaType: String(x.ctaType ?? "").slice(0, 40) || "geen",
           oordeel: (oordeel === "herhalen" || oordeel === "stoppen" ? oordeel : "aanpassen") as VideoAnalyse["oordeel"],
           waarom: String(x.waarom ?? "").slice(0, 240),
           script: String(x.script ?? "").slice(0, 200),

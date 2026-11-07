@@ -370,10 +370,10 @@ export async function pullMetricoolPosts(
               const caption = p.caption ? p.caption.slice(0, 2000) : null;
               const [pub] = await db
                 .insert(publications)
-                .values({ clientId: link.clientId, platform, status: "published", publishedAt, externalPostId: p.externalId, externalUrl: p.url, caption, thumbnailUrl: p.thumbnailUrl })
+                .values({ clientId: link.clientId, platform, status: "published", publishedAt, externalPostId: p.externalId, externalUrl: p.url, caption, thumbnailUrl: p.thumbnailUrl, durationSeconds: p.durationSeconds ? Math.round(p.durationSeconds) : null })
                 .onConflictDoUpdate({
                   target: [publications.platform, publications.externalPostId],
-                  set: { externalUrl: p.url, caption, publishedAt, ...(p.thumbnailUrl ? { thumbnailUrl: p.thumbnailUrl } : {}), updatedAt: new Date() },
+                  set: { externalUrl: p.url, caption, publishedAt, ...(p.thumbnailUrl ? { thumbnailUrl: p.thumbnailUrl } : {}), ...(p.durationSeconds ? { durationSeconds: Math.round(p.durationSeconds) } : {}), updatedAt: new Date() },
                 })
                 .returning({ id: publications.id, hasThumb: sql<boolean>`thumbnail_data is not null` });
               if (!pub) continue;

@@ -1,0 +1,1 @@
+ALTER TABLE "publications" ADD COLUMN "duration_seconds" integer;
