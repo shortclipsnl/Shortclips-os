@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, ChevronLeft, ChevronRight, Landmark, Receipt, Scale, TrendingUp, Wallet } from "lucide-react";
-import { requireOwner } from "@/server/auth/context";
+import { requireFinanceOwner } from "@/server/auth/finance-guard";
+import { FinanceUpload } from "@/components/finance/finance-upload";
 import { getMaandControle, getMaandReeks, getVermogenZakelijk, prevMonth } from "@/server/bank/maand";
 import { Card, CardHeader, PageHeader, Stat } from "@/components/ui";
 import { euro, formatDateFull, formatDateTime } from "@/lib/format";
-import { BankUpload, PrintKnop, TransactieTabel } from "./maand-ui";
+import { PrintKnop, TransactieTabel } from "./maand-ui";
 
 export const metadata: Metadata = { title: "Maandcontrole" };
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ function Badge({ d }: { d: string }) {
 }
 
 export default async function MaandControlePage({ searchParams }: { searchParams: Promise<{ maand?: string }> }) {
-  await requireOwner();
+  await requireFinanceOwner();
   const sp = await searchParams;
   const maand = /^\d{4}-\d{2}$/.test(sp.maand ?? "") ? sp.maand! : vorigeMaandNu();
   const volgende = prevMonth(maand, -1);
@@ -48,7 +49,7 @@ export default async function MaandControlePage({ searchParams }: { searchParams
       <PageHeader
         title={`Maandcontrole ${label(maand)}`}
         description="Omzet, kosten, resultaat, cashflow en banksaldo apart van elkaar, met per cijfer de bron en of die de maand volledig dekt."
-        actions={<PrintKnop />}
+        actions={<div className="flex gap-2"><FinanceUpload /><PrintKnop /></div>}
       />
 
       <div className="mb-4 flex items-center gap-2 print:hidden">
@@ -92,7 +93,6 @@ export default async function MaandControlePage({ searchParams }: { searchParams
             </table>
           </div>
         ) : null}
-        <div className="print:hidden"><BankUpload /></div>
       </Card>
 
       {d.ontbreekt.length || verouderd.length ? (

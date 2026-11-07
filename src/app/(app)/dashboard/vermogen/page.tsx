@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { requireOwner } from "@/server/auth/context";
+import { requireFinanceOwner } from "@/server/auth/finance-guard";
+import { FinanceUpload } from "@/components/finance/finance-upload";
 
 export const metadata: Metadata = { title: "Vermogen" };
 export const dynamic = "force-dynamic";
@@ -10,13 +11,14 @@ export const dynamic = "force-dynamic";
  * iframe zodat alles op één plek blijft in plaats van in een los tabblad.
  */
 export default async function VermogenPage() {
-  await requireOwner();
+  await requireFinanceOwner();
   return (
-    <div className="h-[calc(100vh-6.5rem)]">
+    <div className="flex h-[calc(100vh-6.5rem)] flex-col gap-2">
+      <div className="flex justify-end"><FinanceUpload /></div>
       <iframe
         src="/dashboard/vermogen/embed"
         title="Vermogensdashboard"
-        className="size-full rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)]"
+        className="w-full flex-1 rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)]"
       />
     </div>
   );

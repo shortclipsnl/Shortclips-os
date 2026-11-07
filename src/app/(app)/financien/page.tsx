@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { Repeat, CalendarClock, Wallet, Receipt } from "lucide-react";
-import { requireOwner } from "@/server/auth/context";
+import { requireFinanceOwner } from "@/server/auth/finance-guard";
+import { FinanceUpload } from "@/components/finance/finance-upload";
 import { getManagementFinance } from "@/server/management-finance";
 import { getSyncStatus } from "@/server/bank/maand";
 import Link from "next/link";
 import { getCapacityOverview } from "@/server/capacity";
 import { Card, CardHeader, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { compact, euro, formatDate } from "@/lib/format";
-import { DigibooxImport } from "./financien-ui";
 import { GrowthSimulator } from "../capaciteit/simulator";
 
 function monthLabel(p: string) {
@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 export default async function FinancienPage() {
   // Financiën is uitsluitend voor de eigenaar — hard afgedwongen op paginaniveau
   // (defense-in-depth), náást de finance:read-check in getManagementFinance.
-  await requireOwner();
+  await requireFinanceOwner();
   const [d, capacity, sync] = await Promise.all([getManagementFinance(), getCapacityOverview(), getSyncStatus()]);
   // Omzetgrafiek: laatste 12 maanden, in volgorde. Bij voorkeur de echte
   // gefactureerde omzet uit de boekhouding (Digiboox) — die is per maand gevuld;
@@ -43,7 +43,7 @@ export default async function FinancienPage() {
 
   return (
     <div className="mx-auto max-w-[1300px]">
-      <PageHeader title="Financiën" description="Managementoverzicht — uitsluitend voor de eigenaar. Terugkerende omzet op basis van de werkelijk gefactureerde omzet uit de boekhouding (digibtw) zodra die is ingelezen; anders uit de actieve contracten." />
+      <PageHeader title="Financiën" description="Managementoverzicht, uitsluitend voor de eigenaar. Terugkerende omzet op basis van de werkelijk gefactureerde omzet uit de boekhouding zodra die is ingelezen; anders uit de actieve contracten." actions={<FinanceUpload />} />
 
 
       {/* Synchronisatie: per bron de laatste import, zodat oude cijfers nooit als actueel lijken. */}
@@ -144,7 +144,6 @@ export default async function FinancienPage() {
           <EmptyState title="Nog geen boekhoudcijfers" description="Upload je Digiboox-export om omzet, kosten en resultaat per maand automatisch te vullen." />
         )}
 
-        <DigibooxImport />
       </Card>
 
       {/* Groeisimulator — verplaatst vanaf Teamcapaciteit; staat nu uitsluitend bij de eigenaar. */}

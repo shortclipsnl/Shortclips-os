@@ -99,3 +99,51 @@ export function parseRevolutCsv(content: string): RevolutTx[] {
   }
   return tx;
 }
+
+const MND: Record<string, number> = { jan: 1, feb: 2, mrt: 3, apr: 4, mei: 5, jun: 6, jul: 7, aug: 8, sep: 9, okt: 10, nov: 11, dec: 12 };
+const eur = (s: string) => Number(s.replace(/\./g, "").replace(",", "."));
+
+/**
+ * Revolut PDF-afschrift (Nederlands), als tekst met kolommen (zie pdf-lines).
+ * Het teken van elk bedrag volgt uit het lopende saldo; de keten moet sluiten
+ * op het eindsaldo, anders volgt een waarschuwing. Teruggedraaide posten tellen niet mee.
+ */
+export function parseRevolutAfschriftTekst(text: string): { tx: RevolutTx[]; opening: number | null; eindsaldo: number | null; einddatum: string | null; waarschuwingen: string[] } {
+  const lines = text.split("\n");
+  const waarschuwingen: string[] = [];
+  let opening: number | null = null;
+  const ruw: { datum: string; oms: string; aan: string; bedrag: number; saldo: number }[] = [];
+  let cur: (typeof ruw)[number] | null = null;
+  for (const l of lines) {
+    if (/^\s*Teruggedraaid van/i.test(l)) break;
+    if (opening == null && /^\s*Rekening \(/.test(l)) {
+      const m = /€([\d.]+,\d\d)/.exec(l);
+      if (m) opening = eur(m[1]!);
+      continue;
+    }
+    // Datum, omschrijving, daarna de bedragen (eerste = transactie, laatste = saldo).
+    const m = /^\s*(\d{1,2}) (\w{3}) (\d{4})\s+(.+?)\s+(€[\d.]+,\d\d.*)$/.exec(l);
+    if (m && MND[m[2]!.toLowerCase()]) {
+      const amts = [...m[5]!.matchAll(/€([\d.]+,\d\d)/g)].map((x) => eur(x[1]!));
+      if (!amts.length) continue;
+      cur = { datum: `${m[3]}-${String(MND[m[2]!.toLowerCase()]).padStart(2, "0")}-${m[1]!.padStart(2, "0")}`, oms: m[4]!.trim(), aan: "", bedrag: amts[0]!, saldo: amts.at(-1)! };
+      ruw.push(cur);
+      continue;
+    }
+    const a = /^\s*(?:Aan|Van|Naar):\s*(.+)$/.exec(l);
+    if (cur && a && !cur.aan) cur.aan = a[1]!.trim();
+  }
+  if (opening == null) throw new Error("Geen Revolut-afschrift herkend (openingsbalans ontbreekt).");
+  let prev = opening;
+  const tx: RevolutTx[] = ruw.map((r) => {
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    let bedrag: number;
+    if (Math.abs(r2(prev + r.bedrag) - r.saldo) < 0.011) bedrag = r.bedrag;
+    else if (Math.abs(r2(prev - r.bedrag) - r.saldo) < 0.011) bedrag = -r.bedrag;
+    else bedrag = r2(r.saldo - prev);
+    prev = r.saldo;
+    return { datum: r.datum, oms: r.oms, aan: r.aan, bedrag };
+  });
+  if (!tx.length) waarschuwingen.push("Geen transacties gevonden in het Revolut-afschrift.");
+  return { tx, opening, eindsaldo: ruw.at(-1)?.saldo ?? opening, einddatum: ruw.at(-1)?.datum ?? null, waarschuwingen };
+}

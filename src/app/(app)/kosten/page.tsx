@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { requireOwner } from "@/server/auth/context";
+import { requireFinanceOwner } from "@/server/auth/finance-guard";
+import { FinanceUpload } from "@/components/finance/finance-upload";
 import { getKostenData } from "@/server/kosten/load";
 import Link from "next/link";
 import { EmptyState, PageHeader } from "@/components/ui";
@@ -17,7 +18,7 @@ function isVerouderd(datum: string | null): boolean {
 export default async function KostenPage() {
   // Uitsluitend voor de eigenaar — hard afgedwongen op paginaniveau
   // (defense-in-depth), náást de finance:read-check in getKostenData.
-  await requireOwner();
+  await requireFinanceOwner();
   const data = await getKostenData();
   const heeftData = Object.keys(data.m).length > 0;
 
@@ -25,7 +26,8 @@ export default async function KostenPage() {
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
         title="Kostenmonitor"
-        description="Alle afschrijvingen van de zakelijke rekening per categorie en leverancier, uitsluitend voor de eigenaar. Bron: maandafsluiting van het Knab-afschrift."
+        description="Alle afschrijvingen van de zakelijke rekening per categorie en leverancier, uitsluitend voor de eigenaar. Bron: Knab-transacties en zakelijke Revolut-abonnementen."
+        actions={<FinanceUpload />}
       />
       {heeftData && isVerouderd(data.bijgewerkt) ? (
         <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--color-warn)]/40 bg-[var(--color-warn)]/10 p-3 text-sm">

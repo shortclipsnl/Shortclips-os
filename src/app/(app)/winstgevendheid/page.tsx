@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, ChevronLeft, ChevronRight, Info, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
-import { requireOwner } from "@/server/auth/context";
+import { requireFinanceOwner } from "@/server/auth/finance-guard";
+import { FinanceUpload } from "@/components/finance/finance-upload";
 import { computeProfitabilitySignals, currentPeriod, getClientProfitability, getProfitabilityMonthly, prevPeriod } from "@/server/profitability";
 import { ThresholdForm } from "./threshold-form";
 import { RecalcButton } from "./recalc-button";
@@ -24,7 +25,7 @@ function nextPeriod(period: string) {
 }
 
 export default async function WinstgevendheidPage({ searchParams }: { searchParams: Promise<{ maand?: string }> }) {
-  await requireOwner();
+  await requireFinanceOwner();
   const sp = await searchParams;
   const period = /^\d{4}-\d{2}$/.test(sp.maand ?? "") ? sp.maand! : currentPeriod();
 
@@ -43,7 +44,7 @@ export default async function WinstgevendheidPage({ searchParams }: { searchPara
       <PageHeader
         title="Winstgevendheid per klant"
         description="In één oogopslag welke klanten geld opleveren en waar de marge aandacht vraagt. Omzet telt alleen voor klanten met een geplande opname die maand (op basis van de agenda) — niet elke klant draait elke maand. Directe kosten zijn geregistreerd; overhead en nettowinst zijn geschat (toegerekend)."
-        actions={<ThresholdForm green={settings.marginGreenPct} orange={settings.marginOrangePct} includeOverhead={settings.includeOverhead} />}
+        actions={<div className="flex flex-wrap items-start gap-2"><ThresholdForm green={settings.marginGreenPct} orange={settings.marginOrangePct} includeOverhead={settings.includeOverhead} /><FinanceUpload /></div>}
       />
 
       {/* Maandkiezer */}

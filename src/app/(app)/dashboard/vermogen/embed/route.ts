@@ -16,7 +16,7 @@ export async function GET() {
     return new Response("Niet ingelogd.", { status: 401, headers: { "content-type": "text/plain; charset=utf-8" } });
   }
   if (!isOwner(viewer)) {
-    return new Response("Deze pagina is alleen voor de eigenaar.", { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } });
+    return new Response("Pagina niet gevonden.", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
   }
 
   return new Response(vermogenDashboardHtml(), {
