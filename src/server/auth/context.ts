@@ -7,6 +7,7 @@ import {
   clients,
   deliverables,
   permissions as permissionsTable,
+  productionDays,
   rolePermissions,
   roles,
   tasks,
@@ -291,6 +292,72 @@ export function assertClientAccess(viewer: Viewer, clientId: string): void {
   if (!viewer.clientScope.includes(clientId)) {
     throw new ForbiddenError("Deze klant hoort niet bij jouw toegang.");
   }
+}
+
+/**
+ * Is deze gebruiker een (freelance) editor? Dan mag hij alleen zijn eigen,
+ * toegewezen werk zien en uitvoeren. Kernteam is nooit editor, ook niet als de
+ * hoofdrol per ongeluk op "editor" staat. Gebruikt naast `isEditorOnly`, zodat
+ * een editor met een losse extra rol (bv. clients:read_all) nog steeds geen
+ * bronmateriaal van Team Shortclips kan wijzigen.
+ */
+export function isEditorRole(viewer: Viewer | null): boolean {
+  if (!viewer) return false;
+  return viewer.isEditorOnly || (viewer.primaryRole === "editor" && !isCoreStaff(viewer.email));
+}
+
+/**
+ * Mag deze gebruiker het bronmateriaal van editingprojecten beheren: downloadlinks,
+ * scripts, editorbriefings, deadlines, aantallen shorts en nieuwe projecten?
+ * Uitsluitend Team Shortclips. Editors nooit, ook niet voor hun eigen projecten:
+ * zij bekijken en downloaden alleen.
+ */
+export function canManageEditingProjects(viewer: Viewer | null): boolean {
+  if (!viewer || viewer.isPortalUser || isEditorRole(viewer)) return false;
+  return viewer.permissions.has("videos:write") || isCoreStaff(viewer.email);
+}
+
+/** Server-side poort voor alle beheeracties op editingprojecten (zie hierboven). */
+export async function requireEditingManager(): Promise<Viewer> {
+  const viewer = await requireInternal();
+  if (!canManageEditingProjects(viewer)) {
+    throw new ForbiddenError(
+      "Scripts, briefings, links en deadlines worden beheerd door Team Shortclips. Klopt er iets niet? Laat het je contactpersoon weten.",
+    );
+  }
+  return viewer;
+}
+
+/**
+ * Editors werken alleen aan hun eigen toegewezen projecten. Klanttoegang alleen
+ * is niet genoeg: binnen dezelfde klant kan ook een collega-editor werk hebben.
+ */
+export function assertOwnEditingWork(viewer: Viewer, editorId: string | null): void {
+  if (!isEditorRole(viewer)) return;
+  if (!editorId || editorId !== viewer.id) {
+    throw new ForbiddenError("Dit project is niet aan jou toegewezen.");
+  }
+}
+
+/**
+ * Editors: mag deze editor bij het materiaal van deze opname (script-pdf,
+ * briefing)? Alleen als de opname of een project van die opname aan hem is
+ * toegewezen. Voor niet-editors altijd true (klanttoegang wordt elders gecheckt).
+ */
+export async function editorMayOpenShoot(viewer: Viewer, productionDayId: string): Promise<boolean> {
+  if (!isEditorRole(viewer)) return true;
+  const [day] = await db
+    .select({ editorId: productionDays.editorId })
+    .from(productionDays)
+    .where(eq(productionDays.id, productionDayId))
+    .limit(1);
+  if (day?.editorId === viewer.id) return true;
+  const [own] = await db
+    .select({ id: deliverables.id })
+    .from(deliverables)
+    .where(and(eq(deliverables.productionDayId, productionDayId), eq(deliverables.editorId, viewer.id), isNull(deliverables.deletedAt)))
+    .limit(1);
+  return !!own;
 }
 
 export function hasClientAccess(viewer: Viewer, clientId: string): boolean {

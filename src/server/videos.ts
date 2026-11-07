@@ -24,6 +24,7 @@ import {
 } from "@/db/schema";
 import {
   assertClientAccess,
+  isEditorRole,
   scopeToClients,
   type Viewer,
 } from "@/server/auth/context";
@@ -266,6 +267,17 @@ export async function getVideo(viewer: Viewer, id: string) {
       scriptTitle: scripts.title,
       productionDayId: deliverables.productionDayId,
       shootOn: productionDays.scheduledOn,
+      projectShootOn: deliverables.shootOn,
+      // Bestanden voor de editor (zelfde volgorde als het editing-board).
+      footageUrl: deliverables.footageUrl,
+      scriptUrl: deliverables.scriptUrl,
+      dayFootageUrl: productionDays.footageUrl,
+      dayScriptUrl: productionDays.scriptUrl,
+      dayScriptFileId: sql<string | null>`(
+        select f.id from edit_project_files f
+        where f.production_day_id = ${deliverables.productionDayId} and f.kind = 'script'
+        order by f.created_at desc limit 1
+      )`,
     })
     .from(deliverables)
     .innerJoin(clients, eq(clients.id, deliverables.clientId))
@@ -279,7 +291,7 @@ export async function getVideo(viewer: Viewer, id: string) {
   assertClientAccess(viewer, video.clientId);
 
   // Editors zien alleen video's die aan hen zijn toegewezen.
-  if (viewer.isEditorOnly && video.editorId !== viewer.id) notFound();
+  if (isEditorRole(viewer) && video.editorId !== viewer.id) notFound();
 
   const canSeeInternal = viewer.permissions.has("comments:read_internal");
 

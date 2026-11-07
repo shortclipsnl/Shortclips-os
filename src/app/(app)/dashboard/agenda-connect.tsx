@@ -53,9 +53,10 @@ export function AgendaConnect() {
         <button type="button" onClick={() => setOpen(false)} className="ml-auto text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Sluiten</button>
       </div>
       <p className="mt-1.5 text-xs leading-relaxed text-[var(--color-ink-muted)]">
-        Abonneer je Google Agenda op deze persoonlijke link. Al je toegewezen video&apos;s en
-        deadlines verschijnen dan automatisch — nieuwe toewijzingen en wijzigingen komen er
-        vanzelf bij. Je hoeft dit maar één keer te doen.
+        Abonneer je Google Agenda op deze persoonlijke link. Je editor deadlines van al je
+        toegewezen projecten verschijnen dan automatisch. Nieuwe opdrachten en gewijzigde
+        deadlines komen er vanzelf bij, afgeronde of verwijderde opdrachten verdwijnen. De link
+        is alleen van jou: deel hem niet. Je hoeft dit maar één keer te doen.
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -74,8 +75,12 @@ export function AgendaConnect() {
       <ol className="mt-3 list-decimal space-y-0.5 pl-4 text-xs text-[var(--color-ink-muted)]">
         <li>Open Google Agenda → links bij <strong>Andere agenda&apos;s</strong> op <strong>+</strong> → <strong>Via URL</strong>.</li>
         <li>Plak de gekopieerde link en klik op <strong>Agenda toevoegen</strong>.</li>
-        <li>Klaar — je deadlines staan er als hele-dag-markering, en blijven automatisch up-to-date.</li>
+        <li>Klaar. Je editor deadlines staan er als hele-dag-markering.</li>
       </ol>
+      <p className="mt-2 text-2xs leading-relaxed text-[var(--color-ink-faint)]">
+        Google Agenda bepaalt zelf hoe vaak een abonnement wordt ververst; dat is meestal een paar keer per dag, maar kan tot een dag duren.
+        Het portaal is altijd leidend.
+      </p>
 
       <button type="button" onClick={regenerate} disabled={pending}
         className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">

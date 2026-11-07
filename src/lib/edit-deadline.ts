@@ -34,3 +34,33 @@ export function internalDeadline(
   if (dueOn) return subWorkingDays(dueOn, CLIENT_LEAD_DAYS - EDITOR_LEAD_DAYS, holidays);
   return null;
 }
+
+/** Zoveel werkdagen vóór de klantoplevering moet verwerkte klantfeedback bij
+ *  Team Shortclips liggen (tijd voor QC). */
+export const EDITOR_BUFFER_DAYS = 2;
+
+/** Statussen waarin de editor klantfeedback verwerkt. */
+const CLIENT_FEEDBACK_AT_EDITOR = new Set(["client_revision"]);
+
+/**
+ * DE editor deadline: de datum die met de editor is afgesproken. Eén bron voor
+ * het editorportaal, de iCal-feed en de projectpagina, zodat een editor nooit de
+ * opleverdeadline van Shortclips aan de klant als zijn eigen deadline ziet.
+ *
+ *  - Eerste versie (t/m interne correcties): opname + 7 werkdagen.
+ *  - Klantfeedback verwerken: klantdeadline − 2 werkdagen.
+ *  - Ligt het werk bij Shortclips of de klant, of is het klaar: geen editor
+ *    deadline (null). Er staat dan niets open voor de editor.
+ *
+ * `shootOn` is bij voorkeur de datum uit de centrale opnameplanning.
+ */
+export function editorDeadline(
+  status: string,
+  shootOn: string | null | undefined,
+  dueOn: string | null | undefined,
+  holidays?: ReadonlySet<string>,
+): string | null {
+  if (isFirstVersionPending(status)) return internalDeadline(shootOn, dueOn, holidays);
+  if (CLIENT_FEEDBACK_AT_EDITOR.has(status)) return dueOn ? subWorkingDays(dueOn, EDITOR_BUFFER_DAYS, holidays) : null;
+  return null;
+}

@@ -33,7 +33,12 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  // Het pad doorgeven aan de server-layout, zodat die per rol kan afdwingen welke
+  // pagina's iemand mag openen (editors: strikte allowlist). Een binnenkomende
+  // waarde van de client wordt altijd overschreven.
+  const headers = new Headers(request.headers);
+  headers.set("x-sc-pathname", pathname);
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {

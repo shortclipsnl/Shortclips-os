@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { editProjectFiles, productionDays } from "@/db/schema";
-import { getViewer, hasClientAccess } from "@/server/auth/context";
+import { editorMayOpenShoot, getViewer, hasClientAccess } from "@/server/auth/context";
 import { downloadEditScript } from "@/server/editing/script-file";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +25,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       storagePath: editProjectFiles.storagePath,
       clientId: productionDays.clientId,
       editorId: productionDays.editorId,
+      productionDayId: productionDays.id,
     })
     .from(editProjectFiles)
     .innerJoin(productionDays, eq(productionDays.id, editProjectFiles.productionDayId))
@@ -34,7 +35,10 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (!row) return new Response("Niet gevonden", { status: 404 });
 
   // Toegang: de toegewezen editor, of iemand met toegang tot deze klant.
-  const allowed = row.editorId === viewer.id || hasClientAccess(viewer, row.clientId);
+  // Editors alleen voor hun eigen opnames, niet die van een collega bij dezelfde klant.
+  const allowed =
+    row.editorId === viewer.id ||
+    (hasClientAccess(viewer, row.clientId) && (await editorMayOpenShoot(viewer, row.productionDayId)));
   if (!allowed) return new Response("Niet toegestaan", { status: 403 });
 
   // Bytes uit Supabase (grote bestanden) of uit base64 in de database (klein).

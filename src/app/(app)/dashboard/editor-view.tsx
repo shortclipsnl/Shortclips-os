@@ -6,7 +6,6 @@ import { listEditorBoard, type EditorBoardVideo } from "@/server/editor-board";
 import type { Viewer } from "@/server/auth/context";
 import { Card, CardHeader, ClientLogo, EmptyState, Stat, TeamAvatar } from "@/components/ui";
 import { pct, plural, relativeDays } from "@/lib/format";
-import { isFirstVersionPending } from "@/lib/edit-deadline";
 import { EDIT_PHASE_META } from "@/lib/statuses";
 import { AgendaConnect } from "./agenda-connect";
 import { buildEditorGreeting } from "@/lib/editor-greeting";
@@ -25,8 +24,8 @@ function monthLabel(ym: string): string {
  * en het script openen doen ze op de Editing-pagina.
  *
  * Bron is bewust hetzelfde board als de Editing-pagina (`listEditorBoard`), zodat
- * Vandaag en Editing exact hetzelfde verhaal vertellen. Overal geldt de INTERNE
- * deadline (eerste versie = opname + 7 werkdagen), niet de ruimere klantdeadline.
+ * Vandaag en Editing exact hetzelfde verhaal vertellen. Overal geldt de EDITOR
+ * DEADLINE (lib/edit-deadline), nooit de opleverdeadline van Shortclips aan de klant.
  */
 export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
   const [data, board] = await Promise.all([getEditorDashboard(viewer), listEditorBoard(viewer)]);
@@ -38,16 +37,18 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
 
   // Alles wat nog niet is afgerond staat op het bord; op volgorde van de interne
   // deadline (eerste versie), het meest urgente bovenaan.
-  const active = board
-    .filter((v) => v.phase !== "afgerond")
+  // Opdrachten van niet actieve klanten (status uit het centrale klantenbeheer)
+  // staan niet standaard tussen het actieve werk; ze komen in een apart blok.
+  const open = board.filter((v) => v.phase !== "afgerond");
+  const active = open
+    .filter((v) => v.clientActive)
     .sort((a, b) => (a.editorDueOn ?? "9999").localeCompare(b.editorDueOn ?? "9999"));
+  const inactive = open.filter((v) => !v.clientActive);
 
-  // Tellers op basis van de INTERNE deadline, alleen voor de eerste versie
-  // (daarna is die versie al opgeleverd en geldt de klant-/revisieklok).
+  // Tellers op basis van de editor deadline (alleen werk dat bij de editor ligt
+  // heeft er een).
   const overdue = active.filter((v) => v.editorOverdue).length;
-  const todayOrEarlier = active.filter(
-    (v) => isFirstVersionPending(v.status) && v.editorDueOn && v.editorDueOn <= today,
-  ).length;
+  const todayOrEarlier = active.filter((v) => v.editorDueOn && v.editorDueOn <= today).length;
 
   // Werk dat nu klaarstaat vs. video's die binnenkort beschikbaar komen (nog te
   // plannen / wachten op beeld). Zo kan de editor vooruit plannen.
@@ -97,7 +98,7 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
           <AlertTriangle className="mt-0.5 size-5 shrink-0 text-[var(--color-bad)]" strokeWidth={2} />
           <p className="text-sm text-[#a3271c]">
             <strong className="font-semibold text-[var(--color-ink)]">
-              {plural(overdue, "eerste versie staat", "eerste versies staan")} over de interne deadline.
+              {plural(overdue, "project staat", "projecten staan")} over je editor deadline.
             </strong>{" "}
             Lukt het niet op tijd? Geef dat door aan je projectcoördinator.
           </p>
@@ -113,7 +114,7 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
         <div className="grid gap-3 sm:grid-cols-3">
           <Stat label="Nu op je bord" value={active.length} tone="info" icon={<Film />} emphasis />
           <Stat label="Vandaag of eerder af" value={todayOrEarlier} tone={todayOrEarlier > 0 ? "warn" : "good"} icon={<Clock />} emphasis={todayOrEarlier > 0} />
-          <Stat label="Over interne deadline" value={overdue} tone={overdue > 0 ? "bad" : "good"} icon={<AlertTriangle />} emphasis={overdue > 0} />
+          <Stat label="Over editor deadline" value={overdue} tone={overdue > 0 ? "bad" : "good"} icon={<AlertTriangle />} emphasis={overdue > 0} />
         </div>
       </div>
 
@@ -124,7 +125,7 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
           <div className="p-5 pb-3">
             <CardHeader
               title="Jouw video's"
-              subtitle="Op volgorde van je interne deadline (eerste versie, 7 werkdagen na de opname). Klik een video aan voor de download en het script."
+              subtitle="Op volgorde van je editor deadline. Klik een video aan voor de download, het script en de briefing."
             />
           </div>
           {jouwVideos.length === 0 ? (
@@ -159,6 +160,20 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
           )}
         </Card>
       </div>
+
+      {/* Opdrachten van niet actieve klanten: apart en ingeklapt, zodat ze niet
+          tussen het actieve werk staan maar ook niet onzichtbaar verdwijnen. */}
+      {inactive.length > 0 ? (
+        <details className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)]">
+          <summary className="cursor-pointer px-5 py-3 text-sm font-semibold">
+            Niet actieve klanten <span className="ml-1 font-normal text-[var(--color-ink-muted)]">({plural(inactive.length, "opdracht", "opdrachten")})</span>
+          </summary>
+          <p className="px-5 pb-2 text-xs text-[var(--color-ink-muted)]">Deze klanten staan bij Team Shortclips op niet actief. Twijfel je of je hier nog aan moet werken? Vraag het je contactpersoon.</p>
+          <ul className="divide-y divide-[var(--color-line)] border-t border-[var(--color-line)]">
+            {inactive.map((v) => <VideoRow key={v.id} v={v} />)}
+          </ul>
+        </details>
+      ) : null}
 
       {/* Maandoverzicht van opgeleverde projecten — zodat duidelijk is wat er
           per maand is afgerond. */}
@@ -259,7 +274,7 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
           <ul className="divide-y divide-[var(--color-line)]">
             {data.branding.map((b) => (
               <li key={b.clientId} className="px-5 py-3">
-                <Link href={`/clients/${b.clientSlug}?tab=kennis`} className="text-sm font-medium hover:underline">{b.clientName}</Link>
+                <Link href={`/mijn-klanten/${b.clientSlug}`} className="text-sm font-medium hover:underline">{b.clientName}</Link>
                 {b.notes.length > 0 ? (
                   <ul className="mt-1.5 space-y-1">
                     {b.notes.slice(0, 4).map((n, i) => (
@@ -331,9 +346,30 @@ function opnameLabel(iso: string): string {
   }
 }
 
+/** "2026-11-12" → "do 12 nov". */
+function shortDate(iso: string): string {
+  try {
+    return new Date(`${iso}T00:00:00`).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" });
+  } catch {
+    return iso;
+  }
+}
+
+/**
+ * Beschikbaarheid van het beeldmateriaal, bewust los van de opnamedatum: een
+ * opname betekent nog niet dat de beelden al klaarstaan.
+ */
+function footageLabel(v: EditorBoardVideo, today: string): string {
+  if (v.status === "awaiting_editor") return "staat klaar";
+  if (v.opnameDate && v.opnameDate > today) return "beschikbaar na de opname";
+  if (v.status === "footage_upload") return "wordt geüpload door Team Shortclips";
+  return "wordt klaargezet door Team Shortclips";
+}
+
 /** Eén video-regel op het editor-dashboard: klant, titel, fase en de interne
  *  deadline. Gedeeld door "Jouw video's" en "Binnenkort beschikbaar". */
 function VideoRow({ v }: { v: EditorBoardVideo }) {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
   const phaseMeta = EDIT_PHASE_META[v.phase];
   const needsEditor = phaseMeta.waitOn === "Editor";
   return (
@@ -349,21 +385,27 @@ function VideoRow({ v }: { v: EditorBoardVideo }) {
             {/* Wacht op beeld? Toon de échte opnamedatum uit de opnameplanning,
                 zodat de editor weet wanneer de beelden komen. Nooit verzonnen. */}
             {v.phase === "te_plannen" ? (
-              <span className="mt-0.5 flex items-center gap-1 truncate text-2xs text-[var(--color-ink-faint)]">
-                <CalendarClock className="size-3 shrink-0" strokeWidth={2} />
-                {v.opnameDate
-                  ? `Opname ${opnameLabel(v.opnameDate)} · beelden na de opname`
-                  : "Opnamedatum nog niet bekend"}
+              <span className="mt-1 flex flex-col gap-0.5 text-2xs">
+                <span className="flex items-center gap-1 font-semibold text-[var(--color-ink)]">
+                  <CalendarClock className="size-3 shrink-0" strokeWidth={2} />
+                  Opnamedatum: {v.opnameDate ? opnameLabel(v.opnameDate) : "nog niet gepland"}
+                </span>
+                <span className="pl-4 text-[var(--color-ink-muted)]">Beeldmateriaal: {footageLabel(v, today)}</span>
               </span>
             ) : null}
           </span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-0.5">
           {v.editorDueOn ? (
-            <span className={`text-xs font-semibold ${v.editorOverdue ? "text-[var(--color-bad)]" : needsEditor ? "text-[var(--color-warn)]" : "text-[var(--color-ink-muted)]"}`}>
-              {relativeDays(v.editorDueOn)}
-            </span>
-          ) : null}
+            <>
+              <span className="text-2xs font-medium text-[var(--color-ink-faint)]">Editor deadline</span>
+              <span className={`text-xs font-semibold ${v.editorOverdue ? "text-[var(--color-bad)]" : needsEditor ? "text-[var(--color-warn)]" : "text-[var(--color-ink-muted)]"}`}>
+                {shortDate(v.editorDueOn)} · {relativeDays(v.editorDueOn)}
+              </span>
+            </>
+          ) : (
+            <span className="text-2xs font-medium text-[var(--color-ink-faint)]">{phaseMeta.waitOn === "Klant" ? "Bij de klant" : "Bij Team Shortclips"}</span>
+          )}
           {needsEditor ? <span className="text-2xs font-medium text-[var(--color-ink-faint)]">jouw actie</span> : null}
         </span>
       </Link>

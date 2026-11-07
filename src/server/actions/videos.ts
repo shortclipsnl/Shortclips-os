@@ -15,28 +15,25 @@ import {
 } from "@/db/schema";
 import {
   assertClientAccess,
+  assertOwnEditingWork,
+  isEditorRole,
+  requireEditingManager,
   requireInternal,
   requirePermission,
   requireViewer,
   ForbiddenError,
-  type Viewer,
 } from "@/server/auth/context";
 import { isCoreStaff } from "@/server/core-staff";
 
 /**
- * Wie de bestanden (downloadlinks + script) van een edit-project mag bijwerken:
- * - iedereen met videos:write;
- * - het kernteam (Milou, Jiska, Rutger) — zij beheren alle edit-projecten,
- *   net als de eigenaar;
- * - een editor voor zijn EIGEN edit-projecten, ook zonder videos:write.
- * Geeft een melding terug als het niet mag.
+ * Rechten rond editingprojecten (technisch afgedwongen, niet alleen in de UI):
+ * - Bronmateriaal (downloadlinks, scripts, editorbriefings, deadlines, aantal
+ *   shorts) beheert uitsluitend Team Shortclips → `requireEditingManager()`.
+ * - Editors bekijken en downloaden dat materiaal en werken alleen aan hun EIGEN
+ *   toegewezen projecten: fase doorzetten (aanleveren), feedback en vragen.
  */
-function mayEditVideoFiles(viewer: Viewer, video: { editorId: string | null }): string | null {
-  if (viewer.permissions.has("videos:write")) return null;
-  if (isCoreStaff(viewer.email)) return null;
-  if (video.editorId && video.editorId === viewer.id) return null;
-  return "Je kunt alleen de bestanden van je eigen editprojecten bijwerken.";
-}
+const EDITOR_STATUS_FROM = new Set(["awaiting_editor", "editing", "editor_revision", "client_revision"]);
+const EDITOR_STATUS_TO = new Set(["editing", "internal_review"]);
 import { auditLog, recordActivity } from "@/server/audit";
 import { dispatch } from "@/server/automation";
 import { notify } from "@/server/notifications";
@@ -81,6 +78,7 @@ export async function askEditorQuestion(videoId: string, question: string): Prom
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
+    assertOwnEditingWork(viewer, video.editorId);
 
     await notify({
       userIds: video.coordinatorId ? [video.coordinatorId] : [],
@@ -111,12 +109,10 @@ export async function setEditingVideoLinks(
   links: { footageUrl?: string | null; scriptUrl?: string | null },
 ): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireEditingManager();
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
-    const denied = mayEditVideoFiles(viewer, video);
-    if (denied) return { ok: false, message: denied };
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if ("footageUrl" in links) patch.footageUrl = links.footageUrl?.trim() || null;
@@ -145,12 +141,10 @@ export async function uploadVideoScript(
   file: { fileName: string; contentType: string; base64?: string; storagePath?: string; sizeBytes?: number },
 ): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireEditingManager();
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
-    const denied = mayEditVideoFiles(viewer, video);
-    if (denied) return { ok: false, message: denied };
     if (!video.productionDayId) {
       return { ok: false, message: "Deze video heeft geen gekoppelde opnamedag. Het script hoort bij een opname." };
     }
@@ -180,12 +174,10 @@ export async function uploadVideoScript(
  */
 export async function createVideoScriptUploadUrl(videoId: string): Promise<ActionResult & { uploadUrl?: string; storagePath?: string; headers?: Record<string, string> }> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireEditingManager();
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
-    const denied = mayEditVideoFiles(viewer, video);
-    if (denied) return { ok: false, message: denied };
     if (!video.productionDayId) return { ok: false, message: "Deze video heeft geen gekoppelde opnamedag." };
     const target = await createEditScriptUploadTarget(video.clientId);
     if (!target) return { ok: true }; // geen opslag ingesteld → base64-terugval
@@ -199,12 +191,10 @@ export async function createVideoScriptUploadUrl(videoId: string): Promise<Actio
 /** Het geüploade script-pdf van de opname van deze video verwijderen. */
 export async function deleteVideoScript(videoId: string): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireEditingManager();
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
-    const denied = mayEditVideoFiles(viewer, video);
-    if (denied) return { ok: false, message: denied };
     if (!video.productionDayId) return { ok: true };
 
     await clearEditScript(video.productionDayId);
@@ -223,7 +213,7 @@ export async function setEditingVideoDeadline(
   input: { dueOn?: string | null; shootOn?: string | null },
 ): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
@@ -257,12 +247,10 @@ export async function setEditingVideoDeadline(
 /** Aantal shorts van een video zetten. */
 export async function setEditingVideoShorts(videoId: string, shorts: number | null): Promise<ActionResult> {
   try {
-    const viewer = await requireInternal();
+    const viewer = await requireEditingManager();
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
-    const denied = mayEditVideoFiles(viewer, video);
-    if (denied) return { ok: false, message: denied };
 
     const n = shorts === null ? null : Math.max(0, Math.min(99, Math.round(shorts)));
     await db.update(deliverables).set({ plannedShorts: n, updatedAt: new Date() }).where(eq(deliverables.id, videoId));
@@ -289,6 +277,16 @@ export async function changeVideoStatus(
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
+
+    // Editors: alleen hun eigen project, en alleen de stappen van hun eigen werk
+    // (starten, edit aanleveren, feedback verwerkt aanleveren). Al het overige
+    // (klantstatus, goedkeuren, plannen) doet Team Shortclips.
+    if (isEditorRole(viewer)) {
+      assertOwnEditingWork(viewer, video.editorId);
+      if (!EDITOR_STATUS_FROM.has(video.status) || !EDITOR_STATUS_TO.has(nextStatus)) {
+        return { ok: false, message: "Deze stap zet Team Shortclips. Jij levert je edit aan via \"Interne review\"." };
+      }
+    }
 
     // Publiceren en goedkeuren vragen om een extra recht.
     if (["approved", "ready_to_publish"].includes(nextStatus) && !viewer.permissions.has("videos:approve")) {
@@ -412,7 +410,7 @@ export async function assignEditor(
   try {
     // Editors toewijzen mag iedereen met videos:assign én het vaste kantoorteam
     // (Milou, Jiska, Rutger), net als de eigenaar — zelfde uitzondering als bij
-    // het bijwerken van de bestanden (mayEditVideoFiles).
+    // het beheer van de bestanden (canManageEditingProjects).
     const viewer = await requireInternal();
     if (!viewer.permissions.has("videos:assign") && !isCoreStaff(viewer.email)) {
       throw new ForbiddenError(
@@ -472,7 +470,7 @@ export async function assignEditor(
  *  overschreven door de opnamedatum-herberekening. */
 export async function setVideoDeadline(videoId: string, dueOn: string | null): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     if (dueOn && !/^\d{4}-\d{2}-\d{2}$/.test(dueOn)) return { ok: false, message: "Ongeldige datum." };
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
@@ -517,6 +515,7 @@ export async function addComment(
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
+    assertOwnEditingWork(viewer, video.editorId);
 
     const [thread] = await db
       .insert(reviewThreads)
@@ -567,6 +566,7 @@ export async function resolveThread(threadId: string): Promise<ActionResult> {
     const video = await loadVideo(thread.deliverableId);
     if (!video) return { ok: false, message: "Video niet gevonden." };
     assertClientAccess(viewer, video.clientId);
+    assertOwnEditingWork(viewer, video.editorId);
 
     await db
       .update(reviewThreads)
@@ -593,7 +593,7 @@ export async function listClientEditProjects(clientId: string): Promise<{
   projects: { id: string; title: string; statusLabel: string; hasBriefing: boolean; editorId: string | null; editorName: string | null }[];
 }> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     if (!clientId) return { ok: false, message: "Geen klant.", projects: [] };
     assertClientAccess(viewer, clientId);
     const rows = await db
@@ -630,7 +630,7 @@ export async function listClientEditProjects(clientId: string): Promise<{
 /** De editor van een project een berichtje sturen dat de briefing klaarstaat. */
 export async function notifyEditorOfBriefing(videoId: string): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Project niet gevonden." };
     assertClientAccess(viewer, video.clientId);
@@ -663,7 +663,7 @@ const briefingSchema = z.object({
  *  op de projectpagina en bij de editor — zo staat de briefing waar hij hoort. */
 export async function attachBriefingToProject(input: { videoId: string; briefing: string }): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     const p = briefingSchema.safeParse(input);
     if (!p.success) return { ok: false, message: p.error.issues[0]?.message ?? "Ongeldig." };
     const video = await loadVideo(p.data.videoId);
@@ -709,7 +709,7 @@ export async function attachBriefingToProject(input: { videoId: string; briefing
  */
 export async function regenerateVideoBriefing(videoId: string): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     const [v] = await db
       .select({ clientId: deliverables.clientId, productionDayId: deliverables.productionDayId })
       .from(deliverables)
@@ -736,7 +736,7 @@ export async function regenerateVideoBriefing(videoId: string): Promise<ActionRe
 /** De gekoppelde editingbriefing weer verwijderen (krumpje weg bij de opdracht). */
 export async function clearBriefingFromProject(videoId: string): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     const video = await loadVideo(videoId);
     if (!video) return { ok: false, message: "Project niet gevonden." };
     assertClientAccess(viewer, video.clientId);

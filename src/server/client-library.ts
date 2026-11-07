@@ -10,6 +10,7 @@ import {
   productionDays,
 } from "@/db/schema";
 import { can, canManageClients, isOwner, requireInternal, type Viewer } from "@/server/auth/context";
+import { isActiveClientStatus } from "@/lib/client-status";
 
 /**
  * Persoonlijke klantenbibliotheek voor editors. Puur ter informatie: de Editing
@@ -38,6 +39,10 @@ export type MyClient = {
   monthlyVideoQuota: number; contentFocus: string | null;
   hasGuide: boolean; guideUpdatedAt: Date | null; richtlijnenCount: number;
   lastUpdated: Date | null;
+  /** Live uit het centrale klantenbeheer (clients.status). */
+  status: string;
+  /** Actief = actief of onboarding; anders (gepauzeerd, gestopt) niet actief. */
+  isActive: boolean;
 };
 
 /** Leesbaar label voor het soort content ("organisch" | "advertentie" | "beide"). */
@@ -82,9 +87,12 @@ export async function listMyClients(viewer: Viewer): Promise<MyClient[]> {
   const myIds = await getMyClientIds(viewer);
   if (myIds && myIds.size === 0) return [];
 
+  // Alle statussen ophalen: de pagina toont actieve en niet actieve klanten apart
+  // (filter), met de status live uit het centrale klantenbeheer. Prospects horen
+  // niet in een editorbibliotheek.
   const whereClient = and(
     isNull(clients.deletedAt),
-    sql`${clients.status} <> 'churned'`,
+    sql`${clients.status} <> 'prospect'`,
     myIds ? inArray(clients.id, [...myIds]) : undefined,
   );
   const rows = await db
@@ -92,7 +100,7 @@ export async function listMyClients(viewer: Viewer): Promise<MyClient[]> {
       id: clients.id, name: clients.name, slug: clients.slug, logoUrl: clients.logoUrl,
       color: clients.color, sector: clients.sector, description: clients.description,
       monthlyVideoQuota: clients.monthlyVideoQuota, contentFocus: clients.contentFocus,
-      updatedAt: clients.updatedAt,
+      updatedAt: clients.updatedAt, status: clients.status,
     })
     .from(clients)
     .where(whereClient)
@@ -129,6 +137,8 @@ export async function listMyClients(viewer: Viewer): Promise<MyClient[]> {
       guideUpdatedAt,
       richtlijnenCount: knByClient.get(c.id) ?? 0,
       lastUpdated,
+      status: c.status,
+      isActive: isActiveClientStatus(c.status),
     };
   });
 }
@@ -154,7 +164,7 @@ export type ClientLibraryDetail = {
   client: {
     id: string; name: string; slug: string; logoUrl: string | null; color: string | null;
     sector: string | null; website: string | null; description: string | null; attentionNotes: string | null;
-    monthlyVideoQuota: number; contentFocus: string | null; weHandlePosting: boolean;
+    monthlyVideoQuota: number; contentFocus: string | null; weHandlePosting: boolean; status: string;
   };
   overDeKlant: KnowledgeItem[];
   richtlijnen: KnowledgeItem[];
@@ -175,6 +185,7 @@ export async function getClientLibraryDetail(viewer: Viewer, slug: string): Prom
       id: clients.id, name: clients.name, slug: clients.slug, logoUrl: clients.logoUrl, color: clients.color,
       sector: clients.sector, website: clients.website, description: clients.description, attentionNotes: clients.attentionNotes,
       monthlyVideoQuota: clients.monthlyVideoQuota, contentFocus: clients.contentFocus, weHandlePosting: clients.weHandlePosting,
+      status: clients.status,
     })
     .from(clients)
     .where(and(eq(clients.slug, slug), isNull(clients.deletedAt)))

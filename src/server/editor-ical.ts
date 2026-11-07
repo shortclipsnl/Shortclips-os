@@ -1,17 +1,21 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { and, eq, isNotNull, isNull, notInArray } from "drizzle-orm";
+import { and, eq, isNull, notInArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, deliverables, productionDays, users } from "@/db/schema";
 import { env } from "@/lib/env";
+import { editorDeadline } from "@/lib/edit-deadline";
+import { nlHolidaySet } from "@/lib/holidays";
 
 /* ------------------------------------------------------------------ *
  * Persoonlijke iCal-agendafeed per editor.
  *
  * Elke editor heeft een uniek, geheim token. De feed-URL
  *   <APP_URL>/api/editor/agenda/<token>.ics
- * levert een dynamische VCALENDAR met de deadlines van de video's die aan die
- * editor zijn toegewezen — live uit de database. Google Agenda abonneert op de
+ * levert een dynamische VCALENDAR met de EDITOR DEADLINES (lib/edit-deadline)
+ * van de video's die aan die editor zijn toegewezen, live uit de database. Nooit
+ * de opleverdeadline van Shortclips aan de klant. Projecten die bij Shortclips of
+ * de klant liggen, afgerond of verwijderd zijn, vallen vanzelf uit de feed. Google Agenda abonneert op de
  * URL en ververst periodiek; nieuw werk verschijnt, deadlines worden bijgewerkt
  * en hertoegewezen/verwijderd werk verdwijnt vanzelf (stabiele UID per project,
  * dus nooit dubbel). De feed toont uitsluitend het eigen werk van de editor.
@@ -49,7 +53,8 @@ export function icalFeedUrl(token: string): string {
 /* ------------------------------ Feed bouwen ------------------------------ */
 
 type FeedRow = {
-  id: string; title: string; dueOn: string | null; clientName: string; opnameOn: string | null; updatedAt: Date | string;
+  id: string; title: string; status: string; dueOn: string | null; shootOn: string | null;
+  clientName: string; opnameOn: string | null; updatedAt: Date | string;
 };
 
 /** De actieve, toegewezen video's van één editor met een deadline. */
@@ -58,7 +63,9 @@ async function editorFeedRows(userId: string): Promise<FeedRow[]> {
     .select({
       id: deliverables.id,
       title: deliverables.title,
+      status: deliverables.status,
       dueOn: deliverables.dueOn,
+      shootOn: deliverables.shootOn,
       updatedAt: deliverables.updatedAt,
       clientName: clients.name,
       opnameOn: productionDays.scheduledOn,
@@ -70,7 +77,6 @@ async function editorFeedRows(userId: string): Promise<FeedRow[]> {
       and(
         eq(deliverables.editorId, userId),
         isNull(deliverables.deletedAt),
-        isNotNull(deliverables.dueOn),
         notInArray(deliverables.status, [...DONE_STATUSES]),
       ),
     );
@@ -110,16 +116,20 @@ export async function buildEditorIcal(user: { id: string; fullName: string }): P
     "PRODID:-//Shortclips//Editor-agenda//NL",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    `X-WR-CALNAME:Shortclips — ${esc(user.fullName.split(" ")[0] || "editor")} (deadlines)`,
+    `X-WR-CALNAME:Shortclips - ${esc(user.fullName.split(" ")[0] || "editor")} (editor deadlines)`,
     "X-WR-TIMEZONE:Europe/Amsterdam",
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
     "X-PUBLISHED-TTL:PT1H",
   ];
 
+  const holidays = nlHolidaySet();
   for (const r of rows) {
-    if (!r.dueOn) continue;
+    // Editor deadline uit de centrale regel; opnamedatum bij voorkeur uit de
+    // centrale opnameplanning. Geen editor deadline = niets voor de editor.
+    const due = editorDeadline(r.status, r.opnameOn ?? r.shootOn, r.dueOn, holidays);
+    if (!due) continue;
     const link = `${base}/videos/${r.id}`;
-    const descParts = [`Klant: ${r.clientName}`];
+    const descParts = [`Klant: ${r.clientName}`, `Editor deadline: ${due}`];
     if (r.opnameOn) descParts.push(`Opnamedatum: ${r.opnameOn}`);
     descParts.push(`Project: ${link}`);
     // Hele-dag "deadline"-markering: blokkeert de werkdag niet.
@@ -128,9 +138,9 @@ export async function buildEditorIcal(user: { id: string; fullName: string }): P
       `UID:deliverable-${r.id}@shortclips.nl`,
       `DTSTAMP:${now}`,
       `LAST-MODIFIED:${stamp(r.updatedAt)}`,
-      `DTSTART;VALUE=DATE:${ymd(r.dueOn)}`,
-      `DTEND;VALUE=DATE:${addDay(r.dueOn)}`,
-      fold(`SUMMARY:⏰ Deadline: ${esc(r.clientName)} — ${esc(r.title)}`),
+      `DTSTART;VALUE=DATE:${ymd(due)}`,
+      `DTEND;VALUE=DATE:${addDay(due)}`,
+      fold(`SUMMARY:Editor deadline: ${esc(r.clientName)} - ${esc(r.title)}`),
       fold(`DESCRIPTION:${esc(descParts.join("\n"))}`),
       fold(`URL:${link}`),
       "TRANSP:TRANSPARENT",

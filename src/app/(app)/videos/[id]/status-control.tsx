@@ -24,14 +24,25 @@ const NEXT_STEPS: Record<string, VideoStage[]> = {
   analysis_available: [],
 };
 
+/** Wat een editor zelf mag doorzetten (de server dwingt hetzelfde af). */
+const EDITOR_STEPS: Record<string, VideoStage[]> = {
+  awaiting_editor: ["editing"],
+  editing: ["internal_review"],
+  editor_revision: ["internal_review"],
+  client_revision: ["internal_review"],
+};
+
 export function StatusControl({
   videoId,
   status,
   canWrite,
+  editorMode = false,
 }: {
   videoId: string;
   status: string;
   canWrite: boolean;
+  /** Editor: alleen de stappen van zijn eigen werk, geen "alle statussen". */
+  editorMode?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);
@@ -40,8 +51,8 @@ export function StatusControl({
 
   if (!canWrite) return null;
 
-  const suggested = NEXT_STEPS[status] ?? [];
-  const options = showAll
+  const suggested = editorMode ? (EDITOR_STEPS[status] ?? []) : (NEXT_STEPS[status] ?? []);
+  const options = showAll && !editorMode
     ? VIDEO_STAGES.filter((s) => s !== status)
     : suggested;
 
@@ -70,16 +81,18 @@ export function StatusControl({
         ))}
         {options.length === 0 ? (
           <span className="text-sm text-[var(--color-ink-muted)]">
-            Dit is de laatste stap in de pipeline.
+            {editorMode ? "Er is nu geen actie van jou nodig. Team Shortclips zet de volgende stap." : "Dit is de laatste stap in de pipeline."}
           </span>
         ) : null}
-        <button
-          type="button"
-          onClick={() => setShowAll((v) => !v)}
-          className="text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:underline"
-        >
-          {showAll ? "alleen logische stappen" : "andere status kiezen"}
-        </button>
+        {editorMode ? null : (
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:underline"
+          >
+            {showAll ? "alleen logische stappen" : "andere status kiezen"}
+          </button>
+        )}
       </div>
 
       {result ? (

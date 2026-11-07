@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { deliverables, qcChecks } from "@/db/schema";
-import { assertClientAccess, type Viewer } from "@/server/auth/context";
+import { assertClientAccess, assertOwnEditingWork, type Viewer } from "@/server/auth/context";
 
 /**
  * Vaste kwaliteitscontrole-punten voor een short, af te vinken vóór de video
@@ -73,12 +73,14 @@ export async function qcProgress(deliverableId: string): Promise<{ done: number;
 /** Alleen voor de actie: één check zetten binnen de eigen klanttoegang. */
 export async function assertQcAccess(viewer: Viewer, qcId: string): Promise<boolean> {
   const [row] = await db
-    .select({ clientId: deliverables.clientId })
+    .select({ clientId: deliverables.clientId, editorId: deliverables.editorId })
     .from(qcChecks)
     .innerJoin(deliverables, eq(deliverables.id, qcChecks.deliverableId))
     .where(eq(qcChecks.id, qcId))
     .limit(1);
   if (!row) return false;
   assertClientAccess(viewer, row.clientId);
+  // Editors: alleen de controlepunten van hun eigen project.
+  assertOwnEditingWork(viewer, row.editorId);
   return true;
 }

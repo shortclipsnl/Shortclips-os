@@ -1,3 +1,4 @@
+import { isActiveClientStatus } from "@/lib/client-status";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -36,7 +37,12 @@ export default async function KlantInfoPage({ params }: { params: Promise<{ slug
       <div className="mb-5 flex items-center gap-3">
         <ClientLogo name={client.name} logoUrl={client.logoUrl} color={client.color} size={48} />
         <div>
-          <h1 className="text-xl font-bold text-[var(--color-ink)]">{client.name}</h1>
+          <h1 className="flex items-center gap-2 text-xl font-bold text-[var(--color-ink)]">
+            {client.name}
+            <span className={`rounded-full px-2 py-0.5 text-2xs font-bold ${isActiveClientStatus(client.status) ? "bg-[var(--color-good-soft)] text-[#1d6b4c]" : "bg-[var(--color-neutral-soft)] text-[var(--color-ink-muted)]"}`}>
+              {isActiveClientStatus(client.status) ? "Actief" : "Niet actief"}
+            </span>
+          </h1>
           <p className="text-sm text-[var(--color-ink-muted)]">
             {[client.sector, client.website].filter(Boolean).join(" · ") || "Klantinformatie voor de montage"}
           </p>

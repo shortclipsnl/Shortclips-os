@@ -36,6 +36,19 @@ const PHASE_TO_STATUS: Record<EditPhase, VideoStage> = {
 // Kolombreedtes — gelijk voor kop en rijen zodat alles uitlijnt.
 const GRID = "minmax(140px,1.4fr) 120px minmax(150px,1.3fr) 150px minmax(120px,1fr) 64px minmax(120px,1fr) minmax(110px,1fr) minmax(150px,1.4fr)";
 
+function todayIso(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+}
+
+/** "2026-11-12" → "do 12 nov 2026". */
+function fmtLong(d: string): string {
+  try {
+    return new Date(`${d}T00:00:00`).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return d;
+  }
+}
+
 function fmtShort(d: string): string {
   const [y, m, day] = d.split("-").map(Number);
   return new Date(y!, (m ?? 1) - 1, day).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
@@ -217,7 +230,7 @@ export function EditorBoardTable({
           <div className="grid items-center gap-px border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]" style={{ gridTemplateColumns: GRID }}>
             <span className="px-1">Item</span>
             <span className="px-1 text-center">Editor</span>
-            <span className="px-1 text-center">Deadline</span>
+            <span className="px-1 text-center">{editorView ? "Editor deadline" : "Deadline"}</span>
             <span className="px-1 text-center">Fase</span>
             <span className="px-1 text-center">Prioriteit</span>
             <span className="px-1 text-center">Shorts</span>
@@ -312,10 +325,12 @@ function TextTab({ active, onClick, children }: { active: boolean; onClick: () =
   );
 }
 
-function Row({ v, editors, canEdit, canAssign, canEditFiles, viewerId, phaseColor, editorView = false }: { v: EditorBoardVideo; editors: Editor[]; canEdit: boolean; canAssign: boolean; canEditFiles?: boolean; viewerId?: string; phaseColor: string; editorView?: boolean }) {
+function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorView = false }: { v: EditorBoardVideo; editors: Editor[]; canEdit: boolean; canAssign: boolean; canEditFiles?: boolean; viewerId?: string; phaseColor: string; editorView?: boolean }) {
   // Downloadlink + script mogen editors ook bewerken (los van `canEdit`): wie
   // `videos:write` heeft, of wie zelf de toegewezen editor van deze rij is.
-  const filesEditable = (canEditFiles ?? canEdit) || (viewerId != null && v.editorId === viewerId);
+  // Bronmateriaal (downloadlink, script) beheert alleen Team Shortclips; de
+  // server dwingt dit ook af (requireEditingManager). Editors: alleen openen.
+  const filesEditable = (canEditFiles ?? canEdit) && !editorView;
   const [pending, start] = useTransition();
   const router = useRouter();
   const run = (fn: () => Promise<unknown>) => start(async () => { await fn(); router.refresh(); });
@@ -337,6 +352,14 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, viewerId, phaseColo
           </Link>
           <AskButton videoId={v.id} />
         </div>
+        {/* Editor: bij "Binnenkort beschikbaar" de opnamedatum uit de centrale
+            opnameplanning, los van wanneer het beeldmateriaal klaarstaat. */}
+        {editorView && v.phase === "te_plannen" ? (
+          <div className="pl-[38px] text-2xs leading-tight">
+            <div className="font-semibold text-[var(--color-ink)]">Opnamedatum: {v.opnameDate ? fmtLong(v.opnameDate) : "nog niet gepland"}</div>
+            <div className="text-[var(--color-ink-muted)]">Beeldmateriaal: {v.footageReady ? "staat klaar" : v.opnameDate && v.opnameDate > todayIso() ? "beschikbaar na de opname" : "wordt klaargezet door Team Shortclips"}</div>
+          </div>
+        ) : null}
       </div>
 
       {/* Editor */}
@@ -417,6 +440,20 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, viewerId, phaseColo
  * zet 'm weer op de AI-versie. Zo hoeft het team niets handmatig te maken, maar
  * kan het de briefing wel bijschaven.
  */
+/** Briefing als .txt downloaden (alleen-lezen kopie voor de editor). */
+function downloadBriefing(clientName: string, title: string, text: string) {
+  const safe = `${clientName} - ${title}`.replace(/[^\w\- ]+/g, "_").slice(0, 80);
+  const blob = new Blob([`Editor briefing\n${clientName} - ${title}\n\n${text}\n`], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Briefing ${safe}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function BriefingCell({ v, canEdit, run, pending }: { v: EditorBoardVideo; canEdit: boolean; run: (fn: () => Promise<unknown>) => void; pending: boolean }) {
   const manual = v.briefing?.trim() ? v.briefing : "";
   const auto = v.autoBriefing?.trim() ? v.autoBriefing : "";
@@ -482,6 +519,15 @@ function BriefingCell({ v, canEdit, run, pending }: { v: EditorBoardVideo; canEd
             ) : effective ? (
               <>
                 <div className="max-h-60 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-[var(--color-ink)]">{effective}</div>
+                {/* Alleen-lezen (editor): briefing downloaden als tekstbestand. */}
+                {!canEdit ? (
+                  <div className="mt-2 flex items-center justify-end">
+                    <button type="button" onClick={() => downloadBriefing(v.clientName, v.title, effective)}
+                      className="inline-flex items-center gap-1 rounded px-2 py-1 text-2xs font-semibold text-[var(--color-brand-700)] hover:bg-[var(--color-brand-50)]">
+                      <Download className="size-3" /> Downloaden
+                    </button>
+                  </div>
+                ) : null}
                 {canEdit ? (
                   <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
                     {isManual && auto ? (
@@ -534,13 +580,20 @@ function DeadlineCell({ v, pct, canEdit, onSave, editorView = false }: { v: Edit
   // Editor ziet de interne deadline (opname + 7 wd); de coördinator de klantdeadline.
   const endDate = editorView ? v.editorDueOn : v.dueOn;
   const barColor = editorView ? v.editorBatteryColor : v.batteryColor;
+  const startDate = editorView ? v.editorShootDate : v.shootDate;
+
+  // Editor zonder editor deadline: het werk ligt bij Shortclips of de klant.
+  if (editorView && !endDate) {
+    const where = v.phase === "bij_klant" ? "Bij de klant" : v.phase === "afgerond" ? "Afgerond" : "Bij Team Shortclips";
+    return <div className="flex items-center justify-center p-1 text-2xs font-medium text-[var(--color-ink-faint)]">{where}</div>;
+  }
 
   const bar =
-    endDate && v.shootDate ? (
+    endDate && startDate ? (
       <div className="relative h-6 w-full overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
         <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, background: BATTERY_COLOR[barColor] }} />
         <span className="absolute inset-0 grid place-items-center text-2xs font-semibold text-[var(--color-ink)]">
-          {fmtShort(v.shootDate)} – {fmtShort(endDate)}
+          {fmtShort(startDate)} – {fmtShort(endDate)}
         </span>
       </div>
     ) : (

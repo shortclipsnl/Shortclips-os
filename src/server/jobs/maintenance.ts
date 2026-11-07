@@ -20,7 +20,7 @@ import { getVrijdagcheck } from "@/server/vrijdagcheck";
 import { CORE_STAFF_EMAILS } from "@/server/core-staff";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
-import { internalDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
+import { editorDeadline, internalDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
 import { getDeadlineSettings } from "@/server/deadline-settings";
 import { deadlineMisses } from "@/db/schema";
 import { runJob } from "./runner";
@@ -393,12 +393,14 @@ export async function runEditorDeadlineReminders() {
         title: deliverables.title,
         status: deliverables.status,
         shootOn: deliverables.shootOn,
+        planShootOn: productionDays.scheduledOn,
         dueOn: deliverables.dueOn,
         editorId: deliverables.editorId,
         clientName: clients.name,
       })
       .from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
+      .leftJoin(productionDays, eq(productionDays.id, deliverables.productionDayId))
       .where(
         and(
           isNull(deliverables.deletedAt),
@@ -413,7 +415,9 @@ export async function runEditorDeadlineReminders() {
     const byEditor = new Map<string, { overdue: Proj[]; soon: Proj[] }>();
     for (const r of rows) {
       if (!r.editorId || !isFirstVersionPending(r.status)) continue;
-      const internal = internalDeadline(r.shootOn, r.dueOn, holidays);
+      // Zelfde editor deadline als in het portaal en de iCal-feed (opnamedatum uit
+      // de centrale opnameplanning wint van een oude datum op het project).
+      const internal = editorDeadline(r.status, r.planShootOn ?? r.shootOn, r.dueOn, holidays);
       if (!internal) continue;
       const g = byEditor.get(r.editorId) ?? { overdue: [], soon: [] };
       const proj: Proj = { id: r.id, label: `${r.clientName} — ${r.title}` };
@@ -427,8 +431,8 @@ export async function runEditorDeadlineReminders() {
       if (total === 0) continue;
       ctx.counters.processed++;
       const parts: string[] = [];
-      if (g.overdue.length > 0) parts.push(`${g.overdue.length} over de interne deadline`);
-      if (g.soon.length > 0) parts.push(`${g.soon.length} met interne deadline binnen ${settings["deadline.editorSoonDays"]} dagen`);
+      if (g.overdue.length > 0) parts.push(`${g.overdue.length} over je editor deadline`);
+      if (g.soon.length > 0) parts.push(`${g.soon.length} met editor deadline binnen ${settings["deadline.editorSoonDays"]} dagen`);
       const projects = [...g.overdue, ...g.soon];
       const namen = projects.slice(0, 4).map((p) => p.label).join(" · ") + (projects.length > 4 ? ` · +${projects.length - 4} meer` : "");
       // Eén project → direct doorklikbaar; meerdere → naar het eigen editingbord.
@@ -437,7 +441,7 @@ export async function runEditorDeadlineReminders() {
         userIds: [editorId],
         type: "editor_deadlines",
         level: g.overdue.length > 0 ? "warning" : "info",
-        title: g.overdue.length > 0 ? "Eerste versie over de interne deadline" : "Interne deadline komt eraan",
+        title: g.overdue.length > 0 ? "Eerste versie over je editor deadline" : "Editor deadline komt eraan",
         body: `${parts.join(" · ")}: ${namen}. Pak deze met voorrang op.`,
         href,
         dedupeKey: `editor_deadlines:${editorId}:${today}`,

@@ -18,16 +18,47 @@ function fmtDate(d: Date | string | null) {
   catch { return null; }
 }
 
+type StatusFilter = "actief" | "niet_actief" | "alle";
+
+const STATUS_LABEL: Record<string, string> = { paused: "Gepauzeerd", churned: "Gestopt" };
+
 export function MijnKlantenGrid({ clients }: { clients: MyClient[] }) {
   const [q, setQ] = useState("");
+  // Standaard alleen actieve klanten; de status komt live uit het centrale
+  // klantenbeheer van Team Shortclips.
+  const [status, setStatus] = useState<StatusFilter>("actief");
+  const counts = useMemo(() => {
+    const actief = clients.filter((c) => c.isActive).length;
+    return { actief, niet_actief: clients.length - actief, alle: clients.length };
+  }, [clients]);
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
-    if (!t) return clients;
-    return clients.filter((c) => c.name.toLowerCase().includes(t) || (c.sector ?? "").toLowerCase().includes(t));
-  }, [q, clients]);
+    const byStatus = status === "alle" ? clients : clients.filter((c) => (status === "actief" ? c.isActive : !c.isActive));
+    if (!t) return byStatus;
+    return byStatus.filter((c) => c.name.toLowerCase().includes(t) || (c.sector ?? "").toLowerCase().includes(t));
+  }, [q, status, clients]);
+  const tabs: { key: StatusFilter; label: string }[] = [
+    { key: "actief", label: "Actieve klanten" },
+    { key: "niet_actief", label: "Niet actieve klanten" },
+    { key: "alle", label: "Alle" },
+  ];
 
   return (
     <div>
+      <div className="mb-3 flex flex-wrap items-center gap-2" role="tablist" aria-label="Filter op klantstatus">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={status === t.key}
+            onClick={() => setStatus(t.key)}
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${status === t.key ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-surface)] text-[var(--color-ink-muted)] ring-1 ring-[var(--color-line)] hover:text-[var(--color-ink)]"}`}
+          >
+            {t.label} <span className="tabular-nums opacity-70">{counts[t.key]}</span>
+          </button>
+        ))}
+      </div>
       <div className="relative mb-4 max-w-sm">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--color-ink-faint)]" />
         <input
@@ -40,7 +71,11 @@ export function MijnKlantenGrid({ clients }: { clients: MyClient[] }) {
 
       {filtered.length === 0 ? (
         <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-line-strong)] px-4 py-8 text-center text-sm text-[var(--color-ink-faint)]">
-          {clients.length === 0 ? "Je bent nog aan geen enkele klant gekoppeld. Zodra je aan de video's van een klant werkt, verschijnt die hier automatisch." : "Geen klant gevonden."}
+          {clients.length === 0
+            ? "Je bent nog aan geen enkele klant gekoppeld. Zodra je aan de video's van een klant werkt, verschijnt die hier automatisch."
+            : status === "niet_actief" && !q.trim()
+              ? "Geen niet actieve klanten."
+              : "Geen klant gevonden."}
         </p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -48,12 +83,17 @@ export function MijnKlantenGrid({ clients }: { clients: MyClient[] }) {
             <Link
               key={c.id}
               href={`/mijn-klanten/${c.slug}`}
-              className="group flex flex-col rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 transition hover:border-[var(--color-brand-500)] hover:shadow-[var(--shadow-raised)]"
+              className={`group flex flex-col rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 transition ${c.isActive ? "" : "opacity-75"} hover:border-[var(--color-brand-500)] hover:shadow-[var(--shadow-raised)]`}
             >
               <div className="flex items-center gap-3">
                 <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={44} />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-bold text-[var(--color-ink)] group-hover:text-[var(--color-brand-700)]">{c.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-bold text-[var(--color-ink)] group-hover:text-[var(--color-brand-700)]">{c.name}</span>
+                    <span className={`shrink-0 rounded-full px-1.5 py-px text-[10px] font-bold ${c.isActive ? "bg-[var(--color-good-soft)] text-[#1d6b4c]" : "bg-[var(--color-neutral-soft)] text-[var(--color-ink-muted)]"}`}>
+                      {c.isActive ? "Actief" : `Niet actief${STATUS_LABEL[c.status] ? ` · ${STATUS_LABEL[c.status]}` : ""}`}
+                    </span>
+                  </div>
                   {c.sector ? <div className="truncate text-xs text-[var(--color-ink-faint)]">{c.sector}</div> : null}
                 </div>
               </div>

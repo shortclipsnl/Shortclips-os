@@ -1,4 +1,5 @@
 import "server-only";
+import { isActiveClientStatus } from "@/lib/client-status";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
@@ -11,7 +12,7 @@ const coordUser = alias(users, "coord_user");
 import { scopeToClients, type Viewer } from "@/server/auth/context";
 import { subWorkingDays, workingDaysUntil } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
-import { EDITOR_LEAD_DAYS, internalDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
+import { EDITOR_LEAD_DAYS, editorDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
 import { type EditPhase, type VideoStage } from "@/lib/statuses";
 import type { EditorBriefing } from "@/server/actions/ai-tools";
 
@@ -92,6 +93,8 @@ export type EditorBoardVideo = {
   clientSlug: string;
   clientColor: string | null;
   clientLogo: string | null;
+  /** Is de klant actief in het centrale klantenbeheer (actief/onboarding)? */
+  clientActive: boolean;
   /** De vaste verantwoordelijke (coördinator) van de klant — voor de teamfilter,
    *  zodat Milou/Jiska/Jarno hun eigen klanten op het bord kunnen zien. */
   coordinatorId: string | null;
@@ -138,6 +141,11 @@ export type EditorBoardVideo = {
      werkdagen) i.p.v. de klantdeadline. Zo ziet de editor niet de ruime
      klantdatum maar zijn eigen, strakke deadline. Voor fases ná de eerste versie
      valt dit terug op de klantdeadline (de resterende tijd tot oplevering). --- */
+  /** Opnamedatum voor de editorbalk: centrale opnameplanning, anders het project. */
+  editorShootDate: string | null;
+  /** Staat het beeldmateriaal klaar voor de editor? (los van de opnamedatum) */
+  footageReady: boolean;
+  /** Editor deadline (zie `editorDeadline`); null = er ligt niets bij de editor. */
   editorDueOn: string | null;
   editorWorkdaysToDeadline: number | null;
   editorElapsedWorkdays: number;
@@ -178,6 +186,7 @@ export async function listEditorBoard(
       clientSlug: clients.slug,
       clientColor: clients.color,
       clientLogo: clients.logoUrl,
+      clientStatus: clients.status,
       coordinatorId: clients.coordinatorId,
       coordinatorName: coordUser.fullName,
       coordinatorAvatar: coordUser.avatarUrl,
@@ -287,16 +296,25 @@ export async function listEditorBoard(
     else if (atEditor) batteryColor = "blauw";
     else batteryColor = "groen";
 
-    // Editorperspectief: interne deadline (opname + 7 wd) voor de eerste versie;
-    // daarna de klantdeadline als resterende tijd tot oplevering.
+    // Editorperspectief: de EDITOR DEADLINE (centrale regel in lib/edit-deadline):
+    // eerste versie = opname + 7 wd, klantfeedback verwerken = klantdeadline − 2 wd,
+    // anders geen editor deadline. Nooit de opleverdeadline van Shortclips zelf.
+    // De opnamedatum komt bij voorkeur uit de centrale opnameplanning (de
+    // gekoppelde opnamedag), want die loopt mee als een opname verschuift.
     const firstVersion = isFirstVersionPending(status);
-    const editorDueOn = firstVersion ? internalDeadline(r.shootOn, r.dueOn, holidays) : r.dueOn;
-    const editorTotalWorkdays = firstVersion ? EDITOR_LEAD_DAYS : totalWorkdays;
+    const planShoot = r.dayScheduledOn ?? r.shootOn ?? null;
+    const editorDueOn = editorDeadline(status, planShoot, r.dueOn, holidays);
+    const editorStart = planShoot ?? shootDate;
+    const editorTotalWorkdays = firstVersion
+      ? EDITOR_LEAD_DAYS
+      : editorStart && editorDueOn
+        ? Math.max(1, workingDaysUntil(editorStart, editorDueOn, holidays))
+        : totalWorkdays;
     const editorWorkdaysToDeadline = editorDueOn ? workingDaysUntil(today, editorDueOn, holidays) : null;
-    const editorElapsedWorkdays = shootDate
-      ? Math.max(0, Math.min(editorTotalWorkdays, workingDaysUntil(shootDate, today, holidays)))
+    const editorElapsedWorkdays = editorStart
+      ? Math.max(0, Math.min(editorTotalWorkdays, workingDaysUntil(editorStart, today, holidays)))
       : 0;
-    const editorOverdue = !!editorDueOn && editorDueOn < today && firstVersion;
+    const editorOverdue = !!editorDueOn && editorDueOn < today;
     let editorBatteryColor: "groen" | "blauw" | "oranje" | "rood";
     if (done) editorBatteryColor = "groen";
     else if (editorWorkdaysToDeadline !== null && editorWorkdaysToDeadline < 0) editorBatteryColor = "rood";
@@ -326,6 +344,7 @@ export async function listEditorBoard(
       clientSlug: r.clientSlug,
       clientColor: r.clientColor,
       clientLogo: r.clientLogo,
+      clientActive: isActiveClientStatus(r.clientStatus),
       coordinatorId: r.coordinatorId ?? null,
       coordinatorName: r.coordinatorName ?? null,
       coordinatorAvatar: r.coordinatorAvatar ?? null,
@@ -365,6 +384,8 @@ export async function listEditorBoard(
       elapsedWorkdays,
       totalWorkdays,
       batteryColor,
+      editorShootDate: editorStart,
+      footageReady: status === "awaiting_editor" || !["recorded", "footage_upload"].includes(status),
       editorDueOn,
       editorWorkdaysToDeadline,
       editorElapsedWorkdays,

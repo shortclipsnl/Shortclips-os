@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { briefingSets, deliverables, productionDays, scripts } from "@/db/schema";
-import { assertClientAccess, type Viewer } from "@/server/auth/context";
+import { assertClientAccess, editorMayOpenShoot, ForbiddenError, type Viewer } from "@/server/auth/context";
 import type { EditorBriefing } from "@/server/actions/ai-tools";
 
 export type BriefingStatus = "geen" | "bezig" | "klaar" | "bijgewerkt_script" | "mislukt";
@@ -29,6 +29,9 @@ export async function getBriefingForShoot(viewer: Viewer, productionDayId: strin
     .limit(1);
   if (!day) return null;
   assertClientAccess(viewer, day.clientId);
+  if (!(await editorMayOpenShoot(viewer, productionDayId))) {
+    throw new ForbiddenError("Deze opname is niet aan jou toegewezen.");
+  }
 
   const [set] = await db
     .select({ status: briefingSets.status, generatedAt: briefingSets.generatedAt, content: briefingSets.content })

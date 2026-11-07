@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BookOpen, ExternalLink, Film, Lock, Users } from "lucide-react";
-import { requireInternal } from "@/server/auth/context";
+import { BookOpen, Download, ExternalLink, FileText, Film, Lock, Users } from "lucide-react";
+import { isEditorRole, requireInternal } from "@/server/auth/context";
+import { editorDeadline } from "@/lib/edit-deadline";
+import { nlHolidaySet } from "@/lib/holidays";
 import { isCoreStaff } from "@/server/core-staff";
 import { getVideo } from "@/server/videos";
 import { getBriefingForVideo } from "@/server/briefing/service";
@@ -65,6 +67,14 @@ export default async function VideoPage({
   const pubChecks = detail.video.status === "published" ? await getOrCreatePublicationChecks(id) : [];
   const canEditPubCheck = ["owner", "admin", "operational_manager", "project_coordinator", "content_creator"].includes(viewer.primaryRole);
 
+  // Editorperspectief: eigen editor deadline, geen klantdeadline van Shortclips,
+  // geen links naar beheerpagina's (opnameplanning, klantenbeheer).
+  const editor = isEditorRole(viewer);
+  const editorDue = editorDeadline(v.status, v.shootOn ?? v.projectShootOn, v.dueOn, nlHolidaySet());
+  const downloadHref =
+    v.footageUrl || v.dayFootageUrl || (v.driveFolderId ? `https://drive.google.com/drive/folders/${v.driveFolderId}` : null);
+  const scriptFileHref = v.scriptUrl || (v.dayScriptFileId ? `/api/edit-files/${v.dayScriptFileId}` : null) || v.dayScriptUrl || null;
+
   const days = daysSince(v.statusChangedAt);
   const late = stageOverdue(v.status, days);
   const meta = videoPhase(v.status);
@@ -78,7 +88,7 @@ export default async function VideoPage({
       <PageHeader
         breadcrumb={
           <Link
-            href={`/clients/${v.clientSlug}?tab=videos`}
+            href={editor ? `/mijn-klanten/${v.clientSlug}` : `/clients/${v.clientSlug}?tab=videos`}
             className="text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
           >
             ← {v.clientName}
@@ -92,7 +102,9 @@ export default async function VideoPage({
               {days} dagen in deze stap
             </span>
             <span>· versie {v.currentVersion}</span>
-            {v.dueOn ? <span>· deadline {formatDate(v.dueOn)}</span> : null}
+            {editor ? (
+              editorDue ? <span>· editor deadline {formatDate(editorDue)}</span> : null
+            ) : v.dueOn ? <span>· deadline {formatDate(v.dueOn)}</span> : null}
           </span>
         }
       />
@@ -110,6 +122,7 @@ export default async function VideoPage({
                 videoId={v.id}
                 status={v.status}
                 canWrite={viewer.permissions.has("videos:write")}
+                editorMode={editor}
               />
             </div>
           </Card>
@@ -228,6 +241,22 @@ export default async function VideoPage({
                   <BookOpen className="size-3.5" /> Bekijk klantinformatie
                 </Link>
               </Field>
+              {editor ? (
+                <Field label="Bestanden">
+                  <span className="flex flex-col gap-1.5">
+                    {downloadHref ? (
+                      <a href={downloadHref} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-medium text-[var(--color-brand-700)] hover:underline">
+                        <Download className="size-3.5" /> Beeldmateriaal downloaden
+                      </a>
+                    ) : <span className="text-[var(--color-ink-faint)]">Beeldmateriaal nog niet beschikbaar</span>}
+                    {scriptFileHref ? (
+                      <a href={scriptFileHref} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-medium text-[var(--color-brand-700)] hover:underline">
+                        <FileText className="size-3.5" /> Script openen
+                      </a>
+                    ) : null}
+                  </span>
+                </Field>
+              ) : null}
               <Field label="Script">
                 {v.scriptId ? (
                   <Link href={`/scripts/${v.scriptId}`} className="hover:underline">
@@ -237,12 +266,18 @@ export default async function VideoPage({
               </Field>
               <Field label="Opnamedag">
                 {v.productionDayId ? (
-                  <Link href={`/productions/${v.productionDayId}`} className="hover:underline">
-                    {formatDate(v.shootOn)}
-                  </Link>
+                  editor ? formatDate(v.shootOn) : (
+                    <Link href={`/productions/${v.productionDayId}`} className="hover:underline">
+                      {formatDate(v.shootOn)}
+                    </Link>
+                  )
                 ) : "—"}
               </Field>
-              <Field label="Deadline">{v.dueOn ? formatDateFull(v.dueOn) : "—"}</Field>
+              {editor ? (
+                <Field label="Editor deadline">{editorDue ? formatDateFull(editorDue) : "Geen actie van jou nodig"}</Field>
+              ) : (
+                <Field label="Deadline">{v.dueOn ? formatDateFull(v.dueOn) : "—"}</Field>
+              )}
               <Field label="Publicatiedatum">
                 {v.plannedPublishOn ? formatDateFull(v.plannedPublishOn) : "—"}
               </Field>

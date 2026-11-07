@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function VideosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ weergave?: string; filter?: string; status?: string; klant?: string; editor?: string }>;
+  searchParams: Promise<{ weergave?: string; filter?: string; status?: string; klant?: string; klanten?: string; editor?: string }>;
 }) {
   const viewer = await requireInternal();
   const params = await searchParams;
@@ -29,28 +29,47 @@ export default async function VideosPage({
   // opnames. Veel video's komen binnen zonder opname, dus het
   // opname-board zou leeg blijven. Dit toont de editor precies zijn eigen werk.
   if (viewer.isEditorOnly) {
-    const videos = await listEditorBoard(viewer);
+    const all = await listEditorBoard(viewer);
+    // Klantstatus komt live uit het centrale klantenbeheer. Standaard alleen
+    // actieve klanten; niet actieve klanten staan apart achter een filter.
+    const klantFilter = params.klanten === "niet-actief" ? "niet-actief" : params.klanten === "alle" ? "alle" : "actief";
+    const inactiveCount = all.filter((v) => !v.clientActive).length;
+    const videos = klantFilter === "alle" ? all : all.filter((v) => (klantFilter === "actief" ? v.clientActive : !v.clientActive));
+    const tab = (key: string, label: string, n: number) => (
+      <Link
+        key={key}
+        href={key === "actief" ? "/videos" : `/videos?klanten=${key}`}
+        className={`rounded-full px-3 py-1 text-xs font-semibold ${klantFilter === key ? "bg-[var(--color-ink)] text-white" : "bg-[var(--color-surface)] text-[var(--color-ink-muted)] ring-1 ring-[var(--color-line)] hover:text-[var(--color-ink)]"}`}
+      >
+        {label} <span className="tabular-nums opacity-70">{n}</span>
+      </Link>
+    );
     return (
       <div className="mx-auto max-w-[1500px]">
         <PageHeader title="Editing" description={`${videos.length} video's van jou`} />
         <section className="mb-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
             <h2 className="text-sm font-bold tracking-tight">Jouw edit-projecten</h2>
-            <span className="text-xs text-white/80">Per fase · deadline, aantal shorts, downloadlink en script</span>
+            <span className="text-xs text-white/80">Per fase · editor deadline, aantal shorts, downloadlink en script</span>
           </div>
-          {/* Korte uitleg bovenaan — editors hoeven niets in te vullen; ze
-              openen alleen het materiaal en het script en bewaken de deadline. */}
+          {/* Korte uitleg: editors bekijken en downloaden; het materiaal zelf
+              beheert Team Shortclips (technisch afgedwongen op de server). */}
           <p className="mb-3 rounded-[var(--radius-md)] border border-[var(--color-brand-500)]/30 bg-[var(--color-brand-50)] px-4 py-3 text-sm leading-relaxed text-[var(--color-ink)]">
             Hieronder staan de projecten die <strong>binnenkort beschikbaar</strong> komen en de projecten die nu <strong>in edit</strong> staan.
-            Open het <strong>Download</strong>-materiaal en het <strong>Script</strong> — en je kunt ze ook zelf <strong>toevoegen of bijwerken</strong> (een downloadlink plakken of een script-pdf slepen).
-            Check goed je <strong>interne deadline</strong> (de eerste versie, 7 werkdagen na de opname), plan ze in je eigen agenda en zorg dat je op tijd oplevert.
-            Vragen of kom je ergens niet uit? Neem contact op met je contactpersoon bij ShortClips.
+            Open het <strong>Download</strong>-materiaal, het <strong>Script</strong> en de <strong>Editor briefing</strong>. Deze worden aangeleverd en beheerd door Team Shortclips.
+            Houd je <strong>editor deadline</strong> aan; met de agendalink op Vandaag staan je deadlines automatisch in je eigen agenda.
+            Klopt er iets niet of mis je iets? Neem contact op met je contactpersoon bij Shortclips.
           </p>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {tab("actief", "Actieve klanten", all.length - inactiveCount)}
+            {tab("niet-actief", "Niet actieve klanten", inactiveCount)}
+            {tab("alle", "Alle", all.length)}
+          </div>
           {videos.length > 0 ? (
-            <EditorBoardTable videos={videos} editors={[]} canEdit={false} canAssign={false} canEditFiles showTabs={false} editorView />
+            <EditorBoardTable videos={videos} editors={[]} canEdit={false} canAssign={false} canEditFiles={false} showTabs={false} editorView />
           ) : (
             <p className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">
-              Je hebt op dit moment geen video&apos;s toegewezen gekregen.
+              {klantFilter === "niet-actief" ? "Je hebt geen opdrachten bij niet actieve klanten." : "Je hebt op dit moment geen video's toegewezen gekregen."}
             </p>
           )}
         </section>

@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { productionDays } from "@/db/schema";
-import { assertClientAccess, ForbiddenError, requirePermission } from "@/server/auth/context";
+import { assertClientAccess, ForbiddenError, requireEditingManager, requirePermission } from "@/server/auth/context";
 import { clearEditScript, createEditScriptUploadTarget, replaceEditScript } from "@/server/editing/script-file";
 import { auditLog } from "@/server/audit";
 import { EDIT_PHASE_ORDER } from "@/lib/statuses";
@@ -24,7 +24,7 @@ export async function createEditingProject(input: {
   plannedShorts?: number | null;
 }): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     const title = input.title.trim();
     if (!title) return { ok: false, message: "Geef het project een titel." };
     if (!input.clientId) return { ok: false, message: "Kies een klant." };
@@ -90,7 +90,7 @@ export async function setProjectEditor(id: string, editorId: string | null): Pro
 /** Editingfase van het project wijzigen (te_plannen … afgerond). */
 export async function setProjectEditStatus(id: string, status: string): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     if (!EDIT_PHASE_ORDER.includes(status as (typeof EDIT_PHASE_ORDER)[number])) {
       return { ok: false, message: "Onbekende fase." };
     }
@@ -123,7 +123,7 @@ export async function setProjectEditStatus(id: string, status: string): Promise<
 /** Handmatige oplevering-deadline zetten (of wissen → terug naar automatisch). */
 export async function setProjectDeadline(id: string, dueOn: string | null): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     if (dueOn && !/^\d{4}-\d{2}-\d{2}$/.test(dueOn)) return { ok: false, message: "Ongeldige datum." };
     const project = await loadProject(id);
     if (!project) return { ok: false, message: "Project niet gevonden." };
@@ -141,7 +141,7 @@ export async function setProjectDeadline(id: string, dueOn: string | null): Prom
 /** Aantal geplande shorts voor een opname zetten. */
 export async function setProjectPlannedShorts(id: string, plannedShorts: number | null): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     const project = await loadProject(id);
     if (!project) return { ok: false, message: "Project niet gevonden." };
     assertClientAccess(viewer, project.clientId);
@@ -162,7 +162,7 @@ export async function setProjectLinks(
   links: { footageUrl?: string | null; scriptUrl?: string | null },
 ): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     const project = await loadProject(id);
     if (!project) return { ok: false, message: "Project niet gevonden." };
     assertClientAccess(viewer, project.clientId);
@@ -192,7 +192,7 @@ export async function uploadProjectScript(
   file: { fileName: string; contentType: string; base64?: string; storagePath?: string; sizeBytes?: number },
 ): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     const project = await loadProject(id);
     if (!project) return { ok: false, message: "Project niet gevonden." };
     assertClientAccess(viewer, project.clientId);
@@ -220,7 +220,7 @@ export async function uploadProjectScript(
  */
 export async function createProjectScriptUploadUrl(id: string): Promise<ActionResult & { uploadUrl?: string; storagePath?: string; headers?: Record<string, string> }> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     const project = await loadProject(id);
     if (!project) return { ok: false, message: "Project niet gevonden." };
     assertClientAccess(viewer, project.clientId);
@@ -236,7 +236,7 @@ export async function createProjectScriptUploadUrl(id: string): Promise<ActionRe
 /** Het geüploade script-pdf verwijderen. */
 export async function deleteProjectScript(id: string): Promise<ActionResult> {
   try {
-    const viewer = await requirePermission("videos:write");
+    const viewer = await requireEditingManager();
     const project = await loadProject(id);
     if (!project) return { ok: false, message: "Project niet gevonden." };
     assertClientAccess(viewer, project.clientId);

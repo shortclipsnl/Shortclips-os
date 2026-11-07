@@ -1,4 +1,7 @@
-import { requireInternal, isOwner, canManageClients, canManageQuotes, canManageOperations } from "@/server/auth/context";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { requireInternal, isOwner, isEditorRole, canManageClients, canManageQuotes, canManageOperations } from "@/server/auth/context";
+import { editorMayOpenPath } from "@/lib/editor-routes";
 import { NAVIGATION } from "@/components/layout/nav-config";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SectionTabs } from "@/components/layout/section-tabs";
@@ -25,8 +28,14 @@ export default async function AppLayout({
   const owner = isOwner(viewer);
   // Een editor ziet alleen wat hij nodig heeft: Vandaag, Editing (zijn eigen
   // projecten) en Showcase (zijn awards). Onze klanten en Productieplanning niet.
-  const editorOnly = viewer.primaryRole === "editor";
+  const editorOnly = isEditorRole(viewer);
   const EDITOR_NAV = new Set(["/dashboard", "/videos", "/showcase", "/mijn-klanten"]);
+  // Technische afdwinging (niet alleen het menu verbergen): een editor die een
+  // andere URL intypt, komt terug op zijn eigen dashboard.
+  if (editorOnly) {
+    const path = (await headers()).get("x-sc-pathname") ?? "";
+    if (path && !editorMayOpenPath(path)) redirect("/dashboard");
+  }
   // Vieringskaart bij binnenkomst (alleen editors kunnen awards hebben).
   const celebration = editorOnly ? await getCelebrationContext(viewer.id) : null;
   const groups = NAVIGATION.map((group) => ({
