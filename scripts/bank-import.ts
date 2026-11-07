@@ -31,6 +31,7 @@ async function main() {
     for (const a of r.afschriften) {
       console.log(`[bank-import] ${naam} ${a.iban} ${a.van}..${a.tot}: ${a.nieuw} nieuw, ${a.alAanwezig} al aanwezig | ${a.controle}`);
     }
+    for (const k of r.kosten) console.log(`[bank-import] kosten ${k.maand}: ${k.status}${k.regels ? ` (${k.regels} regels)` : ""}`);
   }
 }
 

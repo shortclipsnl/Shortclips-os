@@ -57,6 +57,9 @@ export function BankUpload() {
               </div>
             )),
           )}
+          {res.resultaten?.flatMap((r) => r.kosten.filter((k) => k.regels > 0).map((k) => (
+            <div key={r.bestand + k.maand}>Kostenmonitor {k.maand}: {k.regels} regels bijgewerkt uit de transacties.</div>
+          )))}
           {res.fouten?.map((f) => (
             <div key={f.bestand} className="text-[var(--color-bad)]">{f.bestand}: {f.fout}</div>
           ))}

@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { bankAfschriften, bankTransacties } from "../../db/schema";
 import { parseCamt053, round2, type CamtAfschrift } from "./camt";
+import { kostenUitBank } from "./kosten-uit-bank";
 
 /**
  * Leest één CAMT.053-bestand in. Idempotent:
@@ -29,12 +30,18 @@ export type BankImportResult = {
     controle: string;
     waarschuwingen: string[];
   }[];
+  /** Maanden waarvan de Kostenmonitor uit deze transacties is aangevuld. */
+  kosten: { maand: string; regels: number; status: string }[];
 };
 
 export async function importCamtBestand(db: Db, bestand: string, content: string): Promise<BankImportResult> {
   const afschriften = parseCamt053(content);
-  const out: BankImportResult = { bestand, afschriften: [] };
+  const out: BankImportResult = { bestand, afschriften: [], kosten: [] };
   for (const a of afschriften) out.afschriften.push(await importAfschrift(db, bestand, a));
+  // Maanden in deze export: de Kostenmonitor aanvullen waar die nog niet definitief is.
+  const maanden = new Set<string>();
+  for (const a of afschriften) for (const t of a.transacties) maanden.add(t.boekdatum.slice(0, 7));
+  out.kosten = await kostenUitBank(db, [...maanden]);
   return out;
 }
 

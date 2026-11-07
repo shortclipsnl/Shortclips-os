@@ -43,5 +43,6 @@ export async function importBankBestanden(formData: FormData): Promise<BankUploa
   }
   revalidatePath("/financien");
   revalidatePath("/financien/maand");
+  revalidatePath("/kosten");
   return { ok: resultaten.length > 0, resultaten, fouten, message: resultaten.length ? undefined : "Niets ingelezen." };
 }
