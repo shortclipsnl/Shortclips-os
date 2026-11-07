@@ -76,7 +76,7 @@ export function VideoResults({ videos }: { videos: PortalTopVideo[] }) {
       <div className="flex flex-col gap-3 px-5 pt-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="flex items-center gap-2 text-[18px] font-bold tracking-tight">Resultaten per video</h2>
-          <p className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">{list.length} video&apos;s geplaatst in deze periode · top 3 op weergaven gemarkeerd</p>
+          <p className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">{list.length} video&apos;s met cijfers in deze periode · top 3 op weergaven gemarkeerd</p>
         </div>
         <label className="flex items-center gap-2 text-[12.5px] text-[var(--color-ink-muted)]">
           <ArrowDown className="size-3.5" /> Sorteer op
