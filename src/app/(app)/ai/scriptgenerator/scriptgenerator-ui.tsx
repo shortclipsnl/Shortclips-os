@@ -833,7 +833,7 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
                       <li key={vi} className="flex items-center gap-2 text-2xs">
                         <span className="min-w-0 flex-1 truncate text-[var(--color-ink-muted)]">
                           <span className="text-[var(--color-ink)]">{v.feedback}</span>
-                          <span className="text-[var(--color-ink-faint)]"> · {new Date(v.at).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}</span>
+                          <span className="text-[var(--color-ink-faint)]"> · {new Date(v.at).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" })}</span>
                         </span>
                         <button type="button" onClick={() => revert(s.id, vi)} className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-0.5 font-medium text-[var(--color-ink)] hover:border-[var(--color-brand-500)]">
                           <RotateCcw className="size-3" /> Herstel

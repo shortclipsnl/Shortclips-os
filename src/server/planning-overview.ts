@@ -155,7 +155,7 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
       const when = new Date(m.scheduledAt);
       return {
         id: m.id, title: m.title, date: iso(when),
-        time: when.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }),
+        time: when.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" }),
         location: m.location, source: "intern", meetLink: null, attendees: [],
         clientName: null, clientColor: null, clientLogo: null, href: `/meetings/${m.id}`, ...noCoord,
       };
@@ -164,7 +164,7 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
       const when = new Date(m.startsAt);
       return {
         id: m.id, title: m.title ?? "Meeting", date: iso(when),
-        time: m.allDay ? "" : when.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }),
+        time: m.allDay ? "" : when.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" }),
         location: m.location, source: "google", meetLink: m.meetLink,
         attendees: attendeeNames(m.attendees),
         clientName: m.clientName, clientColor: m.clientColor, clientLogo: m.clientLogo,

@@ -288,7 +288,9 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
           // melding per agenda per dag.
           const dayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
           await notify({
-            roles: ["owner", "operational_manager"],
+            // Technische melding: alleen naar de eigenaar/beheerder, niet naar
+            // het operationele team (die kan er zelf niets mee).
+            roles: ["owner"],
             level: "critical",
             type: "calendar_agenda_unreachable",
             title: `Agenda synchroniseert niet: ${cal.summary}`,

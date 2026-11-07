@@ -55,7 +55,7 @@ export function WeekPlanning({ shoots, meetings, uploads = [] }: { shoots: WeekS
 
   return (
     <Card padded={false} className="overflow-hidden">
-      <CardHeader title="Deze week" subtitle="Opnames, uploads en meetings per dag (ma–vr)." className="px-5 py-3.5" />
+      <CardHeader title="Agenda deze week" subtitle="Opnames, uploads en meetings per dag (ma–vr)." className="px-5 py-3.5" />
       <div className="grid gap-px bg-[var(--color-line)] sm:grid-cols-5">
         {days.map((d, i) => {
           const key = iso(d);
@@ -126,7 +126,7 @@ export function WeekPlanning({ shoots, meetings, uploads = [] }: { shoots: WeekS
                         <span className="min-w-0">
                           <span className="block truncate text-2xs font-semibold">{m.title}</span>
                           <span className="block text-[10px] text-[var(--color-ink-muted)]">
-                            meeting · {new Date(m.scheduledAt).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}
+                            meeting · {new Date(m.scheduledAt).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" })}
                           </span>
                         </span>
                       </Link>
