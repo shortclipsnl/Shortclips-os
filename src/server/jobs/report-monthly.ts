@@ -1,11 +1,11 @@
 import "server-only";
-import { and, asc, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientReports, clients } from "@/db/schema";
 import { addWorkingDays, snapToWorkingDay } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { ensureMonthlyReport } from "@/server/reports/run";
-import { currentMonthPeriod, periodLabel, previousMonthPeriod } from "@/server/reports/analysis";
+import { ANALYSE_VERSIE, currentMonthPeriod, periodLabel, previousMonthPeriod } from "@/server/reports/analysis";
 
 /** Na zoveel minuten geldt een analyse die nog 'bezig' is als vastgelopen. */
 const STALE_MIN = 20;
@@ -39,10 +39,11 @@ function isWithinMonthStart(today: string): boolean {
  * een rapport klaargezet. Idempotent: klanten met een reeds opgesteld rapport
  * worden overgeslagen. Eén storing blokkeert de rest niet.
  */
-export async function runMonthlyReports(): Promise<{ eligible: boolean; period: string; scanned: number; started: number; failed: number }> {
+export async function runMonthlyReports(): Promise<{ eligible: boolean; period: string; scanned: number; started: number; failed: number; bijgewerkt: number }> {
   const today = amsterdamToday();
   const period = previousMonthPeriod(currentMonthPeriod());
-  if (!isWithinMonthStart(today)) return { eligible: false, period, scanned: 0, started: 0, failed: 0 };
+  const bijgewerkt = await requeueOutdatedReports(period);
+  if (!isWithinMonthStart(today)) return { eligible: false, period, scanned: 0, started: 0, failed: 0, bijgewerkt };
 
   const active = await db
     .select({ id: clients.id })
@@ -72,7 +73,29 @@ export async function runMonthlyReports(): Promise<{ eligible: boolean; period: 
     }
   }
 
-  return { eligible: true, period, scanned: active.length, started, failed };
+  return { eligible: true, period, scanned: active.length, started, failed, bijgewerkt };
+}
+
+/**
+ * Rapporten van de afgelopen maand die nog op controle wachten maar in een
+ * ouder analyseformaat staan, opnieuw in de wachtrij zetten. Zo krijgt het team
+ * na een verbetering van de analyse automatisch de nieuwe versie, zonder dat
+ * iemand op 'AI opnieuw' hoeft te klikken. Goedgekeurde rapporten blijven
+ * ongemoeid; feedback en eerdere versies blijven bewaard.
+ */
+export async function requeueOutdatedReports(period: string): Promise<number> {
+  const rows = await db
+    .update(clientReports)
+    .set({ status: "gegevens_verzamelen", errorMessage: null, updatedAt: new Date() })
+    .where(and(
+      eq(clientReports.periodType, "month"),
+      eq(clientReports.period, period),
+      isNull(clientReports.deletedAt),
+      inArray(clientReports.status, ["klaar_voor_controle", "aanpassing_nodig"]),
+      sql`coalesce((${clientReports.analysis}->>'versie')::int, 0) < ${ANALYSE_VERSIE}`,
+    ))
+    .returning({ id: clientReports.id });
+  return rows.length;
 }
 
 /**

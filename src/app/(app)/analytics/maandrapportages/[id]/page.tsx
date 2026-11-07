@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isOwner } from "@/server/auth/context";
 import { aiConfigured } from "@/server/ai/client";
-import { getMonthlyReport, listReportTeam, requireReportsAccess } from "@/server/reports/service";
+import { getMonthlyReport, listReportTeam, loadReportPdfData, requireReportsAccess } from "@/server/reports/service";
 import { loadStrategyProfile, GOAL_OPTIONS } from "@/server/reports/strategy";
 import { Badge, ClientLogo, PageHeader } from "@/components/ui";
 import { ReviewUI } from "./review-ui";
@@ -19,10 +19,16 @@ export default async function ReportReviewPage({ params }: { params: Promise<{ i
   const report = await getMonthlyReport(viewer, id);
   if (!report) notFound();
   const canWrite = viewer.permissions.has("reports:write");
-  const [strategy, team] = await Promise.all([
+  const [strategy, team, pdfData] = await Promise.all([
     canWrite ? loadStrategyProfile(report.clientId) : Promise.resolve(null),
     listReportTeam(),
+    loadReportPdfData(report.id),
   ]);
+  const videos = (pdfData?.videos ?? []).map((v) => ({
+    key: v.key, titel: v.titel, datum: v.datum, platform: v.platform, views: v.views, likes: v.likes, reacties: v.reacties,
+    shares: v.shares, saves: v.saves, gemKijktijdSec: v.gemKijktijdSec, uitkijkPct: v.uitkijkPct ?? null, duurSec: v.duurSec ?? null,
+    scriptHook: v.scriptHook ?? null, thumb: v.thumb, analyse: v.analyse,
+  }));
 
   return (
     <div className="mx-auto max-w-[1200px]">
@@ -40,6 +46,7 @@ export default async function ReportReviewPage({ params }: { params: Promise<{ i
         viewerId={viewer.id}
         team={team.map((t) => ({ id: t.id, name: t.name }))}
         aiReady={aiConfigured()}
+        videos={videos}
       />
     </div>
   );

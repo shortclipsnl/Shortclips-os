@@ -227,6 +227,24 @@ describe("generatie, wachtrij, feedback en versies", () => {
     expect(versions.every((v) => v.kind === "generatie")).toBe(true);
   });
 
+  it("zet rapporten in een oud analyseformaat automatisch opnieuw in de wachtrij", async () => {
+    const { requeueOutdatedReports } = await import("@/server/jobs/report-monthly");
+    const { ensureMonthlyReport } = await import("@/server/reports/run");
+    const { eq } = await import("drizzle-orm");
+    // Net gegenereerd: actuele versie, dus niets te doen.
+    expect(await requeueOutdatedReports("2026-10")).toBe(0);
+    const [r] = await db.select({ analysis: s.clientReports.analysis }).from(s.clientReports).where(eq(s.clientReports.id, ids.reportActief!));
+    const oud = { ...(r!.analysis as Record<string, unknown>) };
+    delete oud.versie;
+    await db.update(s.clientReports).set({ analysis: oud }).where(eq(s.clientReports.id, ids.reportActief!));
+    expect(await requeueOutdatedReports("2026-10")).toBe(1);
+    const [na] = await db.select({ status: s.clientReports.status }).from(s.clientReports).where(eq(s.clientReports.id, ids.reportActief!));
+    expect(na!.status).toBe("gegevens_verzamelen");
+    expect(await requeueOutdatedReports("2026-10")).toBe(0); // staat al in de wachtrij
+    const res = await ensureMonthlyReport(ids.actief!, "2026-10", { force: true, triggeredById: ids.jarno! });
+    expect(res.ok).toBe(true);
+  });
+
   it("blokkeert goedkeuren zolang de beoordeling ontbreekt of de cijfers een kopie zijn", async () => {
     const { checkReportQuality, canApprove } = await import("@/server/reports/quality");
     const base = { clientName: "x", analysis: { verbeterpunten: [{ titel: "a" }] } as never, metrics: { views: 1, posts: 1 }, ontbrekendeGegevens: [] };

@@ -12,6 +12,13 @@ import { buildVergelijking, formatStats, monthSeries, platformSplit, type Format
 /* ---------------- Periode-helpers (Europe/Amsterdam) ---------------- */
 
 /** Huidige of gegeven maand als YYYY-MM in de Amsterdam-tijdzone. */
+/**
+ * Versie van het analyseformaat. Ophogen als de opbouw van de analyse wezenlijk
+ * verandert: rapporten die nog op controle wachten worden dan automatisch
+ * opnieuw gegenereerd in het nieuwe formaat.
+ */
+export const ANALYSE_VERSIE = 3;
+
 export function currentMonthPeriod(d = new Date()): string {
   return d.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" }).slice(0, 7);
 }
@@ -104,6 +111,8 @@ export type MonthlyAnalysis = ClientInsights & {
   /** Eén kort inzicht per video (klantversie), gekoppeld via de sleutel uit metrics.videos. */
   videoInzichten?: Array<{ key: string; inzicht: string }>;
   intern?: InternAnalyse;
+  /** Versie van het analyseformaat (zie ANALYSE_VERSIE). */
+  versie?: number;
 };
 
 export type ReportVideo = {
@@ -310,6 +319,7 @@ export async function generateMonthlyAnalysis(
   const raw = res.data ?? {};
   const a = raw.analysis ?? raw.analyse ?? { watWerkt: [], watMinder: [], ontwikkelingen: [] };
   const analysis: MonthlyAnalysis = {
+    versie: ANALYSE_VERSIE,
     analysis: {
       watWerkt: arr<Finding>(a.watWerkt),
       watMinder: arr<Finding>(a.watMinder),

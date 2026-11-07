@@ -12,6 +12,7 @@ import {
 import type { ReportDetail } from "@/server/reports/service";
 import type { InternInzicht } from "@/server/reports/analysis";
 import { STATUS_META } from "../report-list";
+import { VideoInsights, type ReviewVideo } from "./video-insights";
 
 type Rec = { titel: string; waarom?: string; wat?: string; hoeMeten?: string; zekerheid?: string };
 type Actie = { titel: string; waarom?: string };
@@ -55,7 +56,7 @@ function Insights({ title, list }: { title: string; list?: InternInzicht[] }) {
 }
 
 export function ReviewUI({
-  report, canWrite, owner, canTask, viewerId, team, aiReady,
+  report, canWrite, owner, canTask, viewerId, team, aiReady, videos = [],
 }: {
   report: ReportDetail;
   canWrite: boolean;
@@ -64,6 +65,7 @@ export function ReviewUI({
   viewerId: string;
   team: Array<{ id: string; name: string }>;
   aiReady: boolean;
+  videos?: ReviewVideo[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -238,13 +240,17 @@ export function ReviewUI({
                 </div>
               ) : null}
               {!a?.intern ? <p className="text-sm text-[var(--color-ink-muted)]">Dit rapport is gemaakt voordat de interne teamanalyse bestond. Genereer de AI-analyse opnieuw om die toe te voegen.</p> : null}
-              <Insights title="Best presterende video's en waarom" list={a?.intern?.besteVideos} />
-              <Insights title="Hooks die werkten" list={a?.intern?.hooks} />
-              <Insights title="Onderwerpen met de meeste betrokkenheid" list={a?.intern?.onderwerpen} />
-              <Insights title="Video's die tegenvielen" list={a?.intern?.tegenvallers} />
-              <Insights title="Lessen over de videostructuur" list={a?.intern?.videostructuur} />
-              <Insights title="Formats om vaker te gebruiken" list={a?.intern?.formatsVaker} />
-              <Insights title="Onderwerpen om te vermijden of aan te passen" list={a?.intern?.vermijdenOfAanpassen} />
+              {videos.some((v) => v.analyse) ? <VideoInsights videos={videos} /> : (
+                <>
+                  <Insights title="Best presterende video's en waarom" list={a?.intern?.besteVideos} />
+                  <Insights title="Hooks die werkten" list={a?.intern?.hooks} />
+                  <Insights title="Onderwerpen met de meeste betrokkenheid" list={a?.intern?.onderwerpen} />
+                  <Insights title="Video's die tegenvielen" list={a?.intern?.tegenvallers} />
+                  <Insights title="Lessen over de videostructuur" list={a?.intern?.videostructuur} />
+                  <Insights title="Formats om vaker te gebruiken" list={a?.intern?.formatsVaker} />
+                  <Insights title="Onderwerpen om te vermijden of aan te passen" list={a?.intern?.vermijdenOfAanpassen} />
+                </>
+              )}
               {a?.intern ? (
                 <div className="grid gap-4 sm:grid-cols-3">
                   {([["Scripts", a.intern.scripts], ["Opnames", a.intern.opnames], ["Montage", a.intern.montage]] as const).map(([t, list]) => (
