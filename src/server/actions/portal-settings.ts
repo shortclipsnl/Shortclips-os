@@ -31,6 +31,7 @@ export async function updatePortalSettings(input: PortalSettings): Promise<Actio
       reviewAutoApproveDays: clampDay(input.reviewAutoApproveDays),
       extraContentNote: str(input.extraContentNote, 500),
       rawFootageFee: str(input.rawFootageFee, 200),
+      deliveryWorkdays: clampDay(input.deliveryWorkdays) || 14,
     };
     await savePortalSettings(clean, viewer.id);
     await auditLog({ viewer, action: "portal_settings.updated", entityType: "settings", entityId: "portaal" });

@@ -455,3 +455,57 @@ export const editorRates = pgTable("editor_rates", {
   capacityPerWeek: integer("capacity_per_week").notNull().default(0),
   ...timestamps,
 }, (t) => [unique("editor_rates_user_unique").on(t.userId)]);
+
+/* ------------------------------------------------------------------ *
+ * Frame.io-bibliotheek voor het klantportaal.
+ *
+ * Een read-only spiegel van de video's in het Frame.io-project van elke klant,
+ * gegroepeerd per opnamesessie (de map direct onder het project, of onder een
+ * jaarmap). Bewust los van `deliverables` (het interne editingbord), zodat
+ * honderden losse Frame-bestanden het werkbord niet vervuilen. Gevuld door de
+ * job `frameio.sync_library`; verdwijnt een bestand uit Frame, dan krijgt de
+ * rij een `deletedAt` (historie blijft bewaard).
+ * ------------------------------------------------------------------ */
+export const frameAssets = pgTable(
+  "frame_assets",
+  {
+    id: pk(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    frameProjectId: varchar("frame_project_id", { length: 200 }).notNull(),
+    /** Frame.io-bestand (of de bovenste versie van een version stack). */
+    frameFileId: varchar("frame_file_id", { length: 200 }).notNull(),
+    /** Het afspeelbare bestand: gelijk aan frameFileId, of de nieuwste versie
+     *  (head) van een version stack. Gebruikt voor thumbnail en afspelen. */
+    mediaFileId: varchar("media_file_id", { length: 200 }).notNull(),
+    name: varchar("name", { length: 400 }).notNull(),
+    /** Opnamesessie = map direct onder het project (jaarmappen overgeslagen). */
+    sessionFolderId: varchar("session_folder_id", { length: 200 }),
+    sessionName: varchar("session_name", { length: 240 }),
+    sessionViewUrl: text("session_view_url"),
+    sessionCreatedAt: timestamp("session_created_at", { withTimezone: true }),
+    /** Laatste wijziging van de sessiemap in Frame (voor incrementeel bijwerken). */
+    sessionUpdatedAt: timestamp("session_updated_at", { withTimezone: true }),
+    /** Opnamedag waar deze sessie bij hoort (datum in de mapnaam, of de laatste
+     *  opname vóór het aanmaken van de map). Null = niet met zekerheid te koppelen. */
+    sessionProductionDayId: uuid("session_production_day_id").references(() => productionDays.id, { onDelete: "set null" }),
+    /** Submap binnen de sessie (bijv. "AD - VERKORTE VERSIES"), of null. */
+    subfolderName: varchar("subfolder_name", { length: 240 }),
+    viewUrl: text("view_url"),
+    durationSeconds: integer("duration_seconds"),
+    commentCount: integer("comment_count"),
+    versionCount: integer("version_count").notNull().default(1),
+    /** Laatst opgehaalde (ondertekende, verlopende) thumbnail-URL. */
+    thumbnailUrl: text("thumbnail_url"),
+    frameCreatedAt: timestamp("frame_created_at", { withTimezone: true }),
+    frameUpdatedAt: timestamp("frame_updated_at", { withTimezone: true }),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    ...timestamps,
+    ...softDelete,
+  },
+  (t) => [
+    unique("frame_assets_file_unique").on(t.frameFileId),
+    index("frame_assets_client_idx").on(t.clientId, t.sessionFolderId),
+  ],
+);

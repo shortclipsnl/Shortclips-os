@@ -17,18 +17,36 @@ import {
 } from "lucide-react";
 
 const ITEMS = [
-  { href: "/portal", label: "Overzicht", icon: LayoutDashboard },
-  { href: "/portal/videos", label: "Video's", icon: Video },
-  { href: "/portal/scripts", label: "Scripts", icon: FileText },
-  { href: "/portal/planning", label: "Opnameplanning", icon: CalendarRange },
-  { href: "/portal/content", label: "Contentplanning", icon: CalendarDays },
-  { href: "/portal/resultaten", label: "Resultaten", icon: BarChart3 },
-  { href: "/portal/analyses", label: "Maandanalyses", icon: FileBarChart },
-  { href: "/portal/samenwerking", label: "Samenwerking", icon: Handshake },
+  { href: "/portal", label: "Overzicht", short: "Overzicht", icon: LayoutDashboard },
+  { href: "/portal/videos", label: "Video's", short: "Video's", icon: Video },
+  { href: "/portal/scripts", label: "Scripts", short: "Scripts", icon: FileText },
+  { href: "/portal/content", label: "Contentplanning", short: "Planning", icon: CalendarDays },
+  { href: "/portal/planning", label: "Opnameplanning", short: "Opnames", icon: CalendarRange },
+  { href: "/portal/resultaten", label: "Resultaten", short: "Resultaten", icon: BarChart3 },
+  { href: "/portal/analyses", label: "Maandanalyses", short: "Analyses", icon: FileBarChart },
+  { href: "/portal/samenwerking", label: "Samenwerking & Afspraken", short: "Afspraken", icon: Handshake },
 ];
 
-/** De vaste tabs onderin op mobiel; de rest (Scripts, Samenwerking) zit onder "Meer". */
-const PRIMARY = ["/portal", "/portal/videos", "/portal/content", "/portal/resultaten"];
+/** De vaste tabs onderin op mobiel; de rest zit onder "Meer". */
+const PRIMARY = ["/portal", "/portal/videos", "/portal/scripts", "/portal/resultaten"];
+
+export type NavCounts = { scripts: number; videos: number };
+function countFor(href: string, c?: NavCounts): number {
+  if (!c) return 0;
+  if (href === "/portal/scripts") return c.scripts;
+  if (href === "/portal/videos") return c.videos;
+  return 0;
+}
+
+/** Oranje teller: hier wacht iets op de klant. */
+function ActionBadge({ n, onDark = false }: { n: number; onDark?: boolean }) {
+  if (n <= 0) return null;
+  return (
+    <span className={`ml-auto grid min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold leading-5 ${onDark ? "bg-white/20 text-current" : "bg-[var(--sc-act)] text-[var(--sc-act-ink)]"}`} aria-label={`${n} wacht op jou`}>
+      {n}
+    </span>
+  );
+}
 
 function useIsActive() {
   const pathname = usePathname();
@@ -36,11 +54,10 @@ function useIsActive() {
     href === "/portal" ? pathname === "/portal" : pathname.startsWith(href);
 }
 
-const ACTIVE_SIDEBAR =
-  "bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] text-white shadow-[0_10px_26px_-10px_rgba(25,168,250,0.7)]";
+const ACTIVE_SIDEBAR = "bg-[var(--sc-cta)] text-[var(--sc-cta-ink)] shadow-[var(--shadow-card)]";
 
 /** Verticale navigatie voor desktop (in de zijbalk). */
-export function PortalNav() {
+export function PortalNav({ counts }: { counts?: NavCounts }) {
   const isActive = useIsActive();
   return (
     <nav aria-label="Portaalnavigatie" className="hidden lg:flex lg:flex-col lg:gap-0.5">
@@ -57,7 +74,8 @@ export function PortalNav() {
             ].join(" ")}
           >
             <Icon className="size-4 shrink-0" strokeWidth={1.75} />
-            <span>{label}</span>
+            <span className="truncate">{label}</span>
+            <ActionBadge n={countFor(href, counts)} onDark={active} />
           </Link>
         );
       })}
@@ -66,7 +84,7 @@ export function PortalNav() {
 }
 
 /** Bottom-tab-bar voor mobiel: vier vaste tabs + een "Meer"-vel. */
-export function PortalMobileNav() {
+export function PortalMobileNav({ counts }: { counts?: NavCounts }) {
   const isActive = useIsActive();
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -81,8 +99,9 @@ export function PortalMobileNav() {
         className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--sc-line)] bg-[var(--sc-header-bg)] pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
       >
         <div className="mx-auto flex max-w-[1240px] items-stretch justify-around px-1">
-          {primary.map(({ href, label, icon: Icon }) => {
+          {primary.map(({ href, short: label, icon: Icon }) => {
             const active = isActive(href);
+            const n = countFor(href, counts);
             return (
               <Link
                 key={href}
@@ -92,7 +111,10 @@ export function PortalMobileNav() {
                   active ? "text-[var(--sc-accent)]" : "text-[var(--color-ink-muted)]"
                 }`}
               >
-                <Icon className="size-[22px]" strokeWidth={active ? 2.1 : 1.75} />
+                <span className="relative">
+                  <Icon className="size-[22px]" strokeWidth={active ? 2.1 : 1.75} />
+                  {n > 0 ? <span className="absolute -right-2 -top-1.5 grid min-w-4 place-items-center rounded-full bg-[var(--sc-act)] px-1 text-[10px] font-bold leading-4 text-[var(--sc-act-ink)]">{n}</span> : null}
+                </span>
                 <span className="leading-none">{label}</span>
               </Link>
             );

@@ -49,6 +49,7 @@ export function PortalSettingsForm({ initial }: { initial: PortalSettings }) {
       <div className="grid gap-4 sm:grid-cols-3">
         <Num label="Beoordelingstermijn (werkdagen)" k="reviewDays" />
         <Num label="Akkoord-bij-geen-reactie (werkdagen)" k="reviewAutoApproveDays" />
+        <Num label="Levertermijn video's na opname (werkdagen)" k="deliveryWorkdays" />
         <Txt label="Raw footage op verzoek" k="rawFootageFee" />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">

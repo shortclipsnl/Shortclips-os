@@ -57,7 +57,7 @@ export function VoorbereidingOverzicht() {
             <ul className="mt-3 flex flex-col gap-2">
               {g.items.map((item) => (
                 <li key={item} className="flex items-start gap-2.5 text-[13px] text-[var(--color-ink-muted)]">
-                  <span className="mt-px grid size-5 shrink-0 place-items-center rounded-full bg-[rgba(46,144,250,0.14)] text-[var(--sc-accent)]">
+                  <span className="mt-px grid size-5 shrink-0 place-items-center rounded-full bg-[var(--st-blue-bg)] text-[var(--sc-accent)]">
                     <Check className="size-3.5" strokeWidth={2.5} />
                   </span>
                   {item}
@@ -68,7 +68,7 @@ export function VoorbereidingOverzicht() {
         ))}
       </div>
 
-      <div className="mt-4 rounded-[14px] border border-[#2e90fa]/25 bg-[rgba(46,144,250,0.06)] p-4">
+      <div className="mt-4 rounded-[14px] border border-[var(--sc-line)] bg-[var(--st-blue-bg)] p-4">
         <div className="text-[14px] font-semibold">Zenuwachtig voor de camera?</div>
         <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">
           Dat hoort erbij en is geen probleem. Wij nemen in korte stukken op, herhalen zo vaak als nodig en halen er in de montage uit wat het beste werkt. Niemand hoeft iets uit het hoofd te leren.

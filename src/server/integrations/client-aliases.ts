@@ -13,6 +13,11 @@ export const CLIENT_ALIASES: Record<string, string[]> = {
   "benz-collector-sneek": ["benz collector museum", "benz collector", "benzcollector"],
   "donker-groep": ["donkergroen", "donker groen"],
   "kavel-10": ["kavel 10 | hetbestebeeld.nl", "hetbestebeeld"],
+  hegro: ["hegro wolvega"],
+  kubo: ["kubo interieur"],
+  bowt: ["bowt watersport"],
+  "de-goede-financieel": ["de goede"],
+  "mr-chikin-nederland": ["mr. chikin", "mr chikin"],
   // Metricool-merknamen die afwijken van de klantnaam.
   "bedrijfskleding-online": ["bedrijfskledingonline.nl", "bedrijfskledingonline"],
   nahv: ["nahv belastingadviseurs"],

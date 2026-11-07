@@ -1,207 +1,206 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarClock, CheckCircle2, Clock, FileText, MapPin, MessageSquareText } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, ChevronDown, Clock, FileText, MapPin } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalData } from "@/server/portal";
 import { getPortalSettingsForClient } from "@/server/portal-settings";
 import { CLIENT_ACTION_STATUSES, listPortalScriptReviews, type PortalReviewListItem } from "@/server/script-review";
 import { ScriptLeeswijzer } from "@/components/portal/script-leeswijzer";
-import { Badge, buttonClass } from "@/components/ui";
-import { daysUntil, formatDateFull, relativeDays } from "@/lib/format";
+import { StatusPill, portalBtn, type StatusTone } from "@/components/portal/status-pill";
+import { relativeDays } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Scripts" };
 export const dynamic = "force-dynamic";
 
-// Statussen waarbij de klant iets moet doen vallen bewust op met de huisstijl-
-// oranje accentkleur; de rest houdt een rustige pil. Klantgerichte labels.
-const PORTAL_STATUS: Record<PortalReviewListItem["status"], { label: string; cls: string }> = {
-  klaar_controle:   { label: "Klaar voor controle",    cls: "bg-[#ff6a00] text-white" },
-  opnieuw_controle: { label: "Opnieuw ter controle",   cls: "bg-[#ff6a00] text-white" },
-  feedback_gegeven: { label: "Feedback ontvangen",     cls: "bg-[rgba(46,144,250,0.15)] text-[#1b6fe8]" },
-  wordt_aangepast:  { label: "Wordt aangepast",        cls: "bg-[rgba(46,144,250,0.15)] text-[#1b6fe8]" },
-  goedgekeurd:      { label: "Goedgekeurd door klant", cls: "bg-[rgba(47,210,122,0.18)] text-[#1d8a52]" },
-};
+const TZ = "Europe/Amsterdam";
+const todayIso = () => new Date().toLocaleDateString("en-CA", { timeZone: TZ });
 
-function StatusBadge({ status }: { status: PortalReviewListItem["status"] }) {
-  const s = PORTAL_STATUS[status];
-  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-bold ${s.cls}`}>{s.label}</span>;
+/** "Donderdag 13 november" — weekdag erbij maakt een deadline direct concreet. */
+function dayLabel(iso: string): string {
+  const s = new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long", timeZone: TZ });
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function fmtShootLine(r: { shootOn: string | null; shootTime: string | null; shootLocation: string | null }): string {
-  if (!r.shootOn) return "";
-  const parts = [formatDateFull(r.shootOn)];
-  if (r.shootTime) parts.push(`vanaf ${r.shootTime.slice(0, 5)}`);
-  if (r.shootLocation) parts.push(r.shootLocation);
-  return parts.join(" · ");
+type Row = {
+  key: string;
+  shootOn: string | null;
+  shootTime: string | null;
+  location: string | null;
+  review: PortalReviewListItem | null;
+};
+
+type Bucket = "actie" | "bezig" | "goedgekeurd" | "afgerond";
+
+/** Status per opname, met de vaste portaalkleuren. */
+function statusOf(r: Row, today: string): { bucket: Bucket; tone: StatusTone; label: string } {
+  const rev = r.review;
+  const past = !!r.shootOn && r.shootOn < today;
+  if (!rev) return past ? { bucket: "afgerond", tone: "grey", label: "Geen script gedeeld" } : { bucket: "bezig", tone: "blue", label: "Script wordt voorbereid" };
+  if (CLIENT_ACTION_STATUSES.includes(rev.status)) {
+    const overdue = !!rev.feedbackDeadline && rev.feedbackDeadline.slice(0, 10) < today;
+    if (overdue) return { bucket: "actie", tone: "red", label: "Feedbacktermijn verstreken" };
+    return { bucket: "actie", tone: "orange", label: rev.status === "opnieuw_controle" ? "Aangepast, wacht op jou" : "Wacht op jouw feedback" };
+  }
+  if (rev.status === "feedback_gegeven" || rev.status === "wordt_aangepast") return { bucket: "bezig", tone: "blue", label: rev.status === "feedback_gegeven" ? "Feedback ontvangen" : "Wordt aangepast" };
+  return past ? { bucket: "afgerond", tone: "grey", label: "Afgerond · opgenomen" } : { bucket: "goedgekeurd", tone: "green", label: "Goedgekeurd" };
+}
+
+function ShootDate({ iso }: { iso: string | null }) {
+  if (!iso) return <span className="grid size-12 shrink-0 place-items-center rounded-[12px] bg-[var(--sc-fill-strong)] text-[var(--color-ink-faint)]"><FileText className="size-5" /></span>;
+  const d = new Date(`${iso}T12:00:00`);
+  return (
+    <span className="flex size-12 shrink-0 flex-col items-center justify-center rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)]">
+      <span className="text-[17px] font-bold leading-none tabular-nums">{d.getDate()}</span>
+      <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">{d.toLocaleDateString("nl-NL", { month: "short", timeZone: TZ })}</span>
+    </span>
+  );
+}
+
+function SessionRow({ r, today }: { r: Row; today: string }) {
+  const st = statusOf(r, today);
+  const rev = r.review;
+  const actie = st.bucket === "actie";
+  return (
+    <div
+      className="sc-glass flex flex-wrap items-center gap-4 p-4 sm:p-5"
+      style={actie ? { boxShadow: `inset 4px 0 0 ${st.tone === "red" ? "var(--st-red)" : "var(--sc-act)"}` } : undefined}
+    >
+      <ShootDate iso={r.shootOn} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <h3 className="text-[15.5px] font-semibold">{r.shootOn ? `Opnamesessie ${dayLabel(r.shootOn).toLowerCase()}` : rev?.title ?? "Scripts"}</h3>
+          <StatusPill tone={st.tone}>{st.label}</StatusPill>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] text-[var(--color-ink-muted)]">
+          {r.shootOn ? <span>{relativeDays(r.shootOn)}{r.shootTime ? ` · vanaf ${r.shootTime.slice(0, 5)}` : ""}</span> : null}
+          {r.location ? <span className="inline-flex items-center gap-1"><MapPin className="size-3.5" /> {r.location}</span> : null}
+          {rev ? <span className="inline-flex items-center gap-1"><FileText className="size-3.5" /> {rev.title}</span> : null}
+          {rev && rev.openComments > 0 ? <span>{rev.openComments} opmerking{rev.openComments === 1 ? "" : "en"}</span> : null}
+        </div>
+        {actie && rev?.feedbackDeadline ? (
+          <p className={`mt-1.5 inline-flex items-center gap-1.5 text-[13px] font-semibold ${st.tone === "red" ? "text-[var(--st-red)]" : "text-[var(--st-orange)]"}`}>
+            <Clock className="size-3.5" /> Feedback uiterlijk {dayLabel(rev.feedbackDeadline).toLowerCase()}
+          </p>
+        ) : null}
+      </div>
+      {rev ? (
+        <Link href={`/portal/scripts/${rev.id}`} className={`${actie ? portalBtn.act : portalBtn.soft} shrink-0`}>
+          {actie ? "Bekijk & geef feedback" : "Bekijk script"} <ArrowRight className="size-4" />
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
+function Section({ title, hint, rows, today }: { title: string; hint?: string; rows: Row[]; today: string }) {
+  if (rows.length === 0) return null;
+  return (
+    <section>
+      <div className="mb-3 flex items-baseline gap-2">
+        <h2 className="text-[17px] font-semibold">{title}</h2>
+        <span className="text-[13px] text-[var(--color-ink-faint)]">{rows.length}</span>
+      </div>
+      {hint ? <p className="-mt-2 mb-3 text-[13px] text-[var(--color-ink-muted)]">{hint}</p> : null}
+      <div className="flex flex-col gap-3">{rows.map((r) => <SessionRow key={r.key} r={r} today={today} />)}</div>
+    </section>
+  );
 }
 
 export default async function PortalScriptsPage() {
   const viewer = await requirePortal();
   const [reviews, data, settings] = await Promise.all([listPortalScriptReviews(viewer), getPortalData(viewer), getPortalSettingsForClient(viewer.clientId ?? "")]);
+  const today = todayIso();
 
-  const actieNodig = reviews.filter((r) => CLIENT_ACTION_STATUSES.includes(r.status));
-  const bijShortclips = reviews.filter((r) => r.status === "feedback_gegeven" || r.status === "wordt_aangepast");
-  const goedgekeurd = reviews.filter((r) => r.status === "goedgekeurd");
-  const reviewByDay = new Map(reviews.map((r) => [r.productionDayId, r]));
+  // Eén rij per opnamesessie: elk review hoort bij een opnamedag; aankomende
+  // opnames zonder script staan er ook in ("wordt voorbereid").
+  const byDay = new Map<string, Row>();
+  for (const r of reviews) byDay.set(r.productionDayId, { key: r.productionDayId, shootOn: r.shootOn, shootTime: r.shootTime, location: r.shootLocation, review: r });
+  for (const s of data.upcomingShoots) {
+    if (!byDay.has(s.id)) byDay.set(s.id, { key: s.id, shootOn: s.scheduledOn, shootTime: s.startTime ?? null, location: s.locationName ?? null, review: null });
+  }
+  const rows = [...byDay.values()];
+  const groups: Record<Bucket, Row[]> = { actie: [], bezig: [], goedgekeurd: [], afgerond: [] };
+  for (const r of rows) groups[statusOf(r, today).bucket].push(r);
+  const asc = (a: Row, b: Row) => (a.shootOn ?? "9999").localeCompare(b.shootOn ?? "9999");
+  groups.actie.sort(asc);
+  groups.bezig.sort(asc);
+  groups.goedgekeurd.sort(asc);
+  groups.afgerond.sort((a, b) => (b.shootOn ?? "").localeCompare(a.shootOn ?? ""));
 
-  // Elke aankomende opname met het script dat erbij hoort, plus eventuele
-  // scripts die op je wachten waarvan de opname niet (meer) in de lijst staat.
-  const upcomingDayIds = new Set(data.upcomingShoots.map((s) => s.id));
-  const opnameRows = [
-    ...data.upcomingShoots.map((s) => ({
-      key: `shoot-${s.id}`,
-      date: s.scheduledOn,
-      time: s.startTime ?? null,
-      location: s.locationName ?? null,
-      review: reviewByDay.get(s.id) ?? null,
-    })),
-    ...reviews
-      .filter((r) => CLIENT_ACTION_STATUSES.includes(r.status) && r.shootOn && !upcomingDayIds.has(r.productionDayId))
-      .map((r) => ({ key: `rev-${r.id}`, date: r.shootOn!, time: r.shootTime, location: r.shootLocation, review: r })),
-  ].sort((a, b) => a.date.localeCompare(b.date));
-
-  const shoot = data.upcomingShoot;
-  const klaarCount = actieNodig.length;
-  // Eerlijke status i.p.v. "niets openstaand": komt de opname eraan en staat er
-  // nog geen script voor klaar, zeg dat we het afronden (geen vals "niets te doen").
-  const shootReview = shoot ? reviewByDay.get(shoot.id) ?? null : null;
-  const daysToShoot = shoot ? daysUntil(shoot.scheduledOn) : null;
-  const shootSoonNoScript =
-    !!shoot && daysToShoot != null && daysToShoot >= 0 && daysToShoot <= 7 &&
-    (!shootReview || (shootReview.status !== "goedgekeurd" && !CLIENT_ACTION_STATUSES.includes(shootReview.status)));
+  const firstAction = groups.actie[0]?.review ?? null;
+  const deadlines = groups.actie.map((r) => r.review?.feedbackDeadline).filter((d): d is string => !!d).sort();
 
   return (
-    <div className="flex flex-col gap-[22px]">
-      {/* Kop */}
-      <div className="px-0.5 pt-1">
+    <div className="flex flex-col gap-7">
+      <div>
         <h1 className="text-[26px] font-bold tracking-tight">Scripts</h1>
-        <p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">
-          Bekijk je scripts, geef eenvoudig feedback en keur ze goed — rechtstreeks hier, vóór de opnamedag.
-        </p>
+        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Per opnamesessie zie je het script, de status en of er iets van je verwacht wordt.</p>
       </div>
 
-      {/* Bovenin: volgende opname + of er actie nodig is */}
-      <div className="grid gap-[18px] sm:grid-cols-2">
-        <section className="sc-glass p-5">
-          <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-            <CalendarClock className="size-4 text-[var(--sc-accent)]" /> Volgende opnamedag
-          </span>
-          {shoot ? (
-            <>
-              <div className="mt-3 text-[15px] font-semibold">{formatDateFull(shoot.scheduledOn)}</div>
-              <div className="mt-1 flex flex-col gap-1 text-[13px] text-[var(--color-ink-muted)]">
-                <span>{relativeDays(shoot.scheduledOn)}{shoot.startTime ? ` · vanaf ${shoot.startTime.slice(0, 5)} uur` : ""}</span>
-                {shoot.locationName ? <span className="flex items-center gap-1.5"><MapPin className="size-3.5" /> {shoot.locationName}</span> : null}
-              </div>
-            </>
-          ) : (
-            <p className="mt-3 text-sm text-[var(--color-ink-muted)]">Nog geen opname gepland.</p>
-          )}
-        </section>
-
-        <section className="sc-glass flex flex-col p-5" style={klaarCount > 0 ? { boxShadow: "inset 3px 0 0 var(--sc-accent)" } : undefined}>
-          <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-            <MessageSquareText className="size-4 text-[var(--sc-accent)]" /> Scriptstatus
-          </span>
-          {klaarCount > 0 ? (
-            <>
-              <div className="mt-3 text-[15px] font-semibold text-[var(--sc-accent)]">
-                {klaarCount} script{klaarCount === 1 ? "" : "s"} {klaarCount === 1 ? "wacht" : "wachten"} op jouw controle
-              </div>
-              <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">Bekijk de scripts hieronder en geef je akkoord of feedback.</p>
-            </>
-          ) : shootSoonNoScript ? (
-            <>
-              <div className="mt-3 flex items-center gap-2 text-[15px] font-semibold text-[var(--sc-accent)]"><Clock className="size-5" /> Scripts in de maak</div>
-              <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">
-                We ronden je scripts af voor de opname van {formatDateFull(shoot!.scheduledOn)} ({relativeDays(shoot!.scheduledOn)}). Je krijgt bericht zodra ze klaarstaan om te controleren.
-                {bijShortclips.length > 0 ? ` ${bijShortclips.length} bij Shortclips in bewerking.` : ""}
-              </p>
-            </>
-          ) : (
-            <>
-              <div className="mt-3 flex items-center gap-2 text-[15px] font-semibold text-[#2fd27a]"><CheckCircle2 className="size-5" /> Niets openstaand</div>
-              <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">
-                {goedgekeurd.length > 0 ? `${goedgekeurd.length} script${goedgekeurd.length === 1 ? "" : "s"} goedgekeurd.` : "Je hoeft nu niets te doen."}
-                {bijShortclips.length > 0 ? ` ${bijShortclips.length} bij Shortclips in bewerking.` : ""}
-              </p>
-            </>
-          )}
-        </section>
-      </div>
-
-      {/* Aankomende opnames staan bovenaan (belangrijkst) — met het script dat
-          erbij hoort ernaast, zodat meteen duidelijk is welk script bij welke
-          opname hoort. De leeswijzer ("zo controleer je") staat eronder. */}
-      {opnameRows.length > 0 ? (
-        <section>
-          <h2 className="mb-1 text-base font-semibold">Aankomende opnames & scripts</h2>
-          <p className="mb-3 text-[13px] text-[var(--color-ink-muted)]">Per opname zie je het bijbehorende script en de status. Scripts die op jou wachten zijn duidelijk gemarkeerd.</p>
-          <div className="flex flex-col gap-3">
-            {opnameRows.map((o) => {
-              const actie = o.review ? CLIENT_ACTION_STATUSES.includes(o.review.status) : false;
-              return (
-                <div key={o.key} className="sc-glass flex flex-wrap items-center gap-4 p-4" style={actie ? { boxShadow: "inset 3px 0 0 var(--sc-accent)" } : undefined}>
-                  <span className="grid size-11 shrink-0 flex-col place-items-center rounded-[12px] border border-[var(--sc-line)] bg-gradient-to-br from-[rgba(25,168,255,0.22)] to-[rgba(27,95,224,0.22)] text-center">
-                    <span className="text-[16px] font-bold leading-none">{new Date(`${o.date}T12:00:00`).getDate()}</span>
-                    <span className="text-[9px] uppercase text-[var(--color-ink-muted)]">{new Date(`${o.date}T12:00:00`).toLocaleDateString("nl-NL", { month: "short" })}</span>
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[14.5px] font-semibold">{formatDateFull(o.date)}</div>
-                    <div className="text-[12.5px] text-[var(--color-ink-muted)]">
-                      {relativeDays(o.date)}{o.time ? ` · vanaf ${o.time.slice(0, 5)}` : ""}{o.location ? ` · ${o.location}` : ""}
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--sc-line)] pt-2">
-                      <FileText className="size-4 shrink-0 text-[var(--sc-accent)]" />
-                      {o.review ? (
-                        <>
-                          <span className="text-[13px] font-medium">{o.review.title}</span>
-                          <StatusBadge status={o.review.status} />
-                          {o.review.openComments > 0 ? <span className="text-[11.5px] text-[var(--color-ink-faint)]">{o.review.openComments} opmerking{o.review.openComments === 1 ? "" : "en"}</span> : null}
-                        </>
-                      ) : (
-                        <span className="text-[13px] text-[var(--color-ink-faint)]">Script wordt voorbereid — je krijgt bericht zodra het klaarstaat</span>
-                      )}
-                    </div>
-                  </div>
-                  {o.review ? (
-                    <Link href={`/portal/scripts/${o.review.id}`} className={`${buttonClass({ variant: actie ? "accent" : "secondary", size: "sm" })} shrink-0`}>
-                      {actie ? "Bekijk & geef feedback" : "Bekijk script"} <ArrowRight className="size-4" />
-                    </Link>
-                  ) : null}
-                </div>
-              );
-            })}
+      {/* In één oogopslag: moet ik iets doen? */}
+      {groups.actie.length > 0 ? (
+        <section className="sc-glass flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6" style={{ boxShadow: "inset 4px 0 0 var(--sc-act)" }}>
+          <div>
+            <StatusPill tone="orange">Actie nodig</StatusPill>
+            <p className="mt-2 text-[20px] font-bold tracking-tight">
+              {groups.actie.length === 1 ? "1 script wacht op jouw feedback" : `${groups.actie.length} scripts wachten op jouw feedback`}
+            </p>
+            <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">
+              {deadlines[0] ? <>Graag uiterlijk <strong className="text-[var(--color-ink)]">{dayLabel(deadlines[0]).toLowerCase()}</strong>. </> : null}
+              Binnen {settings.feedbackDaysScripts * 24} uur reageren houdt de opnamedag op schema.
+            </p>
           </div>
+          {firstAction ? (
+            <Link href={`/portal/scripts/${firstAction.id}`} className={portalBtn.act}>Start met beoordelen <ArrowRight className="size-4" /></Link>
+          ) : null}
+        </section>
+      ) : (
+        <section className="sc-glass flex items-center gap-3.5 p-5">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--st-green-bg)] text-[var(--st-green)]"><CheckCircle2 className="size-5" /></span>
+          <div>
+            <p className="text-[16px] font-semibold">Je hoeft nu niets te doen</p>
+            <p className="text-[13.5px] text-[var(--color-ink-muted)]">
+              {groups.bezig.length > 0 ? `${groups.bezig.length} ${groups.bezig.length === 1 ? "script is" : "scripts zijn"} bij ons in voorbereiding. Je krijgt bericht zodra er iets klaarstaat.` : "Zodra er een nieuw script klaarstaat, zie je het hier en krijg je bericht."}
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* Tellers per status */}
+      <div className="grid grid-cols-3 gap-3">
+        {([
+          ["Wacht op jou", groups.actie.length, "orange"],
+          ["In voorbereiding", groups.bezig.length, "blue"],
+          ["Goedgekeurd", groups.goedgekeurd.length, "green"],
+        ] as const).map(([label, n, tone]) => (
+          <div key={label} className="sc-glass p-4">
+            <div className="text-[28px] font-bold leading-none tabular-nums" style={{ color: n > 0 ? `var(--st-${tone})` : "var(--color-ink-faint)" }}>{n}</div>
+            <div className="mt-1.5 text-[12.5px] font-medium text-[var(--color-ink-muted)]">{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <Section title="Wacht op jouw feedback" rows={groups.actie} today={today} />
+      <Section title="In voorbereiding" hint="Hier zijn wij mee bezig. Je hoeft nog niets te doen." rows={groups.bezig} today={today} />
+      <Section title="Goedgekeurd" hint="Klaar voor de opnamedag." rows={groups.goedgekeurd} today={today} />
+
+      {rows.length === 0 ? (
+        <section className="sc-glass flex items-center gap-3 p-5 text-[14px] text-[var(--color-ink-muted)]">
+          <CalendarClock className="size-5 text-[var(--sc-accent)]" /> Er zijn nog geen opnamesessies of scripts. Zodra we je eerste opname plannen, zie je hier de scripts.
         </section>
       ) : null}
 
-      {/* Leeswijzer: hoe lees en controleer je de scripts ("Zo lees je de
-          scripts") — onder de aankomende scripts, want die zijn belangrijker. */}
       <ScriptLeeswijzer feedbackDays={settings.feedbackDaysScripts} />
 
-      {/* Eerder goedgekeurd */}
-      {goedgekeurd.length > 0 ? (
-        <section>
-          <h2 className="mb-3 text-base font-semibold">Eerder goedgekeurd</h2>
-          <div className="sc-glass divide-y divide-white/10">
-            {goedgekeurd.map((r) => (
-              <Link key={r.id} href={`/portal/scripts/${r.id}`} className="flex items-center gap-3 p-4 transition-colors hover:bg-[var(--sc-fill)]">
-                <CheckCircle2 className="size-5 shrink-0 text-[#2fd27a]" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[14px] font-semibold">{r.title}</div>
-                  <div className="text-[12.5px] text-[var(--color-ink-muted)]">{fmtShootLine(r) || "Goedgekeurd"}</div>
-                </div>
-                <Badge tone="good">Goedgekeurd</Badge>
-              </Link>
-            ))}
-          </div>
-        </section>
+      {groups.afgerond.length > 0 ? (
+        <details className="sc-glass group p-5 [&_summary]:cursor-pointer">
+          <summary className="flex list-none items-center justify-between gap-2 text-[15px] font-semibold">
+            <span>Afgeronde sessies <span className="font-normal text-[var(--color-ink-faint)]">{groups.afgerond.length}</span></span>
+            <ChevronDown className="size-4 text-[var(--color-ink-muted)] transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-4 flex flex-col gap-3">{groups.afgerond.map((r) => <SessionRow key={r.key} r={r} today={today} />)}</div>
+        </details>
       ) : null}
-
-      <footer className="flex items-center gap-1.5 pt-1 text-xs text-[var(--color-ink-faint)]">
-        <Clock className="size-3.5" /> Alles staat hier klaar — je hoeft niet meer naar Adobe of e-mail. Je feedback wordt automatisch bewaard.
-      </footer>
     </div>
   );
 }

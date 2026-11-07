@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CalendarRange, Check, Download, Share2 } from "lucide-react";
-import { PORTAL_PERIODS } from "@/lib/portal-periods";
+import { PORTAL_MONTH_PERIODS, PORTAL_PERIODS } from "@/lib/portal-periods";
 
 /**
  * Periodekeuze + PDF-download voor de resultatenpagina. Wisselt de periode via
@@ -59,14 +59,14 @@ export function ResultControls({
   return (
     <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
       <div className="inline-flex flex-wrap gap-1 rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] p-1">
-        {PORTAL_PERIODS.map((p) => {
+        {[...PORTAL_MONTH_PERIODS, ...PORTAL_PERIODS].map((p) => {
           const active = p.key === periodKey;
           return (
             <button
               key={p.key}
               type="button"
               onClick={() => go(`periode=${p.key}`)}
-              className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${active ? "bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+              className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${active ? "bg-[var(--sc-cta)] text-[var(--sc-cta-ink)]" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
             >
               {p.label}
             </button>
@@ -75,7 +75,7 @@ export function ResultControls({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${periodKey === "custom" ? "bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+          className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${periodKey === "custom" ? "bg-[var(--sc-cta)] text-[var(--sc-cta-ink)]" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
         >
           <CalendarRange className="size-3.5" /> Eigen periode
         </button>
@@ -86,7 +86,7 @@ export function ResultControls({
           href={reportHref}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] px-4 py-1.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+          className="sc-btn-cta inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors"
         >
           <Download className="size-4" /> Download rapport
         </a>
@@ -95,7 +95,7 @@ export function ResultControls({
           onClick={shareReport}
           className="inline-flex items-center justify-center gap-1.5 rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-1.5 text-[13px] font-semibold text-[var(--color-ink)] transition-colors hover:bg-[var(--sc-fill-strong)]"
         >
-          {copied ? <><Check className="size-4 text-[#2fd27a]" /> Link gekopieerd</> : <><Share2 className="size-4" /> Delen</>}
+          {copied ? <><Check className="size-4 text-[var(--st-green)]" /> Link gekopieerd</> : <><Share2 className="size-4" /> Delen</>}
         </button>
       </div>
 
@@ -113,7 +113,7 @@ export function ResultControls({
             type="button"
             onClick={applyCustom}
             disabled={!van || !tot || van > tot}
-            className="rounded-lg bg-gradient-to-br from-[#19a8ff] to-[#1b5fe0] px-3.5 py-1.5 text-[13px] font-semibold text-white disabled:opacity-40"
+            className="sc-btn-cta rounded-lg px-3.5 py-1.5 text-[13px] font-semibold disabled:opacity-40"
           >
             Toepassen
           </button>

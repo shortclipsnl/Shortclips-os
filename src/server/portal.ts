@@ -351,6 +351,11 @@ export type PortalTopVideo = {
   views: number;
   likes: number;
   comments: number;
+  shares: number;
+  saves: number;
+  reach: number;
+  /** Gemiddelde kijktijd in seconden (null = niet geleverd door het platform). */
+  avgWatchSeconds: number | null;
   publishedAt: string | null;
   url: string | null;
   thumbnailUrl: string | null;
@@ -395,6 +400,8 @@ export type PortalResults = {
   milestone: PortalMilestone | null;
   lastUpdated: string | null;
   hasData: boolean;
+  /** Kanalen waarop we voor deze klant publiceren (uit de contentplanning). */
+  plannedPlatforms: string[];
 };
 
 export type PortalResultsOpts = { days?: number; from?: string; to?: string; periodKey?: string };
@@ -529,20 +536,26 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
     db.execute(sql`
       with latest as (
         select distinct on (sm.publication_id)
-          sm.publication_id, sm.platform, sm.views, sm.likes, sm.comments
+          sm.publication_id, sm.platform, sm.views, sm.likes, sm.comments,
+          sm.shares, sm.saves, sm.reach, sm.avg_watch_seconds
         from social_metrics sm
         where sm.client_id = ${clientId} and sm.measured_on between ${startIso} and ${endIso}
         order by sm.publication_id, sm.measured_on desc
       )
       select l.publication_id pid, l.platform, l.views, l.likes, l.comments,
+             l.shares, l.saves, l.reach, l.avg_watch_seconds aws,
              p.external_url url, p.published_at::text pub, p.deliverable_id did, p.caption,
+             p.thumbnail_data pthumb,
              d.title dtitle, d.thumbnail_url dthumb, cc.cover_url cover
       from latest l
       join publications p on p.id = l.publication_id
+        -- Alleen video's die in de gekozen periode geplaatst zijn (zo zijn de
+        -- cijfers per video vergelijkbaar met de periode erboven).
+        and (p.published_at is null or (p.published_at at time zone 'Europe/Amsterdam')::date between ${startIso} and ${endIso})
       left join deliverables d on d.id = p.deliverable_id
       left join content_calendar cc on cc.id = p.calendar_item_id
       order by l.views desc
-      limit 100
+      limit 300
     `),
   ]);
 
@@ -600,14 +613,24 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
     views: Number(v.views ?? 0),
     likes: Number(v.likes ?? 0),
     comments: Number(v.comments ?? 0),
+    shares: Number(v.shares ?? 0),
+    saves: Number(v.saves ?? 0),
+    reach: Number(v.reach ?? 0),
+    avgWatchSeconds: v.aws != null && Number(v.aws) > 0 ? Math.round(Number(v.aws)) : null,
     publishedAt: v.pub ? String(v.pub).slice(0, 10) : null,
     url: v.url ? String(v.url) : null,
-    thumbnailUrl: v.dthumb ? String(v.dthumb) : v.cover ? String(v.cover) : null,
+    // Bewaarde kopie van de miniatuur gaat voor (de bron-URL verloopt).
+    thumbnailUrl: v.pthumb ? String(v.pthumb) : v.dthumb ? String(v.dthumb) : v.cover ? String(v.cover) : null,
   });
   const allVideos: PortalTopVideo[] = [...byDeliverable.values()]
     .sort((a, b) => Number(b.views ?? 0) - Number(a.views ?? 0))
     .map(toTopVideo);
   const topVideos: PortalTopVideo[] = allVideos.slice(0, 3);
+
+  const plannedRes = await db.execute(sql`
+    select distinct p from content_calendar cc, jsonb_array_elements_text(case when jsonb_typeof(cc.platforms) = 'array' then cc.platforms else '[]'::jsonb end) p
+    where cc.client_id = ${clientId} and cc.deleted_at is null`);
+  const plannedPlatforms = rowsOf<{ p: string }>(plannedRes).map((r) => String(r.p)).filter(Boolean);
 
   // Mijlpaal: hoogste drempel die het totaal aantal weergaven (sinds we meten) bereikte.
   const lifetimeViews = Number(life.lv ?? 0);
@@ -652,6 +675,7 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
     milestone,
     lastUpdated,
     hasData,
+    plannedPlatforms,
   };
 }
 
@@ -931,6 +955,11 @@ export type PortalProfile = {
   contract: { startsOn: string; endsOn: string | null; noticePeriodDays: number } | null;
   stats: { shortsProduced: number; opnamesDone: number };
   clientContacts: Array<{ name: string; role: string | null; email: string | null; phone: string | null; isPrimary: boolean }>;
+  /** "organisch" | "advertentie" | "combinatie" of null (niet vastgelegd). */
+  contentFocus: string | null;
+  weHandlePosting: boolean;
+  /** Afgesproken minimale looptijd in maanden (klantdossier), of null. */
+  contractMonths: number | null;
 };
 
 /**
@@ -963,11 +992,12 @@ export async function getPortalProfile(viewer: Viewer): Promise<PortalProfile> {
   const collab = await getPortalCollaboration(viewer);
 
   const [client] = await db
-    .select({ name: clients.name, legalName: clients.legalName, logoUrl: clients.logoUrl, color: clients.color, sector: clients.sector, website: clients.website, description: clients.description })
+    .select({ name: clients.name, legalName: clients.legalName, logoUrl: clients.logoUrl, color: clients.color, sector: clients.sector, website: clients.website, description: clients.description, contentFocus: clients.contentFocus, weHandlePosting: clients.weHandlePosting, contractMonths: clients.contractMonths })
     .from(clients)
     .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
     .limit(1);
   if (!client) notFound();
+  const { contentFocus, weHandlePosting, contractMonths, ...company } = client;
 
   const [[producedRow], [opnamesRow], contacts] = await Promise.all([
     db.select({ n: sql<number>`count(*)` }).from(deliverables).where(and(eq(deliverables.clientId, clientId), isNull(deliverables.deletedAt), eq(deliverables.status, "published"))),
@@ -989,7 +1019,10 @@ export async function getPortalProfile(viewer: Viewer): Promise<PortalProfile> {
   }
 
   return {
-    company: client,
+    company,
+    contentFocus: contentFocus ?? null,
+    weHandlePosting,
+    contractMonths: contractMonths ?? null,
     // Eén bron voor "sinds": de effectieve startdatum (contractstart, met
     // terugval op clients.startedOn) — zodat de hero, het statblok en de looptijd
     // dezelfde datum tonen i.p.v. een leeg "sinds"-veld.

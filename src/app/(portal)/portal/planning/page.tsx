@@ -13,9 +13,9 @@ export const metadata: Metadata = { title: "Opnameplanning" };
 export const dynamic = "force-dynamic";
 
 const TONE_CLS: Record<PortalScriptState["tone"], string> = {
-  warn: "bg-[rgba(25,168,255,0.14)] text-[#19a8ff]",
-  info: "bg-[rgba(25,168,255,0.14)] text-[var(--sc-accent)]",
-  good: "bg-[rgba(47,210,122,0.14)] text-[#2fd27a]",
+  warn: "bg-[var(--st-blue-bg)] text-[var(--sc-accent)]",
+  info: "bg-[var(--st-blue-bg)] text-[var(--sc-accent)]",
+  good: "bg-[var(--st-green-bg)] text-[var(--st-green)]",
   neutral: "bg-[var(--sc-fill-strong)] text-[var(--color-ink-muted)]",
 };
 
@@ -79,7 +79,7 @@ function OpnameCard({ o, hero = false, id }: { o: PortalOpname; hero?: boolean; 
         <DateBadge date={o.date} large={hero} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(25,168,255,0.14)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--sc-accent)]"><Video className="size-3" /> Opnamedag</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--st-blue-bg)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--sc-accent)]"><Video className="size-3" /> Opnamedag</span>
             <span className="text-[12.5px] font-medium text-[var(--color-ink-muted)]">{relativeLabel(o.date)}</span>
           </div>
           <h3 className={`mt-1.5 font-bold leading-tight ${hero ? "text-[19px]" : "text-[16px]"}`}>{dayLabel(o.date)}</h3>
@@ -155,7 +155,7 @@ function MonthCalendar({ year, month, marks }: { year: number; month: number; ma
           const isToday = isThisMonth && d === today.getDate();
           const base = "grid aspect-square place-items-center rounded-lg text-[12.5px] tabular-nums";
           if (mark) {
-            const col = mark.type === "meeting" ? "bg-[rgba(155,120,255,0.18)] text-[#b79bff]" : "bg-[rgba(25,168,255,0.18)] text-[var(--sc-accent)]";
+            const col = mark.type === "meeting" ? "bg-[rgba(155,120,255,0.18)] text-[#b79bff]" : "bg-[var(--st-blue-bg)] text-[var(--sc-accent)]";
             return <a key={i} href={mark.href} title="Bekijk afspraak" className={`${base} ${col} font-bold ring-1 ring-inset ring-[var(--sc-line)] transition-[filter] hover:brightness-110`}>{d}</a>;
           }
           return <div key={i} className={`${base} text-[var(--color-ink-muted)] ${isToday ? "font-semibold text-[var(--color-ink)] ring-1 ring-inset ring-[var(--sc-accent)]" : ""}`}>{d}</div>;
@@ -242,7 +242,7 @@ export default async function PortalPlanningPage() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-base font-semibold">Agenda</h2>
               <div className="flex items-center gap-3 text-[11.5px] text-[var(--color-ink-muted)]">
-                <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[4px] bg-[rgba(25,168,255,0.5)]" /> Opname</span>
+                <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[4px] bg-[var(--st-blue-bg)]" /> Opname</span>
                 <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[4px] bg-[rgba(155,120,255,0.5)]" /> Scriptmeeting</span>
               </div>
             </div>
@@ -274,17 +274,17 @@ export default async function PortalPlanningPage() {
 
           {/* Opname wijzigen of annuleren — belangrijk, dus duidelijk en opvallend
               en bewust vóór de voorbereiding zodat klanten dit snel vinden. */}
-          <section className="overflow-hidden rounded-[16px] border border-[#19a8ff]/35 bg-[rgba(25,168,255,0.05)]">
-            <div className="flex items-center gap-2 border-b border-[#19a8ff]/25 bg-[rgba(25,168,255,0.1)] px-5 py-3">
-              <span className="grid size-7 place-items-center rounded-lg bg-[rgba(25,168,255,0.18)] text-[#1b5fe0]"><CalendarClock className="size-4" /></span>
+          <section className="overflow-hidden rounded-[16px] border border-[var(--sc-line)] bg-[var(--st-blue-bg)]">
+            <div className="flex items-center gap-2 border-b border-[var(--sc-line)] bg-[var(--st-blue-bg)] px-5 py-3">
+              <span className="grid size-7 place-items-center rounded-lg bg-[var(--st-blue-bg)] text-[#1b5fe0]"><CalendarClock className="size-4" /></span>
               <h2 className="text-[15px] font-bold">Opname wijzigen of annuleren</h2>
             </div>
             <div className="grid gap-3 p-5 sm:grid-cols-2">
-              <div className="rounded-[12px] border border-[#2fd27a]/30 bg-[rgba(47,210,122,0.06)] p-4">
-                <div className="text-[13px] font-semibold text-[#2fd27a]">Kosteloos</div>
+              <div className="rounded-[12px] border border-[#2fd27a]/30 bg-[var(--st-green-bg)] p-4">
+                <div className="text-[13px] font-semibold text-[var(--st-green)]">Kosteloos</div>
                 <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Verplaatsen of annuleren kan gratis tot <strong className="text-[var(--color-ink)]">{settings.cancelNoticeDays} werkdagen</strong> vóór de opnamedag.</p>
               </div>
-              <div className="rounded-[12px] border border-[#19a8ff]/35 bg-[rgba(25,168,255,0.08)] p-4">
+              <div className="rounded-[12px] border border-[var(--sc-line)] bg-[var(--st-blue-bg)] p-4">
                 <div className="text-[13px] font-semibold text-[#1b5fe0]">Binnen {settings.cancelNoticeDays} werkdagen</div>
                 <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Dan wordt <strong className="text-[var(--color-ink)]">{settings.cancelFee}</strong> in rekening gebracht. {settings.cancelLateNote}</p>
               </div>

@@ -37,10 +37,10 @@ export function ScriptReviewActions({
   if (approved) {
     const when = approvedAt ? new Date(approvedAt).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" }) : null;
     return (
-      <div className="flex items-center gap-2.5 rounded-[14px] border border-[#2fd27a]/40 bg-[rgba(47,210,122,0.1)] p-4 text-[14px]">
-        <CheckCircle2 className="size-5 shrink-0 text-[#2fd27a]" />
+      <div className="flex items-center gap-2.5 rounded-[14px] border border-[#2fd27a]/40 bg-[var(--st-green-bg)] p-4 text-[14px]">
+        <CheckCircle2 className="size-5 shrink-0 text-[var(--st-green)]" />
         <span>
-          <span className="font-semibold text-[#1d8a52]">Goedgekeurd door klant</span>
+          <span className="font-semibold text-[var(--st-green)]">Goedgekeurd door klant</span>
           {approvedByName ? <span className="text-[var(--color-ink-muted)]"> · {approvedByName}</span> : null}
           {when ? <span className="text-[var(--color-ink-muted)]"> · {when}</span> : null}
         </span>
@@ -69,8 +69,8 @@ export function ScriptReviewActions({
   return (
     <div className="rounded-[16px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4">
       {alreadySubmitted ? (
-        <div className="mb-3 flex items-start gap-2 rounded-[10px] bg-[rgba(46,144,250,0.1)] p-2.5 text-[12.5px] text-[var(--color-ink-muted)]">
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#1b6fe8]" />
+        <div className="mb-3 flex items-start gap-2 rounded-[10px] bg-[var(--st-blue-bg)] p-2.5 text-[12.5px] text-[var(--color-ink-muted)]">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--st-blue)]" />
           <span>Je feedback is doorgegeven — we verwerken je opmerkingen. Je kunt hieronder nog goedkeuren of extra feedback toevoegen.</span>
         </div>
       ) : null}
@@ -82,7 +82,7 @@ export function ScriptReviewActions({
             type="button"
             onClick={approve}
             disabled={pending}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-[#2fd27a] px-4 py-3 text-[15px] font-bold text-white shadow-sm transition hover:brightness-105 disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-[var(--st-green)] px-4 py-3 text-[15px] font-bold text-white shadow-sm transition hover:brightness-105 disabled:opacity-60"
           >
             {pending ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" strokeWidth={2.5} />} Direct goedkeuren
           </button>
@@ -91,7 +91,7 @@ export function ScriptReviewActions({
             type="button"
             onClick={() => { setErr(null); setMode("feedback"); }}
             disabled={pending}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-[#ff6a00] px-4 py-3 text-[15px] font-bold text-white shadow-sm transition hover:brightness-105 disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-[var(--sc-act)] px-4 py-3 text-[15px] font-bold text-[var(--sc-act-ink)] shadow-sm transition hover:brightness-105 disabled:opacity-60"
           >
             <MessageSquarePlus className="size-5" /> Feedback doorgeven{commentCount > 0 ? ` (${commentCount})` : ""}
           </button>
@@ -118,7 +118,7 @@ export function ScriptReviewActions({
               type="button"
               onClick={submit}
               disabled={pending || (commentCount === 0 && !note.trim())}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-[#ff6a00] px-4 py-2.5 text-[14px] font-bold text-white hover:brightness-105 disabled:opacity-60"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-[var(--sc-act)] px-4 py-2.5 text-[14px] font-bold text-[var(--sc-act-ink)] hover:brightness-105 disabled:opacity-60"
             >
               {pending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Versturen
             </button>

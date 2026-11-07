@@ -17,6 +17,7 @@ const FIELDS: Array<{ k: Key; label: string; type: "num" | "text" }> = [
   { k: "extraFeedbackFee", label: "Kosten extra feedbackronde", type: "text" },
   { k: "reviewDays", label: "Beoordelingstermijn (werkdagen)", type: "num" },
   { k: "reviewAutoApproveDays", label: "Akkoord bij geen reactie (werkdagen)", type: "num" },
+  { k: "deliveryWorkdays", label: "Levertermijn video's (werkdagen)", type: "num" },
   { k: "reshootFee", label: "Kosten opnieuw opnemen", type: "text" },
   { k: "extraContentNote", label: "Extra content op locatie", type: "text" },
   { k: "cancelNoticeDays", label: "Annulering kosteloos tot (werkdagen)", type: "num" },

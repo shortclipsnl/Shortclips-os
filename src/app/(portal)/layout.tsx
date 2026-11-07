@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalBranding } from "@/server/portal";
+import { getPortalActionCounts } from "@/server/portal-frame";
 import { Logo } from "@/components/logo";
 import { ClientLogo } from "@/components/ui";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -23,7 +24,7 @@ export default async function PortalLayout({
   children: React.ReactNode;
 }) {
   const viewer = await requirePortal();
-  const branding = await getPortalBranding(viewer);
+  const [branding, counts] = await Promise.all([getPortalBranding(viewer), getPortalActionCounts(viewer)]);
 
   return (
     <div className="portal-studio flex min-h-screen text-[var(--color-ink)]">
@@ -39,7 +40,7 @@ export default async function PortalLayout({
             </Link>
           </div>
           <div className="flex-1 overflow-y-auto p-3">
-            <PortalNav />
+            <PortalNav counts={counts} />
           </div>
         </div>
       </aside>
@@ -76,7 +77,7 @@ export default async function PortalLayout({
       </div>
 
       {/* Mobiele bottom-tab-bar (buiten de flow, vast onderin) */}
-      <PortalMobileNav />
+      <PortalMobileNav counts={counts} />
     </div>
   );
 }

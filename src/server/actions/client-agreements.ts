@@ -10,7 +10,7 @@ import { OVERRIDABLE_KEYS, type PortalSettings } from "@/server/portal-settings"
 
 export type ActionResult = { ok: boolean; message?: string };
 
-const NUMBER_KEYS = new Set<keyof PortalSettings>(["feedbackDaysScripts", "feedbackDaysVideos", "cancelNoticeDays", "reviewDays", "reviewAutoApproveDays"]);
+const NUMBER_KEYS = new Set<keyof PortalSettings>(["feedbackDaysScripts", "feedbackDaysVideos", "cancelNoticeDays", "reviewDays", "reviewAutoApproveDays", "deliveryWorkdays"]);
 const clampDay = (n: unknown) => Math.max(0, Math.min(60, Math.round(Number(n) || 0)));
 
 /**
