@@ -1,5 +1,5 @@
 import "server-only";
-import type { MonthlyAnalysis, ReportMetrics, VideoAnalyse } from "./analysis";
+import type { MonthlyAnalysis, ReportMetrics, VideoAnalyse, VideoPunt } from "./analysis";
 import type { MaandCijfers } from "./metrics";
 import type { Beoordeling } from "./quality";
 import { docShell, esc, LOGO, nf, pctText, shortMonth, signed, topBar } from "./pdf-shared";
@@ -163,6 +163,11 @@ const CSS2 = `
   .vnext th { width: 80px; text-align: left; vertical-align: top; font-size: 10px; font-weight: 700; color: #00003b; padding: 7px 0; border-bottom: 1px solid #e3e4ee; background: none; text-transform: none; letter-spacing: 0; }
   .vnext td { font-size: 10.5px; padding: 7px 0; border-bottom: 1px solid #e3e4ee; line-height: 1.4; }
   .vtxt { font-size: 10.5px; margin-top: 14px; }
+  .pt { padding: 7px 0; border-bottom: 1px solid #eef0f5; }
+  .pt:last-child { border-bottom: 0; }
+  .pt-t { font-size: 11.5px; font-weight: 700; color: #00003b; }
+  .pt-u { font-size: 10px; color: #14143c; line-height: 1.4; margin-top: 1px; }
+  .pt-b { font-size: 9px; color: #5d5d78; margin-top: 2px; }
   .vp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 12px; }
   .vp-head .rk { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #5d5d78; }
   .vp-head .tt { font-size: 16px; font-weight: 700; color: #00003b; line-height: 1.3; margin-top: 2px; }
@@ -307,9 +312,11 @@ function videoCards(videos: InternVideo[], meta: string): string {
     </div>
     <div class="vsub">${nf(v.likes)} likes · ${nf(v.reacties)} reacties · ${nf(v.shares)} shares · ${nf(v.saves)} saves</div>
     ${a?.kijkgedrag ? `<div class="vsub">${esc(a.kijkgedrag)}</div>` : ""}`;
-    const lijst = (items: string[] | undefined) => (items ?? []).length ? `<ul>${(items ?? []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>–</p>`;
+    const lijst = (items: VideoPunt[] | undefined) => (items ?? []).length
+      ? (items ?? []).map((x) => `<div class="pt">${x.titel ? `<div class="pt-t">${esc(x.titel)}</div>` : ""}<div class="pt-u">${esc(x.uitleg)}</div>${x.bewijs ? `<div class="pt-b">${esc(x.bewijs)}</div>` : ""}</div>`).join("")
+      : `<p>–</p>`;
     const wb = a && ((a.watWerkte ?? []).length || (a.watBeter ?? []).length)
-      ? `<div class="wb"><div><div class="vh"><i class="dot g"></i>Werkte</div>${lijst(a.watWerkte)}</div><div><div class="vh"><i class="dot o"></i>Kan beter</div>${lijst(a.watBeter)}</div></div>`
+      ? `<div class="wb"><div><div class="vh"><i class="dot g"></i>Wat werkte</div>${lijst(a.watWerkte)}</div><div><div class="vh"><i class="dot o"></i>Wat moet beter</div>${lijst(a.watBeter)}</div></div>`
       : a?.waarom ? `<p class="vtxt">${esc(a.waarom)}</p>` : "";
     const rij = (label: string, txt: string | undefined) => (txt ? `<tr><th>${esc(label)}</th><td>${esc(txt)}</td></tr>` : "");
     const volgende = a ? `${rij("Hook", a.betereHook)}${rij("Script", a.script)}${rij("Opname", a.opname)}${rij("Montage", a.montage)}` : "";
