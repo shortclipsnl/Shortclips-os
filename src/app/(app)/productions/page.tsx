@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarCheck, CalendarX, ChevronUp } from "lucide-react";
+import { CalendarCheck } from "lucide-react";
 import { asc, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients as clientsTable } from "@/db/schema";
@@ -23,7 +23,6 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
   const viewer = await requireInternal();
   const sp = await searchParams;
   const vgFilter = sp.videograaf?.trim() || null;
-  const showUnplanned = sp.inplannen === "1";
   // Google Agenda op de achtergrond verversen als de laatste sync >1u geleden is.
   await syncCalendarIfStale();
 
@@ -97,15 +96,18 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
   const shownNext = nextPerClient.filter((n) => matchesVg(n.videographerName));
   const shownAgenda = agendaShoots.filter((a) => matchesVg(a.videographerName));
 
-  // "Nog niet ingepland": actieve klanten zonder volgende opnamedatum. Klikbaar
-  // blok → lijst direct eronder (via ?inplannen=1, filter op videograaf blijft).
-  const urgentUnplanned = unplanned.filter((u) => u.priority === "eerste" || u.priority === "achterstallig").length;
-  const nowUnplanned = unplanned.filter((u) => u.priority === "nu").length;
-  const unplannedTone: Tone = unplanned.length === 0 ? "good" : urgentUnplanned > 0 ? "bad" : nowUnplanned > 0 ? "warn" : "info";
-  const keepVg = vgFilter ? `videograaf=${encodeURIComponent(vgFilter)}` : "";
-  const toggleUnplannedHref = showUnplanned
-    ? `/productions${keepVg ? `?${keepVg}` : ""}`
-    : `/productions?inplannen=1${keepVg ? `&${keepVg}` : ""}#nog-niet-ingepland`;
+  // Beschikbare dagen om in te plannen: werkdagen (ma–vr) in de komende 7 dagen
+  // waarop nog geen opname staat — zo zie je in één oogopslag welke dagen nog
+  // vrij zijn om te vullen. De "nog niet ingepland"-klantenlijst staat voortaan
+  // standaard onder de blokken (geen klik meer nodig).
+  const bookedDays = new Set(shoots.map((x) => x.scheduledOn));
+  let availableDays = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const dow = d.getDay(); // 0 = zondag, 6 = zaterdag
+    if (dow >= 1 && dow <= 5 && !bookedDays.has(d.toLocaleDateString("en-CA"))) availableDays++;
+  }
 
   return (
     <div className="mx-auto max-w-[1200px]">
@@ -122,31 +124,19 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
           tone={next ? "warn" : "neutral"}
         />
         <Stat
-          label="Nog niet ingepland"
-          value={unplanned.length}
-          hint={
-            unplanned.length === 0
-              ? "alle klanten hebben een datum"
-              : urgentUnplanned > 0
-                ? `${urgentUnplanned} met voorrang · bekijk lijst`
-                : nowUnplanned > 0
-                  ? `${nowUnplanned} nu inplannen · bekijk lijst`
-                  : "klant" + (unplanned.length === 1 ? "" : "en") + " zonder datum · bekijk lijst"
-          }
-          tone={unplannedTone}
-          href={unplanned.length > 0 ? toggleUnplannedHref : undefined}
-          icon={<CalendarX />}
+          label="Beschikbare dagen"
+          value={availableDays}
+          hint={availableDays === 0 ? "komende week vol ingepland" : `werkdag${availableDays === 1 ? "" : "en"} komende week nog vrij`}
+          tone={availableDays > 0 ? "info" : "good"}
+          icon={<CalendarCheck />}
         />
       </div>
 
-      {showUnplanned && unplanned.length > 0 ? (
+      {unplanned.length > 0 ? (
         <div id="nog-niet-ingepland" className="mb-5 scroll-mt-4">
         <Card className="overflow-hidden" padded={false}>
-          <div className="flex items-center justify-between gap-3 bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
+          <div className="flex items-center gap-3 bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
             <span className="text-sm font-bold tracking-tight">Nog niet ingepland · {unplanned.length} klant{unplanned.length === 1 ? "" : "en"}</span>
-            <Link href={toggleUnplannedHref} className="inline-flex items-center gap-1 text-xs font-medium text-white/80 hover:text-white">
-              Sluiten <ChevronUp className="size-3.5" />
-            </Link>
           </div>
           <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)] sm:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,1.2fr)]">
             <span>Klant</span>

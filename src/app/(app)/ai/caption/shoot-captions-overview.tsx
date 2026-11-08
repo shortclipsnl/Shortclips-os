@@ -155,42 +155,57 @@ export function ShootCaptionsOverview({ rows, stats }: { rows: ShootCaptionRow[]
             return (
               <div
                 key={r.productionDayId}
-                className="flex flex-wrap items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5"
+                className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5"
               >
-                <div className="flex w-20 shrink-0 flex-col">
+                {/* Vaste kolommen (md+) zodat datum, klant, captions, status en
+                    acties per rij netjes onder elkaar uitlijnen — scanbaar. */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 md:grid md:grid-cols-[5rem_minmax(0,1fr)_5rem_9.5rem_15rem] md:items-center md:gap-3">
+                  {/* Datum */}
                   <span className="text-sm font-semibold tabular-nums">{fmtNl(r.scheduledOn)}</span>
-                </div>
-                <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                  <ClientLogo name={r.clientName} logoUrl={r.clientLogo} color={r.clientColor} size={28} />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{r.clientName}</p>
-                    <p className="truncate text-xs text-[var(--color-ink-faint)]">{r.title}</p>
+
+                  {/* Klant */}
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5 md:flex-none">
+                    <ClientLogo name={r.clientName} logoUrl={r.clientLogo} color={r.clientColor} size={28} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{r.clientName}</p>
+                      <p className="truncate text-xs text-[var(--color-ink-faint)]">{r.title}</p>
+                    </div>
+                  </div>
+
+                  {/* Aantal captions */}
+                  <span className="hidden text-xs tabular-nums text-[var(--color-ink-muted)] md:block">
+                    {r.captionCount} caption{r.captionCount === 1 ? "" : "s"}
+                  </span>
+
+                  {/* Status */}
+                  <div className="md:justify-self-start">
+                    <Badge tone={st.tone}>{st.label}</Badge>
+                  </div>
+
+                  {/* Acties rechts: script uit Drive kiezen + captions bekijken of
+                      wachtmelding — in één vaste kolom, rechts uitgelijnd. */}
+                  <div className="flex flex-wrap items-center justify-end gap-2 md:justify-self-end">
+                    {r.driveStatus !== "suggestie" ? (
+                      <DriveScriptPicker productionDayId={r.productionDayId} variant="chip" hasCoupledSource={r.driveStatus === "gekoppeld"} />
+                    ) : null}
+                    {canOpen ? (
+                      <Link
+                        href={`/ai/caption/opname/${r.productionDayId}`}
+                        className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-sunken)]"
+                      >
+                        Bekijk captions <ArrowRight className="size-3.5" />
+                      </Link>
+                    ) : (
+                      <span className="px-2.5 py-1.5 text-xs text-[var(--color-ink-faint)]">
+                        {r.status === "pdf_ontbreekt" ? "Wacht op scripts" : "—"}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="hidden items-center gap-3 text-xs text-[var(--color-ink-muted)] sm:flex">
-                  <span>{r.captionCount} caption{r.captionCount === 1 ? "" : "s"}</span>
-                </div>
-                {/* Script uit Drive kiezen/opnieuw ophalen — klik opent de kiezer
-                    met de script-PDF's van de klant. Bij een suggestie blijft de
-                    bevestig-knop hieronder leidend. */}
-                {r.driveStatus !== "suggestie" ? (
-                  <DriveScriptPicker productionDayId={r.productionDayId} variant="chip" hasCoupledSource={r.driveStatus === "gekoppeld"} />
-                ) : null}
-                <Badge tone={st.tone}>{st.label}</Badge>
-                {canOpen ? (
-                  <Link
-                    href={`/ai/caption/opname/${r.productionDayId}`}
-                    className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs font-medium hover:bg-[var(--color-surface-sunken)]"
-                  >
-                    Bekijk captions <ArrowRight className="size-3.5" />
-                  </Link>
-                ) : (
-                  <span className="px-2.5 py-1.5 text-xs text-[var(--color-ink-faint)]">
-                    {r.status === "pdf_ontbreekt" ? "Wacht op scripts" : "—"}
-                  </span>
-                )}
-                {/* Onzekere automatische match: team bevestigt met één klik. */}
-                {r.driveStatus === "suggestie" ? <DriveSuggestion row={r} /> : null}
+
+                {/* Onzekere automatische match: eigen regel onder de rij, zodat de
+                    kolommen uitgelijnd blijven. */}
+                {r.driveStatus === "suggestie" ? <div className="mt-2"><DriveSuggestion row={r} /></div> : null}
               </div>
             );
           })
