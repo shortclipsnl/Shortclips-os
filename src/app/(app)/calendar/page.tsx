@@ -10,6 +10,9 @@ import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { listCalendar, monthGrid, type CalendarItem } from "@/server/calendar";
 import { listClients } from "@/server/clients";
 import { SharePlanningButton } from "./share-planning";
+import { DeadlineOverview } from "./deadline-overview";
+import { StartDeadlineButton } from "./deadline-actions";
+import { activeDeadlineFor, listTeamDeadlines, sortByUrgency } from "@/server/planning-deadlines";
 import { ContentPlanningPdfButton } from "@/components/content-planning/pdf-button";
 import { Badge, Card, ClientLogo, EmptyState, GuidelineNote, PageHeader } from "@/components/ui";
 import { ListChecks } from "lucide-react";
@@ -44,6 +47,7 @@ export default async function CalendarPage({
     weergave?: string;
     zelf?: string;
     lijst?: string;
+    deadlines?: string;
   }>;
 }) {
   const viewer = await requireInternal();
@@ -155,6 +159,22 @@ export default async function CalendarPage({
     unsharedCount = Number(row?.n ?? 0);
   }
 
+  // Deadlines contentplanning (21 dagen) per klant, binnen de klantscope.
+  const deadlineSort = params.deadlines === "naam" ? "naam" : "kortste";
+  const deadlineRowsRaw = await listTeamDeadlines(viewer);
+  const deadlineRows = deadlineSort === "naam"
+    ? [...deadlineRowsRaw].sort((a, b) => a.clientName.localeCompare(b.clientName, "nl"))
+    : sortByUrgency(deadlineRowsRaw);
+  let selectedHasDeadline = true;
+  if (selectedClient && canWrite && !(await activeDeadlineFor(selectedClient.id))) {
+    // Alleen tonen als er al planning met de klant gedeeld is.
+    const [shared] = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(contentCalendar)
+      .where(and(eq(contentCalendar.clientId, selectedClient.id), isNull(contentCalendar.deletedAt), eq(contentCalendar.clientApproved, true)));
+    selectedHasDeadline = Number(shared?.n ?? 0) === 0;
+  }
+
   const asPlanner = params.weergave === "planner";
   const plannerTo = new Date();
   plannerTo.setDate(plannerTo.getDate() + 120);
@@ -186,6 +206,7 @@ export default async function CalendarPage({
     if (params.platform) qs.set("platform", params.platform);
     if (params.weergave) qs.set("weergave", params.weergave);
     if (params.zelf) qs.set("zelf", params.zelf);
+    if (params.deadlines) qs.set("deadlines", params.deadlines);
     if (value) qs.set(key, value);
     else qs.delete(key);
     return qs.toString() ? `/calendar?${qs}` : "/calendar";
@@ -279,6 +300,14 @@ export default async function CalendarPage({
             ) : null}
           </div>
         }
+      />
+
+      {/* Deadlines contentplanning: welke klanten bijna hun deadline bereiken. */}
+      <DeadlineOverview
+        rows={deadlineRows}
+        sort={deadlineSort}
+        sortHref={{ kortste: withParam("deadlines", undefined), naam: withParam("deadlines", "naam") }}
+        canWrite={canWrite}
       />
 
       {/* Compacte publicatiecheck — herinnering bij het inplannen/publiceren. */}
@@ -379,6 +408,12 @@ export default async function CalendarPage({
       {/* Goedkeuren en delen met de klant (alleen als er één klant gefilterd is). */}
       {selectedClient && canWrite ? (
         <SharePlanningButton clientId={selectedClient.id} clientName={selectedClient.name} unshared={unsharedCount} />
+      ) : null}
+      {selectedClient && canWrite && !selectedHasDeadline && unsharedCount === 0 ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <StartDeadlineButton clientId={selectedClient.id} />
+          <span className="text-xs text-[var(--color-ink-muted)]">Voor {selectedClient.name} loopt nog geen deadline. Bij delen start die automatisch.</span>
+        </div>
       ) : null}
 
       {/* Dezelfde contentplanning-PDF als de klant in het portaal downloadt

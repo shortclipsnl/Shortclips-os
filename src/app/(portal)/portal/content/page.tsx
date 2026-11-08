@@ -7,6 +7,8 @@ import { PLATFORM } from "@/lib/statuses";
 import { loadContentPlanningOverview } from "@/server/content-planning/overview";
 import { PlanningChecklist } from "@/components/portal/planning-checklist";
 import { ContentPlanningPdfButton } from "@/components/content-planning/pdf-button";
+import { loadClientDeadline } from "@/server/planning-deadlines";
+import { DeadlineCountdown } from "@/components/portal/deadline-countdown";
 
 export const metadata: Metadata = { title: "Contentplanning" };
 export const dynamic = "force-dynamic";
@@ -89,9 +91,11 @@ function PostCard({ post, weHandle, isToday }: { post: PortalContentPost; weHand
 
 export default async function PortalContentPage() {
   const viewer = await requirePortal();
-  const [data, overview] = await Promise.all([
+  const [data, overview, deadline] = await Promise.all([
     getPortalContentPlanning(viewer),
     viewer.clientId ? loadContentPlanningOverview(viewer.clientId) : Promise.resolve(null),
+    // Alleen de eigen klant: clientId komt uit de sessie, nooit uit de URL.
+    viewer.clientId ? loadClientDeadline(viewer.clientId) : Promise.resolve(null),
   ]);
   const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
   const thisMonday = mondayOf(todayIso);
@@ -113,6 +117,9 @@ export default async function PortalContentPage() {
           {weHandle ? "Shortclips plaatst je video's" : "Je plaatst de video's zelf"}
         </span>
       </div>
+
+      {/* Afteller: 21 dagen vanaf het delen van de planning (alleen als er een loopt). */}
+      {data.shared && deadline ? <DeadlineCountdown deadline={deadline} /> : null}
 
       {/* Jouw contentplanning: wat Shortclips geregeld heeft en wat er bij de
           klant ligt, op basis van de echte status (zelfde bron als de PDF). */}

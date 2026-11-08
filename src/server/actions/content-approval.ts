@@ -6,6 +6,7 @@ import { db } from "@/db/client";
 import { contentCalendar } from "@/db/schema";
 import { assertClientAccess, ForbiddenError, requirePermission } from "@/server/auth/context";
 import { auditLog, recordActivity } from "@/server/audit";
+import { startDeadlineIfNone } from "@/server/planning-deadlines";
 
 export type ActionResult = { ok: boolean; message?: string; shared?: number };
 
@@ -33,6 +34,10 @@ export async function shareContentPlanning(clientId: string): Promise<ActionResu
     if (updated.length > 0) {
       await auditLog({ viewer, action: "content_planning.shared", entityType: "client", entityId: clientId, clientId, changes: { shared: updated.length } });
       await recordActivity({ clientId, type: "content_planning.shared", title: "Contentplanning gedeeld met de klant", isClientVisible: true });
+      // Afteller van 21 dagen: start alleen als er voor deze klant nog geen loopt.
+      if (await startDeadlineIfNone(clientId, viewer.id)) {
+        await auditLog({ viewer, action: "planning_deadline.started", entityType: "client", entityId: clientId, clientId, changes: { via: "share" } });
+      }
     }
     revalidatePath("/calendar");
     revalidatePath("/portal/planning");

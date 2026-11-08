@@ -6,6 +6,7 @@ import {
   contentCalendar,
   deliverables,
   notifications,
+  planningDeadlines,
   productionDays,
   reviewComments,
   reviewThreads,
@@ -16,6 +17,8 @@ import { env } from "@/lib/env";
 import { PLATFORM } from "@/lib/statuses";
 import { cleanVideoTitle } from "@/lib/portal-status";
 import { portalEmailHtml, sendEmail } from "@/server/email";
+import { evaluateDeadlines } from "@/server/planning-deadlines";
+import { dueReminder, longDate, reminderText, todayAmsterdam } from "@/lib/planning-deadline";
 
 /**
  * Klantnotificaties: meldt de drie momenten waarop een klant iets moet weten of
@@ -28,6 +31,7 @@ import { portalEmailHtml, sendEmail } from "@/server/email";
  *  4. Video gisteren online gezet           (content_calendar → published, gisteren)
  *  5. Nieuwe reactie op een video           (klantzichtbare reactie van het team)
  *  6. Contentplanning beschikbaar           (goedgekeurde planning voor een maand)
+ *  7. Deadline contentplanning              (start, nog 7 dagen, nog 3 dagen, bereikt)
  *
  * Idempotent: de notificatierij met zijn dedupeKey is tegelijk het bewijs "al
  * gemeld". We maken de rij met onConflictDoNothing; alleen als er een nieuwe rij
@@ -37,7 +41,7 @@ import { portalEmailHtml, sendEmail } from "@/server/email";
 
 type NotifyItem = {
   clientId: string;
-  kind: "video_review" | "script_review" | "opname_reminder" | "video_published" | "file_comment" | "content_plan";
+  kind: "video_review" | "script_review" | "opname_reminder" | "video_published" | "file_comment" | "content_plan" | "planning_deadline";
   dedupeKey: string;
   title: string;
   body: string;
@@ -229,7 +233,36 @@ export async function runClientNotifications(): Promise<{
   for (const r of planRows) {
     if (r.clientId && !earliestPlanByClient.has(r.clientId)) earliestPlanByClient.set(r.clientId, r.scheduledOn);
   }
+  // 7. Deadline contentplanning (21 dagen). Eerst bijwerken (automatisch
+  // afronden als de klant alles heeft gedaan), dan per actieve deadline alleen
+  // het laatst bereikte moment melden. Afgeronde deadlines krijgen niets meer.
+  await evaluateDeadlines();
+  const todayIso = todayAmsterdam();
+  const activeDeadlines = await db
+    .select({ id: planningDeadlines.id, clientId: planningDeadlines.clientId, startedOn: planningDeadlines.startedOn, deadlineOn: planningDeadlines.deadlineOn, status: planningDeadlines.status })
+    .from(planningDeadlines)
+    .where(and(isNull(planningDeadlines.deletedAt), eq(planningDeadlines.status, "active")));
+  const clientsWithDeadline = new Set<string>();
+  for (const d of activeDeadlines) {
+    clientsWithDeadline.add(d.clientId);
+    const step = dueReminder(d, todayIso);
+    if (!step) continue;
+    const t = reminderText(step, longDate(d.deadlineOn));
+    items.push({
+      clientId: d.clientId,
+      kind: "planning_deadline",
+      // Per deadline én per moment: nooit dubbel, ook niet na een handmatige aanpassing.
+      dedupeKey: `portal:planning_deadline:${d.id}:${step}`,
+      title: t.title,
+      body: t.body,
+      href: "/portal/content",
+      ctaLabel: "Bekijk wat er nog openstaat",
+    });
+  }
+
   for (const [clientId, firstDate] of earliestPlanByClient) {
+    // Loopt er een deadline, dan meldt die al dat de planning klaarstaat.
+    if (clientsWithDeadline.has(clientId)) continue;
     items.push({
       clientId,
       kind: "content_plan",
@@ -295,7 +328,7 @@ export async function runClientNotifications(): Promise<{
           userId: recipient.userId,
           clientId: item.clientId,
           type: item.kind,
-          level: item.kind === "video_review" || item.kind === "video_published" ? "success" : "info",
+          level: item.kind === "video_review" || item.kind === "video_published" ? "success" : item.kind === "planning_deadline" && /bereikt|3 dagen/.test(item.title) ? "warning" : "info",
           title: item.title,
           body: item.body,
           href: item.href,
