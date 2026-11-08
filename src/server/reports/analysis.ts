@@ -8,6 +8,7 @@ import { getClientReport } from "@/server/client-report";
 import type { ClientInsights, Finding, Recommendation, TopVideo, HookInzicht, FormatInzicht, MindereVideo } from "@/server/insights";
 import { loadStrategyProfile, strategyToText } from "./strategy";
 import { buildVergelijking, formatStats, monthSeries, platformSplit, type FormatStat, type MaandCijfers, type PlatformCijfers, type Vergelijking } from "./metrics";
+import { getGerealiseerd, type Gerealiseerd } from "./realized";
 
 /* ---------------- Periode-helpers (Europe/Amsterdam) ---------------- */
 
@@ -132,6 +133,9 @@ export type ReportMetrics = Awaited<ReturnType<typeof getClientReport>>["totals"
   videos?: ReportVideo[];
   /** Bron van het aantal video's. */
   videoBron?: "publicaties" | "dagcijfers";
+  /** "Dit hebben we gerealiseerd" (sectie 1): opnamedagen, geproduceerd/opgeleverd/
+   *  gepubliceerd, kanalen, publicaties en formats. Deterministisch uit de database. */
+  gerealiseerd?: Gerealiseerd;
 };
 
 export type MonthlyAnalysisResult =
@@ -261,6 +265,9 @@ export async function generateMonthlyAnalysis(
   totals.historie = historie;
   totals.vergelijking = vergelijking;
   totals.formats = formats;
+  // Sectie 1 "Dit hebben we gerealiseerd": deterministisch uit opnamedagen,
+  // deliverables en publicaties (geen AI). Regen-bestendig: bij elke generatie opnieuw.
+  totals.gerealiseerd = await getGerealiseerd(client.id, period);
 
   // Ontbrekende gegevens markeren (eerlijkheid, sectie 5).
   const ontbrekend: string[] = [];

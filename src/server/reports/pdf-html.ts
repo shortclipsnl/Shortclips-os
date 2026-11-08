@@ -283,6 +283,32 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
   const viewsChart = barChart(historie, "views", (n) => nf(n));
   const engChart = barChart(historie, "engagements", (n) => nf(n));
 
+  // Sectie 1 — "Dit hebben we gerealiseerd": opnamedagen, geproduceerd/opgeleverd/
+  // gepubliceerd, kanalen, publicaties en formats. Deterministisch uit de database.
+  const g = t.gerealiseerd;
+  const fmtDag = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "");
+  const platLabel = (p: string) => PLATFORM[p] ?? p;
+  const gerealiseerdPage = g ? `
+  <section class="page">
+    ${topBar(meta)}
+    <h1>Dit hebben we in ${esc(maand)} gerealiseerd</h1>
+    <p class="lead">Van opname tot publicatie — concreet wat we deze maand voor jullie hebben gedaan.</p>
+    <div class="kpis">
+      <div class="kt"><div class="v">${g.opnamedagen.aantal}</div><div class="l">Opnamedag${g.opnamedagen.aantal === 1 ? "" : "en"}</div></div>
+      <div class="kt"><div class="v">${nf(g.geproduceerd)}</div><div class="l">Video's geproduceerd</div></div>
+      <div class="kt"><div class="v">${nf(g.opgeleverd)}</div><div class="l">Video's opgeleverd</div></div>
+    </div>
+    <div class="kpis" style="margin-top:10px">
+      <div class="kt"><div class="v">${nf(g.gepubliceerd)}</div><div class="l">Video's gepubliceerd</div></div>
+      <div class="kt"><div class="v">${g.kanalen.length}</div><div class="l">${g.kanalen.length === 1 ? "Kanaal" : "Kanalen"}</div></div>
+      <div class="kt"><div class="v">${g.formats.length}</div><div class="l">Format${g.formats.length === 1 ? "" : "s"} ingezet</div></div>
+    </div>
+    ${g.opnamedagen.datums.length ? `<h2>Opnamedagen</h2><div class="chips">${g.opnamedagen.datums.map((d) => `<span class="chip2">${esc(fmtDag(d))}</span>`).join("")}</div>` : ""}
+    ${(g.kanalen.length || g.formats.length) ? `<h2>Kanalen &amp; formats</h2><div class="chips">${g.kanalen.map((k) => `<span class="chip2">${esc(platLabel(k))}</span>`).join("")}${g.formats.map((f) => `<span class="chip2 g">${esc(f.naam)} · ${f.aantal}</span>`).join("")}</div>` : ""}
+    ${g.publicaties.length ? `<h2>Wat we publiceerden</h2><div class="soft">${g.publicaties.slice(0, 14).map((p) => `<p><b>${esc([p.datum ? fmtDag(p.datum) : "", p.tijd ? `${p.tijd} uur` : ""].filter(Boolean).join(" · "))}</b> — ${esc(p.titel)}${p.platforms.length ? ` <span style="color:#5d5d78">(${esc(p.platforms.map(platLabel).join(", "))})</span>` : ""}</p>`).join("")}${g.publicaties.length > 14 ? `<p style="color:#5d5d78">+ ${g.publicaties.length - 14} meer</p>` : ""}</div>` : ""}
+    ${!g.pipelineBijgehouden && g.gepubliceerd > 0 ? `<p class="lead" style="margin-top:10px;color:#5d5d78">De interne productiestatus is voor deze klant niet volledig bijgehouden, dus "geproduceerd" en "opgeleverd" staan op 0. De publicatiecijfers kloppen wel.</p>` : ""}
+  </section>` : "";
+
   const body = `
   <section class="page cover">
     <img src="${LOGO.dark}" alt="Shortclips" />
@@ -309,7 +335,7 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
     <h2>Samenvatting</h2>
     <div class="soft">${persoonlijk}</div>
   </section>
-
+${gerealiseerdPage}
   <section class="page">
     ${topBar(meta)}
     <h1>${esc(maand.charAt(0).toUpperCase() + maand.slice(1))} vergeleken met ${esc(vorige)}</h1>
