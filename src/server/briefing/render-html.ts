@@ -4,7 +4,7 @@
  * Huisstijl: navy #00003b en wit, Poppins voor titels, Arial voor scripttekst.
  * ------------------------------------------------------------------ */
 import type { BriefingDoc } from "./assemble";
-import type { ScriptLine, ScriptSection } from "./script-pdf";
+import type { ScriptLine } from "./script-pdf";
 
 const NAVY = "#00003b";
 
@@ -54,25 +54,6 @@ function linesHtml(lines: ScriptLine[]): string {
   }
   if (inList) out += "</ul>";
   return out;
-}
-
-const KIND_CLASS: Record<ScriptSection["kind"], string> = { hook: "hook", cta: "cta", scene: "scene", uitleg: "uitleg", intro: "scene" };
-
-/** Visuele aanwijzingen: letterlijk overgenomen regels (cursief = regie, of
- *  regels over beeld/tekst in beeld/geluid). Alleen kopieën uit het script. */
-const VISUAL_RE = /^(tekst in beeld|b-?roll|beeld|shot\b|pov\b|overlay|in beeld|geluid|muziek|zoom|inzoom|cut\b|overgang|camera)/i;
-function visualCues(sections: ScriptSection[]): string[] {
-  const out: string[] = [];
-  for (const sec of sections) {
-    if (sec.kind === "uitleg") continue;
-    for (const l of sec.lines) {
-      const text = l.spans.map((s) => s.t).join("").trim();
-      const italic = l.spans.every((s) => s.i || !s.t.trim());
-      const hit = italic || VISUAL_RE.test(text) || /tekst in beeld/i.test(text);
-      if (hit && text.length <= 240 && !out.includes(text)) out.push(text);
-    }
-  }
-  return out.slice(0, 10);
 }
 
 /** Zet elke CSS-regel onder één container, zodat de briefing-opmaak in het
@@ -159,7 +140,7 @@ export function renderBriefingHtml(doc: BriefingDoc, opts: { coverDataUri?: stri
     : "";
 
   const hl = doc.highlights;
-  const highlights = `<section class="block">
+  const highlights = `<section class="block page2">
   <h2><span>2</span> Hoe monteer je ${esc(doc.client.name)}?</h2>
   ${
     hl.length
@@ -191,25 +172,20 @@ export function renderBriefingHtml(doc: BriefingDoc, opts: { coverDataUri?: stri
   ${doc.imagePages.length ? `<p class="small">De script-PDF bevat ook ${doc.imagePages.length} beeldpagina's (moodboard of referenties). Die staan alleen in het origineel.</p>` : ""}
 </section>`;
 
+  // Scripts precies zoals in de PDF: originele koppen (links) en tekst (rechts),
+  // in dezelfde volgorde. Geen extra labels, nummering of samenvattingen.
   const scripts = doc.scripts
     .map((s, i) => {
-      let sceneNo = 0;
-      const secs = s.sections
+      const rows = s.sections
         .map((sec) => {
-          const cls = KIND_CLASS[sec.kind];
-          const scenePrefix = sec.kind === "scene" ? `Scène ${++sceneNo}` : "";
-          const label = sec.label ?? "";
-          const head = label || scenePrefix
-            ? `<div class="sec-head"><span class="tag ${cls}">${esc(sec.kind === "hook" ? "Hook" : sec.kind === "cta" ? "Afsluiting / CTA" : sec.kind === "uitleg" ? "Uitleg" : scenePrefix)}</span>${label && !/^HOOK$/i.test(label) ? `<span class="orig">${esc(label)}</span>` : ""}</div>`
-            : "";
-          return `<div class="sec ${cls}">${head}<div class="txt">${sec.lines.length ? linesHtml(sec.lines) : '<p class="muted">(geen tekst onder deze kop)</p>'}</div></div>`;
+          const cls = sec.kind === "hook" ? "hook" : sec.kind === "cta" ? "cta" : sec.kind === "uitleg" ? "uitleg" : "";
+          const body = sec.lines.length ? linesHtml(sec.lines) : "";
+          return `<div class="row ${cls}"><div class="lab">${sec.label ? esc(sec.label) : ""}</div><div class="stxt">${body}</div></div>`;
         })
         .join("");
-      const cues = visualCues(s.sections);
       return `<article class="script" id="video-${i + 1}">
-  <div class="script-head"><span class="vno">Video ${i + 1} van ${doc.scripts.length}</span><h2 class="vtitle">${esc(s.title)}</h2></div>
-  ${secs}
-  ${cues.length ? `<div class="cues"><h4>B-roll en visuele aanwijzingen <span>(letterlijk uit het script)</span></h4><ul>${cues.map((c) => `<li>${esc(c)}</li>`).join("")}</ul></div>` : ""}
+  <div class="script-head"><span class="vno">${i + 1}</span><div><span class="vof">Video ${i + 1} van ${doc.scripts.length}</span><h2 class="vtitle">${esc(s.title)}</h2></div></div>
+  <div class="rows">${rows}</div>
 </article>`;
     })
     .join("");
@@ -253,7 +229,7 @@ export function renderBriefingHtml(doc: BriefingDoc, opts: { coverDataUri?: stri
   .overview .num { font-weight: 700; width: 24px; }
   .overview .vt { font-weight: 600; width: 30%; }
   .overview .doel { color: #3c3c55; font-family: Arial, sans-serif; font-size: 11px; }
-  .overview .doel .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .overview .doel .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .overview .ref { white-space: nowrap; width: 60px; }
   ul.hl { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
   ul.hl li { display: flex; align-items: baseline; gap: 10px; padding: 6px 10px; border: 1px solid #e3e3ec; border-radius: 8px; }
@@ -268,34 +244,25 @@ export function renderBriefingHtml(doc: BriefingDoc, opts: { coverDataUri?: stri
   ul.links li { break-inside: avoid; padding: 4px 0; border-bottom: 1px solid #ececf2; display: flex; flex-direction: column; }
   .links .lk { font-size: 9.5px; text-transform: uppercase; letter-spacing: .08em; color: #6f6f82; font-weight: 600; }
   .links .missing { color: #a15c00; font-weight: 600; }
+  .page2 { ${opts.mode === "pdf" ? "break-before: page; margin-top: 0;" : "margin-top: 30px;"} }
   .script { ${opts.mode === "pdf" ? "break-before: page;" : "margin-top: 34px; padding-top: 22px; border-top: 2px solid " + NAVY + ";"} }
-  .script-head { margin-bottom: 10px; }
-  .vno { font-size: 10px; text-transform: uppercase; letter-spacing: .14em; color: #6f6f82; font-weight: 600; }
-  .vtitle { font-size: 21px; margin: 2px 0 0; line-height: 1.2; }
-  .sec { margin: 0 0 10px; padding: 8px 12px 6px; border-radius: 8px; break-inside: avoid; }
-  .sec.hook { background: #eef0f7; border-left: 4px solid ${NAVY}; }
-  .sec.cta { background: #fff; border: 1.5px solid ${NAVY}; }
-  .sec.scene { border-left: 4px solid #c9c9d8; }
-  .sec.uitleg { background: #f7f7fa; color: #3c3c55; }
-  .sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-  .tag { font-size: 9.5px; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; border-radius: 99px; padding: 2px 8px; }
-  .tag.hook { background: ${NAVY}; color: #fff; }
-  .tag.cta { border: 1.5px solid ${NAVY}; }
-  .tag.scene { background: #e4e4ee; }
-  .tag.uitleg { background: #e9e9f0; color: #5b5b74; }
-  .orig { font-size: 9.5px; letter-spacing: .08em; color: #8a8aa0; }
-  .txt { font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.55; }
-  .txt p { margin: 0 0 4px; }
-  .txt p.dir, .txt em { color: #4a4a68; }
-  .txt p.spk { font-weight: 700; margin-top: 6px; }
-  .txt ul { margin: 0 0 4px; padding-left: 18px; }
-  .cues { margin-top: 6px; padding: 8px 12px; background: #f7f7fa; border-radius: 8px; break-inside: avoid; }
-  .cues h4 { margin: 0 0 3px; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
-  .cues h4 span { font-weight: 400; text-transform: none; letter-spacing: 0; color: #8a8aa0; }
-  .cues ul { margin: 0; padding-left: 18px; font-family: Arial, sans-serif; font-size: 11px; }
-  .cues li { margin: 1px 0; }
+  .script-head { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 2px solid ${NAVY}; }
+  .vno { flex: 0 0 34px; height: 34px; border-radius: 8px; background: ${NAVY}; color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 16px; }
+  .vof { font-size: 9.5px; text-transform: uppercase; letter-spacing: .14em; color: #6f6f82; font-weight: 600; }
+  .vtitle { font-size: 20px; margin: 0; line-height: 1.2; }
+  .row { display: grid; grid-template-columns: 128px 1fr; gap: 14px; padding: 9px 0; border-bottom: 1px solid #ececf2; break-inside: avoid; }
+  .row .lab { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding-top: 2px; }
+  .row.hook { background: #f1f2f8; border-left: 4px solid ${NAVY}; padding-left: 10px; }
+  .row.cta { background: #f1f2f8; border-left: 4px solid ${NAVY}; padding-left: 10px; }
+  .row.uitleg .stxt { color: #4a4a68; }
+  .stxt { font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.55; }
+  .stxt p { margin: 0 0 4px; }
+  .stxt p:last-child { margin-bottom: 0; }
+  .stxt p.dir, .stxt em { color: #4a4a68; }
+  .stxt p.spk { font-weight: 700; margin-top: 6px; }
+  .stxt ul { margin: 0 0 4px; padding-left: 18px; }
   .foot { margin-top: 26px; padding-top: 8px; border-top: 1px solid #ececf2; font-size: 9.5px; color: #8a8aa0; }
-  @media (max-width: 720px) { .cover { flex-direction: column; } .cover-img { width: 100%; height: 160px; order: 0; } .meta { grid-template-columns: 1fr 1fr; row-gap: 10px; } ul.links { columns: 1; } .hl .cat { flex-basis: 80px; } }
+  @media (max-width: 720px) { .row { grid-template-columns: 1fr; gap: 2px; } .cover { flex-direction: column; } .cover-img { width: 100%; height: 160px; order: 0; } .meta { grid-template-columns: 1fr 1fr; row-gap: 10px; } ul.links { columns: 1; } .hl .cat { flex-basis: 80px; } }
   @media print { .sc-brief a { text-decoration: none; } }
   `;
 
