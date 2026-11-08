@@ -540,6 +540,13 @@ function BriefingCell({ v, canEdit, run, pending }: { v: EditorBoardVideo; canEd
               ) : null}
             </div>
 
+            {v.productionDayId && v.briefingStatus !== "geen" && !editing ? (
+              <Link href={`/briefing/${v.productionDayId}`}
+                className="mb-2 flex items-center justify-between gap-2 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-2.5 py-1.5 text-2xs font-semibold text-white hover:brightness-110">
+                <span>Volledige briefing openen</span>
+                <span className="font-normal opacity-80">scripts · guide · materiaal →</span>
+              </Link>
+            ) : null}
             {editing ? (
               <>
                 <textarea autoFocus value={val} onChange={(e) => setVal(e.target.value)} rows={8}

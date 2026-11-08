@@ -5,8 +5,9 @@ const nextConfig: NextConfig = {
   // sowieso weg.
   devIndicators: false,
   // Deze pakketten mogen niet gebundeld worden: pg opent native sockets en
-  // PGlite laadt een WASM-bestand vanaf schijf.
-  serverExternalPackages: ["pg", "@electric-sql/pglite", "mammoth", "ffmpeg-static", "ffprobe-static", "puppeteer-core", "@sparticuz/chromium"],
+  // PGlite laadt een WASM-bestand vanaf schijf. pdfjs-dist laadt zijn worker
+  // vanaf schijf (editor-briefing leest de script-PDF server-side).
+  serverExternalPackages: ["pg", "@electric-sql/pglite", "mammoth", "ffmpeg-static", "ffprobe-static", "puppeteer-core", "@sparticuz/chromium", "pdfjs-dist"],
   // Het vermogensdashboard wordt op verzoek als los bestand uitgeleverd (fs),
   // dus de bestanden moeten mee in de serverless functies op Vercel.
   outputFileTracingIncludes: {
@@ -14,6 +15,9 @@ const nextConfig: NextConfig = {
     // dus het databestand moet mee in díe serverless functie.
     "/dashboard/vermogen/embed": ["./data/vermogen/vermogen_dashboard.html"],
     "/vermogen/vermogen-db-shim.js": ["./data/vermogen/vermogen-db-shim.js"],
+    // Shortclips-logo op de omslag van de editor-briefing (pagina en PDF).
+    "/briefing/[id]": ["./public/shortclips-logo-ondark.png"],
+    "/api/briefing/[productionDayId]/pdf": ["./public/shortclips-logo-ondark.png"],
   },
   experimental: {
     // Server actions krijgen soms grotere payloads: de import-wizard en vooral

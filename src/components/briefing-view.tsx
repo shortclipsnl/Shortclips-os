@@ -21,10 +21,13 @@ export function BriefingView({
   briefing,
   status,
   pdfHref,
+  openHref,
 }: {
   briefing: EditorBriefing | null;
   status: BriefingStatus;
   pdfHref?: string;
+  /** Link naar de volledige briefing-pagina. */
+  openHref?: string;
 }) {
   const st = BRIEFING_STATUS[status] ?? BRIEFING_STATUS.geen;
 
@@ -53,16 +56,23 @@ export function BriefingView({
     <div className="space-y-4 px-5 py-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Badge tone={st.tone}>{st.label}</Badge>
-        {pdfHref ? (
-          <Link href={pdfHref} target="_blank" className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-brand-600)] hover:underline">
-            <FileDown className="size-3.5" /> PDF
-          </Link>
-        ) : null}
+        <span className="flex items-center gap-3">
+          {openHref ? (
+            <Link href={openHref} className="text-xs font-semibold text-[var(--color-ink)] hover:underline">
+              Volledige briefing openen →
+            </Link>
+          ) : null}
+          {pdfHref ? (
+            <Link href={pdfHref} target="_blank" className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-brand-600)] hover:underline">
+              <FileDown className="size-3.5" /> PDF
+            </Link>
+          ) : null}
+        </span>
       </div>
 
       {algemeen.length > 0 ? (
         <div>
-          <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Algemene aandachtspunten</p>
+          <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Uit de Editing Guide</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
             {algemeen.map((a, i) => <li key={i}>{a}</li>)}
           </ul>
@@ -115,18 +125,23 @@ export function VideoBriefingView({ briefing, pdfHref }: { briefing: VideoBriefi
 
       {briefing.algemeneAandachtspunten.length > 0 ? (
         <div>
-          <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Algemeen deze opname</p>
+          <p className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Uit de Editing Guide</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[var(--color-ink-muted)]">
             {briefing.algemeneAandachtspunten.map((a, i) => <li key={i}>{a}</li>)}
           </ul>
         </div>
       ) : null}
 
-      {pdfHref ? (
-        <Link href={pdfHref} target="_blank" className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-brand-600)] hover:underline">
-          <FileDown className="size-3.5" /> Volledige briefing (PDF)
+      <span className="flex items-center gap-3">
+        <Link href={`/briefing/${briefing.productionDayId}`} className="text-xs font-semibold text-[var(--color-ink)] hover:underline">
+          Volledige briefing met scripts openen →
         </Link>
-      ) : null}
+        {pdfHref ? (
+          <Link href={pdfHref} target="_blank" className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-brand-600)] hover:underline">
+            <FileDown className="size-3.5" /> PDF
+          </Link>
+        ) : null}
+      </span>
     </div>
   );
 }

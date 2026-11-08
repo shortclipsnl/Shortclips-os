@@ -19,7 +19,9 @@ const isoDay = (offsetDays: number) => new Date(Date.now() + offsetDays * 86_400
  * script-PDF hangt — uit het klantportaal (scriptcontrole) óf de gekoppelde
  * PDF uit Google Drive (de normale werkwijze). Kandidaat als er nog geen
  * briefing is, de vorige mislukte, of het script daarna is bijgewerkt.
- * Ongewijzigde opnames worden overgeslagen (geen AI-kosten).
+ * Ook als de Editing Guide van de klant is vervangen (nieuwe highlights) of de
+ * briefing nog in het oude formaat staat. Ongewijzigde opnames worden
+ * overgeslagen. De scripts zelf kosten geen AI: die komen letterlijk uit de PDF.
  */
 export async function runBriefingAutoGenerate(): Promise<{
   scanned: number;
@@ -42,6 +44,10 @@ export async function runBriefingAutoGenerate(): Promise<{
       setStatus: sql<string | null>`(select b.status from briefing_sets b where b.production_day_id = ${productionDays.id} and b.deleted_at is null limit 1)`,
       setGeneratedAt: sql<Date | null>`(select b.generated_at from briefing_sets b where b.production_day_id = ${productionDays.id} and b.deleted_at is null limit 1)`,
       setStartedAt: sql<Date | null>`(select b.started_at from briefing_sets b where b.production_day_id = ${productionDays.id} and b.deleted_at is null limit 1)`,
+      // Oude briefing (v1) of highlights die nog niet gelukt zijn → opnieuw.
+      setOutdated: sql<boolean>`coalesce((select (b.content->>'v') is distinct from '2' or ((b.content->'guide'->>'error') is not null and b.generated_at < now() - interval '6 hours') from briefing_sets b where b.production_day_id = ${productionDays.id} and b.deleted_at is null limit 1), false)`,
+      // Laatste wijziging van de Editing Guide van de klant.
+      guideAt: sql<Date | null>`(select max(d.created_at) from client_documents d where d.client_id = ${productionDays.clientId} and d.kind = 'editing_guide' and d.deleted_at is null)`,
     })
     .from(productionDays)
     .where(and(
@@ -59,7 +65,9 @@ export async function runBriefingAutoGenerate(): Promise<{
     if (!r.sourceAt) return false; // nog geen script-PDF: niets om uit te maken
     if (r.setStatus === "bezig" && r.setStartedAt && (Date.now() - ts(r.setStartedAt)) / 60000 < STALE_RUNNING_MIN) return false;
     if (!r.setStatus || r.setStatus === "mislukt") return true;
-    return ts(r.sourceAt) > ts(r.setGeneratedAt); // script bijgewerkt na de laatste briefing
+    if (r.setOutdated) return true;
+    // Script of Editing Guide bijgewerkt na de laatste briefing.
+    return ts(r.sourceAt) > ts(r.setGeneratedAt) || ts(r.guideAt) > ts(r.setGeneratedAt);
   });
 
   // Eerst wat het dichtst bij is: net geweest of binnenkort.

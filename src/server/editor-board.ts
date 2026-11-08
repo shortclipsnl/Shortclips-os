@@ -125,6 +125,8 @@ export type EditorBoardVideo = {
   scriptFileName: string | null;
   /** Heeft deze video een gekoppelde opname(dag)? Zo niet, dan kan er geen script-pdf bij. */
   hasShoot: boolean;
+  /** Opname van dit project (voor de link naar de volledige briefing). */
+  productionDayId: string | null;
   /** Echte opnamedatum uit de gekoppelde opnamedag (YYYY-MM-DD), of null als er
    *  geen betrouwbare opname gekoppeld is ("Opnamedatum nog niet bekend"). */
   opnameDate: string | null;
@@ -379,6 +381,7 @@ export async function listEditorBoard(
       scriptFileId: r.dayScriptFileId,
       scriptFileName: r.dayScriptFileName,
       hasShoot: !!r.productionDayId,
+      productionDayId: r.productionDayId ?? null,
       opnameDate: r.dayScheduledOn,
       downloadHref,
       workdaysToDeadline,

@@ -116,18 +116,19 @@ export default async function ProductionPage({
             )}
           </Card>
 
-          {scripts.length > 0 ? (
+          {scripts.length > 0 || (briefing && briefing.status !== "geen") ? (
             <Card padded={false}>
               <div className="p-5 pb-3">
                 <CardHeader
                   title="Editor Briefing"
-                  subtitle="Compacte montage-aandachtspunten per opname — automatisch uit de definitieve scripts."
+                  subtitle="Automatisch uit de script-PDF, de Editing Guide en de projectgegevens."
                 />
               </div>
               <BriefingView
                 briefing={briefing?.content ?? null}
                 status={briefing?.status ?? "geen"}
                 pdfHref={briefing?.status === "klaar" || briefing?.status === "bijgewerkt_script" ? `/api/briefing/${id}/pdf` : undefined}
+                openHref={`/briefing/${id}`}
               />
             </Card>
           ) : null}
