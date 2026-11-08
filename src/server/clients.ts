@@ -203,6 +203,8 @@ export async function getClientHub(viewer: Viewer, slug: string) {
       id: productionDays.id, title: productionDays.title,
       scheduledOn: productionDays.scheduledOn, status: productionDays.status,
       locationName: productionDays.locationName,
+      startTime: productionDays.startTime,
+      videographerName: sql<string | null>`(select u.full_name from users u where u.id = production_days.videographer_id)`,
       scriptCount: sql<number>`(select count(*) from scripts sc where sc.production_day_id = production_days.id and sc.deleted_at is null)`,
     })
       .from(productionDays)

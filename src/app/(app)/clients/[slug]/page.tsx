@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import {
-  CalendarClock,
   ExternalLink,
   Sparkles,
 } from "lucide-react";
@@ -12,7 +11,6 @@ import { users } from "@/db/schema";
 import { isEditorRole, requireInternal } from "@/server/auth/context";
 import { getClientHub, type ClientHub } from "@/server/clients";
 import { listEditingProjects, type EditingProject } from "@/server/editing-board";
-import { PostingToggle } from "./posting-toggle";
 import { ResultsToggle } from "./results-toggle";
 import { ScriptHistory } from "./script-history";
 import { IntegrationNotice } from "@/components/integration-notice";
@@ -41,7 +39,6 @@ import {
   num,
   periodLabel,
   plural,
-  relativeDays,
 } from "@/lib/format";
 import {
   CLIENT_STATUS,
@@ -61,7 +58,7 @@ import { AgreementOverridesEditor } from "./agreement-overrides";
 import { RetentionTab } from "./retention-tab";
 import { getClientAgreementOverrides, getPortalSettings } from "@/server/portal-settings";
 import { canManageClientDocs, getCurrentDocs, toSlots, visibleKinds } from "@/server/client-documents";
-import { ClientDocButtons } from "@/components/client-docs/doc-buttons";
+import { ClientOverview } from "./client-overview";
 import { ClientDocsPanel } from "@/components/client-docs/docs-panel";
 
 export const dynamic = "force-dynamic";
@@ -118,9 +115,6 @@ export default async function ClientPage({
   const activeVideos = hub.videos.filter(
     (v) => !["published", "analysis_available"].includes(v.status),
   );
-  const publishedThisMonth = hub.videos.filter(
-    (v) => v.publishedAt && new Date(v.publishedAt).getMonth() === new Date().getMonth(),
-  ).length;
   // Eerstvolgende opname = de vroegste toekomstige opnamedag uit Google Agenda
   // (niet geannuleerd). shoots staat aflopend op datum, dus expliciet sorteren,
   // zodat dit altijd dezelfde datum toont als het klantenoverzicht.
@@ -175,18 +169,9 @@ export default async function ClientPage({
             <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={60} />
             <div className="min-w-0">
               <h1 className="text-xl font-semibold tracking-tight">{c.name}</h1>
-              <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">
-                {c.sector ?? "—"}
-                {c.startedOn ? ` · klant sinds ${formatDateFull(c.startedOn)}` : ""}
-              </p>
-              {/* Korte omschrijving: wat voor bedrijf het is. */}
-              {c.description ? (
-                <p className="mt-1.5 max-w-xl text-sm leading-snug text-[var(--color-ink)]">{c.description}</p>
+              {c.sector ? (
+                <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">{c.sector}</p>
               ) : null}
-              <ClientDocButtons
-                slots={docSlots.map((s) => ({ kind: s.kind, label: s.label, url: s.doc?.url ?? null }))}
-                className="mt-3"
-              />
             </div>
           </div>
           <div className="flex items-start gap-4">
@@ -201,11 +186,6 @@ export default async function ClientPage({
                     {CLIENT_STATUS[c.status]?.label}
                   </Badge>
                 )}
-                {c.complexity ? (
-                  <Badge tone={c.complexity === "hoog" ? "bad" : c.complexity === "gemiddeld" ? "warn" : "good"}>
-                    Complexiteit: {c.complexity}
-                  </Badge>
-                ) : null}
                 {c.website ? (
                   <a
                     href={c.website}
@@ -259,23 +239,48 @@ export default async function ClientPage({
 
       {active === "overzicht" ? (
         <div className="space-y-5">
-          {isOwnerViewer ? (
-            <ClientPortalLogin clientId={c.id} hasLogin={Boolean(portalLogin)} loginEmail={portalLogin?.email ?? null} />
-          ) : null}
-          {canEditClient ? (() => {
-            const f = hub.integrations.find((i) => i.provider === "frameio");
-            const cur = f?.externalId && f.externalId !== "manual" ? `https://next.frame.io/project/${f.externalId}` : null;
-            return <ClientFrameLink clientId={c.id} current={cur} />;
-          })() : null}
-          {canManageDocs ? <ClientDocsPanel clientId={c.id} slots={docSlots} /> : null}
-          <OverviewTab hub={hub} publishedThisMonth={publishedThisMonth} nextShoot={nextShoot} activeVideos={activeVideos.length} canEditClient={canEditClient} />
-          {canEditClient && agreementGeneral ? (
-            <Card padded={false}>
-              <CardHeader title="Klantspecifieke afspraken" subtitle="Afwijkingen van de algemene afspraken voor deze klant — zichtbaar op Samenwerking in het klantportaal. De offerte blijft leidend." className="p-5 pb-3" />
-              <div className="px-5 pb-5">
-                <AgreementOverridesEditor clientId={c.id} general={agreementGeneral} overrides={agreementOverrides ?? {}} />
+          <ClientOverview
+            hub={hub}
+            nextShoot={nextShoot}
+            docSlots={docSlots.map((s) => ({ kind: s.kind, label: s.label, url: s.doc?.url ?? null }))}
+            canEditClient={canEditClient}
+          />
+          {/* Beheer (portaallogin, Frame.io, guides uploaden, resultatenvlag,
+              klantspecifieke afspraken) blijft volledig werken, maar staat
+              ingeklapt zodat het overzicht rustig blijft. */}
+          {isOwnerViewer || canEditClient || canManageDocs ? (
+            <details className="sc-card group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3.5 text-sm font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+                Beheer van deze klant
+                <span className="text-xs group-open:hidden">Tonen</span>
+                <span className="hidden text-xs group-open:inline">Verbergen</span>
+              </summary>
+              <div className="space-y-5 border-t border-[var(--color-line)] p-5">
+                {canEditClient ? (
+                  <div className="flex items-center justify-between gap-4 text-sm">
+                    <span className="text-[var(--color-ink-muted)]">Tonen op resultaten</span>
+                    <ResultsToggle clientId={c.id} initial={c.showInResults} canEdit={canEditClient} />
+                  </div>
+                ) : null}
+                {isOwnerViewer ? (
+                  <ClientPortalLogin clientId={c.id} hasLogin={Boolean(portalLogin)} loginEmail={portalLogin?.email ?? null} />
+                ) : null}
+                {canEditClient ? (() => {
+                  const f = hub.integrations.find((i) => i.provider === "frameio");
+                  const cur = f?.externalId && f.externalId !== "manual" ? `https://next.frame.io/project/${f.externalId}` : null;
+                  return <ClientFrameLink clientId={c.id} current={cur} />;
+                })() : null}
+                {canManageDocs ? <ClientDocsPanel clientId={c.id} slots={docSlots} /> : null}
+                {canEditClient && agreementGeneral ? (
+                  <Card padded={false}>
+                    <CardHeader title="Klantspecifieke afspraken" subtitle="Afwijkingen van de algemene afspraken voor deze klant, zichtbaar in het klantportaal." className="p-5 pb-3" />
+                    <div className="px-5 pb-5">
+                      <AgreementOverridesEditor clientId={c.id} general={agreementGeneral} overrides={agreementOverrides ?? {}} />
+                    </div>
+                  </Card>
+                ) : null}
               </div>
-            </Card>
+            </details>
           ) : null}
         </div>
       ) : null}
@@ -293,147 +298,6 @@ export default async function ClientPage({
       {active === "contract" && hub.canSeeFinance ? <ContractTab hub={hub} /> : null}
       {active === "inzichten" ? <InsightsTab hub={hub} /> : null}
       {active === "koppelingen" ? <IntegrationsTab hub={hub} /> : null}
-    </div>
-  );
-}
-
-/* ---------------------------- Overzicht ---------------------------- */
-
-function OverviewTab({
-  hub,
-  publishedThisMonth,
-  nextShoot,
-  activeVideos,
-  canEditClient,
-}: {
-  hub: ClientHub;
-  publishedThisMonth: number;
-  nextShoot?: ClientHub["shoots"][number];
-  activeVideos: number;
-  canEditClient: boolean;
-}) {
-  const c = hub.client;
-  const awaitingClient = hub.videos.filter((v) =>
-    ["client_review", "client_revision"].includes(v.status),
-  );
-
-  return (
-    <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-        <Stat
-          label="Deze maand"
-          value={`${publishedThisMonth}/${c.monthlyVideoQuota}`}
-          hint="gepubliceerd t.o.v. afspraak"
-          tone={publishedThisMonth < c.monthlyVideoQuota ? "warn" : "good"}
-        />
-        <Stat label="In productie" value={activeVideos} hint="video's onderweg" />
-        <Stat
-          label="Bij de klant"
-          value={awaitingClient.length}
-          hint={
-            awaitingClient[0]
-              ? `oudste ${daysSince(awaitingClient[0].statusChangedAt)} dagen`
-              : "niets openstaand"
-          }
-          tone={awaitingClient.some((v) => daysSince(v.statusChangedAt) > 5) ? "warn" : "neutral"}
-        />
-        <Stat label="Weergaven (30d)" value={compact(hub.metrics.views)} hint="alle kanalen" />
-        <Stat label="Volgersgroei (30d)" value={`+${num(hub.metrics.followerGrowth)}`} />
-        {hub.canSeeFinance ? (
-          <Stat label="Per maand" value={euro(c.monthlyRevenue)} hint="contractwaarde" />
-        ) : (
-          <Stat label="Openstaande taken" value={hub.tasks.length} />
-        )}
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
-          <CardHeader title="Samenwerking" />
-          <dl className="mt-4 space-y-3 text-sm">
-            <Row label="Pakket" value={hub.package?.name ?? "—"} />
-            <Row label="Video's per maand" value={String(c.monthlyVideoQuota)} />
-            <Row label="Content plaatsen" value={<PostingToggle clientId={c.id} initial={c.weHandlePosting} canEdit={canEditClient} />} />
-            <Row label="Tonen op resultaten" value={<ResultsToggle clientId={c.id} initial={c.showInResults} canEdit={canEditClient} />} />
-            <Row label="Klant sinds" value={c.startedOn ? formatDateFull(c.startedOn) : "—"} />
-            <Row
-              label="Contract tot"
-              value={
-                hub.contract?.endsOn ? (
-                  <span className={daysUntil(hub.contract.endsOn) < 60 ? "text-[var(--color-bad)]" : undefined}>
-                    {formatDateFull(hub.contract.endsOn)}
-                  </span>
-                ) : "—"
-              }
-            />
-            <Row label="Projectcoördinator" value={c.coordinatorName ?? "—"} />
-            <Row label="Videograaf" value={hub.videographer?.fullName ?? "—"} />
-            <Row
-              label="Belangrijkste contact"
-              value={hub.contacts.find((x) => x.isPrimary)?.fullName ?? "—"}
-            />
-            <Row
-              label="Laatste contact"
-              value={c.lastContactAt ? relativeDays(c.lastContactAt) : "—"}
-            />
-          </dl>
-        </Card>
-
-        <Card className="lg:col-span-2" padded={false}>
-          <div className="p-5 pb-3">
-            <CardHeader
-              title="Wat er nu speelt"
-              subtitle="Video's die wachten, en de eerstvolgende opname."
-            />
-          </div>
-
-          {nextShoot ? (
-            <div className="mx-5 mb-3 flex items-center gap-3 rounded-[var(--radius-md)] bg-[var(--color-info-soft)] px-4 py-3">
-              <CalendarClock className="size-5 shrink-0 text-[var(--color-brand-600)]" strokeWidth={1.75} />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">
-                  Volgende opname {relativeDays(nextShoot.scheduledOn)}
-                </p>
-                <p className="text-xs text-[var(--color-ink-muted)]">
-                  {formatDateFull(nextShoot.scheduledOn)} · {nextShoot.locationName ?? "locatie onbekend"} ·{" "}
-                  {plural(Number(nextShoot.scriptCount), "script")}
-                </p>
-              </div>
-              <LinkButton href={`/productions/${nextShoot.id}`} variant="secondary" size="sm">
-                Openen
-              </LinkButton>
-            </div>
-          ) : (
-            <div className="mx-5 mb-3 rounded-[var(--radius-md)] bg-[var(--color-warn-soft)] px-4 py-3 text-sm text-[#8a5300]">
-              Er staat geen opnamedag gepland. Plan er één om de contentcyclus door te laten lopen.
-            </div>
-          )}
-
-          {hub.videos.filter((v) => !["published", "analysis_available"].includes(v.status)).length === 0 ? (
-            <EmptyState title="Geen lopende video's" />
-          ) : (
-            <ul className="divide-y divide-[var(--color-line)] border-t border-[var(--color-line)]">
-              {hub.videos
-                .filter((v) => !["published", "analysis_available"].includes(v.status))
-                .slice(0, 8)
-                .map((v) => (
-                  <li key={v.id}>
-                    <Link href={`/videos/${v.id}`} className="sc-row-link flex items-center gap-3 px-5 py-2.5">
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{v.title}</span>
-                        <span className="block truncate text-xs text-[var(--color-ink-muted)]">
-                          {v.editorName ?? "geen editor"} · {daysSince(v.statusChangedAt)} dagen in deze stap
-                        </span>
-                      </span>
-                      <Badge tone={videoPhase(v.status).tone}>
-                        {videoPhase(v.status).label}
-                      </Badge>
-                    </Link>
-                  </li>
-                ))}
-            </ul>
-          )}
-        </Card>
-      </div>
     </div>
   );
 }
