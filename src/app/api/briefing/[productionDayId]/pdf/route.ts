@@ -2,14 +2,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ForbiddenError, getViewer } from "@/server/auth/context";
 import { briefingHtml, loadBriefingFor } from "@/server/briefing/access";
 import { htmlToPdf } from "@/server/pdf/render";
+import { mergePdfs } from "@/server/briefing/pdfjs-server";
+import { asc, eq } from "drizzle-orm";
+import { db } from "@/db/client";
+import { kbAssetParts } from "@/db/schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Editor-briefing als PDF: exact dezelfde opmaak als de weergave in het
- * portaal. Toegang via `loadBriefingFor` (team binnen de eigen klanten,
+ * Editor-briefing als PDF: de briefingpagina's in dezelfde opmaak als in het
+ * portaal, gevolgd door de originele scriptpagina's. Toegang via `loadBriefingFor` (team binnen de eigen klanten,
  * editors alleen voor hun eigen opname).
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ productionDayId: string }> }) {
@@ -28,7 +32,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prod
 
   let pdf: Uint8Array;
   try {
-    pdf = await htmlToPdf(await briefingHtml(loaded.doc, "pdf"));
+    // Pagina 1-2 (omslag, overzicht, richtlijnen, materiaal) + de scriptpagina's
+    // exact zoals in de script-PDF.
+    const head = await htmlToPdf(await briefingHtml(loaded.doc, "pdf"));
+    const assetId = loaded.doc.scriptPagesAssetId;
+    if (assetId) {
+      const parts = await db.select({ data: kbAssetParts.data }).from(kbAssetParts).where(eq(kbAssetParts.assetId, assetId)).orderBy(asc(kbAssetParts.partNo));
+      const scripts = new Uint8Array(Buffer.concat(parts.map((p) => Buffer.from(p.data))));
+      pdf = await mergePdfs([head, scripts]);
+    } else {
+      pdf = head;
+    }
   } catch (e) {
     return NextResponse.json(
       { error: "PDF genereren is mislukt. Controleer of Chrome beschikbaar is (CHROME_PATH).", detail: e instanceof Error ? e.message : String(e) },

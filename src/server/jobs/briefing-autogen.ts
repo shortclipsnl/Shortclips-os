@@ -45,7 +45,7 @@ export async function runBriefingAutoGenerate(): Promise<{
       setGeneratedAt: sql<Date | null>`(select b.generated_at from briefing_sets b where b.production_day_id = ${productionDays.id} and b.deleted_at is null limit 1)`,
       setStartedAt: sql<Date | null>`(select b.started_at from briefing_sets b where b.production_day_id = ${productionDays.id} and b.deleted_at is null limit 1)`,
       // Oude briefing (v1) of highlights die nog niet gelukt zijn → opnieuw.
-      setOutdated: sql<boolean>`coalesce((select (b.content->>'v') is distinct from '2' or ((b.content->'guide'->>'error') is not null and b.generated_at < now() - interval '6 hours') from briefing_sets b where b.production_day_id = ${productionDays.id} and b.deleted_at is null limit 1), false)`,
+      setOutdated: sql<boolean>`coalesce((select (b.content->>'v') is distinct from '2' or (b.content->'scriptPages') is null or ((b.content->'guide'->>'error') is not null and b.generated_at < now() - interval '6 hours') from briefing_sets b where b.production_day_id = ${productionDays.id} and b.deleted_at is null limit 1), false)`,
       // Laatste wijziging van de Editing Guide van de klant.
       guideAt: sql<Date | null>`(select max(d.created_at) from client_documents d where d.client_id = ${productionDays.clientId} and d.kind = 'editing_guide' and d.deleted_at is null)`,
     })

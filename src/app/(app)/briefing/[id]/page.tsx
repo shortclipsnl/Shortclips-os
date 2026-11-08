@@ -9,12 +9,14 @@ import { BRIEFING_STATUS } from "@/components/briefing-view";
 import { formatDateTime } from "@/lib/format";
 import type { BriefingStatus } from "@/server/briefing/service";
 import { BriefingTeamPanel } from "./team-panel";
+import { ScriptPages } from "./script-pages";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Editor briefing" };
 
 /**
- * De editor-briefing van één opnamesessie. Dezelfde opmaak als de PDF.
+ * De editor-briefing van één opnamesessie: briefingpagina's in dezelfde opmaak
+ * als de PDF, daarna de scriptpagina's exact zoals in de script-PDF.
  * Editors: alleen lezen en downloaden. Team Shortclips: ook bijwerken en
  * highlights/omslag corrigeren (blijft staan bij automatische updates).
  */
@@ -73,7 +75,9 @@ export default async function BriefingPage({ params }: { params: Promise<{ id: s
           className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-white p-4 text-[#00003b] [color-scheme:light] sm:p-6"
           dangerouslySetInnerHTML={{ __html: html }}
         />
-      ) : (
+      ) : null}
+      {html && doc.scriptPagesAssetId ? <ScriptPages url={`/api/briefing/${id}/scripts`} /> : null}
+      {html ? null : (
         <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--color-line-strong)] p-6 text-sm text-[var(--color-ink-muted)]">
           <p className="font-medium text-[var(--color-ink)]">Er is nog geen briefing voor deze opname.</p>
           <ul className="mt-2 list-disc pl-5">

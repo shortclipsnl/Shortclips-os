@@ -9,6 +9,8 @@ import { runJsonPrompt } from "@/server/ai/client";
 import { parseScriptPdf, type ParsedScriptPdf } from "@/server/briefing/script-pdf";
 import { HIGHLIGHT_SYSTEM, highlightUserPrompt, pdfPlainText, verifyHighlights, type GuideHighlight } from "@/server/briefing/guide-highlights";
 import { isStoreV2, type BriefingStoreV2 } from "@/server/briefing/types";
+import { extractPages } from "@/server/briefing/pdfjs-server";
+import { storeAsset } from "@/server/kennisbank-assets";
 
 const STALE_RUNNING_MIN = 10;
 
@@ -96,7 +98,7 @@ export async function ensureBriefingForShoot(productionDayId: string, opts: { fo
 
   if (existing && !opts.force) {
     const guideSame = (prev?.guide.hash ?? null) === (guide?.hash ?? null) && !prev?.guide.error;
-    if (prev && existing.sourceHash === pdf.hash && guideSame && existing.status !== "mislukt" && existing.status !== "bezig") {
+    if (prev && prev.scriptPages && existing.sourceHash === pdf.hash && guideSame && existing.status !== "mislukt" && existing.status !== "bezig") {
       return { ok: false, reason: "unchanged" };
     }
     if (existing.status === "bezig" && existing.startedAt) {
@@ -136,7 +138,29 @@ export async function ensureBriefingForShoot(productionDayId: string, opts: { fo
   }
   if (scripts.scripts.length === 0) return fail(scripts.warnings[0] ?? "Geen scripts gevonden in de PDF.");
 
-  // 2. Highlights: hergebruiken zolang de guide gelijk is.
+  // 2. De scriptpagina's zelf (exact zoals in de PDF), zonder voorblad en
+  //    beeldpagina's. Hergebruiken zolang de script-PDF niet is veranderd.
+  let scriptPages: BriefingStoreV2["scriptPages"] = null;
+  const pages = [...new Set(scripts.scripts.flatMap((s) => s.pages))].sort((a, b) => a - b);
+  if (prev?.scriptPages && prev.scriptPages.sourceHash === pdf.hash) {
+    scriptPages = prev.scriptPages;
+  } else if (pages.length) {
+    try {
+      const bytes = await extractPages(new Uint8Array(Buffer.from(pdf.pdfBase64, "base64")), pages);
+      const assetId = await storeAsset({
+        kind: "file",
+        fileName: `Scripts ${day.clientName} ${String(day.scheduledOn).slice(0, 10)}.pdf`,
+        contentType: "application/pdf",
+        data: Buffer.from(bytes),
+        sourceRef: `briefing:${productionDayId}`,
+      });
+      scriptPages = { assetId, pages, sourceHash: pdf.hash };
+    } catch (e) {
+      return fail(`De scriptpagina's konden niet uit de PDF worden gehaald (${e instanceof Error ? e.message.slice(0, 120) : "onbekende fout"}).`);
+    }
+  }
+
+  // 3. Highlights: hergebruiken zolang de guide gelijk is.
   let guidePart: BriefingStoreV2["guide"];
   if (!guide) guidePart = { hash: null, fileName: null, highlights: [], error: null };
   else if (prev && prev.guide.hash === guide.hash && !prev.guide.error && prev.guide.highlights.length) guidePart = prev.guide;
@@ -149,6 +173,7 @@ export async function ensureBriefingForShoot(productionDayId: string, opts: { fo
     v: 2,
     source: { fileName: pdf.fileName ?? "script.pdf", origin: pdf.origin === "review" ? "review" : "drive", hash: pdf.hash, parsedAt: new Date().toISOString() },
     scripts,
+    scriptPages,
     guide: guidePart,
     // Handmatige correcties nooit overschrijven.
     ...(prev?.overrides ? { overrides: prev.overrides } : {}),

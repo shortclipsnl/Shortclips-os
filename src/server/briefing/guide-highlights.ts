@@ -8,6 +8,7 @@
  * Het resultaat wordt per guide-versie (sha256) bewaard: geen AI-kosten zolang
  * de guide niet verandert.
  * ------------------------------------------------------------------ */
+import { loadPdfjs } from "./pdfjs-server";
 
 export type GuideHighlight = {
   /** true = iets wat juist NIET mag (stond in de guide onder Niet/Nooit/Verboden). */
@@ -36,8 +37,8 @@ export function normGuide(s: string): string {
 
 /** Platte tekst uit een PDF (server). Regels per tekstfragment. */
 export async function pdfPlainText(data: Uint8Array): Promise<string> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const doc = await pdfjs.getDocument({ data, disableFontFace: true, isEvalSupported: false, useSystemFonts: false }).promise;
+  const pdfjs = await loadPdfjs();
+  const doc = await pdfjs.getDocument({ data: data.slice(), disableFontFace: true, isEvalSupported: false, useSystemFonts: false }).promise;
   const out: string[] = [];
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);

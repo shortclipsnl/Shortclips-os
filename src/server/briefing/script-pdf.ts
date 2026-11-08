@@ -10,6 +10,7 @@
  * Er wordt niets samengevat, herschreven of aangevuld. Wordt de structuur niet
  * herkend, dan valt de briefing terug op de volledige tekst per pagina.
  * ------------------------------------------------------------------ */
+import { loadPdfjs } from "./pdfjs-server";
 
 export type ScriptSpan = { t: string; b?: true; i?: true };
 export type ScriptLine = { spans: ScriptSpan[]; bullet?: true };
@@ -55,8 +56,8 @@ const lineText = (spans: ScriptSpan[]) => spans.map((s) => s.t).join("");
 
 /** Leest alle tekstregels met opmaak uit de PDF. */
 async function readLines(data: Uint8Array): Promise<{ lines: RawLine[]; pageCount: number; emptyPages: number[] }> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const doc = await pdfjs.getDocument({ data, disableFontFace: true, isEvalSupported: false, useSystemFonts: false }).promise;
+  const pdfjs = await loadPdfjs();
+  const doc = await pdfjs.getDocument({ data: data.slice(), disableFontFace: true, isEvalSupported: false, useSystemFonts: false }).promise;
   const lines: RawLine[] = [];
   const emptyPages: number[] = [];
   for (let p = 1; p <= doc.numPages; p++) {

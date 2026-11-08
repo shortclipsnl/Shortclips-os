@@ -4,7 +4,6 @@
  * Huisstijl: navy #00003b en wit, Poppins voor titels, Arial voor scripttekst.
  * ------------------------------------------------------------------ */
 import type { BriefingDoc } from "./assemble";
-import type { ScriptLine } from "./script-pdf";
 
 const NAVY = "#00003b";
 
@@ -26,34 +25,6 @@ function fmtStamp(iso: string | null): string {
   const d = new Date(iso);
   const parts = new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(d);
   return parts;
-}
-
-function lineHtml(l: ScriptLine): string {
-  const inner = l.spans
-    .map((s) => {
-      let t = esc(s.t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>');
-      if (s.i) t = `<em>${t}</em>`;
-      if (s.b) t = `<strong>${t}</strong>`;
-      return t;
-    })
-    .join("");
-  const allItalic = l.spans.every((s) => s.i || !s.t.trim());
-  const plain = l.spans.map((s) => s.t).join("").trim();
-  if (!l.bullet && /^[\p{Lu}0-9 ()'.\-]{2,40}:$/u.test(plain)) return `<p class="spk">${inner}</p>`;
-  if (l.bullet) return `<li>${inner.replace(/^\s*[•·▪●◦\-–]\s*/, "")}</li>`;
-  return `<p${allItalic ? ' class="dir"' : ""}>${inner}</p>`;
-}
-
-function linesHtml(lines: ScriptLine[]): string {
-  let out = "";
-  let inList = false;
-  for (const l of lines) {
-    if (l.bullet && !inList) { out += "<ul>"; inList = true; }
-    if (!l.bullet && inList) { out += "</ul>"; inList = false; }
-    out += lineHtml(l);
-  }
-  if (inList) out += "</ul>";
-  return out;
 }
 
 /** Zet elke CSS-regel onder één container, zodat de briefing-opmaak in het
@@ -127,12 +98,12 @@ export function renderBriefingHtml(doc: BriefingDoc, opts: { coverDataUri?: stri
     ? `<section class="block">
   <h2><span>1</span> Wat moet ik monteren?</h2>
   <table class="overview">
-    <thead><tr><th>#</th><th>Video</th><th>Doel van de video (uit het script)</th><th>Script</th></tr></thead>
+    <thead><tr><th>#</th><th>Video</th><th>Doel van de video (uit het script)</th></tr></thead>
     <tbody>${doc.scripts
       .map((s, i) => {
         const doel = s.sections.find((x) => x.kind === "uitleg");
         const doelText = doel ? doel.lines.map((l) => l.spans.map((x) => x.t).join("")).join(" ") : "";
-        return `<tr><td class="num">${i + 1}</td><td class="vt">${esc(s.title)}</td><td class="doel">${doelText ? `<span class="clamp">${esc(doelText)}</span>` : '<span class="muted">Geen uitleg in het script</span>'}</td><td class="ref"><a href="#video-${i + 1}">Video ${i + 1}</a></td></tr>`;
+        return `<tr><td class="num">${i + 1}</td><td class="vt">${esc(s.title)}</td><td class="doel">${doelText ? `<span class="clamp">${esc(doelText)}</span>` : '<span class="muted">Geen uitleg in het script</span>'}</td></tr>`;
       })
       .join("")}</tbody>
   </table>
@@ -169,28 +140,10 @@ export function renderBriefingHtml(doc: BriefingDoc, opts: { coverDataUri?: stri
   const material = `<section class="block">
   <h2><span>3</span> Waar vind ik het materiaal?</h2>
   <ul class="links">${linkRows}</ul>
-  ${doc.imagePages.length ? `<p class="small">De script-PDF bevat ook ${doc.imagePages.length} beeldpagina's (moodboard of referenties). Die staan alleen in het origineel.</p>` : ""}
+  ${doc.imagePages.length ? `<p class="small">De script-PDF bevat ook ${doc.imagePages.length} beeldpagina's (moodboard of referenties). Die staan in het origineel; hieronder staan alleen de scriptpagina's.</p>` : ""}
 </section>`;
 
-  // Scripts precies zoals in de PDF: originele koppen (links) en tekst (rechts),
-  // in dezelfde volgorde. Geen extra labels, nummering of samenvattingen.
-  const scripts = doc.scripts
-    .map((s, i) => {
-      const rows = s.sections
-        .map((sec) => {
-          const cls = sec.kind === "hook" ? "hook" : sec.kind === "cta" ? "cta" : sec.kind === "uitleg" ? "uitleg" : "";
-          const body = sec.lines.length ? linesHtml(sec.lines) : "";
-          return `<div class="row ${cls}"><div class="lab">${sec.label ? esc(sec.label) : ""}</div><div class="stxt">${body}</div></div>`;
-        })
-        .join("");
-      return `<article class="script" id="video-${i + 1}">
-  <div class="script-head"><span class="vno">${i + 1}</span><div><span class="vof">Video ${i + 1} van ${doc.scripts.length}</span><h2 class="vtitle">${esc(s.title)}</h2></div></div>
-  <div class="rows">${rows}</div>
-</article>`;
-    })
-    .join("");
-
-  const footer = `<footer class="foot">Automatisch samengesteld uit ${doc.sourceFileName ? `de script-PDF "${esc(doc.sourceFileName)}"` : "de script-PDF"}, de Editing Guide en de projectgegevens in het portaal.${doc.updatedAt ? ` Laatst bijgewerkt ${esc(fmtStamp(doc.updatedAt))}.` : ""} Scripts zijn letterlijk overgenomen.</footer>`;
+  const footer = `<footer class="foot">Automatisch samengesteld uit ${doc.sourceFileName ? `de script-PDF "${esc(doc.sourceFileName)}"` : "de script-PDF"}, de Editing Guide en de projectgegevens in het portaal.${doc.updatedAt ? ` Laatst bijgewerkt ${esc(fmtStamp(doc.updatedAt))}.` : ""} De scripts volgen hierna precies zoals in de script-PDF.</footer>`;
 
   const css = `
   ${opts.mode === "pdf" ? "@page { size: A4; margin: 14mm 14mm 16mm; }" : ""}
@@ -245,28 +198,12 @@ export function renderBriefingHtml(doc: BriefingDoc, opts: { coverDataUri?: stri
   .links .lk { font-size: 9.5px; text-transform: uppercase; letter-spacing: .08em; color: #6f6f82; font-weight: 600; }
   .links .missing { color: #a15c00; font-weight: 600; }
   .page2 { ${opts.mode === "pdf" ? "break-before: page; margin-top: 0;" : "margin-top: 30px;"} }
-  .script { ${opts.mode === "pdf" ? "break-before: page;" : "margin-top: 34px; padding-top: 22px; border-top: 2px solid " + NAVY + ";"} }
-  .script-head { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 2px solid ${NAVY}; }
-  .vno { flex: 0 0 34px; height: 34px; border-radius: 8px; background: ${NAVY}; color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 16px; }
-  .vof { font-size: 9.5px; text-transform: uppercase; letter-spacing: .14em; color: #6f6f82; font-weight: 600; }
-  .vtitle { font-size: 20px; margin: 0; line-height: 1.2; }
-  .row { display: grid; grid-template-columns: 128px 1fr; gap: 14px; padding: 9px 0; border-bottom: 1px solid #ececf2; break-inside: avoid; }
-  .row .lab { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding-top: 2px; }
-  .row.hook { background: #f1f2f8; border-left: 4px solid ${NAVY}; padding-left: 10px; }
-  .row.cta { background: #f1f2f8; border-left: 4px solid ${NAVY}; padding-left: 10px; }
-  .row.uitleg .stxt { color: #4a4a68; }
-  .stxt { font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.55; }
-  .stxt p { margin: 0 0 4px; }
-  .stxt p:last-child { margin-bottom: 0; }
-  .stxt p.dir, .stxt em { color: #4a4a68; }
-  .stxt p.spk { font-weight: 700; margin-top: 6px; }
-  .stxt ul { margin: 0 0 4px; padding-left: 18px; }
   .foot { margin-top: 26px; padding-top: 8px; border-top: 1px solid #ececf2; font-size: 9.5px; color: #8a8aa0; }
-  @media (max-width: 720px) { .row { grid-template-columns: 1fr; gap: 2px; } .cover { flex-direction: column; } .cover-img { width: 100%; height: 160px; order: 0; } .meta { grid-template-columns: 1fr 1fr; row-gap: 10px; } ul.links { columns: 1; } .hl .cat { flex-basis: 80px; } }
+  @media (max-width: 720px) { .cover { flex-direction: column; } .cover-img { width: 100%; height: 160px; order: 0; } .meta { grid-template-columns: 1fr 1fr; row-gap: 10px; } ul.links { columns: 1; } .hl .cat { flex-basis: 80px; } }
   @media print { .sc-brief a { text-decoration: none; } }
   `;
 
-  const body = `<div class="sc-brief">${cover}${alertBlock}${note}${overview}${highlights}${material}${scripts}${footer}</div>`;
+  const body = `<div class="sc-brief">${cover}${alertBlock}${note}${overview}${highlights}${material}${footer}</div>`;
   if (opts.mode === "screen") return `<style>${scopeCss(css, ".sc-brief-root")}</style><div class="sc-brief-root">${body}</div>`;
   return `<!doctype html><html lang="nl"><head><meta charset="utf-8" /><title>Editor briefing ${esc(doc.client.name)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
