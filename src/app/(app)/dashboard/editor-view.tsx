@@ -12,6 +12,8 @@ import { getOrCreateIcalToken, icalFeedUrl } from "@/server/editor-ical";
 import { buildEditorGreeting } from "@/lib/editor-greeting";
 import { AvailabilityBox } from "./availability-box";
 import { DeliveredCelebration } from "./delivered-celebration";
+import { StatusCheckCards } from "./status-check-card";
+import { listOpenStatusChecks } from "@/server/editor-status-checks";
 
 /** "2026-10" → "oktober 2026". */
 function monthLabel(ym: string): string {
@@ -29,11 +31,13 @@ function monthLabel(ym: string): string {
  * DEADLINE (lib/edit-deadline), nooit de opleverdeadline van Shortclips aan de klant.
  */
 export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
-  const [data, board, feedToken] = await Promise.all([
+  const [data, board, feedToken, statusChecks] = await Promise.all([
     getEditorDashboard(viewer),
     listEditorBoard(viewer),
     // Persoonlijke agendalink staat altijd klaar (geen aparte aanmaakstap meer).
     getOrCreateIcalToken(viewer.id).catch(() => null),
+    // Openstaande statuschecks ("hoe ver ben je?"): nooit de pagina laten vallen.
+    listOpenStatusChecks(viewer.id).catch((e) => { console.error("[statuscheck]", e); return []; }),
   ]);
   const firstName = viewer.fullName.split(" ")[0];
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
@@ -98,6 +102,9 @@ export async function EditorDashboard({ viewer }: { viewer: Viewer }) {
           <GreetStat label="XP verdiend" value={xp} icon={<Trophy className="size-4" />} />
         </div>
       </div>
+
+      {/* Statuscheck halverwege de editor deadline: één klik, direct zichtbaar voor het team. */}
+      <StatusCheckCards checks={statusChecks} />
 
       {overdue > 0 ? (
         <div className="flex items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--color-bad)]/25 bg-[var(--color-bad-soft)] px-4 py-3">

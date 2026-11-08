@@ -15,6 +15,7 @@ import { nlHolidaySet } from "@/lib/holidays";
 import { EDITOR_LEAD_DAYS, editorDeadline, isFirstVersionPending } from "@/lib/edit-deadline";
 import { type EditPhase, type VideoStage } from "@/lib/statuses";
 import type { EditorBriefing } from "@/server/actions/ai-tools";
+import { getEditorProgress, type EditorProgress } from "@/server/editor-status-checks";
 
 export type BriefingStatus = "geen" | "bezig" | "klaar" | "bijgewerkt_script" | "mislukt";
 
@@ -152,6 +153,8 @@ export type EditorBoardVideo = {
   editorTotalWorkdays: number;
   editorOverdue: boolean;
   editorBatteryColor: "groen" | "blauw" | "oranje" | "rood";
+  /** Laatste statuscheck van de editor (alleen in het teamoverzicht). */
+  progress: EditorProgress | null;
 };
 
 const TOTAL_WORKDAYS = 14; // opname → klantoplevering
@@ -274,7 +277,7 @@ export async function listEditorBoard(
     }
   }
 
-  return rows.map((r) => {
+  const result: EditorBoardVideo[] = rows.map((r) => {
     const workdaysToDeadline = r.dueOn ? workingDaysUntil(today, r.dueOn, holidays) : null;
     const status = r.status as VideoStage;
     const phase = STATUS_TO_EDIT_PHASE[status] ?? "te_plannen";
@@ -392,6 +395,19 @@ export async function listEditorBoard(
       editorTotalWorkdays,
       editorOverdue,
       editorBatteryColor,
+      progress: null,
     };
   });
+
+  // Voortgang uit de statuscheck: alleen in het overzicht voor Team Shortclips.
+  // Een storing hierin mag het editingboard nooit laten vallen.
+  if (opts.allEditors) {
+    try {
+      const progress = await getEditorProgress(result.map((v) => ({ id: v.id, status: v.status, editorId: v.editorId, editorDueOn: v.editorDueOn })));
+      for (const v of result) v.progress = progress.get(v.id) ?? null;
+    } catch (e) {
+      console.error("[statuscheck] voortgang", e);
+    }
+  }
+  return result;
 }

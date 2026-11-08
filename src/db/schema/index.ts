@@ -28,3 +28,4 @@ export * from "./content-research";
 export * from "./client-documents";
 export * from "./bank";
 export * from "./planning-deadlines";
+export * from "./editor-status";

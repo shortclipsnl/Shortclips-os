@@ -10,6 +10,7 @@ import { getShootDeadlines } from "@/server/shoot-deadlines";
 import { getReviewQueue } from "@/server/videos";
 import { listScripting } from "@/server/scripting";
 import { getRetentionSignals, RETENTION_CATEGORIES } from "@/server/client-retention";
+import { getEditorStatusSignals } from "@/server/editor-status-checks";
 import { integrationHealth } from "@/server/integrations/registry";
 import { countOpenLinkSuggestions } from "@/server/link-review";
 import { VIDEO_WAITING_ON, type VideoStage } from "@/lib/statuses";
@@ -70,6 +71,8 @@ const GROUP_OF: Record<string, QualityGroup> = {
   "Video over deadline": "editing",
   "Eerste versie verwacht": "editing",
   "Editor moet opleveren": "editing",
+  "Editor reageert niet": "editing",
+  "Editor nog niet begonnen": "editing",
   "Video wacht op controle": "editing",
   "Feedback niet verwerkt": "editing",
   "Productiegegevens ontbreken": "editing",
@@ -145,7 +148,7 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
   const [
     data, projects, shootDeadlines, reviewQueue, scripting,
     missingVersion, missingData, clientRevision, readyNotSent, overduePublish,
-    openLinks, integrations, retention,
+    openLinks, integrations, retention, editorStatus,
   ] = await Promise.all([
     getDashboard(viewer),
     listEditingProjects(viewer),
@@ -203,11 +206,41 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
     // Klantbehoud: teruglopende resultaten, klachten, contractmomenten en
     // ontbrekende gegevens, met eigen verantwoordelijke (incl. vervanging).
     getRetentionSignals(viewer.clientScope).catch((e) => { console.error("[klantbehoud]", e); return []; }),
+    // Statuscheck editors: geen reactie na één werkdag of nog niet begonnen vlak
+    // voor de editor deadline. Gaat naar de coördinator van de klant.
+    getEditorStatusSignals((clientId) => viewer.clientScope === null || viewer.clientScope.includes(clientId))
+      .catch((e) => { console.error("[statuscheck]", e); return []; }),
   ]);
 
   const items: PartialItem[] = [];
 
   /* ---------- LIJST A — Productie & deadlines ---------- */
+
+  // Statuscheck editors (zie src/server/editor-status-checks.ts).
+  for (const e of editorStatus) {
+    const editor = e.editorName?.split(" ")[0] ?? "Editor";
+    const project = projTitle(e.clientName, e.title);
+    const due = e.editorDueOn ? ` · editor deadline ${e.editorDueOn.slice(8, 10)}-${e.editorDueOn.slice(5, 7)}` : "";
+    if (e.kind === "geen_reactie") {
+      items.push({
+        id: `statuscheck-stil-${e.deliverableId}`, clientName: e.clientName, severity: "oranje", category: "Editor reageert niet",
+        title: `${e.clientName} — ${project}`,
+        detail: `${editor} gaf na een werkdag geen status door op de statuscheck${due} → even navragen`,
+        href: `/videos/${e.deliverableId}`, roles: EDIT,
+        action: `Voortgang navragen bij ${editor}`, reason: `${project} · geen reactie op statuscheck${due}`,
+        priority: "normaal", dueOn: e.editorDueOn ?? undefined,
+      });
+    } else {
+      items.push({
+        id: `statuscheck-risico-${e.deliverableId}`, clientName: e.clientName, severity: "rood", category: "Editor nog niet begonnen",
+        title: `${e.clientName} — ${project}`,
+        detail: `${editor} is nog niet begonnen${due}${e.note ? ` · "${e.note}"` : ""} → bijsturen of herplannen`,
+        href: `/videos/${e.deliverableId}`, roles: EDIT,
+        action: `Editing bijsturen met ${editor}`, reason: `${project} · nog niet begonnen${due}`,
+        priority: "hoog", dueOn: e.editorDueOn ?? undefined,
+      });
+    }
+  }
 
   // #1 Deadline in gevaar — risico, nog niet te laat.
   for (const p of projects) {

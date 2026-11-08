@@ -35,6 +35,17 @@ const PHASE_TO_STATUS: Record<EditPhase, VideoStage> = {
 
 // Kolombreedtes — gelijk voor kop en rijen zodat alles uitlijnt.
 const GRID = "minmax(140px,1.4fr) 120px minmax(150px,1.3fr) 150px minmax(120px,1fr) 64px minmax(120px,1fr) minmax(110px,1fr) minmax(150px,1.4fr)";
+// Teamoverzicht: extra kolom Voortgang (statuscheck van de editor) direct na de deadline.
+const GRID_TEAM = "minmax(140px,1.4fr) 120px minmax(150px,1.3fr) 132px 150px minmax(120px,1fr) 64px minmax(120px,1fr) minmax(110px,1fr) minmax(150px,1.4fr)";
+
+/** Kleuren van de kolom Voortgang: groen = goed, oranje = aandacht, rood = risico. */
+const PROGRESS_TONE: Record<NonNullable<EditorBoardVideo["progress"]>["tone"], { bg: string; fg: string }> = {
+  good: { bg: "var(--color-good-soft)", fg: "var(--color-good)" },
+  warn: { bg: "var(--color-warn-soft)", fg: "var(--color-warn)" },
+  bad: { bg: "var(--color-bad)", fg: "#fff" },
+  info: { bg: "var(--color-info-soft)", fg: "var(--color-brand-700)" },
+  muted: { bg: "transparent", fg: "var(--color-ink-faint)" },
+};
 
 function todayIso(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
@@ -226,11 +237,12 @@ export function EditorBoardTable({
       ) : null}
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <div className="min-w-[1210px]">
-          <div className="grid items-center gap-px border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]" style={{ gridTemplateColumns: GRID }}>
+        <div className={editorView ? "min-w-[1210px]" : "min-w-[1350px]"}>
+          <div className="grid items-center gap-px border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]" style={{ gridTemplateColumns: editorView ? GRID : GRID_TEAM }}>
             <span className="px-1">Item</span>
             <span className="px-1 text-center">Editor</span>
             <span className="px-1 text-center">{editorView ? "Editor deadline" : "Deadline"}</span>
+            {editorView ? null : <span className="px-1 text-center" title="Laatste statuscheck van de editor">Voortgang</span>}
             <span className="px-1 text-center">Fase</span>
             <span className="px-1 text-center">Prioriteit</span>
             <span className="px-1 text-center">Shorts</span>
@@ -341,7 +353,7 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorV
   const pct = Math.min(100, Math.max(6, Math.round((elapsed / Math.max(1, total)) * 100)));
 
   return (
-    <div className="grid items-stretch gap-px border-b border-[var(--color-line)] bg-[var(--color-surface)] text-sm hover:bg-[var(--color-surface-sunken)]/40" style={{ gridTemplateColumns: GRID }}>
+    <div className="grid items-stretch gap-px border-b border-[var(--color-line)] bg-[var(--color-surface)] text-sm hover:bg-[var(--color-surface-sunken)]/40" style={{ gridTemplateColumns: editorView ? GRID : GRID_TEAM }}>
       {/* Item (klant) + "Vraag stellen"-knop voor de editor. De editor-briefing
           staat nu in een eigen kolom (rechts). */}
       <div className="flex flex-col justify-center gap-1 px-2.5 py-2" style={{ boxShadow: `inset 4px 0 0 ${phaseColor}` }}>
@@ -382,6 +394,9 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorV
 
       {/* Deadline — batterij met datumbereik; aanklikken om beide datums (opname + deadline) te wijzigen */}
       <DeadlineCell v={v} pct={pct} canEdit={canEdit} editorView={editorView} onSave={(dates) => run(() => setEditingVideoDeadline(v.id, dates))} />
+
+      {/* Voortgang: laatste statuscheck van de editor + wanneer bijgewerkt. */}
+      {editorView ? null : <ProgressCell v={v} />}
 
       {/* Fase */}
       <div className="p-0.5">
@@ -429,6 +444,27 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorV
       <div className="flex items-center justify-center px-1 py-1">
         <BriefingCell v={v} canEdit={canEdit} run={run} pending={pending} />
       </div>
+    </div>
+  );
+}
+
+/** Kolom Voortgang: wat de editor bij de laatste statuscheck doorgaf. */
+function ProgressCell({ v }: { v: EditorBoardVideo }) {
+  const p = v.progress;
+  if (!p) return <div className="grid place-items-center px-1 text-2xs text-[var(--color-ink-faint)]">—</div>;
+  const tone = PROGRESS_TONE[p.tone];
+  const tip = [p.label, p.updatedAgo, v.editorDueOn ? `editor deadline ${fmtShort(v.editorDueOn)}` : null, p.note ? `"${p.note}"` : null].filter(Boolean).join(" · ");
+  return (
+    <div className="flex flex-col items-center justify-center gap-0.5 px-1 py-1 text-center" title={tip}>
+      {p.key === "geen" ? (
+        <span className="text-2xs text-[var(--color-ink-faint)]">{p.label}</span>
+      ) : (
+        <span className="inline-flex w-full items-center justify-center rounded-[4px] px-1.5 py-1 text-2xs font-semibold" style={{ background: tone.bg, color: tone.fg }}>
+          {p.label}
+        </span>
+      )}
+      {p.updatedAgo ? <span className="text-[10px] leading-tight text-[var(--color-ink-faint)]">{p.updatedAgo}</span> : null}
+      {p.note ? <span className="w-full truncate text-[10px] italic leading-tight text-[var(--color-ink-muted)]">{p.note}</span> : null}
     </div>
   );
 }

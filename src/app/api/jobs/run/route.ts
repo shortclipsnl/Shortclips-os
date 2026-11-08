@@ -38,6 +38,7 @@ import { runMonthlyReports, runReportQueue } from "@/server/jobs/report-monthly"
 import { runReportTeamNotifications } from "@/server/reports/team";
 import { runReportReviewReminders } from "@/server/jobs/report-review-reminders";
 import { runAttentionNotify } from "@/server/jobs/attention-notify";
+import { runEditorStatusChecks } from "@/server/editor-status-checks";
 import { runDriveSync } from "@/server/jobs/drive-sync";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, pullMetricoolPosts, runMetricoolSync } from "@/server/jobs/metricool-sync";
@@ -81,6 +82,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "reminders.daily_todo": runDailyTeamTodoReminder,
   "reminders.next_day_todo": runNextDayTodoReminder,
   "reminders.editor_friday_wrapup": runEditorFridayWrapUp,
+  // Statuscheck editors halverwege de editor deadline (alleen 09:00-17:00 op werkdagen).
+  "editors.status_checks": runEditorStatusChecks,
   "reminders.cleaning_friday": runCleaningFridayReminder,
   "goals.recompute": runGoalsRecompute,
   "goals.seed": runGoalsSeed,
