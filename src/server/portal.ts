@@ -1,6 +1,6 @@
 import "server-only";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   activityEvents,
@@ -171,6 +171,9 @@ export async function getPortalData(viewer: Viewer) {
         and(
           eq(productionDays.clientId, clientId),
           isNull(productionDays.deletedAt),
+          // Geannuleerde opnamedagen blijven in de database staan (agenda-sync),
+          // maar mogen nooit als "volgende opnamedag" bij de klant verschijnen.
+          ne(productionDays.status, "cancelled"),
           gte(productionDays.scheduledOn, today),
         ),
       )

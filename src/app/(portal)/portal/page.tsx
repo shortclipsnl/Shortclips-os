@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Bell, CalendarRange, Camera, Check, ClipboardCheck, Clock, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarRange, Camera, Check, ClipboardCheck, Clock, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalData, getPortalPackageProgress } from "@/server/portal";
 import { getPortalFrameLibrary } from "@/server/portal-frame";
-import { StatusPill, portalBtn } from "@/components/portal/status-pill";
-import { CLIENT_ACTION_STATUSES, listPortalScriptReviews } from "@/server/script-review";
+import { portalBtn } from "@/components/portal/status-pill";
+import { ProductionTimeline, WhatsNext } from "@/components/portal/client-roadmap";
+import { getPortalRoadmap } from "@/server/client-roadmap";
+import { longDate } from "@/lib/client-roadmap";
 import { buttonClass, ClientLogo, TeamAvatar } from "@/components/ui";
-import { compact, formatDate, num } from "@/lib/format";
+import { compact, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
 
 /** +31 6 ... → 316... voor wa.me. */
@@ -134,27 +136,21 @@ const SCRIPT_TONE: Record<"action" | "ready" | "done" | "prep", string> = {
 
 export default async function PortalPage() {
   const viewer = await requirePortal();
-  const [data, contact, scriptReviews, lib, pkg] = await Promise.all([
+  const [data, contact, roadmapRaw, lib, pkg] = await Promise.all([
     getPortalData(viewer),
     getPortalContact(viewer),
-    listPortalScriptReviews(viewer),
+    getPortalRoadmap(viewer),
     getPortalFrameLibrary(viewer),
     getPortalPackageProgress(viewer),
   ]);
 
   const companyName = data.client.name;
 
-  // Openstaande acties: scripts ter controle + video's ter beoordeling.
-  const actionableScripts = scriptReviews.filter((r) => CLIENT_ACTION_STATUSES.includes(r.status));
-  const scriptActions = actionableScripts.length;
   // Video's: sessies in de bibliotheek die op feedback wachten (anders de losse
-  // akkoordverzoeken van het team).
+  // akkoordverzoeken van het team). Alleen nog voor de hint op de videokaart;
+  // de hoofdactie komt uit de roadmap.
   const waitingSessions = lib.sessions.filter((x) => x.status?.key === "feedback");
   const videoActions = Math.max(waitingSessions.length, data.awaitingApproval.length);
-  const newestSession = lib.sessions.find((x) => x.key !== "los") ?? null;
-  const openActions = scriptActions + videoActions;
-  // Eerstvolgende opnamedatum onder de te-controleren scripts → als deadline-hint.
-  const soonestScriptShoot = actionableScripts.map((r) => r.shootOn).filter((d): d is string => !!d).sort()[0] ?? null;
 
   // Eerstvolgende geplande publicatie (uit de goedgekeurde contentplanning).
   const nextPub = data.calendar[0] ?? null;
@@ -187,18 +183,22 @@ export default async function PortalPage() {
     ? personal.split(/\s+/)[0]!
     : companyName;
 
-  type Glance = { key: string; href: string; icon: React.ReactNode; label: string; value: string; sub?: string; tone?: "orange" };
-  const glance: Glance[] = [];
-  if (shootDate) glance.push({ key: "shoot", href: "/portal/planning", icon: <Camera className="size-3.5" />, label: "Volgende opnamedag", value: fullDate(shootDate), sub: [shootTime ? `vanaf ${shootTime}` : null, shoot?.locationName ?? null].filter(Boolean).join(" · ") || undefined });
-  if (scriptActions > 0) glance.push({ key: "scripts", href: "/portal/scripts", icon: <FileText className="size-3.5" />, label: "Scripts", value: `${scriptActions} ${scriptActions === 1 ? "wacht" : "wachten"} op feedback`, sub: soonestScriptShoot ? `vóór de opname van ${formatDate(soonestScriptShoot)}` : undefined, tone: "orange" });
-  if (waitingSessions.length > 0) {
-    const n = waitingSessions.reduce((a, x) => a + x.videos.length, 0);
-    glance.push({ key: "videos", href: "/portal/videos", icon: <Film className="size-3.5" />, label: "Video's klaar", value: `${n} video${n === 1 ? "" : "'s"} klaar voor feedback`, sub: waitingSessions.map((x) => x.title).join(", "), tone: "orange" });
-  } else if (newestSession) {
-    glance.push({ key: "videos", href: `/portal/videos?sessie=${encodeURIComponent(newestSession.key)}`, icon: <Film className="size-3.5" />, label: "Nieuwste video's", value: newestSession.title, sub: `${newestSession.videos.length} video${newestSession.videos.length === 1 ? "" : "'s"}` });
-  }
-  if (nextPub) glance.push({ key: "pub", href: "/portal/content", icon: <CalendarRange className="size-3.5" />, label: "Eerstvolgende publicatie", value: fullDate(dateFromIso(nextPub.scheduledOn)), sub: nextPub.title });
-  if (hasMetrics) glance.push({ key: "res", href: "/portal/resultaten", icon: <Eye className="size-3.5" />, label: "Laatste resultaten", value: `${compact(m.views)} weergaven`, sub: "afgelopen 30 dagen" });
+  // Klantroadmap: één hoofdboodschap + tijdlijn per opnamesessie. Staat er
+  // (nog) geen opnamesessie in de planning maar wel een opname in de gekoppelde
+  // agenda, dan noemen we die datum, zodat beide blokken hetzelfde zeggen.
+  const roadmap = roadmapRaw && !roadmapRaw.inactive && roadmapRaw.sessions.length === 0 && shoot
+    ? {
+        ...roadmapRaw,
+        next: {
+          ...roadmapRaw.next,
+          tone: "grey" as const,
+          headline: `Je volgende opnamedag staat gepland op ${longDate(shoot.scheduledOn)}`,
+          detail: "Bekijk alvast de opnamegegevens. Je hoeft nu niets te doen.",
+          action: { label: "Bekijk opnamedag", href: "/portal/planning" },
+        },
+      }
+    : roadmapRaw;
+  const lastOnline = roadmap?.publication?.lastConfirmedOn ?? null;
 
   return (
     <div className="flex flex-col gap-[22px]">
@@ -213,58 +213,9 @@ export default async function PortalPage() {
         </div>
       </section>
 
-      {/* In één oogopslag: alleen wat er echt is */}
-      {glance.length > 0 ? (
-        <section aria-label="Belangrijk voor jou" className={`grid gap-3 sm:grid-cols-2 ${glance.length >= 4 ? "lg:grid-cols-4" : glance.length === 3 ? "lg:grid-cols-3" : ""} ${glance.length === 5 ? "xl:grid-cols-5" : ""}`}>
-          {glance.map((g) => (
-            <Link key={g.key} href={g.href} className="sc-glass group flex flex-col gap-1.5 p-4 transition-shadow hover:shadow-[var(--shadow-raised)]" style={g.tone === "orange" ? { boxShadow: "inset 0 3px 0 var(--sc-act)" } : undefined}>
-              <span className="flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">{g.icon} {g.label}</span>
-              <span className={`text-[16px] font-bold leading-snug ${g.tone === "orange" ? "text-[var(--st-orange)]" : ""}`}>{g.value}</span>
-              {g.sub ? <span className="text-[12.5px] text-[var(--color-ink-muted)]">{g.sub}</span> : null}
-            </Link>
-          ))}
-        </section>
-      ) : null}
-
-      <h2 className="px-0.5 text-[12px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Aan jou</h2>
-
-      {/* Actie nodig — alleen tonen als er echt iets van de klant wordt verwacht */}
-      {openActions > 0 ? (
-        <section className="sc-glass p-5" style={{ boxShadow: "inset 4px 0 0 var(--sc-act)" }}>
-          <div className="flex items-center gap-2">
-            <Bell className="size-4 text-[var(--st-orange)]" />
-            <h2 className="text-[15px] font-bold">Actie nodig</h2>
-            <StatusPill tone="orange">{openActions} open</StatusPill>
-          </div>
-          <div className="mt-3 flex flex-col gap-2">
-            {scriptActions > 0 ? (
-              <Link href="/portal/scripts" className="flex items-center gap-3 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-3 transition-colors hover:border-[var(--sc-line)]">
-                <FileText className="size-4 shrink-0 text-[var(--sc-accent)]" />
-                <span className="min-w-0 flex-1 text-sm font-medium">
-                  {scriptActions} script{scriptActions === 1 ? "" : "s"} wacht op jouw controle
-                  {soonestScriptShoot ? <span className="font-normal text-[var(--color-ink-muted)]"> · vóór de opname van {formatDate(soonestScriptShoot)}</span> : null}
-                </span>
-                <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
-              </Link>
-            ) : null}
-            {videoActions > 0 ? (
-              <Link href="/portal/videos" className="flex items-center gap-3 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-3 transition-colors hover:border-[var(--sc-line)]">
-                <Play className="size-4 shrink-0 text-[var(--sc-accent)]" fill="currentColor" />
-                <span className="min-w-0 flex-1 text-sm font-medium">{waitingSessions.length > 0 ? `${waitingSessions.length} opnamesessie${waitingSessions.length === 1 ? "" : "s"} ${waitingSessions.length === 1 ? "wacht" : "wachten"} op jouw feedback` : `${videoActions} video${videoActions === 1 ? "" : "'s"} wacht op jouw beoordeling`}</span>
-                <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
-              </Link>
-            ) : null}
-          </div>
-        </section>
-      ) : (
-        <section className="sc-glass flex items-center gap-3 p-5">
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--st-green-bg)] text-[var(--st-green)]"><Check className="size-4" /></span>
-          <div>
-            <p className="text-[14.5px] font-semibold">Alles loopt, jij hoeft niets te doen</p>
-            <p className="text-[13px] text-[var(--color-ink-muted)]">Er wacht op dit moment niets op je. Zodra er iets klaarstaat om te controleren of te beoordelen, zie je het hier.</p>
-          </div>
-        </section>
-      )}
+      {/* Klantroadmap: wat gebeurt er nu, en waar staat elke productie? */}
+      {roadmap ? <WhatsNext roadmap={roadmap} /> : null}
+      {roadmap ? <ProductionTimeline roadmap={roadmap} /> : null}
 
       <h2 className="px-0.5 pt-1 text-[12px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Je opnames &amp; scripts</h2>
 
@@ -368,6 +319,13 @@ export default async function PortalPage() {
           ) : (
             <p className="mt-4 flex flex-1 items-center text-sm text-[var(--color-ink-muted)]">Nog geen publicatie ingepland.</p>
           )}
+          {/* Gepland ≠ online: alleen een publicatie met bevestiging uit de
+              koppeling telt als "online". */}
+          {data.client.weHandlePosting && lastOnline ? (
+            <p className="mt-3 flex items-center gap-1.5 text-[13px] text-[var(--color-ink-muted)]">
+              <Check className="size-3.5 shrink-0 text-[var(--st-green)]" /> Laatst bevestigd online: {longDate(lastOnline)}
+            </p>
+          ) : null}
           {/* Wie plaatst de video's — duidelijk voor de klant (afspraak per klant). */}
           <p className="mt-4 flex items-center gap-1.5 border-t border-[var(--sc-line)] pt-3 text-[13px] text-[var(--color-ink-muted)]">
             <Radio className="size-3.5 shrink-0 text-[var(--sc-accent)]" />
