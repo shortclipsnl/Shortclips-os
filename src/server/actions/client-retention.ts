@@ -1,11 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { attentionStates, clientFeedback, clients, contracts } from "@/db/schema";
-import { assertClientAccess, requireTeamMember } from "@/server/auth/context";
+import { assertClientAccess, isOwner, requireTeamMember } from "@/server/auth/context";
 import { notify } from "@/server/notifications";
 import { retentionContext } from "@/server/client-retention";
 import { nlHolidaySet } from "@/lib/holidays";
@@ -144,9 +144,14 @@ export async function saveContractTerms(input: z.input<typeof contractSchema>): 
       ...(d.renewalMonths != null ? { renewalMonths: d.renewalMonths } : {}),
       verifiedAt: new Date(), verifiedById: viewer.id, updatedAt: new Date(),
     };
-    const [current] = await db.select({ id: contracts.id }).from(contracts)
+    const [current] = await db.select({ id: contracts.id, ownerManaged: contracts.ownerManaged }).from(contracts)
       .where(and(eq(contracts.clientId, d.clientId), isNull(contracts.deletedAt), eq(contracts.status, "active")))
-      .orderBy(desc(contracts.startsOn)).limit(1);
+      .orderBy(sql`${contracts.startsOn} desc nulls last`, desc(contracts.createdAt)).limit(1);
+    // Door de eigenaar vastgelegd in Contracten & Verlengingen: alleen de
+    // eigenaar mag einddatum en voorwaarden dan nog wijzigen.
+    if (current?.ownerManaged && !isOwner(viewer)) {
+      return { ok: false, message: "Dit contract is vastgelegd door Jarno. Einddatum en voorwaarden kunnen alleen in Contracten & Verlengingen worden gewijzigd." };
+    }
     if (current) await db.update(contracts).set(values).where(eq(contracts.id, current.id));
     else await db.insert(contracts).values({ clientId: d.clientId, status: "active", ...values });
 

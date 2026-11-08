@@ -49,7 +49,7 @@ export type ClientRetention = {
   coordinatorId: string | null;
   coordinatorKey: StaffKey | null;
   results: ResultsVerdict;
-  contract: ContractMoment & { contractId: string | null; startsOn: string | null; endsOn: string | null; autoRenew: boolean | null; noticePeriodDays: number | null; verified: boolean };
+  contract: ContractMoment & { contractId: string | null; startsOn: string | null; endsOn: string | null; autoRenew: boolean | null; noticePeriodDays: number | null; verified: boolean; ownerManaged: boolean };
   openFeedback: RetentionFeedback[];
   health: { status: HealthStatus; reasons: string[] };
   commercial: ReturnType<typeof commercialFollowUp>;
@@ -128,10 +128,10 @@ export async function getRetentionOverview(ctx: RetentionContext, clientIds?: st
     // Het lopende contract per klant (meest recente start).
     db.execute(sql`
       select distinct on (k.client_id) k.client_id as "clientId", k.id, k.starts_on as "startsOn", k.ends_on as "endsOn",
-             k.notice_period_days as "noticePeriodDays", k.auto_renew as "autoRenew", k.verified_at as "verifiedAt"
+             k.notice_period_days as "noticePeriodDays", k.auto_renew as "autoRenew", k.verified_at as "verifiedAt", k.owner_managed as "ownerManaged"
       from contracts k join clients c on c.id = k.client_id
       where k.deleted_at is null and k.status in ('active','notice_given') and c.deleted_at is null ${only}
-      order by k.client_id, k.starts_on desc
+      order by k.client_id, k.starts_on desc nulls last, k.created_at desc
     `),
     db.execute(sql`
       select f.id, f.client_id as "clientId", f.kind, f.category, f.source, f.summary, f.follow_up as "followUp",
@@ -150,7 +150,7 @@ export async function getRetentionOverview(ctx: RetentionContext, clientIds?: st
   const daily = group(rows<{ clientId: string; platform: string; measuredOn: unknown; views: number; reach: number; engagements: number; followerDelta: number }>(dailyRes));
   const videos = group(rows<{ clientId: string; platform: string; publishedAt: unknown; title: string; href: string | null; views: number | null }>(videoRes));
   const integrated = new Set(rows<{ clientId: string }>(integRes).map((r) => r.clientId));
-  const contracts = new Map(rows<{ clientId: string; id: string; startsOn: unknown; endsOn: unknown; noticePeriodDays: number | null; autoRenew: boolean | null; verifiedAt: unknown }>(contractRes).map((r) => [r.clientId, r]));
+  const contracts = new Map(rows<{ clientId: string; id: string; startsOn: unknown; endsOn: unknown; noticePeriodDays: number | null; autoRenew: boolean | null; verifiedAt: unknown; ownerManaged: boolean | null }>(contractRes).map((r) => [r.clientId, r]));
   const feedback = group(rows<{ clientId: string; id: string; kind: FeedbackKind; category: FeedbackCategory; source: string; summary: string; followUp: string; dueOn: unknown; status: string; ownerId: string | null; createdAt: unknown }>(feedbackRes));
 
   return rows<{ id: string; name: string; slug: string; coordinatorId: string | null }>(clientRes).map((c) => {
@@ -185,7 +185,7 @@ export async function getRetentionOverview(ctx: RetentionContext, clientIds?: st
       clientId: c.id, name: c.name, slug: c.slug, coordinatorId: c.coordinatorId,
       coordinatorKey: c.coordinatorId ? ctx.staffKeyById.get(c.coordinatorId) ?? null : null,
       results,
-      contract: { ...moment, contractId: k?.id ?? null, startsOn: iso(k?.startsOn), endsOn: iso(k?.endsOn), autoRenew: k?.autoRenew ?? null, noticePeriodDays: k?.noticePeriodDays ?? null, verified },
+      contract: { ...moment, contractId: k?.id ?? null, startsOn: iso(k?.startsOn), endsOn: iso(k?.endsOn), autoRenew: k?.autoRenew ?? null, noticePeriodDays: k?.noticePeriodDays ?? null, verified, ownerManaged: k?.ownerManaged === true },
       openFeedback: fb, health, commercial: commercialFollowUp(moment), notMeasured,
     };
   });

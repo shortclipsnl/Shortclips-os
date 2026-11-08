@@ -29,6 +29,7 @@ import { runJob } from "./runner";
 import { runScriptingTaskSync } from "@/server/scripting-tasks";
 import { remindedDeliverables } from "@/server/feedback-rounds";
 import { isClientInactive, notInactiveClient } from "@/server/client-activity";
+import { syncContractPeriods } from "@/server/contracts";
 
 const day = (offset: number) => {
   const d = new Date();
@@ -132,6 +133,17 @@ export async function runDailySignals() {
       });
     }
     ctx.log(`${tierContracts.length} contracten op een mijlpaal (45/28/7/0 dagen)`);
+
+    // 1c. Contracten & Verlengingen (eigenaar): een verlenging die vandaag
+    //     ingaat zet het nieuwe maandbedrag en de afname door naar de klant, en
+    //     een beëindigde samenwerking waarvan de einddatum voorbij is gaat naar
+    //     "gestopt". Alleen voor contracten die de eigenaar zelf vastlegde.
+    try {
+      const sync = await syncContractPeriods();
+      ctx.log(`Contracten bijgewerkt: ${sync.synced} maandbedragen, ${sync.ended} beëindigd`);
+    } catch (e) {
+      ctx.log(`Contracten bijwerken mislukt: ${e instanceof Error ? e.message : String(e)}`);
+    }
 
     // 2. Video's die te lang op klantfeedback wachten. Termijn in WERKDAGEN uit
     //    de portaalinstellingen (per klant overschrijfbaar), nooit in uren: een

@@ -166,7 +166,7 @@ export async function getClientHub(viewer: Viewer, slug: string) {
 
     db.select().from(contracts)
       .where(and(eq(contracts.clientId, client.id), isNull(contracts.deletedAt)))
-      .orderBy(desc(contracts.startsOn)).limit(1),
+      .orderBy(sql`${contracts.startsOn} desc nulls last`, desc(contracts.createdAt)).limit(1),
 
     client.videographerId
       ? db.select({ id: users.id, fullName: users.fullName }).from(users)

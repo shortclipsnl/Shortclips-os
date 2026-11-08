@@ -127,6 +127,7 @@ export const NAVIGATION: NavGroup[] = [
     items: [
       { href: "/financien", label: "Financiën", icon: "Landmark", ownerOnly: true, match: "/financien" },
       { href: "/kosten", label: "Kosten", icon: "ReceiptEuro", ownerOnly: true, match: "/kosten" },
+      { href: "/contracten", label: "Contracten & Verlengingen", icon: "CalendarClock", ownerOnly: true, match: "/contracten" },
       { href: "/winstgevendheid", label: "Winstgevendheid", icon: "TrendingUp", ownerOnly: true, match: "/winstgevendheid" },
       { href: "/editkosten", label: "Winst & editkosten", icon: "Euro", ownerOnly: true, match: "/editkosten", section: "/winstgevendheid" },
       { href: "/dashboard/vermogen", label: "Vermogen", icon: "Wallet", ownerOnly: true, match: "/dashboard/vermogen" },

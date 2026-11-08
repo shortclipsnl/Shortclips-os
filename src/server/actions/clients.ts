@@ -485,7 +485,8 @@ async function provisionClientSkeleton(
   if (!contract) {
     await db.insert(contracts).values({
       clientId,
-      startsOn: opts.startedOn || new Date().toISOString().slice(0, 10),
+      // Geen bekende startdatum = leeg laten; nooit de aanmaakdatum als startdatum gokken.
+      startsOn: opts.startedOn || null,
       monthlyValue: opts.monthlyRevenue || "0",
       reference: "Nog aanvullen",
       notes: "Automatisch aangemaakt bij nieuwe klant.",

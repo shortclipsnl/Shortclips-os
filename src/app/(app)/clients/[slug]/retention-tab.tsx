@@ -121,7 +121,13 @@ export async function RetentionTab({ clientId }: { clientId: string }) {
             {k.issues.length ? (
               <p className="rounded-[var(--radius-sm)] bg-[var(--color-warn-soft)] px-3 py-2 text-xs text-[#8a5300]">Controle nodig: {k.issues.join(", ").toLowerCase()}. Het systeem gaat niet uit van een verlenging zolang dit niet is gecontroleerd.</p>
             ) : <p className="text-xs text-[var(--color-good)]">Gegevens gecontroleerd.</p>}
-            <ContractTermsForm clientId={clientId} initial={{ startsOn: k.startsOn ?? "", endsOn: k.endsOn ?? "", noticePeriodDays: k.contractId && k.noticePeriodDays != null ? String(k.noticePeriodDays) : "", autoRenew: k.autoRenew ?? false }} />
+            {/* Door de eigenaar vastgelegde contracten worden alleen in
+                Contracten & Verlengingen gewijzigd, niet hier. */}
+            {k.ownerManaged ? (
+              <p className="text-xs text-[var(--color-ink-muted)]">Contract vastgelegd door Jarno: einddatum en voorwaarden worden door hem beheerd.</p>
+            ) : (
+              <ContractTermsForm clientId={clientId} initial={{ startsOn: k.startsOn ?? "", endsOn: k.endsOn ?? "", noticePeriodDays: k.contractId && k.noticePeriodDays != null ? String(k.noticePeriodDays) : "", autoRenew: k.autoRenew ?? false }} />
+            )}
           </div>
         </Card>
       </div>

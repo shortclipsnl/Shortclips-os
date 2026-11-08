@@ -15,6 +15,8 @@ import { PostingReminder, type TodayPost } from "./posting-reminder";
 import { getWorkOverview } from "@/server/werkoverzicht";
 import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
 import { Dagstart } from "./dagstart";
+import { getContractAttention } from "@/server/contracts";
+import { ContractAttentionBlock } from "../contracten/attention-block";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
@@ -43,6 +45,8 @@ export default async function DashboardPage() {
     getWorkOverview(viewer),
   ]);
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
+  // Contracten die aandacht nodig hebben: uitsluitend voor de eigenaar.
+  const contractAttention = isOwner(viewer) ? await getContractAttention().catch(() => null) : null;
   // Operationeel beheer (eigenaar + operationeel beheerder): snelkoppelingen +
   // aandachtspunt "klanten zonder portaallogin".
   const showOps = canManageOperations(viewer);
@@ -125,6 +129,9 @@ export default async function DashboardPage() {
           <span className="text-[var(--color-ink-muted)]">Maak de logins aan in Klantbeheer →</span>
         </Link>
       ) : null}
+
+      {/* Contracten & Verlengingen (alleen eigenaar): alleen wat nu een actie vraagt. */}
+      {contractAttention ? <ContractAttentionBlock items={contractAttention.items} toVerify={contractAttention.toVerify} compact /> : null}
 
       {/* Dagstart: werkdagbalk + Vandaag, Eerstvolgende werkdag en Deze week afronden. */}
       <Dagstart

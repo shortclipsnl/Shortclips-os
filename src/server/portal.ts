@@ -843,7 +843,7 @@ export async function getPortalCollaboration(viewer: Viewer): Promise<{
   packageName: string | null;
   shootDaysPerMonth: number;
   startedOn: string | null;
-  contract: { startsOn: string; endsOn: string | null; noticePeriodDays: number } | null;
+  contract: { startsOn: string | null; endsOn: string | null; noticePeriodDays: number } | null;
   platforms: string[];
   upcomingShoots: number;
 }> {
@@ -894,7 +894,7 @@ export async function getPortalCollaboration(viewer: Viewer): Promise<{
         isNull(contracts.deletedAt),
       ),
     )
-    .orderBy(desc(contracts.startsOn))
+    .orderBy(sql`${contracts.startsOn} desc nulls last`, desc(contracts.createdAt))
     .limit(1);
 
   return {
@@ -955,7 +955,7 @@ export type PortalProfile = {
   shootDaysPerMonth: number;
   platforms: string[];
   upcomingShoots: number;
-  contract: { startsOn: string; endsOn: string | null; noticePeriodDays: number } | null;
+  contract: { startsOn: string | null; endsOn: string | null; noticePeriodDays: number } | null;
   stats: { shortsProduced: number; opnamesDone: number };
   clientContacts: Array<{ name: string; role: string | null; email: string | null; phone: string | null; isPrimary: boolean }>;
   /** "organisch" | "advertentie" | "combinatie" of null (niet vastgelegd). */

@@ -169,7 +169,8 @@ export const contracts = pgTable(
       .references(() => clients.id, { onDelete: "cascade" }),
     reference: varchar("reference", { length: 80 }),
     status: contractStatusEnum("status").notNull().default("active"),
-    startsOn: date("starts_on").notNull(),
+    /** Startdatum van deze contractperiode. Leeg = niet bekend (nooit gokken). */
+    startsOn: date("starts_on"),
     endsOn: date("ends_on"),
     /** Opzegtermijn in dagen; stuurt de verlengingssignalering aan. */
     noticePeriodDays: integer("notice_period_days").notNull().default(30),
@@ -185,6 +186,28 @@ export const contracts = pgTable(
      *  onzeker en vraagt de klantbehoud-signalering eerst om controle. */
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
     verifiedById: uuid("verified_by_id").references(() => users.id, { onDelete: "set null" }),
+    /* ---- Contracten & Verlengingen (alleen eigenaar) ----
+     * Elke contractperiode is een eigen rij: een verlenging maakt een nieuwe rij,
+     * de vorige blijft bewaard als historie. */
+    /** Afgesproken afname per maand (shorts/advertenties) in deze periode. */
+    videosPerMonth: integer("videos_per_month"),
+    /** Afgesproken looptijd in maanden (3, 6, 12 of afwijkend). */
+    durationMonths: integer("duration_months"),
+    /** Commerciële verlengstatus, los van de administratieve status:
+     *  open | in_bespreking | verlengd | beeindigd. */
+    renewalStatus: varchar("renewal_status", { length: 16 }).notNull().default("open"),
+    /** Klant heeft bevestigd door te gaan (nog niet per se vastgelegd als nieuwe periode). */
+    clientConfirmed: boolean("client_confirmed").notNull().default(false),
+    /** Eigen herinneringsmomenten (dagen vóór het beslismoment). Leeg = standaard 60/30/14/7. */
+    reminderDays: jsonb("reminder_days").$type<number[]>(),
+    /** Bij beëindiging: reden en kans op heractivatie (kansrijk | misschien | nee). */
+    endReason: text("end_reason"),
+    reactivation: varchar("reactivation", { length: 12 }),
+    /** Vastgelegd door de eigenaar in Contracten & Verlengingen. Teamleden kunnen
+     *  de voorwaarden en einddatum dan niet meer wijzigen. */
+    ownerManaged: boolean("owner_managed").notNull().default(false),
+    /** De periode die deze verlenging opvolgt. */
+    previousContractId: uuid("previous_contract_id"),
     ...timestamps,
     ...softDelete,
   },
