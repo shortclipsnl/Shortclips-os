@@ -25,7 +25,13 @@ export async function updateKlantbericht(text: string, opts: { reset?: boolean }
       description: "Standaard klantbericht bij de eerste versies (Editing → Kopieer klantbericht)",
       updatedById: viewer.id,
     });
-    await auditLog({ viewer, action: "settings.klantbericht_updated", entityType: "setting", entityId: KLANTBERICHT_SETTING_KEY, changes: { reset: Boolean(opts.reset), length: next.length } });
+    // Logboek mag het opslaan nooit blokkeren. entity_id is een uuid-kolom, dus de
+    // sleutel van de instelling gaat mee in `changes` in plaats van als entityId.
+    try {
+      await auditLog({ viewer, action: "settings.klantbericht_updated", entityType: "setting", changes: { key: KLANTBERICHT_SETTING_KEY, reset: Boolean(opts.reset), length: next.length } });
+    } catch (e) {
+      console.error("[klantbericht] auditlog mislukt", e);
+    }
     revalidatePath("/videos");
     return { ok: true, text: next };
   } catch (error) {
