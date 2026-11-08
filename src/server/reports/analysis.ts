@@ -8,7 +8,7 @@ import { getClientReport } from "@/server/client-report";
 import type { ClientInsights, Finding, Recommendation, TopVideo, HookInzicht, FormatInzicht, MindereVideo } from "@/server/insights";
 import { loadStrategyProfile, strategyToText } from "./strategy";
 import { buildVergelijking, formatStats, monthSeries, platformSplit, type FormatStat, type MaandCijfers, type PlatformCijfers, type Vergelijking } from "./metrics";
-import { getGerealiseerd, type Gerealiseerd } from "./realized";
+import { getGerealiseerd, getVooruitblik, type Gerealiseerd, type Vooruitblik } from "./realized";
 
 /* ---------------- Periode-helpers (Europe/Amsterdam) ---------------- */
 
@@ -136,6 +136,9 @@ export type ReportMetrics = Awaited<ReturnType<typeof getClientReport>>["totals"
   /** "Dit hebben we gerealiseerd" (sectie 1): opnamedagen, geproduceerd/opgeleverd/
    *  gepubliceerd, kanalen, publicaties en formats. Deterministisch uit de database. */
   gerealiseerd?: Gerealiseerd;
+  /** "Dit staat er volgende maand gepland" (sectie 5): volgende opnamedag +
+   *  scriptstatus, geplande publicaties en openstaande klantacties. Deterministisch. */
+  vooruitblik?: Vooruitblik;
 };
 
 export type MonthlyAnalysisResult =
@@ -268,6 +271,9 @@ export async function generateMonthlyAnalysis(
   // Sectie 1 "Dit hebben we gerealiseerd": deterministisch uit opnamedagen,
   // deliverables en publicaties (geen AI). Regen-bestendig: bij elke generatie opnieuw.
   totals.gerealiseerd = await getGerealiseerd(client.id, period);
+  // Sectie 5 "Dit staat er volgende maand gepland": de actuele planning (volgende
+  // opnamedag, gedeelde publicaties, openstaande klantacties). Ook deterministisch.
+  totals.vooruitblik = await getVooruitblik(client.id);
 
   // Ontbrekende gegevens markeren (eerlijkheid, sectie 5).
   const ontbrekend: string[] = [];

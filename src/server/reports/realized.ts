@@ -147,3 +147,83 @@ export async function getGerealiseerd(clientId: string, period: string): Promise
     pipelineBijgehouden: geproduceerd > 0,
   };
 }
+
+/* --- Sectie 5: "Dit staat er volgende maand gepland" --- */
+
+export type GeplandePublicatie = { datum: string | null; tijd: string | null; titel: string; platforms: string[] };
+export type Klantactie = { titel: string; detail: string };
+export type Vooruitblik = {
+  /** De eerstvolgende opnamedag (vanaf vandaag), met de scriptstatus. */
+  volgendeOpnamedag: { datum: string; titel: string; scriptStatus: string; scriptStatusLabel: string } | null;
+  /** Aantal met de klant gedeelde, geplande publicaties vanaf nu. */
+  geplandeVideos: number;
+  /** De geplande, met de klant gedeelde publicaties (datum, tijd, kanalen). */
+  publicaties: GeplandePublicatie[];
+  /** Openstaande acties die bij de klant liggen (video's die op akkoord wachten). */
+  klantacties: Klantactie[];
+};
+
+/** Klantvriendelijke labels voor de scriptingstatus van een opnamedag. */
+const SCRIPT_STATUS_LABEL: Record<string, string> = {
+  afstemmen: "Afstemmen met jullie",
+  concepting: "Script wordt geschreven",
+  klaar_shortclips: "Script klaar bij Shortclips",
+  scriptmeeting: "Scriptbespreking gepland",
+  final: "Script definitief",
+};
+
+export async function getVooruitblik(clientId: string): Promise<Vooruitblik> {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+
+  // Eerstvolgende opnamedag (niet geannuleerd) + scriptstatus.
+  const dagRes = await db.execute(sql`
+    select to_char(scheduled_on, 'YYYY-MM-DD') as datum, title, scripting_status as scripting_status
+    from production_days
+    where client_id = ${clientId} and deleted_at is null
+      and scheduled_on >= ${today} and status <> 'cancelled'
+    order by scheduled_on
+    limit 1
+  `);
+  const dag = rowsOf(dagRes)[0];
+  const volgendeOpnamedag = dag
+    ? {
+        datum: String(dag.datum),
+        titel: String(dag.title ?? "Opnamedag"),
+        scriptStatus: String(dag.scripting_status ?? ""),
+        scriptStatusLabel: SCRIPT_STATUS_LABEL[String(dag.scripting_status ?? "")] ?? "Scripting loopt",
+      }
+    : null;
+
+  // Geplande, met de klant gedeelde publicaties (alleen clientApproved zijn zichtbaar).
+  const pubRes = await db.execute(sql`
+    select to_char(scheduled_on, 'YYYY-MM-DD') as datum, to_char(scheduled_at, 'HH24:MI') as tijd,
+           left(title, 120) as titel, platforms
+    from content_calendar
+    where client_id = ${clientId} and deleted_at is null
+      and client_approved = true and scheduled_on >= ${today}
+    order by scheduled_on, scheduled_at nulls last
+    limit 30
+  `);
+  const publicaties: GeplandePublicatie[] = rowsOf(pubRes).map((r) => ({
+    datum: r.datum ? String(r.datum) : null,
+    tijd: r.tijd ? String(r.tijd) : null,
+    titel: String(r.titel ?? "Video"),
+    platforms: Array.isArray(r.platforms) ? (r.platforms as string[]) : [],
+  }));
+
+  // Video's die op akkoord van de klant wachten = openstaande klantacties.
+  const actieRes = await db.execute(sql`
+    select left(title, 120) as titel, status
+    from deliverables
+    where client_id = ${clientId} and deleted_at is null
+      and status in ('client_review', 'client_revision')
+    order by status_changed_at
+    limit 20
+  `);
+  const klantacties: Klantactie[] = rowsOf(actieRes).map((r) => ({
+    titel: String(r.titel ?? "Video"),
+    detail: String(r.status) === "client_revision" ? "wacht op jullie aangepaste feedback" : "wacht op jullie akkoord",
+  }));
+
+  return { volgendeOpnamedag, geplandeVideos: publicaties.length, publicaties, klantacties };
+}

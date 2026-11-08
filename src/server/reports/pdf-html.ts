@@ -309,6 +309,21 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
     ${!g.pipelineBijgehouden && g.gepubliceerd > 0 ? `<p class="lead" style="margin-top:10px;color:#5d5d78">De interne productiestatus is voor deze klant niet volledig bijgehouden, dus "geproduceerd" en "opgeleverd" staan op 0. De publicatiecijfers kloppen wel.</p>` : ""}
   </section>` : "";
 
+  // Sectie 5 — "Dit staat er volgende maand gepland": volgende opnamedag +
+  // scriptstatus, geplande (gedeelde) publicaties en openstaande klantacties.
+  const vb = t.vooruitblik;
+  const vooruitblikPage = vb && (vb.volgendeOpnamedag || vb.publicaties.length || vb.klantacties.length) ? `
+  <section class="page">
+    ${topBar(meta)}
+    <h1>Dit staat er voor ${esc(volgende)} gepland</h1>
+    <p class="lead">Zo werken we alvast vooruit voor jullie.</p>
+    ${vb.volgendeOpnamedag
+      ? `<h2>Volgende opnamedag</h2><div class="concl"><div class="h">${esc(fmtDag(vb.volgendeOpnamedag.datum))}</div><div style="font-weight:700;font-size:13px">${esc(vb.volgendeOpnamedag.titel)}</div><div style="opacity:.8;font-size:10px;margin-top:4px">Script: ${esc(vb.volgendeOpnamedag.scriptStatusLabel)}</div></div>`
+      : `<p class="lead">De volgende opnamedag is nog niet ingepland — die stemmen we binnenkort met jullie af.</p>`}
+    ${vb.publicaties.length ? `<h2>Geplande publicaties</h2><div class="soft">${vb.publicaties.slice(0, 12).map((p) => `<p><b>${esc([p.datum ? fmtDag(p.datum) : "", p.tijd ? `${p.tijd} uur` : ""].filter(Boolean).join(" · "))}</b> — ${esc(p.titel)}${p.platforms.length ? ` <span style="color:#5d5d78">(${esc(p.platforms.map(platLabel).join(", "))})</span>` : ""}</p>`).join("")}${vb.publicaties.length > 12 ? `<p style="color:#5d5d78">+ ${vb.publicaties.length - 12} meer</p>` : ""}</div>` : ""}
+    ${vb.klantacties.length ? `<h2>Wat we nog van jullie nodig hebben</h2><div class="soft">${vb.klantacties.map((a) => `<p>• <b>${esc(a.titel)}</b> — ${esc(a.detail)}</p>`).join("")}</div>` : ""}
+  </section>` : "";
+
   const body = `
   <section class="page cover">
     <img src="${LOGO.dark}" alt="Shortclips" />
@@ -376,7 +391,7 @@ ${gerealiseerdPage}
     ${steps ? `<h2>Dit gaan we doen</h2><div class="steps">${steps}</div>` : ""}
     ${kansen ? `<h2>Kansen die we zien</h2>${kansen}` : ""}
   </section>
-
+${vooruitblikPage}
   <section class="page end">
     <img src="${LOGO.dark}" alt="Shortclips" />
     <h1>Op naar een sterke ${esc(volgende)}</h1>

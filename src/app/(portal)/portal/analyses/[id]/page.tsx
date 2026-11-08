@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, FileDown } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalReportDetail } from "@/server/reports/service";
-import type { Gerealiseerd } from "@/server/reports/realized";
+import type { Gerealiseerd, Vooruitblik } from "@/server/reports/realized";
 
 export const metadata: Metadata = { title: "Maandanalyse" };
 export const dynamic = "force-dynamic";
@@ -40,6 +40,7 @@ export default async function PortalAnalysisDetailPage({ params }: { params: Pro
   if (!report) notFound();
 
   const g = (report.totals as { gerealiseerd?: Gerealiseerd }).gerealiseerd;
+  const vb = (report.totals as { vooruitblik?: Vooruitblik }).vooruitblik;
 
   return (
     <div className="mx-auto max-w-[760px] px-4 py-6">
@@ -122,6 +123,52 @@ export default async function PortalAnalysisDetailPage({ params }: { params: Pro
             <p className="mt-4 text-xs text-[var(--sc-ink-muted,#9aa3b2)]">
               De interne productiestatus is deze maand niet volledig bijgehouden, dus &ldquo;geproduceerd&rdquo; en &ldquo;opgeleverd&rdquo; staan op 0. De publicatiecijfers kloppen wel.
             </p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* Sectie 5 — Dit staat er volgende maand gepland. */}
+      {vb && (vb.volgendeOpnamedag || vb.publicaties.length || vb.klantacties.length) ? (
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold text-[var(--sc-ink,#fff)]">Dit staat er volgende maand gepland</h2>
+          <p className="mt-1 text-sm text-[var(--sc-ink-muted,#9aa3b2)]">Zo werken we alvast vooruit voor jullie.</p>
+
+          {vb.volgendeOpnamedag ? (
+            <div className="mt-4 rounded-2xl border border-[var(--sc-line,#243044)] bg-[var(--sc-glass,#111827)] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--sc-accent,#2E90FA)]">Volgende opnamedag</p>
+              <p className="mt-1 font-semibold text-[var(--sc-ink,#fff)]">{fmtDag(vb.volgendeOpnamedag.datum)} — {vb.volgendeOpnamedag.titel}</p>
+              <p className="mt-0.5 text-sm text-[var(--sc-ink-muted,#9aa3b2)]">Script: {vb.volgendeOpnamedag.scriptStatusLabel}</p>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-[var(--sc-ink-muted,#9aa3b2)]">De volgende opnamedag is nog niet ingepland — die stemmen we binnenkort met jullie af.</p>
+          )}
+
+          {vb.publicaties.length ? (
+            <div className="mt-5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--sc-ink-muted,#9aa3b2)]">Geplande publicaties</h3>
+              <ul className="mt-2 divide-y divide-[var(--sc-line,#243044)] overflow-hidden rounded-2xl border border-[var(--sc-line,#243044)] bg-[var(--sc-glass,#111827)]">
+                {vb.publicaties.map((p, i) => (
+                  <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-4 py-2.5 text-sm">
+                    <span className="font-medium tabular-nums text-[var(--sc-ink,#fff)]">
+                      {[p.datum ? fmtDag(p.datum) : "", p.tijd ? `${p.tijd} uur` : ""].filter(Boolean).join(" · ")}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[var(--sc-ink-muted,#c3cad6)]">{p.titel}</span>
+                    {p.platforms.length ? <span className="text-xs text-[var(--sc-ink-muted,#9aa3b2)]">{p.platforms.map(platLabel).join(", ")}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {vb.klantacties.length ? (
+            <div className="mt-5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--sc-ink-muted,#9aa3b2)]">Wat we nog van jullie nodig hebben</h3>
+              <ul className="mt-2 space-y-1.5 text-sm text-[var(--sc-ink-muted,#c3cad6)]">
+                {vb.klantacties.map((a, i) => (
+                  <li key={i}>• <span className="font-medium text-[var(--sc-ink,#fff)]">{a.titel}</span> — {a.detail}</li>
+                ))}
+              </ul>
+            </div>
           ) : null}
         </section>
       ) : null}
