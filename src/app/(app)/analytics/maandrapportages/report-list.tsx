@@ -63,11 +63,11 @@ const minutesSince = (iso: string | null) => (iso ? Math.max(0, Math.round((Date
 
 const STAT_TONE: Record<string, string> = {
   neutral: "text-[var(--color-ink)]",
-  violet: "text-[#5636c4]",
-  good: "text-[#1d6b4c]",
-  lime: "text-[#54700a]",
-  bad: "text-[#a3271c]",
-  warn: "text-[#8a5300]",
+  violet: "text-[var(--color-violet)]",
+  good: "text-[var(--color-good)]",
+  lime: "text-[var(--color-lime)]",
+  bad: "text-[var(--color-bad)]",
+  warn: "text-[var(--color-warn)]",
 };
 
 function StatTile({ label, value, tone, hint, active, onClick }: { label: string; value: number; tone: keyof typeof STAT_TONE; hint?: string; active: boolean; onClick: () => void }) {
@@ -87,8 +87,8 @@ function StatTile({ label, value, tone, hint, active, onClick }: { label: string
 /** Compacte PDF-knoppen: bekijken (nieuw tabblad) en downloaden. */
 function PdfButtons({ reportId, versie, enabled }: { reportId: string | null; versie: "intern" | "klant"; enabled: boolean }) {
   const base = versie === "intern"
-    ? "border-[#e8b45a] bg-[var(--color-warn-soft)] text-[#8a5300]"
-    : "border-[#9aa6e8] bg-[var(--color-info-soft)] text-[#24307a]";
+    ? "border-[var(--color-warn)]/50 bg-[var(--color-warn-soft)] text-[var(--color-warn)]"
+    : "border-[var(--color-info)]/50 bg-[var(--color-info-soft)] text-[var(--color-info)]";
   if (!reportId || !enabled) {
     return <span className="inline-flex h-7 items-center rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line)] px-2 text-2xs text-[var(--color-ink-faint)]">Geen PDF</span>;
   }
@@ -453,7 +453,7 @@ export function ReportList({
                         ) : (
                           <div className="text-2xs text-[var(--color-ink-muted)]">
                             Wacht op Jarno
-                            <div><Link href={`/analytics/maandrapportages/${r.id}`} className="text-[var(--color-indigo-ink)] hover:underline">Controle openen</Link></div>
+                            <div><Link href={`/analytics/maandrapportages/${r.id}`} className="text-[var(--color-info)] hover:underline">Controle openen</Link></div>
                           </div>
                         )
                       ) : <span className="text-[var(--color-ink-faint)]">–</span>}
@@ -464,7 +464,7 @@ export function ReportList({
                     <td className="sc-td whitespace-nowrap">
                       {r && row.view === "gepubliceerd" ? (
                         <div className="text-xs">
-                          <span className="inline-flex items-center gap-1 font-medium text-[#54700a]"><Check className="size-3.5" /> Zichtbaar</span>
+                          <span className="inline-flex items-center gap-1 font-medium text-[var(--color-lime)]"><Check className="size-3.5" /> Zichtbaar</span>
                           <div className="text-2xs text-[var(--color-ink-faint)]">sinds {fmtDate(r.publishedAt)}</div>
                         </div>
                       ) : r && row.view === "goedgekeurd" ? (
