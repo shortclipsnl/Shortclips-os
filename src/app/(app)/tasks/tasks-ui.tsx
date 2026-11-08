@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpRight, Check, Copy, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, Copy, Loader2, Pencil, Plus, Trash2, Users, X } from "lucide-react";
 import { createTask, createTasksBulk, deleteTask, setTaskStatus, updateTask } from "@/server/actions/tasks";
 import { Button, ClientLogo, ErrorNote, TeamAvatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -85,8 +85,32 @@ const prioDot: Record<string, string> = {
   urgent: "var(--color-bad)",
 };
 
-/** Supersnelle invoer: typ taken, één per regel. Elke regel wordt een taak. */
-export function QuickTaskLines({ users, defaultAssignee }: { users: UserOption[]; defaultAssignee?: string }) {
+/**
+ * Collega's-schakelaar: standaard dicht, zodat de focus op de eigen taken ligt.
+ * Eén klik op "Taken van collega's" toont de personenrij (als children).
+ */
+export function ColleagueToggle({ defaultOpen = false, children }: { defaultOpen?: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-2 text-sm font-medium hover:bg-[var(--color-surface-2)]"
+      >
+        <Users className="size-4 text-[var(--color-ink-muted)]" />
+        Taken van collega&apos;s
+        <ChevronDown className={cn("size-4 text-[var(--color-ink-faint)] transition-transform", open && "rotate-180")} />
+      </button>
+      {open ? <div className="mt-3">{children}</div> : null}
+    </div>
+  );
+}
+
+/** Supersnelle invoer: typ taken, één per regel. Elke regel wordt een taak.
+ *  `compact` maakt het vak kleiner, zodat de nadruk op de takenlijst blijft. */
+export function QuickTaskLines({ users, defaultAssignee, compact = false }: { users: UserOption[]; defaultAssignee?: string; compact?: boolean }) {
   const [lines, setLines] = useState("");
   const [assigneeId, setAssigneeId] = useState(defaultAssignee ?? "");
   const [category, setCategory] = useState("werkzaamheden");
@@ -114,7 +138,7 @@ export function QuickTaskLines({ users, defaultAssignee }: { users: UserOption[]
   return (
     <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold text-[var(--color-ink-muted)]">Snel toevoegen — typ taken, één per regel:</span>
+        <span className="text-xs font-semibold text-[var(--color-ink-muted)]">{compact ? "Nieuwe taak toevoegen — één per regel:" : "Snel toevoegen — typ taken, één per regel:"}</span>
         <label className="ml-auto flex items-center gap-1.5 text-2xs font-medium text-[var(--color-ink-faint)]">
           Soort
           <select className="sc-input h-8 w-36 py-0 text-xs" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Soort taak">
@@ -135,7 +159,7 @@ export function QuickTaskLines({ users, defaultAssignee }: { users: UserOption[]
       </div>
       <textarea
         className="sc-input resize-y text-sm leading-relaxed"
-        rows={4}
+        rows={compact ? 2 : 4}
         placeholder={"• Montage Koops afmaken\n• Script Luxewagen inplannen\n• Feedback KKFH verwerken"}
         value={lines}
         onChange={(e) => setLines(e.target.value)}

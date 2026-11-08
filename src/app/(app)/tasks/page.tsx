@@ -8,7 +8,7 @@ import { requireInternal, scopeToClients } from "@/server/auth/context";
 import { listAssignableUsers } from "@/server/clients";
 import { isCoreStaff, coreStaffRank } from "@/server/core-staff";
 import { Card, EmptyState, PageHeader, TeamAvatar } from "@/components/ui";
-import { QuickTaskLines, TaskItem, type TaskItemData } from "./tasks-ui";
+import { ColleagueToggle, QuickTaskLines, TaskItem, type TaskItemData } from "./tasks-ui";
 import { HandoverBoard, type HandoverNote } from "./handover-board";
 import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
 import { taskHref } from "@/lib/task-links";
@@ -56,10 +56,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     resolvedByName: h.resolvedById ? nameById.get(h.resolvedById) ?? null : null,
   }));
 
-  // Eerste bezoek (geen ?persoon): voor IEDEREEN meteen de eigen taken tonen
-  // i.p.v. "Kies een persoon". De knop "Iedereen" stuurt een lege ?persoon= en
-  // houdt het overzicht.
-  const persoon = spPersoon === undefined ? viewer.id : spPersoon;
+  // Iedereen ziet standaard de eigen taken. Een lege of ontbrekende ?persoon valt
+  // terug op de eigen weergave (geen "Kies een persoon"-tussenstap meer).
+  const persoon = spPersoon && spPersoon.length ? spPersoon : viewer.id;
   // Open overdrachtspunten (voor het aantal op de kleine "Overdracht"-kaart).
   const handoverOpen = handover.filter((h) => !h.resolvedAt).length;
 
@@ -114,11 +113,10 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   // tonen we bij de eigen weergave netjes "Taken van <jij>".
   const selectedLabel = selected ? selected.fullName : persoon === viewer.id ? viewer.fullName : persoon === "algemeen" ? "Verdelen onder team" : persoon === "overdracht" ? "Overdracht" : null;
 
-  // Open taken in twee kolommen: Klantcontact apart, al het overige werk samen
-  // als "Werkzaamheden" (voorheen Scripting + Overige taken). Afgerond en
-  // gearchiveerd eronder, op volle breedte.
-  let klantcontact: TaskItemData[] = [];
-  let werkzaamheden: TaskItemData[] = [];
+  // Alle open taken in één lijst (geen Klantcontact/Werkzaamheden-splitsing meer):
+  // de nadruk ligt op de werkzaamheden die echt uitgevoerd moeten worden.
+  // Afgerond en gearchiveerd eronder, op volle breedte.
+  let openItems: TaskItemData[] = [];
   let afgerond: TaskItemData[] = [];
   let gearchiveerd: TaskItemData[] = [];
   if (persoon && persoon !== "overdracht") {
@@ -128,69 +126,62 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       fetchTasks(and(isNull(tasks.deletedAt), eq(tasks.status, "done"), isNull(tasks.archivedAt), assigneeCond, scopeToClients(viewer, tasks.clientId))),
       fetchTasks(and(isNull(tasks.deletedAt), isNotNull(tasks.archivedAt), assigneeCond, scopeToClients(viewer, tasks.clientId))),
     ]);
-    const o = open as TaskItemData[];
-    klantcontact = o.filter((t) => (t.category || "overig") === "klantcontact");
-    werkzaamheden = o.filter((t) => (t.category || "overig") !== "klantcontact");
+    openItems = open as TaskItemData[];
     afgerond = (done as TaskItemData[]).slice(0, 20);
     gearchiveerd = (archived as TaskItemData[]).slice(0, 30);
   }
-  const openTotal = klantcontact.length + werkzaamheden.length;
+  const openTotal = openItems.length;
 
   return (
-    <div className="mx-auto max-w-[1100px]">
-      <PageHeader title="Taken" description={persoon === "algemeen" ? "Taken die nog verdeeld moeten worden — wijs ze toe aan een teamlid." : selectedLabel ? `Taken van ${selectedLabel}` : "Kies een persoon om direct de taken te zien."} />
-
-      {/* Personen als primaire navigatie — eigen taken staan zo meteen bovenaan.
-          Overdracht is een klein tabblad naast "Algemeen" i.p.v. een groot blok. */}
-      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-        {persons.map((u) => (
-          <PersonCard key={u.id} id={u.id} name={u.fullName} count={openCountFor(u.id)} active={persoon === u.id} />
-        ))}
-        <PersonCard id="algemeen" name="Verdelen onder team" count={algemeenCount} active={persoon === "algemeen"} generic chip="⇢" countLabel="te verdelen" />
-        <PersonCard id="overdracht" name="Overdracht" count={handoverOpen} active={persoon === "overdracht"} generic chip="⇄" countLabel="open" accent="var(--color-violet)" />
-      </div>
-
-      {canWrite && persoon !== "overdracht" ? (
-        <div className="mb-4">
-          {/* key op de geselecteerde persoon: zo herstart het formulier bij het
-              wisselen van persoon en staat de toewijzing meteen op de juiste
-              persoon (geen extra handeling). "Algemeen" start zonder toewijzing. */}
-          <QuickTaskLines
-            key={`qt-${persoon ?? "none"}`}
-            users={userOptions}
-            defaultAssignee={selected?.id ?? (persoon === "algemeen" ? undefined : persoon === viewer.id ? viewer.id : undefined)}
-          />
+    <div className="mx-auto max-w-[1100px] space-y-4">
+      {/* Primaire kop: de eigen taken van vandaag vallen meteen op. Een collega of
+          "Verdelen" toont die weergave; Overdracht krijgt een eigen titel. */}
+      {persoon === "overdracht" ? (
+        <PageHeader title="Overdracht" description="Punten die aan een collega worden overgedragen." />
+      ) : (
+        <div className="flex items-center gap-2.5 rounded-[var(--radius-md)] bg-gradient-to-r from-[var(--color-indigo-ink)] to-[var(--color-brand-600)] px-4 py-3.5 text-white">
+          <ListChecks className="size-6 shrink-0" />
+          <h1 className="text-lg font-semibold tracking-tight">
+            {persoon === viewer.id ? "Mijn taken voor vandaag" : persoon === "algemeen" ? "Nog te verdelen onder het team" : `Taken van ${selectedLabel}`}
+          </h1>
+          <span className="ml-auto rounded-full bg-white/20 px-3 py-0.5 text-sm font-bold tabular-nums">{openTotal}</span>
         </div>
-      ) : null}
+      )}
+
+      {/* Collega's achter een knop — standaard dicht zodat de focus op de eigen
+          taken ligt. Bij het bekijken van een ander staat de rij open (om terug te
+          kunnen). */}
+      <ColleagueToggle defaultOpen={persoon !== viewer.id}>
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+          {persons.map((u) => (
+            <PersonCard key={u.id} id={u.id} name={u.fullName} count={openCountFor(u.id)} active={persoon === u.id} />
+          ))}
+          <PersonCard id="algemeen" name="Verdelen onder team" count={algemeenCount} active={persoon === "algemeen"} generic chip="⇢" countLabel="te verdelen" />
+          <PersonCard id="overdracht" name="Overdracht" count={handoverOpen} active={persoon === "overdracht"} generic chip="⇄" countLabel="open" accent="var(--color-violet)" />
+        </div>
+      </ColleagueToggle>
 
       {persoon === "overdracht" ? (
         <HandoverBoard notes={handover} users={userOptions} canWrite={canWrite} />
-      ) : !persoon ? (
-        <Card>
-          <EmptyState title="Kies een persoon" description="Klik hierboven op een teamlid of op Algemeen om de taken te zien." />
-        </Card>
       ) : (
         <div className="space-y-4">
-          {/* Gekleurde balk die direct opvalt — meteen onder het invoerveld. */}
-          <div className="flex items-center gap-2.5 rounded-[var(--radius-md)] bg-gradient-to-r from-[var(--color-indigo-ink)] to-[var(--color-brand-600)] px-4 py-3 text-white">
-            <ListChecks className="size-5 shrink-0" />
-            <span className="font-semibold tracking-tight">
-              {persoon === viewer.id ? "Mijn taken voor vandaag" : persoon === "algemeen" ? "Nog te verdelen" : `Taken van ${selectedLabel}`}
-            </span>
-            <span className="ml-auto rounded-full bg-white/20 px-2.5 py-0.5 text-sm font-bold tabular-nums">{openTotal}</span>
-          </div>
-
           {openTotal === 0 && afgerond.length === 0 && gearchiveerd.length === 0 ? (
             <Card><EmptyState title="Geen taken" description="Er staat niets open voor deze weergave." /></Card>
           ) : null}
 
-          {/* Twee kolommen: Klantcontact links, Werkzaamheden rechts. Op mobiel
-              netjes onder elkaar. */}
+          {/* Eén lijst met werkzaamheden — dit is de hoofdfocus van de pagina. */}
           {openTotal > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              <TaskColumn title="Klantcontact" accent="var(--color-info)" items={klantcontact} users={userOptions} canWrite={canWrite} celebrateName={viewer.fullName.split(" ")[0] ?? ""} />
-              <TaskColumn title="Werkzaamheden" accent="var(--color-brand-500)" items={werkzaamheden} users={userOptions} canWrite={canWrite} celebrateName={viewer.fullName.split(" ")[0] ?? ""} />
-            </div>
+            <TaskColumn title="Werkzaamheden" accent="var(--color-brand-500)" items={openItems} users={userOptions} canWrite={canWrite} celebrateName={viewer.fullName.split(" ")[0] ?? ""} />
+          ) : null}
+
+          {/* Kleiner toevoegvak onder de lijst — minder nadruk dan de taken zelf. */}
+          {canWrite ? (
+            <QuickTaskLines
+              compact
+              key={`qt-${persoon ?? "none"}`}
+              users={userOptions}
+              defaultAssignee={selected?.id ?? (persoon === "algemeen" ? undefined : persoon === viewer.id ? viewer.id : undefined)}
+            />
           ) : null}
 
           {afgerond.length > 0 ? <TaskColumn title="Afgerond" accent="var(--color-good)" items={afgerond} users={userOptions} canWrite={canWrite} celebrateName="" /> : null}

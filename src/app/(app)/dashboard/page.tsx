@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireInternal, isOwner, canManageOperations, viewerForUser } from "@/server/auth/context";
+import { requireInternal, isOwner, canManageOperations } from "@/server/auth/context";
 import { portalAccessReport } from "@/server/jobs/portal-access";
 import { getDashboard } from "@/server/dashboard";
 import { listUpcomingMeetings } from "@/server/meetings";
@@ -13,16 +13,14 @@ import { EditorDashboard } from "./editor-view";
 import { WeekPlanning, type WeekUpload } from "./week-planning";
 import { PostingReminder, type TodayPost } from "./posting-reminder";
 import { getWorkOverview } from "@/server/werkoverzicht";
-import { listAttentionTeam } from "@/server/attention";
 import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
 import { Dagstart } from "./dagstart";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ persoon?: string }> }) {
+export default async function DashboardPage() {
   const viewer = await requireInternal();
-  const persoonParam = (await searchParams).persoon;
 
   // Editors krijgen een eigen, smaller dashboard met uitsluitend hun werk.
   if (viewer.isEditorOnly) return <EditorDashboard viewer={viewer} />;
@@ -37,17 +35,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // bezoek aan de Takenpagina).
   await syncScriptingTasksIfStale().catch(() => undefined);
 
-  // Eigenaar en operationeel beheer kunnen de dagstart van een collega bekijken.
-  const canViewOthers = canManageOperations(viewer);
-  const target = canViewOthers && persoonParam && persoonParam !== viewer.id ? await viewerForUser(persoonParam) : null;
-  const subject = target ?? viewer;
-
-  const [data, meetings, contentItems, work, team] = await Promise.all([
+  // Iedereen ziet uitsluitend de eigen dagstart — geen "bekijk als een ander".
+  const [data, meetings, contentItems, work] = await Promise.all([
     getDashboard(viewer),
     listUpcomingMeetings(7),
     listCalendar(viewer, { from: contentFrom, to: contentTo }),
-    getWorkOverview(subject, { trusted: Boolean(target) }),
-    canViewOthers ? listAttentionTeam() : Promise.resolve([]),
+    getWorkOverview(viewer),
   ]);
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
   // Operationeel beheer (eigenaar + operationeel beheerder): snelkoppelingen +
@@ -133,29 +126,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </Link>
       ) : null}
 
-      {/* Bekijk als: eigenaar/operationeel beheer ziet de dagstart van elk kernteamlid. */}
-      {canViewOthers && team.length ? (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-[var(--color-ink-muted)]">Dagstart van:</span>
-          {team.map((m) => {
-            const active = m.id === subject.id;
-            return (
-              <Link
-                key={m.id}
-                href={m.id === viewer.id ? "/dashboard" : `/dashboard?persoon=${m.id}`}
-                className={`rounded-full border px-3 py-1 ${active ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-ink)] text-white" : "border-[var(--color-line)] hover:bg-[var(--color-surface-muted,#f4f5f8)]"}`}
-              >
-                {m.name}{m.id === viewer.id ? " (jij)" : ""}
-              </Link>
-            );
-          })}
-        </div>
-      ) : null}
-
       {/* Dagstart: werkdagbalk + Vandaag, Eerstvolgende werkdag en Deze week afronden. */}
       <Dagstart
         personName={work.person.fullName}
-        isSelf={subject.id === viewer.id}
+        isSelf={true}
         today={new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" })}
         todayIsWorkday={work.todayIsWorkday}
         nextDay={work.nextDay}
