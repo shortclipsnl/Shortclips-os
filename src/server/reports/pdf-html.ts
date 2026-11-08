@@ -76,6 +76,7 @@ export const CLIENT_CSS = `
   .checks { list-style: none; padding: 0; margin: 0; }
   .checks li { position: relative; padding-left: 22px; margin: 6px 0; }
   .checks li::before { content: "✓"; position: absolute; left: 0; top: -1px; width: 15px; height: 15px; border-radius: 50%; background: ${GREEN_SOFT}; color: ${GREEN}; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .checks.min li::before { content: "→"; background: #e9eaf1; color: #00003b; }
   .concl { background: #00003b; color: #fff; border-radius: 14px; padding: 15px 18px; }
   .concl .h { font-size: 9px; letter-spacing: .14em; text-transform: uppercase; opacity: .7; font-weight: 600; margin-bottom: 6px; }
   .concl ul { padding-left: 16px; margin: 0; } .concl li { margin: 3px 0; }
@@ -280,6 +281,18 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
     `<div class="step"><div class="sn">Stap ${i + 1}</div><div class="st">${esc(x.titel)}</div>${x.waarom ? `<div class="sw">${esc(x.waarom)}</div>` : ""}</div>`).join("");
   const kansen = (a?.kansen ?? []).filter((k) => geenDoel(`${k.titel} ${k.toelichting}`)).slice(0, 3).map((k) => `<div class="kans"><div class="t">${esc(k.titel)}</div><div class="s">${esc(k.toelichting)}</div></div>`).join("");
 
+  // Sectie 3 — "Dit hebben we geleerd": expliciet wat ging goed / kan beter / nemen we mee.
+  const watMinder = (a?.analysis?.watMinder ?? []).filter((f) => geenDoel(f.punt)).slice(0, 4).map((f) => `<li>${esc(f.punt)}</li>`).join("");
+  const geleerdPage = (watWerkt || watMinder || conclusies) ? `
+  <section class="page">
+    ${topBar(meta)}
+    <h1>Dit hebben we geleerd van jullie content</h1>
+    <p class="lead">Wat deze maand opviel — en wat we meenemen naar de nieuwe video's.</p>
+    ${watWerkt ? `<h2>Wat ging goed</h2><ul class="checks">${watWerkt}</ul>` : ""}
+    ${watMinder ? `<h2>Wat kan beter</h2><ul class="checks min">${watMinder}</ul>` : ""}
+    ${conclusies ? `<h2>Wat we meenemen</h2><div class="concl"><ul>${conclusies}</ul></div>` : ""}
+  </section>` : "";
+
   const viewsChart = barChart(historie, "views", (n) => nf(n));
   const engChart = barChart(historie, "engagements", (n) => nf(n));
 
@@ -378,16 +391,14 @@ ${gerealiseerdPage}
     <h1>De best presterende video's</h1>
     <p class="lead">Deze video's deden het deze maand het sterkst.</p>
     ${topVideos || `<p class="lead">De cijfers per video zijn voor deze maand nog niet beschikbaar.</p>`}
-    ${watWerkt ? `<h2>Wat werkte goed</h2><ul class="checks">${watWerkt}</ul>` : ""}
   </section>
 
   ${videoPages(input.videos ?? [], maand, meta)}
-
+${geleerdPage}
   <section class="page">
     ${topBar(meta)}
     <h1>Onze aanpak voor ${esc(volgende)}</h1>
-    <p class="lead">Wat we meenemen naar de nieuwe content.</p>
-    ${conclusies ? `<div class="concl"><div class="h">Wat we concluderen</div><ul>${conclusies}</ul></div>` : ""}
+    <p class="lead">Wat we gaan doen in de nieuwe content.</p>
     ${steps ? `<h2>Dit gaan we doen</h2><div class="steps">${steps}</div>` : ""}
     ${kansen ? `<h2>Kansen die we zien</h2>${kansen}` : ""}
   </section>

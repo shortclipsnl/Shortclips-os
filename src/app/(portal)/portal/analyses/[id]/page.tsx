@@ -41,6 +41,11 @@ export default async function PortalAnalysisDetailPage({ params }: { params: Pro
 
   const g = (report.totals as { gerealiseerd?: Gerealiseerd }).gerealiseerd;
   const vb = (report.totals as { vooruitblik?: Vooruitblik }).vooruitblik;
+  // Sectie 3 — Dit hebben we geleerd (goed / beter / mee).
+  const leerGoed = (report.analysis?.analysis?.watWerkt ?? []).map((f) => f.punt);
+  const leerBeter = (report.analysis?.analysis?.watMinder ?? []).map((f) => f.punt);
+  const leerMee = report.analysis?.conclusies ?? [];
+  const heeftGeleerd = leerGoed.length > 0 || leerBeter.length > 0 || leerMee.length > 0;
 
   return (
     <div className="mx-auto max-w-[760px] px-4 py-6">
@@ -124,6 +129,28 @@ export default async function PortalAnalysisDetailPage({ params }: { params: Pro
               De interne productiestatus is deze maand niet volledig bijgehouden, dus &ldquo;geproduceerd&rdquo; en &ldquo;opgeleverd&rdquo; staan op 0. De publicatiecijfers kloppen wel.
             </p>
           ) : null}
+        </section>
+      ) : null}
+
+      {/* Sectie 3 — Dit hebben we geleerd. */}
+      {heeftGeleerd ? (
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold text-[var(--sc-ink,#fff)]">Dit hebben we geleerd</h2>
+          <p className="mt-1 text-sm text-[var(--sc-ink-muted,#9aa3b2)]">Wat deze maand opviel — en wat we meenemen naar de nieuwe video&apos;s.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {[
+              { titel: "Wat ging goed", punten: leerGoed, kleur: "#12a150" },
+              { titel: "Wat kan beter", punten: leerBeter, kleur: "var(--sc-accent,#2E90FA)" },
+              { titel: "Wat we meenemen", punten: leerMee, kleur: "#9aa3b2" },
+            ].filter((b) => b.punten.length > 0).map((b) => (
+              <div key={b.titel} className="rounded-2xl border border-[var(--sc-line,#243044)] bg-[var(--sc-glass,#111827)] p-4">
+                <h3 className="text-sm font-semibold" style={{ color: b.kleur }}>{b.titel}</h3>
+                <ul className="mt-2 space-y-1.5 text-sm text-[var(--sc-ink-muted,#c3cad6)]">
+                  {b.punten.slice(0, 4).map((p, i) => <li key={i}>{p}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
         </section>
       ) : null}
 
