@@ -10,6 +10,7 @@ import { taskHref } from "@/lib/task-links";
 import { nlHolidaySet } from "@/lib/holidays";
 import { addWorkingDays, subWorkingDays } from "@/lib/workdays";
 import { TEAM_WORKDAY } from "@/lib/werkdag";
+import { reportWorkSummary, reportWorkText } from "@/server/reports/today";
 
 /**
  * Werkoverzicht per medewerker: één bron voor "Wat moet ik vandaag doen" en
@@ -191,6 +192,8 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
   // 1) Taken (handmatig + automatisch). Scriptingtaken zijn al per opname
   //    ontdubbeld (dedupeKey), dus geen aparte scriptinglijst nodig.
   for (const t of taskRows) {
+    // Controletaken van maandrapportages worden hieronder gebundeld tot één item.
+    if ((t.dedupeKey ?? "").startsWith("report_review:")) continue;
     const due = iso(t.dueOn);
     const cat: WorkCategory = t.category === "klantcontact" ? "klantcontact" : t.category === "scripting" || (t.dedupeKey ?? "").startsWith("scripting:") ? "scripting" : "intern";
     const urgent = t.priority === "urgent" || t.priority === "high";
@@ -202,6 +205,21 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
       due, state, daysLate, taskId: t.id, source: "taak", flag: null,
       status: t.status === "in_progress" ? "bezig" : t.status === "blocked" ? "geblokkeerd" : "open",
       urgent: urgent || state === "late",
+    });
+  }
+
+  // 1b) Maandrapportages: één compact item (controleren, publiceren, mislukt)
+  //     in plaats van een losse melding per klant.
+  const rep = await reportWorkSummary(person, today).catch(() => null);
+  if (rep) {
+    const { title, detail } = reportWorkText(rep);
+    const now = rep.mislukt > 0 || rep.tePubliceren > 0;
+    items.push({
+      key: "maandrapportages", category: "publicatie", title, detail, clientName: null,
+      href: rep.teControleren || rep.tePubliceren ? "/analytics/maandrapportages?status=actie" : "/analytics/maandrapportages?status=mislukt", due: null, state: now ? "today" : "week", daysLate: 0,
+      taskId: null, source: "signaal", flag: rep.mislukt ? `${rep.mislukt} mislukt` : null, status: "open",
+      // Mislukt of klaar om te publiceren: niet laten wegzakken onder ander werk.
+      urgent: now,
     });
   }
 

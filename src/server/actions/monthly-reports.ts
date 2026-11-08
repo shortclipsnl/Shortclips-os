@@ -50,8 +50,12 @@ export async function startMonthlyReport(clientId: string, period?: string, mode
     if (p >= currentMonthPeriod()) return { ok: false, message: "Een maandrapport kan pas gemaakt worden als de maand voorbij is." };
     const now = new Date();
     // Rij vast klaarzetten zodat de UI meteen status 'analyse_bezig' toont.
-    const [existing] = await db.select({ id: clientReports.id, status: clientReports.status }).from(clientReports).where(and(eq(clientReports.clientId, clientId), eq(clientReports.period, p), eq(clientReports.periodType, "month"))).limit(1);
+    const [existing] = await db.select({ id: clientReports.id, status: clientReports.status, startedAt: clientReports.startedAt, deletedAt: clientReports.deletedAt }).from(clientReports).where(and(eq(clientReports.clientId, clientId), eq(clientReports.period, p), eq(clientReports.periodType, "month"))).limit(1);
     if (existing && APPROVED_STATUSES.includes(existing.status as ReportStatus)) return { ok: false, message: "Dit rapport is al goedgekeurd. Zet het eerst terug naar aanpassen." };
+    // Dubbel klikken of twee collega's tegelijk: een lopende generatie niet opnieuw starten.
+    if (existing && !existing.deletedAt && existing.status === "analyse_bezig" && existing.startedAt && Date.now() - existing.startedAt.getTime() < 15 * 60000) {
+      return { ok: false, message: "Dit rapport wordt al gegenereerd. Even geduld, de status werkt vanzelf bij." };
+    }
     let reportId = existing?.id;
     if (!reportId) {
       const [created] = await db.insert(clientReports).values({ clientId, periodType: "month", period: p, title: `Maandrapport ${periodLabel(p)}`, status: "analyse_bezig", startedAt: now, generatedById: viewer.id }).returning({ id: clientReports.id });
@@ -156,6 +160,7 @@ export async function generatePersonalText(reportId: string): Promise<ActionResu
 /**
  * Rapport goedkeuren. Alleen de eigenaar (Jarno) keurt goed, en alleen als de
  * verplichte kwaliteitspunten af zijn. Daarna krijgt het team een leesopdracht.
+ * Publiceren naar het klantportaal is een aparte, expliciete stap.
  */
 export async function approveMonthlyReport(reportId: string): Promise<ActionResult> {
   return guard(async () => {
@@ -181,8 +186,8 @@ export async function approveMonthlyReport(reportId: string): Promise<ActionResu
     await db.update(tasks).set({ status: "done", completedAt: now, updatedAt: now }).where(and(eq(tasks.dedupeKey, `report_review:${reportId}`), isNull(tasks.deletedAt))).catch(() => undefined);
     await assignReportReaders(reportId, viewer.id);
     await auditLog({ viewer, action: "report.approved", entityType: "client_report", entityId: reportId, clientId: r.clientId });
-    // Na goedkeuring staat de klantversie automatisch in het klantportaal.
-    await publishToPortal(viewer, r);
+    // Bewust géén automatische publicatie: de klantversie gaat pas naar het
+    // klantportaal als een medewerker de publicatie expliciet bevestigt.
     revalidatePath(`/analytics/maandrapportages/${reportId}`);
     revalidatePath("/analytics/maandrapportages");
     return { ok: true };
@@ -225,8 +230,8 @@ export async function requestReportChanges(reportId: string, feedback?: string, 
 
 /**
  * Zet de klantversie in het klantportaal en laat de portaalgebruikers van deze
- * klant weten dat de rapportage klaarstaat. Gebruikt bij goedkeuren (automatisch)
- * en bij handmatig opnieuw delen na intrekken.
+ * klant weten dat de rapportage klaarstaat. Alleen na expliciete bevestiging
+ * door een medewerker (publishMonthlyReport), nooit automatisch.
  */
 async function publishToPortal(viewer: Awaited<ReturnType<typeof requirePermission>>, r: { id: string; clientId: string; period: string }): Promise<void> {
   // Versiesnapshot van wat de klant te zien krijgt (traceerbaarheid).
@@ -257,11 +262,11 @@ async function publishToPortal(viewer: Awaited<ReturnType<typeof requirePermissi
   await recordActivity({ clientId: r.clientId, type: "report.published", title: `Maandrapportage ${periodLabel(r.period)} gedeeld`, isClientVisible: true }).catch(() => undefined);
 }
 
-/** Goedgekeurd (en eerder ingetrokken) rapport opnieuw delen in het klantportaal. */
+/** Goedgekeurd rapport (expliciet bevestigd) publiceren in het klantportaal van de juiste klant. */
 export async function publishMonthlyReport(reportId: string): Promise<ActionResult> {
   return guard(async () => {
     const viewer = await requirePermission("reports:write");
-    const [r] = await db.select().from(clientReports).where(eq(clientReports.id, reportId)).limit(1);
+    const [r] = await db.select().from(clientReports).where(and(eq(clientReports.id, reportId), isNull(clientReports.deletedAt))).limit(1);
     if (!r) return { ok: false, message: "Rapport niet gevonden." };
     assertClientAccess(viewer, r.clientId);
     if (r.status !== "goedgekeurd") return { ok: false, message: r.status === "gepubliceerd" ? "Dit rapport is al gedeeld met de klant." : "Keur het rapport eerst goed." };

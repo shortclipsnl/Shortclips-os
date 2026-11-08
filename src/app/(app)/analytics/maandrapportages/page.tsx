@@ -6,7 +6,7 @@ import { listMonthlyReports, requireReportsAccess } from "@/server/reports/servi
 import { PageHeader } from "@/components/ui";
 import { ReportList } from "./report-list";
 
-export const metadata: Metadata = { title: "AI Maandrapportages" };
+export const metadata: Metadata = { title: "Maandrapportages" };
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
@@ -16,15 +16,16 @@ export default async function MaandrapportagesPage({ searchParams }: { searchPar
   const one = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
   const overview = await listMonthlyReports(viewer);
   const canWrite = viewer.permissions.has("reports:write");
-  const vorigeMaand = previousMonthPeriod(currentMonthPeriod());
+  const huidigeMaand = currentMonthPeriod();
+  const vorigeMaand = previousMonthPeriod(huidigeMaand);
 
   return (
-    <div className="mx-auto max-w-[1300px]">
+    <div className="mx-auto max-w-[1400px]">
       <PageHeader
-        title="AI Maandrapportages"
+        title="Maandrapportages"
         description={overview.teamOnly
-          ? "De goedgekeurde maandrapportages van onze klanten. Neem de inzichten door, markeer ze als doorgenomen en pak de acties op."
-          : "Per klant per maand: AI stelt de analyse op uit de gemeten cijfers, Jarno controleert en keurt goed, het team neemt de inzichten door en zet ze om in acties."}
+          ? "De goedgekeurde maandrapportages van onze klanten. Open de interne versie, neem de inzichten door en pak de acties op."
+          : "Per klant per maand een interne versie en een klantversie. Genereren, controleren, goedkeuren en publiceren doe je hier, direct vanuit de tabel."}
       />
       <ReportList
         overview={overview}
@@ -33,7 +34,8 @@ export default async function MaandrapportagesPage({ searchParams }: { searchPar
         owner={isOwner(viewer)}
         aiReady={aiConfigured()}
         vorigeMaand={vorigeMaand}
-        initial={{ maand: one("maand"), status: one("status"), weergave: one("weergave"), klantstatus: one("klantstatus"), klant: one("klant") }}
+        huidigeMaand={huidigeMaand}
+        initial={{ maand: one("maand"), status: one("status"), weergave: one("weergave"), klantstatus: one("klantstatus"), klant: one("klant"), zoek: one("zoek") }}
       />
     </div>
   );

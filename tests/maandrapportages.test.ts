@@ -363,3 +363,56 @@ describe("PDF's", () => {
     expect(intern).toContain("Geen retentiedata");
   });
 });
+
+describe("pagina Maandrapportages", () => {
+  it("vertaalt rapportstatussen naar de tabelstatus en sorteert actie eerst, mislukt onderaan", async () => {
+    const { viewStatus, compareRows, countStatuses } = await import("@/lib/maandrapport-status");
+    expect(viewStatus({ exists: false })).toBe("nog_genereren");
+    expect(viewStatus({ exists: true, status: "gegevens_verzamelen" })).toBe("bezig");
+    expect(viewStatus({ exists: true, status: "analyse_bezig" })).toBe("bezig");
+    expect(viewStatus({ exists: true, status: "analyse_bezig", stale: true })).toBe("mislukt");
+    expect(viewStatus({ exists: true, status: "klaar_voor_controle", beoordeeld: false })).toBe("gegenereerd");
+    expect(viewStatus({ exists: true, status: "klaar_voor_controle", beoordeeld: true })).toBe("controleren");
+    expect(viewStatus({ exists: true, status: "aanpassing_nodig" })).toBe("controleren");
+    expect(viewStatus({ exists: true, status: "gepubliceerd" })).toBe("gepubliceerd");
+    const rows = [
+      { clientName: "E", period: "2026-10", view: "mislukt" as const },
+      { clientName: "D", period: "2026-10", view: "gepubliceerd" as const },
+      { clientName: "C", period: "2026-10", view: "nog_genereren" as const },
+      { clientName: "B", period: "2026-10", view: "goedgekeurd" as const },
+      { clientName: "A", period: "2026-10", view: "controleren" as const },
+    ];
+    expect([...rows].sort(compareRows).map((r) => r.clientName)).toEqual(["A", "B", "C", "D", "E"]);
+    expect(countStatuses(rows.map((r) => r.view))).toMatchObject({ totaal: 5, teControleren: 1, goedgekeurd: 1, gepubliceerd: 1, mislukt: 1, nogGenereren: 1 });
+  });
+
+  it("geeft per rij goedkeurder, PDF-beschikbaarheid en open controlepunten mee", async () => {
+    const { listMonthlyReports } = await import("@/server/reports/service");
+    const o = await listMonthlyReports(viewer("jarno", ["reports:read", "reports:write"]));
+    const r = o.reports.find((x) => x.id === ids.reportActief)!;
+    expect(r.approvedByName).toBe("Jarno");
+    expect(r.hasAnalysis).toBe(true);
+    expect(typeof r.openChecks).toBe("number");
+  });
+
+  it("bundelt openstaand rapportwerk tot één Vandaag-item (eigenaar: publiceren)", async () => {
+    const { reportWorkSummary, reportWorkText } = await import("@/server/reports/today");
+    const s1 = await reportWorkSummary(viewer("jarno", ["reports:read", "reports:write"]), "2026-11-07");
+    expect(s1).not.toBeNull();
+    expect(s1!.tePubliceren).toBeGreaterThanOrEqual(1);
+    expect(reportWorkText(s1!).title).toContain("publiceren");
+    // Teamleden zonder controlerecht krijgen dit item niet.
+    expect(await reportWorkSummary(viewer("jiska", ["reports:team_read"]), "2026-11-07")).toBeNull();
+  });
+
+  it("goedkeuren publiceert nooit automatisch; de interne versie zit niet in de portaalroute", async () => {
+    const fs = await import("node:fs");
+    const src = fs.readFileSync("src/server/actions/monthly-reports.ts", "utf8");
+    const approve = src.slice(src.indexOf("export async function approveMonthlyReport"), src.indexOf("export async function requestReportChanges"));
+    expect(approve).not.toContain("publishToPortal(");
+    expect(approve).not.toContain("gepubliceerd");
+    const portal = fs.readFileSync("src/app/api/portal/maandrapport/[id]/pdf/route.ts", "utf8");
+    expect(portal).not.toContain("renderInternReportHtml");
+    expect(portal).toContain('data.status !== "gepubliceerd"');
+  });
+});

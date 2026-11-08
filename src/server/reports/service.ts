@@ -64,6 +64,18 @@ export type ReportRow = {
   readByMe: boolean;
   openActies: number;
   actiesTotaal: number;
+  /** Wie het rapport heeft goedgekeurd (naam). */
+  approvedByName: string | null;
+  /** Foutmelding bij een mislukte generatie. */
+  errorMessage: string | null;
+  /** Start van de lopende generatie (voortgang tonen). */
+  startedAt: string | null;
+  /** Analyse staat langer dan 20 minuten op 'bezig' (vastgelopen). */
+  stale: boolean;
+  /** Er is een AI-analyse, dus beide PDF-versies zijn op te vragen. */
+  hasAnalysis: boolean;
+  /** Aantal verplichte controlepunten dat nog open staat (blokkeert goedkeuren). */
+  openChecks: number;
 };
 
 export type TeamReadStat = { userId: string; name: string; assigned: number; read: number; openReportIds: string[] };
@@ -87,7 +99,9 @@ const rowsOf = <T,>(r: unknown): T[] => ((r as { rows?: T[] }).rows ?? (r as T[]
 export async function listMonthlyReports(viewer: Viewer): Promise<ReportOverview> {
   const teamOnly = isTeamReader(viewer);
   const scope = scopeToClients(viewer, clientReports.clientId);
+  const approver = db.$with("approver").as(db.select({ id: users.id, name: users.fullName }).from(users));
   const rows = await db
+    .with(approver)
     .select({
       id: clientReports.id,
       clientId: clientReports.clientId,
@@ -106,12 +120,16 @@ export async function listMonthlyReports(viewer: Viewer): Promise<ReportOverview
       updatedAt: clientReports.updatedAt,
       approvedAt: clientReports.approvedAt,
       publishedAt: clientReports.publishedAt,
+      errorMessage: clientReports.errorMessage,
+      startedAt: clientReports.startedAt,
+      approvedByName: approver.name,
       pmId: clients.coordinatorId,
       pmName: users.fullName,
     })
     .from(clientReports)
     .innerJoin(clients, eq(clients.id, clientReports.clientId))
     .leftJoin(users, eq(users.id, clients.coordinatorId))
+    .leftJoin(approver, eq(approver.id, clientReports.approvedById))
     .where(and(
       eq(clientReports.periodType, "month"),
       isNull(clientReports.deletedAt),
@@ -185,6 +203,20 @@ export async function listMonthlyReports(viewer: Viewer): Promise<ReportOverview
       readByMe: Boolean(mine?.readAt),
       openActies: acts.get(r.id)?.open ?? 0,
       actiesTotaal: acts.get(r.id)?.total ?? 0,
+      approvedByName: r.approvedByName ?? null,
+      errorMessage: r.errorMessage ?? null,
+      startedAt: r.startedAt ? r.startedAt.toISOString() : null,
+      stale: r.status === "analyse_bezig" && (!r.startedAt || Date.now() - r.startedAt.getTime() > 20 * 60000),
+      hasAnalysis: Boolean(r.analysis && Object.keys(r.analysis as object).length),
+      // Zonder de dubbele-cijferscontrole (die vraagt een query per rapport);
+      // goedkeuren controleert op de server altijd volledig.
+      openChecks: checkReportQuality({
+        clientName: r.clientName,
+        analysis: a,
+        beoordeling: b,
+        metrics: m,
+        ontbrekendeGegevens: Array.isArray(r.ontbrekendeGegevens) ? (r.ontbrekendeGegevens as string[]) : [],
+      }).filter((i) => i.severity === "blok").length,
     };
   });
 

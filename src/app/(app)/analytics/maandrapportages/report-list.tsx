@@ -1,155 +1,300 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Sparkles, Loader2, Check, Minus, CircleAlert } from "lucide-react";
-import { Badge, ClientLogo, Stat, buttonClass, type Tone } from "@/components/ui";
-import { queueMonthlyReports, startMonthlyReport } from "@/server/actions/monthly-reports";
+import { Sparkles, Loader2, Check, CircleAlert, Download, Eye, Search, Send, RotateCcw, ShieldCheck, Lock, Globe } from "lucide-react";
+import { Badge, ClientLogo, buttonClass, type Tone } from "@/components/ui";
+import { approveMonthlyReport, publishMonthlyReport, queueMonthlyReports, startMonthlyReport } from "@/server/actions/monthly-reports";
 import type { ReportOverview, ReportRow } from "@/server/reports/service";
+import { VIEW_STATUS_META, compareRows, countStatuses, viewStatus, type ViewStatus } from "@/lib/maandrapport-status";
 
+/** Statuslabels van de onderliggende rapportstatus (ook gebruikt op de detailpagina). */
 export const STATUS_META: Record<string, { label: string; tone: Tone }> = {
   gegevens_verzamelen: { label: "In de wachtrij", tone: "info" },
   analyse_bezig: { label: "Analyse bezig", tone: "info" },
   klaar_voor_controle: { label: "Wacht op controle", tone: "violet" },
   aanpassing_nodig: { label: "Aanpassing nodig", tone: "warn" },
   goedgekeurd: { label: "Goedgekeurd", tone: "good" },
-  gepubliceerd: { label: "Gedeeld met klant", tone: "lime" },
+  gepubliceerd: { label: "Gepubliceerd", tone: "lime" },
   mislukt: { label: "Mislukt", tone: "bad" },
 };
 
-const WORKFLOW: Array<{ key: string; label: string; match: (r: ReportRow) => boolean }> = [
-  { key: "alle", label: "Alle statussen", match: () => true },
-  { key: "wacht", label: "Wacht op controle", match: (r) => r.status === "klaar_voor_controle" },
-  { key: "aanpassing", label: "Aanpassing nodig", match: (r) => r.status === "aanpassing_nodig" },
-  { key: "goedgekeurd", label: "Goedgekeurd", match: (r) => r.status === "goedgekeurd" || r.status === "gepubliceerd" },
-  { key: "bezig", label: "Bezig of in de wachtrij", match: (r) => r.status === "analyse_bezig" || r.status === "gegevens_verzamelen" },
-  { key: "mislukt", label: "Mislukt", match: (r) => r.status === "mislukt" },
+type StatusFilter = "alle" | "actie" | ViewStatus;
+const STATUS_FILTERS: Array<{ key: StatusFilter; label: string }> = [
+  { key: "alle", label: "Alle statussen" },
+  { key: "actie", label: "Actie nodig" },
+  { key: "nog_genereren", label: "Nog genereren" },
+  { key: "bezig", label: "Bezig" },
+  { key: "gegenereerd", label: "Gegenereerd" },
+  { key: "controleren", label: "Controleren" },
+  { key: "goedgekeurd", label: "Goedgekeurd" },
+  { key: "gepubliceerd", label: "Gepubliceerd" },
+  { key: "mislukt", label: "Mislukt" },
 ];
+const LEGACY_FILTER: Record<string, StatusFilter> = { wacht: "actie", aanpassing: "controleren", goedgekeurd: "goedgekeurd", bezig: "bezig", mislukt: "mislukt" };
 
-const APPROVED = new Set(["goedgekeurd", "gepubliceerd"]);
+type Row = {
+  key: string;
+  clientId: string;
+  clientName: string;
+  logoUrl: string | null;
+  color: string | null;
+  active: boolean;
+  pmId: string | null;
+  pmName: string | null;
+  period: string;
+  periods: string[];
+  report: ReportRow | null;
+  view: ViewStatus;
+};
 
 function monthLabel(p: string): string {
   const [y, m] = p.split("-").map(Number);
   return new Date(y!, (m ?? 1) - 1, 1).toLocaleDateString("nl-NL", { month: "long", year: "numeric" });
 }
-function lastMonths(from: string, n: number): string[] {
-  const [y, m] = from.split("-").map(Number);
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date(Date.UTC(y!, (m ?? 1) - 1 - i, 1));
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-  });
-}
-const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }) : null);
+const shortMonth = (p: string) => {
+  const [y, m] = p.split("-").map(Number);
+  return `${new Date(y!, (m ?? 1) - 1, 1).toLocaleDateString("nl-NL", { month: "short" }).replace(".", "")} ${String(y).slice(2)}`;
+};
+const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }) : "");
+const fmtDateTime = (iso: string | null) => (iso ? new Date(iso).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
+const minutesSince = (iso: string | null) => (iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)) : 0);
 
-function Step({ on, label }: { on: boolean; label: string }) {
+const STAT_TONE: Record<string, string> = {
+  neutral: "text-[var(--color-ink)]",
+  violet: "text-[#5636c4]",
+  good: "text-[#1d6b4c]",
+  lime: "text-[#54700a]",
+  bad: "text-[#a3271c]",
+  warn: "text-[#8a5300]",
+};
+
+function StatTile({ label, value, tone, hint, active, onClick }: { label: string; value: number; tone: keyof typeof STAT_TONE; hint?: string; active: boolean; onClick: () => void }) {
   return (
-    <span title={label} aria-label={label} className={`inline-flex size-5 items-center justify-center rounded-full ${on ? "bg-[var(--color-good-soft)] text-[var(--color-good)]" : "border border-[var(--color-line)] text-[var(--color-ink-faint)]"}`}>
-      {on ? <Check className="size-3" /> : <Minus className="size-3" />}
+    <button
+      type="button"
+      onClick={onClick}
+      className={`sc-card flex flex-col items-start px-3 py-2 text-left transition-colors ${active ? "ring-2 ring-[var(--color-indigo-ink)]" : "hover:brightness-[0.98]"}`}
+    >
+      <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{label}</span>
+      <span className={`text-xl font-semibold tabular-nums ${value > 0 ? STAT_TONE[tone] : "text-[var(--color-ink-faint)]"}`}>{value}</span>
+      {hint ? <span className="text-2xs text-[var(--color-ink-muted)]">{hint}</span> : null}
+    </button>
+  );
+}
+
+/** Compacte PDF-knoppen: bekijken (nieuw tabblad) en downloaden. */
+function PdfButtons({ reportId, versie, enabled }: { reportId: string | null; versie: "intern" | "klant"; enabled: boolean }) {
+  const base = versie === "intern"
+    ? "border-[#e8b45a] bg-[var(--color-warn-soft)] text-[#8a5300]"
+    : "border-[#9aa6e8] bg-[var(--color-info-soft)] text-[#24307a]";
+  if (!reportId || !enabled) {
+    return <span className="inline-flex h-7 items-center rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line)] px-2 text-2xs text-[var(--color-ink-faint)]">Geen PDF</span>;
+  }
+  const url = `/api/reports/monthly/${reportId}/pdf?versie=${versie}`;
+  const naam = versie === "intern" ? "interne versie" : "klantversie";
+  return (
+    <span className={`inline-flex h-7 items-stretch overflow-hidden rounded-[var(--radius-sm)] border text-2xs font-medium ${base}`}>
+      <a href={url} target="_blank" rel="noopener" title={`Bekijk de ${naam} als PDF`} className="inline-flex items-center gap-1 px-2 hover:brightness-95">
+        <Eye className="size-3.5" /> PDF
+      </a>
+      <a href={`${url}&download=1`} title={`Download de ${naam}`} aria-label={`Download de ${naam}`} className="inline-flex items-center border-l border-current/30 px-1.5 hover:brightness-95">
+        <Download className="size-3.5" />
+      </a>
     </span>
   );
 }
 
 export function ReportList({
-  overview, viewerId, canWrite, owner, aiReady, vorigeMaand, initial,
+  overview, viewerId, canWrite, owner, aiReady, vorigeMaand, huidigeMaand, initial,
 }: {
   overview: ReportOverview;
   viewerId: string;
   canWrite: boolean;
   owner: boolean;
   aiReady: boolean;
+  /** De actuele rapportagemaand (de afgelopen kalendermaand). */
   vorigeMaand: string;
-  initial: { maand?: string; status?: string; weergave?: string; klantstatus?: string; klant?: string };
+  /** De lopende maand: daarvoor kan nog geen rapport gemaakt worden. */
+  huidigeMaand: string;
+  initial: { maand?: string; status?: string; weergave?: string; klantstatus?: string; klant?: string; zoek?: string };
 }) {
   const router = useRouter();
   const { reports, clients, periods, team, teamOnly } = overview;
   const monthOptions = useMemo(() => [...new Set([vorigeMaand, ...periods])].sort().reverse(), [periods, vorigeMaand]);
   const years = useMemo(() => [...new Set(monthOptions.map((p) => p.slice(0, 4)))], [monthOptions]);
 
-  const [maand, setMaand] = useState(initial.maand && /^\d{4}-\d{2}$/.test(initial.maand) ? initial.maand : (periods[0] ?? vorigeMaand));
+  const [maand, setMaand] = useState(initial.maand && (/^\d{4}-\d{2}$/.test(initial.maand) || initial.maand === "alle") ? initial.maand : vorigeMaand);
   const [jaar, setJaar] = useState("alle");
   const [klantStatus, setKlantStatus] = useState(initial.klantstatus === "actief" || initial.klantstatus === "inactief" ? initial.klantstatus : "alle");
-  const [klant, setKlant] = useState(initial.klant ?? "");
-  const [workflow, setWorkflow] = useState(WORKFLOW.some((w) => w.key === initial.status) ? initial.status! : "alle");
+  // ?klant=<id> (oude links) wordt een zoekopdracht op de klantnaam.
+  const [zoek, setZoek] = useState(initial.zoek ?? clients.find((c) => c.id === initial.klant)?.name ?? "");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
+    const s = initial.status ?? "alle";
+    if (STATUS_FILTERS.some((f) => f.key === s)) return s as StatusFilter;
+    return LEGACY_FILTER[s] ?? "alle";
+  });
   const [weergave, setWeergave] = useState(initial.weergave === "te-lezen" || initial.weergave === "mijn-klanten" ? initial.weergave : "alles");
-
-  const [genClient, setGenClient] = useState("");
-  const [genMonth, setGenMonth] = useState(vorigeMaand);
-  const [pending, start] = useTransition();
+  /** Per klant een andere maand bekijken dan het filter (eerdere maanden in de rij zelf). */
+  const [rowMonth, setRowMonth] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [rowMsg, setRowMsg] = useState<Record<string, { ok: boolean; text: string }>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, start] = useTransition();
 
-  const shown = reports.filter((r) => {
-    if (maand !== "alle" && r.period !== maand) return false;
-    if (maand === "alle" && jaar !== "alle" && !r.period.startsWith(jaar)) return false;
-    if (klantStatus === "actief" && !r.clientActive) return false;
-    if (klantStatus === "inactief" && r.clientActive) return false;
-    if (klant && r.clientId !== klant) return false;
-    if (!WORKFLOW.find((w) => w.key === workflow)!.match(r)) return false;
+  // Snelle opzoektabellen.
+  const byKey = useMemo(() => new Map(reports.map((r) => [`${r.clientId}|${r.period}`, r])), [reports]);
+  const periodsByClient = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const r of reports) m.set(r.clientId, [...(m.get(r.clientId) ?? []), r.period]);
+    return m;
+  }, [reports]);
+
+  const rows: Row[] = useMemo(() => {
+    const make = (c: { id: string; name: string; logoUrl: string | null; color: string | null; active: boolean; pmId: string | null; pmName: string | null }, period: string): Row => {
+      const r = byKey.get(`${c.id}|${period}`) ?? null;
+      const periodsHere = [...new Set([period, ...(maand === "alle" ? [] : [maand]), ...(periodsByClient.get(c.id) ?? [])])].sort().reverse();
+      return {
+        key: maand === "alle" ? `${c.id}|${period}` : c.id,
+        clientId: c.id, clientName: c.name, logoUrl: c.logoUrl, color: c.color, active: c.active, pmId: c.pmId, pmName: c.pmName,
+        period, periods: periodsHere, report: r,
+        view: viewStatus({ exists: Boolean(r), status: r?.status, beoordeeld: r?.beoordeeld, stale: r?.stale }),
+      };
+    };
+    const meta = new Map<string, { id: string; name: string; logoUrl: string | null; color: string | null; active: boolean; pmId: string | null; pmName: string | null }>();
+    for (const c of clients) meta.set(c.id, { id: c.id, name: c.name, logoUrl: null, color: null, active: c.active, pmId: c.pmId, pmName: c.pmName });
+    for (const r of reports) {
+      const cur = meta.get(r.clientId);
+      meta.set(r.clientId, { id: r.clientId, name: r.clientName, logoUrl: r.logoUrl, color: r.color, active: r.clientActive, pmId: cur?.pmId ?? r.pmId, pmName: cur?.pmName ?? r.pmName });
+    }
+
+    if (maand === "alle") {
+      return reports
+        .filter((r) => jaar === "alle" || r.period.startsWith(jaar))
+        .map((r) => make(meta.get(r.clientId)!, r.period));
+    }
+    const out: Row[] = [];
+    for (const c of meta.values()) {
+      const period = rowMonth[c.id] ?? maand;
+      const hasReport = byKey.has(`${c.id}|${period}`);
+      // Teamleden zonder controlerecht zien alleen goedgekeurde rapporten.
+      if (teamOnly && !hasReport) continue;
+      // Inactieve klanten zonder rapport alleen tonen als je daar expliciet op filtert.
+      if (!c.active && !hasReport && klantStatus !== "inactief") continue;
+      out.push(make(c, period));
+    }
+    return out;
+  }, [byKey, clients, jaar, klantStatus, maand, periodsByClient, reports, rowMonth, teamOnly]);
+
+  const q = zoek.trim().toLowerCase();
+  const baseRows = rows.filter((r) => {
+    if (klantStatus === "actief" && !r.active) return false;
+    if (klantStatus === "inactief" && r.active) return false;
+    if (q && !r.clientName.toLowerCase().includes(q)) return false;
     if (weergave === "mijn-klanten" && r.pmId !== viewerId) return false;
-    if (weergave === "te-lezen" && !(r.assignedToMe && !r.readByMe)) return false;
+    if (weergave === "te-lezen" && !(r.report?.assignedToMe && !r.report.readByMe)) return false;
     return true;
   });
+  const counts = countStatuses(baseRows.map((r) => r.view));
+  const shown = baseRows
+    .filter((r) => statusFilter === "alle" || (statusFilter === "actie" ? ["gegenereerd", "controleren", "goedgekeurd"].includes(r.view) : r.view === statusFilter))
+    .sort(compareRows);
 
-  // Dashboard voor de gekozen maand.
-  const monthReports = maand === "alle" ? [] : reports.filter((r) => r.period === maand);
-  const byClient = new Map(monthReports.map((r) => [r.clientId, r]));
-  const activeClients = clients.filter((c) => c.active);
-  const missing = maand === "alle" ? [] : activeClients.filter((c) => {
-    const r = byClient.get(c.id);
-    return !r || r.status === "mislukt";
-  });
-  const stats = {
-    gereed: monthReports.filter((r) => APPROVED.has(r.status)).length,
-    wacht: monthReports.filter((r) => r.status === "klaar_voor_controle").length,
-    aanpassing: monthReports.filter((r) => r.status === "aanpassing_nodig").length,
-    bezig: monthReports.filter((r) => r.status === "analyse_bezig" || r.status === "gegevens_verzamelen").length,
-    reads: monthReports.reduce((s, r) => s + r.readsDone, 0),
-    readsTotal: monthReports.reduce((s, r) => s + r.readsTotal, 0),
-    teLezenIk: reports.filter((r) => r.assignedToMe && !r.readByMe).length,
-  };
-  const teamStats = maand === "alle" ? [] : (team[maand] ?? []);
+  // Ontbrekende rapporten van de gekozen maand (actieve klanten), voor de bulkknop.
+  const missing = maand === "alle" ? [] : rows.filter((r) => r.active && r.period === maand && (r.view === "nog_genereren" || r.view === "mislukt"));
+  const kanMaand = maand !== "alle" && maand < huidigeMaand;
 
-  function run(fn: () => Promise<{ ok: boolean; message?: string }>, okText: string, after?: (res: unknown) => void) {
+  // Zolang er iets gegenereerd wordt, de tabel automatisch verversen.
+  const anyBusy = rows.some((r) => r.view === "bezig") || Object.values(busy).some(Boolean);
+  useEffect(() => {
+    if (!anyBusy) return;
+    const t = setInterval(() => router.refresh(), 6000);
+    return () => clearInterval(t);
+  }, [anyBusy, router]);
+
+  function rowAction(row: Row, fn: () => Promise<{ ok: boolean; message?: string }>, okText: string) {
+    setBusy((b) => ({ ...b, [row.key]: true }));
+    setRowMsg((m) => { const n = { ...m }; delete n[row.key]; return n; });
+    start(async () => {
+      try {
+        const res = await fn();
+        setRowMsg((m) => ({ ...m, [row.key]: res.ok ? { ok: true, text: okText } : { ok: false, text: res.message ?? "Er ging iets mis." } }));
+      } catch {
+        setRowMsg((m) => ({ ...m, [row.key]: { ok: false, text: "Er ging iets mis. Probeer het opnieuw." } }));
+      } finally {
+        setBusy((b) => ({ ...b, [row.key]: false }));
+        router.refresh();
+      }
+    });
+  }
+
+  function generate(row: Row) {
+    const r = row.report;
+    if (r && (row.view === "gegenereerd" || row.view === "controleren")) {
+      if (!window.confirm(`De analyse van ${row.clientName} (${monthLabel(row.period)}) opnieuw genereren? De beoordeling en eerdere versies blijven bewaard.`)) return;
+    }
+    // Nieuw rapport: volledig opstellen. Bestaand rapport: alleen de AI-analyse vernieuwen (beoordeling blijft).
+    const mode = r && r.hasAnalysis ? "ai_only" : "full";
+    rowAction(row, () => startMonthlyReport(row.clientId, row.period, mode), "Genereren gestart. Dit duurt meestal een paar minuten.");
+  }
+  function approve(row: Row) {
+    if (!row.report) return;
+    if (!window.confirm(`Klantversie van ${row.clientName} (${monthLabel(row.period)}) goedkeuren? Daarna kun je hem publiceren naar het klantportaal.`)) return;
+    rowAction(row, () => approveMonthlyReport(row.report!.id), "Goedgekeurd. Publiceer hem nu naar het klantportaal.");
+  }
+  function publish(row: Row) {
+    if (!row.report) return;
+    if (!window.confirm(`De klantversie van ${monthLabel(row.period)} publiceren in het klantportaal van ${row.clientName}? De klant krijgt daarvan een melding.`)) return;
+    rowAction(row, () => publishMonthlyReport(row.report!.id), "Gepubliceerd in het klantportaal.");
+  }
+  function queueMissing() {
+    if (!window.confirm(`Voor ${missing.length} ${missing.length === 1 ? "klant" : "klanten"} de rapportage van ${monthLabel(maand)} genereren?`)) return;
     setMsg(null);
     start(async () => {
-      const res = await fn();
-      if (res.ok) { setMsg({ ok: true, text: okText }); after?.(res); }
-      else setMsg({ ok: false, text: res.message ?? "Er ging iets mis." });
+      const res = await queueMonthlyReports(maand);
+      setMsg(res.ok ? { ok: true, text: `${(res as { queued?: number }).queued ?? missing.length} rapporten staan in de wachtrij en worden op de achtergrond gemaakt (een paar per kwartier). De status werkt vanzelf bij.` } : { ok: false, text: res.message ?? "Er ging iets mis." });
       router.refresh();
     });
   }
-  const generateOne = () => run(() => startMonthlyReport(genClient, genMonth, "full"), "De analyse is gestart.", (res) => {
-    const id = (res as { reportId?: string }).reportId;
-    if (id) router.push(`/analytics/maandrapportages/${id}`);
-  });
-  const queueMissing = () => run(() => queueMonthlyReports(maand), "De ontbrekende rapporten staan in de wachtrij en worden op de achtergrond opgesteld (een paar per kwartier).");
 
   const pill = (on: boolean) => `rounded-full px-3 py-1.5 text-xs font-medium ${on ? "bg-[var(--color-indigo-ink)] text-white" : "border border-[var(--color-line)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`;
+  const toggle = (k: StatusFilter) => setStatusFilter((cur) => (cur === k ? "alle" : k));
+  const teamStats = maand === "alle" ? [] : (team[maand] ?? []);
+  const teLezenIk = reports.filter((r) => r.assignedToMe && !r.readByMe).length;
+  const label = (t: string) => <span className="mb-1 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{t}</span>;
 
   return (
-    <div className="space-y-5">
-      {/* Filters */}
-      <div className="sc-card flex flex-wrap items-end gap-3 p-4">
-        <div>
-          <span className="mb-1 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Klantstatus</span>
-          <div className="flex gap-1">
-            {(["alle", "actief", "inactief"] as const).map((k) => (
-              <button key={k} type="button" className={pill(klantStatus === k)} onClick={() => setKlantStatus(k)}>
-                {k === "alle" ? "Alle klanten" : k === "actief" ? "Actieve klanten" : "Inactieve klanten"}
-              </button>
-            ))}
-          </div>
-        </div>
+    <div className="space-y-4">
+      {/* Statistieken: binnen een paar seconden zien waar actie nodig is. Klik = filter. */}
+      <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
+        <StatTile label="Totaal klanten" value={counts.totaal} tone="neutral" active={statusFilter === "alle"} onClick={() => setStatusFilter("alle")} />
+        <StatTile label="Nog genereren" value={counts.nogGenereren} tone="neutral" hint={counts.bezig ? `${counts.bezig} bezig` : undefined} active={statusFilter === "nog_genereren"} onClick={() => toggle("nog_genereren")} />
+        <StatTile label="Te controleren" value={counts.teControleren} tone="violet" active={statusFilter === "actie"} onClick={() => toggle("actie")} />
+        <StatTile label="Goedgekeurd" value={counts.goedgekeurd} tone="good" hint={counts.goedgekeurd ? "nog publiceren" : undefined} active={statusFilter === "goedgekeurd"} onClick={() => toggle("goedgekeurd")} />
+        <StatTile label="Gepubliceerd" value={counts.gepubliceerd} tone="lime" active={statusFilter === "gepubliceerd"} onClick={() => toggle("gepubliceerd")} />
+        <StatTile label="Mislukt" value={counts.mislukt} tone="bad" active={statusFilter === "mislukt"} onClick={() => toggle("mislukt")} />
+      </div>
+
+      {/* Filters en zoeken */}
+      <div className="sc-card flex flex-wrap items-end gap-3 p-3">
+        <label className="min-w-[180px] flex-1 sm:max-w-[240px]">
+          {label("Zoeken")}
+          <span className="relative block">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--color-ink-faint)]" />
+            <input type="search" value={zoek} onChange={(e) => setZoek(e.target.value)} placeholder="Klantnaam" className="sc-input w-full pl-8 text-sm" />
+          </span>
+        </label>
         <label>
-          <span className="mb-1 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Maand</span>
-          <select className="sc-input text-sm" value={maand} onChange={(e) => setMaand(e.target.value)}>
+          {label("Maand")}
+          <select className="sc-input text-sm" value={maand} onChange={(e) => { setMaand(e.target.value); setRowMonth({}); }}>
+            {monthOptions.map((p) => <option key={p} value={p}>{monthLabel(p)}{p === vorigeMaand ? " (actueel)" : ""}</option>)}
             <option value="alle">Alle maanden</option>
-            {monthOptions.map((p) => <option key={p} value={p}>{monthLabel(p)}</option>)}
           </select>
         </label>
         {maand === "alle" ? (
           <label>
-            <span className="mb-1 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Jaar</span>
+            {label("Jaar")}
             <select className="sc-input text-sm" value={jaar} onChange={(e) => setJaar(e.target.value)}>
               <option value="alle">Alle jaren</option>
               {years.map((y) => <option key={y} value={y}>{y}</option>)}
@@ -157,174 +302,212 @@ export function ReportList({
           </label>
         ) : null}
         <label>
-          <span className="mb-1 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Klant</span>
-          <select className="sc-input text-sm" value={klant} onChange={(e) => setKlant(e.target.value)}>
-            <option value="">Alle klanten</option>
-            {clients.filter((c) => klantStatus === "alle" || (klantStatus === "actief") === c.active).map((c) => <option key={c.id} value={c.id}>{c.name}{c.active ? "" : " (inactief)"}</option>)}
+          {label("Status")}
+          <select className="sc-input text-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}>
+            {STATUS_FILTERS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
           </select>
         </label>
-        <label>
-          <span className="mb-1 block text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Status</span>
-          <select className="sc-input text-sm" value={workflow} onChange={(e) => setWorkflow(e.target.value)}>
-            {WORKFLOW.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}
-          </select>
-        </label>
-        <div className="ml-auto flex gap-1">
-          <button type="button" className={pill(weergave === "alles")} onClick={() => setWeergave("alles")}>Alles</button>
-          <button type="button" className={pill(weergave === "mijn-klanten")} onClick={() => setWeergave("mijn-klanten")}>Mijn klanten</button>
-          <button type="button" className={pill(weergave === "te-lezen")} onClick={() => setWeergave("te-lezen")}>Door mij te lezen{stats.teLezenIk ? ` (${stats.teLezenIk})` : ""}</button>
+        <div>
+          {label("Klanten")}
+          <div className="flex gap-1">
+            {(["alle", "actief", "inactief"] as const).map((k) => (
+              <button key={k} type="button" className={pill(klantStatus === k)} onClick={() => setKlantStatus(k)}>
+                {k === "alle" ? "Alle" : k === "actief" ? "Actief" : "Niet actief"}
+              </button>
+            ))}
+          </div>
         </div>
+        <div>
+          {label("Weergave")}
+          <div className="flex gap-1">
+            <button type="button" className={pill(weergave === "alles")} onClick={() => setWeergave("alles")}>Alles</button>
+            <button type="button" className={pill(weergave === "mijn-klanten")} onClick={() => setWeergave("mijn-klanten")}>Mijn klanten</button>
+            <button type="button" className={pill(weergave === "te-lezen")} onClick={() => setWeergave("te-lezen")}>Door mij te lezen{teLezenIk ? ` (${teLezenIk})` : ""}</button>
+          </div>
+        </div>
+        {canWrite && kanMaand && missing.length > 0 ? (
+          <button type="button" disabled={pending || !aiReady} onClick={queueMissing} className={buttonClass({ variant: "primary", size: "sm", className: "ml-auto" })} title={aiReady ? "" : "AI-sleutel ontbreekt"}>
+            {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} Alle ontbrekende genereren ({missing.length})
+          </button>
+        ) : null}
       </div>
-
-      {/* Dashboard voor de gekozen maand */}
-      {maand !== "alle" ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <Stat label="Gereed (goedgekeurd)" value={stats.gereed} tone="good" onClick={() => setWorkflow("goedgekeurd")} active={workflow === "goedgekeurd"} />
-          {!teamOnly ? <Stat label="Wacht op controle" value={stats.wacht} tone={stats.wacht > 0 ? "violet" : "neutral"} onClick={() => setWorkflow("wacht")} active={workflow === "wacht"} /> : null}
-          {!teamOnly ? <Stat label="Aanpassing nodig" value={stats.aanpassing + stats.bezig} hint={stats.bezig ? `${stats.bezig} bezig/wachtrij` : undefined} tone={stats.aanpassing > 0 ? "warn" : "neutral"} onClick={() => setWorkflow("aanpassing")} active={workflow === "aanpassing"} /> : null}
-          {!teamOnly ? <Stat label="Actieve klanten zonder rapport" value={missing.length} tone={missing.length > 0 ? "bad" : "neutral"} /> : null}
-          <Stat label="Doorgenomen door team" value={stats.readsTotal ? `${stats.reads}/${stats.readsTotal}` : "–"} tone={stats.readsTotal && stats.reads === stats.readsTotal ? "good" : "neutral"} />
-        </div>
-      ) : null}
 
       {msg ? <p className={`text-sm ${msg.ok ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}`}>{msg.text}</p> : null}
 
-      <div className="grid gap-5 2xl:grid-cols-[1fr_300px]">
-        <div className="space-y-5 min-w-0">
-          {/* Workflow per klant */}
-          {shown.length === 0 ? (
-            <div className="sc-card p-6 text-sm text-[var(--color-ink-muted)]">
-              {weergave === "te-lezen" ? "Je hebt alle maandrapportages doorgenomen." : "Geen maandrapporten gevonden voor deze filters."}
-            </div>
-          ) : (
-            <div className="sc-card overflow-x-auto">
-              <table className="w-full min-w-[860px] text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--color-line)] text-left text-2xs uppercase tracking-wide text-[var(--color-ink-faint)]">
-                    <th className="sc-th">Klant</th><th className="sc-th">Maand</th><th className="sc-th">Status</th>
-                    <th className="sc-th" title="Gegenereerd · Gecontroleerd (beoordeling) · Goedgekeurd">Voortgang</th>
-                    <th className="sc-th text-center">Doorgenomen</th><th className="sc-th text-center">Verbeterp.</th><th className="sc-th text-center">Open acties</th>
-                    <th className="sc-th text-right">{`Video's`}</th>
+      {/* De tabel: één rij per klant, alle acties direct in de rij. */}
+      {shown.length === 0 ? (
+        <div className="sc-card p-6 text-sm text-[var(--color-ink-muted)]">
+          {weergave === "te-lezen" ? "Je hebt alle maandrapportages doorgenomen." : q ? `Geen klant gevonden met "${zoek}".` : "Geen rapportages voor deze filters."}
+        </div>
+      ) : (
+        <div className="sc-card overflow-x-auto">
+          <table className="w-full min-w-[1000px] text-sm [&_td]:!px-2.5 [&_th]:!px-2.5 [&_td:first-child]:!pl-4 [&_th:first-child]:!pl-4">
+            <thead>
+              <tr className="border-b border-[var(--color-line)] text-left text-2xs uppercase tracking-wide text-[var(--color-ink-faint)]">
+                <th className="sc-th sticky left-0 z-10 min-w-[200px] bg-[var(--color-surface)]">Klant</th>
+                <th className="sc-th">Maand</th>
+                <th className="sc-th">Status</th>
+                <th className="sc-th"><span className="inline-flex items-start gap-1"><Lock className="mt-px size-3 shrink-0" /> Interne<br />versie</span></th>
+                <th className="sc-th"><span className="inline-flex items-start gap-1"><Globe className="mt-px size-3 shrink-0" /> Klant-<br />versie</span></th>
+                {canWrite ? <th className="sc-th">Genereren</th> : null}
+                <th className="sc-th">Goedkeuren</th>
+                <th className="sc-th">Klant-<br />portaal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((row) => {
+                const r = row.report;
+                const meta = VIEW_STATUS_META[row.view];
+                const isBusy = Boolean(busy[row.key]);
+                const lopend = row.period >= huidigeMaand;
+                const m = rowMsg[row.key];
+                const pdfOk = Boolean(r?.hasAnalysis) && row.view !== "bezig";
+                return (
+                  <tr key={row.key} className="border-b border-[var(--color-line)] align-top last:border-0">
+                    {/* Klant */}
+                    <td className={`sc-td sticky left-0 z-10 min-w-[200px] bg-[var(--color-surface)]`}>
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <ClientLogo name={row.clientName} logoUrl={row.logoUrl} color={row.color} size={22} />
+                        {r ? (
+                          <Link href={`/analytics/maandrapportages/${r.id}`} className="font-medium text-[var(--color-ink)] hover:underline">{row.clientName}</Link>
+                        ) : <span className="font-medium text-[var(--color-ink)]">{row.clientName}</span>}
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5 whitespace-nowrap text-2xs text-[var(--color-ink-faint)]">
+                        <Badge tone={row.active ? "good" : "neutral"}>{row.active ? "Actief" : "Niet actief"}</Badge>
+                        <span>{row.pmName ?? "Geen PM"}</span>
+                        {r?.assignedToMe && !r.readByMe ? <Badge tone="violet">Te lezen</Badge> : null}
+                        {r && r.readsTotal > 0 ? <span title="Door het team doorgenomen" className={r.readsDone === r.readsTotal ? "text-[var(--color-good)]" : ""}>team {r.readsDone}/{r.readsTotal}</span> : null}
+                        {r && r.ontbrekend > 0 && !teamOnly ? <span title="Opmerkingen over ontbrekende of onvolledige data" className="inline-flex items-center gap-0.5 text-[var(--color-warn)]"><CircleAlert className="size-3" />{r.ontbrekend} data</span> : null}
+                      </div>
+                    </td>
+
+                    {/* Maand: per rij een eerdere maand kiezen */}
+                    <td className="sc-td whitespace-nowrap">
+                      {maand === "alle" || row.periods.length <= 1 ? (
+                        <span>{shortMonth(row.period)}</span>
+                      ) : (
+                        <select
+                          aria-label={`Maand voor ${row.clientName}`}
+                          className="sc-input !w-[92px] !py-1 !pl-2 !pr-5 text-xs"
+                          value={row.period}
+                          onChange={(e) => setRowMonth((cur) => ({ ...cur, [row.clientId]: e.target.value }))}
+                        >
+                          {row.periods.map((p) => <option key={p} value={p}>{shortMonth(p)}</option>)}
+                        </select>
+                      )}
+                    </td>
+
+                    {/* Status */}
+                    <td className="sc-td">
+                      <span title={meta.uitleg}><Badge tone={meta.tone}>{row.view === "bezig" ? <><Loader2 className="mr-1 inline size-3 animate-spin" />{meta.label}</> : meta.label}</Badge></span>
+                      {row.view === "bezig" && r ? (
+                        <div className="mt-1 text-2xs text-[var(--color-ink-muted)]">
+                          {r.status === "gegevens_verzamelen" ? "In de wachtrij" : `Analyse loopt${r.startedAt ? ` · ${minutesSince(r.startedAt)} min` : ""}`}
+                        </div>
+                      ) : null}
+                      {row.view === "mislukt" && r ? (
+                        <div className="mt-1 max-w-[160px] text-2xs text-[var(--color-bad)]">{r.stale ? "Vastgelopen tijdens het genereren." : r.errorMessage ?? "Onbekende fout."}</div>
+                      ) : null}
+                      {row.view === "controleren" && r?.status === "aanpassing_nodig" ? <div className="mt-1 text-2xs text-[var(--color-warn)]">Aanpassing gevraagd{r.feedbackOpen ? ` · ${r.feedbackOpen} feedback open` : ""}</div> : null}
+                      {(row.view === "gegenereerd" || row.view === "controleren") && r?.generatedAt ? <div className="mt-1 text-2xs text-[var(--color-ink-faint)]">gemaakt {fmtDate(r.generatedAt)}</div> : null}
+                    </td>
+
+                    {/* PDF's direct in de tabel */}
+                    <td className="sc-td"><PdfButtons reportId={r?.id ?? null} versie="intern" enabled={pdfOk} /></td>
+                    <td className="sc-td"><PdfButtons reportId={r?.id ?? null} versie="klant" enabled={pdfOk} /></td>
+
+                    {/* Genereren */}
+                    {canWrite ? (
+                      <td className="sc-td whitespace-nowrap">
+                        {row.view === "bezig" || isBusy ? (
+                          <span className={buttonClass({ variant: "secondary", size: "sm" })} aria-disabled><Loader2 className="size-3.5 animate-spin" /> Bezig</span>
+                        ) : row.view === "goedgekeurd" || row.view === "gepubliceerd" ? (
+                          <span className="text-[var(--color-ink-faint)]" title="Goedgekeurd: zet het rapport eerst terug naar aanpassen (op de detailpagina) om opnieuw te genereren.">–</span>
+                        ) : lopend ? (
+                          <span className="text-2xs text-[var(--color-ink-faint)]" title="Een maandrapport kan pas gemaakt worden als de maand voorbij is.">Maand loopt nog</span>
+                        ) : row.view === "nog_genereren" ? (
+                          <button type="button" disabled={!aiReady || pending} onClick={() => generate(row)} className={buttonClass({ variant: "primary", size: "sm" })}><Sparkles className="size-3.5" /> Genereren</button>
+                        ) : (
+                          <button type="button" disabled={!aiReady || pending} onClick={() => generate(row)} className={buttonClass({ variant: row.view === "mislukt" ? "primary" : "ghost", size: "sm" })}><RotateCcw className="size-3.5" /> Opnieuw</button>
+                        )}
+                        {m ? <div className={`mt-1 max-w-[200px] whitespace-normal text-2xs ${m.ok ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}`}>{m.text}</div> : null}
+                      </td>
+                    ) : null}
+
+                    {/* Goedkeuren */}
+                    <td className="sc-td whitespace-nowrap">
+                      {r && (row.view === "goedgekeurd" || row.view === "gepubliceerd") ? (
+                        <div className="text-xs">
+                          <span className="inline-flex items-center gap-1 font-medium text-[var(--color-good)]"><ShieldCheck className="size-3.5" /> {r.approvedByName ? r.approvedByName.split(" ")[0] : "Goedgekeurd"}</span>
+                          <div className="text-2xs text-[var(--color-ink-faint)]">{fmtDateTime(r.approvedAt)}</div>
+                        </div>
+                      ) : r && (row.view === "gegenereerd" || row.view === "controleren") ? (
+                        owner ? (
+                          r.openChecks > 0 ? (
+                            <Link href={`/analytics/maandrapportages/${r.id}`} title="Vul eerst de beoordeling in en rond de verplichte controlepunten af" className={buttonClass({ variant: "secondary", size: "sm" })}>
+                              <CircleAlert className="size-3.5" /> Controleren
+                            </Link>
+                          ) : (
+                            <button type="button" disabled={pending || isBusy} onClick={() => approve(row)} className={buttonClass({ variant: "primary", size: "sm" })}><Check className="size-3.5" /> Goedkeuren</button>
+                          )
+                        ) : (
+                          <div className="text-2xs text-[var(--color-ink-muted)]">
+                            Wacht op Jarno
+                            <div><Link href={`/analytics/maandrapportages/${r.id}`} className="text-[var(--color-indigo-ink)] hover:underline">Controle openen</Link></div>
+                          </div>
+                        )
+                      ) : <span className="text-[var(--color-ink-faint)]">–</span>}
+                      {!canWrite && m ? <div className={`mt-1 text-2xs ${m.ok ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}`}>{m.text}</div> : null}
+                    </td>
+
+                    {/* Klantportaal */}
+                    <td className="sc-td whitespace-nowrap">
+                      {r && row.view === "gepubliceerd" ? (
+                        <div className="text-xs">
+                          <span className="inline-flex items-center gap-1 font-medium text-[#54700a]"><Check className="size-3.5" /> Zichtbaar</span>
+                          <div className="text-2xs text-[var(--color-ink-faint)]">sinds {fmtDate(r.publishedAt)}</div>
+                        </div>
+                      ) : r && row.view === "goedgekeurd" ? (
+                        canWrite ? (
+                          <button type="button" disabled={pending || isBusy} onClick={() => publish(row)} className={buttonClass({ variant: "primary", size: "sm" })}><Send className="size-3.5" /> Publiceren</button>
+                        ) : <span className="text-2xs text-[var(--color-ink-muted)]">Nog niet gepubliceerd</span>
+                      ) : <span className="text-2xs text-[var(--color-ink-faint)]" title="Niet zichtbaar in het klantportaal">Niet zichtbaar</span>}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {shown.map((r) => {
-                    const st = STATUS_META[r.status] ?? STATUS_META.gegevens_verzamelen!;
-                    const generated = Boolean(r.generatedAt) && r.status !== "mislukt";
-                    return (
-                      <tr key={r.id} className="border-b border-[var(--color-line)] last:border-0">
-                        <td className="sc-td">
-                          <Link href={`/analytics/maandrapportages/${r.id}`} className="inline-flex items-center gap-2 font-medium text-[var(--color-ink)] hover:underline">
-                            <ClientLogo name={r.clientName} logoUrl={r.logoUrl} color={r.color} size={22} /> {r.clientName}
-                          </Link>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-2xs text-[var(--color-ink-faint)]">
-                            {r.pmName ? <span>{r.pmName}</span> : <span>Geen PM</span>}
-                            {!r.clientActive ? <Badge tone="neutral">Inactief</Badge> : null}
-                            {r.assignedToMe && !r.readByMe ? <Badge tone="violet">Te lezen</Badge> : null}
-                            {r.ontbrekend > 0 && !teamOnly ? <span title="Opmerkingen over ontbrekende of onvolledige data" className="inline-flex items-center gap-0.5 whitespace-nowrap text-[var(--color-warn)]"><CircleAlert className="size-3" />{r.ontbrekend} data</span> : null}
-                          </div>
-                        </td>
-                        <td className="sc-td whitespace-nowrap capitalize">{r.periodLabel}</td>
-                        <td className="sc-td"><Badge tone={st.tone}>{st.label}</Badge>{r.feedbackOpen > 0 ? <div className="mt-1 text-2xs text-[var(--color-warn)]">{r.feedbackOpen} feedback open</div> : null}</td>
-                        <td className="sc-td">
-                          <div className="flex items-center gap-1">
-                            <Step on={generated} label={generated ? `Gegenereerd ${fmt(r.generatedAt) ?? ""}` : "Nog niet gegenereerd"} />
-                            <span className="h-px w-3 bg-[var(--color-line)]" />
-                            <Step on={r.beoordeeld} label={r.beoordeeld ? "Beoordeling ingevuld" : "Beoordeling nog niet ingevuld"} />
-                            <span className="h-px w-3 bg-[var(--color-line)]" />
-                            <Step on={APPROVED.has(r.status)} label={APPROVED.has(r.status) ? `Goedgekeurd ${fmt(r.approvedAt) ?? ""}` : "Nog niet goedgekeurd"} />
-                          </div>
-                          <div className="mt-0.5 text-2xs text-[var(--color-ink-faint)]">{APPROVED.has(r.status) ? `goedgekeurd ${fmt(r.approvedAt) ?? ""}` : generated ? `gegenereerd ${fmt(r.generatedAt) ?? ""}` : ""}</div>
-                        </td>
-                        <td className="sc-td text-center tabular-nums">{r.readsTotal ? <span className={r.readsDone === r.readsTotal ? "text-[var(--color-good)]" : ""}>{r.readsDone}/{r.readsTotal}</span> : <span className="text-[var(--color-ink-faint)]">–</span>}</td>
-                        <td className="sc-td text-center tabular-nums">{r.verbeterpunten || "–"}</td>
-                        <td className="sc-td text-center tabular-nums">{r.actiesTotaal ? <span className={r.openActies ? "font-medium text-[var(--color-warn)]" : "text-[var(--color-good)]"}>{r.openActies}/{r.actiesTotaal}</span> : <span className="text-[var(--color-ink-faint)]">–</span>}</td>
-                        <td className="sc-td text-right tabular-nums">{r.aantalVideos}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Ontbrekende klanten */}
-          {canWrite && maand !== "alle" && missing.length > 0 && (klantStatus !== "inactief") ? (
-            <div className="sc-card p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-semibold text-[var(--color-ink)]">Nog geen (gelukt) rapport voor {monthLabel(maand)}</p>
-                {maand < vorigeMaand || maand === vorigeMaand ? (
-                  <button type="button" disabled={pending || !aiReady} onClick={queueMissing} className={buttonClass({ variant: "secondary", size: "sm", className: "ml-auto" })}>
-                    {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} Alle {missing.length} in de wachtrij zetten
-                  </button>
-                ) : null}
-              </div>
-              <ul className="mt-2 grid gap-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                {missing.map((c) => {
-                  const r = byClient.get(c.id);
-                  return (
-                    <li key={c.id} className="flex items-center gap-2 text-[var(--color-ink-muted)]">
-                      <span className="size-1.5 rounded-full bg-[var(--color-bad)]" />
-                      {r ? <Link href={`/analytics/maandrapportages/${r.id}`} className="hover:underline">{c.name}</Link> : c.name}
-                      {r ? <span className="text-2xs text-[var(--color-bad)]">mislukt</span> : null}
-                    </li>
-                  );
-                })}
-              </ul>
-              <p className="mt-2 text-2xs text-[var(--color-ink-faint)]">Een rapport mislukt wanneer er voor die maand geen cijfers zijn (bijvoorbeeld omdat de klant nog niet aan Metricool is gekoppeld). Er wordt dan niets verzonnen.</p>
-            </div>
-          ) : null}
+                );
+              })}
+            </tbody>
+          </table>
         </div>
+      )}
 
-        {/* Zijkolom */}
-        <div className="grid content-start gap-5 md:grid-cols-2 2xl:grid-cols-1">
-          {maand !== "alle" ? (
-            <div className="sc-card p-4">
-              <p className="text-sm font-semibold text-[var(--color-ink)]">Team: doorgenomen</p>
-              <p className="mb-3 text-2xs text-[var(--color-ink-faint)] capitalize">{monthLabel(maand)}</p>
-              {teamStats.length === 0 ? (
-                <p className="text-xs text-[var(--color-ink-muted)]">Zodra rapporten zijn goedgekeurd, zie je hier per medewerker wat er is doorgenomen.</p>
-              ) : (
-                <ul className="space-y-2.5">
-                  {teamStats.map((t) => {
-                    const pct = t.assigned ? Math.round((t.read / t.assigned) * 100) : 0;
-                    return (
-                      <li key={t.userId}>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-[var(--color-ink)]">{t.name}</span>
-                          <span className={`tabular-nums text-xs ${t.read === t.assigned ? "text-[var(--color-good)]" : "text-[var(--color-ink-muted)]"}`}>{t.read}/{t.assigned}</span>
-                        </div>
-                        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
-                          <div className="h-full rounded-full bg-[var(--color-indigo-ink)]" style={{ width: `${pct}%` }} />
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          ) : null}
+      <p className="text-2xs text-[var(--color-ink-faint)]">
+        De interne versie is alleen voor het Shortclips-team en nooit zichtbaar in het klantportaal. De klantversie komt pas in het klantportaal na goedkeuring én een bevestigde publicatie.
+        {canWrite && !owner ? " Goedkeuren doet Jarno." : ""}
+      </p>
 
-          {canWrite ? (
-            <div className="sc-card space-y-2 p-4">
-              <p className="text-sm font-semibold text-[var(--color-ink)]">Rapport genereren</p>
-              <select className="sc-input w-full text-sm" value={genClient} onChange={(e) => setGenClient(e.target.value)}>
-                <option value="">Kies een klant…</option>
-                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.active ? "" : " (inactief)"}</option>)}
-              </select>
-              <select className="sc-input w-full text-sm" value={genMonth} onChange={(e) => setGenMonth(e.target.value)}>
-                {lastMonths(vorigeMaand, 12).map((p) => <option key={p} value={p}>{monthLabel(p)}</option>)}
-              </select>
-              <button type="button" onClick={generateOne} disabled={!genClient || pending || !aiReady} className={buttonClass({ variant: "primary", size: "sm", className: "w-full" })}>
-                {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} Genereren
-              </button>
-              {!aiReady ? <p className="text-2xs text-[var(--color-ink-faint)]">AI-sleutel ontbreekt.</p> : null}
-              <p className="text-2xs text-[var(--color-ink-faint)]">Bestaat het rapport al, dan wordt de analyse vernieuwd. Eerdere versies en feedback blijven bewaard. Goedgekeurde rapporten eerst terugzetten naar aanpassen.</p>
-              {!owner ? <p className="text-2xs text-[var(--color-ink-faint)]">Goedkeuren doet Jarno.</p> : null}
-            </div>
-          ) : null}
+      {/* Teamvoortgang (doornemen van goedgekeurde rapporten), compact onder de tabel. */}
+      {teamStats.length > 0 ? (
+        <div className="sc-card p-4">
+          <p className="mb-2 text-sm font-semibold text-[var(--color-ink)]">Team: doorgenomen <span className="font-normal capitalize text-[var(--color-ink-faint)]">· {monthLabel(maand)}</span></p>
+          <ul className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-4">
+            {teamStats.map((t) => {
+              const pct = t.assigned ? Math.round((t.read / t.assigned) * 100) : 0;
+              return (
+                <li key={t.userId}>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[var(--color-ink)]">{t.name}</span>
+                    <span className={`tabular-nums text-xs ${t.read === t.assigned ? "text-[var(--color-good)]" : "text-[var(--color-ink-muted)]"}`}>{t.read}/{t.assigned}</span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
+                    <div className="h-full rounded-full bg-[var(--color-indigo-ink)]" style={{ width: `${pct}%` }} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

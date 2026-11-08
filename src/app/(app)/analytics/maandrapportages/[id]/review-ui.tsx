@@ -170,8 +170,8 @@ export function ReviewUI({
                 {report.status === "gepubliceerd"
                   ? `Staat in het klantportaal${report.publishedAt ? ` sinds ${dt(report.publishedAt)}` : ""}.`
                   : approved
-                    ? "Goedgekeurd, maar staat niet (meer) in het klantportaal."
-                    : "Nog niet gedeeld. Komt automatisch in het klantportaal zodra Jarno goedkeurt."}
+                    ? "Goedgekeurd, nog niet gepubliceerd in het klantportaal."
+                    : "Nog niet gepubliceerd. Na goedkeuring door Jarno publiceer je de klantversie zelf naar het klantportaal."}
               </p>
             </div>
             <Badge tone={st.tone}>{st.label}</Badge>
@@ -188,9 +188,9 @@ export function ReviewUI({
             />
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t border-[var(--color-line)] pt-3">
-            {owner && !approved ? <button type="button" disabled={pending || !canApprove} title={canApprove ? "" : "Rond eerst de verplichte controlepunten af"} onClick={() => run(() => approveMonthlyReport(report.id), "Goedgekeurd en gedeeld in het klantportaal. Het team krijgt een melding om dit door te nemen.")} className={buttonClass({ variant: "primary", size: "sm" })}><Check className="size-3.5" /> Goedkeuren en delen in portaal</button> : null}
+            {owner && !approved ? <button type="button" disabled={pending || !canApprove} title={canApprove ? "" : "Rond eerst de verplichte controlepunten af"} onClick={() => run(() => approveMonthlyReport(report.id), "Goedgekeurd. Het team krijgt een melding om dit door te nemen. Publiceer de klantversie wanneer je zover bent.")} className={buttonClass({ variant: "primary", size: "sm" })}><Check className="size-3.5" /> Goedkeuren</button> : null}
             {!owner && canWrite && !approved ? <span className="text-xs text-[var(--color-ink-muted)]">Goedkeuren doet Jarno.</span> : null}
-            {canWrite && report.status === "goedgekeurd" ? <button type="button" disabled={pending} onClick={() => run(() => publishMonthlyReport(report.id), "De klantversie staat nu in het klantportaal.")} className={buttonClass({ variant: "primary", size: "sm" })}><Send className="size-3.5" /> Delen in portaal</button> : null}
+            {canWrite && report.status === "goedgekeurd" ? <button type="button" disabled={pending} onClick={() => { if (window.confirm(`De klantversie publiceren in het klantportaal van ${report.clientName}? De klant krijgt daarvan een melding.`)) run(() => publishMonthlyReport(report.id), "De klantversie staat nu in het klantportaal."); }} className={buttonClass({ variant: "primary", size: "sm" })}><Send className="size-3.5" /> Publiceren in klantportaal</button> : null}
             {canWrite && report.status === "gepubliceerd" ? <button type="button" disabled={pending} onClick={() => run(() => unpublishMonthlyReport(report.id))} className={buttonClass({ variant: "ghost", size: "sm" })}>Uit portaal halen</button> : null}
             {canWrite && report.status === "goedgekeurd" ? <button type="button" disabled={pending} onClick={() => run(() => requestReportChanges(report.id))} className={buttonClass({ variant: "ghost", size: "sm" })}>Terug naar aanpassen</button> : null}
             {canWrite && !approved ? <button type="button" disabled={pending || !aiReady} onClick={() => run(() => startMonthlyReport(report.clientId, report.period, "ai_only"), "Nieuwe analyse gestart.")} className={buttonClass({ variant: "ghost", size: "sm" })}><Sparkles className="size-3.5" /> AI opnieuw</button> : null}
