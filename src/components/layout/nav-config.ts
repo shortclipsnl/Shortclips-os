@@ -55,6 +55,8 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/dashboard", label: "Vandaag", icon: "LayoutDashboard" },
       { href: "/tasks", label: "Taken", icon: "CircleCheck", permissions: ["tasks:read"], match: "/tasks" },
       { href: "/kwaliteit", label: "Aandachtspunten", icon: "ShieldCheck", match: "/kwaliteit" },
+      // Persoonlijk: eigen verantwoordelijkheden, bevoegdheden en wanneer Jarno erbij moet.
+      { href: "/verantwoordelijkheden", label: "Mijn verantwoordelijkheden", icon: "ListChecks", match: "/verantwoordelijkheden" },
     ],
   },
   {
