@@ -1,4 +1,6 @@
 import "server-only";
+import { activeClientsWhere, clientIsActive } from "@/server/client-activity";
+import { isActiveClientStatus } from "@/lib/client-status";
 import {
   and,
   asc,
@@ -120,7 +122,7 @@ export async function getDashboard(viewer: Viewer) {
       })
       .from(clients)
       .leftJoin(users, eq(users.id, clients.coordinatorId))
-      .where(and(isNull(clients.deletedAt), ne(clients.status, "churned"), clientScope)),
+      .where(and(activeClientsWhere(), clientScope)),
 
     // Pipeline: aantal per status
     db
@@ -262,7 +264,7 @@ export async function getDashboard(viewer: Viewer) {
       .where(
         and(
           isNull(clients.deletedAt),
-          eq(clients.status, "active"),
+          clientIsActive(),
           sql`not exists (
             select 1 from production_days pd
             where pd.client_id = clients.id
@@ -406,7 +408,7 @@ export async function getDashboard(viewer: Viewer) {
 
   /* ---- Afgeleide cijfers ---- */
 
-  const activeClients = clientRows.filter((c) => c.status === "active");
+  const activeClients = clientRows.filter((c) => isActiveClientStatus(c.status));
   const mrr = activeClients.reduce((sum, c) => sum + Number(c.monthlyRevenue), 0);
   const atRisk = clientRows.filter((c) => c.riskLevel === "high" || c.riskLevel === "medium");
 
@@ -517,7 +519,7 @@ export async function getDashboardTopStats(viewer: Viewer) {
   const openForDeadline = active.filter((s) => !DONE_STAGES.has(s));
 
   const [clientsRow, shootsRow, editingRow, dueSoonRow, overRow, tasksRow] = await Promise.all([
-    db.select({ n: count() }).from(clients).where(and(isNull(clients.deletedAt), eq(clients.status, "active"), scopeToClients(viewer, clients.id))),
+    db.select({ n: count() }).from(clients).where(and(isNull(clients.deletedAt), clientIsActive(), scopeToClients(viewer, clients.id))),
     db.select({ n: count() }).from(productionDays).where(and(isNull(productionDays.deletedAt), gte(productionDays.scheduledOn, today), lte(productionDays.scheduledOn, day(7)), ne(productionDays.status, "cancelled"), scopeToClients(viewer, productionDays.clientId))),
     db.select({ n: count() }).from(deliverables).where(and(isNull(deliverables.deletedAt), eq(deliverables.status, "editing"), scopeToClients(viewer, deliverables.clientId))),
     db.select({ n: count() }).from(deliverables).where(and(isNull(deliverables.deletedAt), gte(deliverables.dueOn, today), lte(deliverables.dueOn, day(5)), inArray(deliverables.status, openForDeadline), scopeToClients(viewer, deliverables.clientId))),

@@ -3,6 +3,7 @@ import { and, asc, gte, isNull, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { productionDays } from "@/db/schema";
 import { ensureBriefingForShoot } from "@/server/briefing/run";
+import { notInactiveClient } from "@/server/client-activity";
 
 const STALE_RUNNING_MIN = 10;
 const MAX_PER_RUN = 25;
@@ -48,6 +49,7 @@ export async function runBriefingAutoGenerate(): Promise<{
       ne(productionDays.status, "cancelled"),
       gte(productionDays.scheduledOn, isoDay(-DAYS_BACK)),
       lte(productionDays.scheduledOn, isoDay(DAYS_FORWARD)),
+      notInactiveClient(productionDays.clientId),
     ))
     .orderBy(asc(productionDays.scheduledOn))
     .limit(500);

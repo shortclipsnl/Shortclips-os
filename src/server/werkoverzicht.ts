@@ -1,4 +1,5 @@
 import "server-only";
+import { activeClientsWhere, notInactiveClient } from "@/server/client-activity";
 import { and, asc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, deliverables, editProjectFiles, leaveRequests, productionDays, scripts, shootScriptSources, tasks, users } from "@/db/schema";
@@ -155,8 +156,9 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
         since: new Date().toISOString(), doneAt: null, notes: [], href: s.href, kids: [], manual: false, dueOn: s.dueOn ?? null,
       })) as AttentionItem[],
     })),
+    // Alleen actieve klanten: bij niet actieve klanten wordt niet meer op de klant gewacht.
     db.select({ id: clients.id, name: clients.name }).from(clients)
-      .where(and(eq(clients.coordinatorId, person.id), isNull(clients.deletedAt))),
+      .where(and(eq(clients.coordinatorId, person.id), activeClientsWhere())),
     db
       .select({
         id: productionDays.id, clientId: productionDays.clientId, clientName: clients.name, coordinatorId: clients.coordinatorId,
@@ -169,6 +171,7 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
       .where(and(
         isNull(productionDays.deletedAt),
         sql`${productionDays.status} <> 'cancelled'`,
+        notInactiveClient(productionDays.clientId),
         gte(productionDays.scheduledOn, subWorkingDays(refDay, 5, holidays)),
         lte(productionDays.scheduledOn, horizon),
         or(

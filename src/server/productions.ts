@@ -1,4 +1,5 @@
 import "server-only";
+import { clientIsActive } from "@/server/client-activity";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -218,7 +219,7 @@ export async function nextShootPerClient(viewer: Viewer) {
       and(
         isNull(productionDays.deletedAt),
         isNull(clients.deletedAt),
-        eq(clients.status, "active"),
+        clientIsActive(),
         gte(productionDays.scheduledOn, today()),
         ne(productionDays.status, "cancelled"),
         scopeToClients(viewer, productionDays.clientId),
@@ -388,7 +389,7 @@ export async function unplannedClients(viewer: Viewer): Promise<UnplannedClient[
     .where(
       and(
         isNull(clients.deletedAt),
-        eq(clients.status, "active"),
+        clientIsActive(),
         sql`(${clients.endedOn} is null or ${clients.endedOn} > ${todayIso})`,
         sql`not exists (
           select 1 from production_days pd

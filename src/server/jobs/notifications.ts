@@ -19,6 +19,7 @@ import { cleanVideoTitle } from "@/lib/portal-status";
 import { portalEmailHtml, sendEmail } from "@/server/email";
 import { evaluateDeadlines } from "@/server/planning-deadlines";
 import { dueReminder, longDate, reminderText, todayAmsterdam } from "@/lib/planning-deadline";
+import { withoutInactiveClients } from "@/server/client-activity";
 
 /**
  * Klantnotificaties: meldt de drie momenten waarop een klant iets moet weten of
@@ -273,6 +274,11 @@ export async function runClientNotifications(): Promise<{
       ctaLabel: "Bekijk de planning",
     });
   }
+
+  // Centrale klantstatus: een niet actieve klant krijgt geen portaalmeldingen of
+  // e-mails meer (ook niet voor werk dat nog in de pijplijn stond).
+  const kept = await withoutInactiveClients(items, (i) => i.clientId);
+  items.splice(0, items.length, ...kept);
 
   if (items.length === 0) {
     return { ok: true, created: 0, emailed: 0, emailSkipped: 0, byKind: {} };

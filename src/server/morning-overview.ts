@@ -1,4 +1,5 @@
 import "server-only";
+import { notInactiveClient } from "@/server/client-activity";
 import { and, asc, desc, eq, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, deliverables, scripts, tasks, deadlineMisses, users } from "@/db/schema";
@@ -47,7 +48,7 @@ export async function getMorningOverview(viewer: Viewer): Promise<MorningOvervie
     .select({ id: deliverables.id, title: deliverables.title, status: deliverables.status, shootOn: deliverables.shootOn, dueOn: deliverables.dueOn, clientName: clients.name })
     .from(deliverables)
     .innerJoin(clients, eq(clients.id, deliverables.clientId))
-    .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, [...FV_STAGES]), scopeToClients(viewer, deliverables.clientId) ?? undefined));
+    .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, [...FV_STAGES]), scopeToClients(viewer, deliverables.clientId) ?? undefined, notInactiveClient(deliverables.clientId)));
 
   const overdue: Array<{ id: string; label: string; daysLate: number }> = [];
   for (const d of dels) {
@@ -68,7 +69,7 @@ export async function getMorningOverview(viewer: Viewer): Promise<MorningOvervie
     .where(and(
       isNull(deliverables.deletedAt),
       inArray(deliverables.status, ["client_review", "client_revision"]),
-      scopeToClients(viewer, deliverables.clientId) ?? undefined,
+      scopeToClients(viewer, deliverables.clientId) ?? undefined, notInactiveClient(deliverables.clientId),
     ))
     .orderBy(asc(deliverables.statusChangedAt));
   const atClientRows = atClientCandidates.filter((r) => isClientFeedbackOverdue(r.since as Date | string, feedbackDays, t, holidays));
@@ -106,10 +107,10 @@ export async function getMorningOverview(viewer: Viewer): Promise<MorningOvervie
   const [waitVideos, waitScripts] = await Promise.all([
     db.select({ id: deliverables.id, title: deliverables.title, since: deliverables.statusChangedAt, clientName: clients.name })
       .from(deliverables).innerJoin(clients, eq(clients.id, deliverables.clientId))
-      .where(and(isNull(deliverables.deletedAt), eq(deliverables.status, "client_review"), scopeToClients(viewer, deliverables.clientId) ?? undefined)),
+      .where(and(isNull(deliverables.deletedAt), eq(deliverables.status, "client_review"), scopeToClients(viewer, deliverables.clientId) ?? undefined, notInactiveClient(deliverables.clientId))),
     db.select({ id: scripts.id, title: scripts.title, since: scripts.updatedAt, clientName: clients.name })
       .from(scripts).innerJoin(clients, eq(clients.id, scripts.clientId))
-      .where(and(isNull(scripts.deletedAt), eq(scripts.status, "client_review"), scopeToClients(viewer, scripts.clientId) ?? undefined)),
+      .where(and(isNull(scripts.deletedAt), eq(scripts.status, "client_review"), scopeToClients(viewer, scripts.clientId) ?? undefined, notInactiveClient(scripts.clientId))),
   ]);
   const toDay = (d: Date | string | null): string => (d ? (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10) : t);
   const clientsWaiting = [

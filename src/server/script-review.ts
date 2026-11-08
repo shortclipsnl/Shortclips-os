@@ -1,4 +1,5 @@
 import "server-only";
+import { clientIsActive } from "@/server/client-activity";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, productionDays, scriptReviewComments, scriptReviewThreads, scriptReviewVersions, scriptReviews, users } from "@/db/schema";
@@ -240,7 +241,7 @@ export async function listClientsWithSessions(viewer: Viewer): Promise<ClientWit
   const clientRows = await db
     .select({ id: clients.id, name: clients.name, slug: clients.slug, logoUrl: clients.logoUrl, color: clients.color })
     .from(clients)
-    .where(and(isNull(clients.deletedAt), eq(clients.status, "active"), scopeToClients(viewer, clients.id) ?? sql`true`))
+    .where(and(isNull(clients.deletedAt), clientIsActive(), scopeToClients(viewer, clients.id) ?? sql`true`))
     .orderBy(asc(clients.name));
   if (clientRows.length === 0) return [];
 

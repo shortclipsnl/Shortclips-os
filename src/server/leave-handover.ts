@@ -1,4 +1,5 @@
 import "server-only";
+import { clientIsActive } from "@/server/client-activity";
 import { and, between, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, contentCalendar, deliverables, productionDays } from "@/db/schema";
@@ -100,7 +101,7 @@ export async function getLeaveHandover(
     db
       .select({ id: clients.id, name: clients.name })
       .from(clients)
-      .where(and(isNull(clients.deletedAt), eq(clients.status, "active"), eq(clients.coordinatorId, userId))),
+      .where(and(isNull(clients.deletedAt), clientIsActive(), eq(clients.coordinatorId, userId))),
   ]);
 
   const roleFor = (r: { videographerId: string | null; editorId: string | null; coordinatorId: string | null }) =>

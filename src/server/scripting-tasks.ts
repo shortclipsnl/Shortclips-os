@@ -14,6 +14,7 @@ import {
   type ScriptingDayState,
 } from "@/lib/scripting-task-plan";
 import { runJob } from "@/server/jobs/runner";
+import { isInactiveClientStatus } from "@/lib/client-status";
 
 /**
  * Scriptingstatus → takenlijst.
@@ -101,6 +102,7 @@ export async function syncScriptingTasks(dayIds?: string[]): Promise<ScriptingTa
       clientId: productionDays.clientId,
       clientName: clients.name,
       clientDeleted: clients.deletedAt,
+      clientStatus: clients.status,
       scheduledOn: productionDays.scheduledOn,
       status: productionDays.status,
       deletedAt: productionDays.deletedAt,
@@ -191,7 +193,10 @@ export async function syncScriptingTasks(dayIds?: string[]): Promise<ScriptingTa
         note: d.note,
         assigneeId: d.scriptingStatus === CONTROLE_JARNO ? owner ?? responsible : responsible,
         sessionLabel: sessionByDay.get(d.id) ?? null,
-        gone: d.deletedAt != null || d.clientDeleted != null || d.status === "cancelled" || d.scheduledOn < today,
+        // Niet actieve klant (centrale klantstatus) telt als vervallen: open
+        // scriptingtaken sluiten en geen nieuwe aanmaken. Wordt de klant weer
+        // actief, dan ontstaan taken opnieuw voor de aankomende opnames.
+        gone: d.deletedAt != null || d.clientDeleted != null || d.status === "cancelled" || d.scheduledOn < today || isInactiveClientStatus(d.clientStatus),
       };
       const existing = tasksByDay.get(d.id) ?? [];
 

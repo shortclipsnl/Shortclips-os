@@ -8,6 +8,7 @@ import {
 import { db } from "@/db/client";
 import { notifications, users } from "@/db/schema";
 import { activeCoverMap } from "./leave-cover";
+import { isClientInactive, MANUAL_NOTIFICATION_TYPES } from "./client-activity";
 
 export type NotifyInput = {
   userIds?: string[];
@@ -23,6 +24,8 @@ export type NotifyInput = {
   entityId?: string;
   /** Voorkomt dat dezelfde melding twee keer verschijnt. */
   dedupeKey?: string;
+  /** Ook versturen als de klant niet actief is (alleen voor bewuste, administratieve meldingen). */
+  allowInactiveClient?: boolean;
 };
 
 /**
@@ -31,6 +34,19 @@ export type NotifyInput = {
  * per gebruiker welk kanaal gebruikt wordt. Vandaag is alleen in-app actief.
  */
 export async function notify(input: NotifyInput): Promise<number> {
+  // Centrale klantstatus: een niet actieve klant veroorzaakt geen automatische
+  // meldingen meer. Meldingen die een mens zelf in gang zet (toewijzen,
+  // goedkeuren, offerte) gaan wel door.
+  const clientRef = input.clientId ?? (input.entityType === "client" ? input.entityId : null);
+  if (
+    clientRef &&
+    !input.allowInactiveClient &&
+    !MANUAL_NOTIFICATION_TYPES.has(input.type) &&
+    (await isClientInactive(clientRef))
+  ) {
+    return 0;
+  }
+
   const targets = new Set(input.userIds ?? []);
 
   if (input.roles?.length) {

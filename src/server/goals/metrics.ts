@@ -78,7 +78,7 @@ export const METRIC_RESOLVERS: Record<string, (ctx: Ctx) => Promise<MetricResult
   async shoots_through_dec({ now }) {
     const today = now.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
     const r = await db.execute(sql`
-      with actief as (select id, name from clients where deleted_at is null and status = 'active'),
+      with actief as (select id, name from clients where deleted_at is null and status in ('active','onboarding')),
       gepland as (
         select distinct client_id from production_days
         where deleted_at is null and status <> 'cancelled'
@@ -156,7 +156,7 @@ export const METRIC_RESOLVERS: Record<string, (ctx: Ctx) => Promise<MetricResult
   // 20. Alle actieve klanten met actuele resultaten (laatste 30 dagen).
   async results_coverage() {
     const r = await db.execute(sql`
-      with actief as (select id, name from clients where deleted_at is null and status = 'active'),
+      with actief as (select id, name from clients where deleted_at is null and status in ('active','onboarding')),
       metr as (
         select distinct client_id from daily_metrics
         where measured_on >= current_date - interval '30 days'

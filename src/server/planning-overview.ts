@@ -1,4 +1,5 @@
 import "server-only";
+import { clientIsActive } from "@/server/client-activity";
 import { and, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { calendarEvents, clients, contentCalendar, deliverables, leaveRequests, productionDays, teamMeetings, users } from "@/db/schema";
@@ -203,7 +204,7 @@ export async function getPlanningOverview(viewer: Viewer, weeks = 8): Promise<Pl
 export async function planningFilterOptions(viewer: Viewer) {
   const scope = viewer.clientScope;
   const clientRows = scope === null
-    ? await db.select({ name: clients.name }).from(clients).where(and(eq(clients.status, "active"), isNull(clients.deletedAt))).orderBy(clients.name)
+    ? await db.select({ name: clients.name }).from(clients).where(and(clientIsActive(), isNull(clients.deletedAt))).orderBy(clients.name)
     : scope.length === 0 ? [] : await db.select({ name: clients.name }).from(clients).where(and(inArray(clients.id, scope), isNull(clients.deletedAt))).orderBy(clients.name);
   return { clients: clientRows.map((c) => c.name) };
 }

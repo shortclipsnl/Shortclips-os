@@ -39,6 +39,7 @@ import { aliasesForSlug } from "@/server/integrations/client-aliases";
 import { listEnabledCouplings } from "@/server/calendar-couplings";
 import { runJob } from "./runner";
 import { editorIdsByKey, mergeDuplicateDeliverables } from "@/server/editing/integrity";
+import { inactiveClientIds } from "@/server/client-activity";
 
 /**
  * Publieke e-mailproviders mogen nooit als "klantdomein" gelden — anders zou
@@ -552,6 +553,11 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
       // ontdubbeling mag de sync nooit breken.
       try { await mergeDuplicateShoots(); } catch { /* ontdubbeling overslaan */ }
 
+      // Centrale klantstatus: een opname in de agenda van een niet actieve klant
+      // wordt wel gespiegeld (de afspraak bestaat echt), maar wordt geen nieuwe
+      // editing-opdracht. De coördinator krijgt één signaal om te beslissen.
+      const inactiveShootClients = await inactiveClientIds(shootEvents.map((e) => e.clientId));
+
       let shoots = 0;
       const seenShoot = new Map<string, string>(); // dedup-sleutel → productionDayId
       for (const ev of shootEvents) {
@@ -678,7 +684,24 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         // een nieuwe of gewijzigde opname uit Google Agenda vanzelf op het
         // editing-board komt ("binnenkort beschikbaar") — zonder handwerk. Eén
         // deliverable per opname (dedup op production_day_id).
-        if (!alreadyCounted) {
+        if (!alreadyCounted && inactiveShootClients.has(ev.clientId)) {
+          const cname = clientNameById.get(ev.clientId) ?? "Klant";
+          const [coord] = await db.select({ id: clients.coordinatorId }).from(clients).where(eq(clients.id, ev.clientId)).limit(1);
+          await notify({
+            userIds: coord?.id ? [coord.id] : [],
+            roles: ["owner"],
+            clientId: ev.clientId,
+            allowInactiveClient: true,
+            type: "shoot_inactive_client",
+            level: "warning",
+            title: `Opname gepland voor niet actieve klant: ${cname}`,
+            body: `In de agenda staat een opname op ${scheduledOn}, maar ${cname} staat op niet actief. Er is daarom geen editing-opdracht aangemaakt. Zet de klant weer op actief of verwijder de afspraak.`,
+            href: `/productions/${targetPdId}`,
+            entityType: "production_day",
+            entityId: targetPdId,
+            dedupeKey: `shoot_inactive_client:${targetPdId}`,
+          });
+        } else if (!alreadyCounted) {
           // Videograaf standaard koppelen als er nog geen staat (handmatige keuze
           // blijft behouden): Luxewagen → Jarno, de rest → Rutger.
           const [pd] = await db

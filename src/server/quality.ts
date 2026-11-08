@@ -16,6 +16,7 @@ import { countOpenLinkSuggestions } from "@/server/link-review";
 import { VIDEO_WAITING_ON, type VideoStage } from "@/lib/statuses";
 import { isOwner, scopeToClients, type Viewer } from "@/server/auth/context";
 import { CORE_STAFF_EMAILS, isCoreStaff } from "@/server/core-staff";
+import { notInactiveClient } from "@/server/client-activity";
 
 /**
  * Centrale kwaliteitsbewaking: bundelt alle automatisch gesignaleerde punten tot
@@ -163,7 +164,7 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
       .innerJoin(productionDays, and(eq(productionDays.id, deliverables.productionDayId), isNull(productionDays.deletedAt)))
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
       .leftJoin(users, eq(users.id, deliverables.editorId))
-      .where(and(isNull(deliverables.deletedAt), eq(deliverables.currentVersion, 0), inArray(deliverables.status, AT_EDITOR), scopeToClients(viewer, deliverables.clientId)))
+      .where(and(isNull(deliverables.deletedAt), eq(deliverables.currentVersion, 0), inArray(deliverables.status, AT_EDITOR), scopeToClients(viewer, deliverables.clientId), notInactiveClient(deliverables.clientId)))
       .limit(60),
     // #9 Productiegegevens ontbreken: geen editor of geen deadline.
     db.select({
@@ -171,7 +172,7 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
       clientName: clients.name, clientSlug: clients.slug,
     }).from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
-      .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, ACTIVE_EDIT), or(isNull(deliverables.editorId), isNull(deliverables.dueOn)), scopeToClients(viewer, deliverables.clientId)))
+      .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, ACTIVE_EDIT), or(isNull(deliverables.editorId), isNull(deliverables.dueOn)), scopeToClients(viewer, deliverables.clientId), notInactiveClient(deliverables.clientId)))
       .limit(40),
     // #10 Feedback niet verwerkt: klant gaf feedback (client_revision), bal bij editor.
     db.select({
@@ -180,7 +181,7 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
     }).from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
       .leftJoin(users, eq(users.id, deliverables.editorId))
-      .where(and(isNull(deliverables.deletedAt), eq(deliverables.status, "client_revision"), scopeToClients(viewer, deliverables.clientId)))
+      .where(and(isNull(deliverables.deletedAt), eq(deliverables.status, "client_revision"), scopeToClients(viewer, deliverables.clientId), notInactiveClient(deliverables.clientId)))
       .limit(40),
     // #11 Video klaar maar niet verstuurd: goedgekeurd/klaar, nog niet ingepland of live.
     db.select({
@@ -190,7 +191,7 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
       // Alleen voor klanten waarvoor Shortclips de content plaatst: bij klanten
       // die zelf posten is inplannen/publiceren niet onze taak.
-      .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, ["approved", "ready_to_publish"] as VideoStage[]), eq(clients.weHandlePosting, true), scopeToClients(viewer, deliverables.clientId)))
+      .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, ["approved", "ready_to_publish"] as VideoStage[]), eq(clients.weHandlePosting, true), scopeToClients(viewer, deliverables.clientId), notInactiveClient(deliverables.clientId)))
       .limit(40),
     // #12 Video niet gepubliceerd: geplande publicatiedatum verstreken, nog niet live.
     db.select({
@@ -198,7 +199,7 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
       deliverableId: contentCalendar.deliverableId, clientName: clients.name, clientSlug: clients.slug,
     }).from(contentCalendar)
       .innerJoin(clients, eq(clients.id, contentCalendar.clientId))
-      .where(and(isNull(contentCalendar.deletedAt), lt(contentCalendar.scheduledOn, today), ne(contentCalendar.status, "published"), eq(clients.weHandlePosting, true), scopeToClients(viewer, contentCalendar.clientId)))
+      .where(and(isNull(contentCalendar.deletedAt), lt(contentCalendar.scheduledOn, today), ne(contentCalendar.status, "published"), eq(clients.weHandlePosting, true), scopeToClients(viewer, contentCalendar.clientId), notInactiveClient(contentCalendar.clientId)))
       .limit(40),
     // Owner-only bronnen.
     owner ? countOpenLinkSuggestions() : Promise.resolve(0),

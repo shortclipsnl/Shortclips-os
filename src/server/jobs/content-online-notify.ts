@@ -6,6 +6,7 @@ import { env } from "@/lib/env";
 import { PLATFORM } from "@/lib/statuses";
 import { emailConfigured, portalEmailHtml, sendEmail } from "@/server/email";
 import { runJob } from "./runner";
+import { notInactiveClient } from "@/server/client-activity";
 
 /**
  * De dag ná publicatie krijgt de klant per e-mail bericht dat zijn video online
@@ -36,6 +37,7 @@ export async function runContentOnlineNotifications() {
         eq(contentCalendar.scheduledOn, yesterday),
         isNull(contentCalendar.onlineNotifiedAt),
         isNull(contentCalendar.deletedAt),
+        notInactiveClient(contentCalendar.clientId),
       ));
 
     const portalUrl = `${(env.APP_URL || "").replace(/\/$/, "")}/portal/content`;

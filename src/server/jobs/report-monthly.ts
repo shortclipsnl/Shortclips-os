@@ -1,4 +1,5 @@
 import "server-only";
+import { notInactiveClient } from "@/server/client-activity";
 import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientReports, clients } from "@/db/schema";
@@ -93,6 +94,7 @@ export async function requeueOutdatedReports(period: string): Promise<number> {
       isNull(clientReports.deletedAt),
       inArray(clientReports.status, ["klaar_voor_controle", "aanpassing_nodig"]),
       sql`coalesce((${clientReports.analysis}->>'versie')::int, 0) < ${ANALYSE_VERSIE}`,
+      notInactiveClient(clientReports.clientId),
     ))
     .returning({ id: clientReports.id });
   return rows.length;
@@ -115,7 +117,10 @@ export async function runReportQueue(): Promise<{ queued: number; processed: num
       eq(clientReports.periodType, "month"),
       isNull(clientReports.deletedAt),
       or(
-        eq(clientReports.status, "gegevens_verzamelen"),
+        // Centrale klantstatus: geen nieuwe rapportages voor een niet actieve klant.
+        // Een handmatig gestarte generatie die vastliep (analyse_bezig) wordt wel
+        // afgemaakt, zodat administratieve afronding mogelijk blijft.
+        and(eq(clientReports.status, "gegevens_verzamelen"), notInactiveClient(clientReports.clientId)),
         and(eq(clientReports.status, "analyse_bezig"), or(isNull(clientReports.startedAt), lt(clientReports.startedAt, staleBefore))),
       ),
     ))

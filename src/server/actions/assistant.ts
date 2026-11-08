@@ -1,5 +1,6 @@
 "use server";
 
+import { clientIsActive } from "@/server/client-activity";
 import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, dailyMetrics, notifications } from "@/db/schema";
@@ -271,7 +272,7 @@ async function hResultaten(viewer: Viewer): Promise<AssistantAnswer> {
     })
     .from(dailyMetrics)
     .innerJoin(clients, eq(clients.id, dailyMetrics.clientId))
-    .where(and(isNull(clients.deletedAt), eq(clients.status, "active"), gte(dailyMetrics.measuredOn, sql`current_date - interval '30 days'`), scopeToClients(viewer, clients.id)))
+    .where(and(isNull(clients.deletedAt), clientIsActive(), gte(dailyMetrics.measuredOn, sql`current_date - interval '30 days'`), scopeToClients(viewer, clients.id)))
     .groupBy(clients.id, clients.name, clients.slug)
     .orderBy(desc(sql`coalesce(sum(${dailyMetrics.views}), 0)`))
     .limit(6);

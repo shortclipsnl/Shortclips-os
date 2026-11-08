@@ -3,6 +3,7 @@ import { and, isNull, lt, notInArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { contentCalendar } from "@/db/schema";
 import { runJob } from "./runner";
+import { notInactiveClient } from "@/server/client-activity";
 
 /**
  * Zet publicaties waarvan de geplande datum voorbij is automatisch op
@@ -22,6 +23,8 @@ export async function runAutoPublishDueContent() {
           isNull(contentCalendar.deletedAt),
           lt(contentCalendar.scheduledOn, today),
           notInArray(contentCalendar.status, ["published", "failed"]),
+          // Centrale klantstatus: geen automatische statuswijzigingen bij niet actieve klanten.
+          notInactiveClient(contentCalendar.clientId),
         ),
       )
       .returning({ id: contentCalendar.id });

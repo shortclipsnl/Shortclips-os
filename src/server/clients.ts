@@ -1,4 +1,5 @@
 import "server-only";
+import { clientIsActive } from "@/server/client-activity";
 import { notFound } from "next/navigation";
 import {
   and,
@@ -435,7 +436,7 @@ export async function activeClientsMissingCoordinator(): Promise<{ count: number
   const rows = await db
     .select({ name: clients.name })
     .from(clients)
-    .where(and(eq(clients.status, "active"), isNull(clients.deletedAt), isNull(clients.coordinatorId)))
+    .where(and(clientIsActive(), isNull(clients.deletedAt), isNull(clients.coordinatorId)))
     .orderBy(asc(clients.name));
   return { count: rows.length, names: rows.map((r) => r.name) };
 }

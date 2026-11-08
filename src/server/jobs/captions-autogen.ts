@@ -3,6 +3,7 @@ import { and, eq, gte, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { captionSets, productionDays, scriptReviews } from "@/db/schema";
 import { ensureCaptionsForShoot } from "@/server/captions/run";
+import { notInactiveClient } from "@/server/client-activity";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const STALE_RUNNING_MIN = 10;
@@ -38,7 +39,7 @@ export async function runCaptionsAutoGenerate(): Promise<{
     .from(productionDays)
     .innerJoin(scriptReviews, and(eq(scriptReviews.productionDayId, productionDays.id), isNull(scriptReviews.deletedAt)))
     .leftJoin(captionSets, and(eq(captionSets.productionDayId, productionDays.id), isNull(captionSets.deletedAt)))
-    .where(and(isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled"), gte(productionDays.scheduledOn, today())))
+    .where(and(isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled"), gte(productionDays.scheduledOn, today()), notInactiveClient(productionDays.clientId)))
     .limit(500);
 
   const candidates = rows.filter((r) => {

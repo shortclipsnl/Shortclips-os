@@ -1,4 +1,5 @@
 import "server-only";
+import { notInactiveClient } from "@/server/client-activity";
 import { randomBytes } from "node:crypto";
 import { and, eq, isNull, notInArray } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -78,6 +79,8 @@ async function editorFeedRows(userId: string): Promise<FeedRow[]> {
         eq(deliverables.editorId, userId),
         isNull(deliverables.deletedAt),
         notInArray(deliverables.status, [...DONE_STATUSES]),
+        // Centrale klantstatus: geen deadlines in de agenda voor niet actieve klanten.
+        notInactiveClient(deliverables.clientId),
       ),
     );
   return rows as FeedRow[];

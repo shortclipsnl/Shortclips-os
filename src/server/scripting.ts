@@ -1,4 +1,6 @@
 import "server-only";
+import { clientIsActive, clientsStatusWhere } from "@/server/client-activity";
+import type { ClientStatusFilter } from "@/lib/client-status";
 import { and, asc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
@@ -87,7 +89,7 @@ export type ClientResponsible = {
   responsibleAvatar: string | null;
 };
 
-export async function listScripting(viewer: Viewer, opts: { trusted?: boolean } = {}) {
+export async function listScripting(viewer: Viewer, opts: { trusted?: boolean; klanten?: ClientStatusFilter } = {}) {
   // `trusted`: aangeroepen vanuit een geplande taak met een al opgebouwde Viewer
   // (zie viewerForUser) — dan is er geen request/sessie om te controleren.
   if (!opts.trusted) await requireInternal();
@@ -126,6 +128,8 @@ export async function listScripting(viewer: Viewer, opts: { trusted?: boolean } 
         ne(productionDays.status, "cancelled"),
         gte(productionDays.scheduledOn, today),
         scopeToClients(viewer, productionDays.clientId),
+        // Centrale klantstatus: standaard alleen actieve klanten.
+        clientsStatusWhere(opts.klanten ?? "actief"),
       ),
     )
     .orderBy(asc(productionDays.scheduledOn));
@@ -268,7 +272,7 @@ export async function listScripting(viewer: Viewer, opts: { trusted?: boolean } 
       })
       .from(clients)
       .leftJoin(coord, eq(coord.id, clients.coordinatorId))
-      .where(and(isNull(clients.deletedAt), eq(clients.status, "active"), scopeToClients(viewer, clients.id)))
+      .where(and(isNull(clients.deletedAt), clientIsActive(), scopeToClients(viewer, clients.id)))
       .orderBy(asc(clients.name))
   ).map((c) => ({ ...c }));
 

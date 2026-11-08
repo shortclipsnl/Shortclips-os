@@ -11,9 +11,9 @@ import type { MonthlyAnalysis, VideoAnalyse } from "./analysis";
 export type ReportStatus =
   | "gegevens_verzamelen" | "analyse_bezig" | "klaar_voor_controle" | "aanpassing_nodig" | "goedgekeurd" | "gepubliceerd" | "mislukt";
 
-/** Klantstatussen die als "actief" tellen; de rest (paused, churned, prospect) is inactief. */
-export const ACTIVE_CLIENT_STATUSES = ["active", "onboarding"] as const;
-export const isActiveClientStatus = (s: string) => (ACTIVE_CLIENT_STATUSES as readonly string[]).includes(s);
+/** Klantstatussen die als "actief" tellen: één centrale definitie (zie @/lib/client-status). */
+export { ACTIVE_CLIENT_STATUSES, isActiveClientStatus } from "@/lib/client-status";
+import { isActiveClientStatus } from "@/lib/client-status";
 
 /** Statussen waarin een rapport intern is goedgekeurd (en dus door het team gelezen mag worden). */
 export const APPROVED_STATUSES: ReportStatus[] = ["goedgekeurd", "gepubliceerd"];

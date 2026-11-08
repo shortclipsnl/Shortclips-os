@@ -1,4 +1,6 @@
 import "server-only";
+import { clientColumnStatusFilter } from "@/server/client-activity";
+import type { ClientStatusFilter } from "@/lib/client-status";
 import { notFound } from "next/navigation";
 import {
   and,
@@ -35,10 +37,16 @@ export type VideoFilter = {
   clientSlug?: string;
   editorId?: string;
   preset?: "te-laat" | "bij-klant" | "mijn-werk" | "actief";
+  /** Klantstatus (centraal); standaard alleen actieve klanten. */
+  klanten?: ClientStatusFilter;
 };
 
 export async function listVideos(viewer: Viewer, filter: VideoFilter = {}) {
-  const conditions = [isNull(deliverables.deletedAt), scopeToClients(viewer, deliverables.clientId)];
+  const conditions = [
+    isNull(deliverables.deletedAt),
+    scopeToClients(viewer, deliverables.clientId),
+    clientColumnStatusFilter(deliverables.clientId, filter.klanten ?? "actief"),
+  ];
 
   // Een editor ziet uitsluitend eigen toegewezen video's — ook binnen een klant
   // waar hij verder wel toegang toe heeft.

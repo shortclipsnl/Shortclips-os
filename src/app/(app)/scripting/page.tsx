@@ -9,13 +9,15 @@ import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
 import { Card, CardHeader, ClientLogo, GuidelineNote, PageHeader, TeamAvatar } from "@/components/ui";
 import { IntegrationNotice } from "@/components/integration-notice";
 import { ScriptingBoard } from "./scripting-ui";
+import { ClientStatusTabs } from "@/components/client-status-tabs";
+import { parseClientStatusFilter } from "@/lib/client-status";
 
 export const metadata: Metadata = { title: "Scripting" };
 export const dynamic = "force-dynamic";
 // De batch-generator (6 concepten) doet meerdere AI-aanroepen; ruim de tijd geven.
 export const maxDuration = 300;
 
-export default async function ScriptingPage({ searchParams }: { searchParams: Promise<{ filter?: string; status?: string; sessie?: string }> }) {
+export default async function ScriptingPage({ searchParams }: { searchParams: Promise<{ filter?: string; status?: string; sessie?: string; klanten?: string }> }) {
   const viewer = await requireInternal();
   // Scripting leest dezelfde opnames (production_days) als de opnameplanning, dus
   // ook hier de Google Agenda op de achtergrond verversen als 'ie >20 min oud is.
@@ -24,7 +26,9 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
   await syncScriptingTasksIfStale();
   const canWrite = viewer.permissions.has("scripts:write");
   const canUseGenerator = viewer.permissions.has("ai:read");
-  const { rows, clientOptions, writerOptions, clientResponsibles } = await listScripting(viewer);
+  // Centrale klantstatus: standaard alleen actieve klanten, met filter.
+  const klantenFilter = parseClientStatusFilter((await searchParams).klanten);
+  const { rows, clientOptions, writerOptions, clientResponsibles } = await listScripting(viewer, { klanten: klantenFilter });
   const scriptAppts = await upcomingScriptAppointments();
   // Scriptverantwoordelijke per klant (slug → naam/foto), om bij elke script
   // meeting automatisch te tonen wie die doet.
@@ -48,6 +52,9 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
           </Link>
         ) : undefined}
       />
+      <div className="mb-4">
+        <ClientStatusTabs basePath="/scripting" current={klantenFilter} />
+      </div>
 
       {/* Duidelijke melding als de Drive-koppeling (bron van de script-PDF's)
           niet beschikbaar is — zodat "geen scripts" niet voor verwarring zorgt. */}

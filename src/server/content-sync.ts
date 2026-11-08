@@ -1,4 +1,5 @@
 import "server-only";
+import { notInactiveClient } from "@/server/client-activity";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { contentCalendar, deliverables, socialAccounts } from "@/db/schema";
@@ -117,7 +118,8 @@ export async function reconcileContentFromVideos(): Promise<{ created: number; u
   const rows = await db
     .select({ id: deliverables.id })
     .from(deliverables)
-    .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, [...PUBLISHABLE])));
+    // Centrale klantstatus: geen nieuwe planningsitems voor niet actieve klanten.
+    .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, [...PUBLISHABLE]), notInactiveClient(deliverables.clientId)));
 
   let created = 0;
   let updated = 0;

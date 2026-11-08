@@ -1,7 +1,8 @@
 "use server";
 
+import { clientIsActive } from "@/server/client-activity";
 import { revalidatePath } from "next/cache";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients } from "@/db/schema";
 import {
@@ -23,7 +24,7 @@ export async function refreshInsights(clientId?: string): Promise<ActionResult> 
       : await db
           .select({ id: clients.id })
           .from(clients)
-          .where(and(isNull(clients.deletedAt), eq(clients.status, "active")));
+          .where(and(isNull(clients.deletedAt), clientIsActive()));
 
     let total = 0;
     for (const target of targets) {

@@ -1,4 +1,6 @@
 import "server-only";
+import { clientColumnStatusFilter } from "@/server/client-activity";
+import type { ClientStatusFilter } from "@/lib/client-status";
 import { and, desc, eq, gte, isNull, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, deliverables, users } from "@/db/schema";
@@ -64,7 +66,7 @@ export async function getEditingDashboard(_viewer: Viewer) {
       from clients c
       left join deliverables d on d.client_id = c.id and d.deleted_at is null
       left join users u on u.id = d.editor_id
-      where c.deleted_at is null and c.status = 'active'
+      where c.deleted_at is null and c.status in ('active','onboarding')
       group by c.id, c.slug, c.name, c.color, c.logo_url, c.monthly_video_quota, c.edit_cost_per_video, c.editor_name
       order by in_production desc, name
     `),
@@ -111,10 +113,12 @@ const DONE_STATUSES = ["approved", "ready_to_publish", "scheduled", "published",
 
 /** Alle video's die relevant zijn voor de editingproductie, per status gebucket.
  *  Gescoped: editors zien uitsluitend eigen werk; coördinatoren hun klanten. */
-export async function listEditingProjects(viewer: Viewer): Promise<EditingProject[]> {
+export async function listEditingProjects(viewer: Viewer, opts: { klanten?: ClientStatusFilter } = {}): Promise<EditingProject[]> {
   const conds = [
     isNull(deliverables.deletedAt),
     scopeToClients(viewer, deliverables.clientId),
+    // Centrale klantstatus: standaard alleen actieve klanten.
+    clientColumnStatusFilter(deliverables.clientId, opts.klanten ?? "actief"),
     // Actief, óf recent afgerond (laatste 30 dagen) zodat de "Afgerond"-kolom gevuld is.
     or(
       notInArray(deliverables.status, ["published", "analysis_available"] as const),

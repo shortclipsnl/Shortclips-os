@@ -1,4 +1,5 @@
 import "server-only";
+import { clientIsActive } from "@/server/client-activity";
 import { and, asc, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
@@ -70,7 +71,7 @@ export async function getEmergencySnapshot(): Promise<EmergencySnapshot> {
       .from(clients)
       .leftJoin(coord, eq(coord.id, clients.coordinatorId))
       .leftJoin(vid, eq(vid.id, clients.videographerId))
-      .where(and(isNull(clients.deletedAt), eq(clients.status, "active")))
+      .where(and(isNull(clients.deletedAt), clientIsActive()))
       .orderBy(asc(clients.name)),
     db
       .select({

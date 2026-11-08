@@ -37,7 +37,7 @@ export async function runMonthlyInsightTasks() {
     const rows = await db.execute(sql`
       select c.id, c.slug, c.name
       from clients c
-      where c.deleted_at is null and c.status = 'active'
+      where c.deleted_at is null and c.status in ('active','onboarding')
         and exists (
           select 1 from daily_metrics dm
           where dm.client_id = c.id and dm.measured_on >= current_date - interval '45 days'

@@ -12,6 +12,7 @@ import {
   users,
 } from "@/db/schema";
 import { notify } from "./notifications";
+import { isClientInactive } from "./client-activity";
 import { sendEmail } from "./email";
 import { env } from "@/lib/env";
 import {
@@ -55,6 +56,12 @@ function conditionsMatch(
 
 /** Voert alle regels uit die bij deze gebeurtenis passen. */
 export async function dispatch(event: AutomationEvent): Promise<void> {
+  // Tijdgestuurde regels (dagelijkse/uurlijkse controles) draaien niet voor een
+  // niet actieve klant. Gebeurtenissen die een mens of de klant zelf veroorzaakt
+  // (video goedgekeurd, status gewijzigd) lopen wel door, zodat lopend werk
+  // handmatig kan worden afgerond; taken en meldingen worden daarbinnen alsnog
+  // centraal tegengehouden.
+  if (event.trigger.startsWith("schedule.") && (await isClientInactive(event.clientId))) return;
   const rules = await db
     .select()
     .from(automationRules)
@@ -125,6 +132,8 @@ async function runAction(action: Action, event: AutomationEvent, ruleKey?: strin
     }
 
     case "create_task": {
+      // Centrale klantstatus: geen nieuwe automatische taken voor een niet actieve klant.
+      if (await isClientInactive(event.clientId)) return { skipped: "klant niet actief" };
       // Dedupe-sleutel: regel + entiteit + periode. Bestaat er al een OPEN
       // automatische taak met deze sleutel, dan niets aanmaken (geen dubbels,
       // ook niet bij meerdere runs op dezelfde dag of gelijktijdig).

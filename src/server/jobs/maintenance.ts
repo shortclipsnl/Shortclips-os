@@ -27,6 +27,7 @@ import { isClientFeedbackOverdue } from "@/lib/client-feedback";
 import { deadlineMisses } from "@/db/schema";
 import { runJob } from "./runner";
 import { runScriptingTaskSync } from "@/server/scripting-tasks";
+import { isClientInactive, notInactiveClient } from "@/server/client-activity";
 
 const day = (offset: number) => {
   const d = new Date();
@@ -429,6 +430,7 @@ export async function runEditorDeadlineReminders() {
           isNull(deliverables.deletedAt),
           inArray(deliverables.status, [...firstVersionStages]),
           sql`${deliverables.editorId} is not null`,
+          notInactiveClient(deliverables.clientId),
         ),
       );
 
@@ -496,6 +498,7 @@ export async function runTaskDeadlineReminders() {
           isNull(tasks.deletedAt),
           inArray(tasks.status, ["todo", "in_progress", "blocked"]),
           lte(tasks.dueOn, soon),
+          notInactiveClient(tasks.clientId),
         ),
       )
       .groupBy(tasks.assigneeId);
@@ -894,7 +897,7 @@ export async function runClientsWithoutShootSignal() {
         (select count(*) from deliverables d where d.client_id = c.id and d.deleted_at is null
            and d.status in ('approved','ready_to_publish','scheduled'))::int voorraad
       from clients c
-      where c.deleted_at is null and c.status = 'active'
+      where c.deleted_at is null and c.status in ('active','onboarding')
         and not exists (
           select 1 from production_days pd
           where pd.client_id = c.id and pd.deleted_at is null
@@ -946,7 +949,7 @@ export async function runContentGapSignal() {
     const res = await db.execute(sql`
       select c.id, c.name, c.slug, c.coordinator_id
       from clients c
-      where c.deleted_at is null and c.status = 'active'
+      where c.deleted_at is null and c.status in ('active','onboarding')
         and c.we_handle_posting = true
         and not exists (
           select 1 from content_calendar cc
@@ -1027,7 +1030,7 @@ export async function runEditorEscalations() {
       .from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
       .leftJoin(users, eq(users.id, deliverables.editorId))
-      .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, [...FV_STAGES]), sql`${deliverables.editorId} is not null`));
+      .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, [...FV_STAGES]), sql`${deliverables.editorId} is not null`, notInactiveClient(deliverables.clientId)));
 
     type Item = { label: string; daysLate: number };
     const byCoord = new Map<string, Item[]>();
@@ -1217,6 +1220,8 @@ async function ensureTask(input: {
   entityId: string;
   dedupeKey: string;
 }): Promise<boolean> {
+  // Centrale klantstatus: geen nieuwe automatische taken voor een niet actieve klant.
+  if (await isClientInactive(input.clientId)) return false;
   const existing = await db
     .select({ id: tasks.id })
     .from(tasks)
@@ -1305,6 +1310,7 @@ export async function runPostShootReminder() {
           isNull(productionDays.deletedAt),
           ne(productionDays.status, "cancelled"),
           eq(productionDays.scheduledOn, yesterday),
+          notInactiveClient(productionDays.clientId),
         ),
       );
 

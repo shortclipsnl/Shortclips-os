@@ -127,7 +127,7 @@ export function ReportList({
 
   const [maand, setMaand] = useState(initial.maand && (/^\d{4}-\d{2}$/.test(initial.maand) || initial.maand === "alle") ? initial.maand : vorigeMaand);
   const [jaar, setJaar] = useState("alle");
-  const [klantStatus, setKlantStatus] = useState(initial.klantstatus === "actief" || initial.klantstatus === "inactief" ? initial.klantstatus : "alle");
+  const [klantStatus, setKlantStatus] = useState(initial.klantstatus === "alle" || initial.klantstatus === "inactief" ? initial.klantstatus : "actief");
   // ?klant=<id> (oude links) wordt een zoekopdracht op de klantnaam.
   const [zoek, setZoek] = useState(initial.zoek ?? clients.find((c) => c.id === initial.klant)?.name ?? "");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
@@ -310,7 +310,7 @@ export function ReportList({
         <div>
           {label("Klanten")}
           <div className="flex gap-1">
-            {(["alle", "actief", "inactief"] as const).map((k) => (
+            {(["actief", "inactief", "alle"] as const).map((k) => (
               <button key={k} type="button" className={pill(klantStatus === k)} onClick={() => setKlantStatus(k)}>
                 {k === "alle" ? "Alle" : k === "actief" ? "Actief" : "Niet actief"}
               </button>

@@ -1,3 +1,4 @@
+import { sweepInactiveClients } from "@/server/client-status-transition";
 import { syncFrameLibrary } from "./frameio-library";
 import "server-only";
 import { runProductionPhaseAdvance } from "./production-phases";
@@ -74,6 +75,9 @@ export async function runNightlySync() {
   // Portaaltoegang gelijktrekken met de samenwerkingsstatussen (gestopte klanten
   // dicht, actieve weer open).
   results.push(await step("portal.enforce_access", () => enforcePortalAccess()));
+  // Centrale klantstatus: vangnet dat open automatische taken en rapporten in de
+  // wachtrij van niet actieve klanten opruimt (idempotent).
+  results.push(await step("clients.status_sweep", () => sweepInactiveClients()));
   results.push(await step("production.advance_phases", () => runProductionPhaseAdvance()));
   results.push(await step("editing.suggest_opname_links", () => runLinkSuggestions()));
   results.push(await step("content.sync_from_videos", () => runContentSync()));

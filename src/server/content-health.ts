@@ -105,7 +105,7 @@ export async function getContentHealth(trusted = false): Promise<HealthOverview>
              u.full_name as "coordinatorName"
       from clients c
       left join users u on u.id = c.coordinator_id
-      where c.deleted_at is null and c.status = 'active'
+      where c.deleted_at is null and c.status in ('active','onboarding')
       order by c.name
     `),
     // Geplande publicaties in de komende 8 weken (contentplanning).

@@ -45,6 +45,7 @@ import { linkMetricoolBrands, pullMetricoolMetrics, pullMetricoolPosts, runMetri
 import { runShootReconciliation } from "@/server/jobs/shoot-reconciliation";
 import { setTeamContact } from "@/server/jobs/team";
 import { enforcePortalAccess, portalAccessReport } from "@/server/jobs/portal-access";
+import { sweepInactiveClients } from "@/server/client-status-transition";
 import { seedAiKnowledge } from "@/server/jobs/ai-seed";
 import { seedAutomationRules } from "@/server/jobs/automations-seed";
 import { runProductionPhaseAdvance } from "@/server/jobs/production-phases";
@@ -120,6 +121,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "sync.nightly": runNightlySync,
   "pilot.setup_logins": () => runPilotPortalSetup(),
   "portal.enforce_access": enforcePortalAccess,
+  "clients.status_sweep": sweepInactiveClients,
   "portal.coverage": portalAccessReport,
   "portal.notify_clients": runClientNotifications,
   "ai.seed_knowledge": seedAiKnowledge,

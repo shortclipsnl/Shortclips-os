@@ -15,6 +15,8 @@ import { EditorBoardTable } from "./editor-board-table";
 import { AutofillEditorsButton } from "./autofill-editors";
 import { KlantberichtButton } from "./klantbericht-button";
 import { getKlantbericht } from "@/server/klantbericht";
+import { ClientStatusTabs } from "@/components/client-status-tabs";
+import { parseClientStatusFilter } from "@/lib/client-status";
 
 export const metadata: Metadata = { title: "Editing" };
 export const dynamic = "force-dynamic";
@@ -93,16 +95,19 @@ export default async function VideosPage({
   // zodat het editing-board niet dubbel/driedubbel volloopt. Draait ná de response.
   await mergeDuplicateShootsIfStale();
 
+  // Centrale klantstatus: standaard alleen actieve klanten, met filter.
+  const klantenFilter = parseClientStatusFilter(params.klanten);
   const [rows, highlights, editors, editingProjects, clientList] = await Promise.all([
     listVideos(viewer, {
       preset,
       status: params.status,
       clientSlug: params.klant,
       editorId: params.editor,
+      klanten: klantenFilter,
     }),
     getVideoHighlights(viewer),
     listEditorOptions(),
-    listEditingProjects(viewer),
+    listEditingProjects(viewer, { klanten: klantenFilter }),
     listClients(viewer),
   ]);
   const canEdit = viewer.permissions.has("videos:write");
@@ -121,7 +126,10 @@ export default async function VideosPage({
   const showAllBoard = owner || isCoreStaff(viewer.email);
   // Alle editing-opdrachten (video's) over alle editors — het volledige beeld,
   // gegroepeerd per fase met de editor erbij.
-  const allEditorVideos = showAllBoard ? await listEditorBoard(viewer, { allEditors: true }) : [];
+  const allEditorVideos = showAllBoard
+    ? (await listEditorBoard(viewer, { allEditors: true })).filter((v) =>
+        klantenFilter === "alle" ? true : klantenFilter === "actief" ? v.clientActive : !v.clientActive)
+    : [];
   // "Kopieer klantbericht": zichtbaar zodra er eerste versies klaarstaan om naar de
   // klant te sturen (fase Interne review of Feedback klant).
   const readyForClient = allEditorVideos.some((v) => v.phase === "interne_controle" || v.phase === "bij_klant");
@@ -133,6 +141,9 @@ export default async function VideosPage({
         title="Editing"
         description={`${editingProjects.length} projecten · ${rows.length} video's in productie`}
       />
+      <div className="mb-4">
+        <ClientStatusTabs basePath="/videos" current={klantenFilter} params={{ filter: params.filter, status: params.status, klant: params.klant, editor: params.editor, weergave: params.weergave }} />
+      </div>
 
       {showAllBoard ? (
         <section className="mb-6">

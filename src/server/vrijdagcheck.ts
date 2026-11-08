@@ -66,7 +66,7 @@ export async function getVrijdagcheck(): Promise<{ weekLabel: string; checks: Vr
   const pubGap = rows<{ name: string }>(
     await db.execute(sql`
       select c.name from clients c
-      where c.deleted_at is null and c.status = 'active'
+      where c.deleted_at is null and c.status in ('active','onboarding')
         and not exists (select 1 from content_calendar cc
           where cc.client_id = c.id and cc.deleted_at is null and cc.status <> 'failed'
             and cc.scheduled_on between ${monI} and ${sunI})

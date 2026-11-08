@@ -1,4 +1,5 @@
 import "server-only";
+import { clientIsActive } from "@/server/client-activity";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientReports, clients } from "@/db/schema";
@@ -25,7 +26,7 @@ export async function runMonthlyReportDrafts() {
     const active = await db
       .select({ id: clients.id, slug: clients.slug })
       .from(clients)
-      .where(and(eq(clients.status, "active"), isNull(clients.deletedAt)));
+      .where(and(clientIsActive(), isNull(clients.deletedAt)));
     ctx.log(`${active.length} actieve klanten · periode ${period}`);
 
     for (const c of active) {

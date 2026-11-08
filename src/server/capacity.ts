@@ -1,4 +1,5 @@
 import "server-only";
+import { clientIsActive } from "@/server/client-activity";
 import { and, between, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { capacityParams, capacityPeople, clients, deliverables, productionDays, users } from "@/db/schema";
@@ -138,7 +139,7 @@ export async function getCapacityOverview(): Promise<{
       const cs = await db
         .select({ quota: clients.monthlyVideoQuota, complexity: clients.complexity })
         .from(clients)
-        .where(and(eq(clients.coordinatorId, row.userId), eq(clients.status, "active"), isNull(clients.deletedAt)));
+        .where(and(eq(clients.coordinatorId, row.userId), clientIsActive(), isNull(clients.deletedAt)));
       const uShort = param("cc_u_short", 0.5) + param("cc_u_post", 0.1667);
       const uOpname = param("cc_u_opname", 2);
       const uVast = param("cc_u_vast", 2);
@@ -188,11 +189,11 @@ export async function getCapacityOverview(): Promise<{
   const [{ c: activeClients }] = await db
     .select({ c: sql<number>`count(*)` })
     .from(clients)
-    .where(and(eq(clients.status, "active"), isNull(clients.deletedAt)));
+    .where(and(clientIsActive(), isNull(clients.deletedAt)));
   const [{ s: monthlyShortsRaw }] = await db
     .select({ s: sql<number>`coalesce(sum(${clients.monthlyVideoQuota}),0)` })
     .from(clients)
-    .where(and(eq(clients.status, "active"), isNull(clients.deletedAt)));
+    .where(and(clientIsActive(), isNull(clients.deletedAt)));
   const monthlyShorts = Number(monthlyShortsRaw ?? 0);
   const activeEditors = peopleRows.filter((p) => (p.role ?? "").toLowerCase().includes("editor")).length;
   const editChainCapacity = param("edit_keten", 0) || null;

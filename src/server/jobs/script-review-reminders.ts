@@ -10,6 +10,7 @@ import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { env } from "@/lib/env";
 import { runJob } from "./runner";
+import { notInactiveClient } from "@/server/client-activity";
 
 const appUrl = env.APP_URL.replace(/\/$/, "");
 
@@ -57,6 +58,7 @@ export async function runScriptReviewReminders() {
       .where(and(
         isNull(scriptReviews.deletedAt),
         inArray(scriptReviews.status, ["klaar_controle", "opnieuw_controle"]),
+        notInactiveClient(scriptReviews.clientId),
       ));
     // Herinneren zodra de deadline (al in werkdagen gezet) morgen of eerder is,
     // of, zonder deadline, als de feedbacktermijn in WERKDAGEN verstreken is.

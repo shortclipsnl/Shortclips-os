@@ -1,6 +1,7 @@
 "use server";
 
 import { editorIdsByKey, propagateClientEditor } from "@/server/editing/integrity";
+import { applyClientStatusTransition } from "@/server/client-status-transition";
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -582,7 +583,10 @@ export async function updateClient(slug: string, input: ClientInput): Promise<Ac
     });
 
     // Statuswijziging kan portaaltoegang raken (gestopt → dicht, actief → open).
-    if (status !== existing.status) await enforcePortalAccess();
+    if (status !== existing.status) {
+      await applyClientStatusTransition(existing.id, existing.status, status);
+      await enforcePortalAccess();
+    }
 
     revalidatePath("/clients");
     revalidatePath(`/clients/${slug}`);
@@ -599,7 +603,7 @@ export async function setClientStatus(slug: string, status: ClientStatus): Promi
     const viewer = await requirePermission("clients:write");
     if (!CLIENT_STATUSES.includes(status)) return { ok: false, message: "Onbekende status." };
     const [existing] = await db
-      .select({ id: clients.id, name: clients.name, managedFields: clients.managedFields })
+      .select({ id: clients.id, name: clients.name, managedFields: clients.managedFields, status: clients.status })
       .from(clients)
       .where(and(eq(clients.slug, slug), isNull(clients.deletedAt)))
       .limit(1);
@@ -632,9 +636,12 @@ export async function setClientStatus(slug: string, status: ClientStatus): Promi
       actor: { id: viewer.id, fullName: viewer.fullName },
     });
 
+    // Centrale klantstatus: lopende automatische processen stoppen of hervatten.
+    await applyClientStatusTransition(existing.id, existing.status, status);
     await enforcePortalAccess();
     revalidatePath("/clients");
     revalidatePath(`/clients/${slug}`);
+    revalidatePath("/tasks");
     return { ok: true, slug };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };

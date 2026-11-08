@@ -1,4 +1,6 @@
 import "server-only";
+import { clientColumnStatusFilter } from "@/server/client-activity";
+import type { ClientStatusFilter } from "@/lib/client-status";
 import { and, between, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, productionDays, users } from "@/db/schema";
@@ -51,7 +53,7 @@ export type EditingProject = {
  */
 export async function listEditingProjects(
   viewer: Viewer,
-  opts: { editorId?: string; clientId?: string } = {},
+  opts: { editorId?: string; clientId?: string; klanten?: ClientStatusFilter } = {},
 ): Promise<EditingProject[]> {
   const holidays = nlHolidaySet();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
@@ -70,6 +72,10 @@ export async function listEditingProjects(
   // Optioneel beperken tot één klant (bijv. de klantpagina), zodat die exact
   // dezelfde editing-deadlines toont als het board.
   if (opts.clientId) conds.push(eq(productionDays.clientId, opts.clientId));
+  // Centrale klantstatus: standaard alleen actieve klanten (op de klantpagina zelf
+  // altijd alles van die klant, zodat de historie zichtbaar blijft).
+  const statusCond = clientColumnStatusFilter(productionDays.clientId, opts.klanten ?? (opts.clientId ? "alle" : "actief"));
+  if (statusCond) conds.push(statusCond);
 
   const rows = await db
     .select({

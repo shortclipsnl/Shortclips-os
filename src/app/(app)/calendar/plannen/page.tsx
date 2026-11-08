@@ -1,6 +1,7 @@
+import { clientIsActive } from "@/server/client-activity";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
@@ -16,7 +17,7 @@ export default async function AutoPlanPage() {
   const rows = await db
     .select({ id: clients.id, name: clients.name, quota: clients.monthlyVideoQuota })
     .from(clients)
-    .where(and(isNull(clients.deletedAt), eq(clients.status, "active")))
+    .where(and(isNull(clients.deletedAt), clientIsActive()))
     .orderBy(asc(clients.name));
   // Publicatieritme per week afgeleid uit het maandelijkse shorts-quotum (±4,33 weken/maand).
   const activeClients = rows.map((c) => ({

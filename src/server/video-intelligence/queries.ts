@@ -1,4 +1,5 @@
 import "server-only";
+import { clientIsActive } from "@/server/client-activity";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -166,7 +167,7 @@ export async function getSteps(viewer: Viewer, id: string) {
 export async function assignableClients(viewer: Viewer) {
   const scope = viewer.clientScope;
   const where = scope === null
-    ? and(eq(clients.status, "active"), isNull(clients.deletedAt))
+    ? and(clientIsActive(), isNull(clients.deletedAt))
     : scope.length === 0
       ? and(eq(clients.id, "00000000-0000-0000-0000-000000000000"))
       : and(inArray(clients.id, scope), isNull(clients.deletedAt));
