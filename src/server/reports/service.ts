@@ -2,11 +2,13 @@ import "server-only";
 import { and, asc, desc, eq, inArray, isNull, like, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientReports, clients, monthlyReportFeedback, monthlyReportReads, monthlyReportVersions, tasks, users } from "@/db/schema";
-import { assertClientAccess, ForbiddenError, requireInternal, scopeToClients, type Viewer } from "@/server/auth/context";
+import { assertClientAccess, ForbiddenError, isOwner as isOwnerViewer, requireInternal, scopeToClients, type Viewer } from "@/server/auth/context";
 import { periodLabel } from "./analysis";
 import { checkReportQuality, type Beoordeling, type QualityIssue } from "./quality";
 import { duplicateIssue, findDuplicateMetricClients, monthVideos, platformSplit, thumbnailsFor, type MaandCijfers, type MonthVideo, type Vergelijking } from "./metrics";
 import type { MonthlyAnalysis, VideoAnalyse } from "./analysis";
+import { controllersFor, listBatches, type BatchInfo } from "./batch";
+import { controleFase, type ControleFase } from "@/lib/maandcontrole";
 
 export type ReportStatus =
   | "gegevens_verzamelen" | "analyse_bezig" | "klaar_voor_controle" | "aanpassing_nodig" | "goedgekeurd" | "gepubliceerd" | "mislukt";
@@ -76,6 +78,10 @@ export type ReportRow = {
   hasAnalysis: boolean;
   /** Aantal verplichte controlepunten dat nog open staat (blokkeert goedkeuren). */
   openChecks: number;
+  /** Wie deze rapportage controleert (projectmanager, anders operationeel manager). */
+  controllerId: string | null;
+  /** Stap in de maandcontrole (null = wordt gegenereerd of mislukt). */
+  fase: ControleFase | null;
 };
 
 export type TeamReadStat = { userId: string; name: string; assigned: number; read: number; openReportIds: string[] };
@@ -87,6 +93,8 @@ export type ReportOverview = {
   periods: string[];
   team: Record<string, TeamReadStat[]>;
   teamOnly: boolean;
+  /** Maandtaken (controle) per maand en medewerker: eigenaar ziet alles, anderen de eigen. */
+  batches: BatchInfo[];
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -167,6 +175,12 @@ export async function listMonthlyReports(viewer: Viewer): Promise<ReportOverview
     acts.set(t.entityId, cur);
   }
 
+  const [controllers, batches] = await Promise.all([
+    controllersFor(rows.map((r) => ({ id: r.id, pmId: r.pmId }))),
+    listBatches(viewer.id, true),
+  ]);
+  const batchBy = new Map(batches.map((b) => [`${b.period}|${b.userId}`, b]));
+
   const reports: ReportRow[] = rows.map((r) => {
     const m = (r.metrics ?? {}) as { posts?: number; views?: number };
     const a = (r.analysis ?? {}) as Partial<MonthlyAnalysis>;
@@ -217,6 +231,19 @@ export async function listMonthlyReports(viewer: Viewer): Promise<ReportOverview
         metrics: m,
         ontbrekendeGegevens: Array.isArray(r.ontbrekendeGegevens) ? (r.ontbrekendeGegevens as string[]) : [],
       }).filter((i) => i.severity === "blok").length,
+      controllerId: controllers.get(r.id) ?? null,
+      fase: null,
+    };
+  }).map((row) => {
+    const b = (rows.find((x) => x.id === row.id)?.beoordeling ?? {}) as Beoordeling;
+    const gestart = Boolean((b.positief ?? "").trim() || (b.verbeteren ?? "").trim() || (b.volgendeMaand ?? "").trim() || (b.klanttekst ?? "").trim()) || row.feedbackOpen > 0;
+    const batch = row.controllerId ? batchBy.get(`${row.period}|${row.controllerId}`) : undefined;
+    return {
+      ...row,
+      fase: controleFase({
+        status: row.status, beoordeeld: row.beoordeeld, gestart, openChecks: row.openChecks,
+        batch: batch ? { exists: true, planned: Boolean(batch.dueOn) } : { exists: false, planned: false },
+      }),
     };
   });
 
@@ -253,6 +280,7 @@ export async function listMonthlyReports(viewer: Viewer): Promise<ReportOverview
     periods,
     team,
     teamOnly,
+    batches: isOwnerViewer(viewer) ? batches : batches.filter((b) => b.userId === viewer.id),
   };
 }
 

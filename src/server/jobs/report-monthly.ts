@@ -6,6 +6,7 @@ import { clientReports, clients } from "@/db/schema";
 import { addWorkingDays, snapToWorkingDay } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { ensureMonthlyReport } from "@/server/reports/run";
+import { syncReportBatches } from "@/server/reports/batch";
 import { ANALYSE_VERSIE, currentMonthPeriod, periodLabel, previousMonthPeriod } from "@/server/reports/analysis";
 
 /** Na zoveel minuten geldt een analyse die nog 'bezig' is als vastgelopen. */
@@ -155,5 +156,8 @@ export async function runReportQueue(): Promise<{ queued: number; processed: num
       failed++;
     }
   }
+  // Maandtaken bijwerken (ook als de laatste generatie mislukte), zodat de
+  // melding "staan klaar" komt zodra alles voor iemand gegenereerd is.
+  if (processed > 0 || failed > 0) await syncReportBatches().catch(() => undefined);
   return { queued: queue.length, processed, ok, failed };
 }

@@ -17,6 +17,8 @@ import { duplicateIssue, findDuplicateMetricClients } from "@/server/reports/met
 import { currentMonthPeriod, previousMonthPeriod, periodLabel } from "@/server/reports/analysis";
 import { checkReportQuality, canApprove, type Beoordeling } from "@/server/reports/quality";
 import { saveStrategyProfile } from "@/server/reports/strategy";
+import { syncReportBatches } from "@/server/reports/batch";
+import { parseBatchKey } from "@/lib/maandcontrole";
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -106,6 +108,7 @@ export async function saveReportBeoordeling(reportId: string, beoordeling: Beoor
     };
     await db.update(clientReports).set({ beoordeling: clean as unknown as Record<string, unknown>, reviewedById: viewer.id, updatedAt: new Date() }).where(eq(clientReports.id, reportId));
     revalidatePath(`/analytics/maandrapportages/${reportId}`);
+    after(() => syncReportBatches().catch(() => undefined));
     return { ok: true };
   });
 }
@@ -190,6 +193,7 @@ export async function approveMonthlyReport(reportId: string): Promise<ActionResu
     // klantportaal als een medewerker de publicatie expliciet bevestigt.
     revalidatePath(`/analytics/maandrapportages/${reportId}`);
     revalidatePath("/analytics/maandrapportages");
+    after(() => syncReportBatches().catch(() => undefined));
     return { ok: true };
   });
 }
@@ -224,6 +228,7 @@ export async function requestReportChanges(reportId: string, feedback?: string, 
     }
     revalidatePath(`/analytics/maandrapportages/${reportId}`);
     revalidatePath("/analytics/maandrapportages");
+    after(() => syncReportBatches().catch(() => undefined));
     return { ok: true };
   });
 }
@@ -400,5 +405,25 @@ export async function createReportActionTask(input: { reportId: string; key: str
     revalidatePath(`/analytics/maandrapportages/${input.reportId}`);
     revalidatePath("/analytics/maandrapportages");
     return { ok: true, taskId: created!.id };
+  });
+}
+
+/**
+ * Controledag van de maandtaak wijzigen (of leegmaken). Alleen de medewerker
+ * van de taak zelf of de eigenaar. Een leeg gemaakte dag levert na een werkdag
+ * één herinnering op; een verlopen dag staat als 'te laat' in de planning.
+ */
+export async function setReportControleDag(taskId: string, dueOn: string | null): Promise<ActionResult> {
+  return guard(async () => {
+    const viewer = await requireInternal();
+    if (!isUuid(taskId)) return { ok: false, message: "Taak niet gevonden." };
+    if (dueOn !== null && !/^\d{4}-\d{2}-\d{2}$/.test(dueOn)) return { ok: false, message: "Ongeldige datum." };
+    const [t] = await db.select({ id: tasks.id, assigneeId: tasks.assigneeId, dedupeKey: tasks.dedupeKey }).from(tasks).where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt))).limit(1);
+    if (!t || !parseBatchKey(t.dedupeKey)) return { ok: false, message: "Taak niet gevonden." };
+    if (t.assigneeId !== viewer.id && !isOwner(viewer)) return { ok: false, message: "Alleen de verantwoordelijke kan de controledag wijzigen." };
+    await db.update(tasks).set({ dueOn, updatedAt: new Date() }).where(eq(tasks.id, taskId));
+    revalidatePath("/analytics/maandrapportages");
+    revalidatePath("/tasks");
+    return { ok: true };
   });
 }

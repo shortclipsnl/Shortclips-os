@@ -1,9 +1,9 @@
 import "server-only";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientReports, clients, monthlyReportFeedback, monthlyReportVersions, tasks, users } from "@/db/schema";
-import { notify } from "@/server/notifications";
+import { clientReports, clients, monthlyReportFeedback, monthlyReportVersions } from "@/db/schema";
 import { recordActivity } from "@/server/audit";
+import { syncReportBatches } from "./batch";
 import { generateMonthlyAnalysis, periodLabel, previousMonthPeriod, type MonthlyAnalysis } from "./analysis";
 
 const STALE_RUNNING_MIN = 15;
@@ -115,52 +115,9 @@ export async function ensureMonthlyReport(
     }
   }
 
-  // Eigenaar (controleur) één keer per maand laten weten dat er rapporten wachten.
-  const owners = await db.select({ id: users.id }).from(users).where(and(eq(users.primaryRole, "owner"), eq(users.status, "active"), isNull(users.deletedAt)));
-  if (owners.length) {
-    await notify({
-      userIds: owners.map((o) => o.id),
-      level: "info",
-      type: "report_review",
-      title: `Maandrapportages ${periodLabel(period)} wachten op controle`,
-      body: `Er staan maandrapportages over ${periodLabel(period)} klaar die je kunt controleren en goedkeuren.`,
-      href: `/analytics/maandrapportages?maand=${period}&status=wacht`,
-      dedupeKey: `report_review_owner:${period}`,
-    }).catch(() => undefined);
-  }
-
-  // PM notificeren + controletaak (één open taak per rapport).
-  const coordinatorId = client.coordinatorId;
-  await notify({
-    roles: ["project_coordinator", "operational_manager"],
-    userIds: coordinatorId ? [coordinatorId] : undefined,
-    clientId,
-    level: "info",
-    type: "report_review",
-    title: "Maandrapportage klaar voor controle",
-    body: `De AI-maandanalyse voor ${client.name} (${periodLabel(period)}) staat klaar voor controle.`,
-    href: `/analytics/maandrapportages/${reportId}`,
-    entityType: "client_report",
-    entityId: reportId,
-    dedupeKey: `report_review:${reportId}`,
-  }).catch(() => undefined);
-
-  if (coordinatorId) {
-    await db
-      .insert(tasks)
-      .values({
-        clientId,
-        title: `Maandrapport controleren — ${client.name} (${periodLabel(period)})`,
-        category: "overig",
-        assigneeId: coordinatorId,
-        entityType: "client_report",
-        entityId: reportId,
-        source: "automation",
-        dedupeKey: `report_review:${reportId}`,
-      })
-      .onConflictDoNothing()
-      .catch(() => undefined);
-  }
+  // Maandcontrole: één taak en één melding per controleur per maand (geen
+  // losse melding of taak per klant meer). Idempotent.
+  await syncReportBatches().catch(() => undefined);
 
   await recordActivity({ clientId, type: "report.generated", title: `Maandrapportage ${periodLabel(period)} klaar voor controle`, isClientVisible: false }).catch(() => undefined);
 

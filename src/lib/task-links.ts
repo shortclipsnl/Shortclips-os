@@ -1,3 +1,4 @@
+import { batchHref, parseBatchKey } from "@/lib/maandcontrole";
 import { dayIdFromKey, scriptingTaskHref, SCRIPTING_TASK_PREFIX } from "@/lib/scripting-task-plan";
 
 /**
@@ -15,5 +16,8 @@ export function taskHref(t: { entityType: string | null; entityId: string | null
   if (t.entityType === "client_report" && t.entityId && t.dedupeKey?.startsWith("report_action:")) {
     return `/analytics/maandrapportages/${t.entityId}`;
   }
+  // Maandcontrole (één taak per maand) → pagina Maandrapportages, die maand.
+  const batch = parseBatchKey(t.dedupeKey);
+  if (t.entityType === "report_batch" && batch) return batchHref(batch.period);
   return null;
 }
