@@ -549,6 +549,20 @@ export async function getPortalMonthlyReports(viewer: Viewer): Promise<Array<{ i
   });
 }
 
+/**
+ * Eén gepubliceerd maandrapport voor de klantportaal-inline-weergave. Hard
+ * gescoopt: alleen een rapport van de eigen klant én met status "gepubliceerd".
+ * Geeft dezelfde data als de PDF (de pagina toont nooit interne velden).
+ */
+export async function getPortalReportDetail(viewer: Viewer, reportId: string): Promise<ReportPdfData | null> {
+  if (!viewer.clientScope || viewer.clientScope.length === 0) return null;
+  const data = await loadReportPdfData(reportId);
+  if (!data) return null;
+  if (data.clientId !== viewer.clientScope[0]) return null;
+  if (data.status !== "gepubliceerd") return null;
+  return data;
+}
+
 /** Interne team-medewerkers die rapporten mogen lezen (voor toewijzing en taken). */
 export async function listReportTeam(): Promise<Array<{ id: string; name: string; role: string }>> {
   const res = await db.execute(sql`
