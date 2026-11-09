@@ -57,6 +57,24 @@ function unwrap<T>(payload: Page<T>): T[] {
   return Array.isArray(payload) ? payload : (payload.data ?? []);
 }
 
+/** app_settings-sleutel met het laatst door Adobe uitgegeven refresh-token. */
+export const FRAMEIO_REFRESH_KEY = "frameio.refresh_token";
+
+async function loadStoredRefreshToken(): Promise<string | null> {
+  try {
+    const { getStringSetting } = await import("@/server/app-settings");
+    const v = await getStringSetting(FRAMEIO_REFRESH_KEY, "");
+    return v || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function storeRefreshToken(token: string): Promise<void> {
+  const { setStringSetting } = await import("@/server/app-settings");
+  await setStringSetting(FRAMEIO_REFRESH_KEY, token, { category: "integrations", description: "Frame.io refresh-token (wordt automatisch vernieuwd)." });
+}
+
 export class FrameService {
   private accessToken: string | null = null;
   private expiresAt = 0;
@@ -97,12 +115,15 @@ export class FrameService {
       return this.accessToken;
     }
 
-    const body = this.refreshToken
+    // Adobe vervangt het refresh-token regelmatig (geldig 14 dagen). Het laatst
+    // ontvangen token staat in app_settings; de env-waarde is alleen de start.
+    const refreshToken = (await loadStoredRefreshToken()) ?? this.refreshToken;
+    const body = refreshToken
       ? new URLSearchParams({
           grant_type: "refresh_token",
           client_id: this.clientId,
           client_secret: this.clientSecret,
-          refresh_token: this.refreshToken,
+          refresh_token: refreshToken,
         })
       : new URLSearchParams({
           grant_type: "client_credentials",
@@ -119,7 +140,7 @@ export class FrameService {
     });
     if (!response.ok) {
       const bodyText = await response.text().catch(() => "");
-      const expired = this.refreshToken && (response.status === 400 || response.status === 401);
+      const expired = refreshToken && (response.status === 400 || response.status === 401);
       throw new IntegrationError(
         "frameio",
         `Adobe IMS gaf HTTP ${response.status} bij het ophalen van een Frame.io-access-token${expired ? " — het FRAMEIO_REFRESH_TOKEN is waarschijnlijk verlopen" : ""}.${bodyText ? ` ${bodyText.slice(0, 200)}` : ""}`,
@@ -127,7 +148,11 @@ export class FrameService {
         response.status >= 500,
       );
     }
-    const data = (await response.json()) as { access_token: string; expires_in: number };
+    const data = (await response.json()) as { access_token: string; expires_in: number; refresh_token?: string };
+    // Nieuw refresh-token direct bewaren; anders verloopt de koppeling na 14 dagen.
+    if (data.refresh_token && data.refresh_token !== refreshToken) {
+      await storeRefreshToken(data.refresh_token).catch(() => undefined);
+    }
     this.accessToken = data.access_token;
     this.expiresAt = Date.now() + data.expires_in * 1000;
     return this.accessToken;
