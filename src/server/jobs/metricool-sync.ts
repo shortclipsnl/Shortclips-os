@@ -425,3 +425,12 @@ export async function runMetricoolSync(triggeredById?: string, source: Source & 
   const posts = await pullMetricoolPosts(triggeredById, source);
   return { ok: link.ok && metrics.ok && posts.ok, link, metrics, posts };
 }
+
+/**
+ * Dagelijkse, lichte postsync (laatste 45 dagen) als eigen cron, los van de
+ * nachtelijke keten: die liep na eerdere stappen tegen de time-out aan,
+ * waardoor Metricool vanaf 5 nov 2026 niet meer werd bijgewerkt.
+ */
+export async function pullMetricoolPostsRecent() {
+  return pullMetricoolPosts(undefined, metricool, 45);
+}

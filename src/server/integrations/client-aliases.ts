@@ -21,6 +21,7 @@ export const CLIENT_ALIASES: Record<string, string[]> = {
   // Metricool-merknamen die afwijken van de klantnaam.
   "bedrijfskleding-online": ["bedrijfskledingonline.nl", "bedrijfskledingonline"],
   nahv: ["nahv belastingadviseurs"],
+  ai2: ["ai2.nl"],
   "hoekstra-transport": ["hoekstrasneek", "hoekstra sneek"],
 };
 

@@ -43,7 +43,7 @@ import { runEditorStatusChecks } from "@/server/editor-status-checks";
 import { processDriveChanges, reconcileDriveFolders, runDriveSync } from "@/server/jobs/drive-sync";
 import { runDriveHealthCheck } from "@/server/integrations/drive-status";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
-import { linkMetricoolBrands, pullMetricoolMetrics, pullMetricoolPosts, runMetricoolSync } from "@/server/jobs/metricool-sync";
+import { linkMetricoolBrands, pullMetricoolMetrics, pullMetricoolPosts, pullMetricoolPostsRecent, runMetricoolSync } from "@/server/jobs/metricool-sync";
 import { runShootReconciliation } from "@/server/jobs/shoot-reconciliation";
 import { setTeamContact } from "@/server/jobs/team";
 import { enforcePortalAccess, portalAccessReport } from "@/server/jobs/portal-access";
@@ -121,6 +121,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "metricool.link_brands": linkMetricoolBrands,
   "metricool.pull_metrics": pullMetricoolMetrics,
   "metricool.pull_posts": pullMetricoolPosts,
+  "metricool.pull_posts_recent": pullMetricoolPostsRecent,
   "metricool.sync": runMetricoolSync,
   "sync.frequent": runFrequentSync,
   "sync.nightly": runNightlySync,
