@@ -100,7 +100,7 @@ export function ColleagueToggle({ defaultOpen = false, children }: { defaultOpen
         className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-2 text-sm font-medium hover:bg-[var(--color-surface-2)]"
       >
         <Users className="size-4 text-[var(--color-ink-muted)]" />
-        Taken van collega&apos;s
+        {open ? "Verberg taken van collega's" : "Bekijk taken van collega's"}
         <ChevronDown className={cn("size-4 text-[var(--color-ink-faint)] transition-transform", open && "rotate-180")} />
       </button>
       {open ? <div className="mt-3">{children}</div> : null}
