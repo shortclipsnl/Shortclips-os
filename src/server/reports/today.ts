@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, gte, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientReports, clients } from "@/db/schema";
+import { clientReports, clients, monthlyReportReads } from "@/db/schema";
 import { isOwner, type Viewer } from "@/server/auth/context";
 import { periodLabel } from "./analysis";
 import { checkReportQuality, type Beoordeling } from "./quality";
@@ -83,4 +83,27 @@ export function reportWorkText(s: ReportWorkSummary): { title: string; detail: s
     title: `Maandrapportages: ${parts.join(", ")}`,
     detail: s.period ? `Vanaf ${periodLabel(s.period)}. Alles staat op de pagina Maandrapportages.` : "Alles staat op de pagina Maandrapportages.",
   };
+}
+
+/**
+ * Voor teamleden die maandrapportages alleen doornemen (geen controlerecht):
+ * hoeveel goedgekeurde rapportages er nog door hen gelezen moeten worden.
+ */
+export async function reportReadSummary(person: Viewer): Promise<{ open: number; period: string | null } | null> {
+  if (person.isPortalUser || person.permissions.has("reports:read") || !person.permissions.has("reports:team_read")) return null;
+  const rows = await db
+    .select({ period: clientReports.period })
+    .from(monthlyReportReads)
+    .innerJoin(clientReports, eq(clientReports.id, monthlyReportReads.reportId))
+    .innerJoin(clients, eq(clients.id, clientReports.clientId))
+    .where(and(
+      eq(monthlyReportReads.userId, person.id),
+      isNull(monthlyReportReads.readAt),
+      inArray(clientReports.status, ["goedgekeurd", "gepubliceerd"]),
+      isNull(clientReports.deletedAt),
+      isNull(clients.deletedAt),
+    ));
+  if (!rows.length) return null;
+  const period = rows.map((r) => r.period).sort().at(-1) ?? null;
+  return { open: rows.length, period };
 }

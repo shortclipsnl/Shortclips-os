@@ -182,4 +182,14 @@ describe("maandtaak en meldingen", () => {
     const rows = await db.select({ status: s.clientReports.status, isPublished: s.clientReports.isPublished }).from(s.clientReports);
     expect(rows.every((r) => r.status !== "gepubliceerd" && !r.isPublished)).toBe(true);
   });
+
+  it("vaste lezer (bv. Head of Content) neemt elke goedgekeurde rapportage door", async () => {
+    const { readersForReport, EXTRA_READERS_KEY } = await import("@/server/reports/team");
+    const { setStringSetting } = await import("@/server/app-settings");
+    const before = await readersForReport(ids.r_c!);
+    expect(before.some((r) => r.userId === ids.jiska)).toBe(false);
+    await setStringSetting(EXTRA_READERS_KEY, ids.jiska!);
+    const after = await readersForReport(ids.r_c!);
+    expect(after.find((r) => r.userId === ids.jiska)?.reason).toBe("vaste lezer");
+  });
 });

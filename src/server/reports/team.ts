@@ -3,12 +3,21 @@ import { and, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientReports, clients, monthlyReportReads, scripts } from "@/db/schema";
 import { notify } from "@/server/notifications";
+import { getStringSetting } from "@/server/app-settings";
 import { periodLabel } from "./analysis";
 import { shiftPeriod } from "./metrics";
 import { APPROVED_STATUSES, listReportTeam } from "./service";
 
 /** Na hoeveel dagen zonder doornemen een herinnering volgt (en daarna opnieuw). */
 export const REMINDER_AFTER_DAYS = 3;
+
+/** Instelling met vaste lezers van alle maandrapportages (komma-gescheiden user-id's). */
+export const EXTRA_READERS_KEY = "reports.extra_readers";
+
+async function extraReaders(): Promise<string[]> {
+  const raw = await getStringSetting(EXTRA_READERS_KEY, "").catch(() => "");
+  return raw.split(",").map((x) => x.trim()).filter(Boolean);
+}
 
 /**
  * Bepaalt wie een goedgekeurd rapport moet doornemen: de projectmanager
@@ -43,6 +52,10 @@ export async function readersForReport(reportId: string): Promise<Array<{ userId
     .from(scripts)
     .where(and(eq(scripts.clientId, r.clientId), isNull(scripts.deletedAt), isNotNull(scripts.creatorId), gte(scripts.updatedAt, from)));
   for (const w of writers) add(w.id, "scriptschrijver");
+
+  // Vaste lezers (bv. Head of Content): nemen elke goedgekeurde rapportage door,
+  // los van welke klant. Ingesteld in app_settings "reports.extra_readers".
+  for (const id of await extraReaders()) add(id, "vaste lezer");
 
   if (out.size === 0) {
     const owner = team.find((t) => t.role === "owner");

@@ -11,7 +11,7 @@ import { taskHref } from "@/lib/task-links";
 import { nlHolidaySet } from "@/lib/holidays";
 import { addWorkingDays, subWorkingDays } from "@/lib/workdays";
 import { TEAM_WORKDAY } from "@/lib/werkdag";
-import { reportWorkSummary, reportWorkText } from "@/server/reports/today";
+import { reportReadSummary, reportWorkSummary, reportWorkText } from "@/server/reports/today";
 import { BATCH_PREFIX } from "@/lib/maandcontrole";
 
 /**
@@ -229,6 +229,18 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
       taskId: null, source: "signaal", flag: rep.mislukt ? `${rep.mislukt} mislukt` : null, status: "open",
       // Mislukt of klaar om te publiceren: niet laten wegzakken onder ander werk.
       urgent: now,
+    });
+  }
+
+  // 1c) Doornemen (teamleden zonder controlerecht, bv. Head of Content): één item.
+  const lees = await reportReadSummary(person).catch(() => null);
+  if (lees) {
+    items.push({
+      key: "maandrapportages-lezen", category: "publicatie",
+      title: `Maandrapportages doornemen: ${lees.open} ${lees.open === 1 ? "rapportage" : "rapportages"}`,
+      detail: "Neem de inzichten door voor scripts, opnames en montage en markeer ze als doorgenomen.",
+      clientName: null, href: `/analytics/maandrapportages?${lees.period ? `maand=${lees.period}&` : ""}weergave=te-lezen`,
+      due: null, state: "week", daysLate: 0, taskId: null, source: "signaal", flag: null, status: "open", urgent: false,
     });
   }
 
