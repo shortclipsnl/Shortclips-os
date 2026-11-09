@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Copy, Loader2, Pencil, X } from "lucide-react";
+import { Check, Copy, Eye, Loader2, RotateCcw, Save, X } from "lucide-react";
 import { updateKlantbericht } from "@/server/actions/klantbericht";
+
+const LINK_PLACEHOLDER = "[Voeg videolink toe]";
 
 /** Tekst naar het klembord, met terugval voor oudere browsers / niet-beveiligde context. */
 async function copyText(text: string): Promise<boolean> {
@@ -30,60 +32,91 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
+/** Kort "Bericht gekopieerd" tonen na het kopiëren. */
+function useCopyFeedback() {
+  const [state, setState] = useState<"ok" | "fout" | null>(null);
+  async function copy(text: string) {
+    const ok = await copyText(text);
+    setState(ok ? "ok" : "fout");
+    setTimeout(() => setState(null), 2200);
+    return ok;
+  }
+  return { state, copy };
+}
+
 /**
- * "Kopieer klantbericht": kopieert het vaste bericht voor de eerste versies, zodat
- * het team het direct in WhatsApp (of een ander kanaal) kan plakken. De videolink
- * voegt de medewerker zelf toe. Beheerders kunnen de tekst centraal aanpassen.
+ * Opleveringsbericht voor de eerste versies van de video's.
+ * - "Kopieer opleveringsbericht": kopieert direct het standaardbericht.
+ * - "Bekijk en pas aan": opent het bericht; de medewerker kan het voor deze klant
+ *   aanpassen (bijv. meteen de videolink invullen) en dan kopiëren. Die aanpassing
+ *   geldt alleen voor dit ene bericht.
+ * - Beheerders kunnen in hetzelfde venster de standaardtekst voor iedereen opslaan.
  */
 export function KlantberichtButton({ text, canManage }: { text: string; canManage: boolean }) {
-  const [current, setCurrent] = useState(text);
-  const [copied, setCopied] = useState<"ok" | "fout" | null>(null);
-  const [editing, setEditing] = useState(false);
-
-  async function onCopy() {
-    const ok = await copyText(current);
-    setCopied(ok ? "ok" : "fout");
-    setTimeout(() => setCopied(null), 2200);
-  }
+  const [standard, setStandard] = useState(text);
+  const [open, setOpen] = useState(false);
+  const { state, copy } = useCopyFeedback();
 
   return (
     <div className="flex items-center gap-1.5">
       <button
         type="button"
-        onClick={onCopy}
-        title="Kopieer het standaardbericht voor de eerste versies. Voeg daarna zelf de juiste videolink toe."
+        onClick={() => copy(standard)}
+        title="Kopieer het standaard opleveringsbericht voor de eerste versies. Voeg daarna zelf de juiste videolink toe."
         className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-indigo-ink)] shadow-sm hover:bg-white/90"
       >
-        {copied === "ok" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-        {copied === "ok" ? "Bericht gekopieerd" : copied === "fout" ? "Kopiëren mislukt" : "Kopieer klantbericht"}
+        {state === "ok" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+        {state === "ok" ? "Bericht gekopieerd" : state === "fout" ? "Kopiëren mislukt" : "Kopieer opleveringsbericht"}
       </button>
-      {canManage ? (
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          title="Standaard klantbericht aanpassen (geldt direct voor iedereen)"
-          aria-label="Standaard klantbericht aanpassen"
-          className="grid size-7 place-items-center rounded-[var(--radius-sm)] border border-white/30 bg-white/10 text-white hover:bg-white/20"
-        >
-          <Pencil className="size-3.5" />
-        </button>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="Bekijk het opleveringsbericht en pas het aan voordat je het kopieert"
+        className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-white/30 bg-white/10 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-white/20"
+      >
+        <Eye className="size-3.5" /> Bekijk en pas aan
+      </button>
+      {open ? (
+        <MessageDialog
+          standard={standard}
+          canManage={canManage}
+          onClose={() => setOpen(false)}
+          onStandardSaved={setStandard}
+        />
       ) : null}
-      {editing ? <EditDialog initial={current} onClose={() => setEditing(false)} onSaved={(t) => { setCurrent(t); setEditing(false); }} /> : null}
     </div>
   );
 }
 
-function EditDialog({ initial, onClose, onSaved }: { initial: string; onClose: () => void; onSaved: (text: string) => void }) {
-  const [val, setVal] = useState(initial);
-  const [error, setError] = useState<string | null>(null);
+function MessageDialog({
+  standard,
+  canManage,
+  onClose,
+  onStandardSaved,
+}: {
+  standard: string;
+  canManage: boolean;
+  onClose: () => void;
+  onStandardSaved: (text: string) => void;
+}) {
+  const [val, setVal] = useState(standard);
+  const [notice, setNotice] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
   const [pending, start] = useTransition();
+  const { state, copy } = useCopyFeedback();
+  const changed = val !== standard;
+  const linkMissing = val.includes(LINK_PLACEHOLDER);
 
-  const save = (reset = false) =>
+  const saveStandard = (reset = false) =>
     start(async () => {
-      setError(null);
+      setNotice(null);
       const r = await updateKlantbericht(val, { reset });
-      if (r.ok) onSaved(r.text);
-      else setError(r.message);
+      if (r.ok) {
+        onStandardSaved(r.text);
+        setVal(r.text);
+        setNotice({ tone: "ok", text: reset ? "Standaardtekst hersteld voor iedereen." : "Opgeslagen als standaard voor iedereen." });
+      } else {
+        setNotice({ tone: "bad", text: r.message });
+      }
     });
 
   return (
@@ -91,40 +124,78 @@ function EditDialog({ initial, onClose, onSaved }: { initial: string; onClose: (
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Standaard klantbericht aanpassen"
-        className="w-full max-w-xl rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-raised)]"
+        aria-label="Opleveringsbericht"
+        className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-raised)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-1 flex items-start justify-between gap-3">
-          <h3 className="text-base font-bold">Standaard klantbericht</h3>
+          <h3 className="text-base font-bold">Opleveringsbericht eerste versies</h3>
           <button type="button" onClick={onClose} aria-label="Sluiten" className="text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]">
             <X className="size-4" />
           </button>
         </div>
-        <p className="mb-3 text-xs text-[var(--color-ink-muted)]">
-          Wijzigingen gelden direct voor alle medewerkers. Witregels en opsommingstekens worden precies zo gekopieerd.
+        <p className="mb-3 text-xs leading-relaxed text-[var(--color-ink-muted)]">
+          Pas het bericht gerust aan voor deze klant en vul de videolink in. Je aanpassing geldt alleen voor dit bericht; de standaardtekst blijft hetzelfde.
         </p>
+
         <textarea
           value={val}
           onChange={(e) => setVal(e.target.value)}
-          rows={16}
-          className="sc-input w-full resize-y py-2 font-mono text-xs leading-relaxed"
+          rows={18}
+          aria-label="Tekst van het opleveringsbericht"
+          className="sc-input min-h-[260px] w-full flex-1 resize-y py-2.5 text-sm leading-relaxed"
         />
-        {error ? <p className="mt-2 text-xs font-medium text-[var(--color-bad)]">{error}</p> : null}
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <button type="button" disabled={pending} onClick={() => save(true)} className="text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] disabled:opacity-50">
-            Standaardtekst herstellen
-          </button>
+
+        {linkMissing ? (
+          <p className="mt-2 text-xs font-medium text-[var(--color-warn)]">Let op: de videolink is nog niet ingevuld. Vervang {LINK_PLACEHOLDER} of voeg de link na het plakken toe.</p>
+        ) : null}
+        {notice ? (
+          <p className={`mt-2 text-xs font-medium ${notice.tone === "ok" ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}`}>{notice.text}</p>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            {changed ? (
+              <button type="button" onClick={() => setVal(standard)} className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+                <RotateCcw className="size-3.5" /> Terug naar standaardtekst
+              </button>
+            ) : null}
+          </div>
           <div className="flex gap-2">
             <button type="button" onClick={onClose} className="rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 py-1.5 text-xs font-medium">
-              Annuleren
+              Sluiten
             </button>
-            <button type="button" disabled={pending || !val.trim()} onClick={() => save(false)}
-              className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-indigo-soft)] disabled:opacity-50">
-              {pending ? <Loader2 className="size-3.5 animate-spin" /> : null} Opslaan
+            <button
+              type="button"
+              disabled={!val.trim()}
+              onClick={() => copy(val)}
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-indigo-soft)] disabled:opacity-50"
+            >
+              {state === "ok" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              {state === "ok" ? "Bericht gekopieerd" : state === "fout" ? "Kopiëren mislukt" : "Kopieer bericht"}
             </button>
           </div>
         </div>
+
+        {/* Alleen beheerders: de standaardtekst voor het hele team wijzigen. */}
+        {canManage ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-line)] pt-3">
+            <span className="text-2xs text-[var(--color-ink-faint)]">Beheer: standaardtekst voor alle medewerkers</span>
+            <div className="flex items-center gap-3">
+              <button type="button" disabled={pending} onClick={() => saveStandard(true)} className="text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] disabled:opacity-50">
+                Standaardtekst herstellen
+              </button>
+              <button
+                type="button"
+                disabled={pending || !changed || !val.trim()}
+                onClick={() => saveStandard(false)}
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2.5 py-1 text-xs font-semibold disabled:opacity-40"
+              >
+                {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />} Opslaan als standaard
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
