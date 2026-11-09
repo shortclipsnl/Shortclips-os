@@ -2,7 +2,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { appSettings } from "@/db/schema";
-import { normaliseer, standaardConfig, type Categorie, type Config } from "@/lib/verantwoordelijkheden/data";
+import { MEDEWERKERS, normaliseer, standaardConfig, type Categorie, type Config } from "@/lib/verantwoordelijkheden/data";
 import type { WorkOverview } from "@/server/werkoverzicht";
 
 /**
@@ -12,10 +12,29 @@ import type { WorkOverview } from "@/server/werkoverzicht";
  */
 export const SETTING_KEY = "team.verantwoordelijkheden";
 
+/**
+ * Vult het voorstel aan voor elk teamlid dat nog géén verantwoordelijkheden in
+ * de opgeslagen config heeft (bijv. nieuw toegevoegde medewerkers). Bestaande
+ * bewerkingen van Jarno blijven ongemoeid — er wordt alleen toegevoegd voor wie
+ * nog niets heeft.
+ */
+function vulAanVoorNieuweLeden(config: Config): Config {
+  const heeft = new Set(config.verantwoordelijkheden.map((v) => v.persoon));
+  const ontbreekt = new Set<string>(MEDEWERKERS.map((m) => m.email).filter((e) => !heeft.has(e)));
+  if (ontbreekt.size === 0) return config;
+  const voorstel = standaardConfig();
+  return {
+    ...config,
+    verantwoordelijkheden: [...config.verantwoordelijkheden, ...voorstel.verantwoordelijkheden.filter((v) => ontbreekt.has(v.persoon))],
+    beslissingen: [...config.beslissingen, ...voorstel.beslissingen.filter((x) => ontbreekt.has(x.persoon))],
+    controles: [...config.controles, ...voorstel.controles.filter((x) => ontbreekt.has(x.persoon))],
+  };
+}
+
 export async function getVerantwoordelijkheden(): Promise<Config> {
   try {
     const [row] = await db.select({ value: appSettings.value }).from(appSettings).where(eq(appSettings.key, SETTING_KEY)).limit(1);
-    return row ? normaliseer(row.value) : standaardConfig();
+    return vulAanVoorNieuweLeden(row ? normaliseer(row.value) : standaardConfig());
   } catch {
     return standaardConfig();
   }
