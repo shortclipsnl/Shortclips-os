@@ -77,7 +77,8 @@ export function verifyHighlights(candidates: unknown, guideText: string): GuideH
     out.push({
       categorie: categorie || "Richtlijn",
       tekst,
-      niet: Boolean((c as { niet?: unknown }).niet),
+      // "Geen logo over het beeld" is zelf al een verbod: geen dubbel "Niet:".
+      niet: Boolean((c as { niet?: unknown }).niet) && !/^(geen|nooit|niet|verboden|vermijd)\b/i.test(tekst),
       kritiek: Boolean((c as { kritiek?: unknown }).kritiek),
     });
     if (out.length >= MAX_HIGHLIGHTS) break;

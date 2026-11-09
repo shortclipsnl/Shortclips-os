@@ -156,6 +156,7 @@ export async function matchDriveScriptsForShoots(shoots: ShootForMatch[]): Promi
         status: shootScriptSources.status,
         confirmedAt: shootScriptSources.confirmedAt,
         fileExternalId: shootScriptSources.fileExternalId,
+        fileName: shootScriptSources.fileName,
       })
       .from(shootScriptSources)
       .where(inArray(shootScriptSources.productionDayId, shoots.map((s) => s.productionDayId))),
@@ -166,7 +167,10 @@ export async function matchDriveScriptsForShoots(shoots: ShootForMatch[]): Promi
   for (const shoot of shoots) {
     const prior = existingByDay.get(shoot.productionDayId);
     // Menselijke beslissing respecteren: bevestigde koppeling of afwijzing laten staan.
-    if (prior && (prior.confirmedAt || prior.status === "afgewezen")) {
+    // Uitzondering: een koppeling aan een macOS-restbestand ("._naam.pdf") is nooit
+    // bedoeld en bevat geen script; die wordt altijd opnieuw bepaald.
+    const priorIsJunk = Boolean(prior?.fileName?.startsWith("._"));
+    if (prior && !priorIsJunk && (prior.confirmedAt || prior.status === "afgewezen")) {
       outcomes.push({ productionDayId: shoot.productionDayId, linked: prior.status === "gekoppeld" ? 1 : 0, suggested: prior.status === "suggestie" ? 1 : 0 });
       continue;
     }

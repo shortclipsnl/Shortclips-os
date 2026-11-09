@@ -52,8 +52,9 @@ async function buildHighlights(clientName: string, assetId: string): Promise<{ h
   try {
     const text = await pdfPlainText(await assetBytes(assetId));
     if (!text.trim()) return { highlights: [], error: "De Editing Guide bevat geen leesbare tekst." };
-    const res = await runJsonPrompt<{ highlights?: unknown }>({ system: HIGHLIGHT_SYSTEM, user: highlightUserPrompt(clientName, text), maxTokens: 1500 });
-    if (!res.ok) return { highlights: [], error: res.reason === "no_provider" ? "AI is niet ingesteld." : "AI tijdelijk niet beschikbaar; volgende ronde opnieuw." };
+    // Ruim tokenbudget: het model denkt eerst na; te weinig ruimte geeft een afgekapt (ongeldig) antwoord.
+    const res = await runJsonPrompt<{ highlights?: unknown }>({ system: HIGHLIGHT_SYSTEM, user: highlightUserPrompt(clientName, text), maxTokens: 8000 });
+    if (!res.ok) return { highlights: [], error: res.reason === "no_provider" ? "AI is niet ingesteld." : `AI niet gelukt (${(res.error ?? "onbekend").slice(0, 160)}); volgende ronde opnieuw.` };
     const highlights = verifyHighlights(res.data?.highlights, text);
     return { highlights, error: highlights.length ? null : "Geen letterlijke richtlijnen gevonden." };
   } catch (e) {
