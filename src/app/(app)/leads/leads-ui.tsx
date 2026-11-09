@@ -2,11 +2,12 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlarmClock, ArrowRightCircle, Check, FolderOpen, Loader2, Plus, Search, Trophy, Users, XCircle } from "lucide-react";
-import { convertLeadToClient, createLead, setLeadFollowUp, setLeadSource, setLeadStatus } from "@/server/actions/leads";
+import { AlarmClock, Check, FolderOpen, Loader2, Plus, Search, Trophy, Users, XCircle } from "lucide-react";
+import { createLead, setLeadFollowUp, setLeadSource, setLeadStatus } from "@/server/actions/leads";
 import type { LeadRow } from "@/server/leads";
 import { LEAD_STATUS } from "@/lib/statuses";
 import { Stat } from "@/components/ui";
+import { ConvertButton } from "./convert-dialog";
 
 /** Het jaar waar een lead bij hoort: de jaargang (bijv. "2026")
  *  als die er is, anders het jaar van de eerste contactdatum. Zo vallen ook
@@ -351,31 +352,12 @@ function SourceCell({ id, source }: { id: string; source: string | null }) {
 }
 
 function ConvertCell({ id, convertedSlug }: { id: string; convertedSlug: string | null }) {
-  const [pending, start] = useTransition();
-  const [err, setErr] = useState<string | null>(null);
-  const router = useRouter();
-
   if (convertedSlug) {
     return (
-      <a href={`/clients/${convertedSlug}`} className="inline-flex items-center gap-1 rounded-full bg-[var(--color-good-soft)] px-2.5 py-1 text-2xs font-medium text-[#14633a] hover:underline" title="Deze lead is al een klant">
+      <a href={`/clients/${convertedSlug}?tab=onboarding`} className="inline-flex items-center gap-1 rounded-full bg-[var(--color-good-soft)] px-2.5 py-1 text-2xs font-medium text-[#14633a] hover:underline" title="Deze lead is al een klant: open de klant">
         <Check className="size-3.5" /> Klant
       </a>
     );
   }
-  return (
-    <span className="inline-flex flex-col items-end gap-0.5">
-      <button type="button" disabled={pending}
-        onClick={() => start(async () => {
-          setErr(null);
-          const res = await convertLeadToClient(id);
-          if (res.ok && res.slug) router.push(`/clients/${res.slug}`);
-          else { setErr(res.message ?? "Mislukt"); router.refresh(); }
-        })}
-        className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-1 text-2xs font-medium text-[var(--color-brand-700)] hover:bg-[var(--color-surface-sunken)]"
-        title="Zet deze lead om naar een klant (neemt gegevens automatisch over)">
-        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <ArrowRightCircle className="size-3.5" />} Naar klant
-      </button>
-      {err ? <span className="text-2xs text-[var(--color-bad)]">{err}</span> : null}
-    </span>
-  );
+  return <ConvertButton leadId={id} />;
 }

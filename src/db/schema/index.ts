@@ -29,3 +29,4 @@ export * from "./client-documents";
 export * from "./bank";
 export * from "./planning-deadlines";
 export * from "./editor-status";
+export * from "./onboarding";

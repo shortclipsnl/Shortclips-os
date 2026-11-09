@@ -7,6 +7,8 @@ import { LinkButton, PageHeader } from "@/components/ui";
 import { ClientsBoard, type BoardClient } from "./clients-board";
 import { getRetentionOverview, retentionContext } from "@/server/client-retention";
 import { isEditorRole } from "@/server/auth/context";
+import { listOnboardings } from "@/server/onboarding";
+import { OnboardingOverview } from "./onboarding-overview";
 
 export const metadata: Metadata = { title: "Klanten" };
 export const dynamic = "force-dynamic";
@@ -54,6 +56,7 @@ export default async function ClientsPage() {
   // "mijn klanten".
   const covering = await coveringForUser(viewer.id);
   const coveringIds = covering.map((c) => c.absentId);
+  const onboardings = isEditorRole(viewer) ? [] : await listOnboardings().catch(() => []);
   const myCount = clients.filter((c) => c.coordinatorId === viewer.id || (!!c.coordinatorId && coveringIds.includes(c.coordinatorId))).length;
 
   return (
@@ -65,13 +68,14 @@ export default async function ClientsPage() {
       />
       {canWrite ? (
         <p className="-mt-2 mb-4 max-w-3xl text-sm text-[var(--color-ink-muted)]">
-          Nieuwe klant? Klik rechtsboven op{" "}
+          Gewonnen lead? Zet hem om via Leads → Naar klant, dan richt het portaal alles in. Anders: klik rechtsboven op{" "}
           <span className="font-semibold text-[var(--color-ink)]">Nieuwe klant</span> en vul meteen{" "}
           <span className="font-semibold text-[var(--color-ink)]">alle gegevens volledig</span> in
           (naam, website, logo, verantwoordelijke, aantal shorts per maand, contactpersoon…). Dan klopt
           alles vanaf het begin en hoeft er later niets te worden aangevuld.
         </p>
       ) : null}
+      <OnboardingOverview rows={onboardings} />
       <ClientsBoard clients={clients} viewerId={viewer.id} coveringIds={coveringIds} coveringNames={covering.map((c) => c.absentName)} defaultPod={myCount > 0 ? "mijn" : "alle"} />
     </div>
   );

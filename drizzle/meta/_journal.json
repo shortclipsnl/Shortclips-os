@@ -736,6 +736,13 @@
       "when": 1794207105519,
       "tag": "0104_scriptgoedkeuring_per_script",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1794208661935,
+      "tag": "0105_klantonboarding",
+      "breakpoints": true
     }
   ]
 }

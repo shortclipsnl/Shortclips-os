@@ -60,6 +60,8 @@ import { getClientAgreementOverrides, getPortalSettings } from "@/server/portal-
 import { canManageClientDocs, getCurrentDocs, toSlots, visibleKinds } from "@/server/client-documents";
 import { ClientOverview } from "./client-overview";
 import { ClientDocsPanel } from "@/components/client-docs/docs-panel";
+import { getOnboardingView } from "@/server/onboarding";
+import { OnboardingTab } from "./onboarding-tab";
 
 export const dynamic = "force-dynamic";
 
@@ -134,7 +136,15 @@ export default async function ClientPage({
   // contactpersoon) blijven altijd staan — die worden verwacht, ook als ze leeg
   // zijn. Een tab die hier wegvalt, kan ook niet geselecteerd worden, dus zijn
   // paneel hieronder rendert dan evenmin.
+  // Klantonboarding: tabblad vooraan zolang de onboarding loopt, daarna achteraan.
+  const onboarding = isEditorRole(viewer) ? null : await getOnboardingView(c.id).catch(() => null);
+  const onboardingOpen = Boolean(onboarding && !onboarding.completedAt);
+  const onboardingTab: TabDef[] = onboarding
+    ? [{ key: "onboarding", label: onboardingOpen ? `Onboarding ${onboarding.done}/${onboarding.total}` : "Onboarding" }]
+    : [];
+
   const tabs: TabDef[] = [
+    ...(onboardingOpen ? onboardingTab : []),
     { key: "overzicht", label: "Overzicht" },
     { key: "videos", label: "Video's", count: activeVideos.length },
     { key: "scripts", label: "Scripts", count: hub.scripts.filter((s) => s.status !== "shot").length },
@@ -150,8 +160,9 @@ export default async function ClientPage({
     ...(hub.canSeeFinance ? [{ key: "financieel", label: "Financieel" }, { key: "contract", label: "Contract & facturatie" }] : []),
     ...(hub.insights.length > 0 ? [{ key: "inzichten", label: "AI-inzichten", count: hub.insights.length }] : []),
     ...(hub.integrations.length > 0 ? [{ key: "koppelingen", label: "Koppelingen" }] : []),
+    ...(!onboardingOpen ? onboardingTab : []),
   ];
-  const active = tabs.some((t) => t.key === tab) ? tab! : "overzicht";
+  const active = tabs.some((t) => t.key === tab) ? tab! : onboardingOpen ? "onboarding" : "overzicht";
 
   return (
     <div className="mx-auto max-w-[1400px]">
@@ -298,6 +309,7 @@ export default async function ClientPage({
       {active === "contract" && hub.canSeeFinance ? <ContractTab hub={hub} /> : null}
       {active === "inzichten" ? <InsightsTab hub={hub} /> : null}
       {active === "koppelingen" ? <IntegrationsTab hub={hub} /> : null}
+      {active === "onboarding" && onboarding ? <OnboardingTab view={onboarding} slug={slug} canEdit={canEditClient} /> : null}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { runContentSync } from "./content-sync";
 import { runAutoPublishDueContent } from "./content-publish";
 import { runTaskArchive } from "./task-archive";
 import { runCalendarSync } from "./calendar-sync";
+import { syncOpenOnboardings } from "@/server/onboarding";
 import { runShootReconciliation } from "./shoot-reconciliation";
 import { runMonthlyReportDrafts } from "./report-drafts";
 import { runContentOnlineNotifications } from "./content-online-notify";
@@ -56,6 +57,7 @@ async function step(job: string, fn: () => Promise<unknown>): Promise<StepResult
 export async function runFrequentSync() {
   const results: StepResult[] = [];
   results.push(await step("calendar.sync", () => runCalendarSync()));
+  results.push(await step("onboarding.sync", () => syncOpenOnboardings()));
   results.push(await step("frameio.pull_comments", () => pullFrameComments()));
   results.push(await step("signals.hourly", () => runHourlySignals()));
   // Klant op de hoogte brengen (video/script klaar, opname morgen). Idempotent,

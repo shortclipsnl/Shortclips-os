@@ -16,6 +16,7 @@ import {
   pullFrameProjects,
 } from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
+import { syncOpenOnboardings } from "@/server/onboarding";
 import { runScriptingTaskSync } from "@/server/scripting-tasks";
 import { runScriptVersionSync } from "@/server/script-versions";
 import { runFrequentSync, runNightlySync } from "@/server/jobs/orchestrator";
@@ -107,9 +108,12 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "calendar.sync": async () => {
     const res = await runCalendarSync();
     await runScriptingTaskSync().catch((e) => console.error("[scripting.task_sync]", e));
+    // Klantonboarding: opname in de agenda → opnamedag-stap klaar, alles klaar → afgerond.
+    await syncOpenOnboardings().catch((e) => console.error("[onboarding.sync]", e));
     return res;
   },
   "scripting.task_sync": runScriptingTaskSync,
+  "onboarding.sync": syncOpenOnboardings,
   // Altijd de nieuwste scriptversie: nieuwere Drive-versie koppelen en captions bijwerken.
   "scripts.version_sync": runScriptVersionSync,
   "shoots.reconcile": runShootReconciliation,
