@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Sparkles, Loader2, Check, CircleAlert, Download, Eye, Search, Send, RotateCcw, ShieldCheck, Lock, Globe } from "lucide-react";
+import { Sparkles, Loader2, Check, CircleAlert, Download, Eye, Search, Send, RotateCcw, Lock, Globe } from "lucide-react";
 import { Badge, ClientLogo, buttonClass, type Tone } from "@/components/ui";
 import { approveMonthlyReport, publishMonthlyReport, queueMonthlyReports, setReportControleDag, startMonthlyReport } from "@/server/actions/monthly-reports";
 import type { ReportOverview, ReportRow } from "@/server/reports/service";
@@ -60,7 +60,6 @@ const shortMonth = (p: string) => {
   return `${new Date(y!, (m ?? 1) - 1, 1).toLocaleDateString("nl-NL", { month: "short" }).replace(".", "")} ${String(y).slice(2)}`;
 };
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }) : "");
-const fmtDateTime = (iso: string | null) => (iso ? new Date(iso).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
 const minutesSince = (iso: string | null) => (iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)) : 0);
 
 const STAT_TONE: Record<string, string> = {
@@ -72,16 +71,18 @@ const STAT_TONE: Record<string, string> = {
   warn: "text-[var(--color-warn)]",
 };
 
+/** Compacte, klikbare statchip (filter aan/uit) — één strakke balk i.p.v. grote tegels. */
 function StatTile({ label, value, tone, hint, active, onClick }: { label: string; value: number; tone: keyof typeof STAT_TONE; hint?: string; active: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`sc-card flex flex-col items-start px-3 py-2 text-left transition-colors ${active ? "ring-2 ring-[var(--color-indigo-ink)]" : "hover:brightness-[0.98]"}`}
+      title={hint ? `${label} · ${hint}` : label}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${active ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-ink)] text-white" : "border-[var(--color-line)] hover:brightness-[0.98]"}`}
     >
-      <span className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{label}</span>
-      <span className={`text-xl font-semibold tabular-nums ${value > 0 ? STAT_TONE[tone] : "text-[var(--color-ink-faint)]"}`}>{value}</span>
-      {hint ? <span className="text-2xs text-[var(--color-ink-muted)]">{hint}</span> : null}
+      <span className={active ? "font-medium" : "text-[var(--color-ink-muted)]"}>{label}</span>
+      <span className={`font-semibold tabular-nums ${active ? "" : value > 0 ? STAT_TONE[tone] : "text-[var(--color-ink-faint)]"}`}>{value}</span>
+      {hint ? <span className={`text-2xs ${active ? "text-white/80" : "text-[var(--color-ink-faint)]"}`}>· {hint}</span> : null}
     </button>
   );
 }
@@ -404,8 +405,8 @@ export function ReportList({
         <MaandControle maand={maand} batches={overview.batches} rows={baseRows} viewerId={viewerId} owner={owner} actief={faseFilter} onFilter={setFaseFilter} />
       ) : null}
 
-      {/* Statistieken: binnen een paar seconden zien waar actie nodig is. Klik = filter. */}
-      <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
+      {/* Statistieken: compacte klikbare chips (filter). */}
+      <div className="flex flex-wrap items-center gap-1.5">
         <StatTile label="Totaal klanten" value={counts.totaal} tone="neutral" active={statusFilter === "alle"} onClick={() => setStatusFilter("alle")} />
         <StatTile label="Nog genereren" value={counts.nogGenereren} tone="neutral" hint={counts.bezig ? `${counts.bezig} bezig` : undefined} active={statusFilter === "nog_genereren"} onClick={() => toggle("nog_genereren")} />
         <StatTile label="Te controleren" value={counts.teControleren} tone="violet" active={statusFilter === "actie"} onClick={() => toggle("actie")} />
@@ -480,7 +481,7 @@ export function ReportList({
         </div>
       ) : (
         <div className="sc-card overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-sm [&_td]:!px-2.5 [&_th]:!px-2.5 [&_td:first-child]:!pl-4 [&_th:first-child]:!pl-4">
+          <table className="w-full min-w-[840px] text-sm [&_td]:!px-2.5 [&_th]:!px-2.5 [&_td:first-child]:!pl-4 [&_th:first-child]:!pl-4">
             <thead>
               <tr className="border-b border-[var(--color-line)] text-left text-2xs uppercase tracking-wide text-[var(--color-ink-faint)]">
                 <th className="sc-th sticky left-0 z-10 min-w-[200px] bg-[var(--color-surface)]">Klant</th>
@@ -488,9 +489,7 @@ export function ReportList({
                 <th className="sc-th">Status</th>
                 <th className="sc-th"><span className="inline-flex items-start gap-1"><Lock className="mt-px size-3 shrink-0" /> Interne<br />versie</span></th>
                 <th className="sc-th"><span className="inline-flex items-start gap-1"><Globe className="mt-px size-3 shrink-0" /> Klant-<br />versie</span></th>
-                {canWrite ? <th className="sc-th">Genereren</th> : null}
-                <th className="sc-th">Goedkeuren</th>
-                <th className="sc-th">Klant-<br />portaal</th>
+                <th className="sc-th">Actie</th>
               </tr>
             </thead>
             <tbody>
@@ -559,62 +558,72 @@ export function ReportList({
                     <td className="sc-td"><PdfButtons reportId={r?.id ?? null} versie="intern" enabled={pdfOk} /></td>
                     <td className="sc-td"><PdfButtons reportId={r?.id ?? null} versie="klant" enabled={pdfOk} /></td>
 
-                    {/* Genereren */}
-                    {canWrite ? (
-                      <td className="sc-td whitespace-nowrap">
-                        {row.view === "bezig" || isBusy ? (
-                          <span className={buttonClass({ variant: "secondary", size: "sm" })} aria-disabled><Loader2 className="size-3.5 animate-spin" /> Bezig</span>
-                        ) : row.view === "goedgekeurd" || row.view === "gepubliceerd" ? (
-                          <span className="text-[var(--color-ink-faint)]" title="Goedgekeurd: zet het rapport eerst terug naar aanpassen (op de detailpagina) om opnieuw te genereren.">–</span>
-                        ) : lopend ? (
-                          <span className="text-2xs text-[var(--color-ink-faint)]" title="Een maandrapport kan pas gemaakt worden als de maand voorbij is.">Maand loopt nog</span>
-                        ) : row.view === "nog_genereren" ? (
-                          <button type="button" disabled={!aiReady || pending} onClick={() => generate(row)} className={buttonClass({ variant: "primary", size: "sm" })}><Sparkles className="size-3.5" /> Genereren</button>
-                        ) : (
-                          <button type="button" disabled={!aiReady || pending} onClick={() => generate(row)} className={buttonClass({ variant: row.view === "mislukt" ? "primary" : "ghost", size: "sm" })}><RotateCcw className="size-3.5" /> Opnieuw</button>
-                        )}
-                        {m ? <div className={`mt-1 max-w-[200px] whitespace-normal text-2xs ${m.ok ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}`}>{m.text}</div> : null}
-                      </td>
-                    ) : null}
-
-                    {/* Goedkeuren */}
+                    {/* Actie: alleen de nu relevante stap in de gecontroleerde stroom. */}
                     <td className="sc-td whitespace-nowrap">
-                      {r && (row.view === "goedgekeurd" || row.view === "gepubliceerd") ? (
-                        <div className="text-xs">
-                          <span className="inline-flex items-center gap-1 font-medium text-[var(--color-good)]"><ShieldCheck className="size-3.5" /> {r.approvedByName ? r.approvedByName.split(" ")[0] : "Goedgekeurd"}</span>
-                          <div className="text-2xs text-[var(--color-ink-faint)]">{fmtDateTime(r.approvedAt)}</div>
-                        </div>
-                      ) : r && (row.view === "gegenereerd" || row.view === "controleren") ? (
-                        owner ? (
-                          r.openChecks > 0 ? (
-                            <Link href={`/analytics/maandrapportages/${r.id}`} title="Vul eerst de beoordeling in en rond de verplichte controlepunten af" className={buttonClass({ variant: "secondary", size: "sm" })}>
-                              <CircleAlert className="size-3.5" /> Controleren
-                            </Link>
+                      {(() => {
+                        if (row.view === "bezig" || isBusy) {
+                          return <span className={buttonClass({ variant: "secondary", size: "sm" })} aria-disabled><Loader2 className="size-3.5 animate-spin" /> Bezig</span>;
+                        }
+                        if (row.view === "gepubliceerd") {
+                          return (
+                            <div className="text-xs">
+                              <span className="inline-flex items-center gap-1 font-medium text-[var(--color-lime)]"><Check className="size-3.5" /> Gepubliceerd</span>
+                              {r?.publishedAt ? <div className="text-2xs text-[var(--color-ink-faint)]">sinds {fmtDate(r.publishedAt)}</div> : null}
+                            </div>
+                          );
+                        }
+                        if (row.view === "goedgekeurd" && r) {
+                          return canWrite ? (
+                            <>
+                              <button type="button" disabled={pending || isBusy} onClick={() => publish(row)} className={buttonClass({ variant: "primary", size: "sm" })}><Send className="size-3.5" /> Publiceren</button>
+                              <div className="mt-1 text-2xs text-[var(--color-ink-faint)]">Goedgekeurd{r.approvedByName ? ` · ${r.approvedByName.split(" ")[0]}` : ""}</div>
+                            </>
                           ) : (
-                            <button type="button" disabled={pending || isBusy} onClick={() => approve(row)} className={buttonClass({ variant: "primary", size: "sm" })}><Check className="size-3.5" /> Goedkeuren</button>
-                          )
-                        ) : (
-                          <div className="text-2xs text-[var(--color-ink-muted)]">
-                            Wacht op Jarno
-                            <div><Link href={`/analytics/maandrapportages/${r.id}`} className="text-[var(--color-info)] hover:underline">Controle openen</Link></div>
-                          </div>
-                        )
-                      ) : <span className="text-[var(--color-ink-faint)]">–</span>}
-                      {!canWrite && m ? <div className={`mt-1 text-2xs ${m.ok ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}`}>{m.text}</div> : null}
-                    </td>
-
-                    {/* Klantportaal */}
-                    <td className="sc-td whitespace-nowrap">
-                      {r && row.view === "gepubliceerd" ? (
-                        <div className="text-xs">
-                          <span className="inline-flex items-center gap-1 font-medium text-[var(--color-lime)]"><Check className="size-3.5" /> Zichtbaar</span>
-                          <div className="text-2xs text-[var(--color-ink-faint)]">sinds {fmtDate(r.publishedAt)}</div>
-                        </div>
-                      ) : r && row.view === "goedgekeurd" ? (
-                        canWrite ? (
-                          <button type="button" disabled={pending || isBusy} onClick={() => publish(row)} className={buttonClass({ variant: "primary", size: "sm" })}><Send className="size-3.5" /> Publiceren</button>
-                        ) : <span className="text-2xs text-[var(--color-ink-muted)]">Nog niet gepubliceerd</span>
-                      ) : <span className="text-2xs text-[var(--color-ink-faint)]" title="Niet zichtbaar in het klantportaal">Niet zichtbaar</span>}
+                            <span className="text-2xs text-[var(--color-ink-muted)]">Goedgekeurd — wacht op publicatie</span>
+                          );
+                        }
+                        if ((row.view === "gegenereerd" || row.view === "controleren") && r) {
+                          const controle = owner ? (
+                            r.openChecks > 0 ? (
+                              <Link href={`/analytics/maandrapportages/${r.id}`} title="Vul eerst de beoordeling in en rond de verplichte controlepunten af" className={buttonClass({ variant: "secondary", size: "sm" })}>
+                                <CircleAlert className="size-3.5" /> Controleren
+                              </Link>
+                            ) : (
+                              <button type="button" disabled={pending || isBusy} onClick={() => approve(row)} className={buttonClass({ variant: "primary", size: "sm" })}><Check className="size-3.5" /> Goedkeuren</button>
+                            )
+                          ) : (
+                            <div className="text-2xs text-[var(--color-ink-muted)]">
+                              Wacht op Jarno
+                              <div><Link href={`/analytics/maandrapportages/${r.id}`} className="text-[var(--color-info)] hover:underline">Controle openen</Link></div>
+                            </div>
+                          );
+                          return (
+                            <>
+                              {controle}
+                              {canWrite ? (
+                                <button type="button" disabled={!aiReady || pending} onClick={() => generate(row)} className="mt-1 inline-flex items-center gap-1 text-2xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+                                  <RotateCcw className="size-3" /> Opnieuw genereren
+                                </button>
+                              ) : null}
+                            </>
+                          );
+                        }
+                        if (lopend) {
+                          return <span className="text-2xs text-[var(--color-ink-faint)]" title="Een maandrapport kan pas gemaakt worden als de maand voorbij is.">Maand loopt nog</span>;
+                        }
+                        if (row.view === "nog_genereren") {
+                          return canWrite
+                            ? <button type="button" disabled={!aiReady || pending} onClick={() => generate(row)} className={buttonClass({ variant: "primary", size: "sm" })}><Sparkles className="size-3.5" /> Genereren</button>
+                            : <span className="text-[var(--color-ink-faint)]">–</span>;
+                        }
+                        if (row.view === "mislukt") {
+                          return canWrite
+                            ? <button type="button" disabled={!aiReady || pending} onClick={() => generate(row)} className={buttonClass({ variant: "primary", size: "sm" })}><RotateCcw className="size-3.5" /> Opnieuw</button>
+                            : <span className="text-[var(--color-ink-faint)]">–</span>;
+                        }
+                        return <span className="text-[var(--color-ink-faint)]">–</span>;
+                      })()}
+                      {m ? <div className={`mt-1 max-w-[220px] whitespace-normal text-2xs ${m.ok ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}`}>{m.text}</div> : null}
                     </td>
                   </tr>
                 );
