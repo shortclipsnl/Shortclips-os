@@ -181,6 +181,9 @@ export const ROLE_DEFINITIONS: Array<{
       "ai:run",
       "video_intelligence:read",
       "video_intelligence:run",
+      // Content Research: net als het contentteam onderzoek bekijken en starten.
+      "content_research:read",
+      "content_research:write",
       "ai_editor:read",
       "ai_editor:run",
       "integrations:read",
