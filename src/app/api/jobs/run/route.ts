@@ -38,6 +38,7 @@ import { runContentResearchNotify } from "@/server/jobs/content-research-notify"
 import { runMonthlyReports, runReportQueue } from "@/server/jobs/report-monthly";
 import { runReportTeamNotifications } from "@/server/reports/team";
 import { runReportReviewReminders } from "@/server/jobs/report-review-reminders";
+import { runFeedbackReminders } from "@/server/feedback-rounds";
 import { runAttentionNotify } from "@/server/jobs/attention-notify";
 import { runEditorStatusChecks } from "@/server/editor-status-checks";
 import { processDriveChanges, reconcileDriveFolders, runDriveSync } from "@/server/jobs/drive-sync";
@@ -87,6 +88,9 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "reminders.editor_friday_wrapup": runEditorFridayWrapUp,
   // Statuscheck editors halverwege de editor deadline (alleen 09:00-17:00 op werkdagen).
   "editors.status_checks": runEditorStatusChecks,
+  // Feedbacktermijn klant: rondes bijwerken en op de laatste termijndag (vanaf
+  // 09:00, werkdagen) de vaste verantwoordelijke een melding + taak geven.
+  "feedback.reminders": runFeedbackReminders,
   "reminders.cleaning_friday": runCleaningFridayReminder,
   "goals.recompute": runGoalsRecompute,
   "goals.seed": runGoalsSeed,

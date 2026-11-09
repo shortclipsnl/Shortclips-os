@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { syncFeedbackRounds } from "@/server/feedback-rounds";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -40,6 +41,8 @@ export async function approveVideo(videoId: string): Promise<ActionResult> {
       .update(deliverables)
       .set({ status: "approved", statusChangedAt: new Date(), approvedAt: new Date() })
       .where(eq(deliverables.id, videoId));
+    // Klant heeft gereageerd: feedbackronde stopt, herinneringstaak vervalt.
+    await syncFeedbackRounds([videoId]).catch((e) => console.error("[feedback-rounds]", e));
 
     // Showcase: awards van de editor bijwerken (nooit blokkerend).
     await recordAwardsSafe(video.editorId);
@@ -123,6 +126,8 @@ export async function requestChanges(
         clientRevisionRounds: video.clientRevisionRounds + 1,
       })
       .where(eq(deliverables.id, videoId));
+    // Klant heeft feedback gegeven: feedbackronde stopt, herinneringstaak vervalt.
+    await syncFeedbackRounds([videoId]).catch((e) => console.error("[feedback-rounds]", e));
 
     await db
       .update(approvals)

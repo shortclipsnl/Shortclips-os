@@ -134,6 +134,9 @@ async function runAction(action: Action, event: AutomationEvent, ruleKey?: strin
     case "create_task": {
       // Centrale klantstatus: geen nieuwe automatische taken voor een niet actieve klant.
       if (await isClientInactive(event.clientId)) return { skipped: "klant niet actief" };
+      // Feedbacktermijn: de vaste verantwoordelijke kreeg op de laatste
+      // termijndag al een herinneringstaak voor deze ronde. Geen tweede taak.
+      if (event.data?.skipCoordinatorTask === true) return { skipped: "herinnering al aangemaakt" };
       // Dedupe-sleutel: regel + entiteit + periode. Bestaat er al een OPEN
       // automatische taak met deze sleutel, dan niets aanmaken (geen dubbels,
       // ook niet bij meerdere runs op dezelfde dag of gelijktijdig).

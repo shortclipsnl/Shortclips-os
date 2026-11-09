@@ -27,6 +27,7 @@ import { isClientFeedbackOverdue } from "@/lib/client-feedback";
 import { deadlineMisses } from "@/db/schema";
 import { runJob } from "./runner";
 import { runScriptingTaskSync } from "@/server/scripting-tasks";
+import { remindedDeliverables } from "@/server/feedback-rounds";
 import { isClientInactive, notInactiveClient } from "@/server/client-activity";
 
 const day = (offset: number) => {
@@ -160,9 +161,14 @@ export async function runDailySignals() {
       .where(
         and(
           isNull(deliverables.deletedAt),
-          inArray(deliverables.status, ["client_review", "client_revision"]),
+          // Alleen video's die echt op de klant wachten. Bij "Feedback klant
+          // verwerken" heeft de klant al gereageerd: geen herinnering meer.
+          eq(deliverables.status, "client_review"),
         ),
       );
+    // Video's waarvan de lopende feedbackronde al een herinneringstaak kreeg
+    // (werkdag 3): geen tweede opvolgtaak voor de coördinator.
+    const alreadyReminded = await remindedDeliverables(videoCandidates.map((v) => v.id)).catch(() => new Set<string>());
     const stale: Array<(typeof videoCandidates)[number] & { termDays: number }> = [];
     for (const v of videoCandidates) {
       const term = (await feedbackTerm(v.clientId)).videos;
@@ -188,6 +194,7 @@ export async function runDailySignals() {
           title: video.title,
           coordinatorId: video.coordinatorId,
           href: `/videos/${video.id}`,
+          skipCoordinatorTask: alreadyReminded.has(video.id),
         },
       });
     }

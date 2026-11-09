@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { syncFeedbackRounds } from "@/server/feedback-rounds";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -24,7 +25,7 @@ import {
   ForbiddenError,
 } from "@/server/auth/context";
 import { isCoreStaff } from "@/server/core-staff";
-import { canManageFeedbackRounds } from "@/server/feedback-rounds";
+import { canManageFeedbackRounds } from "@/server/feedback-rounds-access";
 import { FEEDBACK_ROUNDS_MAX } from "@/lib/feedback-rounds";
 
 /**
@@ -365,6 +366,10 @@ export async function changeVideoStatus(
     if (nextStatus === "published") patch.publishedAt = new Date();
 
     await db.update(deliverables).set(patch).where(eq(deliverables.id, videoId));
+
+    // Feedbacktermijn klant: ronde starten (naar Feedback klant) of stoppen
+    // (fase verlaten). Nooit blokkerend; de uurlijkse job is het vangnet.
+    await syncFeedbackRounds([videoId]).catch((e) => console.error("[feedback-rounds]", e));
 
     // Showcase: awards van de editor bijwerken zodra de video klantgoedgekeurd of
     // afgerond is (nooit blokkerend; het nachtelijke vangnet herstelt).

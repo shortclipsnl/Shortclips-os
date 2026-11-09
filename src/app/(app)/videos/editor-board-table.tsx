@@ -258,7 +258,7 @@ export function EditorBoardTable({
             <span className="px-1">Item</span>
             <span className="px-1 text-center">Editor</span>
             <span className="px-1 text-center">{editorView ? "Editor deadline" : "Deadline"}</span>
-            {editorView ? null : <span className="px-1 text-center" title="Laatste statuscheck van de editor">Voortgang</span>}
+            {editorView ? null : <span className="px-1 text-center" title="Laatste statuscheck van de editor; bij Feedback klant de feedbacktermijn van de klant">Voortgang</span>}
             <span className="px-1 text-center">Fase</span>
             {withFeedback ? <span className="px-1 text-center" title="Aantal feedbackrondes van deze opname. Vanaf 2 gelden extra kosten.">Feedbackrondes</span> : null}
             <span className="px-1 text-center">Prioriteit</span>
@@ -468,6 +468,41 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorV
   );
 }
 
+/** Kleuren van de feedbacktermijn: dag 1 groen, dag 2 oranje, dag 3 rood, te laat vol rood. */
+const FEEDBACK_TONE: Record<NonNullable<EditorBoardVideo["feedbackTerm"]>["tone"], { bg: string; fg: string; dot: string }> = {
+  groen: { bg: "var(--color-good-soft)", fg: "var(--color-good)", dot: "var(--color-good)" },
+  oranje: { bg: "var(--color-warn-soft)", fg: "var(--color-warn)", dot: "var(--color-warn)" },
+  rood: { bg: "var(--color-bad-soft)", fg: "var(--color-bad)", dot: "var(--color-bad)" },
+  rood_vol: { bg: "var(--color-bad)", fg: "#fff", dot: "#fff" },
+};
+
+/**
+ * Feedbacktermijn klant (fase Feedback klant): hoeveel werkdagen de klant nog
+ * heeft, of dat hij te laat is. Staat in de kolom Voortgang, want zolang de
+ * video bij de klant ligt is er geen editorvoortgang om te tonen.
+ */
+function FeedbackTermCell({ f }: { f: NonNullable<EditorBoardVideo["feedbackTerm"]> }) {
+  const tone = FEEDBACK_TONE[f.tone];
+  const sub = f.reminder === "verstuurd" ? "Herinnering verstuurd" : f.sub;
+  const tip = [
+    `Feedbacktermijn ${f.state.termDays} werkdagen`,
+    `laatste dag ${fmtShort(f.dueOn)}`,
+    f.round > 1 ? `feedbackronde ${f.round}` : null,
+    f.reminder === "open" ? "herinneringstaak staat open" : f.reminder === "verstuurd" ? "herinnering verstuurd" : null,
+  ].filter(Boolean).join(" · ");
+  return (
+    <div className="flex flex-col items-center justify-center gap-0.5 px-1 py-1 text-center" title={tip}>
+      <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-[4px] px-1.5 py-1 text-2xs font-semibold" style={{ background: tone.bg, color: tone.fg }}>
+        <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ background: tone.dot }} />
+        {f.title}
+      </span>
+      <span className="text-[10px] font-medium leading-tight text-[var(--color-ink-muted)]">
+        {sub}{f.round > 1 ? ` · ronde ${f.round}` : ""}
+      </span>
+    </div>
+  );
+}
+
 /**
  * Compacte melding boven het overzicht zolang er opnames op feedbackronde 2 of
  * hoger staan, zodat het team de extra kosten niet vergeet te communiceren.
@@ -579,6 +614,7 @@ function FeedbackRoundsCell({ v }: { v: EditorBoardVideo }) {
 
 /** Kolom Voortgang: wat de editor bij de laatste statuscheck doorgaf. */
 function ProgressCell({ v }: { v: EditorBoardVideo }) {
+  if (v.feedbackTerm) return <FeedbackTermCell f={v.feedbackTerm} />;
   const p = v.progress;
   if (!p) return <div className="grid place-items-center px-1 text-2xs text-[var(--color-ink-faint)]">—</div>;
   const tone = PROGRESS_TONE[p.tone];

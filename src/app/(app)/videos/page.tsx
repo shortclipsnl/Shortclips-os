@@ -4,7 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { requireInternal, isOwner, canManageOperations } from "@/server/auth/context";
 import { assignMissingEditorsIfStale, mergeDuplicateShootsIfStale } from "@/server/jobs/calendar-sync";
 import { isCoreStaff } from "@/server/core-staff";
-import { canManageFeedbackRounds } from "@/server/feedback-rounds";
+import { canManageFeedbackRounds } from "@/server/feedback-rounds-access";
 import { getVideoHighlights, listEditorOptions, listVideos } from "@/server/videos";
 import { listEditingProjects } from "@/server/editing-board";
 import { listEditorBoard } from "@/server/editor-board";

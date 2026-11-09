@@ -12,6 +12,10 @@ export function taskHref(t: { entityType: string | null; entityId: string | null
     const id = t.entityId ?? dayIdFromKey(t.dedupeKey);
     return id ? scriptingTaskHref(id) : null;
   }
+  // Feedbackherinnering → het project (video) op Editing.
+  if (t.entityType === "deliverable" && t.entityId && t.dedupeKey?.startsWith("feedbackronde:")) {
+    return `/videos/${t.entityId}`;
+  }
   // Actiepunt uit een maandrapportage → terug naar dat rapport.
   if (t.entityType === "client_report" && t.entityId && t.dedupeKey?.startsWith("report_action:")) {
     return `/analytics/maandrapportages/${t.entityId}`;

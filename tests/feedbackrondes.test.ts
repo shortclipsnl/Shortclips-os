@@ -78,7 +78,7 @@ describe("feedbackrondes", () => {
   });
 
   it("alleen Jarno, Milou, Jiska en Rutger", async () => {
-    const { canManageFeedbackRounds } = await import("@/server/feedback-rounds");
+    const { canManageFeedbackRounds } = await import("@/server/feedback-rounds-access");
     for (const mail of ["jarno@shortclips.nl", "milou@shortclips.nl", "jiska@shortclips.nl", "rutger@shortclips.nl", "Milou@Shortclips.nl"]) {
       expect(canManageFeedbackRounds(viewer(mail))).toBe(true);
     }

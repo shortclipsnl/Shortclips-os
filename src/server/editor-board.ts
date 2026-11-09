@@ -2,6 +2,7 @@ import "server-only";
 import { isActiveClientStatus } from "@/lib/client-status";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { getFeedbackTerms, syncFeedbackRounds, type FeedbackTermView } from "@/server/feedback-rounds";
 import { db } from "@/db/client";
 import { inArray } from "drizzle-orm";
 import { briefingSets, clients, deliverables, productionDays, users } from "@/db/schema";
@@ -160,6 +161,8 @@ export type EditorBoardVideo = {
   /** Feedbackrondes (0-6) van deze opname. Alleen gevuld voor het kernteam
    *  (Jarno, Milou, Jiska, Rutger); voor iedereen anders null. */
   feedbackRounds: number | null;
+  /** Feedbacktermijn van de klant bij fase Feedback klant (alleen in het teamoverzicht). */
+  feedbackTerm: FeedbackTermView | null;
 };
 
 const TOTAL_WORKDAYS = 14; // opname → klantoplevering
@@ -406,6 +409,7 @@ export async function listEditorBoard(
       editorBatteryColor,
       progress: null,
       feedbackRounds: opts.withFeedbackRounds ? Number(r.feedbackRounds ?? 0) : null,
+      feedbackTerm: null,
     };
   });
 
@@ -417,6 +421,19 @@ export async function listEditorBoard(
       for (const v of result) v.progress = progress.get(v.id) ?? null;
     } catch (e) {
       console.error("[statuscheck] voortgang", e);
+    }
+    // Feedbacktermijn klant per video op Feedback klant. Eerst de rondes
+    // gelijktrekken (vangnet voor statuswissels buiten het portaal om, zoals
+    // Frame.io), dan de lopende termijn lezen. Nooit blokkerend.
+    try {
+      const atClient = result.filter((v) => v.status === "client_review").map((v) => v.id);
+      if (atClient.length) {
+        await syncFeedbackRounds(atClient);
+        const terms = await getFeedbackTerms(atClient);
+        for (const v of result) v.feedbackTerm = terms.get(v.id) ?? null;
+      }
+    } catch (e) {
+      console.error("[feedback-rounds] board", e);
     }
   }
   return result;
