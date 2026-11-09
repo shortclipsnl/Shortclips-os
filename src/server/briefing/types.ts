@@ -14,8 +14,9 @@ export type BriefingStoreV2 = {
   v: 2;
   source: { fileName: string; origin: "drive" | "review"; hash: string; parsedAt: string };
   scripts: ParsedScriptPdf;
-  /** Alleen de scriptpagina's uit de originele PDF (geen voorblad of beeldpagina's), opgeslagen als bestand. */
-  scriptPages?: { assetId: string; pages: number[]; sourceHash: string } | null;
+  /** Welke pagina's van de script-PDF scriptpagina's zijn (geen voorblad of beeldpagina's).
+   *  De pagina's zelf worden bij het openen uit de bron-PDF gehaald (niet in de database). */
+  scriptPages?: { assetId?: string | null; pages: number[]; sourceHash: string } | null;
   guide: { hash: string | null; fileName: string | null; highlights: GuideHighlight[]; error?: string | null };
   /** Handmatige correcties door Team Shortclips. Een automatische update raakt
    *  dit nooit aan. */

@@ -76,7 +76,7 @@ export default async function BriefingPage({ params }: { params: Promise<{ id: s
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : null}
-      {html && doc.scriptPagesAssetId ? <ScriptPages url={`/api/briefing/${id}/scripts`} /> : null}
+      {html && doc.scriptPages ? <ScriptPages url={`/api/briefing/${id}/scripts`} /> : null}
       {html ? null : (
         <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--color-line-strong)] p-6 text-sm text-[var(--color-ink-muted)]">
           <p className="font-medium text-[var(--color-ink)]">Er is nog geen briefing voor deze opname.</p>

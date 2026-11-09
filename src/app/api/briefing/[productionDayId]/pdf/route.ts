@@ -3,9 +3,7 @@ import { ForbiddenError, getViewer } from "@/server/auth/context";
 import { briefingHtml, loadBriefingFor } from "@/server/briefing/access";
 import { htmlToPdf } from "@/server/pdf/render";
 import { mergePdfs } from "@/server/briefing/pdfjs-server";
-import { asc, eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { kbAssetParts } from "@/db/schema";
+import { scriptPagesPdf } from "@/server/briefing/script-pages";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,14 +33,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prod
     // Pagina 1-2 (omslag, overzicht, richtlijnen, materiaal) + de scriptpagina's
     // exact zoals in de script-PDF.
     const head = await htmlToPdf(await briefingHtml(loaded.doc, "pdf"));
-    const assetId = loaded.doc.scriptPagesAssetId;
-    if (assetId) {
-      const parts = await db.select({ data: kbAssetParts.data }).from(kbAssetParts).where(eq(kbAssetParts.assetId, assetId)).orderBy(asc(kbAssetParts.partNo));
-      const scripts = new Uint8Array(Buffer.concat(parts.map((p) => Buffer.from(p.data))));
-      pdf = await mergePdfs([head, scripts]);
-    } else {
-      pdf = head;
-    }
+    const scripts = await scriptPagesPdf(loaded.doc);
+    pdf = scripts ? await mergePdfs([head, scripts]) : head;
   } catch (e) {
     return NextResponse.json(
       { error: "PDF genereren is mislukt. Controleer of Chrome beschikbaar is (CHROME_PATH).", detail: e instanceof Error ? e.message : String(e) },

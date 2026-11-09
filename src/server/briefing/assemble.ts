@@ -51,8 +51,8 @@ export type BriefingDoc = {
   stills: BriefingStill[];
   coverAssetId: string | null;
   sourceFileName: string | null;
-  /** Opgeslagen PDF met alleen de scriptpagina's (exact uit de script-PDF). */
-  scriptPagesAssetId: string | null;
+  /** Welke pagina's van de script-PDF de scripts bevatten (null = nog niet bepaald). */
+  scriptPages: { pages: number[]; sourceHash: string } | null;
 };
 
 const cleanTitle = (t: string) =>
@@ -258,7 +258,7 @@ export async function assembleBriefing(
     stills,
     coverAssetId,
     sourceFileName: store?.source.fileName ?? src?.fileName ?? null,
-    scriptPagesAssetId: store?.scriptPages?.assetId ?? null,
+    scriptPages: store?.scriptPages?.pages?.length ? { pages: store.scriptPages.pages, sourceHash: store.scriptPages.sourceHash } : null,
   };
 }
 

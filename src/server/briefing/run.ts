@@ -9,8 +9,6 @@ import { runJsonPrompt } from "@/server/ai/client";
 import { parseScriptPdf, type ParsedScriptPdf } from "@/server/briefing/script-pdf";
 import { HIGHLIGHT_SYSTEM, highlightUserPrompt, pdfPlainText, verifyHighlights, type GuideHighlight } from "@/server/briefing/guide-highlights";
 import { isStoreV2, type BriefingStoreV2 } from "@/server/briefing/types";
-import { extractPages } from "@/server/briefing/pdfjs-server";
-import { storeAsset } from "@/server/kennisbank-assets";
 
 const STALE_RUNNING_MIN = 10;
 
@@ -149,23 +147,7 @@ export async function ensureBriefingForShoot(productionDayId: string, opts: { fo
   const pages = scripts.scripts.length
     ? [...new Set(scripts.scripts.flatMap((s) => s.pages))].sort((a, b) => a - b)
     : Array.from({ length: scripts.pageCount }, (_, i) => i + 1).filter((p) => !scripts.imagePages.includes(p));
-  if (prev?.scriptPages && prev.scriptPages.sourceHash === pdf.hash) {
-    scriptPages = prev.scriptPages;
-  } else if (pages.length) {
-    try {
-      const bytes = await extractPages(new Uint8Array(Buffer.from(pdf.pdfBase64, "base64")), pages);
-      const assetId = await storeAsset({
-        kind: "file",
-        fileName: `Scripts ${day.clientName} ${String(day.scheduledOn).slice(0, 10)}.pdf`,
-        contentType: "application/pdf",
-        data: Buffer.from(bytes),
-        sourceRef: `briefing:${productionDayId}`,
-      });
-      scriptPages = { assetId, pages, sourceHash: pdf.hash };
-    } catch (e) {
-      return fail(`De scriptpagina's konden niet uit de PDF worden gehaald (${e instanceof Error ? e.message.slice(0, 120) : "onbekende fout"}).`);
-    }
-  }
+  if (pages.length) scriptPages = { pages, sourceHash: pdf.hash };
 
   // 3. Highlights: hergebruiken zolang de guide gelijk is.
   let guidePart: BriefingStoreV2["guide"];
