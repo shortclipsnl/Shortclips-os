@@ -39,6 +39,9 @@
     { "path": "/api/jobs/run?job=reports.team_notify", "schedule": "5 7-15 * * 1-5" },
     { "path": "/api/jobs/run?job=editors.status_checks", "schedule": "10 7-15 * * 1-5" },
     { "path": "/api/jobs/run?job=attention.notify", "schedule": "0 7 * * 1-5" },
-    { "path": "/api/jobs/run?job=attention.notify", "schedule": "0 12 * * 1-5" }
+    { "path": "/api/jobs/run?job=attention.notify", "schedule": "0 12 * * 1-5" },
+    { "path": "/api/jobs/run?job=drive.sync_changes", "schedule": "*/2 * * * *" },
+    { "path": "/api/jobs/run?job=drive.reconcile", "schedule": "17 * * * *" },
+    { "path": "/api/jobs/run?job=drive.health", "schedule": "*/15 * * * *" }
   ]
 }

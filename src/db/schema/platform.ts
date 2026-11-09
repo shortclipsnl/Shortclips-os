@@ -133,6 +133,16 @@ export const driveMappings = pgTable(
     watchChannelId: varchar("watch_channel_id", { length: 120 }),
     watchExpiresAt: timestamp("watch_expires_at", { withTimezone: true }),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    /**
+     * Vergrendeling tegen dubbele runs: wie de lease heeft, mag synchroniseren.
+     * Verloopt vanzelf, zodat een afgebroken run nooit alles blokkeert.
+     */
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    leaseOwner: varchar("lease_owner", { length: 64 }),
+    /** Laatste volledige controle van de klantmap (vangnet naast de changes-feed). */
+    lastFullSyncAt: timestamp("last_full_sync_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [
@@ -156,9 +166,11 @@ export const integrationConnections = pgTable(
     /** Niet-gevoelige configuratie (account-id, workspace, scopes). */
     config: jsonb("config").notNull().default(sql`'{}'::jsonb`),
     /**
-     * Let op: hier staan NOOIT tokens. Secrets komen uitsluitend uit
-     * environment variables. Dit veld bevat alleen metadata over het token,
-     * zoals verloopdatum en scopes, voor de health-pagina.
+     * Metadata over het token (scopes, account, status) voor de statuspagina.
+     * Uitzondering: voor Google staat hier het refresh-token, uitsluitend
+     * VERSLEUTELD (AES-256-GCM, zie google-connection.ts), zodat opnieuw
+     * verbinden vanuit het portaal kan zonder env-wijziging en deploy. Nooit
+     * onversleutelde secrets in dit veld.
      */
     tokenMeta: jsonb("token_meta").notNull().default(sql`'{}'::jsonb`),
     lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),

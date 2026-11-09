@@ -1,9 +1,9 @@
 import "server-only";
 import { env } from "@/lib/env";
 import { apiFetch } from "./http";
+import { googleAuth } from "./google-auth";
 import {
   IntegrationError,
-  MissingCredentialsError,
   type ConnectionTest,
 } from "./types";
 
@@ -18,7 +18,6 @@ import {
  * publicaties) en koppelt ze aan de juiste klant. Onzekere afspraken worden
  * nooit stilletjes toegewezen — die belanden in de review in het beheer.
  */
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const API = "https://www.googleapis.com/calendar/v3";
 
 export type CalendarListEntry = {
@@ -65,8 +64,6 @@ export type CalendarEvent = {
 };
 
 export class GoogleCalendarService {
-  private accessToken: string | null = null;
-  private expiresAt = 0;
 
   constructor(
     private clientId = env.GOOGLE_CLIENT_ID,
@@ -86,46 +83,9 @@ export class GoogleCalendarService {
       .filter(Boolean);
   }
 
-  private async token(): Promise<string> {
-    if (!this.isConfigured) {
-      throw new MissingCredentialsError("google_calendar", [
-        "GOOGLE_CLIENT_ID",
-        "GOOGLE_CLIENT_SECRET",
-        "GOOGLE_REFRESH_TOKEN",
-      ]);
-    }
-    // Een minuut marge, zodat een token nooit halverwege een verzoek verloopt.
-    if (this.accessToken && Date.now() < this.expiresAt - 60_000) {
-      return this.accessToken;
-    }
-
-    const body = new URLSearchParams({
-      client_id: this.clientId!,
-      client_secret: this.clientSecret!,
-      refresh_token: this.refreshToken!,
-      grant_type: "refresh_token",
-    });
-
-    const response = await fetch(TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new IntegrationError(
-        "google_calendar",
-        `Token vernieuwen mislukt (HTTP ${response.status})`,
-        response.status,
-        response.status >= 500,
-      );
-    }
-
-    const data = (await response.json()) as { access_token: string; expires_in: number };
-    this.accessToken = data.access_token;
-    this.expiresAt = Date.now() + data.expires_in * 1000;
-    return this.accessToken;
+  /** Token komt uit het centrale Google-tokenbeheer (gedeeld met Drive en Gmail). */
+  private token(): Promise<string> {
+    return googleAuth.getAccessToken("google_calendar");
   }
 
   private async request<T>(
@@ -134,6 +94,11 @@ export class GoogleCalendarService {
   ): Promise<T> {
     const token = await this.token();
     return apiFetch<T>("google_calendar", `${API}${path}`, {
+      retries: 4,
+      onUnauthorized: async () => {
+        googleAuth.invalidate();
+        return { Authorization: `Bearer ${await this.token()}` };
+      },
       headers: { Authorization: `Bearer ${token}` },
       query,
     });

@@ -26,6 +26,8 @@ export async function runIntegrationHealthCheck() {
       ctx.counters.processed++;
       // Niet-geconfigureerde koppelingen zijn een bewuste keuze, geen storing.
       if (!h.configured) continue;
+      // Google Drive heeft een eigen bewaking (drive.health) met dedupe.
+      if (h.spec.provider === "google_drive") continue;
       if (h.status === "error" || h.status === "stale" || h.status === "never_synced") {
         const reason = STATUS_REASON[h.status] ?? "vraagt aandacht";
         // In de dagbundel technische storingen, alleen voor de eigenaar: het

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { db } from "@/db/client";
 import { clients, syncJobs, integrationEvents } from "@/db/schema";
-import { requireOperationalManager } from "@/server/auth/context";
+import { isOwner, requireOperationalManager } from "@/server/auth/context";
 import { integrationHealth } from "@/server/integrations/registry";
 import { appointmentReviewStats, unmatchedAppointments } from "@/server/appointments";
 import { calendarColorMap } from "@/server/calendar-couplings";
@@ -16,6 +16,7 @@ import { Badge, Card, CardHeader, EmptyState, PageHeader, Table } from "@/compon
 import { formatDateTime, relativeDays } from "@/lib/format";
 import { INTEGRATION_LABEL } from "@/lib/statuses";
 import { JobButton, TestButton } from "./actions-ui";
+import { DriveStatusCard } from "./drive-status-card";
 import { AppointmentReview, type ReviewRow } from "./appointment-review";
 
 export const metadata: Metadata = { title: "Koppelingen" };
@@ -37,8 +38,19 @@ function staleHours(ms: number | null): string {
   return h >= 48 ? `${Math.round(h / 24)} dagen` : `${h} uur`;
 }
 
-export default async function IntegrationsPage() {
+export default async function IntegrationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ google?: string; melding?: string }>;
+}) {
   const viewer = await requireOperationalManager();
+  const sp = await searchParams;
+  const googleNotice =
+    sp.google === "verbonden"
+      ? { ok: true, text: "Google is opnieuw verbonden. De synchronisatie loopt weer automatisch." }
+      : sp.google === "fout"
+        ? { ok: false, text: sp.melding ?? "Opnieuw verbinden is niet gelukt." }
+        : undefined;
   const health = await integrationHealth();
   const canWrite = viewer.permissions.has("integrations:write");
 
@@ -83,6 +95,7 @@ export default async function IntegrationsPage() {
       />
 
       <div className="space-y-5">
+        <DriveStatusCard isOwner={isOwner(viewer)} notice={googleNotice} />
         {health.map((item) => {
           const meta = STATUS_META[item.status] ?? STATUS_META.not_configured!;
           return (

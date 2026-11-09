@@ -40,7 +40,8 @@ import { runReportTeamNotifications } from "@/server/reports/team";
 import { runReportReviewReminders } from "@/server/jobs/report-review-reminders";
 import { runAttentionNotify } from "@/server/jobs/attention-notify";
 import { runEditorStatusChecks } from "@/server/editor-status-checks";
-import { runDriveSync } from "@/server/jobs/drive-sync";
+import { processDriveChanges, reconcileDriveFolders, runDriveSync } from "@/server/jobs/drive-sync";
+import { runDriveHealthCheck } from "@/server/integrations/drive-status";
 import { runPilotPortalSetup } from "@/server/jobs/pilot-setup";
 import { linkMetricoolBrands, pullMetricoolMetrics, pullMetricoolPosts, runMetricoolSync } from "@/server/jobs/metricool-sync";
 import { runShootReconciliation } from "@/server/jobs/shoot-reconciliation";
@@ -156,6 +157,12 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "reports.team_notify": () => runReportTeamNotifications(),
   "attention.notify": runAttentionNotify,
   "drive.sync_all": runDriveSync,
+  // Elke 2 minuten: wijzigingen uit Drive verwerken (licht als er niets is).
+  "drive.sync_changes": () => processDriveChanges({ trigger: "cron", budgetMs: 100_000 }),
+  // Elk uur: een paar klantmappen volledig nalopen (vangnet).
+  "drive.reconcile": () => reconcileDriveFolders({ budgetMs: 200_000, maxClients: 8 }),
+  // Elke 15 minuten: bewaking, afgebroken runs afsluiten, melden bij echte verbreking.
+  "drive.health": runDriveHealthCheck,
   "finance.snapshot_month": snapshotFinanceMonth,
   "team.curate": curateTeam,
   "team.setup_logins": setupTeamLogins,

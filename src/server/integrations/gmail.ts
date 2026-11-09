@@ -1,7 +1,8 @@
 import "server-only";
 import { env } from "@/lib/env";
 import { apiFetch } from "./http";
-import { IntegrationError, MissingCredentialsError, type ConnectionTest } from "./types";
+import { googleAuth } from "./google-auth";
+import { IntegrationError, type ConnectionTest } from "./types";
 
 /**
  * Gmail — API v1 (alleen-lezen). Zelfde refresh-token-flow als Google Drive en
@@ -10,7 +11,6 @@ import { IntegrationError, MissingCredentialsError, type ConnectionTest } from "
  * contactformulier-mails als leads te importeren. Vereist dat de bestaande
  * GOOGLE_REFRESH_TOKEN ook de scope gmail.readonly heeft.
  */
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 export type GmailMessage = {
@@ -62,8 +62,6 @@ function header(headers: RawHeader[] | undefined, name: string): string | null {
 }
 
 export class GmailService {
-  private accessToken: string | null = null;
-  private expiresAt = 0;
 
   constructor(
     private clientId = env.GOOGLE_CLIENT_ID,
@@ -75,27 +73,19 @@ export class GmailService {
     return Boolean(this.clientId && this.clientSecret && this.refreshToken);
   }
 
-  private async token(): Promise<string> {
-    if (!this.isConfigured) {
-      throw new MissingCredentialsError("gmail", ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"]);
-    }
-    if (this.accessToken && Date.now() < this.expiresAt - 60_000) return this.accessToken;
-    const body = new URLSearchParams({
-      client_id: this.clientId!, client_secret: this.clientSecret!, refresh_token: this.refreshToken!, grant_type: "refresh_token",
-    });
-    const response = await fetch(TOKEN_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body, cache: "no-store" });
-    if (!response.ok) {
-      throw new IntegrationError("gmail", `Token vernieuwen mislukt (HTTP ${response.status})`, response.status, response.status >= 500);
-    }
-    const data = (await response.json()) as { access_token: string; expires_in: number };
-    this.accessToken = data.access_token;
-    this.expiresAt = Date.now() + data.expires_in * 1000;
-    return this.accessToken;
+  /** Token komt uit het centrale Google-tokenbeheer (gedeeld met Drive en Gmail). */
+  private token(): Promise<string> {
+    return googleAuth.getAccessToken("gmail");
   }
 
   private async request<T>(path: string, query: Record<string, string | number | boolean | undefined> = {}): Promise<T> {
     const token = await this.token();
-    return apiFetch<T>("gmail", `${API}${path}`, { headers: { Authorization: `Bearer ${token}` }, query });
+    return apiFetch<T>("gmail", `${API}${path}`, {
+      retries: 4,
+      onUnauthorized: async () => {
+        googleAuth.invalidate();
+        return { Authorization: `Bearer ${await this.token()}` };
+      }, headers: { Authorization: `Bearer ${token}` }, query });
   }
 
   /** De label-id opzoeken op naam (hoofdletterongevoelig). */

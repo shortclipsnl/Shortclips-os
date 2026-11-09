@@ -46,13 +46,14 @@ export async function POST(request: Request) {
   }
 
   processInBackground(result.eventId, async () => {
+    // Alleen meldingen van een bij ons bekend kanaal verwerken.
     const [mapping] = await db
-      .select()
+      .select({ id: driveMappings.id })
       .from(driveMappings)
       .where(eq(driveMappings.watchChannelId, channelId))
       .limit(1);
     if (!mapping) return { skipped: true };
-    await syncDriveChanges(mapping.id);
+    await syncDriveChanges();
     return {};
   });
 

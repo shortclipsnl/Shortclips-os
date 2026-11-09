@@ -6,6 +6,8 @@ import { logError } from "@/server/audit";
 import { notifyTechnical } from "@/server/notification-digest";
 import type { Provider } from "@/server/integrations/types";
 import { IntegrationError, MissingCredentialsError } from "@/server/integrations/types";
+import { GoogleReauthRequiredError } from "@/server/integrations/google-auth";
+import { ensureConnectionRow } from "@/server/integrations/google-connection";
 
 export type JobLogEntry = { at: string; level: "info" | "warn" | "error"; message: string };
 
@@ -45,8 +47,22 @@ export async function runJob(
   jobType: string,
   params: Record<string, unknown>,
   work: (ctx: JobContext) => Promise<void>,
-  options: { triggeredById?: string; scopeType?: string; scopeId?: string } = {},
+  options: {
+    triggeredById?: string;
+    scopeType?: string;
+    scopeId?: string;
+    /**
+     * Direct melden bij een fout (standaard aan). Uit voor koppelingen met een
+     * eigen bewaking (Google Drive), zodat één tijdelijke storing geen melding
+     * oplevert; die bewaking meldt pas als het probleem blijft bestaan.
+     */
+    notify?: boolean;
+  } = {},
 ): Promise<{ jobId: string; ok: boolean; error?: string }> {
+  if (EXTERNAL_PROVIDERS.has(provider)) {
+    // In productie bestond deze rij niet, waardoor status en fouten nergens landden.
+    await ensureConnectionRow(provider).catch(() => {});
+  }
   const [job] = await db
     .insert(syncJobs)
     .values({
@@ -132,7 +148,13 @@ export async function runJob(
 
     // Directe melding aan de verantwoordelijke bij een echte koppelingsfout
     // (niet bij ontbrekende configuratie — dat is een bewuste keuze, geen storing).
-    if (EXTERNAL_PROVIDERS.has(provider) && !(error instanceof MissingCredentialsError)) {
+    if (
+      options.notify !== false &&
+      EXTERNAL_PROVIDERS.has(provider) &&
+      !(error instanceof MissingCredentialsError) &&
+      // Ingetrokken Google-toestemming: de Drive-bewaking meldt dat één keer.
+      !(error instanceof GoogleReauthRequiredError)
+    ) {
       await notifySyncFailure(provider, message).catch(() => {});
     }
     return { jobId: job!.id, ok: false, error: message };

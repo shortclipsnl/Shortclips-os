@@ -14,9 +14,24 @@ export type RequestOptions = {
   retries?: number;
   /** Query-parameters; undefined-waarden worden weggelaten. */
   query?: Record<string, string | number | boolean | undefined>;
+  /**
+   * Wordt aangeroepen bij een 401. Geeft nieuwe headers terug (bijv. met een
+   * vers token) om het verzoek één keer opnieuw te doen, of null om te stoppen.
+   */
+  onUnauthorized?: () => Promise<Record<string, string> | null>;
 };
 
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+/** Google Drive meldt limieten vaak als 403 met een reden in de body. */
+export function isRateLimitBody(text: string): boolean {
+  return /rateLimitExceeded|userRateLimitExceeded|quotaExceeded|backendError/i.test(text);
+}
+
+/** Exponentiële backoff met spreiding, maximaal 32 seconden. */
+export function backoffMs(attempt: number): number {
+  return Math.min(32_000, 2 ** attempt * 1000) + Math.floor(Math.random() * 500);
+}
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -34,7 +49,10 @@ export async function apiFetch<T>(
     timeoutMs = 20000,
     retries = 2,
     query,
+    onUnauthorized,
   } = options;
+  let currentHeaders = headers;
+  let reauthTried = false;
 
   const target = new URL(url);
   if (query) {
@@ -55,16 +73,28 @@ export async function apiFetch<T>(
         headers: {
           Accept: "application/json",
           ...(body ? { "Content-Type": "application/json" } : {}),
-          ...headers,
+          ...currentHeaders,
         },
         body: body ? JSON.stringify(body) : undefined,
         signal: controller.signal,
         cache: "no-store",
       });
 
+      if (response.status === 401 && onUnauthorized && !reauthTried) {
+        reauthTried = true;
+        const fresh = await onUnauthorized();
+        if (fresh) {
+          currentHeaders = { ...currentHeaders, ...fresh };
+          attempt--; // telt niet als herhaalpoging
+          continue;
+        }
+      }
+
       if (!response.ok) {
         const text = await response.text().catch(() => "");
-        const retryable = RETRYABLE_STATUS.has(response.status);
+        const retryable =
+          RETRYABLE_STATUS.has(response.status) ||
+          (response.status === 403 && isRateLimitBody(text));
         lastError = new IntegrationError(
           provider,
           `HTTP ${response.status} bij ${method} ${target.pathname}`,
@@ -79,7 +109,7 @@ export async function apiFetch<T>(
         await sleep(
           Number.isFinite(retryAfter) && retryAfter > 0
             ? retryAfter * 1000
-            : 2 ** attempt * 500,
+            : backoffMs(attempt),
         );
         continue;
       }
@@ -102,7 +132,7 @@ export async function apiFetch<T>(
           true,
         );
         if (attempt === retries) throw lastError;
-        await sleep(2 ** attempt * 500);
+        await sleep(backoffMs(attempt));
       }
     } finally {
       clearTimeout(timer);

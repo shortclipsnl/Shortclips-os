@@ -141,3 +141,29 @@ export async function confirmImport(runId: string): Promise<ActionResult> {
     throw error;
   }
 }
+
+/**
+ * 'Nu synchroniseren' op de Drive-statuskaart: voert een echte sync uit
+ * (wijzigingen uit Drive ophalen en verwerken), niet alleen een verversing.
+ */
+export async function syncDriveNow(): Promise<ActionResult> {
+  try {
+    const viewer = await requireOperationalManager();
+    const { processDriveChanges } = await import("@/server/jobs/drive-sync");
+    const r = await processDriveChanges({ trigger: "handmatig", triggeredById: viewer.id, budgetMs: 45_000 });
+    revalidatePath("/settings/integrations");
+    if (r.skipped === "already_running") {
+      return { ok: true, message: "Er loopt al een synchronisatie; die maakt het werk af. Ververs over een minuut." };
+    }
+    if (r.skipped === "not_configured") return { ok: false, message: "Google Drive is nog niet ingesteld." };
+    if (!r.ok) return { ok: false, message: r.error ?? "Synchroniseren is mislukt. Het systeem probeert het automatisch opnieuw." };
+    if (r.changes === 0) return { ok: true, message: "Alles is actueel. Er waren geen nieuwe wijzigingen in Drive." };
+    return {
+      ok: true,
+      message: `${r.changes} wijziging(en) verwerkt: ${r.created} nieuw, ${r.updated} bijgewerkt.${r.caughtUp ? "" : " Er staat nog meer klaar; dat volgt automatisch."}`,
+    };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}

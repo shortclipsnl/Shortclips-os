@@ -1,21 +1,15 @@
 import "server-only";
-import { env } from "@/lib/env";
 import { apiFetch } from "./http";
+import { googleAuth, googleFetch, type GoogleAuth } from "./google-auth";
 import {
   IntegrationError,
-  MissingCredentialsError,
   type ConnectionTest,
 } from "./types";
 
 /**
- * Google Drive — API v3.
- *
- * We gebruiken een refresh-token flow: de refresh-token staat in de omgeving en
- * wordt omgewisseld voor een kortlevend access-token. Het access-token wordt in
- * het geheugen bewaard tot vlak voor het verloopt, zodat niet elke aanroep een
- * extra rondje naar Google kost.
+ * Google Drive — API v3. Authenticatie loopt via het centrale tokenbeheer
+ * (google-auth.ts), gedeeld met Agenda en Gmail.
  */
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const API = "https://www.googleapis.com/drive/v3";
 
 export type DriveFile = {
@@ -32,59 +26,14 @@ export type DriveFile = {
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
 export class DriveService {
-  private accessToken: string | null = null;
-  private expiresAt = 0;
-
-  constructor(
-    private clientId = env.GOOGLE_CLIENT_ID,
-    private clientSecret = env.GOOGLE_CLIENT_SECRET,
-    private refreshToken = env.GOOGLE_REFRESH_TOKEN,
-  ) {}
+  constructor(private auth: GoogleAuth = googleAuth) {}
 
   get isConfigured(): boolean {
-    return Boolean(this.clientId && this.clientSecret && this.refreshToken);
+    return this.auth.isConfigured;
   }
 
-  private async token(): Promise<string> {
-    if (!this.isConfigured) {
-      throw new MissingCredentialsError("google_drive", [
-        "GOOGLE_CLIENT_ID",
-        "GOOGLE_CLIENT_SECRET",
-        "GOOGLE_REFRESH_TOKEN",
-      ]);
-    }
-    // Een minuut marge, zodat een token nooit halverwege een verzoek verloopt.
-    if (this.accessToken && Date.now() < this.expiresAt - 60_000) {
-      return this.accessToken;
-    }
-
-    const body = new URLSearchParams({
-      client_id: this.clientId!,
-      client_secret: this.clientSecret!,
-      refresh_token: this.refreshToken!,
-      grant_type: "refresh_token",
-    });
-
-    const response = await fetch(TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new IntegrationError(
-        "google_drive",
-        `Token vernieuwen mislukt (HTTP ${response.status})`,
-        response.status,
-        response.status >= 500,
-      );
-    }
-
-    const data = (await response.json()) as { access_token: string; expires_in: number };
-    this.accessToken = data.access_token;
-    this.expiresAt = Date.now() + data.expires_in * 1000;
-    return this.accessToken;
+  private token(): Promise<string> {
+    return this.auth.getAccessToken("google_drive");
   }
 
   private async request<T>(
@@ -94,12 +43,32 @@ export class DriveService {
     const token = await this.token();
     return apiFetch<T>("google_drive", `${API}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
+      // Drive-limieten (429 en 403 rateLimitExceeded) met backoff opvangen.
+      retries: 4,
+      timeoutMs: 30_000,
+      onUnauthorized: async () => {
+        this.auth.invalidate();
+        return { Authorization: `Bearer ${await this.token()}` };
+      },
       query: {
         supportsAllDrives: true,
         includeItemsFromAllDrives: true,
         ...query,
       },
     });
+  }
+
+  /** Ruwe aanroep (download/upload) met token, 401-herstel en backoff. */
+  private raw(url: string, init: RequestInit = {}): Promise<Response> {
+    return googleFetch("google_drive", url, init, { auth: this.auth });
+  }
+
+  /** Welk Google-account is gekoppeld? */
+  async about(): Promise<{ emailAddress: string; displayName: string }> {
+    const r = await this.request<{ user: { emailAddress: string; displayName: string } }>("/about", {
+      fields: "user(displayName,emailAddress)",
+    });
+    return r.user;
   }
 
   async testConnection(): Promise<ConnectionTest> {
@@ -197,8 +166,10 @@ export class DriveService {
     return this.request("/changes", {
       pageToken,
       fields:
-        "newStartPageToken,nextPageToken,changes(fileId,removed,file(id,name,mimeType,size,modifiedTime,webViewLink,parents,trashed))",
-      pageSize: 200,
+        "newStartPageToken,nextPageToken,changes(fileId,removed,changeType,file(id,name,mimeType,size,modifiedTime,webViewLink,parents,trashed))",
+      pageSize: 500,
+      spaces: "drive",
+      includeRemoved: true,
     });
   }
 
@@ -220,10 +191,9 @@ export class DriveService {
     });
     if (res.files?.[0]?.id) return res.files[0].id;
 
-    const token = await this.token();
-    const r = await fetch(`${API}/files?fields=id&supportsAllDrives=true`, {
+    const r = await this.raw(`${API}/files?fields=id&supportsAllDrives=true`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, mimeType: FOLDER_MIME }),
     });
     if (!r.ok) {
@@ -242,10 +212,9 @@ export class DriveService {
     });
     if (res.files?.[0]?.id) return res.files[0].id;
 
-    const token = await this.token();
-    const r = await fetch(`${API}/files?fields=id&supportsAllDrives=true`, {
+    const r = await this.raw(`${API}/files?fields=id&supportsAllDrives=true`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
     });
     if (!r.ok) {
@@ -256,9 +225,8 @@ export class DriveService {
 
   /** Download de ruwe inhoud (bytes) van één bestand uit Drive. */
   async downloadBytes(fileId: string): Promise<Uint8Array> {
-    const token = await this.token();
     const url = `${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    const res = await this.raw(url);
     if (!res.ok) {
       throw new IntegrationError("google_drive", `Bestand downloaden mislukt (HTTP ${res.status})`, res.status, res.status >= 500);
     }
@@ -276,9 +244,8 @@ export class DriveService {
     const { dirname } = await import("node:path");
     const { Readable } = await import("node:stream");
     const { pipeline } = await import("node:stream/promises");
-    const token = await this.token();
     const url = `${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true&acknowledgeAbuse=true`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    const res = await this.raw(url);
     if (!res.ok || !res.body) {
       throw new IntegrationError("google_drive", `Bestand downloaden mislukt (HTTP ${res.status})`, res.status, res.status >= 500);
     }
@@ -290,9 +257,8 @@ export class DriveService {
   /** Exporteert een Google-document (Docs) als platte tekst. Alleen voor
    *  Google-native bestanden; gewone bestanden gaan via downloadBytes. */
   async exportText(fileId: string): Promise<string> {
-    const token = await this.token();
     const url = `${API}/files/${encodeURIComponent(fileId)}/export?mimeType=text/plain&supportsAllDrives=true`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    const res = await this.raw(url);
     if (!res.ok) {
       throw new IntegrationError("google_drive", `Document exporteren mislukt (HTTP ${res.status})`, res.status, res.status >= 500);
     }
@@ -301,16 +267,15 @@ export class DriveService {
 
   /** Upload een bestand (bytes) naar een map. Multipart upload in één request. */
   async uploadBytes(name: string, mimeType: string, bytes: Uint8Array, parentId: string): Promise<{ id: string }> {
-    const token = await this.token();
     const boundary = "scbackup_" + Math.random().toString(36).slice(2);
     const meta = JSON.stringify({ name, parents: [parentId] });
     const pre = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`;
     const post = `\r\n--${boundary}--`;
     const body = Buffer.concat([Buffer.from(pre, "utf8"), Buffer.from(bytes), Buffer.from(post, "utf8")]);
 
-    const r = await fetch(`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id&supportsAllDrives=true`, {
+    const r = await this.raw(`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id&supportsAllDrives=true`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+      headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
       body,
     });
     if (!r.ok) {
@@ -322,11 +287,7 @@ export class DriveService {
 
   /** Een bestand verwijderen (voor het opruimen van oude backups). */
   async deleteFileById(id: string): Promise<void> {
-    const token = await this.token();
-    const r = await fetch(`${API}/files/${id}?supportsAllDrives=true`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const r = await this.raw(`${API}/files/${id}?supportsAllDrives=true`, { method: "DELETE" });
     if (!r.ok && r.status !== 404) {
       throw new IntegrationError("google_drive", `Verwijderen mislukt (HTTP ${r.status})`, r.status, r.status >= 500);
     }

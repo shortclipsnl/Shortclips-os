@@ -743,6 +743,13 @@
       "when": 1794208661935,
       "tag": "0105_klantonboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1794210349690,
+      "tag": "0106_drive_betrouwbaar",
+      "breakpoints": true
     }
   ]
 }

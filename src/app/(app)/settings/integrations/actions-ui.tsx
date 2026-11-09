@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plug, RefreshCw } from "lucide-react";
-import { runSyncJob, testIntegration } from "@/server/actions/integrations";
+import { runSyncJob, syncDriveNow, testIntegration } from "@/server/actions/integrations";
 import { Button, ErrorNote, InfoNote } from "@/components/ui";
 
 export function TestButton({ provider, canTest }: { provider: string; canTest: boolean }) {
@@ -58,6 +58,35 @@ export function JobButton({ job, label }: { job: string; label: string }) {
       >
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
         {label}
+      </Button>
+      {result ? (
+        result.ok ? <InfoNote tone="good">{result.message}</InfoNote> : <ErrorNote>{result.message}</ErrorNote>
+      ) : null}
+    </div>
+  );
+}
+
+/** 'Nu synchroniseren' voor Google Drive: start een echte synchronisatietaak. */
+export function DriveSyncButton() {
+  const [pending, start] = useTransition();
+  const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);
+  const router = useRouter();
+  return (
+    <div className="space-y-2">
+      <Button
+        size="sm"
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            setResult(null);
+            const res = await syncDriveNow();
+            setResult(res);
+            router.refresh();
+          })
+        }
+      >
+        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+        {pending ? "Bezig met synchroniseren…" : "Nu synchroniseren"}
       </Button>
       {result ? (
         result.ok ? <InfoNote tone="good">{result.message}</InfoNote> : <ErrorNote>{result.message}</ErrorNote>
