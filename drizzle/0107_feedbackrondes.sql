@@ -1,0 +1,1 @@
+ALTER TABLE "deliverables" ADD COLUMN "feedback_rounds" integer DEFAULT 0 NOT NULL;

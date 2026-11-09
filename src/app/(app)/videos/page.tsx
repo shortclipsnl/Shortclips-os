@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { requireInternal, isOwner, canManageOperations } from "@/server/auth/context";
 import { assignMissingEditorsIfStale, mergeDuplicateShootsIfStale } from "@/server/jobs/calendar-sync";
 import { isCoreStaff } from "@/server/core-staff";
+import { canManageFeedbackRounds } from "@/server/feedback-rounds";
 import { getVideoHighlights, listEditorOptions, listVideos } from "@/server/videos";
 import { listEditingProjects } from "@/server/editing-board";
 import { listEditorBoard } from "@/server/editor-board";
@@ -126,8 +127,10 @@ export default async function VideosPage({
   const showAllBoard = owner || isCoreStaff(viewer.email);
   // Alle editing-opdrachten (video's) over alle editors — het volledige beeld,
   // gegroepeerd per fase met de editor erbij.
+  // Feedbackrondes: alleen voor het kernteam (Jarno, Milou, Jiska, Rutger).
+  const showFeedbackRounds = canManageFeedbackRounds(viewer);
   const allEditorVideos = showAllBoard
-    ? (await listEditorBoard(viewer, { allEditors: true })).filter((v) =>
+    ? (await listEditorBoard(viewer, { allEditors: true, withFeedbackRounds: showFeedbackRounds })).filter((v) =>
         klantenFilter === "alle" ? true : klantenFilter === "actief" ? v.clientActive : !v.clientActive)
     : [];
   // "Kopieer klantbericht": zichtbaar zodra er eerste versies klaarstaan om naar de
@@ -163,6 +166,7 @@ export default async function VideosPage({
               canAssign={canAssign}
               canEditFiles={showAllBoard}
               viewerId={viewer.id}
+              showFeedbackRounds={showFeedbackRounds}
             />
           ) : (
             <p className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">

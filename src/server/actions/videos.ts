@@ -24,6 +24,8 @@ import {
   ForbiddenError,
 } from "@/server/auth/context";
 import { isCoreStaff } from "@/server/core-staff";
+import { canManageFeedbackRounds } from "@/server/feedback-rounds";
+import { FEEDBACK_ROUNDS_MAX } from "@/lib/feedback-rounds";
 
 /**
  * Rechten rond editingprojecten (technisch afgedwongen, niet alleen in de UI):
@@ -254,6 +256,49 @@ export async function setEditingVideoShorts(videoId: string, shorts: number | nu
 
     const n = shorts === null ? null : Math.max(0, Math.min(99, Math.round(shorts)));
     await db.update(deliverables).set({ plannedShorts: n, updatedAt: new Date() }).where(eq(deliverables.id, videoId));
+
+    revalidatePath("/videos");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Feedbackrondes van één opname (editingproject) vastleggen: 0 t/m 6.
+ * Uitsluitend voor het kernteam (Jarno, Milou, Jiska, Rutger); technisch
+ * afgedwongen, niet alleen verborgen in de UI. Elke opname heeft een eigen
+ * teller (per deliverable), dus opnames van dezelfde klant raken elkaar niet.
+ */
+export async function setFeedbackRounds(videoId: string, rounds: number): Promise<ActionResult> {
+  try {
+    const viewer = await requireInternal();
+    if (!canManageFeedbackRounds(viewer)) {
+      await auditLog({ viewer, action: "videos.feedback_rounds", entityType: "deliverable", entityId: videoId, outcome: "deny" });
+      return { ok: false, message: "Alleen het kernteam kan feedbackrondes registreren." };
+    }
+    if (!Number.isInteger(rounds) || rounds < 0 || rounds > FEEDBACK_ROUNDS_MAX) {
+      return { ok: false, message: `Kies een aantal van 0 tot en met ${FEEDBACK_ROUNDS_MAX}.` };
+    }
+    const video = await loadVideo(videoId);
+    if (!video) return { ok: false, message: "Opname niet gevonden." };
+    assertClientAccess(viewer, video.clientId);
+
+    const [before] = await db
+      .select({ feedbackRounds: deliverables.feedbackRounds })
+      .from(deliverables)
+      .where(eq(deliverables.id, videoId))
+      .limit(1);
+    await db.update(deliverables).set({ feedbackRounds: rounds, updatedAt: new Date() }).where(eq(deliverables.id, videoId));
+    await auditLog({
+      viewer,
+      action: "videos.feedback_rounds",
+      entityType: "deliverable",
+      entityId: videoId,
+      clientId: video.clientId,
+      changes: { from: before?.feedbackRounds ?? 0, to: rounds },
+    });
 
     revalidatePath("/videos");
     return { ok: true };

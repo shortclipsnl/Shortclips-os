@@ -92,6 +92,9 @@ export const deliverables = pgTable(
       .notNull()
       .default(0),
     clientRevisionRounds: integer("client_revision_rounds").notNull().default(0),
+    /** Feedbackrondes (0-6), handmatig bijgehouden door het kernteam op het
+     *  editingoverzicht. Vanaf 2 gelden extra kosten volgens de prijslijst. */
+    feedbackRounds: integer("feedback_rounds").notNull().default(0),
     editCost: numeric("edit_cost", { precision: 10, scale: 2 })
       .notNull()
       .default("0"),

@@ -3,14 +3,15 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ClipboardList, Download, FileText, Loader2, MessageSquare, Pencil, RefreshCw, Sparkles, Upload, X } from "lucide-react";
+import { AlertTriangle, ClipboardList, Download, FileText, Loader2, MessageSquare, Pencil, RefreshCw, Sparkles, Upload, X } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
 import { editorColor, editorDisplayName, firstNameKey } from "@/lib/editors";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { EDIT_PHASE_META, EDIT_PHASE_ORDER, type EditPhase, type VideoStage } from "@/lib/statuses";
 import { EditPhaseHeader } from "@/components/edit-phase-header";
-import { askEditorQuestion, assignEditor, attachBriefingToProject, changeVideoStatus, clearBriefingFromProject, createVideoScriptUploadUrl, deleteVideoScript, regenerateVideoBriefing, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts, uploadVideoScript } from "@/server/actions/videos";
+import { askEditorQuestion, assignEditor, attachBriefingToProject, changeVideoStatus, clearBriefingFromProject, createVideoScriptUploadUrl, deleteVideoScript, regenerateVideoBriefing, setEditingVideoDeadline, setEditingVideoLinks, setEditingVideoShorts, setFeedbackRounds, uploadVideoScript } from "@/server/actions/videos";
+import { FEEDBACK_ROUND_OPTIONS, extraFeedbackRoundText, isExtraFeedbackRound } from "@/lib/feedback-rounds";
 import { fileToBase64 } from "../ai/_shared";
 import type { EditorBoardVideo } from "@/server/editor-board";
 
@@ -37,6 +38,13 @@ const PHASE_TO_STATUS: Record<EditPhase, VideoStage> = {
 const GRID = "minmax(140px,1.4fr) 120px minmax(150px,1.3fr) 150px minmax(120px,1fr) 64px minmax(120px,1fr) minmax(110px,1fr) minmax(150px,1.4fr)";
 // Teamoverzicht: extra kolom Voortgang (statuscheck van de editor) direct na de deadline.
 const GRID_TEAM = "minmax(140px,1.4fr) 120px minmax(150px,1.3fr) 132px 150px minmax(120px,1fr) 64px minmax(120px,1fr) minmax(110px,1fr) minmax(150px,1.4fr)";
+// Kernteam: extra smalle kolom Feedbackrondes direct na de Fase.
+const GRID_TEAM_FEEDBACK = "minmax(140px,1.4fr) 120px minmax(150px,1.3fr) 132px 150px 108px minmax(120px,1fr) 64px minmax(120px,1fr) minmax(110px,1fr) minmax(150px,1.4fr)";
+
+function gridFor(editorView: boolean, showFeedbackRounds: boolean): string {
+  if (editorView) return GRID;
+  return showFeedbackRounds ? GRID_TEAM_FEEDBACK : GRID_TEAM;
+}
 
 /** Kleuren van de kolom Voortgang: groen = goed, oranje = aandacht, rood = risico. */
 const PROGRESS_TONE: Record<NonNullable<EditorBoardVideo["progress"]>["tone"], { bg: string; fg: string }> = {
@@ -94,6 +102,7 @@ export function EditorBoardTable({
   viewerId,
   showTabs = true,
   editorView = false,
+  showFeedbackRounds = false,
 }: {
   videos: EditorBoardVideo[];
   editors: Editor[];
@@ -109,7 +118,12 @@ export function EditorBoardTable({
   showTabs?: boolean;
   /** Editorperspectief: toon de interne deadline (opname + 7 wd) i.p.v. de klantdeadline. */
   editorView?: boolean;
+  /** Kolom Feedbackrondes tonen (alleen kernteam; de server stuurt de waarde
+   *  ook alleen dan mee). */
+  showFeedbackRounds?: boolean;
 }) {
+  const withFeedback = showFeedbackRounds && !editorView;
+  const grid = gridFor(editorView, withFeedback);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(["afgerond"]));
   const [editor, setEditor] = useState<string>("alle");
 
@@ -236,14 +250,17 @@ export function EditorBoardTable({
       </div>
       ) : null}
 
+      {withFeedback ? <ExtraFeedbackNotice videos={videos} /> : null}
+
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <div className={editorView ? "min-w-[1210px]" : "min-w-[1350px]"}>
-          <div className="grid items-center gap-px border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]" style={{ gridTemplateColumns: editorView ? GRID : GRID_TEAM }}>
+        <div className={editorView ? "min-w-[1210px]" : withFeedback ? "min-w-[1460px]" : "min-w-[1350px]"}>
+          <div className="grid items-center gap-px border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2 py-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]" style={{ gridTemplateColumns: grid }}>
             <span className="px-1">Item</span>
             <span className="px-1 text-center">Editor</span>
             <span className="px-1 text-center">{editorView ? "Editor deadline" : "Deadline"}</span>
             {editorView ? null : <span className="px-1 text-center" title="Laatste statuscheck van de editor">Voortgang</span>}
             <span className="px-1 text-center">Fase</span>
+            {withFeedback ? <span className="px-1 text-center" title="Aantal feedbackrondes van deze opname. Vanaf 2 gelden extra kosten.">Feedbackrondes</span> : null}
             <span className="px-1 text-center">Prioriteit</span>
             <span className="px-1 text-center">Shorts</span>
             <span className="px-1 text-center">Links shorts</span>
@@ -260,7 +277,7 @@ export function EditorBoardTable({
                 <EditPhaseHeader label={meta.label} color={meta.color} count={list.length} open={open} onToggle={() => toggle(ph)} />
                 {open ? (
                   list.length > 0 ? (
-                    list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} canEditFiles={canEditFiles} viewerId={viewerId} phaseColor={meta.color} editorView={editorView} />)
+                    list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} canEditFiles={canEditFiles} viewerId={viewerId} phaseColor={meta.color} editorView={editorView} grid={grid} showFeedbackRounds={withFeedback} />)
                   ) : (
                     <p className="border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2.5 text-2xs text-[var(--color-ink-faint)]">Nog geen video&apos;s in deze fase.</p>
                   )
@@ -337,7 +354,7 @@ function TextTab({ active, onClick, children }: { active: boolean; onClick: () =
   );
 }
 
-function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorView = false }: { v: EditorBoardVideo; editors: Editor[]; canEdit: boolean; canAssign: boolean; canEditFiles?: boolean; viewerId?: string; phaseColor: string; editorView?: boolean }) {
+function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorView = false, grid, showFeedbackRounds = false }: { v: EditorBoardVideo; editors: Editor[]; canEdit: boolean; canAssign: boolean; canEditFiles?: boolean; viewerId?: string; phaseColor: string; editorView?: boolean; grid: string; showFeedbackRounds?: boolean }) {
   // Downloadlink + script mogen editors ook bewerken (los van `canEdit`): wie
   // `videos:write` heeft, of wie zelf de toegewezen editor van deze rij is.
   // Bronmateriaal (downloadlink, script) beheert alleen Team Shortclips; de
@@ -353,7 +370,7 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorV
   const pct = Math.min(100, Math.max(6, Math.round((elapsed / Math.max(1, total)) * 100)));
 
   return (
-    <div className="grid items-stretch gap-px border-b border-[var(--color-line)] bg-[var(--color-surface)] text-sm hover:bg-[var(--color-surface-sunken)]/40" style={{ gridTemplateColumns: editorView ? GRID : GRID_TEAM }}>
+    <div className="grid items-stretch gap-px border-b border-[var(--color-line)] bg-[var(--color-surface)] text-sm hover:bg-[var(--color-surface-sunken)]/40" style={{ gridTemplateColumns: grid }}>
       {/* Item (klant) + "Vraag stellen"-knop voor de editor. De editor-briefing
           staat nu in een eigen kolom (rechts). */}
       <div className="flex flex-col justify-center gap-1 px-2.5 py-2" style={{ boxShadow: `inset 4px 0 0 ${phaseColor}` }}>
@@ -415,6 +432,9 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorV
         )}
       </div>
 
+      {/* Feedbackrondes — alleen kernteam; per opname een eigen teller. */}
+      {showFeedbackRounds ? <FeedbackRoundsCell v={v} /> : null}
+
       {/* Prioriteit */}
       <div className="flex items-center justify-center px-1 py-1">
         {prio ? (
@@ -444,6 +464,115 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorV
       <div className="flex items-center justify-center px-1 py-1">
         <BriefingCell v={v} canEdit={canEdit} run={run} pending={pending} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * Compacte melding boven het overzicht zolang er opnames op feedbackronde 2 of
+ * hoger staan, zodat het team de extra kosten niet vergeet te communiceren.
+ * Alleen actieve opnames; afgeronde projecten tellen niet mee.
+ */
+function ExtraFeedbackNotice({ videos }: { videos: EditorBoardVideo[] }) {
+  const extra = videos.filter((v) => v.phase !== "afgerond" && isExtraFeedbackRound(v.feedbackRounds));
+  if (extra.length === 0) return null;
+  const names = [...new Set(extra.map((v) => v.clientName))];
+  const shown = names.slice(0, 4).join(", ") + (names.length > 4 ? ` +${names.length - 4}` : "");
+  return (
+    <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-warn)]/40 bg-[var(--color-warn-soft)] px-3 py-2 text-xs text-[var(--color-ink)]">
+      <AlertTriangle className="size-4 shrink-0 text-[var(--color-warn)]" strokeWidth={2} />
+      <span className="min-w-0 truncate">
+        <strong>{extra.length === 1 ? "1 opname" : `${extra.length} opnames`} met extra feedbackrondes</strong>
+        <span className="text-[var(--color-ink-muted)]"> · {shown} · extra kosten vooraf met de klant communiceren</span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Kolom Feedbackrondes: klik op het aantal, kies 0 t/m 6, direct opgeslagen.
+ * 0-1 neutraal; 2 of hoger oranje met waarschuwingsicoon en een melding dat er
+ * extra kosten gelden volgens de prijslijst (geen vast bedrag).
+ */
+function FeedbackRoundsCell({ v }: { v: EditorBoardVideo }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [value, setValue] = useState<number>(v.feedbackRounds ?? 0);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const extra = isExtraFeedbackRound(value);
+
+  const choose = (n: number) => {
+    if (n === value) {
+      if (!isExtraFeedbackRound(n)) setOpen(false);
+      return;
+    }
+    const prev = value;
+    setValue(n);
+    setError(null);
+    // Bij 2 of hoger blijft het menu open zodat de waarschuwing zichtbaar is.
+    if (!isExtraFeedbackRound(n)) setOpen(false);
+    start(async () => {
+      const r = await setFeedbackRounds(v.id, n);
+      if (!r.ok) {
+        setValue(prev);
+        setError(r.message ?? "Opslaan mislukt.");
+        setOpen(true);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
+  const title = extra
+    ? `Let op: extra feedbackronde. ${extraFeedbackRoundText(value)} Communiceer dit vooraf duidelijk met de klant.`
+    : `${value} ${value === 1 ? "feedbackronde" : "feedbackrondes"} · klik om aan te passen`;
+
+  return (
+    <div className="relative flex items-center justify-center px-1 py-1">
+      <button type="button" onClick={() => setOpen((o) => !o)} disabled={pending} title={title}
+        aria-label={`Feedbackrondes: ${value}`}
+        className={`inline-flex h-7 min-w-12 items-center justify-center gap-1 rounded-[4px] px-2 text-sm font-semibold tabular-nums transition hover:brightness-95 ${extra ? "bg-[var(--color-warn-soft)] text-[var(--color-warn)] ring-1 ring-[var(--color-warn)]/50" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
+        {extra ? <AlertTriangle className="size-3.5" strokeWidth={2.25} /> : null}
+        {value}
+        {pending ? <Loader2 className="size-3 animate-spin" /> : null}
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
+          <div className="absolute left-1/2 top-full z-20 mt-1 w-64 -translate-x-1/2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
+            <p className="mb-1.5 px-0.5 text-2xs font-semibold text-[var(--color-ink-muted)]">Feedbackrondes · {v.clientName}</p>
+            <div className="grid grid-cols-7 gap-1">
+              {FEEDBACK_ROUND_OPTIONS.map((n) => {
+                const on = n === value;
+                const warn = isExtraFeedbackRound(n);
+                return (
+                  <button key={n} type="button" onClick={() => choose(n)} disabled={pending}
+                    className={`h-8 rounded-[4px] text-sm font-semibold tabular-nums transition ${on ? (warn ? "bg-[var(--color-warn)] text-white" : "bg-[var(--color-indigo-ink)] text-white") : warn ? "bg-[var(--color-warn-soft)] text-[var(--color-warn)] hover:brightness-95" : "bg-[var(--color-surface-2)] text-[var(--color-ink)] hover:brightness-95"}`}>
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
+            {error ? <p className="mt-2 px-0.5 text-2xs font-semibold text-[var(--color-bad)]">{error}</p> : null}
+            {extra ? (
+              <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--color-warn)]/40 bg-[var(--color-warn-soft)] p-2 text-xs leading-snug text-[var(--color-ink)]">
+                <p className="mb-1 flex items-center gap-1.5 font-bold text-[var(--color-warn)]">
+                  <AlertTriangle className="size-3.5" strokeWidth={2.25} /> Let op: Extra feedbackronde
+                </p>
+                <p>{extraFeedbackRoundText(value)}</p>
+                <p className="mt-1 font-semibold">Communiceer dit vooraf duidelijk met de klant.</p>
+                <div className="mt-2 flex justify-end">
+                  <button type="button" onClick={() => setOpen(false)}
+                    className="rounded bg-[var(--color-ink)] px-2.5 py-1 text-2xs font-semibold text-white">Begrepen</button>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 px-0.5 text-2xs text-[var(--color-ink-faint)]">De eerste feedbackronde valt binnen de standaard dienstverlening.</p>
+            )}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

@@ -157,6 +157,9 @@ export type EditorBoardVideo = {
   editorBatteryColor: "groen" | "blauw" | "oranje" | "rood";
   /** Laatste statuscheck van de editor (alleen in het teamoverzicht). */
   progress: EditorProgress | null;
+  /** Feedbackrondes (0-6) van deze opname. Alleen gevuld voor het kernteam
+   *  (Jarno, Milou, Jiska, Rutger); voor iedereen anders null. */
+  feedbackRounds: number | null;
 };
 
 const TOTAL_WORKDAYS = 14; // opname → klantoplevering
@@ -164,10 +167,12 @@ const TOTAL_WORKDAYS = 14; // opname → klantoplevering
 /**
  * @param opts.allEditors  true = alle editors (voor eigenaar/coördinator, met de
  *   editor per rij). Standaard alleen de eigen video's van de viewer.
+ * @param opts.withFeedbackRounds  true = feedbackrondes meesturen. Alleen voor
+ *   het kernteam (zie `canManageFeedbackRounds`); anders blijft het veld null.
  */
 export async function listEditorBoard(
   viewer: Viewer,
-  opts: { allEditors?: boolean } = {},
+  opts: { allEditors?: boolean; withFeedbackRounds?: boolean } = {},
 ): Promise<EditorBoardVideo[]> {
   const holidays = nlHolidaySet();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
@@ -187,6 +192,7 @@ export async function listEditorBoard(
       shootOn: deliverables.shootOn,
       briefing: deliverables.briefing,
       currentVersion: deliverables.currentVersion,
+      feedbackRounds: deliverables.feedbackRounds,
       clientName: clients.name,
       clientSlug: clients.slug,
       clientColor: clients.color,
@@ -399,6 +405,7 @@ export async function listEditorBoard(
       editorOverdue,
       editorBatteryColor,
       progress: null,
+      feedbackRounds: opts.withFeedbackRounds ? Number(r.feedbackRounds ?? 0) : null,
     };
   });
 
