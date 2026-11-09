@@ -24,7 +24,7 @@ const NIET_NODIG = ["De opening herschrijven of afzwakken", "Spreektaal formeler
 
 export function ScriptLeeswijzer({ feedbackDays }: { feedbackDays?: number }) {
   return (
-    <details className="sc-glass p-5 sm:p-6 [&_summary]:cursor-pointer" open>
+    <details className="sc-glass p-5 sm:p-6 [&_summary]:cursor-pointer">
       <summary className="flex items-center gap-2 text-base font-semibold">
         <BookOpen className="size-4 text-[var(--sc-accent)]" /> Hoe controleer ik mijn scripts?
       </summary>

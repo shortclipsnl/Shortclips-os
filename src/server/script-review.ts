@@ -2,7 +2,9 @@ import "server-only";
 import { clientIsActive } from "@/server/client-activity";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, productionDays, scriptReviewComments, scriptReviewThreads, scriptReviewVersions, scriptReviews, users } from "@/db/schema";
+import { clients, productionDays, scriptReviewComments, scriptReviewPageApprovals, scriptReviewThreads, scriptReviewVersions, scriptReviews, users } from "@/db/schema";
+import { pageStates, scriptPageRange, scriptPages, summarize, type ApprovalSummary, type ScriptPageState } from "@/lib/script-approval";
+import { downloadScriptPdf } from "@/server/scripts/script-storage";
 import { assertClientAccess, scopeToClients, type Viewer } from "@/server/auth/context";
 
 /**
@@ -39,6 +41,9 @@ export type PortalReviewListItem = {
   feedbackDeadline: string | null;
   openComments: number;
   approvedAt: string | null;
+  /** Goedgekeurde scripts / totaal in de huidige versie (0/0 = onbekend). */
+  approvedScripts: number;
+  totalScripts: number;
 };
 
 const rows = <T,>(r: unknown): T[] => ((r as { rows?: T[] }).rows ?? (r as T[])) as T[];
@@ -103,6 +108,13 @@ export async function listPortalScriptReviews(viewer: Viewer): Promise<PortalRev
     feedbackDeadline: r.feedbackDeadline ? r.feedbackDeadline.toISOString() : null,
     openComments: extra.get(r.id)?.openComments ?? 0,
     approvedAt: r.approvedAt ? r.approvedAt.toISOString() : null,
+    approvedScripts: 0,
+    totalScripts: 0,
+  }));
+  await Promise.all(items.map(async (it) => {
+    const a = await getReviewApproval(it.id, it.currentVersion, it.currentVersionId);
+    it.totalScripts = a.summary.total;
+    it.approvedScripts = it.status === "goedgekeurd" ? a.summary.total : a.summary.approved;
   }));
   // Actie-vereist eerst.
   const order = (s: ScriptReviewStatus) => (CLIENT_ACTION_STATUSES.includes(s) ? 0 : s === "goedgekeurd" ? 2 : 1);
@@ -122,6 +134,7 @@ export type PortalReviewDetail = {
   feedbackDeadline: string | null;
   approvedAt: string | null;
   approvedByName: string | null;
+  approval: ReviewApproval;
   threads: Array<{
     id: string;
     versionNumber: number;
@@ -192,6 +205,7 @@ export async function getPortalScriptReview(viewer: Viewer, reviewId: string): P
     feedbackDeadline: r.feedbackDeadline ? r.feedbackDeadline.toISOString() : null,
     approvedAt: r.approvedAt ? r.approvedAt.toISOString() : null,
     approvedByName: r.approvedByName ?? null,
+    approval: await getReviewApproval(r.id, r.currentVersion, version?.id ?? null),
     threads: threadRows.map((t) => ({
       id: t.id,
       versionNumber: t.versionNumber,
@@ -221,6 +235,79 @@ export async function getScriptPdfVersion(versionId: string): Promise<{ fileName
     .where(eq(scriptReviewVersions.id, versionId))
     .limit(1);
   return row ?? null;
+}
+
+
+/* ------------------------------------------- goedkeuring per script (pagina) */
+
+export type ScriptPageInfo = {
+  /** Pagina in de PDF (1-based). */
+  page: number;
+  /** Volgnummer van het script (1, 2, 3…). */
+  index: number;
+  state: ScriptPageState;
+  approvedAt: string | null;
+  approvedByName: string | null;
+};
+
+export type ReviewApproval = { scripts: ScriptPageInfo[]; summary: ApprovalSummary };
+
+const EMPTY_APPROVAL: ReviewApproval = { scripts: [], summary: { total: 0, approved: 0, changes: 0, open: 0, allHandled: false, allApproved: false } };
+
+/**
+ * Aantal pagina's + scriptbereik van een PDF-versie. Wordt één keer uit de PDF
+ * bepaald en daarna bewaard. Faalt het lezen, dan null (de review valt dan
+ * terug op goedkeuren van het hele document).
+ */
+export async function ensureVersionPages(versionId: string): Promise<{ pageCount: number; from: number; to: number } | null> {
+  const [v] = await db
+    .select({ pageCount: scriptReviewVersions.pageCount, from: scriptReviewVersions.scriptPageFrom, to: scriptReviewVersions.scriptPageTo, dataBase64: scriptReviewVersions.dataBase64, storagePath: scriptReviewVersions.storagePath })
+    .from(scriptReviewVersions)
+    .where(eq(scriptReviewVersions.id, versionId))
+    .limit(1);
+  if (!v) return null;
+  if (v.pageCount && v.from && v.to) return { pageCount: v.pageCount, from: v.from, to: v.to };
+  try {
+    const bytes = v.storagePath ? await downloadScriptPdf(v.storagePath) : v.dataBase64 ? Buffer.from(v.dataBase64, "base64") : null;
+    if (!bytes) return null;
+    const { PDFDocument } = await import("pdf-lib");
+    const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+    const pageCount = doc.getPageCount();
+    const range = scriptPageRange(pageCount);
+    if (!range) return null;
+    await db.update(scriptReviewVersions).set({ pageCount, scriptPageFrom: range.from, scriptPageTo: range.to }).where(eq(scriptReviewVersions.id, versionId));
+    return { pageCount, ...range };
+  } catch {
+    return null;
+  }
+}
+
+/** Status per script in de huidige versie van een review. */
+export async function getReviewApproval(reviewId: string, currentVersion: number, versionId: string | null): Promise<ReviewApproval> {
+  if (!versionId) return EMPTY_APPROVAL;
+  const info = await ensureVersionPages(versionId);
+  if (!info) return EMPTY_APPROVAL;
+  const pages = scriptPages(info);
+  const [approvals, threads] = await Promise.all([
+    db.select({ page: scriptReviewPageApprovals.pageNumber, at: scriptReviewPageApprovals.approvedAt, name: scriptReviewPageApprovals.approvedByName })
+      .from(scriptReviewPageApprovals)
+      .where(and(eq(scriptReviewPageApprovals.reviewId, reviewId), eq(scriptReviewPageApprovals.versionNumber, currentVersion))),
+    db.select({ versionNumber: scriptReviewThreads.versionNumber, pageNumber: scriptReviewThreads.pageNumber })
+      .from(scriptReviewThreads)
+      .where(and(eq(scriptReviewThreads.reviewId, reviewId), eq(scriptReviewThreads.visibility, "client"), isNull(scriptReviewThreads.deletedAt))),
+  ]);
+  const states = pageStates({ pages, currentVersion, approvedPages: approvals.map((a) => a.page), clientThreads: threads });
+  const byPage = new Map(approvals.map((a) => [a.page, a]));
+  return {
+    scripts: pages.map((p, i) => ({
+      page: p,
+      index: i + 1,
+      state: states.get(p)!,
+      approvedAt: byPage.get(p)?.at ? byPage.get(p)!.at.toISOString() : null,
+      approvedByName: byPage.get(p)?.name ?? null,
+    })),
+    summary: summarize(states),
+  };
 }
 
 /* ----------------------------------------------------------- intern */
@@ -275,6 +362,8 @@ export type InternalReviewItem = {
   shootOn: string | null;
   openComments: number;
   updatedAt: string;
+  approvedScripts: number;
+  totalScripts: number;
 };
 
 /** Alle reviews die de medewerker mag zien (klant-scope), nieuwste eerst. */
@@ -308,6 +397,8 @@ export async function listInternalScriptReviews(viewer: Viewer): Promise<Interna
     shootOn: r.shootOn ?? null,
     openComments: extra.get(r.id)?.openComments ?? 0,
     updatedAt: r.updatedAt.toISOString(),
+    approvedScripts: 0,
+    totalScripts: 0,
   }));
 }
 
@@ -326,6 +417,7 @@ export type InternalReviewDetail = {
   approvedAt: string | null;
   approvedByName: string | null;
   approvedVersion: number | null;
+  approval: ReviewApproval;
   versions: Array<{ id: string; versionNumber: number; fileName: string; note: string | null; createdAt: string }>;
   threads: Array<{
     id: string;
@@ -402,6 +494,7 @@ export async function getInternalScriptReview(viewer: Viewer, reviewId: string):
     approvedAt: r.approvedAt ? r.approvedAt.toISOString() : null,
     approvedByName: r.approvedByName ?? null,
     approvedVersion: r.approvedVersion ?? null,
+    approval: await getReviewApproval(r.id, r.currentVersion, versions[0]?.id ?? null),
     versions: versions.map((v) => ({ id: v.id, versionNumber: v.versionNumber, fileName: v.fileName, note: v.note ?? null, createdAt: v.createdAt.toISOString() })),
     threads: threadRows.map((t) => ({
       id: t.id,

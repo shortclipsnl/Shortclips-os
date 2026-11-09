@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, MessageSquarePlus, Minus, Plus, X } from "lucide-react";
 import { addScriptReviewComment } from "@/server/actions/script-review";
@@ -35,16 +35,37 @@ export function ScriptPdfReview({
   reviewId,
   pins,
   canAnnotate,
+  annotatePage,
+  contained = true,
+  renderBelowPage,
+  onPageSeen,
+  showPage,
+  aboveDocument,
 }: {
   url: string;
   reviewId: string;
   pins: ReviewPin[];
   canAnnotate: boolean;
+  /** Alleen op deze pagina mag de klant opmerkingen plaatsen (na "Wijziging
+   *  voorstellen"). null = nergens, undefined = overal (oude werking). */
+  annotatePage?: number | null;
+  /** In een eigen scrollvak (intern) of gewoon mee met de pagina (portaal). */
+  contained?: boolean;
+  /** Inhoud direct onder een pagina, bv. de goedkeurknoppen per script. */
+  renderBelowPage?: (pageNumber: number) => ReactNode;
+  /** Gemeld zodra een pagina grotendeels in beeld is geweest. */
+  onPageSeen?: (pageNumber: number) => void;
+  /** Welke pagina's getoond worden (standaard alle). */
+  showPage?: (pageNumber: number) => boolean;
+  /** Extra inhoud bovenaan in het document, bv. "Toon uitlegpagina's". */
+  aboveDocument?: ReactNode;
 }) {
   const [doc, setDoc] = useState<any | null>(null);
   const [numPages, setNumPages] = useState(0);
   const [aspect, setAspect] = useState(1.414); // hoogte/breedte (A4-staand standaard)
   const [scale, setScale] = useState(1.1);
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [baseWidth, setBaseWidth] = useState(0); // paginabreedte bij 100%
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,7 +84,13 @@ export function ScriptPdfReview({
         try {
           const p1 = await loaded.getPage(1);
           const vp = p1.getViewport({ scale: 1 });
-          if (!cancelled && vp.width > 0) setAspect(vp.height / vp.width);
+          if (!cancelled && vp.width > 0) {
+            setAspect(vp.height / vp.width);
+            setBaseWidth(vp.width);
+            // Op smalle schermen passend maken, zodat tekstlaag en canvas gelijk lopen.
+            const avail = (frameRef.current?.clientWidth ?? 0) - 16;
+            if (avail > 0 && avail < vp.width * 1.1) setScale(Math.max(0.4, Math.floor((avail / vp.width) * 100) / 100));
+          }
         } catch { /* standaard A4 */ }
         if (cancelled) { loaded.destroy(); return; }
         setDoc(loaded);
@@ -81,7 +108,7 @@ export function ScriptPdfReview({
 
   return (
     <div className="flex flex-col">
-      {canAnnotate ? (
+      {canAnnotate && annotatePage === undefined ? (
         <div className="mb-3 flex items-start gap-2.5 rounded-[12px] border border-[var(--sc-line)] bg-[var(--st-blue-bg)] p-3 text-[13px]">
           <MessageSquarePlus className="mt-0.5 size-4 shrink-0 text-[var(--sc-accent)]" />
           <span className="text-[var(--color-ink-muted)]">
@@ -92,10 +119,10 @@ export function ScriptPdfReview({
 
       <div className="sticky top-0 z-20 mb-3 flex items-center justify-between gap-2 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-header-bg)] px-3 py-2 backdrop-blur">
         <span className="text-[12px] text-[var(--color-ink-muted)]">
-          {numPages > 0 ? `${numPages} pagina${numPages === 1 ? "" : "'s"}` : "PDF"}
+          {numPages > 0 ? (showPage ? "Inzoomen voor grotere tekst" : `${numPages} pagina${numPages === 1 ? "" : "'s"}`) : "PDF"}
         </span>
         <div className="flex items-center gap-1">
-          <button type="button" aria-label="Uitzoomen" onClick={() => setScale((s) => Math.max(0.6, Math.round((s - 0.15) * 100) / 100))}
+          <button type="button" aria-label="Uitzoomen" onClick={() => setScale((s) => Math.max(0.4, Math.round((s - 0.15) * 100) / 100))}
             className="grid size-8 place-items-center rounded-[8px] border border-[var(--sc-line)] hover:bg-[var(--sc-fill-strong)]"><Minus className="size-4" /></button>
           <span className="w-12 text-center text-[12px] tabular-nums text-[var(--color-ink-muted)]">{Math.round(scale * 100)}%</span>
           <button type="button" aria-label="Inzoomen" onClick={() => setScale((s) => Math.min(2.4, Math.round((s + 0.15) * 100) / 100))}
@@ -103,16 +130,36 @@ export function ScriptPdfReview({
         </div>
       </div>
 
-      <div className="max-h-[80vh] overflow-auto rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-3">
+      <div ref={frameRef} className={`${contained ? "max-h-[80vh] overflow-auto" : "overflow-x-auto"} rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-2 sm:p-3`}>
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-16 text-sm text-[var(--color-ink-muted)]"><Loader2 className="size-4 animate-spin" /> PDF laden…</div>
         ) : error ? (
           <p className="py-16 text-center text-sm text-[var(--color-ink-muted)]">{error}</p>
         ) : (
-          <div className="flex flex-col items-center gap-5">
-            {Array.from({ length: numPages }, (_, i) => (
-              <ReviewPage key={i} doc={doc} pageNumber={i + 1} scale={scale} aspect={aspect} reviewId={reviewId} pins={byPage(i + 1)} canAnnotate={canAnnotate} />
-            ))}
+          <div className="mx-auto flex w-max min-w-full flex-col items-center gap-5">
+            {aboveDocument}
+            {Array.from({ length: numPages }, (_, i) => (showPage && !showPage(i + 1) ? null : (
+              <div
+                key={i}
+                id={`script-page-${i + 1}`}
+                className="flex scroll-mt-20 flex-col items-center gap-3"
+                // Kolom precies zo breed als de pagina: de balk eronder volgt die breedte
+                // en alleen bij inzoomen ontstaat er horizontaal scrollen.
+                style={{ width: baseWidth ? Math.floor(baseWidth * scale) : "100%", maxWidth: baseWidth ? undefined : 720 }}
+              >
+                <ReviewPage
+                  doc={doc}
+                  pageNumber={i + 1}
+                  scale={scale}
+                  aspect={aspect}
+                  reviewId={reviewId}
+                  pins={byPage(i + 1)}
+                  canAnnotate={canAnnotate && (annotatePage === undefined || annotatePage === i + 1)}
+                  onSeen={onPageSeen}
+                />
+                {renderBelowPage ? renderBelowPage(i + 1) : null}
+              </div>
+            )))}
           </div>
         )}
       </div>
@@ -122,7 +169,7 @@ export function ScriptPdfReview({
 
 type Draft = { x: number; y: number; quote?: string } | null;
 
-function ReviewPage({ doc, pageNumber, scale, aspect, reviewId, pins, canAnnotate }: { doc: any; pageNumber: number; scale: number; aspect: number; reviewId: string; pins: ReviewPin[]; canAnnotate: boolean }) {
+function ReviewPage({ doc, pageNumber, scale, aspect, reviewId, pins, canAnnotate, onSeen }: { doc: any; pageNumber: number; scale: number; aspect: number; reviewId: string; pins: ReviewPin[]; canAnnotate: boolean; onSeen?: (pageNumber: number) => void }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
@@ -145,6 +192,19 @@ function ReviewPage({ doc, pageNumber, scale, aspect, reviewId, pins, canAnnotat
     return () => io.disconnect();
   }, [visible]);
 
+  // "Gezien": de pagina is minstens voor de helft in beeld geweest.
+  useEffect(() => {
+    if (!onSeen) return;
+    const el = wrapRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => {
+      const seen = entries.some((e) => e.isIntersecting && (e.intersectionRatio >= 0.5 || e.intersectionRect.height >= window.innerHeight * 0.6));
+      if (seen) { onSeen(pageNumber); io.disconnect(); }
+    }, { threshold: [0.1, 0.25, 0.5] });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [onSeen, pageNumber]);
+
   // Canvas + tekstlaag renderen (bij zichtbaar worden en bij zoomwijziging).
   useEffect(() => {
     if (!doc || !visible) return;
@@ -158,7 +218,8 @@ function ReviewPage({ doc, pageNumber, scale, aspect, reviewId, pins, canAnnotat
       if (!canvas) return;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      const ratio = Math.min(2, window.devicePixelRatio || 1);
+      // Minstens 2x en tot 3x scherp: kleine scripttekst blijft leesbaar bij inzoomen.
+      const ratio = Math.min(3, Math.max(2, window.devicePixelRatio || 1));
       canvas.width = Math.floor(viewport.width * ratio);
       canvas.height = Math.floor(viewport.height * ratio);
       canvas.style.width = `${Math.floor(viewport.width)}px`;
@@ -224,8 +285,8 @@ function ReviewPage({ doc, pageNumber, scale, aspect, reviewId, pins, canAnnotat
   return (
     <div
       ref={wrapRef}
-      className={`relative inline-block w-full max-w-[720px] ${canAnnotate && rendered ? "cursor-crosshair" : ""}`}
-      style={!rendered ? { aspectRatio: `1 / ${aspect}` } : undefined}
+      className={`relative inline-block ${rendered ? "" : "w-full"} ${canAnnotate && rendered ? "cursor-crosshair" : ""}`}
+      style={!rendered ? { aspectRatio: `1 / ${aspect}` } : { width }}
       onMouseUp={onMouseUp}
       onClick={onPageClick}
     >
@@ -234,7 +295,7 @@ function ReviewPage({ doc, pageNumber, scale, aspect, reviewId, pins, canAnnotat
           <span className="inline-flex items-center gap-1.5"><Loader2 className="size-3.5 animate-spin" /> pagina {pageNumber}…</span>
         </div>
       ) : null}
-      <canvas ref={canvasRef} className="block max-w-full rounded-[6px] bg-white shadow-[0_6px_20px_-8px_rgba(0,0,0,0.6)]" />
+      <canvas ref={canvasRef} className="block rounded-[6px] bg-white shadow-[0_6px_20px_-8px_rgba(0,0,0,0.6)]" />
       {/* Selecteerbare tekstlaag exact over de canvas (z-2). */}
       <div ref={textLayerRef} className="sc-textlayer" style={{ width: width || undefined }} />
       {/* Pins + nieuwe-opmerking-popovers erboven (z-5). */}

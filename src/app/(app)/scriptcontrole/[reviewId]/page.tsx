@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2, FileText, History, MessageSquare } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, FileText, History, ListChecks, MessageSquare } from "lucide-react";
+import { SCRIPT_PAGE_LABEL, type ScriptPageState } from "@/lib/script-approval";
 import { requirePermission } from "@/server/auth/context";
 import { getInternalScriptReview, SCRIPT_REVIEW_STATUS } from "@/server/script-review";
 import { Badge, Card, CardHeader, PageHeader } from "@/components/ui";
@@ -18,6 +19,8 @@ function fmtDate(iso: string | null): string {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y!, (m ?? 1) - 1, d).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
 }
+
+const PAGE_TONE: Record<ScriptPageState, "warn" | "info" | "good" | "neutral"> = { todo: "neutral", revised: "warn", change: "info", approved: "good" };
 
 export default async function InternalScriptReviewPage({ params }: { params: Promise<{ reviewId: string }> }) {
   const { reviewId } = await params;
@@ -67,8 +70,39 @@ export default async function InternalScriptReviewPage({ params }: { params: Pro
           )}
         </div>
 
-        {/* Feedback verwerken + nieuwe versie + historie */}
+        {/* Voortgang per script + feedback verwerken + nieuwe versie + historie */}
         <div className="flex flex-col gap-5">
+          {review.approval.summary.total > 0 ? (
+            <Card>
+              <div className="flex items-center gap-2">
+                <ListChecks className="size-4 text-[var(--color-brand-600)]" />
+                <h2 className="text-base font-semibold">Goedkeuring per script</h2>
+                <span className="ml-auto text-sm font-semibold tabular-nums">
+                  {review.status === "goedgekeurd" ? review.approval.summary.total : review.approval.summary.approved} van {review.approval.summary.total}
+                </span>
+              </div>
+              <ul className="mt-3 flex flex-col gap-1.5">
+                {review.approval.scripts.map((sc) => {
+                  const state: ScriptPageState = review.status === "goedgekeurd" ? "approved" : sc.state;
+                  return (
+                    <li key={sc.page} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="flex min-w-0 items-start gap-2">
+                        {state === "approved" ? <Check className="mt-0.5 size-4 shrink-0 text-[var(--color-good)]" strokeWidth={3} /> : <span className="inline-block size-4 shrink-0" />}
+                        <span className="min-w-0">
+                          <span className="whitespace-nowrap font-medium">Script {sc.index}</span>
+                          <span className="block text-2xs text-[var(--color-ink-faint)]">
+                            pagina {sc.page}{sc.approvedAt && state === "approved" ? ` · ${sc.approvedByName ? `${sc.approvedByName}, ` : ""}${new Date(sc.approvedAt).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}
+                          </span>
+                        </span>
+                      </span>
+                      <Badge tone={PAGE_TONE[state]}>{SCRIPT_PAGE_LABEL[state]}</Badge>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          ) : null}
+
           <Card>
             <div className="flex items-center gap-2">
               <MessageSquare className="size-4 text-[var(--color-brand-600)]" />

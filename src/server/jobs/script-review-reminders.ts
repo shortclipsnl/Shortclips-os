@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, productionDays, scriptReviews, users } from "@/db/schema";
+import { clients, productionDays, scriptReviewVersions, scriptReviews, users } from "@/db/schema";
 import { notify } from "@/server/notifications";
 import { portalEmailHtml, sendEmail } from "@/server/email";
 import { getFeedbackDays } from "@/server/portal-settings";
@@ -9,6 +9,7 @@ import { amsterdamDay, isClientFeedbackOverdue } from "@/lib/client-feedback";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { env } from "@/lib/env";
+import { getReviewApproval } from "@/server/script-review";
 import { runJob } from "./runner";
 import { notInactiveClient } from "@/server/client-activity";
 
@@ -44,6 +45,8 @@ export async function runScriptReviewReminders() {
     const candidates = await db
       .select({
         id: scriptReviews.id,
+        currentVersion: scriptReviews.currentVersion,
+        coordinatorId: clients.coordinatorId,
         feedbackDeadline: scriptReviews.feedbackDeadline,
         updatedAt: scriptReviews.updatedAt,
         clientId: scriptReviews.clientId,
@@ -72,6 +75,27 @@ export async function runScriptReviewReminders() {
     );
     ctx.counters.processed = rows.length;
 
+    // Signaal voor de verantwoordelijke: termijn verstreken én de opname komt
+    // dichtbij (binnen 5 werkdagen). Eén keer per review-versie, geen herhaling.
+    const soon = addWorkingDays(today, 5, holidays);
+    for (const r of candidates) {
+      const overdue = r.feedbackDeadline ? amsterdamDay(r.feedbackDeadline as Date | string) < today : false;
+      if (!overdue || !r.shootOn || r.shootOn > soon || r.shootOn < today) continue;
+      await notify({
+        roles: r.coordinatorId ? undefined : ["owner"],
+        userIds: r.coordinatorId ? [r.coordinatorId] : undefined,
+        clientId: r.clientId,
+        level: "warning",
+        type: "script_review_overdue",
+        title: `${r.clientName}: scripts nog niet goedgekeurd`,
+        body: `De feedbacktermijn is verstreken en de opname is op ${fmtDate(r.shootOn)}. Neem even contact op met de klant.`,
+        href: `/scriptcontrole/${r.id}`,
+        entityType: "script_review",
+        entityId: r.id,
+        dedupeKey: `script_review_overdue:${r.id}:v${r.currentVersion}`,
+      });
+    }
+
     for (const r of rows) {
       const portal = await db
         .select({ id: users.id, email: users.email })
@@ -81,7 +105,11 @@ export async function runScriptReviewReminders() {
 
       const href = `/portal/scripts/${r.id}`;
       const heading = "Nog even je scripts bekijken?";
-      const body = `Je scripts${r.shootOn ? ` voor de opname van ${fmtDate(r.shootOn)}` : ""} staan nog klaar om te bekijken. Geef je feedback of keur ze goed — het kost maar een paar minuten.`;
+      const [v] = await db.select({ id: scriptReviewVersions.id }).from(scriptReviewVersions)
+        .where(and(eq(scriptReviewVersions.reviewId, r.id), eq(scriptReviewVersions.versionNumber, r.currentVersion))).limit(1);
+      const { summary } = await getReviewApproval(r.id, r.currentVersion, v?.id ?? null);
+      const progress = summary.total > 0 && summary.approved > 0 ? ` Je hebt er al ${summary.approved} van de ${summary.total} goedgekeurd.` : "";
+      const body = `Je scripts${r.shootOn ? ` voor de opname van ${fmtDate(r.shootOn)}` : ""} staan nog klaar om te bekijken.${progress} Goedkeuren kan per script met één klik.`;
       const sent = await notify({
         userIds: portal.map((p) => p.id),
         clientId: r.clientId,

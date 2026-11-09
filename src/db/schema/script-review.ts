@@ -64,6 +64,12 @@ export const scriptReviewVersions = pgTable(
     storagePath: text("storage_path"),
     /** Korte toelichting bij deze versie (wat is aangepast). */
     note: text("note"),
+    /** Aantal pagina's van deze PDF en de pagina's waarop scripts staan (1-based,
+     *  inclusief). De rest (voor- en achterpagina's van het sjabloon) is uitleg en
+     *  wordt niet per script goedgekeurd. Leeg = nog niet bepaald. */
+    pageCount: integer("page_count"),
+    scriptPageFrom: integer("script_page_from"),
+    scriptPageTo: integer("script_page_to"),
     uploadedById: uuid("uploaded_by_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -119,4 +125,28 @@ export const scriptReviewComments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("script_review_comments_thread_idx").on(t.threadId)],
+);
+
+/**
+ * Goedkeuring per script (= per scriptpagina) binnen een PDF-versie. Zodra alle
+ * scriptpagina's van de huidige versie goedgekeurd zijn, staat de hele review op
+ * "goedgekeurd". Een nieuwe versie begint opnieuw; ongewijzigde scripts zonder
+ * opmerking worden dan automatisch meegenomen (carriedOver).
+ */
+export const scriptReviewPageApprovals = pgTable(
+  "script_review_page_approvals",
+  {
+    id: pk(),
+    reviewId: uuid("review_id")
+      .notNull()
+      .references(() => scriptReviews.id, { onDelete: "cascade" }),
+    versionNumber: integer("version_number").notNull(),
+    pageNumber: integer("page_number").notNull(),
+    approvedById: uuid("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+    approvedByName: varchar("approved_by_name", { length: 160 }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Overgenomen van de vorige versie (script ongewijzigd, geen opmerking). */
+    carriedOver: boolean("carried_over").notNull().default(false),
+  },
+  (t) => [unique("script_review_page_approvals_unique").on(t.reviewId, t.versionNumber, t.pageNumber)],
 );

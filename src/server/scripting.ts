@@ -4,7 +4,8 @@ import type { ClientStatusFilter } from "@/lib/client-status";
 import { and, asc, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
-import { clients, productionDays, scriptReviews, scripts, shootScriptSources, users } from "@/db/schema";
+import { clients, productionDays, scriptReviewVersions, scriptReviews, scripts, shootScriptSources, users } from "@/db/schema";
+import { getReviewApproval } from "@/server/script-review";
 import { requireInternal, scopeToClients, type Viewer } from "@/server/auth/context";
 import { CORE_STAFF_EMAILS, coreStaffRank } from "@/server/core-staff";
 import { subWorkingDays } from "@/lib/workdays";
@@ -54,6 +55,9 @@ export type ScriptingRow = {
   /** Script-PDF ter controle in het klantportaal (als er al één verstuurd is). */
   reviewId: string | null;
   reviewStatus: string | null;
+  /** Goedgekeurde scripts / totaal in de huidige versie (0/0 = onbekend). */
+  reviewApproved: number;
+  reviewTotal: number;
 };
 
 /** Eén aan de opname gekoppeld script, met status en volledige inhoud (voor
@@ -172,11 +176,19 @@ export async function listScripting(viewer: Viewer, opts: { trusted?: boolean; k
   // Script-PDF's die al ter controle in het klantportaal staan (per opname).
   const reviewRows = dayIds.length
     ? await db
-        .select({ id: scriptReviews.id, productionDayId: scriptReviews.productionDayId, status: scriptReviews.status })
+        .select({ id: scriptReviews.id, productionDayId: scriptReviews.productionDayId, status: scriptReviews.status, currentVersion: scriptReviews.currentVersion })
         .from(scriptReviews)
         .where(and(inArray(scriptReviews.productionDayId, dayIds), isNull(scriptReviews.deletedAt)))
     : [];
-  const reviewByDay = new Map(reviewRows.map((r) => [r.productionDayId, { id: r.id, status: r.status as string }]));
+  // Voortgang per script (x van y goedgekeurd) voor de reviews die nog lopen.
+  const progress = new Map<string, { approved: number; total: number }>();
+  await Promise.all(reviewRows.map(async (r) => {
+    const [v] = await db.select({ id: scriptReviewVersions.id }).from(scriptReviewVersions)
+      .where(and(eq(scriptReviewVersions.reviewId, r.id), eq(scriptReviewVersions.versionNumber, r.currentVersion))).limit(1);
+    const { summary } = await getReviewApproval(r.id, r.currentVersion, v?.id ?? null);
+    progress.set(r.id, { approved: r.status === "goedgekeurd" ? summary.total : summary.approved, total: summary.total });
+  }));
+  const reviewByDay = new Map(reviewRows.map((r) => [r.productionDayId, { id: r.id, status: r.status as string, ...(progress.get(r.id) ?? { approved: 0, total: 0 }) }]));
 
   const holidays = nlHolidaySet();
   const list: ScriptingRow[] = rows.map((r) => {
@@ -216,6 +228,8 @@ export async function listScripting(viewer: Viewer, opts: { trusted?: boolean; k
       linkedPdf: linkByDay.get(r.id) ?? null,
       reviewId: reviewByDay.get(r.id)?.id ?? null,
       reviewStatus: reviewByDay.get(r.id)?.status ?? null,
+      reviewApproved: reviewByDay.get(r.id)?.approved ?? 0,
+      reviewTotal: reviewByDay.get(r.id)?.total ?? 0,
     };
   });
 

@@ -5,15 +5,17 @@ import { after } from "next/server";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { clients, productionDays, scripts as scriptsTable, scriptReviewComments, scriptReviewThreads, scriptReviewVersions, scriptReviews, users } from "@/db/schema";
+import { clients, productionDays, scripts as scriptsTable, scriptReviewComments, scriptReviewPageApprovals, scriptReviewThreads, scriptReviewVersions, scriptReviews, users } from "@/db/schema";
 import { assertClientAccess, ForbiddenError, requirePermission, requirePortal } from "@/server/auth/context";
 import { auditLog, recordActivity } from "@/server/audit";
-import { notify } from "@/server/notifications";
+import { clearByDedupe, notify } from "@/server/notifications";
 import { portalEmailHtml, sendEmail } from "@/server/email";
 import { env } from "@/lib/env";
 import { getFeedbackDays } from "@/server/portal-settings";
 import { addWorkingDays } from "@/lib/workdays";
-import { assertReviewAccess } from "@/server/script-review";
+import { assertReviewAccess, ensureVersionPages, getReviewApproval } from "@/server/script-review";
+import { carryOverPages } from "@/lib/script-approval";
+import { syncScriptingTasks } from "@/server/scripting-tasks";
 import { createScriptUploadTarget } from "@/server/scripts/script-storage";
 import { ensureCaptionsForShoot } from "@/server/captions/run";
 import { ensureBriefingForShoot } from "@/server/briefing/run";
@@ -26,7 +28,7 @@ async function scriptFeedbackDeadline(): Promise<Date> {
   return new Date(`${day}T17:00:00`);
 }
 
-export type ActionResult = { ok: boolean; message?: string; reviewId?: string };
+export type ActionResult = { ok: boolean; message?: string; reviewId?: string; round?: "open" | "approved" | "feedback" };
 
 const MAX_PDF_BYTES = 15 * 1024 * 1024; // 15 MB
 const appUrl = env.APP_URL.replace(/\/$/, "");
@@ -54,6 +56,73 @@ async function clientStaff(clientId: string): Promise<{ coordinatorId: string | 
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y!, (m ?? 1) - 1, d).toLocaleDateString("nl-NL", { day: "numeric", month: "long" });
+}
+
+/**
+ * Houdt de interne scriptingstatus van de opname gelijk met wat de klant doet,
+ * zodat niemand dat handmatig hoeft bij te werken:
+ *  - scripts verstuurd → "Controle bij klant" (taak van de schrijver sluit);
+ *  - klant stelt wijzigingen voor → "Feedback verwerken" (taak "Scripts aanpassen");
+ *  - klant keurt alles goed → "Final voor opname" (taak sluit).
+ * Faalt stil: de klantactie zelf mag hier nooit op mislukken.
+ */
+async function syncDayScriptingStatus(productionDayId: string, status: "scripts_bij_klant" | "feedback_jarno" | "final"): Promise<void> {
+  try {
+    const [d] = await db.select({ prev: productionDays.scriptingStatus }).from(productionDays).where(eq(productionDays.id, productionDayId)).limit(1);
+    if (!d || d.prev === status) return;
+    await db.update(productionDays).set({ scriptingStatus: status, updatedAt: new Date() }).where(eq(productionDays.id, productionDayId));
+    if (d.prev === "controle_jarno") await clearByDedupe(`scripting_controle:${productionDayId}`);
+    await syncScriptingTasks([productionDayId]);
+    revalidatePath("/scripting");
+  } catch (error) {
+    console.error("[script-review] scriptingstatus bijwerken mislukt", productionDayId, error);
+  }
+}
+
+/** Id van een bepaalde versie van een review. */
+async function versionIdOf(reviewId: string, versionNumber: number): Promise<string | null> {
+  const [v] = await db
+    .select({ id: scriptReviewVersions.id })
+    .from(scriptReviewVersions)
+    .where(and(eq(scriptReviewVersions.reviewId, reviewId), eq(scriptReviewVersions.versionNumber, versionNumber)))
+    .limit(1);
+  return v?.id ?? null;
+}
+
+/**
+ * Neemt goedkeuringen van ongewijzigde scripts over naar een nieuwe versie (zelfde
+ * aantal pagina's, geen opmerking in de vorige versie). Zo hoeft de klant alleen
+ * de aangepaste scripts opnieuw te bekijken.
+ */
+async function carryOverApprovals(reviewId: string, prevVersion: number, newVersion: number): Promise<void> {
+  try {
+    const [prevId, newId] = await Promise.all([versionIdOf(reviewId, prevVersion), versionIdOf(reviewId, newVersion)]);
+    if (!prevId || !newId) return;
+    const [prev, next] = await Promise.all([ensureVersionPages(prevId), ensureVersionPages(newId)]);
+    const [approved, comments] = await Promise.all([
+      db.select({ page: scriptReviewPageApprovals.pageNumber, by: scriptReviewPageApprovals.approvedById, name: scriptReviewPageApprovals.approvedByName, at: scriptReviewPageApprovals.approvedAt })
+        .from(scriptReviewPageApprovals)
+        .where(and(eq(scriptReviewPageApprovals.reviewId, reviewId), eq(scriptReviewPageApprovals.versionNumber, prevVersion))),
+      db.select({ page: scriptReviewThreads.pageNumber })
+        .from(scriptReviewThreads)
+        .where(and(eq(scriptReviewThreads.reviewId, reviewId), eq(scriptReviewThreads.versionNumber, prevVersion), eq(scriptReviewThreads.visibility, "client"), isNull(scriptReviewThreads.deletedAt))),
+    ]);
+    const keep = carryOverPages({
+      prevPageCount: prev?.pageCount ?? null,
+      newPageCount: next?.pageCount ?? null,
+      prevApprovedPages: approved.map((a) => a.page),
+      prevCommentPages: comments.map((c) => c.page).filter((p): p is number => p != null),
+    });
+    if (keep.length === 0) return;
+    const byPage = new Map(approved.map((a) => [a.page, a]));
+    await db.insert(scriptReviewPageApprovals).values(keep.map((page) => ({
+      reviewId, versionNumber: newVersion, pageNumber: page,
+      approvedById: byPage.get(page)?.by ?? null, approvedByName: byPage.get(page)?.name ?? null,
+      approvedAt: byPage.get(page)?.at ?? new Date(), carriedOver: true,
+    }))).onConflictDoNothing();
+  } catch (error) {
+    console.error("[script-review] goedkeuringen overnemen mislukt", reviewId, error);
+  }
 }
 
 /* ------------------------------------------------------------ intern */
@@ -163,6 +232,9 @@ export async function sendScriptForReview(input: z.infer<typeof sendSchema>): Pr
       reviewId, versionNumber, fileName: fileName.slice(0, 255), contentType: contentType || "application/pdf", sizeBytes,
       dataBase64: base64 ?? null, storagePath: storagePath ?? null, uploadedById: viewer.id,
     });
+
+    if (herzien) await carryOverApprovals(reviewId, versionNumber - 1, versionNumber);
+    await syncDayScriptingStatus(productionDayId, "scripts_bij_klant");
 
     await auditLog({ viewer, action: "script_review.sent", entityType: "script_review", entityId: reviewId, clientId, changes: { version: versionNumber } });
     await recordActivity({ clientId, type: "script_review.sent", title: herzien ? "Aangepaste scripts klaargezet ter controle" : "Scripts klaargezet ter controle", isClientVisible: true });
@@ -355,13 +427,189 @@ async function createClientComment(
 }
 
 /** Klant: opmerking opslaan (algemeen of op een plek/zin in de PDF). Verandert de
- *  status NIET en stuurt geen melding — dat gebeurt bij "Feedback doorgeven". */
+ *  status NIET en stuurt geen melding — dat gebeurt zodra de ronde rond is (zie
+ *  finalizeRoundIfHandled) of bij "Wijzigingen nu doorsturen". */
 export async function addScriptReviewComment(input: { reviewId: string; body: string; pageNumber?: number; posX?: number; posY?: number }): Promise<ActionResult> {
   try {
     const viewer = await requirePortal();
     const parsed = commentSchema.safeParse(input);
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Controleer je opmerking." };
-    return await createClientComment(viewer, parsed.data);
+    const res = await createClientComment(viewer, parsed.data);
+    if (!res.ok) return res;
+    // Opmerking op een script dat al akkoord was? Dan geldt die goedkeuring niet meer.
+    if (parsed.data.pageNumber && res.versionNumber) {
+      await db.delete(scriptReviewPageApprovals).where(and(
+        eq(scriptReviewPageApprovals.reviewId, parsed.data.reviewId),
+        eq(scriptReviewPageApprovals.versionNumber, res.versionNumber),
+        eq(scriptReviewPageApprovals.pageNumber, parsed.data.pageNumber),
+      ));
+    }
+    const round = await finalizeRoundIfHandled(viewer, parsed.data.reviewId);
+    revalidatePortalReview(parsed.data.reviewId);
+    return { ok: true, round };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+type PortalViewer = Awaited<ReturnType<typeof requirePortal>>;
+type ReviewRow = { id: string; clientId: string; productionDayId: string; currentVersion: number; status: string };
+
+async function loadPortalReview(viewer: PortalViewer, reviewId: string): Promise<ReviewRow | null> {
+  const [review] = await db
+    .select({ id: scriptReviews.id, clientId: scriptReviews.clientId, productionDayId: scriptReviews.productionDayId, currentVersion: scriptReviews.currentVersion, status: scriptReviews.status })
+    .from(scriptReviews)
+    .where(and(eq(scriptReviews.id, reviewId), eq(scriptReviews.clientId, viewer.clientId!), isNull(scriptReviews.deletedAt)))
+    .limit(1);
+  return review ?? null;
+}
+
+function revalidatePortalReview(reviewId: string) {
+  revalidatePath(`/portal/scripts/${reviewId}`);
+  revalidatePath("/portal/scripts");
+  revalidatePath("/portal");
+  revalidatePath(`/scriptcontrole/${reviewId}`);
+  revalidatePath("/scripting");
+}
+
+/** Aantal klantopmerkingen op de huidige versie. */
+async function clientCommentCount(reviewId: string, versionNumber: number): Promise<number> {
+  const [{ cnt }] = await db
+    .select({ cnt: sql<number>`count(*)::int` })
+    .from(scriptReviewThreads)
+    .where(and(eq(scriptReviewThreads.reviewId, reviewId), eq(scriptReviewThreads.versionNumber, versionNumber), eq(scriptReviewThreads.visibility, "client"), isNull(scriptReviewThreads.deletedAt)));
+  return Number(cnt ?? 0);
+}
+
+/** Zet de review op "feedback gegeven" en stuurt het team één melding per versie. */
+async function markFeedbackGiven(review: ReviewRow, cnt: number): Promise<void> {
+  await db.update(scriptReviews).set({ status: "feedback_gegeven", updatedAt: new Date() })
+    .where(and(eq(scriptReviews.id, review.id), sql`${scriptReviews.status} <> 'goedgekeurd'`));
+  await recordActivity({ clientId: review.clientId, type: "script_review.feedback", title: "Klant stelde wijzigingen voor in de scripts", isClientVisible: false });
+  const staff = await clientStaff(review.clientId);
+  await notify({
+    roles: ["owner"],
+    userIds: staff.coordinatorId ? [staff.coordinatorId] : undefined,
+    clientId: review.clientId,
+    level: "warning",
+    type: "script_review_feedback",
+    title: `${staff.clientName} stelde wijzigingen voor in de scripts`,
+    body: `${cnt} opmerking${cnt === 1 ? "" : "en"} op versie ${review.currentVersion}. Bekijk en verwerk ze.`,
+    href: `/scriptcontrole/${review.id}`,
+    entityType: "script_review",
+    entityId: review.id,
+    dedupeKey: `script_review_feedback:${review.id}:v${review.currentVersion}`,
+  });
+  await syncDayScriptingStatus(review.productionDayId, "feedback_jarno");
+}
+
+/** Definitieve goedkeuring van de hele review (deze versie). Eén keer, ook bij dubbel klikken. */
+async function markApproved(viewer: PortalViewer, review: ReviewRow): Promise<void> {
+  const updated = await db
+    .update(scriptReviews)
+    .set({ status: "goedgekeurd", approvedAt: new Date(), approvedById: viewer.id, approvedVersion: review.currentVersion, updatedAt: new Date() })
+    .where(and(eq(scriptReviews.id, review.id), sql`${scriptReviews.status} <> 'goedgekeurd'`))
+    .returning({ id: scriptReviews.id });
+  if (updated.length === 0) return; // al goedgekeurd (bijv. tweede klik of tweede tabblad)
+
+  await auditLog({ viewer, action: "script_review.approved", entityType: "script_review", entityId: review.id, clientId: review.clientId, changes: { version: review.currentVersion } });
+  await recordActivity({ clientId: review.clientId, type: "script_review.approved_by_client", title: "Scripts goedgekeurd door de klant", isClientVisible: true });
+
+  const staff = await clientStaff(review.clientId);
+  await notify({
+    roles: ["owner"],
+    userIds: staff.coordinatorId ? [staff.coordinatorId] : undefined,
+    clientId: review.clientId,
+    level: "success",
+    type: "script_review_approved",
+    title: `${staff.clientName} keurde alle scripts goed`,
+    body: `Versie ${review.currentVersion} is goedgekeurd. De scripting staat op Final voor opname.`,
+    href: `/scriptcontrole/${review.id}`,
+    entityType: "script_review",
+    entityId: review.id,
+    dedupeKey: `script_review_approved:${review.id}:v${review.currentVersion}`,
+  });
+  // Openstaande feedbackmelding van deze versie is hiermee achterhaald.
+  await clearByDedupe(`script_review_feedback:${review.id}:v${review.currentVersion}`);
+  await syncDayScriptingStatus(review.productionDayId, "final");
+}
+
+export type RoundOutcome = "open" | "approved" | "feedback";
+
+/**
+ * Rondt de beoordelingsronde automatisch af zodra elk script behandeld is:
+ * alles goedgekeurd → review goedgekeurd; anders (minstens één wijziging) →
+ * feedback naar het team, in één melding. Nog open scripts → niets.
+ */
+async function finalizeRoundIfHandled(viewer: PortalViewer, reviewId: string): Promise<RoundOutcome> {
+  const review = await loadPortalReview(viewer, reviewId);
+  if (!review || review.status === "goedgekeurd") return review ? "approved" : "open";
+  const versionId = await versionIdOf(reviewId, review.currentVersion);
+  const { summary } = await getReviewApproval(reviewId, review.currentVersion, versionId);
+  if (!summary.allHandled) return "open";
+  if (summary.allApproved) {
+    await markApproved(viewer, review);
+    return "approved";
+  }
+  if (review.status !== "feedback_gegeven" && review.status !== "wordt_aangepast") {
+    await markFeedbackGiven(review, await clientCommentCount(reviewId, review.currentVersion));
+  }
+  return "feedback";
+}
+
+const pageSchema = z.object({ reviewId: z.string().uuid(), pageNumber: z.number().int().positive() });
+
+/** Controleert of een pagina een script is in de huidige versie. */
+async function isScriptPage(reviewId: string, versionNumber: number, pageNumber: number): Promise<boolean> {
+  const id = await versionIdOf(reviewId, versionNumber);
+  if (!id) return false;
+  const info = await ensureVersionPages(id);
+  return !!info && pageNumber >= info.from && pageNumber <= info.to;
+}
+
+/** Klant: keurt één script goed. Dubbel klikken heeft geen effect. */
+export async function approveScriptPage(input: { reviewId: string; pageNumber: number }): Promise<ActionResult & { round?: RoundOutcome }> {
+  try {
+    const viewer = await requirePortal();
+    const parsed = pageSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: "Onbekend script." };
+    const review = await loadPortalReview(viewer, parsed.data.reviewId);
+    if (!review) return { ok: false, message: "Dit script is niet gevonden." };
+    if (review.status === "goedgekeurd") return { ok: true, round: "approved" };
+    if (!(await isScriptPage(review.id, review.currentVersion, parsed.data.pageNumber))) return { ok: false, message: "Onbekend script." };
+
+    await db.insert(scriptReviewPageApprovals).values({
+      reviewId: review.id, versionNumber: review.currentVersion, pageNumber: parsed.data.pageNumber,
+      approvedById: viewer.id, approvedByName: viewer.fullName,
+    }).onConflictDoNothing();
+    await auditLog({ viewer, action: "script_review.page_approved", entityType: "script_review", entityId: review.id, clientId: review.clientId, changes: { version: review.currentVersion, page: parsed.data.pageNumber } });
+
+    const round = await finalizeRoundIfHandled(viewer, review.id);
+    revalidatePortalReview(review.id);
+    return { ok: true, round };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/** Klant: goedkeuring van één script terugdraaien (zolang de ronde nog loopt). */
+export async function undoScriptPageApproval(input: { reviewId: string; pageNumber: number }): Promise<ActionResult> {
+  try {
+    const viewer = await requirePortal();
+    const parsed = pageSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: "Onbekend script." };
+    const review = await loadPortalReview(viewer, parsed.data.reviewId);
+    if (!review) return { ok: false, message: "Dit script is niet gevonden." };
+    if (review.status === "goedgekeurd") return { ok: false, message: "De scripts zijn al definitief goedgekeurd. Neem contact op als er toch iets moet veranderen." };
+    await db.delete(scriptReviewPageApprovals).where(and(
+      eq(scriptReviewPageApprovals.reviewId, review.id),
+      eq(scriptReviewPageApprovals.versionNumber, review.currentVersion),
+      eq(scriptReviewPageApprovals.pageNumber, parsed.data.pageNumber),
+    ));
+    revalidatePortalReview(review.id);
+    return { ok: true };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
@@ -369,66 +617,69 @@ export async function addScriptReviewComment(input: { reviewId: string; body: st
 }
 
 /**
- * Klant: "Feedback doorgeven" — dient de geplaatste opmerkingen in. Optioneel met
- * een afsluitende algemene notitie. Zet de status op "feedback gegeven" (in het
- * portaal getoond als "Feedback ontvangen") en stuurt het team één melding.
+ * Klant: alle scripts die nog open staan in één keer goedkeuren. Alleen te
+ * gebruiken nadat de klant alle scripts in beeld heeft gehad (de knop wordt pas
+ * dan actief). Scripts met een voorgestelde wijziging blijven ongemoeid.
+ */
+export async function approveRemainingScripts(reviewId: string): Promise<ActionResult & { round?: RoundOutcome }> {
+  try {
+    const viewer = await requirePortal();
+    const id = z.string().uuid().parse(reviewId);
+    const review = await loadPortalReview(viewer, id);
+    if (!review) return { ok: false, message: "Dit script is niet gevonden." };
+    if (review.status === "goedgekeurd") return { ok: true, round: "approved" };
+
+    const versionId = await versionIdOf(id, review.currentVersion);
+    const { scripts } = await getReviewApproval(id, review.currentVersion, versionId);
+    const open = scripts.filter((s) => s.state === "todo" || s.state === "revised").map((s) => s.page);
+    if (scripts.length === 0) {
+      // Pagina's niet te bepalen (afwijkende PDF): het hele document goedkeuren.
+      await markApproved(viewer, review);
+      revalidatePortalReview(id);
+      return { ok: true, round: "approved" };
+    }
+    if (open.length > 0) {
+      await db.insert(scriptReviewPageApprovals).values(open.map((pageNumber) => ({
+        reviewId: id, versionNumber: review.currentVersion, pageNumber, approvedById: viewer.id, approvedByName: viewer.fullName,
+      }))).onConflictDoNothing();
+      await auditLog({ viewer, action: "script_review.pages_approved", entityType: "script_review", entityId: id, clientId: review.clientId, changes: { version: review.currentVersion, pages: open } });
+    }
+    const round = await finalizeRoundIfHandled(viewer, id);
+    revalidatePortalReview(id);
+    return { ok: true, round };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Klant: "Wijzigingen nu doorsturen" — voor als de klant de voorgestelde
+ * wijzigingen al wil versturen terwijl nog niet elk script beoordeeld is.
+ * Optioneel met een algemene notitie. Eén melding naar het team.
  */
 export async function submitScriptReviewFeedback(input: { reviewId: string; note?: string }): Promise<ActionResult> {
   try {
     const viewer = await requirePortal();
     const reviewId = z.string().uuid().parse(input.reviewId);
-
-    const [review] = await db
-      .select({ id: scriptReviews.id, clientId: scriptReviews.clientId, currentVersion: scriptReviews.currentVersion, status: scriptReviews.status })
-      .from(scriptReviews)
-      .where(and(eq(scriptReviews.id, reviewId), eq(scriptReviews.clientId, viewer.clientId!), isNull(scriptReviews.deletedAt)))
-      .limit(1);
+    const review = await loadPortalReview(viewer, reviewId);
     if (!review) return { ok: false, message: "Dit script is niet gevonden." };
     if (review.status === "goedgekeurd") return { ok: false, message: "Dit script is al goedgekeurd." };
 
-    // Optionele afsluitende notitie als algemene opmerking opslaan.
-    const note = input.note?.trim();
+    const note = input.note?.trim().slice(0, 4000);
     if (note) {
-      await db.insert(scriptReviewThreads).values({
+      const [t] = await db.insert(scriptReviewThreads).values({
         reviewId, versionNumber: review.currentVersion, pageNumber: null,
         visibility: "client", createdById: viewer.id, authorName: viewer.fullName,
-      }).returning({ id: scriptReviewThreads.id }).then(async ([t]) => {
-        if (t) await db.insert(scriptReviewComments).values({ threadId: t.id, body: note, authorUserId: viewer.id, authorName: viewer.fullName, isInternal: false });
-      });
+      }).returning({ id: scriptReviewThreads.id });
+      if (t) await db.insert(scriptReviewComments).values({ threadId: t.id, body: note, authorUserId: viewer.id, authorName: viewer.fullName, isInternal: false });
     }
 
-    // Minstens één opmerking op de huidige versie vereist om in te dienen.
-    const [{ cnt }] = await db
-      .select({ cnt: sql<number>`count(*)::int` })
-      .from(scriptReviewThreads)
-      .where(and(eq(scriptReviewThreads.reviewId, reviewId), eq(scriptReviewThreads.versionNumber, review.currentVersion), eq(scriptReviewThreads.visibility, "client"), isNull(scriptReviewThreads.deletedAt)));
-    if (!cnt || cnt === 0) {
-      return { ok: false, message: "Plaats eerst een opmerking (of schrijf een notitie) voordat je feedback doorgeeft." };
-    }
+    const cnt = await clientCommentCount(reviewId, review.currentVersion);
+    if (cnt === 0) return { ok: false, message: "Beschrijf eerst welke wijziging je wilt voorstellen." };
 
-    await db.update(scriptReviews).set({ status: "feedback_gegeven", updatedAt: new Date() })
-      .where(and(eq(scriptReviews.id, reviewId), sql`${scriptReviews.status} <> 'goedgekeurd'`));
-
-    await recordActivity({ clientId: review.clientId, type: "script_review.feedback", title: "Klant gaf feedback op de scripts", isClientVisible: false });
-    const staff = await clientStaff(review.clientId);
-    await notify({
-      roles: ["owner"],
-      userIds: staff.coordinatorId ? [staff.coordinatorId] : undefined,
-      clientId: review.clientId,
-      level: "warning",
-      type: "script_review_feedback",
-      title: `${staff.clientName} gaf feedback op de scripts`,
-      body: `${cnt} opmerking${cnt === 1 ? "" : "en"} op versie ${review.currentVersion}. Bekijk en verwerk ze.`,
-      href: `/scriptcontrole/${reviewId}`,
-      entityType: "script_review",
-      entityId: reviewId,
-      dedupeKey: `script_review_feedback:${reviewId}:v${review.currentVersion}`,
-    });
-
-    revalidatePath(`/portal/scripts/${reviewId}`);
-    revalidatePath("/portal/scripts");
-    revalidatePath(`/scriptcontrole/${reviewId}`);
-    revalidatePath("/scriptcontrole");
+    await markFeedbackGiven(review, cnt);
+    revalidatePortalReview(reviewId);
     return { ok: true };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
@@ -436,50 +687,12 @@ export async function submitScriptReviewFeedback(input: { reviewId: string; note
   }
 }
 
-/** Klant: keurt de scripts definitief goed (legt vast wie, wanneer en welke versie). */
+/**
+ * Klant: keurt de scripts in één keer goed. Gebruikt als de scriptpagina's niet
+ * te bepalen zijn; anders gelijk aan "alle resterende scripts goedkeuren".
+ */
 export async function approveScriptReview(reviewId: string): Promise<ActionResult> {
-  try {
-    const viewer = await requirePortal();
-    const [review] = await db
-      .select({ id: scriptReviews.id, clientId: scriptReviews.clientId, currentVersion: scriptReviews.currentVersion, status: scriptReviews.status })
-      .from(scriptReviews)
-      .where(and(eq(scriptReviews.id, reviewId), eq(scriptReviews.clientId, viewer.clientId!), isNull(scriptReviews.deletedAt)))
-      .limit(1);
-    if (!review) return { ok: false, message: "Dit script is niet gevonden." };
-    if (review.status === "goedgekeurd") return { ok: true };
-
-    // Goedkeuring geldt expliciet voor DEZE versie — een latere versie reset dit.
-    await db
-      .update(scriptReviews)
-      .set({ status: "goedgekeurd", approvedAt: new Date(), approvedById: viewer.id, approvedVersion: review.currentVersion, updatedAt: new Date() })
-      .where(eq(scriptReviews.id, reviewId));
-
-    await auditLog({ viewer, action: "script_review.approved", entityType: "script_review", entityId: reviewId, clientId: review.clientId, changes: { version: review.currentVersion } });
-    await recordActivity({ clientId: review.clientId, type: "script_review.approved_by_client", title: "Scripts goedgekeurd door de klant", isClientVisible: true });
-
-    const staff = await clientStaff(review.clientId);
-    await notify({
-      roles: ["owner"],
-      userIds: staff.coordinatorId ? [staff.coordinatorId] : undefined,
-      clientId: review.clientId,
-      level: "success",
-      type: "script_review_approved",
-      title: `${staff.clientName} keurde de scripts goed`,
-      body: `Versie ${review.currentVersion} is definitief goedgekeurd.`,
-      href: "/scriptcontrole",
-      entityType: "script_review",
-      entityId: reviewId,
-      dedupeKey: `script_review_approved:${reviewId}:v${review.currentVersion}`,
-    });
-
-    revalidatePath(`/portal/scripts/${reviewId}`);
-    revalidatePath("/portal/scripts");
-    revalidatePath("/scriptcontrole");
-    return { ok: true };
-  } catch (error) {
-    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
-    throw error;
-  }
+  return approveRemainingScripts(reviewId);
 }
 
 /* --------------------------------------- intern: feedback verwerken (Fase 3) */
@@ -611,6 +824,9 @@ export async function uploadScriptReviewVersion(input: z.infer<typeof versionSch
 
     await db.insert(scriptReviewVersions).values({ reviewId, versionNumber, fileName: fileName.slice(0, 255), contentType: "application/pdf", sizeBytes, dataBase64: base64 ?? null, storagePath: storagePath ?? null, note: note ?? null, uploadedById: viewer.id });
     await db.update(scriptReviews).set({ status: "opnieuw_controle", currentVersion: versionNumber, feedbackDeadline: await scriptFeedbackDeadline(), updatedAt: new Date() }).where(eq(scriptReviews.id, reviewId));
+
+    await carryOverApprovals(reviewId, versionNumber - 1, versionNumber);
+    await syncDayScriptingStatus(review.productionDayId, "scripts_bij_klant");
 
     await auditLog({ viewer, action: "script_review.new_version", entityType: "script_review", entityId: reviewId, clientId: review.clientId, changes: { version: versionNumber } });
     await recordActivity({ clientId: review.clientId, type: "script_review.new_version", title: "Aangepaste scripts klaargezet ter controle", isClientVisible: true });

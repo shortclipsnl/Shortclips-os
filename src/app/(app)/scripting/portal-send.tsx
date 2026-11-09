@@ -95,6 +95,7 @@ export function PortalSendCell({ row, canWrite }: { row: ScriptingRow; canWrite:
         <>
           <Link href={`/scriptcontrole/${row.reviewId}`} className="inline-flex items-center gap-1.5 hover:underline">
             <Badge tone={meta.tone}>{meta.label}</Badge>
+            {row.reviewTotal > 0 && row.reviewStatus !== "goedgekeurd" ? <span className="text-2xs font-semibold tabular-nums text-[var(--color-ink-muted)]">{row.reviewApproved}/{row.reviewTotal} akkoord</span> : null}
           </Link>
           {canWrite ? (
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">

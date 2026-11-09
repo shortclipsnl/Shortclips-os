@@ -39,9 +39,9 @@ function statusOf(r: Row, today: string): { bucket: Bucket; tone: StatusTone; la
   if (CLIENT_ACTION_STATUSES.includes(rev.status)) {
     const overdue = !!rev.feedbackDeadline && rev.feedbackDeadline.slice(0, 10) < today;
     if (overdue) return { bucket: "actie", tone: "red", label: "Feedbacktermijn verstreken" };
-    return { bucket: "actie", tone: "orange", label: rev.status === "opnieuw_controle" ? "Aangepast, wacht op jou" : "Wacht op jouw feedback" };
+    return { bucket: "actie", tone: "orange", label: rev.status === "opnieuw_controle" ? "Aangepast, opnieuw beoordelen" : "Wacht op jouw akkoord" };
   }
-  if (rev.status === "feedback_gegeven" || rev.status === "wordt_aangepast") return { bucket: "bezig", tone: "blue", label: rev.status === "feedback_gegeven" ? "Feedback ontvangen" : "Wordt aangepast" };
+  if (rev.status === "feedback_gegeven" || rev.status === "wordt_aangepast") return { bucket: "bezig", tone: "blue", label: rev.status === "feedback_gegeven" ? "Wijziging voorgesteld" : "Wordt aangepast" };
   return past ? { bucket: "afgerond", tone: "grey", label: "Afgerond · opgenomen" } : { bucket: "goedgekeurd", tone: "green", label: "Goedgekeurd" };
 }
 
@@ -77,17 +77,33 @@ function SessionRow({ r, today }: { r: Row; today: string }) {
           {rev ? <span className="inline-flex items-center gap-1"><FileText className="size-3.5" /> {rev.title}</span> : null}
           {rev && rev.openComments > 0 ? <span>{rev.openComments} opmerking{rev.openComments === 1 ? "" : "en"}</span> : null}
         </div>
+        {rev && rev.totalScripts > 0 && st.bucket !== "afgerond" ? <ScriptProgress approved={rev.approvedScripts} total={rev.totalScripts} /> : null}
         {actie && rev?.feedbackDeadline ? (
           <p className={`mt-1.5 inline-flex items-center gap-1.5 text-[13px] font-semibold ${st.tone === "red" ? "text-[var(--st-red)]" : "text-[var(--st-orange)]"}`}>
-            <Clock className="size-3.5" /> Feedback uiterlijk {dayLabel(rev.feedbackDeadline).toLowerCase()}
+            <Clock className="size-3.5" /> Graag uiterlijk {dayLabel(rev.feedbackDeadline).toLowerCase()}
           </p>
         ) : null}
       </div>
       {rev ? (
         <Link href={`/portal/scripts/${rev.id}`} className={`${actie ? portalBtn.act : portalBtn.soft} shrink-0`}>
-          {actie ? "Bekijk & geef feedback" : "Bekijk script"} <ArrowRight className="size-4" />
+          {actie ? (rev.approvedScripts > 0 ? "Verder beoordelen" : "Scripts beoordelen") : "Bekijk scripts"} <ArrowRight className="size-4" />
         </Link>
       ) : null}
+    </div>
+  );
+}
+
+/** "4 van 6 scripts goedgekeurd" met een smalle voortgangsbalk. */
+function ScriptProgress({ approved, total }: { approved: number; total: number }) {
+  const pct = Math.round((approved / total) * 100);
+  return (
+    <div className="mt-2 flex max-w-[360px] items-center gap-2.5">
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--sc-fill-strong)]" aria-hidden>
+        <div className="h-full rounded-full bg-[var(--st-green)]" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="shrink-0 text-[12.5px] font-semibold text-[var(--color-ink-muted)] tabular-nums">
+        {approved === total ? <span className="text-[var(--st-green)]">Alle {total} goedgekeurd</span> : `${approved} van ${total} scripts goedgekeurd`}
+      </span>
     </div>
   );
 }
@@ -143,15 +159,18 @@ export default async function PortalScriptsPage() {
           <div>
             <StatusPill tone="orange">Actie nodig</StatusPill>
             <p className="mt-2 text-[20px] font-bold tracking-tight">
-              {groups.actie.length === 1 ? "1 script wacht op jouw feedback" : `${groups.actie.length} scripts wachten op jouw feedback`}
+              {firstAction && firstAction.totalScripts > 0
+                ? `${firstAction.approvedScripts} van de ${firstAction.totalScripts} scripts goedgekeurd`
+                : groups.actie.length === 1 ? "Je scripts wachten op je akkoord" : `${groups.actie.length} opnames wachten op je akkoord`}
             </p>
+            {firstAction?.shootOn ? <p className="text-[13.5px] font-medium text-[var(--color-ink)]">Scripts voor de opname van {dayLabel(firstAction.shootOn).toLowerCase()}</p> : null}
             <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">
               {deadlines[0] ? <>Graag uiterlijk <strong className="text-[var(--color-ink)]">{dayLabel(deadlines[0]).toLowerCase()}</strong>. </> : null}
               Binnen {settings.feedbackDaysScripts} {settings.feedbackDaysScripts === 1 ? "werkdag" : "werkdagen"} reageren houdt de opnamedag op schema.
             </p>
           </div>
           {firstAction ? (
-            <Link href={`/portal/scripts/${firstAction.id}`} className={portalBtn.act}>Start met beoordelen <ArrowRight className="size-4" /></Link>
+            <Link href={`/portal/scripts/${firstAction.id}`} className={portalBtn.act}>{firstAction.approvedScripts > 0 ? "Verder beoordelen" : "Start met beoordelen"} <ArrowRight className="size-4" /></Link>
           ) : null}
         </section>
       ) : (
@@ -180,7 +199,7 @@ export default async function PortalScriptsPage() {
         ))}
       </div>
 
-      <Section title="Wacht op jouw feedback" rows={groups.actie} today={today} />
+      <Section title="Wacht op jouw akkoord" rows={groups.actie} today={today} />
       <Section title="In voorbereiding" hint="Hier zijn wij mee bezig. Je hoeft nog niets te doen." rows={groups.bezig} today={today} />
       <Section title="Goedgekeurd" hint="Klaar voor de opnamedag." rows={groups.goedgekeurd} today={today} />
 
