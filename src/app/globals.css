@@ -597,3 +597,31 @@ body {
 }
 .sc-check-pop { animation: sc-check-pop 0.4s ease-out; }
 @media (prefers-reduced-motion: reduce) { .sc-check-pop { animation: none; } }
+
+/* ---- Portaal "Zo werken wij": glanzende vinkjes in de weergave "Wat Shortclips doet" ---- */
+.portal-studio .zww-glow {
+  position: relative;
+  overflow: hidden;
+  animation: zwwPulse 2.4s ease-in-out infinite;
+}
+.portal-studio .zww-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.85) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: zwwShine 2.4s ease-in-out infinite;
+  animation-delay: inherit;
+}
+@keyframes zwwPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--st-green) 55%, transparent); }
+  50% { box-shadow: 0 0 0 6px transparent, 0 0 12px 2px color-mix(in srgb, var(--st-green) 45%, transparent); }
+}
+@keyframes zwwShine {
+  0%, 40% { transform: translateX(-120%); }
+  70%, 100% { transform: translateX(120%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .portal-studio .zww-glow, .portal-studio .zww-glow::after { animation: none; }
+}
