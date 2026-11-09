@@ -41,7 +41,7 @@ function staleHours(ms: number | null): string {
 export default async function IntegrationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ google?: string; melding?: string }>;
+  searchParams: Promise<{ google?: string; frameio?: string; melding?: string }>;
 }) {
   const viewer = await requireOperationalManager();
   const sp = await searchParams;
@@ -50,6 +50,12 @@ export default async function IntegrationsPage({
       ? { ok: true, text: "Google is opnieuw verbonden. De synchronisatie loopt weer automatisch." }
       : sp.google === "fout"
         ? { ok: false, text: sp.melding ?? "Opnieuw verbinden is niet gelukt." }
+        : undefined;
+  const frameioNotice =
+    sp.frameio === "verbonden"
+      ? { ok: true, text: "Frame.io is opnieuw verbonden. De synchronisatie loopt weer automatisch." }
+      : sp.frameio === "fout"
+        ? { ok: false, text: sp.melding ?? "Frame.io opnieuw verbinden is niet gelukt." }
         : undefined;
   const health = await integrationHealth();
   const canWrite = viewer.permissions.has("integrations:write");
@@ -96,6 +102,9 @@ export default async function IntegrationsPage({
 
       <div className="space-y-5">
         <DriveStatusCard isOwner={isOwner(viewer)} notice={googleNotice} />
+        {frameioNotice ? (
+          <p className={`mt-3 text-sm ${frameioNotice.ok ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}`}>{frameioNotice.text}</p>
+        ) : null}
         {health.map((item) => {
           const meta = STATUS_META[item.status] ?? STATUS_META.not_configured!;
           return (
@@ -208,6 +217,11 @@ export default async function IntegrationsPage({
             subtitle="Normaal draaien deze taken automatisch. Hier kun je ze direct uitvoeren."
           />
           <div className="mt-4 flex flex-wrap gap-3">
+            {isOwner(viewer) ? (
+              <a href="/api/integrations/frameio/connect" className="inline-flex items-center rounded-[var(--radius-sm)] bg-[var(--color-brand-500)] px-3 py-1.5 text-sm font-medium text-white">
+                Frame.io opnieuw verbinden
+              </a>
+            ) : null}
             <JobButton job="frameio.pull_projects" label="Frame.io-projecten ophalen" />
             <JobButton job="frameio.pull_deliverables" label="Frame.io-video's ophalen" />
             <JobButton job="frameio.pull_comments" label="Frame.io-feedback ophalen" />
