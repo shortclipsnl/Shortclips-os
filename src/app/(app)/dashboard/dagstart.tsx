@@ -173,6 +173,9 @@ function Column({
         </div>
       </div>
 
+      {/* Werkweek-tijdlijn: hoeveel tijd is er deze week nog om af te ronden. */}
+      {col === "week" ? <WeekTimeline today={today} /> : null}
+
       {items.length === 0 ? (
         <p className="px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">{empty}</p>
       ) : (
@@ -220,6 +223,82 @@ function Column({
 
 function GroupLabel({ children }: { children: React.ReactNode }) {
   return <div className="px-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-[var(--color-ink-faint)]">{children}</div>;
+}
+
+const WEEK_DAYS = ["Ma", "Di", "Wo", "Do", "Vr"];
+
+/** Kleur die met de week meeloopt: begin groen, midden oranje, richting vrijdag rood. */
+function weekUrgency(dayIndex: number): { color: string; soft: string } {
+  // dayIndex: 1=ma … 5=vr, 0=weekend (nieuwe week nog niet begonnen).
+  if (dayIndex >= 4) return { color: "var(--color-bad)", soft: "var(--color-bad-soft)" }; // do/vr: rood
+  if (dayIndex === 3) return { color: "var(--color-warn)", soft: "var(--color-warn-soft)" }; // wo: oranje
+  return { color: "var(--color-good)", soft: "var(--color-good-soft)" }; // ma/di + weekend: groen
+}
+
+/**
+ * Compacte werkweek-tijdlijn boven "Deze week afronden". Loopt automatisch mee
+ * met de dag (uit de Amsterdamse datum in `today`), kleurt subtiel op richting
+ * vrijdag en toont hoeveel werkdagen er nog over zijn. Puur tijd-gebaseerd —
+ * losstaand van hoeveel taken al zijn afgevinkt. Reset vanzelf elke maandag.
+ */
+function WeekTimeline({ today }: { today: string }) {
+  const dow = new Date(`${today}T12:00:00Z`).getUTCDay(); // 0 zo … 6 za
+  const dayIndex = dow >= 1 && dow <= 5 ? dow : 0; // 1..5 ma-vr, 0 = weekend
+  const started = dayIndex > 0;
+  const remaining = started ? 6 - dayIndex : 5; // ma→5 … vr→1 ; weekend→5
+  const { color, soft } = weekUrgency(dayIndex);
+
+  // Voortgang = verstreken tijd (midden van de huidige dag), NIET het percentage
+  // afgevinkte taken. Dots staan op 10/30/50/70/90% → lijn loopt van 10% tot 90%.
+  const centerPct = started ? ((dayIndex - 0.5) / 5) * 100 : 0;
+  const fillPct = started ? Math.max(0, centerPct - 10) : 0;
+
+  const label = !started
+    ? "Nieuwe werkweek — maandag starten we opnieuw"
+    : dayIndex === 5
+      ? "Vrijdag — laatste dag om deze week af te ronden"
+      : `Nog ${remaining} werkdag${remaining === 1 ? "" : "en"} om deze week af te ronden`;
+
+  return (
+    <div className="border-b border-[var(--color-line)] px-3.5 pb-3 pt-2.5">
+      <div className="mb-2 flex items-center gap-1.5">
+        <span className="size-1.5 shrink-0 rounded-full" style={{ background: color }} />
+        <span className="text-[11.5px] font-semibold leading-tight" style={{ color }}>{label}</span>
+      </div>
+      <div className="relative">
+        {/* grondlijn + verstreken tijd */}
+        <div className="absolute left-[10%] right-[10%] top-[7px] h-[3px] rounded-full bg-[var(--color-line-strong)]/40" />
+        <div className="absolute left-[10%] top-[7px] h-[3px] rounded-full transition-all" style={{ width: `${fillPct}%`, background: color }} />
+        <div className="relative grid grid-cols-5">
+          {WEEK_DAYS.map((d, idx) => {
+            const n = idx + 1;
+            const isToday = started && n === dayIndex;
+            const isPast = started && n < dayIndex;
+            return (
+              <div key={d} className="flex flex-col items-center gap-1">
+                <span
+                  className="grid size-[15px] place-items-center rounded-full border-2"
+                  style={{
+                    borderColor: isToday || isPast ? color : "var(--color-line-strong)",
+                    background: isPast ? color : isToday ? soft : "var(--color-surface)",
+                    boxShadow: isToday ? `0 0 0 3px ${soft}` : undefined,
+                  }}
+                >
+                  {isToday ? <span className="size-1.5 rounded-full" style={{ background: color }} /> : null}
+                </span>
+                <span
+                  className="text-[10px] font-semibold"
+                  style={{ color: isToday ? color : isPast ? "var(--color-ink-muted)" : "var(--color-ink-faint)" }}
+                >
+                  {d}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function TaskCard({
