@@ -40,16 +40,8 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
     );
   }
 
-  if (!owner && config.status !== "goedgekeurd") {
-    return (
-      <div className="mx-auto max-w-[1100px]">
-        <PageHeader title="Mijn verantwoordelijkheden" description={INTRO} />
-        <div className="sc-card p-6 text-sm text-[var(--color-ink-muted)]">
-          Jarno legt jouw verantwoordelijkheden op dit moment vast. Zodra hij de verdeling heeft goedgekeurd, zie je ze hier.
-        </div>
-      </div>
-    );
-  }
+  // De verantwoordelijkheden zijn direct zichtbaar voor het team — geen aparte
+  // goedkeurstap meer. Elke wijziging die Jarno in Beheer opslaat is meteen live.
 
   // Live tellingen uit het bestaande werkoverzicht (dezelfde bron als Vandaag).
   let subject = owner ? null : viewer;
@@ -95,7 +87,7 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
               config.status === "goedgekeurd" ? "bg-[var(--color-good-soft)] text-[#1d6b4c]" : "bg-[#fff4c2] text-[#7a5a00]",
             )}
           >
-            {config.status === "goedgekeurd" ? "Goedgekeurd: zichtbaar voor het team" : "Concept: het team ziet dit nog niet"}
+            {config.status === "goedgekeurd" ? "Goedgekeurd · zichtbaar voor het team" : "Concept · ook direct zichtbaar voor het team"}
           </span>
         </div>
       )}
