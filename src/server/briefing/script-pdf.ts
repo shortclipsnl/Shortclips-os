@@ -162,7 +162,12 @@ const normTitle = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 export function structureLines(lines: RawLine[], pageCount: number, emptyPages: number[]): ParsedScriptPdf {
   const warnings: string[] = [];
   const body = median(lines.map((l) => l.size)) || 10;
-  const titleMin = body * 1.6;
+  // Shortclips-template: titel ± 3× de bodytekst. Andere exports (bijv. Apple
+  // Notities) hebben kleinere koppen; dan een lagere drempel.
+  const titleMin = lines.some((l) => l.size >= body * 1.6) ? body * 1.6 : body * 1.3;
+  // Documenttitel ("Short video scripts - 6 November - Koops") is geen video.
+  const isDocTitle = (t: string) =>
+    /(short\s*(form\s*)?video|scripts?)\b.*\b(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)\b/i.test(t);
 
   const scripts: ParsedScript[] = [];
   let cur: ParsedScript | null = null;
@@ -176,10 +181,18 @@ export function structureLines(lines: RawLine[], pageCount: number, emptyPages: 
 
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i]!;
+    if (l.size >= titleMin && isDocTitle(l.text)) continue;
     if (l.size >= titleMin) {
       // Titel kan over meerdere regels lopen (zelfde pagina, direct onder elkaar).
       const parts = [l.text.trim()];
-      while (i + 1 < lines.length && lines[i + 1]!.size >= titleMin && lines[i + 1]!.page === l.page) parts.push(lines[++i]!.text.trim());
+      while (
+        i + 1 < lines.length &&
+        lines[i + 1]!.size >= titleMin &&
+        lines[i + 1]!.page === l.page &&
+        !isDocTitle(lines[i + 1]!.text) &&
+        lines[i + 1]!.gapBefore < lines[i + 1]!.size * 2
+      )
+        parts.push(lines[++i]!.text.trim());
       let title = parts.join(" ").replace(/\s+/g, " ").trim();
       const num = title.match(/^(\d{1,2})[.)]\s*(.+)$/);
       if (num) title = num[2]!.trim();
@@ -232,8 +245,7 @@ export function structureLines(lines: RawLine[], pageCount: number, emptyPages: 
 
   // Lege secties (bijv. kop zonder tekst) blijven staan: ze komen zo uit het script.
   const structured = scripts.length > 0 && scripts.some((s) => s.sections.some((x) => x.label));
-  if (scripts.length === 0) warnings.push("Er zijn geen videotitels herkend in de script-PDF.");
-  else if (!structured) warnings.push("De indeling (hook, middenstuk, CTA) is niet herkend; het script staat er volledig als doorlopende tekst.");
+  if (scripts.length === 0) warnings.push("De videotitels zijn niet herkend in de script-PDF; de scriptpagina's staan er wel volledig in.");
   for (const s of scripts) {
     if (!s.sections.some((x) => x.lines.length > 0)) warnings.push(`"${s.title}" bevat geen leesbare tekst in de PDF.`);
   }

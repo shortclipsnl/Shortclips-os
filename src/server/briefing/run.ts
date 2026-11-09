@@ -137,12 +137,18 @@ export async function ensureBriefingForShoot(productionDayId: string, opts: { fo
         : `De script-PDF kon niet worden gelezen (${e instanceof Error ? e.message.slice(0, 120) : "onbekende fout"}).`,
     );
   }
-  if (scripts.scripts.length === 0) return fail(scripts.warnings[0] ?? "Geen scripts gevonden in de PDF.");
+  // Geen titels herkend (afwijkende opmaak)? Dan toch een briefing: alle pagina's
+  // met tekst gaan mee als scriptpagina's en de briefing meldt dat de titels ontbreken.
+  if (scripts.scripts.length === 0 && scripts.pageCount === scripts.imagePages.length) {
+    return fail(scripts.warnings[0] ?? "De script-PDF bevat geen leesbare tekst.");
+  }
 
   // 2. De scriptpagina's zelf (exact zoals in de PDF), zonder voorblad en
   //    beeldpagina's. Hergebruiken zolang de script-PDF niet is veranderd.
   let scriptPages: BriefingStoreV2["scriptPages"] = null;
-  const pages = [...new Set(scripts.scripts.flatMap((s) => s.pages))].sort((a, b) => a - b);
+  const pages = scripts.scripts.length
+    ? [...new Set(scripts.scripts.flatMap((s) => s.pages))].sort((a, b) => a - b)
+    : Array.from({ length: scripts.pageCount }, (_, i) => i + 1).filter((p) => !scripts.imagePages.includes(p));
   if (prev?.scriptPages && prev.scriptPages.sourceHash === pdf.hash) {
     scriptPages = prev.scriptPages;
   } else if (pages.length) {
