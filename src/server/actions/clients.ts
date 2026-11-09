@@ -7,7 +7,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientContacts, clientIntegrations, clients, contracts, roles, userRoles, users } from "@/db/schema";
+import { clientContacts, clientIntegrations, clientPackages, clients, contracts, roles, userRoles, users } from "@/db/schema";
 import { firstNameKey } from "@/lib/editors";
 import {
   assertClientAccess,
@@ -333,7 +333,66 @@ export type ClientInput = {
   contactName?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  /** Plaatst Shortclips de content (true) of de klant zelf (false). */
+  weHandlePosting?: boolean;
+  /** Contractduur in maanden. */
+  contractMonths?: number | null;
+  /** Alleen true als startdatum of contractduur in het formulier is gewijzigd:
+   *  dan wordt het lopende contract (start/einde) bijgewerkt. */
+  contractTouched?: boolean;
+  /** Alleen true als pakket of shorts per maand is gewijzigd: dan wordt het
+   *  actieve pakket bijgewerkt. */
+  packageTouched?: boolean;
 };
+
+/** Pakketnaam per soort content (zelfde namen als de offertesjablonen). */
+function packageLabel(focus: ContentFocus): string {
+  return focus === "organisch" ? "Organische shorts" : focus === "advertentie" ? "Advertentie creatives" : "Organisch + advertenties";
+}
+const STANDARD_PACKAGES = ["Organische shorts", "Advertentie creatives", "Organisch + advertenties"];
+
+/** Laatste dag van een contract: startdatum + looptijd, min één dag
+ *  (1 april + 12 maanden loopt t/m 31 maart). */
+function contractEndDate(startsOn: string, months: number): string {
+  const [y, m, d] = startsOn.slice(0, 10).split("-").map(Number);
+  const end = new Date(Date.UTC(y, m - 1 + months, d) - 86400000);
+  return end.toISOString().slice(0, 10);
+}
+
+/**
+ * Houdt het lopende contract en het actieve pakket in lijn met wat er op de
+ * klantpagina is gekozen, zodat dezelfde gegevens niet op meerdere plekken
+ * hoeven te worden bijgehouden. Bedragen worden hier nooit aangeraakt.
+ */
+async function syncContractAndPackage(clientId: string, input: ClientInput, force: boolean): Promise<void> {
+  const startsOn = clean(input.startedOn);
+  const months = input.contractMonths ?? null;
+  if ((force || input.contractTouched) && startsOn && months && months > 0) {
+    const endsOn = contractEndDate(startsOn, months);
+    const [current] = await db.select({ id: contracts.id }).from(contracts)
+      .where(and(eq(contracts.clientId, clientId), isNull(contracts.deletedAt), eq(contracts.status, "active")))
+      .orderBy(desc(contracts.startsOn)).limit(1);
+    if (current) {
+      await db.update(contracts).set({ startsOn, endsOn, updatedAt: new Date() }).where(eq(contracts.id, current.id));
+    } else {
+      await db.insert(contracts).values({ clientId, status: "active", startsOn, endsOn });
+    }
+  }
+
+  const focus = cleanContentFocus(input.contentFocus);
+  if ((force || input.packageTouched) && focus) {
+    const [pkg] = await db.select({ id: clientPackages.id, name: clientPackages.name }).from(clientPackages)
+      .where(and(eq(clientPackages.clientId, clientId), eq(clientPackages.isActive, true))).limit(1);
+    const videosPerMonth = input.monthlyVideoQuota ?? 0;
+    if (pkg) {
+      // Een eigen pakketnaam laten we staan; alleen de standaardnamen lopen mee.
+      const name = !pkg.name || STANDARD_PACKAGES.includes(pkg.name) ? packageLabel(focus) : pkg.name;
+      await db.update(clientPackages).set({ name, videosPerMonth }).where(eq(clientPackages.id, pkg.id));
+    } else {
+      await db.insert(clientPackages).values({ clientId, name: packageLabel(focus), videosPerMonth });
+    }
+  }
+}
 
 function slugify(input: string): string {
   return (
@@ -472,6 +531,8 @@ export async function createClient(input: ClientInput): Promise<ActionResult> {
         videographerId: input.videographerId || null,
         monthlyVideoQuota: input.monthlyVideoQuota ?? 0,
         contentFocus: cleanContentFocus(input.contentFocus),
+        ...(input.weHandlePosting !== undefined ? { weHandlePosting: input.weHandlePosting } : {}),
+        ...(input.contractMonths !== undefined ? { contractMonths: input.contractMonths } : {}),
         monthlyRevenue: clean(input.monthlyRevenue) ?? undefined,
         startedOn: clean(input.startedOn) ?? undefined,
         notes: clean(input.notes),
@@ -487,6 +548,7 @@ export async function createClient(input: ClientInput): Promise<ActionResult> {
       startedOn: clean(input.startedOn),
       monthlyRevenue: clean(input.monthlyRevenue),
     });
+    await syncContractAndPackage(clientId, input, true);
 
     await auditLog({
       viewer,
@@ -563,6 +625,8 @@ export async function updateClient(slug: string, input: ClientInput): Promise<Ac
         videographerId: input.videographerId || null,
         monthlyVideoQuota: input.monthlyVideoQuota ?? 0,
         contentFocus: cleanContentFocus(input.contentFocus),
+        ...(input.weHandlePosting !== undefined ? { weHandlePosting: input.weHandlePosting } : {}),
+        ...(input.contractMonths !== undefined ? { contractMonths: input.contractMonths } : {}),
         ...(newRevenue !== null ? { monthlyRevenue: newRevenue } : {}),
         startedOn: newStarted,
         notes: clean(input.notes),
@@ -572,6 +636,7 @@ export async function updateClient(slug: string, input: ClientInput): Promise<Ac
       .where(eq(clients.id, existing.id));
 
     await upsertPrimaryContact(existing.id, input);
+    await syncContractAndPackage(existing.id, input, false);
 
     await auditLog({
       viewer,

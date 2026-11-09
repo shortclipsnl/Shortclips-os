@@ -394,12 +394,22 @@ export async function getClientForEdit(viewer: Viewer, slug: string) {
       startedOn: clients.startedOn,
       notes: clients.notes,
       managedFields: clients.managedFields,
+      weHandlePosting: clients.weHandlePosting,
+      contractMonths: clients.contractMonths,
     })
     .from(clients)
     .where(and(eq(clients.slug, slug), isNull(clients.deletedAt)))
     .limit(1);
   if (!client) notFound();
   assertClientAccess(viewer, client.id);
+
+  // Lopend contract (alleen data, geen bedragen) voor startdatum en looptijd.
+  const [contract] = await db
+    .select({ startsOn: contracts.startsOn, endsOn: contracts.endsOn })
+    .from(contracts)
+    .where(and(eq(contracts.clientId, client.id), isNull(contracts.deletedAt), eq(contracts.status, "active")))
+    .orderBy(desc(contracts.startsOn))
+    .limit(1);
 
   const [contact] = await db
     .select({
@@ -425,7 +435,19 @@ export async function getClientForEdit(viewer: Viewer, slug: string) {
     .where(eq(clientIntegrations.clientId, client.id))
     .orderBy(asc(clientIntegrations.provider));
 
-  return { client, contact: contact ?? null, integrations };
+  return { client, contact: contact ?? null, integrations, contract: contract ?? null };
+}
+
+/** Sectoren die al bij klanten in gebruik zijn, meest gebruikte eerst. Voeden de
+ *  keuzeknoppen op de bewerkpagina, zodat iedereen dezelfde benaming kiest. */
+export async function listClientSectors(): Promise<string[]> {
+  const rows = await db
+    .select({ sector: clients.sector, n: sql<number>`count(*)::int` })
+    .from(clients)
+    .where(and(isNull(clients.deletedAt), sql`coalesce(trim(${clients.sector}), '') <> ''`))
+    .groupBy(clients.sector)
+    .orderBy(sql`count(*) desc`);
+  return rows.map((r) => r.sector!.trim()).filter(Boolean);
 }
 
 /**
