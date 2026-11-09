@@ -56,6 +56,8 @@ import { FinanceMonths } from "./finance-months";
 import { GenerateReportButton, ReportPublishToggle } from "./report-actions";
 import { AgreementOverridesEditor } from "./agreement-overrides";
 import { RetentionTab } from "./retention-tab";
+import { ExitInterviewTab } from "./exit-interview-tab";
+import { EXIT_STATUSES } from "@/lib/exit-interview";
 import { getClientAgreementOverrides, getPortalSettings } from "@/server/portal-settings";
 import { canManageClientDocs, getCurrentDocs, toSlots, visibleKinds } from "@/server/client-documents";
 import { ClientOverview } from "./client-overview";
@@ -146,6 +148,8 @@ export default async function ClientPage({
   const tabs: TabDef[] = [
     ...(onboardingOpen ? onboardingTab : []),
     { key: "overzicht", label: "Overzicht" },
+    // Exitgesprek: alleen bij gestopte of gepauzeerde klanten, alleen voor het team.
+    ...(!isEditorRole(viewer) && (EXIT_STATUSES as readonly string[]).includes(c.status) ? [{ key: "exitgesprek", label: "Exitgesprek" }] : []),
     { key: "videos", label: "Video's", count: activeVideos.length },
     { key: "scripts", label: "Scripts", count: hub.scripts.filter((s) => s.status !== "shot").length },
     ...(hub.shoots.length > 0 ? [{ key: "opnames", label: "Opnames" }] : []),
@@ -305,6 +309,7 @@ export default async function ClientPage({
       {active === "documenten" ? <FilesTab hub={hub} /> : null}
       {active === "contacten" ? <ContactsTab hub={hub} /> : null}
       {active === "klantbehoud" ? <RetentionTab clientId={c.id} /> : null}
+      {active === "exitgesprek" ? <ExitInterviewTab clientId={c.id} /> : null}
       {active === "financieel" && hub.canSeeFinance ? <FinanceTab hub={hub} /> : null}
       {active === "contract" && hub.canSeeFinance ? <ContractTab hub={hub} /> : null}
       {active === "inzichten" ? <InsightsTab hub={hub} /> : null}
