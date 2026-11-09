@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { and, eq, isNull } from "drizzle-orm";
 import { closeDatabase, freshDatabase } from "./helpers/db";
-import { buildWelcomeMessage, computeSteps, isSimilarCompany, withRetry, type OnboardingFacts } from "@/lib/onboarding-plan";
+import { buildWelcomeMessage, computeSteps, isSimilarCompany, nextFriday, planFollowups, withRetry, type OnboardingFacts } from "@/lib/onboarding-plan";
 
 /* ------------------------------------------------------------------ *
  * Drive nabootsen: geen echte mappen tijdens de test. Te sturen per test.
@@ -75,6 +75,21 @@ describe("onboarding: vaste regels", () => {
     const c = computeSteps({ ...base, hasPortalLogin: true, whatsappDone: true, hasShoot: true });
     expect(c.complete).toBe(true);
     expect(c.done).toBe(9);
+  });
+
+  it("plant de vervolgmomenten op vaste regels", () => {
+    expect(nextFriday("2026-11-09")).toBe("2026-11-13");
+    expect(nextFriday("2026-11-13")).toBe("2026-11-13");
+    const p = planFollowups({ clientName: "X", convertedOn: "2026-11-09", startOn: "2026-12-01", endsOn: "2027-02-28", noticeDays: 30 });
+    const by = Object.fromEntries(p.map((f) => [f.key, f]));
+    expect(by.factuur!.dueOn).toBe("2026-11-13");
+    expect(by.factuur!.owner).toBe("facturatie");
+    expect(by.evaluatie_1m!.dueOn).toBe("2027-01-01");
+    expect(by.tevredenheid!.dueOn).toBe("2027-01-12");
+    expect(by.verlenging!.dueOn).toBe("2027-01-22");
+    expect(by.verlenging!.showFrom).toBe("2027-01-08");
+    // Zonder einddatum geen verlengingsmoment.
+    expect(planFollowups({ clientName: "X", convertedOn: "2026-11-09", startOn: "2026-12-01", endsOn: null, noticeDays: 30 }).map((f) => f.key)).not.toContain("verlenging");
   });
 
   it("probeert alleen tijdelijke fouten opnieuw", async () => {
@@ -175,8 +190,12 @@ describe("onboarding: lead omzetten tegen een echte database", () => {
     expect(first.drive.ok).toBe(false);
     expect(first.tasks).toBe(5);
     const open = await db.select().from(s.tasks).where(and(eq(s.tasks.clientId, c!.id), isNull(s.tasks.deletedAt)));
-    expect(open).toHaveLength(5);
-    expect(open.every((t) => t.assigneeId === milouId && t.category === "klantcontact")).toBe(true);
+    const onbTasks = open.filter((t) => !t.dedupeKey!.includes("vervolg_"));
+    expect(onbTasks).toHaveLength(5);
+    expect(onbTasks.every((t) => t.assigneeId === milouId && t.category === "klantcontact")).toBe(true);
+    // De eerste factuur staat meteen klaar bij de facturatie-eigenaar (Milou).
+    const factuur = open.find((t) => t.dedupeKey!.endsWith("vervolg_factuur"));
+    expect(factuur?.assigneeId).toBe(milouId);
     const notes = await db.select().from(s.notifications).where(eq(s.notifications.userId, milouId));
     expect(notes.map((n) => n.type).sort()).toEqual(["onboarding_assigned", "onboarding_failed"]);
     // Jarno krijgt bij een eerste fout niets.
@@ -191,7 +210,7 @@ describe("onboarding: lead omzetten tegen een echte database", () => {
     const top = driveState.folders.filter((f) => f.parent === ROOT);
     expect(top.map((f) => f.name)).toEqual(["TESTBEDRIJF NOORD"]);
     expect(driveState.folders.filter((f) => f.parent === top[0]!.id)).toHaveLength(7);
-    expect(await db.select().from(s.tasks).where(eq(s.tasks.clientId, c!.id))).toHaveLength(5);
+    expect(await db.select().from(s.tasks).where(eq(s.tasks.clientId, c!.id))).toHaveLength(6);
     expect(await db.select().from(s.notifications).where(and(eq(s.notifications.userId, milouId), eq(s.notifications.type, "onboarding_assigned")))).toHaveLength(1);
   });
 
@@ -222,6 +241,30 @@ describe("onboarding: lead omzetten tegen een echte database", () => {
     expect(v!.completedAt).not.toBeNull();
     const [shootTask] = await db.select().from(s.tasks).where(eq(s.tasks.dedupeKey, `onboarding:${c!.id}:opnamedag`));
     expect(shootTask!.status).toBe("done");
+  });
+
+  it("vervolgtaken komen pas in beeld als het zover is en schuiven mee met het contract", async () => {
+    const [c] = await db.select().from(s.clients).where(eq(s.clients.name, "Testbedrijf Noord"));
+    const keys = async () => (await db.select({ k: s.tasks.dedupeKey }).from(s.tasks).where(eq(s.tasks.clientId, c!.id))).map((r) => r.k!).filter((k) => k.includes("vervolg_"));
+    expect(await keys()).toEqual([`onboarding:${c!.id}:vervolg_factuur`]);
+    // Start in het verleden: evaluatie en tevredenheid moeten nu in beeld zijn.
+    await db.update(s.clients).set({ startedOn: "2026-01-05" }).where(eq(s.clients.id, c!.id));
+    await db.update(s.contracts).set({ endsOn: "2026-04-04" }).where(eq(s.contracts.clientId, c!.id));
+    await onb.syncAllFollowups();
+    expect((await keys()).sort()).toEqual([
+      `onboarding:${c!.id}:vervolg_evaluatie_1m`,
+      `onboarding:${c!.id}:vervolg_factuur`,
+      `onboarding:${c!.id}:vervolg_tevredenheid`,
+      `onboarding:${c!.id}:vervolg_verlenging`,
+    ]);
+    // Contract verlengd: open verlengingstaak schuift mee, er komt geen tweede.
+    await db.update(s.contracts).set({ endsOn: "2027-06-30" }).where(eq(s.contracts.clientId, c!.id));
+    await onb.syncAllFollowups();
+    const [v] = await db.select().from(s.tasks).where(eq(s.tasks.dedupeKey, `onboarding:${c!.id}:vervolg_verlenging`));
+    expect(v!.dueOn).toBe("2027-05-24");
+    expect((await keys()).length).toBe(4);
+    const view = await onb.getOnboardingView(c!.id);
+    expect(view!.followups.map((f) => f.state)).toEqual(["open", "open", "open", "open"]);
   });
 
   it("gelijkende naam: eerst een keuze, koppelen maakt geen nieuwe klant", async () => {

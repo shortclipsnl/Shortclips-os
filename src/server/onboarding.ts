@@ -20,6 +20,7 @@ import { drive, DriveService } from "@/server/integrations/drive";
 import { notify } from "@/server/notifications";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
+import { isInactiveClientStatus } from "@/lib/client-status";
 import {
   buildWelcomeMessage,
   computeSteps,
@@ -31,7 +32,9 @@ import {
   onboardingTaskDedupe,
   PAKKETTEN,
   WELCOME_FILES,
+  planFollowups,
   withRetry,
+  type FollowupPlan,
   type OnboardingFacts,
 } from "@/lib/onboarding-plan";
 
@@ -556,6 +559,7 @@ export async function runOnboardingAutomation(clientId: string): Promise<{ drive
     const attempts = row?.steps?.drive?.attempts ?? 0;
     await notifyFailure(clientId, "Google Drive-map", driveRes.message ?? "Aanmaken mislukt.", attempts >= 6).catch(() => undefined);
   }
+  await syncFollowups(clientId).catch((e) => console.error("[onboarding.followups]", clientId, e));
   await refreshOnboarding(clientId).catch(() => undefined);
   return { drive: driveRes, tasks: taskRes.created };
 }
@@ -663,6 +667,7 @@ export type OnboardingView = {
   total: number;
   needsAction: boolean;
   log: OnboardingLogEntry[];
+  followups: FollowupView[];
 };
 
 export async function getOnboardingView(clientId: string): Promise<OnboardingView | null> {
@@ -688,6 +693,7 @@ export async function getOnboardingView(clientId: string): Promise<OnboardingVie
     total: v.total,
     needsAction: v.needsAction,
     log: [...(row.log ?? [])].reverse().slice(0, 12),
+    followups: await getFollowupsView(clientId).catch(() => []),
   };
 }
 
@@ -759,7 +765,7 @@ export async function listOnboardings(): Promise<OnboardingListRow[]> {
 }
 
 /** Elk uur (na de agenda-sync): voortgang van alle lopende onboardings bijwerken. */
-export async function syncOpenOnboardings(): Promise<{ ok: boolean; checked: number; completed: number }> {
+export async function syncOpenOnboardings(): Promise<{ ok: boolean; checked: number; completed: number; followupsCreated: number }> {
   const open = await db.select({ clientId: clientOnboardings.clientId }).from(clientOnboardings).where(isNull(clientOnboardings.completedAt));
   let completed = 0;
   for (const o of open) {
@@ -773,7 +779,132 @@ export async function syncOpenOnboardings(): Promise<{ ok: boolean; checked: num
       console.error("[onboarding.sync]", o.clientId, e);
     }
   }
-  return { ok: true, checked: open.length, completed };
+  const f = await syncAllFollowups().catch(() => ({ created: 0 }));
+  return { ok: true, checked: open.length, completed, followupsCreated: f.created };
 }
 
 export const PAKKET_LABEL: Record<string, string> = Object.fromEntries(PAKKETTEN.map((p) => [p.value, p.label]));
+
+/* ------------------------------------------------------------------ *
+ * Vervolgmomenten (factuur, evaluatie, tevredenheid, verlenging)
+ * ------------------------------------------------------------------ */
+
+const BILLING_EMAIL = "milou@shortclips.nl";
+
+async function followupContext(clientId: string) {
+  const row = await getOnb(clientId);
+  if (!row) return null;
+  const [client] = await db
+    .select({ id: clients.id, name: clients.name, status: clients.status, startedOn: clients.startedOn, coordinatorId: clients.coordinatorId, deletedAt: clients.deletedAt })
+    .from(clients)
+    .where(eq(clients.id, clientId))
+    .limit(1);
+  if (!client || client.deletedAt) return null;
+  const [contract] = await db
+    .select({ endsOn: contracts.endsOn, notice: contracts.noticePeriodDays })
+    .from(contracts)
+    .where(and(eq(contracts.clientId, clientId), isNull(contracts.deletedAt)))
+    .orderBy(desc(contracts.startsOn))
+    .limit(1);
+  const convertedOn = row.createdAt.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  const plans = planFollowups({
+    clientName: client.name,
+    convertedOn,
+    startOn: client.startedOn ?? convertedOn,
+    endsOn: contract?.endsOn ?? null,
+    noticeDays: contract?.notice ?? 30,
+  });
+  return { row, client, plans };
+}
+
+async function billingUserId(fallback: string | null): Promise<string | null> {
+  const [u] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(sql`lower(${users.email}) = ${BILLING_EMAIL}`, isNull(users.deletedAt), eq(users.status, "active")))
+    .limit(1);
+  return u?.id ?? fallback;
+}
+
+/**
+ * Maakt de vervolgtaken aan zodra ze in beeld moeten komen (niet maanden
+ * vooruit), en schuift de deadline van een open taak mee als het contract
+ * verandert. Idempotent: één taak per moment per klant.
+ */
+export async function syncFollowups(clientId: string): Promise<{ created: number; updated: number }> {
+  const ctx = await followupContext(clientId);
+  if (!ctx || isInactiveClientStatus(ctx.client.status)) return { created: 0, updated: 0 };
+  const today = todayAmsterdam();
+  let created = 0;
+  let updated = 0;
+  for (const f of ctx.plans) {
+    const dedupeKey = onboardingTaskDedupe(clientId, `vervolg_${f.key}`);
+    const [existing] = await db
+      .select({ id: tasks.id, status: tasks.status, dueOn: tasks.dueOn })
+      .from(tasks)
+      .where(and(eq(tasks.dedupeKey, dedupeKey), isNull(tasks.deletedAt)))
+      .limit(1);
+    if (existing) {
+      if (existing.status !== "done" && existing.dueOn !== f.dueOn) {
+        await db.update(tasks).set({ dueOn: f.dueOn, updatedAt: new Date() }).where(eq(tasks.id, existing.id));
+        updated++;
+      }
+      continue;
+    }
+    if (f.showFrom > today) continue;
+    const assignee = f.owner === "facturatie" ? await billingUserId(ctx.client.coordinatorId) : ctx.client.coordinatorId;
+    if (!assignee) continue;
+    const res = await db
+      .insert(tasks)
+      .values({
+        clientId,
+        title: f.title,
+        description: f.description,
+        status: "todo",
+        priority: "normal",
+        category: f.owner === "facturatie" ? "overig" : "klantcontact",
+        assigneeId: assignee,
+        dueOn: f.dueOn,
+        entityType: "client_onboarding",
+        entityId: ctx.row.id,
+        source: "automation",
+        dedupeKey,
+      })
+      .onConflictDoNothing()
+      .returning({ id: tasks.id });
+    created += res.length;
+  }
+  return { created, updated };
+}
+
+export type FollowupView = FollowupPlan & { state: "gepland" | "open" | "afgerond"; assignee: string | null };
+
+export async function getFollowupsView(clientId: string): Promise<FollowupView[]> {
+  const ctx = await followupContext(clientId);
+  if (!ctx) return [];
+  const out: FollowupView[] = [];
+  for (const f of ctx.plans) {
+    const [t] = await db
+      .select({ status: tasks.status, dueOn: tasks.dueOn, name: users.fullName })
+      .from(tasks)
+      .leftJoin(users, eq(users.id, tasks.assigneeId))
+      .where(and(eq(tasks.dedupeKey, onboardingTaskDedupe(clientId, `vervolg_${f.key}`)), isNull(tasks.deletedAt)))
+      .limit(1);
+    out.push({ ...f, dueOn: t?.dueOn ?? f.dueOn, state: !t ? "gepland" : t.status === "done" ? "afgerond" : "open", assignee: t?.name ?? null });
+  }
+  return out.sort((a, b) => a.dueOn.localeCompare(b.dueOn));
+}
+
+/** Elk uur: vervolgtaken van alle klanten met een onboarding (ook afgeronde). */
+export async function syncAllFollowups(): Promise<{ ok: boolean; clients: number; created: number }> {
+  const rows = await db.select({ clientId: clientOnboardings.clientId }).from(clientOnboardings);
+  let created = 0;
+  for (const r of rows) {
+    try {
+      created += (await syncFollowups(r.clientId)).created;
+    } catch (e) {
+      console.error("[onboarding.followups]", r.clientId, e);
+    }
+  }
+  return { ok: true, clients: rows.length, created };
+}

@@ -95,6 +95,27 @@ export function OnboardingTab({ view, slug, canEdit }: { view: OnboardingView; s
           </dl>
         </Card>
 
+        {view.followups.length ? (
+          <Card>
+            <CardHeader title="Vervolgmomenten" subtitle="Komen vanzelf als taak op Vandaag zodra ze in beeld moeten zijn." />
+            <ul className="space-y-2 text-sm">
+              {view.followups.map((f) => (
+                <li key={f.key} className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium">{f.label}</p>
+                    <p className="text-xs text-[var(--color-ink-muted)]">
+                      {formatDate(f.dueOn)}{f.assignee ? ` · ${f.assignee}` : f.owner === "facturatie" ? " · facturatie" : " · projectmanager"}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 text-xs font-semibold ${f.state === "afgerond" ? "text-[var(--color-good)]" : f.state === "open" ? "text-[var(--color-brand-700)]" : "text-[var(--color-ink-muted)]"}`}>
+                    {f.state === "afgerond" ? "Afgerond" : f.state === "open" ? "Taak staat klaar" : "Gepland"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
+
         <WelcomeMessageBox clientId={view.clientId} slug={slug} initial={view.welcomeMessage ?? ""} canEdit={canEdit} />
 
         <Card>

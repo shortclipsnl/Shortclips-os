@@ -201,3 +201,116 @@ export async function withRetry<T>(fn: () => Promise<T>, max = 3, wait = (ms: nu
     }
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Vervolgmomenten na de onboarding
+ * ------------------------------------------------------------------ */
+
+export type FollowupKey = "factuur" | "tevredenheid" | "evaluatie_1m" | "verlenging";
+
+export type FollowupPlan = {
+  key: FollowupKey;
+  /** Korte naam voor het overzicht. */
+  label: string;
+  title: string;
+  description: string;
+  /** Wie: projectmanager of de facturatie-eigenaar. */
+  owner: "pm" | "facturatie";
+  dueOn: string;
+  /** Vanaf deze dag staat de taak op Vandaag/Taken (niet maanden vooruit). */
+  showFrom: string;
+};
+
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function addMonthsKeepDay(dateStr: string, months: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number) as [number, number, number];
+  const last = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m - 1 + months, Math.min(d, last))).toISOString().slice(0, 10);
+}
+
+/** Eerstvolgende vrijdag op of na deze datum (weekronde facturatie). */
+export function nextFriday(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  const add = (5 - d.getUTCDay() + 7) % 7;
+  return addDays(dateStr, add);
+}
+
+/** Werkdag op of vóór deze datum (zaterdag/zondag → vrijdag). */
+function workdayOnOrBefore(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00Z`).getUTCDay();
+  return d === 6 ? addDays(dateStr, -1) : d === 0 ? addDays(dateStr, -2) : dateStr;
+}
+
+/**
+ * De vervolgmomenten van een nieuwe klant, als vaste regels:
+ * - eerste factuur in de eerstvolgende weekronde (vrijdag) na het omzetten;
+ * - evaluatie na de eerste maand (Shortclips evaluatiebestand, 1 maand);
+ * - klanttevredenheid peilen zes weken na de start;
+ * - verlenging bespreken vóór de opzegdeadline (einddatum min opzegtermijn
+ *   min een week), alleen bij een contract met einddatum.
+ */
+export function planFollowups(input: {
+  clientName: string;
+  convertedOn: string;
+  startOn: string;
+  endsOn: string | null;
+  noticeDays: number;
+}): FollowupPlan[] {
+  const c = input.clientName;
+  const out: FollowupPlan[] = [];
+
+  const factuur = nextFriday(input.convertedOn);
+  out.push({
+    key: "factuur",
+    label: "Eerste factuur (weekronde)",
+    title: `Eerste factuur ${c} meenemen in de weekronde`,
+    description: `Nieuwe klant, start ${input.startOn}. Maandbedrag en contract staan bij Contract & facturatie. Factuur in de weekronde van vrijdag.`,
+    owner: "facturatie",
+    dueOn: factuur,
+    showFrom: input.convertedOn,
+  });
+
+  const eval1 = workdayOnOrBefore(addMonthsKeepDay(input.startOn, 1));
+  out.push({
+    key: "evaluatie_1m",
+    label: "Evaluatie na de eerste maand",
+    title: `Evaluatie na de eerste maand voorbereiden voor ${c}`,
+    description: "Maak het evaluatiebestand (1 maand) met de statistieken en plan het evaluatiemoment met de klant.",
+    owner: "pm",
+    dueOn: eval1,
+    showFrom: addDays(eval1, -7),
+  });
+
+  const tevreden = workdayOnOrBefore(addDays(input.startOn, 42));
+  out.push({
+    key: "tevredenheid",
+    label: "Klanttevredenheid peilen",
+    title: `Klanttevredenheid peilen bij ${c}`,
+    description: "Kort contactmoment: hoe ervaart de klant de samenwerking, scripts en video's tot nu toe? Leg feedback vast bij Klantbehoud.",
+    owner: "pm",
+    dueOn: tevreden,
+    showFrom: addDays(tevreden, -5),
+  });
+
+  if (input.endsOn) {
+    const deadline = addDays(input.endsOn, -input.noticeDays);
+    const due = workdayOnOrBefore(addDays(deadline, -7));
+    out.push({
+      key: "verlenging",
+      label: "Verlenging bespreken",
+      title: `Verlenging bespreken met ${c}`,
+      description: `Contract loopt tot ${input.endsOn}, opzegdeadline ${deadline}. Bereid de evaluatie voor en bespreek de verlenging ruim vóór de deadline.`,
+      owner: "pm",
+      dueOn: due,
+      showFrom: addDays(due, -14),
+    });
+  }
+
+  // Een moment dat vóór het omzetten zou liggen, schuift naar de omzetdag.
+  return out.map((f) => (f.dueOn < input.convertedOn ? { ...f, dueOn: input.convertedOn, showFrom: input.convertedOn } : f));
+}
