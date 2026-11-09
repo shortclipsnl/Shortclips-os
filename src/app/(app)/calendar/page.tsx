@@ -319,7 +319,13 @@ export default async function CalendarPage({
           defaultOpen={emphasizePublicatiecheck}
           highlight={emphasizePublicatiecheck}
           items={[
-            <><strong className="font-semibold text-[var(--color-ink)]">Video:</strong> juiste versie, goedgekeurd, beeld en geluid in orde.</>,
+            <>
+              <strong className="font-semibold text-[var(--color-ink)]">Video gecontroleerd</strong>
+              <span className="mt-1 block space-y-0.5">
+                <span className="flex gap-1.5"><span aria-hidden>✓</span><span>De definitieve video is goedgekeurd door de klant.</span></span>
+                <span className="flex gap-1.5"><span aria-hidden>✓</span><span>De ondertiteling is volledig gecontroleerd en bevat geen spel- of typefouten.</span></span>
+              </span>
+            </>,
             <><strong className="font-semibold text-[var(--color-ink)]">Caption:</strong> klopt, zonder typefouten, met de juiste toon en hashtags.</>,
             <><strong className="font-semibold text-[var(--color-ink)]">Cover:</strong> de juiste thumbnail/cover staat ingesteld.</>,
             <><strong className="font-semibold text-[var(--color-ink)]">Ondertiteling:</strong> aanwezig, leesbaar en synchroon.</>,
