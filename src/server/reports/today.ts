@@ -1,4 +1,5 @@
 import "server-only";
+import { activeClientsWhere } from "@/server/client-activity";
 import { and, eq, gte, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientReports, clients, monthlyReportReads } from "@/db/schema";
@@ -42,7 +43,8 @@ export async function reportWorkSummary(person: Viewer, today: string): Promise<
     .where(and(
       eq(clientReports.periodType, "month"),
       isNull(clientReports.deletedAt),
-      isNull(clients.deletedAt),
+      // Centrale klantstatus: rapporten van niet actieve klanten zijn geen werk voor vandaag.
+      activeClientsWhere(),
       gte(clientReports.period, minPeriod),
       inArray(clientReports.status, ["klaar_voor_controle", "aanpassing_nodig", "goedgekeurd", "mislukt", "analyse_bezig"]),
       owner ? undefined : eq(clients.coordinatorId, person.id),
@@ -101,7 +103,7 @@ export async function reportReadSummary(person: Viewer): Promise<{ open: number;
       isNull(monthlyReportReads.readAt),
       inArray(clientReports.status, ["goedgekeurd", "gepubliceerd"]),
       isNull(clientReports.deletedAt),
-      isNull(clients.deletedAt),
+      activeClientsWhere(),
     ));
   if (!rows.length) return null;
   const period = rows.map((r) => r.period).sort().at(-1) ?? null;

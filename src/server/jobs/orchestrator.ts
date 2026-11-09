@@ -67,9 +67,9 @@ export async function runFrequentSync() {
 }
 
 /**
- * 's Nachts draaien: de zwaardere, volledige syncs — Frame.io-projecten en
- * -video's, Drive, Metricool, rapportages en de dag-signalen. Alle data staat nu
- * in het platform zelf; er is geen externe projectkoppeling meer.
+ * 's Nachts draaien: de interne run (klantstatus, rapportages, dag-signalen,
+ * herinneringen, klantbehoud, backup). De externe syncs draaien een uur eerder
+ * in runNightlyExternalSync, zodat een time-out daar deze run niet afbreekt.
  */
 export async function runNightlySync() {
   const results: StepResult[] = [];
@@ -90,22 +90,6 @@ export async function runNightlySync() {
   results.push(await step("content.online_notify", () => runContentOnlineNotifications()));
   // Maandelijkse AI-verbeterlus: inzichten → verbeterpunt-taken (idempotent, gated).
   results.push(await step("insights.monthly_tasks", () => runMonthlyInsightTasks()));
-  results.push(await step("drive.sync_all", () => runDriveSync()));
-  // Direct ná de Drive-sync: koppel nieuwe script-PDF's automatisch aan de juiste
-  // opname en bereid de captions voor (de files-tabel is nu vers).
-  results.push(await step("captions.link_drive_scripts", () => runCaptionDriveLink()));
-  results.push(await step("frameio.pull_projects", () => pullFrameProjects()));
-  results.push(await step("frameio.pull_deliverables", () => pullFrameDeliverables()));
-  // Frame.io-bibliotheek voor het klantportaal (sessiemappen, video's, thumbnails).
-  results.push(await step("frameio.sync_library", () => syncFrameLibrary(undefined, undefined, { full: true })));
-  results.push(await step("calendar.sync", () => runCalendarSync()));
-  // Direct ná de agenda-sync: controleer of alle opnames ook echt in de planning
-  // staan en meld afwijkingen (opname zonder klant / mogelijk gemiste opname).
-  results.push(await step("shoots.reconcile", () => runShootReconciliation()));
-  results.push(await step("metricool.sync", () => runMetricoolSync()));
-  // Na alle externe syncs: controleer de gezondheid van de koppelingen en meld
-  // proactief verouderde/nooit-geslaagde koppelingen aan de verantwoordelijke.
-  results.push(await step("integrations.health_check", () => runIntegrationHealthCheck()));
   results.push(await step("finance.snapshot_month", () => snapshotFinanceMonth()));
   // Na de maand-snapshot: financiële winstgevendheid-signalen voor de eigenaar.
   results.push(await step("profit.signals", () => runProfitabilitySignals()));
@@ -132,5 +116,32 @@ export async function runNightlySync() {
   results.push(await step("backup.database", () => runDatabaseBackup()));
   // Noodprocedure-PDF naar Drive, zodat kritieke info bij portaaluitval beschikbaar blijft.
   results.push(await step("emergency.export", () => runEmergencyExport()));
+  return { ok: results.every((r) => r.ok), results };
+}
+
+/**
+ * 's Nachts, vóór de interne run: de zware externe syncs (Drive, Frame.io,
+ * agenda, Metricool) en de gezondheidscheck van die koppelingen. Draait als eigen
+ * cron, zodat een trage of vastlopende koppeling (time-out) nooit meer de
+ * signalen, herinneringen, klantbehoud-taken en backups van de nachtrun meeneemt.
+ */
+export async function runNightlyExternalSync() {
+  const results: StepResult[] = [];
+  results.push(await step("drive.sync_all", () => runDriveSync()));
+  // Direct ná de Drive-sync: koppel nieuwe script-PDF's automatisch aan de juiste
+  // opname en bereid de captions voor (de files-tabel is nu vers).
+  results.push(await step("captions.link_drive_scripts", () => runCaptionDriveLink()));
+  results.push(await step("frameio.pull_projects", () => pullFrameProjects()));
+  results.push(await step("frameio.pull_deliverables", () => pullFrameDeliverables()));
+  // Frame.io-bibliotheek voor het klantportaal (sessiemappen, video's, thumbnails).
+  results.push(await step("frameio.sync_library", () => syncFrameLibrary(undefined, undefined, { full: true })));
+  results.push(await step("calendar.sync", () => runCalendarSync()));
+  // Direct ná de agenda-sync: controleer of alle opnames ook echt in de planning
+  // staan en meld afwijkingen (opname zonder klant / mogelijk gemiste opname).
+  results.push(await step("shoots.reconcile", () => runShootReconciliation()));
+  results.push(await step("metricool.sync", () => runMetricoolSync()));
+  // Na alle externe syncs: controleer de gezondheid van de koppelingen en meld
+  // proactief verouderde/nooit-geslaagde koppelingen aan de verantwoordelijke.
+  results.push(await step("integrations.health_check", () => runIntegrationHealthCheck()));
   return { ok: results.every((r) => r.ok), results };
 }

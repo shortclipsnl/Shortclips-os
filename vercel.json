@@ -8,6 +8,7 @@
     { "path": "/api/jobs/run?job=portal.notify_clients", "schedule": "0 8 * * *" },
     { "path": "/api/jobs/run?job=sync.frequent", "schedule": "0 12 * * *" },
     { "path": "/api/jobs/run?job=frameio.sync_library", "schedule": "40 6-18/2 * * *" },
+    { "path": "/api/jobs/run?job=sync.nightly_external", "schedule": "0 2 * * *" },
     { "path": "/api/jobs/run?job=sync.nightly", "schedule": "0 3 * * *" },
     { "path": "/api/jobs/run?job=metricool.link_brands", "schedule": "10 4 * * *" },
     { "path": "/api/jobs/run?job=metricool.pull_metrics", "schedule": "15 4 * * *" },

@@ -19,7 +19,7 @@ import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { syncOpenOnboardings } from "@/server/onboarding";
 import { runScriptingTaskSync } from "@/server/scripting-tasks";
 import { runScriptVersionSync } from "@/server/script-versions";
-import { runFrequentSync, runNightlySync } from "@/server/jobs/orchestrator";
+import { runFrequentSync, runNightlyExternalSync, runNightlySync } from "@/server/jobs/orchestrator";
 import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
 import { runContentOnlineNotifications } from "@/server/jobs/content-online-notify";
 import { runMonthlyInsightTasks } from "@/server/jobs/insight-tasks";
@@ -125,6 +125,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "metricool.sync": runMetricoolSync,
   "sync.frequent": runFrequentSync,
   "sync.nightly": runNightlySync,
+  "sync.nightly_external": runNightlyExternalSync,
   "pilot.setup_logins": () => runPilotPortalSetup(),
   "portal.enforce_access": enforcePortalAccess,
   "clients.status_sweep": sweepInactiveClients,

@@ -201,6 +201,18 @@ describe("B. klant wordt niet actief", () => {
     expect(videosInactive.filter((v) => v.clientId === wisselt).length).toBeGreaterThan(0);
   });
 
+  it("telt niet mee in de maandcontrole op Vandaag", async () => {
+    const { viewerForUser } = await import("@/server/auth/context");
+    const { reportWorkSummary } = await import("@/server/reports/today");
+    const base = (await viewerForUser(jarno))!;
+    const viewer = { ...base, permissions: new Set([...base.permissions, "reports:read"]) };
+    // Het gestopte rapport (mislukt) van de niet actieve klant is geen werk voor vandaag.
+    expect(await reportWorkSummary(viewer as typeof base, "2026-11-09")).toBeNull();
+    // Een mislukt rapport van een actieve klant wel.
+    await db.insert(clientReports).values({ clientId: actief, periodType: "month", period: "2026-10", title: "Maandrapport", status: "mislukt" });
+    expect((await reportWorkSummary(viewer as typeof base, "2026-11-09"))?.mislukt).toBe(1);
+  });
+
   it("het nachtelijke vangnet is idempotent en maakt geen extra beoordelingstaak", async () => {
     const { sweepInactiveClients } = await import("@/server/client-status-transition");
     const again = await setStatus(wisselt, "churned"); // paused → churned: blijft niet actief
