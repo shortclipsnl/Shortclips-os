@@ -62,11 +62,11 @@ export function KlantberichtButton({ text, canManage }: { text: string; canManag
       <button
         type="button"
         onClick={() => copy(standard)}
-        title="Kopieer het standaard opleveringsbericht voor de eerste versies. Voeg daarna zelf de juiste videolink toe."
-        className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-indigo-ink)] shadow-sm hover:bg-white/90"
+        title="Kopieer het video-opleveringsbericht voor de eerste versies. Voeg daarna zelf de juiste videolink toe."
+        className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[#FF6A00] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm ring-1 ring-black/10 transition-colors hover:bg-[#e85f00]"
       >
         {state === "ok" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-        {state === "ok" ? "Bericht gekopieerd" : state === "fout" ? "Kopiëren mislukt" : "Kopieer opleveringsbericht"}
+        {state === "ok" ? "Bericht gekopieerd!" : state === "fout" ? "Kopiëren mislukt" : "Kopieer video opleveringsbericht"}
       </button>
       <button
         type="button"
