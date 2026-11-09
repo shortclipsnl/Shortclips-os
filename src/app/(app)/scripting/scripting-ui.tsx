@@ -246,7 +246,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
       <div className="mb-2 text-xs text-[var(--color-ink-faint)]">{filtered.length} van {rows.length} opnames</div>
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <table className="w-full min-w-[1180px] text-sm">
+        <table className="w-full min-w-[900px] text-sm">
           <thead>
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] text-left text-xs text-[var(--color-ink-faint)]">
               <th className="px-3 py-2 font-medium">Klant</th>
@@ -380,7 +380,7 @@ function ScriptsCell({ row }: { row: ScriptingRow }) {
         type="button"
         onClick={() => setOpen(true)}
         title={pdf ? `Gekoppelde PDF: ${pdf.name}${pdf.sessionName ? ` (${pdf.sessionName})` : ""}` : "Bekijk de scripts van deze opname en koppel een script-PDF uit Google Drive"}
-        className={`flex w-[150px] items-center gap-1.5 rounded-[var(--radius-sm)] border px-2 py-1.5 text-left text-xs font-medium hover:border-[var(--color-brand-500)] ${heeftIets ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)] text-[var(--color-ink)]" : finalZonderScript ? "border-[var(--color-bad)]/40 bg-[var(--color-bad-soft)] text-[#a3271c]" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)]"}`}
+        className={`flex w-[132px] items-center gap-1.5 rounded-[var(--radius-sm)] border px-2 py-1.5 text-left text-xs font-medium hover:border-[var(--color-brand-500)] ${heeftIets ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)] text-[var(--color-ink)]" : finalZonderScript ? "border-[var(--color-bad)]/40 bg-[var(--color-bad-soft)] text-[#a3271c]" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)]"}`}
       >
         {pdf && n === 0 ? <FileCheck2 className="size-4 shrink-0 text-[var(--color-good)]" /> : <ScrollText className={`size-4 shrink-0 ${heeftIets ? "text-[var(--color-brand-600)]" : "text-[var(--color-ink-faint)]"}`} />}
         <span className="min-w-0">
@@ -582,7 +582,7 @@ function NoteCell({ id, note, canWrite }: { id: string; note: string | null; can
   if (!canWrite && !heeftNotitie) return <span className="text-xs text-[var(--color-ink-faint)]">—</span>;
 
   return (
-    <div className="relative w-[220px]">
+    <div className="relative w-[150px]">
       {/* Compacte knop met een korte preview; klik voor het volledige bericht. */}
       <button
         type="button"
@@ -649,7 +649,7 @@ function StatusPicker({ id, status, canWrite }: { id: string; status: string; ca
 
   if (!canWrite) {
     return (
-      <span className={`inline-flex w-[200px] items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val] ?? "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
+      <span className={`inline-flex w-[150px] items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val] ?? "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>
         <span className="size-2 shrink-0 rounded-full" style={{ background: STATUS_ACCENT[val] ?? "var(--color-ink-faint)" }} />
         <span className="truncate">{STATUS_SHORT[val] ?? meta.label}</span>
       </span>
@@ -659,7 +659,7 @@ function StatusPicker({ id, status, canWrite }: { id: string; status: string; ca
   // De opties klappen uit als een zwevende laag (absolute), zodat de tabel niet
   // verspringt. Een onzichtbare achtergrond vangt een klik ernaast op om te sluiten.
   return (
-    <div className="relative w-[200px]">
+    <div className="relative w-[150px]">
       <button type="button" onClick={() => setOpen((o) => !o)} disabled={pending}
         title={meta.label}
         className={`flex w-full items-center justify-between gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${STATUS_PILL[val] ?? "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}
@@ -673,7 +673,7 @@ function StatusPicker({ id, status, canWrite }: { id: string; status: string; ca
       {open ? (
         <>
           <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-20 mt-1.5 flex w-[200px] flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
+          <div className="absolute left-0 top-full z-20 mt-1.5 flex w-[150px] flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[var(--shadow-raised)]">
             {SCRIPTING_ORDER.map((s) => (
               <button key={s} type="button" onClick={() => choose(s)} title={SCRIPTING_STATUS[s]!.label}
                 className={`flex w-full items-center gap-1.5 rounded-full px-3 py-1.5 text-left text-sm font-semibold ${STATUS_PILL[s]} ${s === val ? "" : "opacity-80 hover:opacity-100"}`}
