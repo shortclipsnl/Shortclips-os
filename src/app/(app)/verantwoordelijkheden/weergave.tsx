@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
-import { ArrowUpRight, CalendarClock, CircleCheck, Flag, MessageCircle, Palmtree, ShieldCheck, Siren, UserRound } from "lucide-react";
+import { ArrowUpRight, CalendarClock, ChevronDown, CircleCheck, Flag, MessageCircle, Palmtree, ShieldCheck, Siren, UserRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 import {
   FREQUENTIES, NIVEAUS, kaal, naamVan,
@@ -22,6 +22,16 @@ function T({ t, markeer }: { t: string; markeer: boolean }) {
     </>
   );
 }
+
+/** Subtiele categoriekleur per verantwoordelijkheid, voor visuele structuur. */
+const CAT_DOT: Record<string, string> = {
+  klantcontact: "bg-[var(--color-brand-500)]",
+  scripting: "bg-[var(--color-violet)]",
+  opname: "bg-[var(--color-warn)]",
+  editing: "bg-[var(--color-info)]",
+  publicatie: "bg-[var(--color-good)]",
+  intern: "bg-[var(--color-ink-faint)]",
+};
 
 const KLEUR: Record<Niveau, { soft: string; tekst: string; rand: string; dot: string; icon: typeof CircleCheck }> = {
   zelf: { soft: "bg-[var(--color-good-soft)]", tekst: "text-[#1d6b4c]", rand: "border-[#bfe3cf]", dot: "bg-[var(--color-good)]", icon: CircleCheck },
@@ -90,42 +100,62 @@ export function Weergave({ config, email, markeer, tellingen }: {
         {items.length === 0 ? (
           <p className="text-sm text-[var(--color-ink-muted)]">Nog geen verantwoordelijkheden vastgelegd.</p>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {items.map((r) => (
-              <article key={r.id} className="sc-card flex flex-col p-4">
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <h3 className="text-[15px] font-semibold leading-snug text-[var(--color-ink)]">{r.titel}</h3>
-                  <Live k={r.koppeling} tellingen={tellingen} />
-                </div>
-                <p className="mb-3 text-sm text-[var(--color-ink-muted)]"><T t={r.wat} markeer={markeer} /></p>
-                <dl className="grid grid-cols-[92px_1fr] gap-x-3 gap-y-1.5 text-sm">
-                  <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Wanneer</dt>
-                  <dd className="text-[var(--color-ink)]"><T t={r.wanneer} markeer={markeer} /></dd>
-                  <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Verwacht</dt>
-                  <dd className="text-[var(--color-ink)]"><T t={r.verwachting} markeer={markeer} /></dd>
-                  <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Klaar als</dt>
-                  <dd className="text-[var(--color-ink)]"><T t={r.afgerond} markeer={markeer} /></dd>
-                  {r.betrokken.length > 0 && (
-                    <>
-                      <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Met</dt>
-                      <dd className="text-[var(--color-ink)]">{r.betrokken.map(naamVan).join(", ")}</dd>
-                    </>
-                  )}
-                </dl>
-                <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 border-t border-[var(--color-line)] pt-2.5 text-xs" style={{ marginTop: "0.875rem" }}>
-                  {r.escalatie && (
-                    <span className="flex items-start gap-1.5 text-[#8a5300]">
-                      <Flag className="mt-0.5 size-3 shrink-0" /> <span>Jarno erbij als: <T t={r.escalatie} markeer={markeer} /></span>
-                    </span>
-                  )}
-                  {r.vervanger && (
-                    <span className="flex items-center gap-1.5 text-[var(--color-ink-muted)]">
-                      <UserRound className="size-3" /> Vervanger: {naamVan(r.vervanger)}
-                    </span>
-                  )}
-                </div>
-              </article>
-            ))}
+          <div className="grid gap-2.5 md:grid-cols-2">
+            {items.map((r) => {
+              const cat = r.koppeling?.categorie && r.koppeling.categorie !== "alle" ? r.koppeling.categorie : null;
+              const t = cat ? tellingen[cat] : null;
+              return (
+                <article key={r.id} className="sc-card overflow-hidden">
+                  {/* Standaard dicht: alleen titel + korte omschrijving. Klik = details. */}
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none items-start gap-2.5 p-3.5 [&::-webkit-details-marker]:hidden">
+                      <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", cat ? CAT_DOT[cat] : "bg-[var(--color-ink-faint)]")} />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="min-w-0 flex-1 text-[14.5px] font-semibold leading-snug text-[var(--color-ink)]">{r.titel}</span>
+                          {t && t.open > 0 ? (
+                            <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-2xs font-bold", t.laat > 0 ? "bg-[var(--color-bad-soft)] text-[#a3271c]" : "bg-[var(--color-neutral-soft)] text-[var(--color-ink)]")}>
+                              {t.laat > 0 ? `${t.laat} te laat` : `${t.open} open`}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--color-ink-muted)]"><T t={r.wat} markeer={markeer} /></span>
+                      </span>
+                      <ChevronDown className="mt-0.5 size-4 shrink-0 text-[var(--color-ink-faint)] transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className="space-y-3 border-t border-[var(--color-line)] px-3.5 pb-3.5 pt-3">
+                      <dl className="grid grid-cols-[86px_1fr] gap-x-3 gap-y-1.5 text-[13px]">
+                        <dt className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Verwacht</dt>
+                        <dd className="text-[var(--color-ink)]"><T t={r.verwachting} markeer={markeer} /></dd>
+                        <dt className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Wanneer</dt>
+                        <dd className="text-[var(--color-ink)]"><T t={r.wanneer} markeer={markeer} /></dd>
+                        <dt className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Klaar als</dt>
+                        <dd className="text-[var(--color-ink)]"><T t={r.afgerond} markeer={markeer} /></dd>
+                        {r.betrokken.length > 0 && (
+                          <>
+                            <dt className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Met</dt>
+                            <dd className="text-[var(--color-ink)]">{r.betrokken.map(naamVan).join(", ")}</dd>
+                          </>
+                        )}
+                      </dl>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+                        {r.koppeling ? <Live k={r.koppeling} tellingen={tellingen} /> : null}
+                        {r.escalatie && (
+                          <span className="flex items-start gap-1.5 text-[#8a5300]">
+                            <Flag className="mt-0.5 size-3 shrink-0" /> <span>Jarno erbij als: <T t={r.escalatie} markeer={markeer} /></span>
+                          </span>
+                        )}
+                        {r.vervanger && (
+                          <span className="flex items-center gap-1.5 text-[var(--color-ink-muted)]">
+                            <UserRound className="size-3" /> Vervanger: {naamVan(r.vervanger)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </details>
+                </article>
+              );
+            })}
           </div>
         )}
       </Blok>
