@@ -41,12 +41,18 @@ export default async function WinstgevendheidPage({ searchParams }: { searchPara
   const omzetDelta = thisM && prevM && prevM.omzet > 0 ? Math.round(((thisM.omzet - prevM.omzet) / prevM.omzet) * 100) : null;
   const margeDelta = thisM?.brutomarge != null && prevM?.brutomarge != null ? Math.round((thisM.brutomarge - prevM.brutomarge) * 10) / 10 : null;
 
+  // Kostentotalen per soort (voor het financieel overzicht bovenaan).
+  const tEdit = rows.reduce((s, r) => s + r.editCost, 0);
+  const tVg = rows.reduce((s, r) => s + r.videographerCost, 0);
+  const tScript = rows.reduce((s, r) => s + r.scriptingCost, 0);
+  const internMissing = settings.internUurtarief === 0;
+
   return (
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
         title="Winstgevendheid per klant"
         description="In één oogopslag welke klanten geld opleveren en waar de marge aandacht vraagt. Omzet telt alleen voor klanten met een geplande opname die maand (op basis van de agenda) — niet elke klant draait elke maand. Directe kosten zijn geregistreerd; overhead en nettowinst zijn geschat (toegerekend)."
-        actions={<div className="flex flex-wrap items-start gap-2"><ThresholdForm green={settings.marginGreenPct} orange={settings.marginOrangePct} includeOverhead={settings.includeOverhead} /><FinanceUpload /></div>}
+        actions={<div className="flex flex-wrap items-start gap-2"><ThresholdForm green={settings.marginGreenPct} orange={settings.marginOrangePct} includeOverhead={settings.includeOverhead} internUurtarief={settings.internUurtarief} internUrenPerKlant={settings.internUrenPerKlant} vgUurtarief={settings.vgUurtarief} overheadKantoor={settings.overheadKantoor} overheadSoftware={settings.overheadSoftware} overheadOverig={settings.overheadOverig} /><FinanceUpload /></div>}
       />
 
       {/* Maandkiezer */}
@@ -73,10 +79,12 @@ export default async function WinstgevendheidPage({ searchParams }: { searchPara
         </div>
       ) : null}
 
-      {/* Maandtotalen + ontwikkeling */}
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* Financieel overzicht bovenaan: de belangrijkste cijfers in één blik. */}
+      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Totale omzet" value={eur(totals.omzet)} hint={omzetDelta != null ? `${omzetDelta >= 0 ? "+" : ""}${omzetDelta}% vs vorige maand` : undefined} />
-        <Stat label="Directe kosten" value={eur(totals.directeKosten)} />
+        <Stat label="Editingkosten" value={eur(tEdit)} />
+        <Stat label="Videograafkosten" value={eur(tVg)} />
+        <Stat label="Interne productiekosten" value={internMissing ? "nog instellen" : eur(tScript)} tone={internMissing ? "warn" : "neutral"} hint={internMissing ? undefined : `${settings.internUrenPerKlant}u × €${settings.internUurtarief}/klant`} />
         <Stat label="Brutowinst" value={eur(totals.brutowinst)} tone={totals.brutowinst >= 0 ? "good" : "bad"} />
         <Stat
           label="Gem. brutomarge"
@@ -84,6 +92,8 @@ export default async function WinstgevendheidPage({ searchParams }: { searchPara
           hint={margeDelta != null ? `${margeDelta >= 0 ? "+" : ""}${margeDelta}pt vs vorige maand` : undefined}
           tone={totals.brutomarge == null ? "neutral" : totals.brutomarge >= settings.marginGreenPct ? "good" : totals.brutomarge >= settings.marginOrangePct ? "warn" : "bad"}
         />
+        <Stat label="Totale directe kosten" value={eur(totals.directeKosten)} />
+        <Stat label="Nettowinst (geschat)" value={overhead.heeftData && settings.includeOverhead ? eur(totals.nettoGeschat) : "—"} tone={!overhead.heeftData || !settings.includeOverhead ? "neutral" : totals.nettoGeschat >= 0 ? "good" : "bad"} hint={overhead.heeftData && settings.includeOverhead ? "na overhead" : "overhead nog instellen"} />
       </div>
 
       {/* Ranglijst per klant */}
@@ -96,30 +106,38 @@ export default async function WinstgevendheidPage({ searchParams }: { searchPara
             head={
               <>
                 <th className="sc-th">Klant</th>
-                <th className="sc-th text-right">Omzet</th>
                 <th className="sc-th text-right">Shorts</th>
-                <th className="sc-th text-right">Directe kosten</th>
+                <th className="sc-th text-right">Omzet</th>
+                <th className="sc-th text-right">Editing</th>
+                <th className="sc-th text-right">Videograaf</th>
+                <th className="sc-th text-right">Scripting</th>
+                <th className="sc-th text-right">Overig</th>
+                <th className="sc-th text-right">Totale kosten</th>
                 <th className="sc-th text-right">Brutowinst</th>
                 <th className="sc-th text-right">Marge</th>
-                <th className="sc-th text-right">Netto (geschat)</th>
+                <th className="sc-th text-right">Netto</th>
               </>
             }
           >
             {rows.map((r) => (
               <tr key={r.clientId} style={{ boxShadow: `inset 3px 0 0 ${DOT[r.kleur]}` }}>
                 <td className="sc-td">
-                  <Link href={`/clients/${r.slug}?tab=financieel`} className="flex items-center gap-2 font-medium hover:underline">
+                  <Link href={`/winstgevendheid/${r.slug}`} className="flex items-center gap-2 font-medium hover:underline">
                     <span className="size-2 shrink-0 rounded-full" style={{ background: DOT[r.kleur] }} />
                     <ClientLogo name={r.name} logoUrl={r.logoUrl} color={r.color} size={22} />
                     {r.name}
                   </Link>
                 </td>
-                <td className="sc-td text-right tabular-nums">{eur(r.omzet)}</td>
                 <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{r.shorts}{r.gemOmzetPerShort ? <span className="block text-2xs text-[var(--color-ink-faint)]">{eur(r.gemOmzetPerShort)}/short</span> : null}</td>
-                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]" title={`Edit ${eur(r.editCost)} · Videograaf ${eur(r.videographerCost)} · Opname ${eur(r.shootCost)} · Strategie ${eur(r.strategyCost)} · Overig ${eur(r.otherCost)}`}>{eur(r.directeKosten)}</td>
+                <td className="sc-td text-right tabular-nums">{eur(r.omzet)}</td>
+                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{eur(r.editCost)}</td>
+                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{eur(r.videographerCost)}</td>
+                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{r.internRateMissing ? <span className="text-[var(--color-warn)]" title="Intern uurtarief staat nog op 0 — stel het in bij Instellingen.">nog instellen</span> : eur(r.scriptingCost)}</td>
+                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{eur(r.overigeKosten)}</td>
+                <td className="sc-td text-right font-medium tabular-nums">{eur(r.directeKosten)}</td>
                 <td className="sc-td text-right font-semibold tabular-nums" style={{ color: r.brutowinst >= 0 ? "var(--color-ink)" : "var(--color-bad)" }}>{eur(r.brutowinst)}</td>
                 <td className="sc-td text-right font-semibold tabular-nums" style={{ color: DOT[r.kleur] }}>{r.brutomarge != null ? `${r.brutomarge}%` : "—"}</td>
-                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{eur(r.nettoGeschat)}<span className="block text-2xs text-[var(--color-ink-faint)]">na overhead</span></td>
+                <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{overhead.heeftData && settings.includeOverhead ? eur(r.nettoGeschat) : "—"}</td>
               </tr>
             ))}
           </Table>

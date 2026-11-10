@@ -11,6 +11,12 @@ export async function updateProfitSettings(input: {
   marginGreenPct?: number;
   marginOrangePct?: number;
   includeOverhead?: boolean;
+  internUurtarief?: number;
+  internUrenPerKlant?: number;
+  vgUurtarief?: number;
+  overheadKantoor?: number;
+  overheadSoftware?: number;
+  overheadOverig?: number;
 }): Promise<ActionResult> {
   try {
     const viewer = await requireOwner();
