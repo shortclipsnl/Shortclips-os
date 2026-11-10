@@ -302,7 +302,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                       <WriterCell id={r.id} writerId={r.scriptWriterId} writerName={r.scriptWriterName} writerAvatar={r.scriptWriterAvatar} options={writerOptions} canWrite={canWrite} urgent={!r.done && r.daysToDeadline <= 7} />
                     </td>
                     <td className="px-2 py-2 align-top">
-                      <StatusPicker id={r.id} status={r.status} canWrite={canWrite} />
+                      <StatusPicker id={r.id} status={r.status} note={r.note} canWrite={canWrite} />
                     </td>
                     <td className="px-2 py-2 align-top">
                       <PortalSendCell row={r} canWrite={canWrite} />
@@ -311,7 +311,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                       <ScriptsCell row={r} />
                     </td>
                     <td className="px-2 py-2 align-top">
-                      <NoteCell id={r.id} note={r.note} canWrite={canWrite} />
+                      <NoteCell id={r.id} note={r.note} status={r.status} canWrite={canWrite} />
                     </td>
                   </tr>
                 ))}
@@ -560,7 +560,7 @@ function WriterCell({ id, writerId, writerName, writerAvatar, options, canWrite,
  * blijft. Een gevuld notitie-icoon maakt meteen duidelijk waar een opmerking bij
  * staat. Opslaan gebeurt bij verlaten van het veld of op Enter.
  */
-function NoteCell({ id, note, canWrite }: { id: string; note: string | null; canWrite: boolean }) {
+function NoteCell({ id, note, status, canWrite }: { id: string; note: string | null; status: string; canWrite: boolean }) {
   const [pending, start] = useTransition();
   const [val, setVal] = useState(note ?? "");
   const [open, setOpen] = useState(false);
@@ -569,6 +569,9 @@ function NoteCell({ id, note, canWrite }: { id: string; note: string | null; can
   // Preview in de cel (ingekort); de volledige tekst zie je in het uitklapvlak.
   const shownNote = (canWrite ? val : note ?? "").trim();
   const heeftNotitie = Boolean(shownNote);
+  // Bij Final/Afgerond blijft de notitie bewaard voor de historie, maar minder
+  // prominent: de nadruk ligt op openstaande "Nog aanvullen"-opmerkingen.
+  const prominent = heeftNotitie && status !== "final";
 
   const save = () => {
     const next = val.trim();
@@ -589,10 +592,14 @@ function NoteCell({ id, note, canWrite }: { id: string; note: string | null; can
         onClick={() => setOpen((o) => !o)}
         title={shownNote || "Notitie toevoegen"}
         className={`flex w-full items-center gap-1.5 rounded-[var(--radius-sm)] border px-2 py-1.5 text-left text-xs ${
-          heeftNotitie ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)] text-[var(--color-ink)]" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-faint)]"
+          prominent
+            ? "border-[var(--color-brand-200)] bg-[var(--color-brand-50)] text-[var(--color-ink)]"
+            : heeftNotitie
+              ? "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-muted)]"
+              : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink-faint)]"
         }`}
       >
-        <MessageSquareText className={`size-4 shrink-0 ${heeftNotitie ? "text-[var(--color-brand-600)]" : "text-[var(--color-ink-faint)]"}`} />
+        <MessageSquareText className={`size-4 shrink-0 ${prominent ? "text-[var(--color-brand-600)]" : "text-[var(--color-ink-faint)]"}`} />
         <span className="truncate">{shownNote || (canWrite ? "Opmerking voor team…" : "")}</span>
       </button>
       {open ? (
@@ -634,17 +641,45 @@ function NoteCell({ id, note, canWrite }: { id: string; note: string | null; can
  * klikken klappen de opties (ook gekleurd, groter) eronder uit — zo ziet het
  * team in één oogopslag de status en kan het met één klik wisselen.
  */
-function StatusPicker({ id, status, canWrite }: { id: string; status: string; canWrite: boolean }) {
+function StatusPicker({ id, status, note, canWrite }: { id: string; status: string; note: string | null; canWrite: boolean }) {
   const [pending, start] = useTransition();
   const [val, setVal] = useState(status);
   const [open, setOpen] = useState(false);
+  // "Nog aanvullen" vereist een notitie: zonder bestaande notitie vragen we die
+  // eerst, zodat het team ziet wat er nog aangevuld of aangepast moet worden.
+  const [vraagNotitie, setVraagNotitie] = useState(false);
+  const [notitie, setNotitie] = useState(note ?? "");
   const router = useRouter();
   const meta = SCRIPTING_STATUS[val] ?? SCRIPTING_STATUS.concepting!;
 
-  const choose = (v: string) => {
+  const opslaan = (v: string) => {
     setVal(v);
     setOpen(false);
+    setVraagNotitie(false);
     start(async () => { await setScriptingStatus(id, v); router.refresh(); });
+  };
+
+  const choose = (v: string) => {
+    if (v === "nog_aanvullen" && !(note ?? "").trim()) {
+      setVal(v);
+      setOpen(false);
+      setNotitie(note ?? "");
+      setVraagNotitie(true);
+      return;
+    }
+    opslaan(v);
+  };
+
+  const bevestigMetNotitie = () => {
+    const tekst = notitie.trim();
+    if (!tekst) return;
+    setVal("nog_aanvullen");
+    setVraagNotitie(false);
+    start(async () => {
+      await setScriptingNote(id, tekst);
+      await setScriptingStatus(id, "nog_aanvullen");
+      router.refresh();
+    });
   };
 
   if (!canWrite) {
@@ -682,6 +717,31 @@ function StatusPicker({ id, status, canWrite }: { id: string; status: string; ca
                 <span className="truncate">{STATUS_SHORT[s]}</span>
               </button>
             ))}
+          </div>
+        </>
+      ) : null}
+      {vraagNotitie ? (
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setVraagNotitie(false)} />
+          <div className="absolute left-0 top-full z-20 mt-1.5 w-72 max-w-[85vw] rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] p-2.5 shadow-[var(--shadow-raised)]">
+            <p className="text-xs font-semibold text-[var(--color-ink)]">Wat moet er nog aangevuld worden?</p>
+            <p className="mb-2 mt-0.5 text-2xs text-[var(--color-ink-muted)]">Verplicht bij &quot;Nog aanvullen&quot; — zichtbaar voor het hele team.</p>
+            <textarea
+              value={notitie}
+              onChange={(e) => setNotitie(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") setVraagNotitie(false); }}
+              maxLength={500}
+              rows={4}
+              autoFocus
+              placeholder="Bijv. hook ontbreekt nog, call-to-action aanpassen…"
+              aria-label="Wat moet er nog aangevuld worden"
+              className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2 py-1.5 text-sm leading-snug text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-brand-500)] focus:outline-none"
+            />
+            <div className="mt-2 flex items-center justify-end gap-2">
+              {pending ? <Loader2 className="size-3.5 animate-spin text-[var(--color-ink-faint)]" /> : null}
+              <button type="button" onClick={() => setVraagNotitie(false)} className="text-xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">Annuleren</button>
+              <button type="button" onClick={bevestigMetNotitie} disabled={!notitie.trim()} className="rounded-[var(--radius-sm)] bg-[var(--color-ink)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40">Opslaan</button>
+            </div>
           </div>
         </>
       ) : null}
