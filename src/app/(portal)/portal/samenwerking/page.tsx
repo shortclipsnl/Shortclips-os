@@ -89,8 +89,8 @@ export default async function PortalSamenwerkingPage() {
 
       {/* Gegevens over de samenwerking */}
       <section className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-        <div className="sc-glass p-5 sm:p-6">
-          <h2 className="flex items-center gap-2 text-[17px] font-semibold"><Handshake className="size-5 text-[var(--sc-accent)]" /> Gegevens over de samenwerking</h2>
+        <div className="rounded-[18px] border border-[var(--sc-accent)]/35 p-5 shadow-[var(--shadow-card)] sm:p-6" style={{ background: "color-mix(in srgb, var(--sc-accent) 9%, transparent)" }}>
+          <h2 className="flex items-center gap-2 text-[17px] font-bold text-[var(--sc-accent)]"><Handshake className="size-5" /> Gegevens over de samenwerking</h2>
           <dl className="mt-3">
             <Field label="Bedrijf" value={profile.company.legalName && profile.company.legalName !== profile.company.name ? `${profile.company.name} (${profile.company.legalName})` : profile.company.name} />
             <Field label="Actief pakket" value={profile.packageName} />

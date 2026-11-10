@@ -18,6 +18,8 @@ const PHASES = [
 ];
 /** Aantal stappen per fase (samen 12). */
 const PHASE_SIZES = [4, 4, 2, 2];
+/** Eigen kleur per fase, zodat de cyclus in één oogopslag te volgen is. */
+const PHASE_COLOR = ["var(--sc-accent)", "var(--st-green)", "var(--st-orange)", "var(--st-blue)"];
 
 function steps(pakket: Pakket): Step[] {
   const stap9: Step =
@@ -196,9 +198,13 @@ export function ZoWerkenWij({ pakket }: { pakket: Pakket }) {
         </div>
 
         <div className="flex flex-col">
-          {grouped.map((phase) => (
+          {grouped.map((phase, pi) => {
+            const col = PHASE_COLOR[pi] ?? "var(--sc-accent)";
+            return (
             <div key={phase.label}>
-              <p className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">{phase.label}</p>
+              <p className="mb-2 mt-5 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: col }}>
+                <span className="size-2 rounded-full" style={{ background: col }} aria-hidden /> {phase.label}
+              </p>
               <ol className="flex flex-col gap-1.5">
                 {phase.steps.map((s) => {
                   const ours = s.who === "shortclips";
@@ -206,13 +212,10 @@ export function ZoWerkenWij({ pakket }: { pakket: Pakket }) {
                   return (
                     <li
                       key={s.n}
-                      className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-[14px] px-4 py-3.5 sm:px-5 ${fade} ${dim ? "opacity-30" : ""} ${
-                        ours
-                          ? "bg-[var(--sc-fill)]"
-                          : `border-2 border-[var(--sc-accent)] bg-[var(--st-blue-bg)] ${view === "jij" ? "shadow-[var(--shadow-raised)]" : ""}`
-                      }`}
+                      className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-[14px] px-4 py-3.5 sm:px-5 ${fade} ${dim ? "opacity-30" : ""} ${ours ? "bg-[var(--sc-fill)]" : view === "jij" ? "shadow-[var(--shadow-raised)]" : ""}`}
+                      style={ours ? { borderLeft: `3px solid ${col}` } : { border: `2px solid ${col}`, background: "color-mix(in srgb, " + col + " 10%, transparent)" }}
                     >
-                      <span className="w-7 shrink-0 text-[16px] font-bold tabular-nums text-[var(--sc-accent)]">{String(s.n).padStart(2, "0")}</span>
+                      <span className="grid size-7 shrink-0 place-items-center rounded-full text-[13px] font-bold tabular-nums text-white" style={{ background: col }}>{String(s.n).padStart(2, "0")}</span>
                       <div className="min-w-0 flex-[1_1_240px]">
                         <h3 className="text-[15px] font-semibold leading-snug">{s.title}</h3>
                         <p className="mt-0.5 text-[13.5px] text-[var(--color-ink-muted)]">{s.line}</p>
@@ -231,7 +234,8 @@ export function ZoWerkenWij({ pakket }: { pakket: Pakket }) {
                 })}
               </ol>
             </div>
-          ))}
+            );
+          })}
           <div className="mt-4 flex items-center gap-4 rounded-[14px] border-2 border-dashed border-[var(--sc-line)] px-4 py-3.5 sm:px-5">
             <Repeat className="size-5 shrink-0 text-[var(--sc-accent)]" />
             <p className="text-[13.5px]">

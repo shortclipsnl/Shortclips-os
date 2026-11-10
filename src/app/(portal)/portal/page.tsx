@@ -217,7 +217,7 @@ export default async function PortalPage() {
       {roadmap ? <WhatsNext roadmap={roadmap} /> : null}
       {roadmap ? <ProductionTimeline roadmap={roadmap} /> : null}
 
-      <h2 className="px-0.5 pt-1 text-[12px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Je opnames &amp; scripts</h2>
+      <h2 className="flex items-center gap-2 px-0.5 pt-1 text-[12px] font-bold uppercase tracking-wider text-[var(--sc-accent)]"><span className="size-2 rounded-full bg-[var(--sc-accent)]" aria-hidden /> Je opnames &amp; scripts</h2>
 
       {/* 2 — Volgende opnamedag en scriptmeeting, naast elkaar */}
       <div className="grid gap-[18px] sm:grid-cols-2">
@@ -276,7 +276,7 @@ export default async function PortalPage() {
         </Link>
       ) : null}
 
-      <h2 className="px-0.5 pt-1 text-[12px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Je video&apos;s &amp; planning</h2>
+      <h2 className="flex items-center gap-2 px-0.5 pt-1 text-[12px] font-bold uppercase tracking-wider text-[var(--st-green)]"><span className="size-2 rounded-full bg-[var(--st-green)]" aria-hidden /> Je video&apos;s &amp; planning</h2>
 
       {/* 3 — Directe toegang tot de video's: rechtstreeks naar de Frame.io-omgeving
           van de klant als die is ingesteld, anders naar de videopagina in het portaal. */}
@@ -344,7 +344,7 @@ export default async function PortalPage() {
         </Link>
       </div>
 
-      <h2 className="px-0.5 pt-1 text-[12px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Je resultaten &amp; pakket</h2>
+      <h2 className="flex items-center gap-2 px-0.5 pt-1 text-[12px] font-bold uppercase tracking-wider text-[var(--st-orange)]"><span className="size-2 rounded-full bg-[var(--st-orange)]" aria-hidden /> Je resultaten &amp; pakket</h2>
 
       {/* Pakketteller: hoeveel video's deze maand online t.o.v. de afspraak */}
       {pkg ? (

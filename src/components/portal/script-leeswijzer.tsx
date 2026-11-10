@@ -1,4 +1,4 @@
-import { BookOpen, Check, HelpCircle } from "lucide-react";
+import { BookOpen, HelpCircle } from "lucide-react";
 
 /**
  * Leeswijzer voor scripts (document "Zo lees je de scripts"): hoe een script is
@@ -24,10 +24,10 @@ const NIET_NODIG = ["De opening herschrijven of afzwakken", "Spreektaal formeler
 
 export function ScriptLeeswijzer({ feedbackDays }: { feedbackDays?: number }) {
   return (
-    <details className="sc-glass p-5 sm:p-6 [&_summary]:cursor-pointer">
-      <summary className="flex items-center gap-2 text-base font-semibold">
-        <BookOpen className="size-4 text-[var(--sc-accent)]" /> Hoe controleer ik mijn scripts?
-      </summary>
+    <section className="rounded-[18px] border border-[var(--sc-accent)]/35 p-5 sm:p-6 shadow-[var(--shadow-card)]" style={{ background: "color-mix(in srgb, var(--sc-accent) 9%, transparent)" }}>
+      <div className="flex items-center gap-2 text-base font-bold text-[var(--sc-accent)]">
+        <BookOpen className="size-4" /> Hoe controleer ik mijn scripts?
+      </div>
 
       <p className="mt-3 text-[13.5px] text-[var(--color-ink-muted)]">
         Jullie bewaken de <strong className="text-[var(--color-ink)]">inhoud</strong>, wij de <strong className="text-[var(--color-ink)]">creatieve uitwerking</strong>. Zo leest een script het makkelijkst.
@@ -76,6 +76,6 @@ export function ScriptLeeswijzer({ feedbackDays }: { feedbackDays?: number }) {
           gladgestreken naar geschreven taal presteren aantoonbaar slechter. Twijfel je? Zet er een opmerking bij, dan bespreken we het.
         </p>
       </div>
-    </details>
+    </section>
   );
 }

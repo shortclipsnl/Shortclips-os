@@ -5,7 +5,6 @@ import { requirePortal } from "@/server/auth/context";
 import { getPortalPlanning, type PortalOpname, type PortalScriptMeeting, type PortalScriptState } from "@/server/portal-planning";
 import { getPortalSettingsForClient } from "@/server/portal-settings";
 import { buttonClass, TeamAvatar } from "@/components/ui";
-import { formatDateFull } from "@/lib/format";
 import { VoorbereidingOverzicht } from "@/components/portal/voorbereiding-overzicht";
 import { OpnamedagContent } from "../samenwerking/_content";
 
@@ -208,9 +207,16 @@ export default async function PortalPlanningPage() {
 
   return (
     <div className="flex flex-col gap-7">
-      <div>
-        <h1 className="text-[25px] font-bold tracking-tight">Opnameplanning</h1>
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Je opnames en scriptmeetings — automatisch bijgewerkt vanuit ons team.</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[25px] font-bold tracking-tight">Opnameplanning</h1>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Je opnames en scriptmeetings — automatisch bijgewerkt vanuit ons team.</p>
+        </div>
+        {/* Opnames annuleren: compact, direct zichtbaar rechtsboven. */}
+        <div className="shrink-0 rounded-[14px] border border-[var(--st-orange)]/40 p-3.5 shadow-[var(--shadow-card)] sm:max-w-[300px]" style={{ background: "color-mix(in srgb, var(--st-orange) 9%, transparent)" }}>
+          <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-[var(--st-orange)]"><CalendarClock className="size-4" /> Opname wijzigen of annuleren</div>
+          <p className="mt-1 text-[12.5px] leading-snug text-[var(--color-ink-muted)]">Gratis tot <strong className="text-[var(--color-ink)]">{settings.cancelNoticeDays} werkdagen</strong> ervoor; daarna {settings.cancelFee}. Laat het je vaste contactpersoon zo snel mogelijk weten.</p>
+        </div>
       </div>
 
       {!hasAny ? (
@@ -254,7 +260,7 @@ export default async function PortalPlanningPage() {
                     {/* Duidelijke maandkop in volle kleur, zodat je per maand kunt scannen. */}
                     <div className="mb-3 flex items-center justify-between gap-2 rounded-[12px] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
                       <h3 className="text-[15px] font-bold capitalize tracking-tight">{MONTH_NAMES[mo.month]} {mo.year}</h3>
-                      <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11.5px] font-semibold">{count > 0 ? `${count} ${count === 1 ? "afspraak" : "afspraken"}` : "geen opname gepland"}</span>
+                      <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11.5px] font-semibold">{count > 0 ? `${count} ${count === 1 ? "afspraak" : "afspraken"}` : "nog af te stemmen"}</span>
                     </div>
                     <div className="grid gap-3 lg:grid-cols-[minmax(260px,320px)_1fr] lg:items-start">
                       <MonthCalendar year={mo.year} month={mo.month} marks={mo.marks} />
@@ -263,35 +269,12 @@ export default async function PortalPlanningPage() {
                           {mo.items.map((it) => it.node)}
                         </div>
                       ) : (
-                        <div className="sc-glass flex items-center gap-2 px-5 py-4 text-[13.5px] text-[var(--color-ink-faint)]"><CalendarDays className="size-4" /> Nog geen opname gepland deze maand.</div>
+                        <div className="flex items-center gap-2 rounded-[14px] border px-5 py-4 text-[13.5px] font-semibold" style={{ borderColor: "color-mix(in srgb, var(--st-orange) 40%, transparent)", background: "color-mix(in srgb, var(--st-orange) 8%, transparent)", color: "var(--st-orange)" }}><CalendarDays className="size-4 shrink-0" /> Opname moet nog worden afgestemd</div>
                       )}
                     </div>
                   </div>
                 );
               })}
-            </div>
-          </section>
-
-          {/* Opname wijzigen of annuleren — belangrijk, dus duidelijk en opvallend
-              en bewust vóór de voorbereiding zodat klanten dit snel vinden. */}
-          <section className="overflow-hidden rounded-[16px] border border-[var(--sc-line)] bg-[var(--st-blue-bg)]">
-            <div className="flex items-center gap-2 border-b border-[var(--sc-line)] bg-[var(--st-blue-bg)] px-5 py-3">
-              <span className="grid size-7 place-items-center rounded-lg bg-[var(--st-blue-bg)] text-[#1b5fe0]"><CalendarClock className="size-4" /></span>
-              <h2 className="text-[15px] font-bold">Opname wijzigen of annuleren</h2>
-            </div>
-            <div className="grid gap-3 p-5 sm:grid-cols-2">
-              <div className="rounded-[12px] border border-[#2fd27a]/30 bg-[var(--st-green-bg)] p-4">
-                <div className="text-[13px] font-semibold text-[var(--st-green)]">Kosteloos</div>
-                <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Verplaatsen of annuleren kan gratis tot <strong className="text-[var(--color-ink)]">{settings.cancelNoticeDays} werkdagen</strong> vóór de opnamedag.</p>
-              </div>
-              <div className="rounded-[12px] border border-[var(--sc-line)] bg-[var(--st-blue-bg)] p-4">
-                <div className="text-[13px] font-semibold text-[#1b5fe0]">Binnen {settings.cancelNoticeDays} werkdagen</div>
-                <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Dan wordt <strong className="text-[var(--color-ink)]">{settings.cancelFee}</strong> in rekening gebracht. {settings.cancelLateNote}</p>
-              </div>
-              <div className="sm:col-span-2 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-[13px] text-[var(--color-ink-muted)]">
-                <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-[var(--sc-accent)]" /> Laat het je vaste contactpersoon zo snel mogelijk weten.</span>
-                <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-[var(--sc-accent)]" /> Een nieuwe datum plannen we direct met je in, afhankelijk van de beschikbaarheid.</span>
-              </div>
             </div>
           </section>
 

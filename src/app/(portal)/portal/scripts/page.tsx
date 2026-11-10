@@ -185,20 +185,6 @@ export default async function PortalScriptsPage() {
         </section>
       )}
 
-      {/* Tellers per status */}
-      <div className="grid grid-cols-3 gap-3">
-        {([
-          ["Wacht op jou", groups.actie.length, "orange"],
-          ["In voorbereiding", groups.bezig.length, "blue"],
-          ["Goedgekeurd", groups.goedgekeurd.length, "green"],
-        ] as const).map(([label, n, tone]) => (
-          <div key={label} className="sc-glass p-4">
-            <div className="text-[28px] font-bold leading-none tabular-nums" style={{ color: n > 0 ? `var(--st-${tone})` : "var(--color-ink-faint)" }}>{n}</div>
-            <div className="mt-1.5 text-[12.5px] font-medium text-[var(--color-ink-muted)]">{label}</div>
-          </div>
-        ))}
-      </div>
-
       <Section title="Wacht op jouw akkoord" rows={groups.actie} today={today} />
       <Section title="In voorbereiding" hint="Hier zijn wij mee bezig. Je hoeft nog niets te doen." rows={groups.bezig} today={today} />
       <Section title="Goedgekeurd" hint="Klaar voor de opnamedag." rows={groups.goedgekeurd} today={today} />
