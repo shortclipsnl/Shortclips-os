@@ -559,3 +559,24 @@ export const capacityParams = pgTable(
   },
   (t) => [unique("capacity_params_key_unique").on(t.key)],
 );
+
+/**
+ * Oppak-status van nog-niet-ingeplande klanten op de Opnameplanning. Het is puur
+ * een werklijst-markering voor het team: geen rij = "nog niet opgepakt". Zet
+ * iemand de status op "opgepakt" of "afgehandeld", dan verdwijnt de klant uit het
+ * standaardoverzicht (maar blijft terugvindbaar via het filter). Raakt de echte
+ * opnameplanning of klantgegevens niet.
+ */
+export const shootPickups = pgTable(
+  "shoot_pickups",
+  {
+    id: pk(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 16 }).notNull(), // 'opgepakt' | 'afgehandeld'
+    byUserId: uuid("by_user_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [unique("shoot_pickups_client_unique").on(t.clientId)],
+);

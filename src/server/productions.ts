@@ -10,6 +10,7 @@ import {
   productionChecklistItems,
   productionDays,
   scripts,
+  shootPickups,
   users,
 } from "@/db/schema";
 import { assertClientAccess, scopeToClients, type Viewer } from "@/server/auth/context";
@@ -346,6 +347,12 @@ export type UnplannedClient = {
   priority: UnplannedPriority;
   /** Dagen te laat t.o.v. de gewenste opnamedatum (alleen bij achterstallig). */
   daysLate: number;
+  /** Werklijst-status: "nieuw" = nog niet opgepakt. Raakt de echte planning niet. */
+  pickupStatus: "nieuw" | "opgepakt" | "afgehandeld";
+  /** Wie de klant heeft opgepakt/afgehandeld. */
+  pickupByName: string | null;
+  /** Wanneer de oppak-status voor het laatst is gewijzigd (ISO). */
+  pickupAt: string | null;
 };
 
 const PRIORITY_ORDER: Record<UnplannedPriority, number> = { eerste: 0, achterstallig: 1, nu: 2, binnenkort: 3 };
@@ -458,6 +465,7 @@ export async function unplannedClients(viewer: Viewer): Promise<UnplannedClient[
         clientId: c.id, clientName: c.name, clientSlug: c.slug, clientColor: c.color, clientLogo: c.logo,
         lastShootOn: null, intervalDays, intervalSource,
         windowFrom: null, windowTo: null, planBy: null, priority: "eerste", daysLate: 0,
+        pickupStatus: "nieuw", pickupByName: null, pickupAt: null,
       };
     }
 
@@ -471,8 +479,25 @@ export async function unplannedClients(viewer: Viewer): Promise<UnplannedClient[
     return {
       clientId: c.id, clientName: c.name, clientSlug: c.slug, clientColor: c.color, clientLogo: c.logo,
       lastShootOn: last, intervalDays, intervalSource, windowFrom, windowTo, planBy, priority, daysLate,
+      pickupStatus: "nieuw", pickupByName: null, pickupAt: null,
     };
   });
+
+  // Oppak-status (werklijst) koppelen: geen rij = "nieuw" (nog niet opgepakt).
+  const pickups = await db
+    .select({ clientId: shootPickups.clientId, status: shootPickups.status, updatedAt: shootPickups.updatedAt, byName: users.fullName })
+    .from(shootPickups)
+    .leftJoin(users, eq(users.id, shootPickups.byUserId))
+    .where(inArray(shootPickups.clientId, ids));
+  const pickupByClient = new Map(pickups.map((p) => [p.clientId, p]));
+  for (const o of out) {
+    const p = pickupByClient.get(o.clientId);
+    if (p && (p.status === "opgepakt" || p.status === "afgehandeld")) {
+      o.pickupStatus = p.status;
+      o.pickupByName = p.byName ?? null;
+      o.pickupAt = p.updatedAt instanceof Date ? p.updatedAt.toISOString() : String(p.updatedAt ?? "");
+    }
+  }
 
   // Eerst de urgentste: nooit gefilmd → achterstallig (langst te laat eerst) →
   // nu inplannen → binnenkort (vroegste gewenste datum eerst).
