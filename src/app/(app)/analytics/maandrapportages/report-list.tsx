@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Sparkles, Loader2, Check, CircleAlert, Download, Eye, Search, Send, RotateCcw, Lock, Globe } from "lucide-react";
+import { Sparkles, Loader2, Check, CircleAlert, Download, Eye, Send, RotateCcw, Lock, Globe } from "lucide-react";
 import { Badge, ClientLogo, buttonClass, type Tone } from "@/components/ui";
 import { approveMonthlyReport, publishMonthlyReport, queueMonthlyReports, setReportControleDag, startMonthlyReport } from "@/server/actions/monthly-reports";
 import type { ReportOverview, ReportRow } from "@/server/reports/service";
@@ -259,8 +259,6 @@ export function ReportList({
   const [maand, setMaand] = useState(initial.maand && (/^\d{4}-\d{2}$/.test(initial.maand) || initial.maand === "alle") ? initial.maand : vorigeMaand);
   const [jaar, setJaar] = useState("alle");
   const [klantStatus, setKlantStatus] = useState(initial.klantstatus === "alle" || initial.klantstatus === "inactief" ? initial.klantstatus : "actief");
-  // ?klant=<id> (oude links) wordt een zoekopdracht op de klantnaam.
-  const [zoek, setZoek] = useState(initial.zoek ?? clients.find((c) => c.id === initial.klant)?.name ?? "");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
     const s = initial.status ?? "alle";
     if (STATUS_FILTERS.some((f) => f.key === s)) return s as StatusFilter;
@@ -319,11 +317,9 @@ export function ReportList({
     return out;
   }, [byKey, clients, jaar, klantStatus, maand, periodsByClient, reports, rowMonth, teamOnly]);
 
-  const q = zoek.trim().toLowerCase();
   const baseRows = rows.filter((r) => {
     if (klantStatus === "actief" && !r.active) return false;
     if (klantStatus === "inactief" && r.active) return false;
-    if (q && !r.clientName.toLowerCase().includes(q)) return false;
     if (weergave === "mijn-klanten" && r.pmId !== viewerId) return false;
     if (weergave === "te-lezen" && !(r.report?.assignedToMe && !r.report.readByMe)) return false;
     if (weergave === "mijn-controle" && r.report?.controllerId !== viewerId) return false;
@@ -415,15 +411,8 @@ export function ReportList({
         <StatTile label="Mislukt" value={counts.mislukt} tone="bad" active={statusFilter === "mislukt"} onClick={() => toggle("mislukt")} />
       </div>
 
-      {/* Filters en zoeken */}
+      {/* Filters */}
       <div className="sc-card flex flex-wrap items-end gap-3 p-3">
-        <label className="min-w-[180px] flex-1 sm:max-w-[240px]">
-          {label("Zoeken")}
-          <span className="relative block">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--color-ink-faint)]" />
-            <input type="search" value={zoek} onChange={(e) => setZoek(e.target.value)} placeholder="Klantnaam" className="sc-input w-full pl-8 text-sm" />
-          </span>
-        </label>
         <label>
           {label("Maand")}
           <select className="sc-input text-sm" value={maand} onChange={(e) => { setMaand(e.target.value); setRowMonth({}); }}>
@@ -477,11 +466,11 @@ export function ReportList({
       {/* De tabel: één rij per klant, alle acties direct in de rij. */}
       {shown.length === 0 ? (
         <div className="sc-card p-6 text-sm text-[var(--color-ink-muted)]">
-          {weergave === "te-lezen" ? "Je hebt alle maandrapportages doorgenomen." : weergave === "mijn-controle" ? "Er staan voor deze maand geen rapportages op jouw naam." : q ? `Geen klant gevonden met "${zoek}".` : "Geen rapportages voor deze filters."}
+          {weergave === "te-lezen" ? "Je hebt alle maandrapportages doorgenomen." : weergave === "mijn-controle" ? "Er staan voor deze maand geen rapportages op jouw naam." : "Geen rapportages voor deze filters."}
         </div>
       ) : (
         <div className="sc-card overflow-x-auto">
-          <table className="w-full min-w-[840px] text-sm [&_td]:!px-2.5 [&_th]:!px-2.5 [&_td:first-child]:!pl-4 [&_th:first-child]:!pl-4">
+          <table className="w-full min-w-[960px] text-sm [&_td]:!px-2.5 [&_th]:!px-2.5 [&_td:first-child]:!pl-4 [&_th:first-child]:!pl-4">
             <thead>
               <tr className="border-b border-[var(--color-line)] text-left text-2xs uppercase tracking-wide text-[var(--color-ink-faint)]">
                 <th className="sc-th sticky left-0 z-10 min-w-[200px] bg-[var(--color-surface)]">Klant</th>
@@ -490,6 +479,7 @@ export function ReportList({
                 <th className="sc-th"><span className="inline-flex items-start gap-1"><Lock className="mt-px size-3 shrink-0" /> Interne<br />versie</span></th>
                 <th className="sc-th"><span className="inline-flex items-start gap-1"><Globe className="mt-px size-3 shrink-0" /> Klant-<br />versie</span></th>
                 <th className="sc-th">Actie</th>
+                <th className="sc-th">Stuur naar<br />klantportaal</th>
               </tr>
             </thead>
             <tbody>
@@ -565,25 +555,13 @@ export function ReportList({
                           return <span className={buttonClass({ variant: "secondary", size: "sm" })} aria-disabled><Loader2 className="size-3.5 animate-spin" /> Bezig</span>;
                         }
                         if (row.view === "gepubliceerd") {
-                          return (
-                            <div className="text-xs">
-                              <span className="inline-flex items-center gap-1 font-medium text-[var(--color-lime)]"><Check className="size-3.5" /> Gepubliceerd</span>
-                              {r?.publishedAt ? <div className="text-2xs text-[var(--color-ink-faint)]">sinds {fmtDate(r.publishedAt)}</div> : null}
-                            </div>
-                          );
+                          return <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-good)]"><Check className="size-3.5" /> Afgerond</span>;
                         }
                         if (row.view === "goedgekeurd" && r) {
-                          return canWrite ? (
-                            <>
-                              <button type="button" disabled={pending || isBusy} onClick={() => publish(row)} className={buttonClass({ variant: "primary", size: "sm" })}><Send className="size-3.5" /> Publiceren</button>
-                              <div className="mt-1 text-2xs text-[var(--color-ink-faint)]">Goedgekeurd{r.approvedByName ? ` · ${r.approvedByName.split(" ")[0]}` : ""}</div>
-                            </>
-                          ) : (
-                            <span className="text-2xs text-[var(--color-ink-muted)]">Goedgekeurd — wacht op publicatie</span>
-                          );
+                          return <span className="text-xs font-medium text-[var(--color-good)]"><Check className="mr-1 inline size-3.5" />Goedgekeurd{r.approvedByName ? ` · ${r.approvedByName.split(" ")[0]}` : ""}</span>;
                         }
                         if ((row.view === "gegenereerd" || row.view === "controleren") && r) {
-                          const controle = owner ? (
+                          const controle = canWrite ? (
                             r.openChecks > 0 ? (
                               <Link href={`/analytics/maandrapportages/${r.id}`} title="Vul eerst de beoordeling in en rond de verplichte controlepunten af" className={buttonClass({ variant: "secondary", size: "sm" })}>
                                 <CircleAlert className="size-3.5" /> Controleren
@@ -593,7 +571,7 @@ export function ReportList({
                             )
                           ) : (
                             <div className="text-2xs text-[var(--color-ink-muted)]">
-                              Wacht op Jarno
+                              Wacht op goedkeuring
                               <div><Link href={`/analytics/maandrapportages/${r.id}`} className="text-[var(--color-info)] hover:underline">Controle openen</Link></div>
                             </div>
                           );
@@ -625,6 +603,25 @@ export function ReportList({
                       })()}
                       {m ? <div className={`mt-1 max-w-[220px] whitespace-normal text-2xs ${m.ok ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}`}>{m.text}</div> : null}
                     </td>
+
+                    {/* Stuur naar klantportaal: pas beschikbaar na goedkeuring; nooit dubbel. */}
+                    <td className="sc-td whitespace-nowrap">
+                      {r && row.view === "gepubliceerd" ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-lime)]" title={r.publishedAt ? `Verzonden op ${fmtDate(r.publishedAt)}` : "Verzonden"}>
+                          <Check className="size-3.5" /> Verzonden{r.publishedAt ? ` · ${fmtDate(r.publishedAt)}` : ""}
+                        </span>
+                      ) : r && row.view === "goedgekeurd" ? (
+                        canWrite ? (
+                          <button type="button" disabled={pending || isBusy} onClick={() => publish(row)} className={buttonClass({ variant: "primary", size: "sm" })}>
+                            <Send className="size-3.5" /> Stuur naar klantportaal
+                          </button>
+                        ) : (
+                          <span className="text-2xs text-[var(--color-ink-muted)]">Nog niet verzonden</span>
+                        )
+                      ) : (
+                        <span className="text-2xs text-[var(--color-ink-faint)]" title="Beschikbaar zodra het rapport is goedgekeurd">Na goedkeuring</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
@@ -634,8 +631,7 @@ export function ReportList({
       )}
 
       <p className="text-2xs text-[var(--color-ink-faint)]">
-        De interne versie is alleen voor het Shortclips-team en nooit zichtbaar in het klantportaal. De klantversie komt pas in het klantportaal na goedkeuring én een bevestigde publicatie.
-        {canWrite && !owner ? " Goedkeuren doet Jarno." : ""}
+        De interne versie is alleen voor het Shortclips-team en nooit zichtbaar in het klantportaal. De klantversie komt pas in het klantportaal na goedkeuring én een bevestigde publicatie via &quot;Stuur naar klantportaal&quot;.
       </p>
 
       {/* Teamvoortgang (doornemen van goedgekeurde rapporten), compact onder de tabel. */}

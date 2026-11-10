@@ -167,8 +167,9 @@ export async function generatePersonalText(reportId: string): Promise<ActionResu
  */
 export async function approveMonthlyReport(reportId: string): Promise<ActionResult> {
   return guard(async () => {
+    // De verantwoordelijke medewerker (recht reports:write) controleert en keurt
+    // goed; publiceren naar het klantportaal is een aparte, expliciete stap.
     const viewer = await requirePermission("reports:write");
-    if (!isOwner(viewer)) return { ok: false, message: "Alleen Jarno kan maandrapportages goedkeuren." };
     const [r] = await db.select().from(clientReports).where(and(eq(clientReports.id, reportId), isNull(clientReports.deletedAt))).limit(1);
     if (!r) return { ok: false, message: "Rapport niet gevonden." };
     assertClientAccess(viewer, r.clientId);
