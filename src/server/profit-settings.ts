@@ -40,7 +40,7 @@ export const PROFIT_DEFAULTS: ProfitSettings = {
   marginGreenPct: 50,
   marginOrangePct: 20,
   includeOverhead: true,
-  internUurtarief: 0, // bewust 0: nog instellen (wordt gemarkeerd i.p.v. stil op 0)
+  internUurtarief: 16.5, // intern uurtarief Shortclips (aanpasbaar via Instellingen)
   internUrenPerKlant: 1.5,
   vgUurtarief: 16.75,
   overheadKantoor: 0,

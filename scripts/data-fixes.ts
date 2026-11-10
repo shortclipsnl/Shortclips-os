@@ -86,6 +86,15 @@ async function main() {
     ON CONFLICT (user_id, role_id) DO NOTHING
   `);
   console.log(`[data-fixes] Milou als operationeel beheerder: ${mr} rol(len) gewijzigd.`);
+
+  // Testklant "Onboarding Test" opruimen: soft-delete (omkeerbaar), naam-exact.
+  // Verdwijnt daarna uit Onboarding en de klantenlijst; andere klanten ongemoeid.
+  const onboardingTest = await db.execute(sql`
+    UPDATE clients SET deleted_at = now(), updated_at = now()
+    WHERE name = 'Onboarding Test' AND deleted_at IS NULL
+  `);
+  const ot = (onboardingTest as unknown as { rowCount?: number }).rowCount ?? 0;
+  console.log(`[data-fixes] Testklant "Onboarding Test" opgeruimd: ${ot} rij(en).`);
 }
 
 main()
