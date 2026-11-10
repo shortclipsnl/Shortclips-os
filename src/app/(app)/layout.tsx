@@ -74,7 +74,8 @@ export default async function AppLayout({
         !item.permissions ||
         item.permissions.some((p) => viewer.permissions.has(p))
       );
-    }),
+    // Editors zien waar nodig een afwijkend label (bijv. "Editing Planning").
+    }).map((item) => (editorOnly && item.editorLabel ? { ...item, label: item.editorLabel } : item)),
   })).filter((group) => group.items.length > 0);
 
   // Tabblad-items waarvan de hoofdpagina voor deze gebruiker niet zichtbaar is,

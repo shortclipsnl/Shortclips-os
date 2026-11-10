@@ -10,7 +10,7 @@ import { ForbiddenError, requirePortal } from "@/server/auth/context";
 import { auditLog, recordActivity } from "@/server/audit";
 import { dispatch } from "@/server/automation";
 import { syncContentForDeliverable } from "@/server/content-sync";
-import { recordAwardsSafe } from "@/server/awards/service";
+import { notifyXpEarned, recordAwardsSafe } from "@/server/awards/service";
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -46,6 +46,7 @@ export async function approveVideo(videoId: string): Promise<ActionResult> {
 
     // Showcase: awards van de editor bijwerken (nooit blokkerend).
     await recordAwardsSafe(video.editorId);
+    await notifyXpEarned(video.editorId, videoId);
 
     await db
       .update(approvals)

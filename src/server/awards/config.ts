@@ -20,6 +20,7 @@ export const AWARD_TIERS: AwardTier[] = [
   { key: "shortclips_pro", threshold: 250, name: "Shortclips Pro", description: "250 shorts, een vaste waarde", color: "#4aa8ec", badge: "250" },
   { key: "master_editor", threshold: 500, name: "Master editor", description: "500 shorts, de standaard voor het team", color: "#ae97f6", badge: "500" },
   { key: "legend", threshold: 1000, name: "Legend", description: "1000 shorts voor Shortclips", color: "#ffffff", badge: "1K" },
+  { key: "ultimate_legend", threshold: 2500, name: "Ultimate Legend", description: "2.500 shorts — de hoogste mijlpaal bij Shortclips", color: "#ffd24a", badge: "2.5K" },
 ];
 
 export const AWARD_COUNT = AWARD_TIERS.length;

@@ -25,6 +25,8 @@ export type NavItem = {
   manageOperations?: boolean;
   /** Uitsluitend voor editors — ook de eigenaar/het team ziet dit niet. */
   editorsOnly?: boolean;
+  /** Afwijkend label in het editorportaal (het interne team houdt `label`). */
+  editorLabel?: string;
   /** Externe/zelfstandige pagina: open als gewone link in een nieuw tabblad
    *  (bijv. het schermvullende vermogensdashboard, buiten de portaalschil). */
   external?: boolean;
@@ -70,7 +72,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/scripting", label: "Scripting", icon: "ScrollText", permissions: ["scripts:read"], match: "/scripting" },
       { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },
       { href: "/productions", label: "Opnames", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
-      { href: "/videos", label: "Editing", icon: "Scissors", permissions: ["videos:read"], match: "/videos" },
+      { href: "/videos", label: "Editing", editorLabel: "Editing Planning", icon: "Scissors", permissions: ["videos:read"], match: "/videos" },
       // Persoonlijke klantenbibliotheek voor editors (eigen klanten + Editing Guide).
       { href: "/mijn-klanten", label: "Mijn klanten", icon: "BookOpen", match: "/mijn-klanten", editorsOnly: true },
       { href: "/showcase", label: "Showcase", icon: "Trophy", permissions: ["videos:read"], match: "/showcase", editorsOnly: true },

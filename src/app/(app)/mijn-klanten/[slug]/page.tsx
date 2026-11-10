@@ -2,7 +2,7 @@ import { isActiveClientStatus } from "@/lib/client-status";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, Clapperboard, Download, ExternalLink, FileText, Film, Info, Scissors, Send } from "lucide-react";
+import { ArrowLeft, BookOpen, Clapperboard, Download, ExternalLink, FileText, Film, Scissors, Send } from "lucide-react";
 import { Card, ClientLogo, EmptyState } from "@/components/ui";
 import { requireInternal } from "@/server/auth/context";
 import { CONTENT_FOCUS_LABEL, getClientLibraryDetail } from "@/server/client-library";
@@ -23,7 +23,7 @@ export default async function KlantInfoPage({ params }: { params: Promise<{ slug
   const viewer = await requireInternal();
   const detail = await getClientLibraryDetail(viewer, slug);
   if (!detail) notFound();
-  const { client, overDeKlant, richtlijnen, editingAandachtspunten, afspraken, guide, canManage } = detail;
+  const { client, richtlijnen, editingAandachtspunten, afspraken, guide, canManage } = detail;
   // Vaste link naar de centrale bron (zelfde PDF als op Klanten en in de Klantenbibliotheek).
   const guideUrl = `/api/klantdocumenten/${client.id}/editing_guide${guide?.variant ? `?v=${encodeURIComponent(guide.variant)}` : ""}`;
   const contentFocusLabel = client.contentFocus ? CONTENT_FOCUS_LABEL[client.contentFocus] ?? client.contentFocus : null;
@@ -80,32 +80,8 @@ export default async function KlantInfoPage({ params }: { params: Promise<{ slug
         <p className="mt-3 text-xs text-[var(--color-ink-faint)]">Deze gegevens komen rechtstreeks uit Klantenbeheer en blijven automatisch actueel.</p>
       </Card>
 
-      {/* B. Over de klant */}
-      <Card className="mb-4">
-        <h2 className="mb-2 flex items-center gap-1.5 text-base font-bold text-[var(--color-ink)]"><Info className="size-4" /> Over de klant</h2>
-        {client.description ? <p className="text-sm leading-relaxed text-[var(--color-ink-muted)]">{client.description}</p> : null}
-        {client.attentionNotes ? (
-          <div className="mt-3 rounded-[var(--radius-sm)] bg-[var(--color-warn-soft)] px-3 py-2 text-sm text-[#8a5300]">
-            <strong>Let op:</strong> {client.attentionNotes}
-          </div>
-        ) : null}
-        {overDeKlant.length ? (
-          <div className="mt-3 space-y-2">
-            {overDeKlant.map((k, i) => (
-              <div key={i}>
-                <div className="text-xs font-semibold text-[var(--color-ink)]">{k.title}</div>
-                <p className="text-sm text-[var(--color-ink-muted)]">{k.body}</p>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {!client.description && !client.attentionNotes && overDeKlant.length === 0 ? (
-          <p className="text-sm text-[var(--color-ink-faint)]">Nog geen beschrijving beschikbaar in de kennisbank.</p>
-        ) : null}
-      </Card>
-
       {/* B. Editing Guide */}
-      <Card padded={false} className="mb-4">
+      <Card padded={false} id="editing-guide" className="mb-4 scroll-mt-20">
         <div className="flex flex-wrap items-center justify-between gap-2 p-5 pb-3">
           <div>
             <h2 className="flex items-center gap-1.5 text-base font-bold text-[var(--color-ink)]"><BookOpen className="size-4" /> Editing Guide</h2>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Volume2, VolumeX } from "lucide-react";
+import { Volume2, VolumeX, Zap } from "lucide-react";
 import { AWARD_TIERS } from "@/server/awards/config";
 import type { ShowcaseData } from "@/server/awards/service";
 import { setAwardSound } from "@/server/actions/awards";
@@ -105,6 +105,26 @@ export function ShowcaseView({
         </div>
       </section>
 
+      {/* a2) XP — zelfde bron als de awards: 100 XP per afgeronde short. */}
+      <section className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-gradient-to-br from-[var(--color-brand-50)] to-[var(--color-surface)] p-5 shadow-[var(--shadow-card)]">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold tabular-nums text-[var(--color-brand-700)]"><CountUp value={data.xp} /></span>
+              <span className="text-sm font-semibold text-[var(--color-brand-700)]">XP</span>
+            </div>
+            <p className="text-2xs text-[var(--color-ink-muted)]">+100 XP voor elke afgeronde short</p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand-600)] px-3 py-1 text-sm font-bold text-white shadow-sm">
+            <Zap className="size-4" /> Level {data.xpLevel}
+          </span>
+        </div>
+        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[var(--color-surface-2)]">
+          <div className="h-full rounded-full bg-gradient-to-r from-[var(--color-brand-500)] to-[var(--color-brand-700)] transition-[width] duration-700 ease-out" style={{ width: `${Math.min(100, (data.xpIntoLevel / data.xpPerLevel) * 100)}%` }} />
+        </div>
+        <p className="mt-1.5 text-2xs text-[var(--color-ink-faint)]">Nog {data.xpPerLevel - data.xpIntoLevel} XP tot level {data.xpLevel + 1}</p>
+      </section>
+
       {/* b) Volgende award */}
       <section className="rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-card)]">
         {nextTier ? (
@@ -145,11 +165,11 @@ export function ShowcaseView({
               <li key={tier.key} className="flex flex-col items-center gap-2 text-center">
                 {earned && ownView ? (
                   <button type="button" onClick={() => setReplayKey(tier.key)} aria-label={`${alt}. Speel de viering opnieuw af.`} className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-brand-500)]">
-                    <AwardBadge tier={tier} earned delayIndex={i} sparkle={tier.key === "legend"} />
+                    <AwardBadge tier={tier} earned delayIndex={i} sparkle={tier.key === "legend" || tier.key === "ultimate_legend"} />
                   </button>
                 ) : (
                   <span role="img" aria-label={alt}>
-                    <AwardBadge tier={tier} earned={earned} delayIndex={i} sparkle={earned && tier.key === "legend"} />
+                    <AwardBadge tier={tier} earned={earned} delayIndex={i} sparkle={earned && (tier.key === "legend" || tier.key === "ultimate_legend")} />
                   </span>
                 )}
                 <div>

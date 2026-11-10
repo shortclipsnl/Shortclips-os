@@ -3,7 +3,7 @@ import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { deliverables, editorAwards, editorPreferences, users } from "@/db/schema";
 import { notify } from "@/server/notifications";
-import { awardByKey, AWARD_COUNT } from "./config";
+import { awardByKey, AWARD_COUNT, AWARD_TIERS } from "./config";
 import { computeEarnedAwards, nextAward, type Delivery, type EarnedAward } from "./compute";
 
 /** Statussen die "klantgoedgekeurd of afgerond" betekenen (gelijk aan editing.ts). */
@@ -85,6 +85,35 @@ export async function recordAwards(editorUserId: string, now = new Date()): Prom
   return { newAwards: fresh };
 }
 
+/**
+ * "+100 XP verdiend!"-melding bij het afronden van een short. Eén keer per
+ * deliverable (unieke (userId, dedupeKey)-constraint voorkomt dubbele beloning
+ * als een video opnieuw wordt geopend/afgerond). Het totaal op de Showcase komt
+ * altijd uit dezelfde bron (count × 100), dus dit is puur de melding.
+ */
+export async function notifyXpEarned(editorUserId: string | null, deliverableId: string): Promise<void> {
+  if (!editorUserId) return;
+  try {
+    const [d] = await db
+      .select({ plannedShorts: deliverables.plannedShorts, title: deliverables.title })
+      .from(deliverables)
+      .where(eq(deliverables.id, deliverableId))
+      .limit(1);
+    const xp = shortsOf(d?.plannedShorts ?? null) * XP_PER_SHORT;
+    await notify({
+      userIds: [editorUserId],
+      type: "xp_earned",
+      level: "success",
+      title: `+${xp} XP verdiend!`,
+      body: `Je short is afgerond${d?.title ? `: ${d.title}` : ""}. Bekijk je voortgang op de Showcase.`,
+      href: "/showcase",
+      dedupeKey: `xp_earned:${deliverableId}`,
+    });
+  } catch {
+    /* XP-melding mag een goedkeuring nooit blokkeren */
+  }
+}
+
 /** Veilige variant: nooit een fout naar de aanroeper (bijv. vanuit een goedkeuringsactie). */
 export async function recordAwardsSafe(editorUserId: string | null): Promise<void> {
   if (!editorUserId) return;
@@ -108,7 +137,16 @@ export type ShowcaseData = {
   awardSound: boolean;
   /** "december 2026" of null als er te weinig data is of alles behaald is. */
   projectionMonth: string | null;
+  /** XP: één bron — 100 XP per afgeronde short (count). Nooit dubbel. */
+  xp: number;
+  xpLevel: number;
+  xpIntoLevel: number;
+  xpPerLevel: number;
 };
+
+/** XP-regels: afgeleid van dezelfde teller als de awards (count). */
+export const XP_PER_SHORT = 100;
+export const XP_PER_LEVEL = 1000; // 10 afgeronde shorts per level
 
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}`;
@@ -148,11 +186,18 @@ export async function getShowcase(editorUserId: string, now = new Date()): Promi
   const thisMonth = dated.filter((d) => monthKey(d.date) === monthKey(now)).length;
   const clientCount = new Set(dated.map((d) => d.clientId)).size;
 
-  const earnedRows = await db.select({ awardKey: editorAwards.awardKey, achievedAt: editorAwards.achievedAt }).from(editorAwards).where(eq(editorAwards.editorId, editorUserId));
-  const earned = earnedRows.map((e) => ({ awardKey: e.awardKey, achievedAt: e.achievedAt.toISOString() }));
+  // Earned rechtstreeks uit de teller: elke drempel ≤ count is behaald (goud),
+  // zodat de weergave nooit uit de pas loopt met het echte aantal shorts. De
+  // behaaldatum is de goedkeuringsdatum van de short die de drempel haalde.
+  const sortedDates = dated.map((d) => d.date).sort((a, b) => a.getTime() - b.getTime());
+  const earned: ShowcaseEarned[] = AWARD_TIERS
+    .filter((t) => count >= t.threshold)
+    .map((t) => ({ awardKey: t.key, achievedAt: (sortedDates[t.threshold - 1] ?? now).toISOString() }));
 
   const [editor] = await db.select({ name: users.fullName }).from(users).where(eq(users.id, editorUserId)).limit(1);
   const [pref] = await db.select({ s: editorPreferences.awardSound }).from(editorPreferences).where(eq(editorPreferences.userId, editorUserId)).limit(1);
+
+  const xp = count * XP_PER_SHORT;
 
   return {
     editorId: editorUserId,
@@ -165,6 +210,10 @@ export async function getShowcase(editorUserId: string, now = new Date()): Promi
     earned,
     awardSound: pref?.s ?? true,
     projectionMonth: projectNextAward(count, dated.map((d) => d.date), now),
+    xp,
+    xpLevel: Math.floor(xp / XP_PER_LEVEL) + 1,
+    xpIntoLevel: xp % XP_PER_LEVEL,
+    xpPerLevel: XP_PER_LEVEL,
   };
 }
 

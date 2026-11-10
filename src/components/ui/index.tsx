@@ -9,13 +9,15 @@ export function Card({
   children,
   className,
   padded = true,
+  id,
 }: {
   children: ReactNode;
   className?: string;
   padded?: boolean;
+  id?: string;
 }) {
   return (
-    <div className={cn("sc-card", padded && "p-5", className)}>{children}</div>
+    <div id={id} className={cn("sc-card", padded && "p-5", className)}>{children}</div>
   );
 }
 

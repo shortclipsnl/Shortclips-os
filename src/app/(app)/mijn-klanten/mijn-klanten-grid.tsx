@@ -80,12 +80,11 @@ export function MijnKlantenGrid({ clients }: { clients: MyClient[] }) {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((c) => (
-            <Link
+            <div
               key={c.id}
-              href={`/mijn-klanten/${c.slug}`}
               className={`group flex flex-col rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 transition ${c.isActive ? "" : "opacity-75"} hover:border-[var(--color-brand-500)] hover:shadow-[var(--shadow-raised)]`}
             >
-              <div className="flex items-center gap-3">
+              <Link href={`/mijn-klanten/${c.slug}`} className="flex items-center gap-3">
                 <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={44} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
@@ -96,7 +95,7 @@ export function MijnKlantenGrid({ clients }: { clients: MyClient[] }) {
                   </div>
                   {c.sector ? <div className="truncate text-xs text-[var(--color-ink-faint)]">{c.sector}</div> : null}
                 </div>
-              </div>
+              </Link>
               {c.description ? <p className="mt-2 line-clamp-2 text-xs text-[var(--color-ink-muted)]">{c.description}</p> : null}
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 {c.monthlyVideoQuota > 0 ? (
@@ -109,13 +108,17 @@ export function MijnKlantenGrid({ clients }: { clients: MyClient[] }) {
                     <Clapperboard className="size-3" /> {CONTENT_FOCUS_SHORT[c.contentFocus] ?? c.contentFocus}
                   </span>
                 ) : null}
-                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-medium ${c.hasGuide ? "bg-[var(--color-good-soft)] text-[#1d6b4c]" : "bg-[var(--color-neutral-soft)] text-[var(--color-ink-faint)]"}`}>
-                  <BookOpen className="size-3" /> {c.hasGuide ? "Editing Guide" : "Geen guide"}
-                </span>
                 {c.richtlijnenCount > 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-info-soft)] px-2 py-0.5 text-2xs font-medium text-[#0060a8]">{c.richtlijnenCount} richtlijn{c.richtlijnenCount === 1 ? "" : "en"}</span> : null}
               </div>
+              {/* Editing Guide meteen bereikbaar per klant — de kernactie voor editors. */}
+              <Link
+                href={`/mijn-klanten/${c.slug}#editing-guide`}
+                className={`mt-3 inline-flex items-center justify-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-sm font-bold transition ${c.hasGuide ? "bg-[#FF6A00] text-white shadow-sm ring-1 ring-black/10 hover:bg-[#e85f00]" : "border border-[var(--color-line-strong)] bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+              >
+                <BookOpen className="size-4" /> {c.hasGuide ? "Open Editing Guide" : "Editing Guide bekijken"}
+              </Link>
               {fmtDate(c.lastUpdated) ? <div className="mt-2 text-2xs text-[var(--color-ink-faint)]">Laatst bijgewerkt {fmtDate(c.lastUpdated)}</div> : null}
-            </Link>
+            </div>
           ))}
         </div>
       )}
