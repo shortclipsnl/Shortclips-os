@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import { clients, deliverables } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
 import { getPortalCollaboration, getPortalResults } from "@/server/portal";
+import { getMilestoneVideos } from "@/server/milestone-videos";
 import {
   AWARDS,
   MONTHS_SHORT,
@@ -61,7 +62,7 @@ export async function getPortalMilestones(viewer: Viewer): Promise<MilestonesDat
   const today = amsDay(new Date());
   const year = Number(today.slice(0, 4));
 
-  const [collab, [client], videoRows, dailyRes] = await Promise.all([
+  const [collab, [client], videoRows, dailyRes, videoLists] = await Promise.all([
     getPortalCollaboration(viewer),
     db.select({ name: clients.name }).from(clients).where(and(eq(clients.id, clientId), isNull(clients.deletedAt))).limit(1),
     db
@@ -73,6 +74,7 @@ export async function getPortalMilestones(viewer: Viewer): Promise<MilestonesDat
       select measured_on::text d, coalesce(sum(views),0)::bigint v, coalesce(sum(engagements),0)::bigint e
       from daily_metrics where client_id = ${clientId}
       group by measured_on order by measured_on`),
+    getMilestoneVideos(clientId),
   ]);
   if (!client) notFound();
 
@@ -234,5 +236,7 @@ export async function getPortalMilestones(viewer: Viewer): Promise<MilestonesDat
     year: yearData,
     physicalAward,
     lastUpdated,
+    videos: videoLists.videos,
+    library: videoLists.library,
   };
 }

@@ -109,6 +109,38 @@ export type MilestonesYear = {
   periodLabel: string;
 };
 
+/** Eén gepubliceerde video met zijn cijfers (posts op meerdere platforms samengevoegd). */
+export type MilestoneVideo = {
+  key: string;
+  title: string;
+  /** YYYY-MM-DD */
+  publishedAt: string;
+  platforms: Array<{ platform: string; url: string | null; views: number }>;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  /** likes + reacties + shares + opgeslagen */
+  interactions: number;
+  thumbUrl: string | null;
+  /** Afspelen via Frame (in het portaal), als de video zeker gekoppeld is. */
+  playSrc: string | null;
+  /** Anders: de originele post als ingesloten speler. */
+  embedSrc: string | null;
+  externalUrl: string | null;
+};
+
+/** Een opgeleverde video uit de videobibliotheek (Frame), altijd afspeelbaar. */
+export type LibraryVideo = {
+  id: string;
+  title: string;
+  publishedAt: string | null;
+  durationSeconds: number | null;
+  /** Sleutel van de gekoppelde post met cijfers, als die er zeker is. */
+  statsKey: string | null;
+};
+
 export type MilestonesData = {
   clientName: string;
   startedOn: string | null;
@@ -121,6 +153,10 @@ export type MilestonesData = {
   /** Fysieke Short Video Award van dit jaar (alleen voor gekozen klanten). */
   physicalAward: { year: number; videos: number; views: number; interactions: number; standOn: string } | null;
   lastUpdated: string | null;
+  /** Video's met cijfers, van veel naar weinig weergaven. */
+  videos: MilestoneVideo[];
+  /** Alle opgeleverde video's uit Frame, nieuwste eerst. */
+  library: LibraryVideo[];
 };
 
 const MONTHS = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];

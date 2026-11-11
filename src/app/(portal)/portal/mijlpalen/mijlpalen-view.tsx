@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Check, Copy, Download, Eye, Handshake, Heart, In
 import { portalBtn } from "@/components/portal/status-pill";
 import { CATEGORIES, METALS, longDateNl, type AwardState, type MilestoneCategory, type MilestonesData } from "@/lib/milestones";
 import { AwardBadge, badgeSvg } from "./award-badge";
+import { ArchiveModal, InteractionsModal, PlayerModal, TopSix, ViewsModal, type Playable } from "./video-parts";
 
 const nf = new Intl.NumberFormat("nl-NL");
 const fmt = (n: number) => nf.format(n);
@@ -17,12 +18,16 @@ type Modal =
   | { kind: "share"; key: string }
   | { kind: "year"; slide: number }
   | { kind: "new"; key: string }
+  | { kind: "archive" }
+  | { kind: "views" }
+  | { kind: "interactions" }
   | null;
 
 export function MijlpalenView({ data }: { data: MilestonesData }) {
   const [cat, setCat] = useState<"alle" | MilestoneCategory>("alle");
   const [modal, setModal] = useState<Modal>(null);
   const [allTl, setAllTl] = useState(false);
+  const [playing, setPlaying] = useState<Playable | null>(null);
   const close = useCallback(() => setModal(null), []);
 
   const achieved = data.awards.filter((a) => a.achieved);
@@ -52,9 +57,14 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
   }, []);
 
   useEffect(() => {
-    if (!modal) return;
+    if (!modal && !playing) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") {
+        if (playing) setPlaying(null);
+        else close();
+        return;
+      }
+      if (!modal) return;
       if (modal.kind === "year") {
         if (e.key === "ArrowRight") setModal((m) => (m && m.kind === "year" ? { kind: "year", slide: m.slide + 1 } : m));
         if (e.key === "ArrowLeft") setModal((m) => (m && m.kind === "year" ? { kind: "year", slide: Math.max(0, m.slide - 1) } : m));
@@ -67,7 +77,7 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [modal, close]);
+  }, [modal, playing, close]);
 
   const timeline = achieved.filter((a) => a.achievedOn).sort((a, b) => (b.achievedOn ?? "").localeCompare(a.achievedOn ?? ""));
   const shownTl = allTl ? timeline : timeline.slice(0, 5);
@@ -96,10 +106,10 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
 
       {/* Kerncijfers */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4" aria-label="Kerncijfers">
-        <Stat icon={Play} label="Gepubliceerde video's" value={fmt(data.totals.videos)} sub={data.totals.firstVideoOn ? `Eerste video op ${longDateNl(data.totals.firstVideoOn)}` : "Sinds de start"} />
-        <Stat icon={Eye} label="Totaal aantal views" value={fmt(data.totals.views)} sub={avg > 0 ? `Gemiddeld ${fmt(avg)} per video` : "Op alle kanalen"} />
-        <Stat icon={Heart} label="Totaal aantal interacties" value={fmt(data.totals.interactions)} sub="Likes, reacties, shares en saves" />
-        <Stat icon={Trophy} label="Behaalde mijlpalen" value={fmt(achieved.length)} sub={`${achieved.length} van ${data.awards.length} awards`} />
+        <Stat icon={Play} label="Gepubliceerde video's" value={fmt(data.totals.videos)} sub={data.totals.firstVideoOn ? `Eerste video op ${longDateNl(data.totals.firstVideoOn)}` : "Sinds de start"} cta="Bekijk alle video's" onClick={data.library.length || data.videos.length ? () => setModal({ kind: "archive" }) : undefined} />
+        <Stat icon={Eye} label="Totaal aantal views" value={fmt(data.totals.views)} sub={avg > 0 ? `Gemiddeld ${fmt(avg)} per video` : "Op alle kanalen"} cta="Bekijk per video" onClick={data.videos.length ? () => setModal({ kind: "views" }) : undefined} />
+        <Stat icon={Heart} label="Totaal aantal interacties" value={fmt(data.totals.interactions)} sub="Likes, reacties, shares en saves" cta="Bekijk de uitsplitsing" onClick={data.videos.length ? () => setModal({ kind: "interactions" }) : undefined} />
+        <Stat icon={Trophy} label="Behaalde mijlpalen" value={fmt(achieved.length)} sub={`${achieved.length} van ${data.awards.length} awards`} cta="Bekijk de awards" onClick={() => document.getElementById("awards")?.scrollIntoView({ behavior: "smooth", block: "start" })} />
       </section>
 
       {/* Volgende mijlpaal + jaaroverzicht */}
@@ -172,8 +182,11 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
         ) : null}
       </section>
 
+      {/* Top 6 */}
+      {data.videos.some((v) => v.views > 0) ? <TopSix videos={data.videos} onPlay={setPlaying} /> : null}
+
       {/* Awards */}
-      <section className="sc-glass p-5 sm:p-6">
+      <section id="awards" className="sc-glass scroll-mt-20 p-5 sm:p-6">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h2 className="text-[20px] font-bold tracking-tight">Onze behaalde awards</h2>
@@ -287,11 +300,24 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(0,0,30,0.6)] p-2.5 backdrop-blur-sm sm:items-center sm:p-6" onClick={(e) => e.target === e.currentTarget && close()}>
           {modal.kind === "award" || modal.kind === "share" ? (
             <AwardModal a={byKey.get(modal.key)!} share={modal.kind === "share"} clientName={data.clientName} totals={data.totals} onClose={close} onShare={(s) => setModal({ kind: s ? "share" : "award", key: modal.key })} />
+          ) : modal.kind === "archive" ? (
+            <ArchiveModal videos={data.videos} library={data.library} totalPublished={data.totals.videos} onClose={close} onPlay={setPlaying} />
+          ) : modal.kind === "views" ? (
+            <ViewsModal videos={data.videos} totalViews={data.totals.views} onClose={close} onPlay={setPlaying} />
+          ) : modal.kind === "interactions" ? (
+            <InteractionsModal videos={data.videos} totalInteractions={data.totals.interactions} onClose={close} onPlay={setPlaying} />
           ) : modal.kind === "new" ? (
             <NewModal a={byKey.get(modal.key)!} onClose={close} onOpen={() => setModal({ kind: "award", key: modal.key })} />
           ) : data.year ? (
             <YearModal data={data} byKey={byKey} slide={modal.slide} setSlide={(s) => setModal({ kind: "year", slide: s })} onClose={close} />
           ) : null}
+        </div>
+      ) : null}
+
+      {/* Speler (boven een eventueel open lijst) */}
+      {playing ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(0,0,20,0.75)] p-2.5 backdrop-blur-sm sm:p-6" onClick={(e) => e.target === e.currentTarget && setPlaying(null)}>
+          <PlayerModal key={playing.playSrc ?? playing.embedSrc ?? playing.title} p={playing} onClose={() => setPlaying(null)} />
         </div>
       ) : null}
     </div>
@@ -300,16 +326,23 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
 
 /* ---------- Kleine onderdelen ---------- */
 
-function Stat({ icon: Icon, label, value, sub }: { icon: typeof Eye; label: string; value: string; sub: string }) {
-  return (
-    <div className="sc-glass flex flex-col gap-1.5 p-4 sm:p-5">
+function Stat({ icon: Icon, label, value, sub, cta, onClick }: { icon: typeof Eye; label: string; value: string; sub: string; cta?: string; onClick?: () => void }) {
+  const body = (
+    <>
       <div className="flex items-center gap-2 text-[12.5px] text-[var(--color-ink-muted)]">
         <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-[var(--st-blue-bg)] text-[var(--sc-accent)]"><Icon className="size-[15px]" /></span>
         <span className="leading-tight">{label}</span>
       </div>
       <div className="text-[22px] font-bold tabular-nums tracking-tight sm:text-[28px]">{value}</div>
       <div className="text-[12px] text-[var(--color-ink-faint)]">{sub}</div>
-    </div>
+      {onClick && cta ? <div className="mt-1 inline-flex items-center gap-1 text-[12.5px] font-semibold text-[var(--sc-accent)]">{cta} <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" /></div> : null}
+    </>
+  );
+  if (!onClick) return <div className="sc-glass flex flex-col gap-1.5 p-4 sm:p-5">{body}</div>;
+  return (
+    <button type="button" onClick={onClick} className="sc-glass group flex flex-col gap-1.5 p-4 text-left transition-shadow hover:shadow-[var(--shadow-raised)] sm:p-5">
+      {body}
+    </button>
   );
 }
 
