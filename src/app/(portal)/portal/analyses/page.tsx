@@ -79,7 +79,7 @@ export default async function PortalAnalysesPage() {
                 <p className="text-[15px] font-semibold capitalize text-[var(--color-ink-muted)]">{monthLabel(key)}</p>
               </div>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--st-orange-bg)] px-2.5 py-1 text-[11.5px] font-semibold text-[var(--st-orange)]">
-                <Clock className="size-3.5" /> Nog toe te voegen
+                <Clock className="size-3.5" /> In afwachting van content creator
               </span>
             </div>
           );
