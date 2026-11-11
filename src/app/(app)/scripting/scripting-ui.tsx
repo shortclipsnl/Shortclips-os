@@ -10,7 +10,7 @@ import { ClientLogo, Stat, TeamAvatar } from "@/components/ui";
 import type { ScriptingRow, WriterOption, LinkedScript } from "@/server/scripting";
 import { PortalSendCell } from "./portal-send";
 import { DriveSessionPicker } from "./drive-session-picker";
-import { ScriptberichtRowButton } from "./scriptbericht";
+import { ScriptberichtRowButton, publishScriptberichtContext } from "./scriptbericht";
 
 /** Toon-kleur per status-tone, voor de kleine statuspillen van gekoppelde scripts. */
 const TONE_COLOR: Record<string, string> = {
@@ -144,6 +144,19 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
       return true;
     });
   }, [rows, filter, status, client, writer]);
+
+  // Scriptbericht: laat de knop bovenaan weten welke scriptsessie open staat
+  // (aangeklikt of via een taak geopend) en welke opnames nu zichtbaar zijn,
+  // zodat het juiste WhatsAppbericht direct verschijnt zonder klantkeuze.
+  const [activeId, setActiveId] = useState<string | null>(focusRow?.id ?? null);
+  useEffect(() => {
+    const visible = filtered.map((r) => r.id);
+    publishScriptberichtContext({
+      activeId: activeId && visible.includes(activeId) ? activeId : null,
+      candidateIds: visible,
+    });
+  }, [filtered, activeId]);
+  useEffect(() => () => publishScriptberichtContext({ activeId: null, candidateIds: [] }), []);
 
   // Per week groeperen (deze week / volgende week / ...), gesorteerd op opnamedag.
   const groups = useMemo(() => {
@@ -283,6 +296,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                 </tr>
                 {g.rows.map((r) => (
                   <tr key={r.id} id={`sessie-${r.id}`} ref={r.id === focusRow?.id ? focusRef : undefined}
+                    onClickCapture={() => setActiveId(r.id)}
                     className={`scroll-mt-24 border-b border-[var(--color-line)] transition-colors duration-700 hover:bg-[var(--color-surface-sunken)]/40 ${flash === r.id ? "bg-[var(--color-brand-50)]" : ""}`}
                     style={{ boxShadow: flash === r.id ? `inset 3px 0 0 ${FLAG_COLOR[r.flag]}, inset 0 0 0 2px var(--color-brand-500)` : `inset 3px 0 0 ${FLAG_COLOR[r.flag]}` }}>
                     <td className="px-3 py-2">

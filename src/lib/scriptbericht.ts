@@ -4,7 +4,8 @@
  * Shortclips Portaal). Pure functies, zodat client en server dezelfde regels
  * gebruiken en alles los te testen is.
  *
- * Opmaak is WhatsAppopmaak: *vet* blijft na kopiëren vet in WhatsApp.
+ * Het bericht is platte tekst: geen sterretjes of andere Markdown-opmaak,
+ * zodat het in WhatsApp netjes leesbaar binnenkomt.
  */
 
 export type ScriptberichtMethode = "adobe" | "portal";
@@ -37,36 +38,36 @@ export const DEFAULT_TEMPLATES: Templates = {
   adobe: [
     "Hierbij de scripts voor de aankomende opnamedag! 🎬",
     "",
-    "📄 *Scripts bekijken:*",
+    "📄 Scripts bekijken:",
     LINK_TOKEN,
     "",
     "Alle feedback uit de scriptbespreking is hierin verwerkt.",
     "",
-    "*Belangrijk om te weten:*",
+    "Belangrijk om te weten:",
     "",
-    "✅ *Opmerkingen of aanpassingen?* Plaats deze rechtstreeks als opmerking bij de betreffende pagina in het document. Graag niet via WhatsApp, zodat alle feedback overzichtelijk op één plek staat.",
+    "✅ Opmerkingen of aanpassingen? Plaats deze rechtstreeks als opmerking bij de betreffende pagina in het document. Graag niet via WhatsApp, zodat alle feedback overzichtelijk op één plek staat.",
     "",
-    "✅ *Voorbereiding opnamedag:* Op de laatste pagina's vinden jullie de benodigde voorbereidingen en materialen. Willen jullie ervoor zorgen dat alles op de opnamedag klaarstaat?",
+    "✅ Voorbereiding opnamedag: Op de laatste pagina's vinden jullie de benodigde voorbereidingen en materialen. Willen jullie ervoor zorgen dat alles op de opnamedag klaarstaat?",
     "",
-    "✅ *Feitelijke onjuistheden?* Controleer de scripts nog even op bijvoorbeeld namen, prijzen en vaktermen. Eventuele correcties kunnen jullie ook rechtstreeks in het document plaatsen.",
+    "✅ Feitelijke onjuistheden? Controleer de scripts nog even op bijvoorbeeld namen, prijzen en vaktermen. Eventuele correcties kunnen jullie ook rechtstreeks in het document plaatsen.",
     "",
     "Dan zorgen we samen voor een goed voorbereide en soepele opnamedag! 🎥",
   ].join("\n"),
   portal: [
     "De scripts voor de aankomende opnamedag staan klaar in het Shortclips Portaal! 🎬",
     "",
-    "📄 *Scripts bekijken:*",
+    "📄 Scripts bekijken:",
     LINK_TOKEN,
     "",
     "Alle feedback uit de scriptbespreking is hierin verwerkt.",
     "",
-    "*Belangrijk om te weten:*",
+    "Belangrijk om te weten:",
     "",
-    "✅ *Opmerkingen of aanpassingen?* Open het betreffende script in het portaal en plaats je opmerking direct bij dat script. Graag niet via WhatsApp, zodat alle feedback overzichtelijk op één plek staat.",
+    "✅ Opmerkingen of aanpassingen? Open het betreffende script in het portaal en plaats je opmerking direct bij dat script. Graag niet via WhatsApp, zodat alle feedback overzichtelijk op één plek staat.",
     "",
-    "✅ *Voorbereiding opnamedag:* Bij de scripts vinden jullie ook de benodigde voorbereidingen en materialen. Willen jullie ervoor zorgen dat alles op de opnamedag klaarstaat?",
+    "✅ Voorbereiding opnamedag: Bij de scripts vinden jullie ook de benodigde voorbereidingen en materialen. Willen jullie ervoor zorgen dat alles op de opnamedag klaarstaat?",
     "",
-    "✅ *Feitelijke onjuistheden?* Controleer de scripts nog even op bijvoorbeeld namen, prijzen en vaktermen. Eventuele correcties kunnen jullie direct bij het betreffende script in het portaal plaatsen.",
+    "✅ Feitelijke onjuistheden? Controleer de scripts nog even op bijvoorbeeld namen, prijzen en vaktermen. Eventuele correcties kunnen jullie direct bij het betreffende script in het portaal plaatsen.",
     "",
     "Dan zorgen we samen voor een goed voorbereide en soepele opnamedag! 🎥",
   ].join("\n"),
@@ -77,9 +78,63 @@ export function insertedValue(methode: ScriptberichtMethode, link: string): stri
   return link.trim() || PLACEHOLDER[methode];
 }
 
+/**
+ * Sterretjes en andere zichtbare Markdown-opmaak uit een bericht halen.
+ * *vet*, **vet**, _cursief_ en ~doorgehaald~ worden gewone tekst; losse
+ * sterretjes verdwijnen ook. Links blijven ongemoeid.
+ */
+export function zonderOpmaak(text: string): string {
+  return text
+    .split(/(https?:\/\/\S+)/g)
+    .map((part, i) => {
+      if (i % 2 === 1) return part; // link: niet aanraken
+      return part
+        .replace(/\*{1,2}([^*\n]+?)\*{1,2}/g, "$1")
+        .replace(/(^|[\s(])_([^_\n]+?)_(?=[\s.,!?:;)]|$)/gm, "$1$2")
+        .replace(/(^|[\s(])~([^~\n]+?)~(?=[\s.,!?:;)]|$)/gm, "$1$2")
+        .replace(/^#{1,6}\s+/gm, "")
+        .replace(/\*/g, "");
+    })
+    .join("");
+}
+
 /** Template invullen met de link (of de plaatshouder als er nog geen link is). */
 export function renderTemplate(template: string, methode: ScriptberichtMethode, link: string): string {
-  return template.split(LINK_TOKEN).join(insertedValue(methode, link));
+  return zonderOpmaak(template).split(LINK_TOKEN).join(insertedValue(methode, link));
+}
+
+/**
+ * Welk bericht past standaard bij deze opname? Eerder gekozen vorm wint;
+ * anders het portaalbericht zodra de scripts in het klantportaal staan,
+ * en anders het Adobe Acrobat bericht.
+ */
+export function standaardMethode(input: { saved: ScriptberichtMethode | null; reviewId: string | null }): ScriptberichtMethode {
+  if (input.saved) return input.saved;
+  return input.reviewId ? "portal" : "adobe";
+}
+
+/** Minimale gegevens om automatisch de juiste opname te kiezen. */
+export type SessieKandidaat = { id: string; scheduledOn: string; done: boolean; status: string };
+
+/**
+ * Kiest de opname waar het scriptbericht over gaat als de medewerker op de
+ * knop bovenaan klikt: eerst de opname die nu open staat (aangeklikt of via
+ * een taak geopend), daarna de eerstvolgende opname uit de huidige selectie
+ * (klant- en scriptschrijverfilter) waarvan de scripts nog naar de klant moeten.
+ */
+export function kiesSessie(rows: SessieKandidaat[], ctx: { activeId?: string | null; candidateIds?: string[] | null }): string | null {
+  if (ctx.activeId && rows.some((r) => r.id === ctx.activeId)) return ctx.activeId;
+  const pool = ctx.candidateIds && ctx.candidateIds.length > 0
+    ? rows.filter((r) => ctx.candidateIds!.includes(r.id))
+    : rows;
+  const rank = (r: SessieKandidaat) => {
+    if (r.done || r.status === "final") return 3;
+    if (r.status === "concepting" || r.status === "scriptmeeting") return 2; // nog niet klaar
+    if (r.status === STATUS_NA_VERSTUREN) return 1; // ligt al bij de klant (opnieuw sturen)
+    return 0; // klaar om te versturen
+  };
+  const best = [...pool].sort((a, b) => rank(a) - rank(b) || a.scheduledOn.localeCompare(b.scheduledOn))[0];
+  return best?.id ?? null;
 }
 
 /**

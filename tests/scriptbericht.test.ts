@@ -7,9 +7,12 @@ import {
   insertedValue,
   normaliseSaved,
   normaliseTemplates,
+  kiesSessie,
   renderTemplate,
+  standaardMethode,
   swapLink,
   validateTemplate,
+  zonderOpmaak,
 } from "@/lib/scriptbericht";
 
 const ADOBE = "https://acrobat.adobe.com/id/urn:aaid:sc:EU:1234";
@@ -21,15 +24,16 @@ describe("scriptbericht templates", () => {
   it("beide standaardteksten hebben precies één linkplek en WhatsApp-vet", () => {
     for (const t of Object.values(DEFAULT_TEMPLATES)) {
       expect(t.split(LINK_TOKEN).length - 1).toBe(1);
-      expect(t).toContain("📄 *Scripts bekijken:*");
-      expect(t).toContain("*Belangrijk om te weten:*");
+      expect(t).toContain("📄 Scripts bekijken:");
+      expect(t).toContain("Belangrijk om te weten:");
+      expect(t).not.toContain("*");
     }
     expect(DEFAULT_TEMPLATES.adobe.startsWith("Hierbij de scripts voor de aankomende opnamedag! 🎬")).toBe(true);
     expect(DEFAULT_TEMPLATES.portal.startsWith("De scripts voor de aankomende opnamedag staan klaar in het Shortclips Portaal! 🎬")).toBe(true);
   });
 
   it("vult de link in, of de plaatshouder zonder link", () => {
-    expect(renderTemplate(DEFAULT_TEMPLATES.adobe, "adobe", ADOBE)).toContain(`📄 *Scripts bekijken:*\n${ADOBE}\n`);
+    expect(renderTemplate(DEFAULT_TEMPLATES.adobe, "adobe", ADOBE)).toContain(`📄 Scripts bekijken:\n${ADOBE}\n`);
     expect(renderTemplate(DEFAULT_TEMPLATES.adobe, "adobe", "")).toContain(PLACEHOLDER.adobe);
     expect(renderTemplate(DEFAULT_TEMPLATES.portal, "portal", "  ")).toContain(PLACEHOLDER.portal);
   });
@@ -135,5 +139,43 @@ describe("status na kopiëren", async () => {
     }
     expect(statusNaKopieren("scripts_bij_klant")).toBeNull();
     expect(statusNaKopieren("final")).toBeNull();
+  });
+});
+
+describe("zonderOpmaak", () => {
+  it("haalt sterretjes en Markdown weg, maar laat inhoud en links staan", () => {
+    expect(zonderOpmaak("📄 *Scripts bekijken:*")).toBe("📄 Scripts bekijken:");
+    expect(zonderOpmaak("✅ **Let op** _even_ checken * los")).toBe("✅ Let op even checken  los");
+    expect(zonderOpmaak("## Titel")).toBe("Titel");
+    const url = "https://acrobat.adobe.com/id/a_b_c*1";
+    expect(zonderOpmaak(`Link: ${url}`)).toBe(`Link: ${url}`);
+  });
+  it("custom templates met sterretjes worden zonder sterretjes gerenderd", () => {
+    expect(renderTemplate(`*Hoi* ${LINK_TOKEN}`, "adobe", ADOBE)).toBe(`Hoi ${ADOBE}`);
+  });
+});
+
+describe("standaardMethode", () => {
+  it("eerder gekozen vorm wint, anders portaal als de scripts daar staan", () => {
+    expect(standaardMethode({ saved: "adobe", reviewId: "x" })).toBe("adobe");
+    expect(standaardMethode({ saved: null, reviewId: "x" })).toBe("portal");
+    expect(standaardMethode({ saved: null, reviewId: null })).toBe("adobe");
+  });
+});
+
+describe("kiesSessie", () => {
+  const rows = [
+    { id: "a", scheduledOn: "2026-11-20", done: false, status: "concepting" },
+    { id: "b", scheduledOn: "2026-11-25", done: false, status: "afwachting_klant" },
+    { id: "c", scheduledOn: "2026-11-18", done: false, status: "scripts_bij_klant" },
+    { id: "d", scheduledOn: "2026-11-15", done: true, status: "final" },
+  ];
+  it("de geopende sessie wint", () => {
+    expect(kiesSessie(rows, { activeId: "d", candidateIds: ["a"] })).toBe("d");
+  });
+  it("anders de eerstvolgende sessie die klaar is om te versturen, binnen de huidige selectie", () => {
+    expect(kiesSessie(rows, {})).toBe("b");
+    expect(kiesSessie(rows, { candidateIds: ["a", "c"] })).toBe("c");
+    expect(kiesSessie([], {})).toBeNull();
   });
 });

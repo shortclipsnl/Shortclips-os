@@ -76,7 +76,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
           <>
             {scriptbericht}
             {canUseGenerator ? (
-              <Link href="/ai/scriptgenerator" className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-good)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-card)] hover:brightness-110">
+              <Link href="/ai/scriptgenerator" className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 text-sm font-medium text-[var(--color-ink)] transition hover:border-[var(--color-line-strong)] hover:bg-[var(--color-surface)]">
                 ✍️ Ga script schrijven
               </Link>
             ) : null}

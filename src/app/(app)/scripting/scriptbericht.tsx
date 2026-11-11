@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type Dispatch, type SetStateAction } from "react";
-import { AlertTriangle, Check, CheckCircle2, Copy, FileText, LayoutDashboard, Link2, Loader2, MessageCircle, RotateCcw, Settings2, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Copy, FileText, LayoutDashboard, Link2, Loader2, MessageCircle, Pencil, RotateCcw, Settings2, X } from "lucide-react";
 import { Button, ClientLogo } from "@/components/ui";
 import {
   DEFAULT_TEMPLATES,
@@ -12,13 +12,16 @@ import {
   PLACEHOLDER,
   checkMessage,
   insertedValue,
+  kiesSessie,
   renderTemplate,
+  standaardMethode,
   statusNaKopieren,
   swapLink,
   type ForeignLink,
   type SavedScriptbericht,
   type ScriptberichtMethode,
   type Templates,
+  zonderOpmaak,
 } from "@/lib/scriptbericht";
 import { resetScriptberichtTemplates, resetScriptberichtText, saveScriptbericht, saveScriptberichtTemplates } from "@/server/actions/scriptbericht";
 
@@ -40,6 +43,23 @@ export type ScriptberichtRow = {
 };
 
 const OPEN_EVENT = "scriptbericht:open";
+
+/** Groene hoofdknop (zelfde vorm als de andere portaalknoppen). */
+const GREEN_BTN =
+  "inline-flex items-center justify-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-good)] font-semibold text-white shadow-[var(--shadow-card)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:brightness-100";
+
+/**
+ * Welke scriptsessie staat nu open op de pagina? Het scriptingoverzicht meldt
+ * hier de laatst aangeklikte opname en de opnames die met de huidige klant- en
+ * scriptschrijverfilter zichtbaar zijn. De knop bovenaan kiest daarmee zelf de
+ * juiste klant, zodat de medewerker niets hoeft te selecteren.
+ */
+type SessieContext = { activeId: string | null; candidateIds: string[] };
+let sessieContext: SessieContext = { activeId: null, candidateIds: [] };
+
+export function publishScriptberichtContext(ctx: Partial<SessieContext>) {
+  sessieContext = { ...sessieContext, ...ctx };
+}
 
 /** Opent het scriptbericht vanaf een regel in de tabel, met die opname al gekozen. */
 export function openScriptbericht(productionDayId: string) {
@@ -127,17 +147,21 @@ export function ScriptberichtButton({
 
   return (
     <>
-      <Button
+      <button
         type="button"
-        variant="secondary"
+        className={`${GREEN_BTN} h-9 px-4 text-sm`}
         onClick={() => {
-          setDayId(defaultDayId && rows.some((r) => r.id === defaultDayId) ? defaultDayId : "");
+          const id = kiesSessie(rows, {
+            activeId: sessieContext.activeId ?? defaultDayId ?? null,
+            candidateIds: sessieContext.candidateIds,
+          });
+          setDayId(id ?? "");
           setOpen(true);
         }}
-        title="Kopieer het vaste WhatsAppbericht voor de klant zodra de scripts klaarstaan"
+        title="Opent direct het WhatsAppbericht voor de klant en scriptsessie die nu open staan"
       >
         <MessageCircle className="size-4" /> Scriptbericht kopiëren
-      </Button>
+      </button>
       {open ? (
         <ScriptberichtDialog
           rows={rows}
@@ -180,7 +204,7 @@ function initEditor(row: ScriptberichtRow, methode: ScriptberichtMethode, templa
     link,
     linkDraft: link,
     linkSource: auto ? "portaal" : savedLink ? "opgeslagen" : null,
-    text: useSaved ? savedText! : renderTemplate(templates[methode], methode, link),
+    text: useSaved ? zonderOpmaak(savedText!) : renderTemplate(templates[methode], methode, link),
     inserted: insertedValue(methode, link),
     fromSaved: useSaved,
   };
@@ -210,12 +234,17 @@ function ScriptberichtDialog({
   onClose: () => void;
 }) {
   const [dayId, setDayId] = useState(initialDayId);
-  // Bij openen met een opname: laatst gebruikte vorm direct klaarzetten.
+  // Bij openen staat het bericht direct klaar: laatst gebruikte vorm, of het
+  // portaalbericht als de scripts al in het klantportaal staan, anders Adobe.
   const [editor, setEditor] = useState<EditorState | null>(() => {
     const r = rows.find((x) => x.id === initialDayId);
-    const s = r ? savedById[r.id] ?? r.saved : null;
-    return r && s?.methode ? initEditor(r, s.methode, templates, s) : null;
+    if (!r) return null;
+    const s = savedById[r.id] ?? r.saved;
+    return initEditor(r, standaardMethode({ saved: s.methode, reviewId: r.reviewId }), templates, s);
   });
+  const [kiesAndere, setKiesAndere] = useState(!rows.some((x) => x.id === initialDayId));
+  const [linkBewerken, setLinkBewerken] = useState(false);
+  const copyRef = useRef<HTMLButtonElement | null>(null);
   const [copied, setCopied] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
@@ -224,6 +253,11 @@ function ScriptberichtDialog({
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const row = rows.find((r) => r.id === dayId) ?? null;
+
+  // Focus bij openen direct op de kopieerknop: Enter kopieert meteen.
+  useEffect(() => {
+    copyRef.current?.focus();
+  }, []);
 
   // Sorteren: aankomende opnames eerst (op datum), afgeronde onderaan.
   const options = useMemo(() => [...rows].sort((a, b) => a.scheduledOn.localeCompare(b.scheduledOn)), [rows]);
@@ -250,9 +284,12 @@ function ScriptberichtDialog({
     setCopied(false);
     setStatusNote(null);
     setSaveErr(null);
+    setLinkBewerken(false);
     const r = rows.find((x) => x.id === id);
-    const last = r ? savedById[r.id]?.methode : null;
-    setEditor(r && last ? initEditor(r, last, templates, savedById[r.id]!) : null);
+    if (!r) { setEditor(null); return; }
+    const s = savedById[r.id] ?? r.saved;
+    setEditor(initEditor(r, standaardMethode({ saved: s.methode, reviewId: r.reviewId }), templates, s));
+    setKiesAndere(false);
   }
 
   useEffect(() => {
@@ -270,6 +307,7 @@ function ScriptberichtDialog({
     if (!row) return;
     setCopied(false);
     setSaveErr(null);
+    setLinkBewerken(false);
     setEditor(initEditor(row, m, templates, savedById[row.id] ?? row.saved));
   }
 
@@ -351,14 +389,14 @@ function ScriptberichtDialog({
 
   async function onCopy() {
     if (!editor || !row || !check?.ok || linkPending) return;
-    const ok = await copyText(editor.text);
+    const ok = await copyText(zonderOpmaak(editor.text));
     if (!ok) {
       setSaveErr("Kopiëren lukte niet. Selecteer de tekst en kopieer handmatig.");
       return;
     }
     setCopied(true);
     if (copiedTimer.current) clearTimeout(copiedTimer.current);
-    copiedTimer.current = setTimeout(() => setCopied(false), 2500);
+    copiedTimer.current = setTimeout(() => setCopied(false), 3000);
     void persist({ link: editor.link, text: editor.text, copied: true }, editor.methode, row);
   }
 
@@ -377,7 +415,7 @@ function ScriptberichtDialog({
             <p className="text-xs text-[var(--color-ink-muted)]">
               {view === "beheer"
                 ? "Deze teksten gelden voor het hele team. Persoonlijke aanpassingen per klant veranderen deze niet."
-                : "Vast WhatsAppbericht voor de klant zodra de scripts klaarstaan."}
+                : "Controleer het bericht, pas het eventueel aan en kopieer het voor WhatsApp."}
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]" aria-label="Sluiten">
@@ -401,16 +439,45 @@ function ScriptberichtDialog({
         ) : (
           <>
             <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
-              {/* 1. Opname / klant */}
-              <div>
-                <label htmlFor="sb-opname" className="mb-1 block text-xs font-semibold text-[var(--color-ink-muted)]">Voor welke klant en opname?</label>
-                <div className="flex items-center gap-2">
-                  {row ? <ClientLogo name={row.clientName} logoUrl={row.clientLogo} color={row.clientColor} size={28} /> : null}
+              {/* 1. Klant en opname: automatisch bepaald, alleen wijzigen als het nodig is */}
+              {row && !kiesAndere ? (
+                <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-2)] px-3 py-2.5">
+                  <ClientLogo name={row.clientName} logoUrl={row.clientLogo} color={row.clientColor} size={32} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold">{row.clientName}</span>
+                    <span className="block text-2xs text-[var(--color-ink-muted)]">Opname {fmtDay(row.scheduledOn)}{row.done ? " · scripts afgerond" : ""}</span>
+                  </span>
+                  {/* Berichttype: automatisch gekozen, met één klik te wisselen */}
+                  <span className="inline-flex rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] p-0.5" role="group" aria-label="Soort bericht">
+                    {(["adobe", "portal"] as const).map((m) => {
+                      const active = editor?.methode === m;
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => chooseMethode(m)}
+                          aria-pressed={active}
+                          title={m === "adobe" ? "Scripts als PDF in Adobe Acrobat" : row.reviewId ? "Scripts staan in het klantportaal" : "Scripts staan nog niet in het klantportaal"}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-2xs font-semibold transition ${active ? "bg-[var(--color-indigo-ink)] text-white" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+                        >
+                          {m === "adobe" ? <FileText className="size-3" /> : <LayoutDashboard className="size-3" />}
+                          {m === "adobe" ? "Adobe Acrobat" : "Shortclips Portaal"}
+                        </button>
+                      );
+                    })}
+                  </span>
+                  <button type="button" onClick={() => setKiesAndere(true)} className="text-2xs font-medium text-[var(--color-ink-muted)] underline-offset-2 hover:text-[var(--color-ink)] hover:underline">
+                    Andere opname
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="sb-opname" className="mb-1 block text-xs font-semibold text-[var(--color-ink-muted)]">Voor welke klant en opname?</label>
                   <select
                     id="sb-opname"
                     value={dayId}
                     onChange={(e) => selectDay(e.target.value)}
-                    className="h-10 min-w-0 flex-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 text-sm"
+                    className="h-10 w-full rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 text-sm"
                   >
                     <option value="">Kies een opname…</option>
                     {options.map((r) => (
@@ -419,85 +486,64 @@ function ScriptberichtDialog({
                       </option>
                     ))}
                   </select>
+                  {row ? (
+                    <button type="button" onClick={() => setKiesAndere(false)} className="mt-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:underline">
+                      Terug naar {row.clientName}
+                    </button>
+                  ) : null}
                 </div>
-              </div>
-
-              {/* 2. Keuze Adobe / Portaal */}
-              {row ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {(["adobe", "portal"] as const).map((m) => {
-                    const active = editor?.methode === m;
-                    const last = (savedById[row.id] ?? row.saved).methode === m;
-                    return (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => chooseMethode(m)}
-                        aria-pressed={active}
-                        className={`flex items-start gap-2.5 rounded-[var(--radius-md)] border p-3 text-left transition ${active ? "border-[var(--color-brand-500)] bg-[var(--color-brand-50)] ring-1 ring-[var(--color-brand-500)]" : "border-[var(--color-line)] hover:border-[var(--color-line-strong)] hover:bg-[var(--color-surface-sunken)]"}`}
-                      >
-                        <span className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-full ${active ? "bg-[var(--color-brand-500)] text-white" : "bg-[var(--color-surface-sunken)] text-[var(--color-ink-muted)]"}`}>
-                          {m === "adobe" ? <FileText className="size-3.5" /> : <LayoutDashboard className="size-3.5" />}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-sm font-semibold">{METHODE_LABEL[m]}</span>
-                          <span className="block text-2xs text-[var(--color-ink-muted)]">
-                            {m === "adobe"
-                              ? "Scripts als PDF met opmerkingen in Adobe Acrobat."
-                              : row.reviewId ? "Scripts staan al in het klantportaal, link wordt automatisch ingevuld." : "Scripts staan nog niet in het klantportaal."}
-                          </span>
-                          {last ? <span className="mt-1 inline-block rounded-full bg-[var(--color-surface-sunken)] px-1.5 py-0.5 text-2xs font-medium text-[var(--color-ink-muted)]">Laatst gebruikt</span> : null}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-line-strong)] px-3 py-4 text-center text-xs text-[var(--color-ink-muted)]">
-                  Kies eerst de klant en opname, dan verschijnt hier het bericht.
-                </p>
               )}
 
-              {/* 3. Link + bericht */}
+              {/* 2. Link: alleen een invulveld als die er nog niet automatisch staat */}
               {row && editor ? (
                 <>
-                  <div>
-                    <label htmlFor="sb-link" className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-[var(--color-ink-muted)]">
-                      <Link2 className="size-3.5" /> {LINK_LABEL[editor.methode]}
-                    </label>
-                    <input
-                      id="sb-link"
-                      type="url"
-                      inputMode="url"
-                      value={editor.linkDraft}
-                      placeholder={editor.methode === "adobe" ? "https://acrobat.adobe.com/id/…" : "https://…/portal/scripts/…"}
-                      onChange={(e) => setEditor({ ...editor, linkDraft: e.target.value })}
-                      onBlur={(e) => applyLink(e.target.value)}
-                      onPaste={(e) => {
-                        const pasted = e.clipboardData.getData("text").trim();
-                        if (pasted) {
-                          e.preventDefault();
-                          applyLink(pasted);
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          applyLink((e.target as HTMLInputElement).value);
-                        }
-                      }}
-                      className="h-10 w-full rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 text-sm"
-                    />
-                    <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">
-                      {editor.linkSource === "portaal"
-                        ? "Automatisch ingevuld: de scripts van deze opname in het klantportaal."
-                        : editor.linkSource === "opgeslagen"
-                          ? "Eerder bij deze opname opgeslagen."
-                          : editor.methode === "portal" && !row.reviewId
-                            ? "Deze scripts staan nog niet in het klantportaal. Stuur ze eerst via 'Genereer & stuur ter controle' of plak de link."
-                            : "Plak de link; die komt automatisch op de juiste plek in het bericht."}
+                  {editor.link && !linkBewerken && !linkPending ? (
+                    <p className="flex min-w-0 items-center gap-1.5 text-2xs text-[var(--color-ink-muted)]">
+                      <Link2 className="size-3.5 shrink-0" />
+                      <span className="shrink-0">{editor.linkSource === "portaal" ? "Portaallink automatisch ingevuld:" : "Link:"}</span>
+                      <span className="min-w-0 truncate font-medium text-[var(--color-ink)]">{editor.link}</span>
+                      <button type="button" onClick={() => setLinkBewerken(true)} className="inline-flex shrink-0 items-center gap-1 rounded px-1 py-0.5 hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]">
+                        <Pencil className="size-3" /> Wijzigen
+                      </button>
                     </p>
-                  </div>
+                  ) : (
+                    <div>
+                      <label htmlFor="sb-link" className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-[var(--color-ink-muted)]">
+                        <Link2 className="size-3.5" /> {LINK_LABEL[editor.methode]}
+                      </label>
+                      <input
+                        id="sb-link"
+                        type="url"
+                        inputMode="url"
+                        autoFocus={linkBewerken}
+                        value={editor.linkDraft}
+                        placeholder={editor.methode === "adobe" ? "Plak hier de Adobe Acrobat link (https://acrobat.adobe.com/id/…)" : "https://…/portal/scripts/…"}
+                        onChange={(e) => setEditor({ ...editor, linkDraft: e.target.value })}
+                        onBlur={(e) => { applyLink(e.target.value); if (e.target.value.trim()) setLinkBewerken(false); }}
+                        onPaste={(e) => {
+                          const pasted = e.clipboardData.getData("text").trim();
+                          if (pasted) {
+                            e.preventDefault();
+                            applyLink(pasted);
+                            setLinkBewerken(false);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            applyLink((e.target as HTMLInputElement).value);
+                            setLinkBewerken(false);
+                          }
+                        }}
+                        className="h-10 w-full rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2.5 text-sm"
+                      />
+                      <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">
+                        {editor.methode === "portal" && !row.reviewId
+                          ? "Deze scripts staan nog niet in het klantportaal. Stuur ze eerst via 'Genereer & stuur ter controle', plak de link of kies Adobe Acrobat."
+                          : "Plak de link; die komt automatisch op de juiste plek in het bericht."}
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
@@ -510,10 +556,10 @@ function ScriptberichtDialog({
                       id="sb-tekst"
                       value={editor.text}
                       onChange={(e) => { setEditor({ ...editor, text: e.target.value }); setCopied(false); }}
-                      rows={14}
-                      className="block w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm leading-relaxed"
+                      rows={15}
+                      className="block w-full resize-y rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-2 text-sm leading-relaxed focus:border-[var(--color-good)] focus:outline-none focus:ring-2 focus:ring-[var(--color-good)]/25"
                     />
-                    <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">*tekst* tussen sterretjes wordt vet in WhatsApp. Aanpassen geldt alleen voor deze opname.</p>
+                    <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">Je kunt de tekst hier direct aanpassen. Dat geldt alleen voor deze opname.</p>
                   </div>
                 </>
               ) : null}
@@ -527,7 +573,7 @@ function ScriptberichtDialog({
                 ) : !check.ok ? (
                   <p className="flex items-start gap-1.5 text-xs font-medium text-[var(--color-bad)]"><AlertTriangle className="mt-px size-3.5 shrink-0" /> {check.reason}</p>
                 ) : copied ? (
-                  <p role="status" className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-good)]"><Check className="size-3.5" /> Bericht gekopieerd!</p>
+                  <p role="status" className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-good)]"><Check className="size-3.5" /> Bericht gekopieerd. Plak het nu in WhatsApp.</p>
                 ) : check.hint ? (
                   <p className="flex items-start gap-1.5 text-xs text-[#8a5300]"><AlertTriangle className="mt-px size-3.5 shrink-0" /> {check.hint}</p>
                 ) : (
@@ -556,9 +602,9 @@ function ScriptberichtDialog({
                   ) : null}
                 </div>
                 <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
-                  <Button type="button" variant="primary" className="flex-1 sm:flex-none" onClick={onCopy} disabled={!row || !editor || !check?.ok || linkPending}>
-                    <Copy className="size-4" /> Kopieer WhatsAppbericht
-                  </Button>
+                  <button ref={copyRef} type="button" className={`${GREEN_BTN} h-11 flex-1 px-6 text-sm sm:flex-none`} onClick={onCopy} disabled={!row || !editor || !check?.ok || linkPending}>
+                    {copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? "Bericht gekopieerd" : "Kopiëren voor WhatsApp"}
+                  </button>
                 </div>
               </div>
             </div>
@@ -600,7 +646,7 @@ function TemplateBeheer({ templates, custom, onBack, onSaved }: { templates: Tem
     <>
       <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
         <p className="rounded-[var(--radius-md)] bg-[var(--color-surface-sunken)] px-3 py-2 text-xs text-[var(--color-ink-muted)]">
-          Zet <code className="font-semibold text-[var(--color-ink)]">{LINK_TOKEN}</code> op de plek waar de link moet komen. Zolang er geen link is, ziet de medewerker daar {PLACEHOLDER.adobe} of {PLACEHOLDER.portal}. *Tekst* tussen sterretjes wordt vet in WhatsApp.
+          Zet <code className="font-semibold text-[var(--color-ink)]">{LINK_TOKEN}</code> op de plek waar de link moet komen. Zolang er geen link is, ziet de medewerker daar {PLACEHOLDER.adobe} of {PLACEHOLDER.portal}. Sterretjes en andere opmaaktekens worden automatisch weggehaald, zodat het bericht als gewone tekst in WhatsApp komt.
           {custom ? null : " Nu actief: de Shortclips-standaard."}
         </p>
         {(["adobe", "portal"] as const).map((m) => (
