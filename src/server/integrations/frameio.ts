@@ -275,6 +275,35 @@ export class FrameService {
     return links?.efficient?.download_url ?? links?.efficient?.url ?? links?.high_quality?.download_url ?? null;
   }
 
+  /**
+   * Ondertekende DOWNLOAD-URL van een bestand: bij voorkeur het origineel of de
+   * hoge kwaliteit, met de efficient-proxy als terugval. Frame levert een
+   * download_url met Content-Disposition (attachment), zodat de browser het
+   * bestand daadwerkelijk downloadt. Kortlevend; vers ophalen wanneer nodig.
+   */
+  async getFileDownload(fileId: string): Promise<string | null> {
+    const res = await this.request<{ data?: FrameFile } | FrameFile>(
+      `/accounts/${this.requireAccount()}/files/${fileId}?include=media_links.original,media_links.high_quality,media_links.efficient`,
+    );
+    const file = (res as { data?: FrameFile }).data ?? (res as FrameFile);
+    const links = file.media_links as
+      | {
+          original?: { download_url?: string; url?: string };
+          high_quality?: { download_url?: string; url?: string };
+          efficient?: { download_url?: string; url?: string };
+        }
+      | undefined;
+    return (
+      links?.original?.download_url ??
+      links?.high_quality?.download_url ??
+      links?.efficient?.download_url ??
+      links?.original?.url ??
+      links?.high_quality?.url ??
+      links?.efficient?.url ??
+      null
+    );
+  }
+
   /** Thumbnail in hoge kwaliteit (valt terug op de gewone). */
   async getFileThumbnailHq(fileId: string): Promise<string | null> {
     const res = await this.request<{ data?: FrameFile } | FrameFile>(

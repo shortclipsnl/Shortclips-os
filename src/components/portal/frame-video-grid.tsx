@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Film, Play, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, ExternalLink, Film, MessageSquareText, Play, X } from "lucide-react";
 
 export type GridVideo = {
   id: string;
@@ -49,7 +49,7 @@ function Thumb({ id, title }: { id: string; title: string }) {
  * speelt direct af in het portaal (ondertekende Frame-link via de server; geen
  * publieke deellink). Pijltjes/toetsenbord om door de sessie te bladeren.
  */
-export function FrameVideoGrid({ videos }: { videos: GridVideo[] }) {
+export function FrameVideoGrid({ videos, reviewUrl }: { videos: GridVideo[]; reviewUrl?: string | null }) {
   const [open, setOpen] = useState<number | null>(null);
   const [playError, setPlayError] = useState(false);
   const close = useCallback(() => { setOpen(null); setPlayError(false); }, []);
@@ -84,11 +84,27 @@ export function FrameVideoGrid({ videos }: { videos: GridVideo[] }) {
             {g.name ? <h3 className="mb-3 text-[13px] font-semibold text-[var(--color-ink-muted)]">{g.name}</h3> : null}
             <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {g.items.map(({ v, i }) => (
-                <button key={v.id} type="button" onClick={() => setOpen(i)} className="group text-left focus-visible:outline-none">
-                  <Thumb id={v.id} title={v.title} />
-                  <p className="mt-2 line-clamp-2 text-[13.5px] font-semibold leading-snug text-[var(--color-ink)] group-hover:text-[var(--sc-accent)]">{v.title}</p>
-                  {fmtDuration(v.durationSeconds) ? <p className="mt-0.5 text-[12px] tabular-nums text-[var(--color-ink-faint)]">{fmtDuration(v.durationSeconds)}</p> : null}
-                </button>
+                <div key={v.id} className="group flex flex-col">
+                  <button type="button" onClick={() => setOpen(i)} className="text-left focus-visible:outline-none" aria-label={`${v.title} afspelen`}>
+                    <Thumb id={v.id} title={v.title} />
+                    <p className="mt-2 line-clamp-2 text-[13.5px] font-semibold leading-snug text-[var(--color-ink)] group-hover:text-[var(--sc-accent)]">{v.title}</p>
+                    {fmtDuration(v.durationSeconds) ? <p className="mt-0.5 text-[12px] tabular-nums text-[var(--color-ink-faint)]">{fmtDuration(v.durationSeconds)}</p> : null}
+                  </button>
+                  {/* Duidelijke acties per video: afspelen (thumbnail) + downloaden. */}
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <button type="button" onClick={() => setOpen(i)} className="inline-flex items-center gap-1 rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--color-ink)] hover:bg-[var(--sc-fill-strong)]">
+                      <Play className="size-3" fill="currentColor" /> Bekijken
+                    </button>
+                    <a
+                      href={`/api/portal/frame/${v.id}/download`}
+                      download
+                      className="inline-flex items-center gap-1 rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--color-ink)] hover:bg-[var(--sc-fill-strong)]"
+                      title="Download deze video"
+                    >
+                      <Download className="size-3" /> Download
+                    </a>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -118,6 +134,26 @@ export function FrameVideoGrid({ videos }: { videos: GridVideo[] }) {
                 Deze video kan nu niet worden afgespeeld. Probeer het over een paar minuten opnieuw of neem contact op met je contactpersoon.
               </p>
             ) : null}
+            {/* Acties op de video: downloaden + (indien beschikbaar) feedback geven in Frame. */}
+            <div className="flex w-full flex-wrap items-center justify-center gap-2">
+              <a
+                href={`/api/portal/frame/${current.id}/download`}
+                download
+                className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[#00003b] hover:bg-white/90"
+              >
+                <Download className="size-4" /> Video downloaden
+              </a>
+              {reviewUrl ? (
+                <a
+                  href={reviewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-[13px] font-semibold text-white hover:bg-white/20"
+                >
+                  <MessageSquareText className="size-4" /> Feedback geven in Frame <ExternalLink className="size-3.5" />
+                </a>
+              ) : null}
+            </div>
             {videos.length > 1 ? (
               <div className="flex items-center gap-3 text-white/80">
                 <button type="button" onClick={() => step(-1)} className="grid size-10 place-items-center rounded-full bg-white/10 hover:bg-white/20" aria-label="Vorige video"><ChevronLeft className="size-5" /></button>

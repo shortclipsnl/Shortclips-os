@@ -125,7 +125,7 @@ export default async function PortalVideosPage({ searchParams }: { searchParams:
           </section>
         ) : null}
 
-        <FrameVideoGrid videos={selected.videos} />
+        <FrameVideoGrid videos={selected.videos} reviewUrl={lib.reviewUrl} />
       </div>
     );
   }
