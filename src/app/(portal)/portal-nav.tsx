@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   MoreHorizontal,
   Repeat,
+  Trophy,
   Video,
   X,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const ITEMS = [
   { href: "/portal/planning", label: "Opnameplanning", short: "Opnames", icon: CalendarRange },
   { href: "/portal/resultaten", label: "Resultaten", short: "Resultaten", icon: BarChart3 },
   { href: "/portal/analyses", label: "Maandanalyses", short: "Analyses", icon: FileBarChart },
+  { href: "/portal/mijlpalen", label: "Onze mijlpalen", short: "Mijlpalen", icon: Trophy },
   { href: "/portal/werkwijze", label: "Zo werken wij", short: "Werkwijze", icon: Repeat },
   { href: "/portal/samenwerking", label: "Samenwerking & Afspraken", short: "Afspraken", icon: Handshake },
 ];
