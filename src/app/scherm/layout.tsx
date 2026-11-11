@@ -8,8 +8,9 @@ export default function ScreenLayout({ children }: { children: React.ReactNode }
   return (
     <div
       style={{
-        minHeight: "100vh",
-        background: "linear-gradient(160deg,#00003b 0%,#0a1f3d 60%,#071630 100%)",
+        height: "100vh",
+        overflow: "hidden",
+        background: "radial-gradient(120% 90% at 30% 20%, #0b0b5c 0%, #00003b 55%, #000026 100%)",
         color: "#fff",
       }}
     >
