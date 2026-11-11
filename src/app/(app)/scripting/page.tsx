@@ -11,6 +11,9 @@ import { IntegrationNotice } from "@/components/integration-notice";
 import { ScriptingBoard } from "./scripting-ui";
 import { ClientStatusTabs } from "@/components/client-status-tabs";
 import { parseClientStatusFilter } from "@/lib/client-status";
+import { ScriptberichtButton, type ScriptberichtRow } from "./scriptbericht";
+import { getSavedScriptberichten, getScriptberichtTemplates, portalScriptLink } from "@/server/scriptbericht";
+import { EMPTY_SAVED } from "@/lib/scriptbericht";
 
 export const metadata: Metadata = { title: "Scripting" };
 export const dynamic = "force-dynamic";
@@ -41,16 +44,43 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
   // Deep-link vanuit een scriptingtaak: direct naar die scriptsessie.
   const focusId = sp.sessie;
 
+  // Scriptbericht (WhatsApp): centrale templates + per opname de opgeslagen
+  // persoonlijke versie en link; portaallink automatisch uit de scriptcontrole.
+  const [{ templates: sbTemplates, custom: sbCustom }, sbSaved] = await Promise.all([
+    getScriptberichtTemplates(),
+    getSavedScriptberichten(rows.map((r) => r.id)),
+  ]);
+  const sbRows: ScriptberichtRow[] = rows.map((r) => ({
+    id: r.id,
+    clientId: r.clientId,
+    clientName: r.clientName,
+    clientLogo: r.clientLogo,
+    clientColor: r.clientColor,
+    scheduledOn: r.scheduledOn,
+    done: r.done,
+    reviewId: r.reviewId,
+    portalLink: portalScriptLink(r.reviewId),
+    saved: sbSaved.get(r.id) ?? EMPTY_SAVED,
+  }));
+  const scriptbericht = (
+    <ScriptberichtButton rows={sbRows} templates={sbTemplates} templatesCustom={sbCustom} canWrite={canWrite} canEditTemplates={isOwner(viewer)} defaultDayId={focusId} />
+  );
+
   return (
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
         title="Scripting"
         description="Alle aankomende opnames en hun scripting in één overzicht — automatisch gekoppeld aan de opnameplanning. Scripts moeten uiterlijk 7 dagen vóór de opname klaar zijn."
-        actions={canUseGenerator ? (
-          <Link href="/ai/scriptgenerator" className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-good)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-card)] hover:brightness-110">
-            ✍️ Ga script schrijven
-          </Link>
-        ) : undefined}
+        actions={
+          <>
+            {scriptbericht}
+            {canUseGenerator ? (
+              <Link href="/ai/scriptgenerator" className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-good)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-card)] hover:brightness-110">
+                ✍️ Ga script schrijven
+              </Link>
+            ) : null}
+          </>
+        }
       />
       <div className="mb-4">
         <ClientStatusTabs basePath="/scripting" current={klantenFilter} />

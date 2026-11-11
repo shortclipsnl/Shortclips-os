@@ -10,6 +10,7 @@ import { ClientLogo, Stat, TeamAvatar } from "@/components/ui";
 import type { ScriptingRow, WriterOption, LinkedScript } from "@/server/scripting";
 import { PortalSendCell } from "./portal-send";
 import { DriveSessionPicker } from "./drive-session-picker";
+import { ScriptberichtRowButton } from "./scriptbericht";
 
 /** Toon-kleur per status-tone, voor de kleine statuspillen van gekoppelde scripts. */
 const TONE_COLOR: Record<string, string> = {
@@ -285,10 +286,13 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                     className={`scroll-mt-24 border-b border-[var(--color-line)] transition-colors duration-700 hover:bg-[var(--color-surface-sunken)]/40 ${flash === r.id ? "bg-[var(--color-brand-50)]" : ""}`}
                     style={{ boxShadow: flash === r.id ? `inset 3px 0 0 ${FLAG_COLOR[r.flag]}, inset 0 0 0 2px var(--color-brand-500)` : `inset 3px 0 0 ${FLAG_COLOR[r.flag]}` }}>
                     <td className="px-3 py-2">
-                      <Link href={`/productions/${r.id}`} className="flex items-center gap-2 font-medium hover:underline">
-                        <ClientLogo name={r.clientName} logoUrl={r.clientLogo} color={r.clientColor} size={22} />
-                        {r.clientName}
-                      </Link>
+                      <span className="flex items-center gap-1">
+                        <Link href={`/productions/${r.id}`} className="flex items-center gap-2 font-medium hover:underline">
+                          <ClientLogo name={r.clientName} logoUrl={r.clientLogo} color={r.clientColor} size={22} />
+                          {r.clientName}
+                        </Link>
+                        <ScriptberichtRowButton productionDayId={r.id} clientName={r.clientName} />
+                      </span>
                     </td>
                     <td className="px-2 py-2 tabular-nums">{fmt(r.scheduledOn)}</td>
                     <td className="px-2 py-2">
