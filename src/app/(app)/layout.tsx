@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireInternal, isOwner, isEditorRole, canManageClients, canManageQuotes, canManageOperations } from "@/server/auth/context";
 import { editorMayOpenPath } from "@/lib/editor-routes";
 import { NAVIGATION } from "@/components/layout/nav-config";
+import { heeftVerantwoordelijkhedenPagina } from "@/lib/verantwoordelijkheden/data";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SectionTabs } from "@/components/layout/section-tabs";
 import { Topbar } from "@/components/layout/topbar";
@@ -63,6 +64,10 @@ export default async function AppLayout({
       // Operationeel beheer (koppelingen, portaal-instellingen): eigenaar + de
       // operationeel beheerder (Milou), niet elke projectcoördinator.
       if (item.manageOperations && !canManageOperations(viewer)) {
+        return false;
+      }
+      // Mijn verantwoordelijkheden: alleen Milou, Jiska en Rutger (en Jarno als beheerder).
+      if (item.verantwoordelijkhedenAccess && !owner && !heeftVerantwoordelijkhedenPagina(viewer.email)) {
         return false;
       }
       // Rechten-gebaseerde items.

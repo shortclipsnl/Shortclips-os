@@ -65,6 +65,14 @@ export const MEDEWERKERS = [
   { email: "jarno@shortclips.nl", naam: "Jarno", functie: "Eigenaar - Head of Growth" },
 ] as const;
 
+/** Besluit 11 nov (2): de pagina is uitsluitend voor de medewerkers met klantverantwoordelijkheid.
+ *  Jarno ziet hem alleen als beheerder (Bekijk als + Beheer), niet als eigen pagina. */
+export const VERANTWOORDELIJKEN = MEDEWERKERS.filter((m) => m.email !== "jarno@shortclips.nl");
+export function heeftVerantwoordelijkhedenPagina(email: string | null | undefined): boolean {
+  const e = (email ?? "").toLowerCase();
+  return VERANTWOORDELIJKEN.some((m) => m.email === e);
+}
+
 /** De cursus Team Shortclips in de kennisbank: de leidende bron voor deze pagina. */
 export const KENNISBANK_TEAM = "/kennisbank/b5318393-4660-4d54-965b-50fad0068a61";
 

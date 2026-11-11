@@ -10,14 +10,17 @@ import { cn } from "@/lib/cn";
 import { requireInternal, isOwner, viewerForUser } from "@/server/auth/context";
 import { getWorkOverview } from "@/server/werkoverzicht";
 import { getVerantwoordelijkheden, telPerCategorie } from "@/server/verantwoordelijkheden";
-import { MEDEWERKERS } from "@/lib/verantwoordelijkheden/data";
+import { VERANTWOORDELIJKEN } from "@/lib/verantwoordelijkheden/data";
 import { Weergave } from "./weergave";
 
 export const metadata: Metadata = { title: "Mijn verantwoordelijkheden" };
 export const dynamic = "force-dynamic";
 
-const INTRO =
-  "Dit zijn jouw verantwoordelijkheden binnen Shortclips. Hier zie je wat je zelfstandig regelt, welke beslissingen je mag nemen en wanneer je Jarno moet inschakelen.";
+/** Voornaam uit het account waarmee is ingelogd; valt terug op de vaste naam. */
+function voornaam(fullName: string | null | undefined, terugval: string): string {
+  const v = (fullName ?? "").trim().split(/\s+/)[0];
+  return v || terugval;
+}
 
 export default async function VerantwoordelijkhedenPage({ searchParams }: { searchParams: Promise<{ persoon?: string }> }) {
   const viewer = await requireInternal();
@@ -25,38 +28,35 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
 
   const owner = isOwner(viewer);
   const param = (await searchParams).persoon?.toLowerCase();
-  const eigen = MEDEWERKERS.find((m) => m.email === viewer.email.toLowerCase());
-  // De eigenaar bekijkt de pagina van een medewerker; het team ziet alleen de eigen pagina.
-  const medewerker = owner ? (MEDEWERKERS.find((m) => m.email === param) ?? MEDEWERKERS[0]) : eigen;
+  const eigen = VERANTWOORDELIJKEN.find((m) => m.email === viewer.email.toLowerCase());
+  // Alleen Milou, Jiska en Rutger hebben deze pagina. Jarno bekijkt hun pagina als beheerder;
+  // ieder ander teamlid krijgt hem niet te zien (ook niet via de URL).
+  const medewerker = owner ? (VERANTWOORDELIJKEN.find((m) => m.email === param) ?? VERANTWOORDELIJKEN[0]) : eigen;
+  if (!medewerker) notFound();
 
   const config = await getVerantwoordelijkheden();
 
-  if (!medewerker) {
-    return (
-      <div className="mx-auto max-w-[1100px]">
-        <PageHeader title="Mijn verantwoordelijkheden" description={INTRO} />
-        <div className="sc-card p-6 text-sm text-[var(--color-ink-muted)]">Voor jou zijn nog geen verantwoordelijkheden vastgelegd.</div>
-      </div>
-    );
-  }
-
-  // De verantwoordelijkheden zijn direct zichtbaar voor het team — geen aparte
-  // goedkeurstap meer. Elke wijziging die Jarno in Beheer opslaat is meteen live.
-
-  // Live tellingen uit het bestaande werkoverzicht (dezelfde bron als Vandaag).
+  // Live tellingen uit het bestaande werkoverzicht (zelfde bron als Vandaag).
   let subject = owner ? null : viewer;
+  let naam: string = owner ? medewerker.naam : voornaam(viewer.fullName, medewerker.naam);
   if (owner) {
-    const [u] = await db.select({ id: users.id }).from(users).where(sql`lower(${users.email}) = ${medewerker.email}`).limit(1);
+    const [u] = await db
+      .select({ id: users.id, fullName: users.fullName })
+      .from(users)
+      .where(sql`lower(${users.email}) = ${medewerker.email}`)
+      .limit(1);
     subject = u ? await viewerForUser(u.id) : null;
+    naam = voornaam(u?.fullName, medewerker.naam);
   }
   const work = subject ? await getWorkOverview(subject, { trusted: owner }).catch(() => null) : null;
   const tellingen = telPerCategorie(work);
+  const functie = config.profielen?.[medewerker.email]?.functie ?? medewerker.functie;
 
   return (
     <div className="mx-auto max-w-[1100px] pb-10">
       <PageHeader
-        title="Mijn verantwoordelijkheden"
-        description={INTRO}
+        title={`Ik, ${naam}, ben verantwoordelijk voor:`}
+        description={functie}
         actions={owner ? (
           <LinkButton href="/verantwoordelijkheden/beheer" variant="secondary">
             <Settings2 className="size-4" /> Beheer
@@ -65,9 +65,9 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
       />
 
       {owner && (
-        <div className="mb-5 flex flex-wrap items-center gap-2">
+        <div className="mb-6 flex flex-wrap items-center gap-2">
           <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Bekijk als</span>
-          {MEDEWERKERS.map((m) => (
+          {VERANTWOORDELIJKEN.map((m) => (
             <Link
               key={m.email}
               href={`/verantwoordelijkheden?persoon=${encodeURIComponent(m.email)}`}
@@ -92,7 +92,7 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
         </div>
       )}
 
-      <Weergave config={config} email={medewerker.email} markeer={owner} tellingen={tellingen} />
+      <Weergave config={config} email={medewerker.email} markeer={owner} tellingen={tellingen} liveBeschikbaar={work !== null} />
     </div>
   );
 }

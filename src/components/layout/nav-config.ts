@@ -25,6 +25,8 @@ export type NavItem = {
   manageOperations?: boolean;
   /** Uitsluitend voor editors — ook de eigenaar/het team ziet dit niet. */
   editorsOnly?: boolean;
+  /** Alleen voor de eigenaar en de medewerkers met klantverantwoordelijkheid (Milou, Jiska, Rutger). */
+  verantwoordelijkhedenAccess?: boolean;
   /** Afwijkend label in het editorportaal (het interne team houdt `label`). */
   editorLabel?: string;
   /** Externe/zelfstandige pagina: open als gewone link in een nieuw tabblad
@@ -58,7 +60,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/tasks", label: "Taken", icon: "CircleCheck", permissions: ["tasks:read"], match: "/tasks" },
       { href: "/kwaliteit", label: "Aandachtspunten", icon: "ShieldCheck", match: "/kwaliteit" },
       // Persoonlijk: eigen verantwoordelijkheden, bevoegdheden en wanneer Jarno erbij moet.
-      { href: "/verantwoordelijkheden", label: "Mijn verantwoordelijkheden", icon: "ListChecks", match: "/verantwoordelijkheden" },
+      { href: "/verantwoordelijkheden", label: "Mijn verantwoordelijkheden", icon: "ListChecks", match: "/verantwoordelijkheden", verantwoordelijkhedenAccess: true },
     ],
   },
   {
