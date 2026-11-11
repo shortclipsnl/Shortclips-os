@@ -5,11 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sparkles, Loader2, Check, CircleAlert, Download, Eye, Send, RotateCcw, Lock, Globe } from "lucide-react";
 import { Badge, ClientLogo, buttonClass, type Tone } from "@/components/ui";
-import { approveMonthlyReport, publishMonthlyReport, queueMonthlyReports, setReportControleDag, startMonthlyReport } from "@/server/actions/monthly-reports";
+import { approveMonthlyReport, publishMonthlyReport, queueMonthlyReports, startMonthlyReport } from "@/server/actions/monthly-reports";
 import type { ReportOverview, ReportRow } from "@/server/reports/service";
 import { VIEW_STATUS_META, compareRows, countStatuses, viewStatus, type ViewStatus } from "@/lib/maandrapport-status";
-import { FASE_LABEL, FASE_STAPPEN, countFases, type ControleFase } from "@/lib/maandcontrole";
-import { CalendarDays } from "lucide-react";
+import { FASE_LABEL, type ControleFase } from "@/lib/maandcontrole";
 
 /** Statuslabels van de onderliggende rapportstatus (ook gebruikt op de detailpagina). */
 export const STATUS_META: Record<string, { label: string; tone: Tone }> = {
@@ -119,126 +118,8 @@ const FASE_TONE: Record<ControleFase, Tone> = {
   beschikbaar: "lime",
 };
 
-const dagLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
-const todayIso = () => new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
-
-/**
- * Maandcontrole bovenaan de pagina: wie controleert, op welke dag (met één
- * klik te wijzigen) en hoe ver het is. Daaronder de zes stappen met per stap
- * het aantal rapportages.
- */
-function MaandControle({ maand, batches, rows, viewerId, owner, onFilter, actief }: {
-  maand: string;
-  batches: ReportOverview["batches"];
-  rows: Row[];
-  viewerId: string;
-  owner: boolean;
-  onFilter: (f: ControleFase | null) => void;
-  actief: ControleFase | null;
-}) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [edit, setEdit] = useState<string | null>(null);
-  const [fout, setFout] = useState<string | null>(null);
-  const vandaag = todayIso();
-  const fases = countFases(rows.map((r) => r.report?.fase ?? null));
-  const mine = batches.filter((b) => b.period === maand && (owner || b.userId === viewerId));
-  const totaalGegenereerd = Object.values(fases).reduce((a, b) => a + b, 0);
-  if (totaalGegenereerd === 0 && mine.length === 0) return null;
-
-  function save(taskId: string, value: string | null) {
-    setFout(null);
-    start(async () => {
-      const res = await setReportControleDag(taskId, value);
-      if (!res.ok) setFout(res.message ?? "Opslaan mislukt.");
-      setEdit(null);
-      router.refresh();
-    });
-  }
-
-  return (
-    <div className="sc-card space-y-3 p-3">
-      {mine.length ? (
-        <div className="space-y-2">
-          {mine.map((b) => {
-            const eigen = rows.filter((r) => r.report?.controllerId === b.userId && r.report?.fase);
-            const klaar = eigen.filter((r) => ["klaar_voor_goedkeuring", "goedgekeurd", "beschikbaar"].includes(r.report!.fase!)).length;
-            const open = eigen.length - klaar;
-            const afgerond = b.status === "done";
-            const teLaat = !afgerond && b.dueOn !== null && b.dueOn < vandaag;
-            const magWijzigen = b.userId === viewerId || owner;
-            return (
-              <div key={b.taskId} className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <div className="flex min-w-[220px] items-center gap-2">
-                  <CalendarDays className="size-4 text-[var(--color-ink-faint)]" />
-                  <div>
-                    <div className="text-sm font-semibold text-[var(--color-ink)]">
-                      Maandcontrole {monthLabel(maand)}{owner && b.userId !== viewerId ? ` · ${b.name}` : ""}
-                    </div>
-                    <div className="text-2xs text-[var(--color-ink-muted)]">
-                      {klaar} van {eigen.length} gecontroleerd{open > 0 ? `, ${open} open` : ""}
-                    </div>
-                  </div>
-                </div>
-                <div className="h-1.5 min-w-[120px] flex-1 overflow-hidden rounded-full bg-[var(--color-line)]">
-                  <div className="h-full bg-[var(--color-good)]" style={{ width: `${eigen.length ? Math.round((klaar / eigen.length) * 100) : 0}%` }} />
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  {afgerond ? (
-                    <Badge tone="good"><Check className="mr-1 inline size-3" />Controle afgerond</Badge>
-                  ) : edit === b.taskId ? (
-                    <>
-                      <input type="date" defaultValue={b.dueOn ?? ""} min={vandaag} className="sc-input !py-1 text-xs" id={`dag-${b.taskId}`} />
-                      <button type="button" disabled={pending} className={buttonClass({ variant: "primary", size: "sm" })}
-                        onClick={() => { const v = (document.getElementById(`dag-${b.taskId}`) as HTMLInputElement | null)?.value; save(b.taskId, v || null); }}>
-                        {pending ? <Loader2 className="size-3.5 animate-spin" /> : null} Opslaan
-                      </button>
-                      <button type="button" className="text-[var(--color-ink-muted)] hover:underline" onClick={() => setEdit(null)}>Annuleren</button>
-                    </>
-                  ) : (
-                    <>
-                      <span className={teLaat ? "font-medium text-[var(--color-bad)]" : "text-[var(--color-ink)]"}>
-                        {b.dueOn ? `Controledag: ${dagLabel(b.dueOn)}${teLaat ? " (verstreken)" : ""}` : "Nog geen controledag ingepland"}
-                      </span>
-                      {magWijzigen ? (
-                        <button type="button" className="text-[var(--color-indigo-ink)] hover:underline" onClick={() => setEdit(b.taskId)}>
-                          {b.dueOn ? "Wijzigen" : "Inplannen"}
-                        </button>
-                      ) : null}
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          {fout ? <p className="text-xs text-[var(--color-bad)]">{fout}</p> : null}
-        </div>
-      ) : null}
-
-      {/* De zes stappen: klik = filter op die stap. */}
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
-        {FASE_STAPPEN.map((st) => {
-          const n = fases[st.key];
-          const on = actief === st.key;
-          return (
-            <button key={st.key} type="button" onClick={() => onFilter(on ? null : st.key)}
-              className={`flex items-start gap-2 rounded-[var(--radius-sm)] border px-2.5 py-2 text-left transition-colors ${on ? "border-[var(--color-indigo-ink)] ring-1 ring-[var(--color-indigo-ink)]" : "border-[var(--color-line)] hover:brightness-[0.98]"}`}>
-              <span className={`mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-semibold ${n > 0 ? "bg-[var(--color-indigo-ink)] text-white" : "bg-[var(--color-line)] text-[var(--color-ink-faint)]"}`}>{st.nr}</span>
-              <span className="min-w-0">
-                <span className="block text-2xs leading-tight text-[var(--color-ink-muted)]">{st.label}</span>
-                <span className={`text-base font-semibold tabular-nums ${n > 0 ? "text-[var(--color-ink)]" : "text-[var(--color-ink-faint)]"}`}>{n}</span>
-                {st.key === "beschikbaar" && fases.goedgekeurd > 0 ? <span className="ml-1 text-2xs text-[var(--color-warn)]">+{fases.goedgekeurd} nog publiceren</span> : null}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export function ReportList({
-  overview, viewerId, canWrite, owner, aiReady, vorigeMaand, huidigeMaand, initial,
+  overview, viewerId, canWrite, aiReady, vorigeMaand, huidigeMaand, initial,
 }: {
   overview: ReportOverview;
   viewerId: string;
@@ -253,10 +134,10 @@ export function ReportList({
 }) {
   const router = useRouter();
   const { reports, clients, periods, team, teamOnly } = overview;
-  const monthOptions = useMemo(() => [...new Set([vorigeMaand, ...periods])].sort().reverse(), [periods, vorigeMaand]);
+  const monthOptions = useMemo(() => [...new Set([huidigeMaand, vorigeMaand, ...periods])].sort().reverse(), [periods, vorigeMaand, huidigeMaand]);
   const years = useMemo(() => [...new Set(monthOptions.map((p) => p.slice(0, 4)))], [monthOptions]);
 
-  const [maand, setMaand] = useState(initial.maand && (/^\d{4}-\d{2}$/.test(initial.maand) || initial.maand === "alle") ? initial.maand : vorigeMaand);
+  const [maand, setMaand] = useState(initial.maand && (/^\d{4}-\d{2}$/.test(initial.maand) || initial.maand === "alle") ? initial.maand : huidigeMaand);
   const [jaar, setJaar] = useState("alle");
   const [klantStatus, setKlantStatus] = useState(initial.klantstatus === "alle" || initial.klantstatus === "inactief" ? initial.klantstatus : "actief");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
@@ -265,7 +146,6 @@ export function ReportList({
     return LEGACY_FILTER[s] ?? "alle";
   });
   const [weergave, setWeergave] = useState(initial.weergave === "te-lezen" || initial.weergave === "mijn-klanten" || initial.weergave === "mijn-controle" ? initial.weergave : "alles");
-  const [faseFilter, setFaseFilter] = useState<ControleFase | null>(null);
   /** Per klant een andere maand bekijken dan het filter (eerdere maanden in de rij zelf). */
   const [rowMonth, setRowMonth] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<Record<string, boolean>>({});
@@ -327,7 +207,6 @@ export function ReportList({
   });
   const counts = countStatuses(baseRows.map((r) => r.view));
   const shown = baseRows
-    .filter((r) => !faseFilter || r.report?.fase === faseFilter || (faseFilter === "beschikbaar" && r.report?.fase === "goedgekeurd"))
     .filter((r) => statusFilter === "alle" || (statusFilter === "actie" ? ["gegenereerd", "controleren", "goedgekeurd"].includes(r.view) : r.view === statusFilter))
     .sort(compareRows);
 
@@ -396,11 +275,6 @@ export function ReportList({
 
   return (
     <div className="space-y-4">
-      {/* Maandcontrole: controledag, voortgang en de zes stappen. */}
-      {maand !== "alle" && !teamOnly ? (
-        <MaandControle maand={maand} batches={overview.batches} rows={baseRows} viewerId={viewerId} owner={owner} actief={faseFilter} onFilter={setFaseFilter} />
-      ) : null}
-
       {/* Statistieken: compacte klikbare chips (filter). */}
       <div className="flex flex-wrap items-center gap-1.5">
         <StatTile label="Totaal klanten" value={counts.totaal} tone="neutral" active={statusFilter === "alle"} onClick={() => setStatusFilter("alle")} />
@@ -416,7 +290,7 @@ export function ReportList({
         <label>
           {label("Maand")}
           <select className="sc-input text-sm" value={maand} onChange={(e) => { setMaand(e.target.value); setRowMonth({}); }}>
-            {monthOptions.map((p) => <option key={p} value={p}>{monthLabel(p)}{p === vorigeMaand ? " (actueel)" : ""}</option>)}
+            {monthOptions.map((p) => <option key={p} value={p}>{monthLabel(p)}{p === huidigeMaand ? " (deze maand)" : p === vorigeMaand ? " (vorige maand)" : ""}</option>)}
             <option value="alle">Alle maanden</option>
           </select>
         </label>
@@ -476,8 +350,8 @@ export function ReportList({
                 <th className="sc-th sticky left-0 z-10 min-w-[200px] bg-[var(--color-surface)]">Klant</th>
                 <th className="sc-th">Maand</th>
                 <th className="sc-th">Status</th>
-                <th className="sc-th"><span className="inline-flex items-start gap-1"><Lock className="mt-px size-3 shrink-0" /> Interne<br />versie</span></th>
-                <th className="sc-th"><span className="inline-flex items-start gap-1"><Globe className="mt-px size-3 shrink-0" /> Klant-<br />versie</span></th>
+                <th className="sc-th"><span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-warn-soft)] px-2 py-0.5 text-[var(--color-warn)]"><Lock className="size-3 shrink-0" /> Intern</span><span className="mt-0.5 block text-[9px] normal-case text-[var(--color-ink-faint)]">niet voor klant</span></th>
+                <th className="sc-th"><span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-info-soft)] px-2 py-0.5 text-[var(--color-info)]"><Globe className="size-3 shrink-0" /> Klant</span><span className="mt-0.5 block text-[9px] normal-case text-[var(--color-ink-faint)]">na goedkeuring</span></th>
                 <th className="sc-th">Actie</th>
                 <th className="sc-th">Stuur naar<br />klantportaal</th>
               </tr>
@@ -655,6 +529,65 @@ export function ReportList({
             })}
           </ul>
         </div>
+      ) : null}
+
+      {/* Archief: eerdere maanden, altijd terug te vinden en opnieuw te bekijken. */}
+      <MaandArchief
+        months={[...new Set(periods)].sort().reverse().filter((p) => p < huidigeMaand)}
+        onOpen={(p) => { setMaand(p); setRowMonth({}); }}
+      />
+    </div>
+  );
+}
+
+/**
+ * Archief van eerdere maanden onderaan de pagina. Een maand aanvinken archiveert
+ * 'm (per medewerker, in de browser bewaard); gearchiveerde maanden blijven altijd
+ * terug te vinden en opnieuw te bekijken onder "Gearchiveerd".
+ */
+function MaandArchief({ months, onOpen }: { months: string[]; onOpen: (p: string) => void }) {
+  const [archived, setArchived] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("maandrapport-archief");
+      if (raw) setArchived(new Set(JSON.parse(raw) as string[]));
+    } catch { /* geen opgeslagen archief */ }
+  }, []);
+  const toggle = (p: string) =>
+    setArchived((s) => {
+      const n = new Set(s);
+      if (n.has(p)) n.delete(p); else n.add(p);
+      try { localStorage.setItem("maandrapport-archief", JSON.stringify([...n])); } catch { /* opslaan mislukt */ }
+      return n;
+    });
+
+  if (months.length === 0) return null;
+  const actief = months.filter((p) => !archived.has(p));
+  const gearchiveerd = months.filter((p) => archived.has(p));
+
+  const Regel = ({ p }: { p: string }) => (
+    <li className="flex items-center justify-between gap-3 py-2">
+      <button type="button" onClick={() => onOpen(p)} className="text-sm font-medium capitalize text-[var(--color-ink)] hover:text-[var(--color-brand-700)] hover:underline">{monthLabel(p)}</button>
+      <label className="inline-flex items-center gap-1.5 text-2xs text-[var(--color-ink-muted)]">
+        <input type="checkbox" checked={archived.has(p)} onChange={() => toggle(p)} /> Archiveren
+      </label>
+    </li>
+  );
+
+  return (
+    <div className="sc-card p-4">
+      <h2 className="text-sm font-semibold text-[var(--color-ink)]">Archief — eerdere maanden</h2>
+      <p className="mb-2 mt-0.5 text-2xs text-[var(--color-ink-muted)]">Vink een maand aan om te archiveren. Gearchiveerde maanden blijven altijd terug te vinden en opnieuw te bekijken.</p>
+      {actief.length > 0 ? (
+        <ul className="divide-y divide-[var(--color-line)]">{actief.map((p) => <Regel key={p} p={p} />)}</ul>
+      ) : (
+        <p className="text-xs text-[var(--color-ink-faint)]">Alle eerdere maanden zijn gearchiveerd.</p>
+      )}
+      {gearchiveerd.length > 0 ? (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs font-semibold text-[var(--color-ink-muted)]">Gearchiveerd ({gearchiveerd.length})</summary>
+          <ul className="mt-1 divide-y divide-[var(--color-line)]">{gearchiveerd.map((p) => <Regel key={p} p={p} />)}</ul>
+        </details>
       ) : null}
     </div>
   );
