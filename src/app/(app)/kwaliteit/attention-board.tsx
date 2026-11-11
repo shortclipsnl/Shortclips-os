@@ -269,8 +269,12 @@ export function AttentionBoard({ items: initial, team, viewerId, defaultScope }:
     const doneRow = i.status === "klaar";
     const Icon = AREA_ICON[i.area];
     const owner = member(i.ownerId);
+    // Urgent (vandaag): een smalle rode rand links en een vleugje rood in de
+    // achtergrond. Normale punten blijven neutraal, zodat urgentie opvalt.
+    const urgent = !doneRow && i.priority === "hoog";
     return (
       <div key={i.key} onClick={() => setOpenKey(i.key)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") setOpenKey(i.key); }}
+        style={urgent ? { boxShadow: "inset 3px 0 0 var(--color-bad)", background: "color-mix(in srgb, var(--color-bad) 5%, var(--color-surface))" } : undefined}
         className="group flex min-h-[62px] cursor-pointer items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5 transition hover:border-[var(--color-line-strong)] sm:gap-3.5 sm:pl-3.5">
         <button type="button" title={doneRow ? "Heropenen" : "Afronden"} onClick={(e) => { e.stopPropagation(); setStatus(i, doneRow ? "open" : "klaar"); }}
           className={`grid size-[22px] shrink-0 place-items-center rounded-full border-2 transition ${poppedKey === i.key ? "sc-check-pop" : ""} ${doneRow ? "border-[var(--color-good)] bg-[var(--color-good)]" : "border-[var(--color-line-strong)] hover:border-[var(--color-good)] hover:bg-[var(--color-good-soft)]"}`}>
@@ -285,13 +289,20 @@ export function AttentionBoard({ items: initial, team, viewerId, defaultScope }:
             {i.clientName ? <span className="block font-normal text-[var(--color-ink-muted)] sm:inline">{i.clientName}<span className="hidden sm:inline"> · </span></span> : null}
             {i.action}{i.kids.length ? <span className="ml-1.5 rounded bg-[var(--color-neutral-soft)] px-1.5 py-px text-2xs font-semibold text-[var(--color-ink-muted)]">{i.kids.length}</span> : null}
           </span>
-          <span className="mt-0.5 block text-xs text-[var(--color-ink-muted)] sm:truncate">{i.reason}</span>
+          <span className="mt-0.5 line-clamp-2 text-xs text-[var(--color-ink-muted)]">{i.reason}</span>
         </span>
         {i.status === "open" ? (
           <button type="button" onClick={(e) => { e.stopPropagation(); setStatus(i, "bezig"); }}
             className="hidden shrink-0 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink)] opacity-0 transition group-hover:opacity-100 sm:block">Oppakken</button>
         ) : null}
         {i.status === "bezig" ? <span className="shrink-0 rounded-full bg-[var(--color-violet-soft)] px-2 py-0.5 text-2xs font-semibold text-[var(--color-violet)]">Bezig</span> : null}
+        {/* Directe knop naar de pagina waar de actie gebeurt. */}
+        {i.href && !doneRow ? (
+          <Link href={i.href} onClick={(e) => e.stopPropagation()} title={i.cta ?? "Openen"}
+            className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-1 text-xs font-medium text-[var(--color-ink)] transition hover:border-[var(--color-violet)] hover:text-[var(--color-violet)]">
+            <span className="hidden sm:inline">{i.cta ?? "Openen"}</span><ArrowRight className="size-3.5" />
+          </Link>
+        ) : null}
         {/* Hoe lang het punt al openstaat; pas vanaf 1 dag, zodat nieuwe punten rustig blijven. */}
         <span className={`hidden w-[56px] shrink-0 text-right text-xs sm:block ${n > 5 ? "font-medium text-[var(--color-warn)]" : "text-[var(--color-ink-faint)]"}`}>{!doneRow && n > 0 ? ageLabel(n) : ""}</span>
         <button type="button" title={owner ? `${owner.name} · toewijzen` : "Toewijzen"} onClick={(e) => { e.stopPropagation(); setAssignFor({ key: i.key, rect: e.currentTarget.getBoundingClientRect() }); }}
@@ -354,7 +365,7 @@ export function AttentionBoard({ items: initial, team, viewerId, defaultScope }:
             <button type="button" onClick={() => setStatus(i, "open")} className="h-11 w-full rounded-[var(--radius-md)] border border-[var(--color-line-strong)] text-sm font-medium">Heropenen</button>
           ) : (
             <>
-              {i.href ? <Link href={i.href} className="flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-violet)] text-sm font-medium text-white hover:brightness-95">Openen <ArrowRight className="size-4" /></Link> : null}
+              {i.href ? <Link href={i.href} className="flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-violet)] text-sm font-medium text-white hover:brightness-95">{i.cta ?? "Openen"} <ArrowRight className="size-4" /></Link> : null}
               {i.status === "open" ? <button type="button" onClick={() => setStatus(i, "bezig")} className="h-11 w-full rounded-[var(--radius-md)] border border-[var(--color-line-strong)] text-sm font-medium">Ik pak dit op</button> : null}
               <button type="button" onClick={() => setStatus(i, "klaar")} className="h-11 w-full rounded-[var(--radius-md)] border border-[var(--color-good)] bg-[var(--color-good-soft)] text-sm font-medium text-[var(--color-good)]">Afronden</button>
             </>

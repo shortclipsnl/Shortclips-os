@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, isNull, lt, ne, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, contentCalendar, deliverables, productionDays, users } from "@/db/schema";
 import { daysSince, daysUntil } from "@/lib/format";
@@ -60,6 +60,8 @@ export type QualityItem = {
   kids?: { label: string; sub: string; href?: string }[];
   /** Concrete deadline (YYYY-MM-DD), waar bekend. */
   dueOn?: string;
+  /** Tekst op de directe knop naar de juiste pagina ("Naar planning"). */
+  cta?: string;
 };
 
 export type AttentionPriority = "hoog" | "normaal" | "laag";
@@ -79,7 +81,7 @@ const GROUP_OF: Record<string, QualityGroup> = {
   "Productiegegevens ontbreken": "editing",
   "Te laat bij klant": "klant",
   "Feedback ontbreekt": "klant",
-  "Video klaar maar niet verstuurd": "klant",
+  "Contentplanning ontbreekt": "klant",
   "Video niet gepubliceerd": "klant",
   "Klant vraagt aandacht": "klant",
   [RETENTION_CATEGORIES.resultaten]: "klant",
@@ -142,13 +144,31 @@ const AT_EDITOR: VideoStage[] = ["recorded", "footage_upload", "awaiting_editor"
 
 const projTitle = (clientName: string, title: string) => (title === clientName ? "video" : title);
 
+/** Feedbacktermijn van de klant (uren). Bewust in uren: niet aangepast voor feestdagen. */
+const FEEDBACK_HOURS = 72;
+/** Zoveel werkdagen na goedkeuring mag een video zonder contentplanning staan. */
+const PLANNING_GRACE_WORKDAYS = 2;
+/** Vanaf dit moment (minuten na middernacht, Amsterdam) telt "vandaag publiceren" als achter. */
+const PUBLISH_CHECK_MINUTES = 16 * 60;
+const videoCount = (n: number) => (n === 1 ? "1 video" : `${n} video's`);
+/** Groepeert rijen per klant, zodat één klant één punt per soort krijgt. */
+function byClient<T extends { clientId: string }>(rows: T[]): T[][] {
+  const m = new Map<string, T[]>();
+  for (const r of rows) m.set(r.clientId, [...(m.get(r.clientId) ?? []), r]);
+  return [...m.values()];
+}
+
 export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boolean } = {}): Promise<{ items: QualityItem[]; counts: Record<QualitySeverity, number> }> {
   const owner = isOwner(viewer);
   const today = new Date().toISOString().slice(0, 10);
+  // Publiceren gaat op Amsterdamse tijd (postmoment 14:30-17:00).
+  const amsToday = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  const amsClock = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Amsterdam", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+  const amsMinutes = Number(amsClock.slice(0, 2)) * 60 + Number(amsClock.slice(3, 5));
 
   const [
     data, projects, shootDeadlines, reviewQueue, scripting,
-    missingVersion, missingData, clientRevision, readyNotSent, overduePublish,
+    missingVersion, missingData, clientRevision, approvedUnplanned, toPublish, atClient,
     openLinks, integrations, retention, editorStatus,
   ] = await Promise.all([
     getDashboard(viewer),
@@ -177,30 +197,43 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
     // #10 Feedback niet verwerkt: klant gaf feedback (client_revision), bal bij editor.
     db.select({
       id: deliverables.id, title: deliverables.title, statusChangedAt: deliverables.statusChangedAt,
-      clientName: clients.name, clientSlug: clients.slug, editorName: users.fullName,
+      clientId: clients.id, clientName: clients.name, clientSlug: clients.slug, editorName: users.fullName,
     }).from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
       .leftJoin(users, eq(users.id, deliverables.editorId))
       .where(and(isNull(deliverables.deletedAt), eq(deliverables.status, "client_revision"), scopeToClients(viewer, deliverables.clientId), notInactiveClient(deliverables.clientId)))
-      .limit(40),
-    // #11 Video klaar maar niet verstuurd: goedgekeurd/klaar, nog niet ingepland of live.
+      .limit(80),
+    // #11 Contentplanning ontbreekt: goedgekeurd, maar er is nog geen regel in de
+    // contentplanning aan gekoppeld. Alleen voor klanten waarvoor Shortclips de
+    // content plaatst; bij klanten die zelf posten is plannen niet onze taak.
     db.select({
       id: deliverables.id, title: deliverables.title, statusChangedAt: deliverables.statusChangedAt,
-      clientName: clients.name, clientSlug: clients.slug,
+      clientId: clients.id, clientName: clients.name, clientSlug: clients.slug,
     }).from(deliverables)
       .innerJoin(clients, eq(clients.id, deliverables.clientId))
-      // Alleen voor klanten waarvoor Shortclips de content plaatst: bij klanten
-      // die zelf posten is inplannen/publiceren niet onze taak.
-      .where(and(isNull(deliverables.deletedAt), inArray(deliverables.status, ["approved", "ready_to_publish"] as VideoStage[]), eq(clients.weHandlePosting, true), scopeToClients(viewer, deliverables.clientId), notInactiveClient(deliverables.clientId)))
-      .limit(40),
-    // #12 Video niet gepubliceerd: geplande publicatiedatum verstreken, nog niet live.
+      .where(and(
+        isNull(deliverables.deletedAt), inArray(deliverables.status, ["approved", "ready_to_publish"] as VideoStage[]),
+        eq(clients.weHandlePosting, true), scopeToClients(viewer, deliverables.clientId), notInactiveClient(deliverables.clientId),
+        sql`not exists (select 1 from ${contentCalendar} where ${contentCalendar.deliverableId} = ${deliverables.id} and ${contentCalendar.deletedAt} is null)`,
+      ))
+      .limit(120),
+    // #12 Klaar om te publiceren: volgens de contentplanning vandaag of eerder
+    // online, maar nog niet als gepubliceerd geregistreerd.
     db.select({
-      id: contentCalendar.id, title: contentCalendar.title, scheduledOn: contentCalendar.scheduledOn,
-      deliverableId: contentCalendar.deliverableId, clientName: clients.name, clientSlug: clients.slug,
+      id: contentCalendar.id, title: contentCalendar.title, scheduledOn: contentCalendar.scheduledOn, status: contentCalendar.status,
+      deliverableId: contentCalendar.deliverableId, clientId: clients.id, clientName: clients.name, clientSlug: clients.slug,
     }).from(contentCalendar)
       .innerJoin(clients, eq(clients.id, contentCalendar.clientId))
-      .where(and(isNull(contentCalendar.deletedAt), lt(contentCalendar.scheduledOn, today), ne(contentCalendar.status, "published"), eq(clients.weHandlePosting, true), scopeToClients(viewer, contentCalendar.clientId), notInactiveClient(contentCalendar.clientId)))
-      .limit(40),
+      .where(and(isNull(contentCalendar.deletedAt), lte(contentCalendar.scheduledOn, amsToday), ne(contentCalendar.status, "published"), eq(clients.weHandlePosting, true), scopeToClients(viewer, contentCalendar.clientId), notInactiveClient(contentCalendar.clientId)))
+      .limit(120),
+    // #4 Feedbacktermijn: video's die bij de klant ter beoordeling liggen.
+    db.select({
+      id: deliverables.id, title: deliverables.title, statusChangedAt: deliverables.statusChangedAt,
+      clientId: clients.id, clientName: clients.name, clientSlug: clients.slug,
+    }).from(deliverables)
+      .innerJoin(clients, eq(clients.id, deliverables.clientId))
+      .where(and(isNull(deliverables.deletedAt), eq(deliverables.status, "client_review"), scopeToClients(viewer, deliverables.clientId), notInactiveClient(deliverables.clientId)))
+      .limit(120),
     // Owner-only bronnen.
     owner ? countOpenLinkSuggestions() : Promise.resolve(0),
     owner ? integrationHealth() : Promise.resolve([]),
@@ -257,6 +290,9 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
 
   // Video over deadline — al te laat (directe actie).
   for (const v of data.videos.late) {
+    // Bij de klant of met klantfeedback: dat dekken de feedbacksignalen
+    // hieronder al (72 uur, nieuwe feedback). Zo komt één video niet twee keer voor.
+    if (v.status === "client_review" || v.status === "client_revision") continue;
     const d = Math.max(1, -daysUntil(v.dueOn));
     const atClient = VIDEO_WAITING_ON[v.status as VideoStage] === "client";
     items.push({
@@ -301,15 +337,24 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
     });
   }
 
-  // #4 Feedback ontbreekt — te lang bij klant zonder reactie.
-  for (const v of data.videos.stalledAtClient.filter((x) => daysSince(x.statusChangedAt) > 3)) {
+  // #4 Feedbacktermijn verstreken: 72 uur bij de klant zonder reactie. Eén punt
+  // per klant; verdwijnt vanzelf zodra de klant feedback geeft of akkoord gaat.
+  const hoursAt = (d: Date | null) => (d ? (Date.now() - d.getTime()) / 36e5 : 0);
+  for (const list of byClient(atClient.filter((v) => hoursAt(v.statusChangedAt) >= FEEDBACK_HOURS))) {
+    const f = list[0]!;
+    const maxH = Math.max(...list.map((v) => hoursAt(v.statusChangedAt)));
+    const days = (v: { statusChangedAt: Date | null }) => Math.floor(hoursAt(v.statusChangedAt) / 24);
     items.push({
-      id: `stall-${v.id}`, clientName: v.clientName, severity: "oranje", category: "Feedback ontbreekt",
-      title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
-      detail: `${daysSince(v.statusChangedAt)} dagen geen klantfeedback → herinneren`,
-      href: `/videos/${v.id}`, roles: CC,
-      action: "Klant herinneren aan feedback", reason: `${daysSince(v.statusChangedAt)} dagen geen reactie op ${projTitle(v.clientName, v.title)}`,
-      priority: daysSince(v.statusChangedAt) >= 7 ? "hoog" : "normaal",
+      id: `feedbacktermijn-${f.clientId}`, clientName: f.clientName, severity: maxH >= 120 ? "rood" : "oranje", category: "Feedback ontbreekt",
+      title: `${f.clientName} — feedbacktermijn verstreken`,
+      detail: `De feedbacktermijn van 72 uur is verstreken voor ${videoCount(list.length)}. Controleer de status bij de klant.`,
+      href: list.length === 1 ? `/videos/${f.id}` : `/videos?klant=${f.clientSlug}`, roles: CC,
+      action: "Feedbacktermijn verstreken",
+      reason: list.length === 1
+        ? `De feedbacktermijn is verstreken (${days(f)} dagen). Controleer de status bij de klant.`
+        : `De feedbacktermijn is verstreken voor ${list.length} video's. Controleer de status bij de klant.`,
+      priority: maxH >= 120 ? "hoog" : "normaal", cta: list.length === 1 ? "Naar video" : "Naar video's",
+      kids: list.length > 1 ? list.map((v) => ({ label: projTitle(v.clientName, v.title), sub: `${days(v)} dagen bij klant`, href: `/videos/${v.id}` })) : undefined,
     });
   }
 
@@ -389,43 +434,68 @@ export async function getQualityOverview(viewer: Viewer, opts: { trusted?: boole
     });
   }
 
-  // #10 Feedback niet verwerkt — klantfeedback staat open.
-  for (const v of clientRevision) {
+  // #10 Klant heeft feedback gegeven die nog verwerkt moet worden. Verdwijnt
+  // vanzelf zodra de video verder gaat (verwerkt) of de klant akkoord geeft.
+  for (const list of byClient(clientRevision)) {
+    const f = list[0]!;
+    const oldest = Math.max(...list.map((v) => daysSince(v.statusChangedAt)));
     items.push({
-      id: `clientrev-${v.id}`, clientName: v.clientName, severity: "oranje", category: "Feedback niet verwerkt",
-      title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
-      detail: `Klantfeedback ${daysSince(v.statusChangedAt)} dag(en) open · ${v.editorName ?? "geen editor"} → verwerken`,
-      href: `/videos/${v.id}`, roles: EDIT,
-      action: "Klantfeedback laten verwerken", reason: `${daysSince(v.statusChangedAt)} ${daysSince(v.statusChangedAt) === 1 ? "dag" : "dagen"} open · ${v.editorName ?? "geen editor"}`,
-      priority: daysSince(v.statusChangedAt) >= 3 ? "hoog" : "normaal",
+      id: `klantfeedback-${f.clientId}`, clientName: f.clientName, severity: oldest >= 2 ? "rood" : "oranje", category: "Feedback niet verwerkt",
+      title: `${f.clientName} — nieuwe feedback`,
+      detail: `Nieuwe feedback ontvangen op ${videoCount(list.length)}${list.length === 1 && f.editorName ? ` · ${f.editorName}` : ""}.`,
+      href: list.length === 1 ? `/videos/${f.id}` : `/videos?klant=${f.clientSlug}`, roles: EDIT,
+      action: "Klantfeedback verwerken",
+      reason: `Nieuwe feedback ontvangen op ${videoCount(list.length)}${oldest >= 1 ? ` · ${oldest} ${oldest === 1 ? "dag" : "dagen"} open` : ""}.`,
+      priority: oldest >= 2 ? "hoog" : "normaal", cta: "Naar feedback",
+      kids: list.length > 1 ? list.map((v) => ({ label: projTitle(v.clientName, v.title), sub: `${daysSince(v.statusChangedAt)}d · ${v.editorName ?? "geen editor"}`, href: `/videos/${v.id}` })) : undefined,
     });
   }
 
-  // #11 Video klaar maar niet verstuurd — goedgekeurd, nog niet ingepland/live.
-  for (const v of readyNotSent) {
+  // #11 Contentplanning ontbreekt. Bewust géén melding direct na goedkeuring:
+  // dat pakt het team in de praktijk meteen op. Pas als er na
+  // ${PLANNING_GRACE_WORKDAYS} werkdagen nog geen planning is, wordt het een punt.
+  const unplanned = approvedUnplanned.filter((v) => v.statusChangedAt && workingDaysBetween(v.statusChangedAt.toISOString().slice(0, 10), today) >= PLANNING_GRACE_WORKDAYS);
+  for (const list of byClient(unplanned)) {
+    const f = list[0]!;
+    const wd = Math.max(...list.map((v) => workingDaysBetween(v.statusChangedAt!.toISOString().slice(0, 10), today)));
     items.push({
-      id: `notsent-${v.id}`, clientName: v.clientName, severity: "oranje", category: "Video klaar maar niet verstuurd",
-      title: `${v.clientName} — ${projTitle(v.clientName, v.title)}`,
-      detail: `Goedgekeurd, ${daysSince(v.statusChangedAt)} dag(en) niet verstuurd → inplannen/publiceren`,
-      href: `/videos/${v.id}`, roles: CC,
-      action: "Video versturen of inplannen",
-      reason: `${projTitle(v.clientName, v.title)} · ${daysSince(v.statusChangedAt) <= 0 ? "vandaag goedgekeurd" : `goedgekeurd ${daysSince(v.statusChangedAt)} ${daysSince(v.statusChangedAt) === 1 ? "dag" : "dagen"} geleden`}`,
-      priority: daysSince(v.statusChangedAt) >= 7 ? "hoog" : "normaal",
+      id: `planning-ontbreekt-${f.clientId}`, clientName: f.clientName, severity: wd >= 5 ? "rood" : "oranje", category: "Contentplanning ontbreekt",
+      title: `${f.clientName} — contentplanning ontbreekt`,
+      detail: `${videoCount(list.length)} goedgekeurd, maar nog niet in de contentplanning gezet.`,
+      href: `/calendar?klant=${f.clientSlug}`, roles: CC,
+      action: "Contentplanning maken",
+      reason: list.length === 1
+        ? "De video is goedgekeurd, maar de contentplanning ontbreekt nog."
+        : `${list.length} video's zijn goedgekeurd, maar de contentplanning ontbreekt nog.`,
+      priority: wd >= 5 ? "hoog" : "normaal", cta: "Naar planning",
+      kids: list.length > 1 ? list.map((v) => ({ label: projTitle(v.clientName, v.title), sub: `${workingDaysBetween(v.statusChangedAt!.toISOString().slice(0, 10), today)} werkdagen goedgekeurd`, href: `/videos/${v.id}` })) : undefined,
     });
   }
 
-  // #12 Video niet gepubliceerd — geplande publicatiedatum verstreken.
-  for (const p of overduePublish) {
-    const d = Math.max(1, -daysUntil(p.scheduledOn));
+  // #12 Klaar om te publiceren: volgens de planning online, nog niet geüpload of
+  // niet als gepubliceerd geregistreerd. Video's van vandaag pas aan het eind van
+  // het postmoment (vanaf 16:00): eerder is het gewoon werk dat nog loopt.
+  // Status "ingepland" vandaag telt niet: die staat al klaar in de planningstool.
+  const publishDue = toPublish.filter((p) =>
+    p.scheduledOn < amsToday || (amsMinutes >= PUBLISH_CHECK_MINUTES && ["to_prepare", "ready", "failed"].includes(p.status)));
+  for (const list of byClient(publishDue)) {
+    const f = list[0]!;
+    const late = list.filter((p) => p.scheduledOn < amsToday).length;
+    const failed = list.filter((p) => p.status === "failed").length;
+    const n = list.length;
     items.push({
-      id: `unpub-${p.id}`, clientName: p.clientName, severity: "oranje", category: "Video niet gepubliceerd",
-      title: `${p.clientName} — ${p.title}`,
-      detail: `${d} dag(en) over geplande publicatie → publiceren`,
-      href: p.deliverableId ? `/videos/${p.deliverableId}` : "/calendar", roles: CC,
-      action: "Video publiceren", reason: `${p.title} · ${d} ${d === 1 ? "dag" : "dagen"} over de geplande datum`,
-      priority: d >= 3 ? "hoog" : "normaal",
+      id: `publiceren-${f.clientId}`, clientName: f.clientName, severity: late || failed ? "rood" : "oranje", category: "Video niet gepubliceerd",
+      title: `${f.clientName} — klaar om te publiceren`,
+      detail: `${n === 1 ? "Er staat 1 video" : `Er staan ${n} video's`} klaar om gepubliceerd te worden${late ? `, waarvan ${late} over de geplande datum` : ""}${failed ? ` · ${failed} mislukt` : ""}.`,
+      href: `/calendar?klant=${f.clientSlug}`, roles: CC,
+      action: "Video's publiceren",
+      reason: `${n === 1 ? "Er staat 1 video" : `Er staan ${n} video's`} klaar om gepubliceerd te worden${late ? ` · ${late} over de geplande datum` : ""}${failed ? ` · ${failed} mislukt` : ""}.`,
+      priority: late || failed ? "hoog" : "normaal", cta: "Naar planning",
+      kids: n > 1 ? list.map((p) => ({ label: p.title, sub: p.scheduledOn < amsToday ? `${Math.max(1, -daysUntil(p.scheduledOn))}d over datum` : "vandaag", href: p.deliverableId ? `/videos/${p.deliverableId}` : `/calendar?klant=${f.clientSlug}` })) : undefined,
+      dueOn: list.map((p) => p.scheduledOn).sort()[0],
     });
   }
+
 
   // #13 Klantbehoud — vervangt de oude "Resultaten vallen terug" (alleen
   // weergaven, zonder datacontrole) en "Contract loopt af" (einddatum i.p.v.

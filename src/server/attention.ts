@@ -34,6 +34,8 @@ export type AttentionItem = {
   manual: boolean;
   /** Concrete deadline (YYYY-MM-DD), waar bekend. */
   dueOn: string | null;
+  /** Tekst op de directe knop naar de juiste pagina. */
+  cta?: string | null;
 };
 export type TeamMember = { id: string; name: string; initials: string; role: string };
 
@@ -98,7 +100,7 @@ export async function getAttentionBoard(viewer: Viewer, opts: { trusted?: boolea
       action: s.action, reason: s.reason, why: s.detail, priority: s.priority, area: s.area,
       ownerId: st?.assigneeId ?? s.ownerId ?? null, status,
       since: (st?.createdAt ?? new Date()).toISOString(), doneAt: status === "klaar" ? st?.doneAt?.toISOString() ?? null : null,
-      notes: st?.notes ?? [], href: s.href, kids: s.kids ?? [], manual: false, dueOn: s.dueOn ?? null,
+      notes: st?.notes ?? [], href: s.href, kids: s.kids ?? [], manual: false, dueOn: s.dueOn ?? null, cta: s.cta ?? null,
     });
   }
 
@@ -120,7 +122,7 @@ export async function getAttentionBoard(viewer: Viewer, opts: { trusted?: boolea
       priority: (r.priority as AttentionPriority) ?? "normaal", area: (r.category as AttentionArea) ?? "overig",
       ownerId: r.assigneeId, status: r.status as AttentionStatus, since: r.createdAt.toISOString(),
       doneAt: r.doneAt?.toISOString() ?? null, notes: r.notes ?? [],
-      href: manual && logo ? `/clients/${logo.slug}` : null, kids: [], manual, dueOn: null,
+      href: manual && logo ? `/clients/${logo.slug}` : null, kids: [], manual, dueOn: null, cta: manual && logo ? "Naar klant" : null,
     });
   }
 
