@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Lightbulb } from "lucide-react";
 import { Badge, Card, ClientLogo, EmptyState, LinkButton } from "@/components/ui";
 import { StartResearchButton } from "./start-research-button";
 import type { OverviewClient } from "@/server/content-research/service";
@@ -60,7 +61,7 @@ export function OverviewGrid({ clients, canWrite }: { clients: OverviewClient[];
               </div>
 
               <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
-                <LinkButton href={`/ai/content-research/${c.id}?tab=ideeen`} variant="secondary" size="sm">Bekijk ideeën</LinkButton>
+                <LinkButton href={`/ai/content-research/${c.id}?tab=ideeen`} variant="primary" size="sm"><Lightbulb className="size-4" /> Bekijk ideeën{c.totalIdeas > 0 ? ` (${c.totalIdeas})` : ""}</LinkButton>
                 {/* Status is leidend: alleen actieve klanten kunnen nieuw onderzoek
                     starten. Inactieve klanten houden hun bestaande ideeën. */}
                 {canWrite && c.active ? <StartResearchButton clientId={c.id} running={c.running} variant="ghost" /> : null}
