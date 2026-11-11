@@ -104,8 +104,9 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 <div class="app">
   <nav class="side" aria-label="Hoofdnavigatie">
     <div class="brand">Vermogen<small>Jarno Klijnsma</small></div>
+    <a href="#adviseur" data-p="adviseur">Mijn adviseur</a>
     <a href="#overzicht" data-p="overzicht">Overzicht</a>
-    <a href="#advies" data-p="advies">Advies</a>
+    <a href="#advies" data-p="advies">Potjes en belasting</a>
     <a href="#cashflow" data-p="cashflow">Cashflow privé</a>
     <a href="#banken" data-p="banken">Bankrekeningen</a>
     <a href="#potjes" data-p="potjes">Spaarpotjes</a>
@@ -290,7 +291,7 @@ function inlegTussen(port,van,tot){return INLEG.filter(i=>i.port===port&&i.ym>va
 function hasTest(){return SALDI.some(s=>s.test)||PF.some(p=>p.test)||INLEG.some(i=>i.test)||FLOWS.some(f=>f.test)||accs().some(a=>a.test)}
 
 /* ---------- navigatie ---------- */
-function go(){const h=(location.hash||"#overzicht").slice(1);PAGE=["overzicht","advies","cashflow","banken","potjes","beleggen","pensioen","ontwikkeling","doelen","instellingen"].includes(h)?h:"overzicht";
+function go(){const h=(location.hash||"#adviseur").slice(1);PAGE=["adviseur","overzicht","advies","cashflow","banken","potjes","beleggen","pensioen","ontwikkeling","doelen","instellingen"].includes(h)?h:"adviseur";
   document.querySelectorAll("nav.side a").forEach(a=>a.setAttribute("aria-current",a.dataset.p===PAGE?"page":"false"));render()}
 window.addEventListener("hashchange",go);
 
@@ -298,8 +299,8 @@ function render(){
   if(!db){return}
   if(!ready.cfg){$("main").innerHTML='<p class="sub">Gegevens laden…</p>';return}
   if(!CFG){CFG={rekeningen:[],doelen:[],schulden:[]}}
-  const fn={overzicht:pOverzicht,advies:pAdvies,cashflow:pCashflow,banken:pBanken,potjes:pPotjes,beleggen:()=>pInvest("belegging"),pensioen:()=>pInvest("pensioen"),ontwikkeling:pOntwikkeling,doelen:pDoelen,instellingen:pInstellingen}[PAGE];
-  const y=scrollY;$("main").innerHTML=(hasTest()?`<div class="pill warn" style="justify-self:start;white-space:normal;border-radius:10px;padding:4px 10px">Bevat testgegevens. Verwijder ze in Instellingen voordat je echte gegevens gebruikt.</div>`:"")+fn();bind();scrollTo(0,y)}
+  const fn={adviseur:pAdviseur,overzicht:pOverzicht,advies:pAdvies,cashflow:pCashflow,banken:pBanken,potjes:pPotjes,beleggen:()=>pInvest("belegging"),pensioen:()=>pInvest("pensioen"),ontwikkeling:pOntwikkeling,doelen:pDoelen,instellingen:pInstellingen}[PAGE];
+  const y=scrollY;$("main").innerHTML=(hasTest()?`<div class="pill warn" style="justify-self:start;white-space:normal;border-radius:10px;padding:4px 10px">Bevat testgegevens. Verwijder ze in Instellingen voordat je echte gegevens gebruikt.</div>`:"")+fn();bind();scrollTo(0,y);bewaarFeiten()}
 
 /* ---------- grafieken ---------- */
 function axis(min,max){const span=Math.max(1,max-min);const raw=span/5;const mag=Math.pow(10,Math.floor(Math.log10(raw)));const step=[1,2,2.5,5,10].map(x=>x*mag).find(x=>span/x<=5.5);const lo=Math.floor(min/step)*step,hi=Math.ceil(max/step)*step;const t=[];for(let v=lo;v<=hi+1e-9;v+=step)t.push(v);return {lo,hi,t}}
@@ -456,7 +457,7 @@ function pInstellingen(){const insts=[...new Set([...INST,...accs().map(a=>a.ins
 
 const MNL=["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"];
 /* ---------- PAGINA: advies ---------- */
-const ADV_DEF={btwNodig:{v:10200,l:"Te betalen btw lopend/vorig kwartaal",b:"Aanname: €17.667 btw volgens DigiBoox min geschatte voorbelasting €7.442 (CEO-dashboard, 10 okt). Check je aangifte."},
+const ADV_DEF={btwNodig:{v:0,l:"Te betalen btw (nog niet betaalde kwartalen)",b:"Schatting: 21% over je omzet min ca. 11,6% van je kosten als voorbelasting (verhouding uit Q3 2026). Vul het bedrag uit DigiBoox in zodra je het weet."},
   ibVorigNodig:{v:null,l:"Nog te betalen IB vorig jaar",b:"Onbekend. Vul het bedrag van je (verwachte) aanslag in; leeg = het potje telt als voldoende."},
   ibJaar:{v:51700,l:"Verwachte IB + Zvw dit jaar",b:"Berekening CEO-dashboard (prognose winst 2026, tarieven 2026). Check met je boekhouder."},
   ibBetaald:{v:0,l:"Al betaald via voorlopige aanslag dit jaar",b:"Onbekend, staat op 0. Vul in als je maandelijks een voorlopige aanslag betaalt."},
@@ -467,6 +468,7 @@ const ADV_DEF={btwNodig:{v:10200,l:"Te betalen btw lopend/vorig kwartaal",b:"Aan
 function advManual(k){const c=CFG?.advies||{};return c[k]!==undefined&&c[k]!==""&&c[k]!==null}
 function advDef(k){const d=ADV_DEF[k];
   if(k==="ibJaar"){const p=ibPrognose();if(p)return {v:Math.round(p.J.tax),b:`Prognose uit het groeidashboard (winst ${eur(p.wP)} verwacht, tarieven 2026), bijgewerkt ${fmtD(p.bijgewerkt)}. Rekent elke maand mee met je omzet.`}}
+  if(k==="btwNodig"){const b=btwSchatting();if(b)return {v:Math.round(b.totaal),b:`Schatting ${b.kw.map(q=>`Q${q.q} ${q.y}: ${eur(q.btw)} over ${q.mnd}`).join("; ")}. 21% over de omzet min ca. 11,6% van de kosten als voorbelasting (verhouding uit Q3 2026). Neem bij de aangifte het bedrag uit DigiBoox over.`}}
   if(k==="uitgPrive"){const g=cfGemiddelde();if(g)return {v:g.v,b:`Gemiddelde uit Cashflow privé over ${g.n} volledige maanden.`}}
   return {v:d.v,b:d.b}}
 function advVal(k){return advManual(k)?CFG.advies[k]:advDef(k).v}
@@ -548,17 +550,20 @@ function splitCard(C,full){if(!C||!C.poolStart)return "";const S=C.steps;const g
    ${bar}${leg}${full?belTabel(C):""}${full?jaar:`<p class="sub" style="margin-top:10px"><a href="#advies">Bekijk de berekening en acties bij Advies</a></p>`}</section>`}
 
 function eindeMaand(y,m){return new Date(y,m,0)} // m = 1..12
-function belTabel(C){const S=C.steps,now=new Date(today()+"T12:00:00"),Y=now.getFullYear(),M=now.getMonth()+1;
-  const kw=[1,4,7,10].includes(M)?{q:((M-1)/3)||4,y:M===1?Y-1:Y,due:eindeMaand(Y,M)}:{q:Math.ceil(M/3),y:Y,due:eindeMaand(Y,Math.ceil(M/3)*3+1>12?1:Math.ceil(M/3)*3+1)};
-  if(kw.due.getMonth()===0&&M>10)kw.due=eindeMaand(Y+1,1);
-  const dagen=Math.round((kw.due-now)/864e5);const d=x=>x.toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
-  const P=C.PR,ib=S[2];const ratio=!C.ibHand&&P&&P.J.tax?P.J.ibNet/P.J.tax:null;
+function belTabel(C){const S=C.steps,now=new Date(today()+"T12:00:00"),Y=now.getFullYear();
+  const d=x=>x.toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
+  const P=C.PR,ib=S[2];const JY=!C.ibHand&&P?P.JY:null;const ratio=JY&&JY.tax?JY.ibNet/JY.tax:null;
+  const B=advManual("btwNodig")?null:btwSchatting();
+  const btwWan=B?B.kw.map(k=>{const dg=Math.round((k.due-now)/864e5);return `Q${k.q}: betalen vóór ${d(k.due)}${dg>=0?` (nog ${dg} dag${dg===1?"":"en"})`:""}`}).join(". "):"Volgens je btw-aangifte";
+  const btwTitel=B?`Btw ${B.kw.map(k=>`Q${k.q}`).join(" en ")} ${Y}`:"Btw";
+  const btwUitleg=B?`Schatting over ${B.kw.map(k=>`Q${k.q} (${k.mnd}${k.compleet?"":"; loopt nog"})`).join(" en ")}: 21% over je omzet min de btw op je kosten. Eerdere kwartalen gaan ervan uit dat ze betaald zijn. Dit geld is nooit van jou geweest.`:"Door jou ingevuld bij de uitgangspunten. Dit geld is nooit van jou geweest.";
+  const zvwVol=JY&&JY.zvw>=IB26.zvwMax*IB26.zvw-1;const tm=P?MNL[+P.last.slice(5,7)-1]:"";
   const rows=[
-   {k:"var(--bad)",w:`Btw ${kw.q}e kwartaal ${kw.y}`,o:"Btw die je klanten via je facturen hebt betaald, min de btw op je kosten. Dit geld is nooit van jou geweest.",s:S[0],wan:`Betalen vóór ${d(kw.due)}${dagen>=0?` (nog ${dagen} dag${dagen===1?"":"en"})`:""}`},
-   {k:"#d9534f",w:`Inkomstenbelasting ${Y-1}`,o:S[1].need===S[1].have&&!advManual("ibVorigNodig")?"Belasting en Zvw over je winst van vorig jaar. Het precieze bedrag staat op de aanslag; vul het in bij de uitgangspunten.":"Belasting en Zvw over je winst van vorig jaar, volgens de aanslag.",s:S[1],wan:"Binnen 2 maanden na de datum op de aanslag"},
+   {k:"var(--bad)",w:btwTitel,o:btwUitleg,s:S[0],wan:btwWan},
+   {k:"#d9534f",w:`Inkomstenbelasting ${Y-1}`,o:S[1].need===S[1].have&&!advManual("ibVorigNodig")?"Belasting en Zvw over je winst van vorig jaar. Bedrag nog niet bekend: hier staat wat er in het potje zit. Vul het bedrag van de aanslag in bij de uitgangspunten.":"Belasting en Zvw over je winst van vorig jaar, volgens de aanslag.",s:S[1],onbekend:S[1].need===S[1].have&&!advManual("ibVorigNodig"),wan:"Binnen 2 maanden na de datum op de aanslag"},
    ...(ratio!=null?[
-    {k:"#e8837e",w:`Inkomstenbelasting ${Y}`,o:`Box 1 over je winst t/m nu, na zelfstandigenaftrek, mkb-winstvrijstelling en heffingskortingen.`,v:ib.need*ratio,wan:`Na de aangifte vóór 1 mei ${Y+1}, of eerder via een voorlopige aanslag`},
-    {k:"#f2b0ac",w:`Zvw-bijdrage ${Y}`,o:"Inkomensafhankelijke bijdrage zorgverzekeringswet, 4,85% over je belastbare winst.",v:ib.need*(1-ratio),wan:"Komt mee met de aanslag inkomstenbelasting"}]:
+    {k:"#e8837e",w:`Inkomstenbelasting ${Y}`,o:`Box 1 over je winst januari t/m ${tm} (${eur(P.wY)}), alsof het jaar nu eindigt: na zelfstandigenaftrek € 1.200, 12,7% mkb-winstvrijstelling en heffingskortingen.`,v:ib.need*ratio,wan:`Na de aangifte vóór 1 mei ${Y+1}, of eerder via een voorlopige aanslag`},
+    {k:"#f2b0ac",w:`Zvw-bijdrage ${Y}`,o:zvwVol?`4,85% over je belastbare winst, maximaal over € 79.409. Dat maximum heb je al bereikt: dit is het hoogste bedrag voor ${Y}, hier komt niets meer bij.`:"4,85% over je belastbare winst, maximaal over € 79.409.",v:ib.need*(1-ratio),wan:"Komt mee met de aanslag inkomstenbelasting"}]:
     [{k:"#e8837e",w:`Inkomstenbelasting en Zvw ${Y}`,o:"Over je winst t/m nu, volgens je eigen jaarbedrag.",v:ib.need,wan:`Na de aangifte vóór 1 mei ${Y+1}, of eerder via een voorlopige aanslag`}])];
   // per potje: bij IB dit jaar staat het saldo op het potje voor IB+Zvw samen
   const ibHave=ib.have,ibNeed=ib.need||0;
@@ -568,9 +573,11 @@ function belTabel(C){const S=C.steps,now=new Date(today()+"T12:00:00"),Y=now.get
   const bar=`<div style="display:flex;height:12px;border-radius:5px;overflow:hidden;gap:2px;margin:6px 0 10px">${R.filter(r=>r.need>0.5).map(r=>`<div title="${esc(r.w)}: ${eur(r.need)}" style="flex:${r.need} 1 0;background:${r.k}"></div>`).join("")}</div>`;
   return `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--grid);min-width:0"><h3 style="margin:0 0 2px;font-size:14px">Waar de ${eur(tot)} voor de Belastingdienst heen gaat</h3>${bar}
    <div class="tbl"><table><thead><tr><th class="l">Wat</th><th>Bedrag</th><th>Staat apart</th><th>Ontbreekt</th><th class="l">Wanneer</th></tr></thead><tbody>
-   ${R.map(r=>`<tr><td class="l" style="white-space:normal;min-width:220px"><span style="display:flex;gap:6px;align-items:center"><i class="sw" style="background:${r.k}"></i><b>${esc(r.w)}</b></span><div class="sub" style="max-width:46ch">${esc(r.o)}</div><div class="sub">Potje: ${esc(r.pot)}</div></td><td>${eur(r.need)}</td><td>${eur(r.have)}</td><td style="color:var(${r.mis>0.5?"--bad":"--ok"})">${r.mis>0.5?eur(r.mis):"op orde"}</td><td class="l sub" style="white-space:normal;min-width:150px">${esc(r.wan)}</td></tr>`).join("")}
+   ${R.map(r=>`<tr><td class="l" style="white-space:normal;min-width:220px"><span style="display:flex;gap:6px;align-items:center"><i class="sw" style="background:${r.k}"></i><b>${esc(r.w)}</b></span><div class="sub" style="max-width:46ch">${esc(r.o)}</div><div class="sub">Potje: ${esc(r.pot)}</div></td><td>${eur(r.need)}</td><td>${eur(r.have)}</td><td style="color:var(${r.mis>0.5?"--bad":r.onbekend?"--warn":"--ok"})">${r.mis>0.5?eur(r.mis):r.onbekend?"aanslag invullen":"op orde"}</td><td class="l sub" style="white-space:normal;min-width:150px">${esc(r.wan)}</td></tr>`).join("")}
    <tr class="tot"><td class="l">Totaal</td><td>${eur(tot)}</td><td>${eur(R.reduce((a,r)=>a+r.have,0))}</td><td style="color:var(--bad)">${eur(R.reduce((a,r)=>a+r.mis,0))}</td><td></td></tr></tbody></table></div>
-   ${ratio!=null&&C.ibPerMaand>0?`<p class="sub" style="margin-top:6px">Daarna groeit het bedrag voor ${Y} met ongeveer ${eur(C.ibPerMaand)} per maand, tot de aangifte.</p>`:""}</div>`}
+   ${ratio!=null&&C.ibPerMaand>0?`<p class="sub" style="margin-top:6px">Inkomstenbelasting ${Y} groeit daarna met ongeveer ${eur(C.ibPerMaand)} per maand: elke extra euro winst valt in de 49,5%-schijf${zvwVol?" en de Zvw zit al op het maximum":""}. Dat rekent met ${eur(P.omA-P.koA)} winst per maand (gemiddelde van de laatste 3 maanden). Verwacht voor heel ${Y}: ${eur(P.J.tax)} bij ${eur(P.wP)} winst.</p>`:""}
+   ${B&&!B.kw.at(-1).compleet?`<p class="sub" style="margin-top:4px">Btw Q${B.kw.at(-1).q} loopt nog: elke nieuwe maand omzet komt erbij.</p>`:""}
+   <p class="sub" style="margin-top:4px">Niet meegenomen: box 3 over je spaargeld en beleggingen, privé-aftrekposten en een eventuele verdeling van de winst als je in een vof zit. Laat de definitieve bedragen bevestigen door je boekhouder.</p></div>`}
 
 /* ---------- IB-prognose uit het groeidashboard ---------- */
 const IB26={s1:38883,s2:78426,t1:.3575,t2:.3756,t3:.495,za:1200,mkb:.127,ahk:3115,ahkVan:29736,ahkAf:.06398,ak:5685,akVan:45592,akAf:.0651,zvw:.0485,zvwMax:79409};
@@ -584,9 +591,20 @@ function ibPrognose(){if(!PROG?.maanden)return null;const Y=today().slice(0,4);c
   const om=k=>+PROG.maanden[k].omzet||0,ko=k=>+PROG.maanden[k].kosten||0;const l3=ks.slice(-3);
   const omY=ks.reduce((s,k)=>s+om(k),0),koY=ks.reduce((s,k)=>s+ko(k),0),wY=omY-koY,rest=12-L;
   const omA=l3.reduce((s,k)=>s+om(k),0)/l3.length,koA=l3.reduce((s,k)=>s+ko(k),0)/l3.length;const wP=wY+rest*(omA-koA);
-  const J=ibCalc(wP);const taxYTD=wY*J.eff;const perMaand=rest>0?Math.max(0,(J.tax-taxYTD)/rest):0;
+  const J=ibCalc(wP);const JY=ibCalc(wY);const taxYTD=JY.tax;const perMaand=rest>0?Math.max(0,(J.tax-taxYTD)/rest):0;
   const oud=(new Date(today())-new Date(PROG.bijgewerkt||"2000-01-01"))/864e5>45;
-  return {L,last:ks.at(-1),omY,koY,wY,wP,rest,omA,koA,J,taxYTD,perMaand,oud,bijgewerkt:PROG.bijgewerkt,bron:PROG.bron}}
+  return {L,last:ks.at(-1),omY,koY,wY,wP,rest,omA,koA,J,JY,taxYTD,perMaand,oud,bijgewerkt:PROG.bijgewerkt,bron:PROG.bron}}
+/* Btw-schatting voor de kwartalen die nog niet betaald zijn. Een kwartaal geldt als betaald na zijn deadline
+   (laatste dag van de maand na het kwartaal). Btw = 21% over omzet min ca. 11,6% van de kosten als voorbelasting. */
+const BTW_TARIEF=.21,BTW_VOORBEL=.116;
+function btwDeadline(q,y){return q===4?eindeMaand(y+1,1):eindeMaand(y,q*3+1)}
+function btwSchatting(){if(!PROG?.maanden)return null;const now=new Date(today()+"T12:00:00"),Y=now.getFullYear(),M=now.getMonth()+1;
+  const qNu=Math.ceil(M/3);const lijst=[{q:qNu,y:Y}];
+  if([1,4,7,10].includes(M)){const v=qNu===1?{q:4,y:Y-1}:{q:qNu-1,y:Y};if(btwDeadline(v.q,v.y)>=now)lijst.unshift(v)}
+  const kw=lijst.map(({q,y})=>{const ks=[0,1,2].map(i=>`${y}-${String((q-1)*3+1+i).padStart(2,"0")}`).filter(k=>PROG.maanden[k]);
+    const om=ks.reduce((s,k)=>s+(+PROG.maanden[k].omzet||0),0),ko=ks.reduce((s,k)=>s+(+PROG.maanden[k].kosten||0),0);
+    return {q,y,ks,om,ko,btw:Math.max(0,om*BTW_TARIEF-ko*BTW_VOORBEL),due:btwDeadline(q,y),compleet:ks.length===3,mnd:ks.length?ks.map(k=>MNL[+k.slice(5,7)-1]).join(", "):"nog geen afgesloten maand"}});
+  return {kw,totaal:kw.reduce((s,k)=>s+k.btw,0)}}
 function progCard(p,handmatig){if(!p)return `<section class="card"><h2>Belastingprognose</h2><p class="msg">Nog geen winstcijfers uit het groeidashboard. De maandrun van de 1e zet ze hier neer; tot die tijd rekent het advies met de vaste aanname.</p></section>`;
   const mn=k=>MNL[+k.slice(5,7)-1];
   return `<section class="card"><h2>Belastingprognose ${today().slice(0,4)}</h2>
@@ -596,7 +614,7 @@ function progCard(p,handmatig){if(!p)return `<section class="card"><h2>Belasting
     <div class="tile"><span class="lab">Winst t/m ${mn(p.last)}</span><span class="val">${eur(p.wY)}</span><span class="sub">omzet ${eur(p.omY)} min kosten ${eur(p.koY)}, zonder btw</span></div>
     <div class="tile"><span class="lab">Verwachte winst heel jaar</span><span class="val">${eur(p.wP)}</span><span class="sub">${p.rest?`plus ${p.rest} maand${p.rest>1?"en":""} met het gemiddelde van de laatste 3 (${eur(p.omA-p.koA)} per maand)`:"jaar is afgesloten"}</span></div>
     <div class="tile"><span class="lab">Verwachte IB + Zvw</span><span class="val">${eur(p.J.tax)}</span><span class="sub">IB ${eur(p.J.ibNet)} + Zvw ${eur(p.J.zvw)}, effectief ${(p.J.eff*100).toFixed(1).replace(".",",")}%</span></div>
-    <div class="tile"><span class="lab">Nodig in het potje nu</span><span class="val">${eur(p.taxYTD)}</span><span class="sub">belasting over de winst t/m ${mn(p.last)}</span></div>
+    <div class="tile"><span class="lab">Nodig in het potje nu</span><span class="val">${eur(p.taxYTD)}</span><span class="sub">IB ${eur(p.JY.ibNet)} + Zvw ${eur(p.JY.zvw)} over de winst t/m ${mn(p.last)}, alsof het jaar dan eindigt</span></div>
     <div class="tile"><span class="lab">Per maand bijzetten</span><span class="val">${eur(p.perMaand)}</span><span class="sub">${p.rest?"tot en met december":"–"}</span></div>
    </div>
    <p class="sub" style="margin-top:8px">Bron: ${esc(p.bron||"groeidashboard")}, bijgewerkt ${fmtD(p.bijgewerkt)}. Tarieven 2026: zelfstandigenaftrek € 1.200 (urencriterium aangenomen), mkb-winstvrijstelling 12,7%, box 1 35,75% / 37,56% / 49,5%, algemene heffingskorting, arbeidskorting en Zvw 4,85%. Niet meegenomen: privé-aftrekposten, investeringsaftrek en een winstverdeling met een compagnon. Een sterke maand verhoogt het bedrag direct, een rustige maand verlaagt het.</p></section>`}
@@ -737,7 +755,123 @@ async function act(k,ds){
   if(k==="resadv"){await saveCfg({advies:{}});toast("Standaardwaarden hersteld");return}
   if(k==="catrule"){const cat=$("cr"+ds.i)?.value;if(!cat||!ds.naam)return;const L=(CFG.catRegels||[]).filter(r=>r.zoek.toLowerCase()!==ds.naam.toLowerCase());await saveCfg({catRegels:[...L,{zoek:ds.naam,cat}]});toast("Indeling vastgelegd");return}
   if(k==="delrule"){await saveCfg({catRegels:(CFG.catRegels||[]).filter((r,i)=>i!==+ds.i)});return}
+  if(k==="analyse")return analyse();
+  if(k==="savprof"){const P={...(CFG.profiel||{})};for(const key of ["horizonJaren","maxDaling","maxPerAandeel","maxCrypto","doelKern","maandinleg"]){const v=$("pr_"+key)?.value.trim().replace(",",".");if(v===""||v==null)delete P[key];else if(!isNaN(+v))P[key]=+v}
+    P.doelen=$("pr_doelen")?.value.trim()||null;P.uitsluitingen=$("pr_uit")?.value.trim()||null;P.ingevuld=today();await saveCfg({profiel:P});toast("Regels opgeslagen. Klik op Analyseer opnieuw voor een advies op basis van je nieuwe regels.");return}
   if(k==="import")return importDlg()}
+
+/* ---------- Mijn Vermogensadviseur ---------- */
+/* De cijfers hieronder worden in code berekend (feitenblad). De AI schrijft alleen de uitleg en
+   het advies; de server controleert elk getal daarin tegen dit feitenblad. */
+let ADVIEZEN=[], FEITEN_OPGESLAGEN=null, FEITEN_T=null;const ADV_UI={bezig:false,auto:false,fout:null,log:null};
+const r0=v=>Math.round(+v||0), r1=v=>Math.round((+v||0)*10)/10, pc=v=>String(r1(v)).replace(".",",")+"%";
+function pfLaatst(port){return PF.filter(p=>p.port===port).sort((x,y)=>y.datum.localeCompare(x.datum))[0]||null}
+function soortPos(p){return /crypto/i.test(p.product)?"crypto":/\bETF\b|UCITS|Index/i.test(p.product)?"ETF":"aandeel"}
+function profielRegels(){const P=CFG?.profiel||{};const d={horizonJaren:10,maxDaling:35,maxPerAandeel:10,maxCrypto:10,doelKern:70,maandinleg:0};const o={};let std=0;
+  for(const k of Object.keys(d)){const v=P[k];if(typeof v==="number"&&isFinite(v))o[k]=v;else{o[k]=d[k];std++}}return {...o,standaard:std,ingevuld:P.ingevuld||null}}
+function feitenblad(){if(!ready.cfg||!ready.saldi||!ready.pf)return null;const now=today();const T=totals(now);const C=pAdvies({calc:true});const S=C.steps;const R=profielRegels();
+  const F=[];const f=(id,label,waarde,eenheid="EUR",bron)=>{if(waarde==null||!isFinite(waarde))return;F.push({id,label,waarde:eenheid==="EUR"?r0(waarde):r1(waarde),eenheid,...(bron?{bron}:{})})};
+  const prive=accs().filter(a=>a.meetellen!==false&&a.scope!=="zakelijk"&&!isInv(a));const sv=a=>saldoOp(a,now)?.eur||0;
+  // vermogen en verdeling
+  f("totaal_vermogen","Totaal vermogen (zakelijk en privé, incl. beleggingen en pensioen)",T.totaal);
+  f("prive_vermogen","Privévermogen zonder pensioen",T.prive);f("zakelijk_geld","Geld op zakelijke rekeningen",T.zakelijk);
+  f("belegd","Beleggingen (gewone rekening)",T.belegd);f("pensioen","Pensioenrekening",T.pensioen);
+  const pv=T.prive+T.pensioen;if(pv>0){f("pct_belegd","Deel van privévermogen dat belegd is (incl. pensioen)",(T.belegd+T.pensioen)/pv*100,"%")}
+  const grootste=prive.map(a=>({a,v:sv(a)})).sort((x,y)=>y.v-x.v)[0];if(grootste&&pv>0){f("grootste_rekening","Grootste privérekening: "+grootste.a.instelling+" "+grootste.a.naam,grootste.v);f("pct_grootste_rekening","Deel van privévermogen op die ene rekening",grootste.v/pv*100,"%")}
+  // belasting
+  const nm=["btw","ib_vorig","ib_dit_jaar"];S.slice(0,3).forEach((s,i)=>{f(nm[i]+"_nodig",s.n+": nodig",s.need==null?null:s.need);f(nm[i]+"_apart",s.n+": staat apart",s.have);f(nm[i]+"_tekort",s.n+": nog apart te zetten",Math.max(0,(s.need||0)-s.have))});
+  f("belasting_tekort","Totaal belastinggeld dat nog apart moet",S.slice(0,3).reduce((t,s)=>t+Math.max(0,(s.need||0)-s.have),0));
+  S.slice(0,3).forEach((s,i)=>{if(s.uitPrive>0)f(nm[i]+"_uit_prive",s.n+": deel dat uit privégeld moet komen, omdat het zakelijke geld op is",s.uitPrive)});
+  const zp=S.slice(0,3).reduce((t,s)=>t+(s.uitPrive||0),0);if(zp>0)f("belasting_uit_prive","Belastinggeld dat in totaal uit privégeld moet komen (zakelijk geld reikt niet)",zp);
+  if(C.ibPerMaand>0)f("ib_per_maand","Inkomstenbelasting die er per maand bijkomt",C.ibPerMaand);
+  if(C.PR){f("winst_tm","Winst dit jaar t/m "+MNL[+C.PR.last.slice(5,7)-1],C.PR.wY);f("winst_jaar","Verwachte winst heel jaar",C.PR.wP);f("ib_jaar","Verwachte IB en Zvw heel jaar",C.PR.J.tax)}
+  // buffers en doelen
+  const bn=["operationeel","zakelijke_buffer","privebuffer","woninginrichting"];S.slice(3,7).forEach((s,i)=>{if(s.need!=null)f(bn[i]+"_nodig",s.n+": doel",s.need);f(bn[i]+"_heeft",s.n+": staat erop",s.have)});
+  const bufNodig=S.slice(3,6).reduce((t,s)=>t+(s.need==null?0:s.need),0),bufHeeft=S.slice(3,6).reduce((t,s)=>t+(s.need==null?0:Math.min(s.have,s.need)),0);if(bufNodig>0)f("pct_buffers","Buffers op doel",bufHeeft/bufNodig*100,"%");
+  S.slice(3,5).forEach((s,i)=>{if(s.tekort>0)f(bn[i]+"_tekort",s.n+": tekort dat niet uit zakelijk geld te dekken is",s.tekort)});
+  f("vrij_prive","Privégeld vrij na belasting, buffers en doelen",C.vrijP);f("vrij_zakelijk","Zakelijk geld vrij na belasting en buffers",C.vrijZ);
+  // beleggingen
+  const ports=accs().filter(a=>a.type==="belegging"&&a.meetellen!==false);const pens=accs().filter(a=>a.type==="pensioen"&&a.meetellen!==false);
+  const pos=[];let cash=0;const bronnen=[];
+  for(const a of ports){const p=pfLaatst(a.id);if(!p)continue;bronnen.push({label:"Posities "+a.instelling+" "+a.naam,datum:p.datum});cash+=+p.cash||0;for(const x of p.posities||[])pos.push({product:x.product,rekening:a.instelling+" "+a.naam,soort:soortPos(x),valuta:x.koersValuta||"EUR",waarde:r0(x.waarde)})}
+  const beleg=pos.reduce((t,x)=>t+x.waarde,0)+cash;
+  const som=s=>pos.filter(x=>x.soort===s).reduce((t,x)=>t+x.waarde,0);const cr=som("crypto"),etf=som("ETF"),aand=som("aandeel");
+  pos.forEach(x=>x.gewicht=beleg?r1(x.waarde/beleg*100):0);pos.sort((x,y)=>y.waarde-x.waarde);
+  const chk=[];
+  if(beleg>0){f("beleggingen_totaal","Waarde gewone beleggingsrekening(en) incl. cash",beleg);f("beleggingen_cash","Cash op de beleggingsrekening",cash);
+    f("crypto_waarde","Crypto",cr);f("crypto_pct","Crypto als deel van beleggingen",cr/beleg*100,"%");f("etf_waarde","ETF's",etf);f("etf_pct","ETF's als deel van beleggingen",etf/beleg*100,"%");
+    f("aandelen_waarde","Losse aandelen",aand);f("aandelen_pct","Losse aandelen als deel van beleggingen",aand/beleg*100,"%");
+    f("usd_pct","Deel in dollars genoteerd",pos.filter(x=>x.valuta==="USD").reduce((t,x)=>t+x.waarde,0)/beleg*100,"%");
+    f("aantal_posities","Aantal posities",pos.length,"aantal");const klein=pos.filter(x=>x.waarde<200);f("kleine_posities","Posities kleiner dan € 200",klein.length,"aantal");f("kleine_posities_waarde","Waarde van die kleine posities",klein.reduce((t,x)=>t+x.waarde,0));
+    const inl=ports.reduce((t,a)=>t+inlegTot(a.id,now),0);if(inl>0){f("inleg","Netto ingelegd op de beleggingsrekening",inl);f("winst_verlies","Winst of verlies sinds inleg",beleg-inl);f("rendement_pct","Rendement sinds inleg",(beleg-inl)/inl*100,"%")}
+    // regels
+    const crMax=R.maxCrypto/100*beleg;const crOk=cr<=crMax+1;chk.push({regel:`Crypto max ${R.maxCrypto}% van beleggingen`,gehaald:crOk,toelichting:`nu ${pc(cr/beleg*100)}`});
+    if(!crOk){f("crypto_max_bedrag","Maximaal toegestaan in crypto volgens je regel",crMax);f("crypto_boven_limiet","Crypto boven je limiet",cr-crMax)}
+    const aMax=R.maxPerAandeel/100*beleg;pos.filter(x=>x.soort==="aandeel").forEach((x,i)=>{if(x.waarde>aMax+1){x.inBuitenRegel=`boven max ${R.maxPerAandeel}% per aandeel`;f("boven_max_"+i,`${x.product}: boven je max per aandeel`,x.waarde-aMax)}});
+    const coins=pos.filter(x=>x.soort==="crypto");coins.forEach((x,i)=>{if(x.waarde>aMax+1){x.inBuitenRegel=`boven max ${R.maxPerAandeel}% per positie`;f("crypto_boven_max_"+i,`${x.product}: boven je max per positie`,x.waarde-aMax)}});
+    chk.push({regel:`Max ${R.maxPerAandeel}% per losse positie`,gehaald:!pos.some(x=>x.inBuitenRegel),toelichting:pos.filter(x=>x.inBuitenRegel).map(x=>`${x.product} ${pc(x.gewicht)}`).join(", ")||"alle posities binnen de grens"});
+    const kern=R.doelKern/100*beleg;f("kern_doel","Doelbedrag wereldwijde ETF-kern volgens je regel",kern);if(etf<kern-1)f("kern_tekort","ETF-kern onder je doel",kern-etf);
+    chk.push({regel:`Wereldwijde ETF als kern, doel ${R.doelKern}%`,gehaald:etf>=kern-1,toelichting:`nu ${pc(etf/beleg*100)}`});
+    // stresstest
+    const st=(etf+aand)*0.2+cr*0.5;f("stress_verlies","Stresstest: aandelen en ETF's -20% en crypto -50%, verlies",st);f("stress_pct","Stresstest: verlies als deel van beleggingen",st/beleg*100,"%");
+    chk.push({regel:`Maximale tijdelijke daling ${R.maxDaling}%`,gehaald:st/beleg*100<=R.maxDaling,toelichting:`stresstest ${pc(st/beleg*100)}`})}
+  for(const a of pens){const p=pfLaatst(a.id);if(!p)continue;bronnen.push({label:"Pensioenrekening "+a.instelling,datum:p.datum});const inl=inlegTot(a.id,now);if(inl>0){f("pensioen_inleg","Ingelegd op de pensioenrekening",inl);f("pensioen_rendement_pct","Rendement pensioenrekening sinds inleg",(p.waarde-inl)/inl*100,"%")}}
+  if(R.maandinleg>0)f("maandinleg","Vaste maandinleg volgens je regel",R.maandinleg);
+  const belTekort=S.slice(0,3).reduce((t,s)=>t+Math.max(0,(s.need||0)-s.have),0);chk.unshift({regel:"Belastinggeld staat volledig apart",gehaald:belTekort<1,toelichting:belTekort<1?"btw en inkomstenbelasting gedekt":`nog ${eur(belTekort)} apart te zetten`});
+  // bronnen en waarschuwingen
+  const ds=SALDI.map(s=>s.datum).sort();bronnen.unshift({label:"Banksaldi (nieuwste meting)",datum:ds.at(-1)||null});if(PROG?.bijgewerkt)bronnen.push({label:"Winst en kosten (DigiBoox en Kostenmonitor)",datum:PROG.bijgewerkt});
+  const W=[];for(const b of bronnen){if(b.datum&&(new Date(now)-new Date(b.datum))/864e5>45)W.push(`${b.label} is van ${fmtD(b.datum)}, ouder dan 45 dagen.`)}
+  const mis=accs().filter(a=>a.meetellen!==false&&!saldoOp(a,now));if(mis.length)W.push("Geen saldo bekend van: "+mis.map(a=>a.instelling+" "+a.naam).join(", ")+".");
+  if(R.standaard)W.push(`${R.standaard} van de 6 beleggingsregels zijn standaardwaarden; Jarno heeft ze nog niet zelf ingevuld.`);
+  if(S[5]&&S[5].need==null)W.push("Privé-uitgaven per maand onbekend, dus de privébuffer is niet te toetsen.");
+  if(!S[1].need||S[1].need===S[1].have)W.push("De aanslag inkomstenbelasting over vorig jaar is nog niet ingevuld; het potje telt als voldoende.");
+  return {versie:1,datum:now,bronnen,feiten:F,posities:pos,regelchecks:chk,waarschuwingen:W}}
+function bewaarFeiten(){clearTimeout(FEITEN_T);FEITEN_T=setTimeout(async()=>{try{const fb=feitenblad();if(!fb)return;const s=JSON.stringify(fb);if(s===FEITEN_OPGESLAGEN)return;
+  await db.doc("v/feiten").set(fb);FEITEN_OPGESLAGEN=s;if(PAGE==="adviseur")autoAnalyse()}catch(e){console.warn("feitenblad opslaan",e)}},1500)}
+function adviezen(){return [...ADVIEZEN].sort((a,b)=>(b.id||"").localeCompare(a.id||""))}
+function autoAnalyse(){const m=today().slice(0,7);if(ADV_UI.bezig||ADV_UI.auto)return;if(!FEITEN_OPGESLAGEN)return;if(adviezen().some(d=>d.maand===m))return;ADV_UI.auto=true;analyse()}
+async function analyse(){if(ADV_UI.bezig)return;ADV_UI.bezig=true;ADV_UI.fout=null;render();
+  try{const fb=feitenblad();if(fb){await db.doc("v/feiten").set(fb);FEITEN_OPGESLAGEN=JSON.stringify(fb)}
+    const r=await fetch("/api/vermogen/advies",{method:"POST",credentials:"same-origin"});const d=await r.json().catch(()=>({}));
+    if(d&&d.id&&d.status!=="fout"||d.advies){ADVIEZEN=[...ADVIEZEN.filter(x=>x.id!==d.id),d];if(d.status!=="ok")ADV_UI.fout=d.melding||"Het advies is niet goedgekeurd."}else ADV_UI.fout=d.melding||d.error||`De analyse lukte niet (${r.status}).`}
+  catch(e){ADV_UI.fout="De analyse lukte niet: "+e.message}finally{ADV_UI.bezig=false;render()}}
+const OORDEEL_PILL={Uitbreiden:"ok",Vasthouden:"info",Verkleinen:"warn","Nader onderzoeken":"dim"};
+function pAdviseur(){const L=adviezen();const ok=L.find(d=>d.status==="ok");const laatst=L[0];const fb=feitenblad();const val=id=>fb?.feiten.find(x=>x.id===id)?.waarde;const R=profielRegels();
+  const A=ok?.advies;const g=A?.gezondheid?.oordeel;const gk=g==="Goed"?"ok":g==="Redelijk"?"warn":"bad";
+  const bron=fb?fb.bronnen.filter(b=>b.datum).map(b=>`${esc(b.label)} ${fmtD(b.datum)}`).join(" · "):"";
+  const tiles=fb?`<div class="tiles">
+    <div class="tile"><span class="lab">Totaal vermogen</span><span class="val">${eur(val("totaal_vermogen"))}</span><span class="sub">privé ${eur(val("prive_vermogen"))} · zakelijk ${eur(val("zakelijk_geld"))}</span></div>
+    <div class="tile"><span class="lab">Beleggingen</span><span class="val">${eur(val("beleggingen_totaal"))}</span><span class="sub">${val("rendement_pct")!=null?`${(val("rendement_pct")>=0?"+":"")+String(val("rendement_pct")).replace(".",",")}% sinds inleg`:"rendement onbekend"}</span></div>
+    <div class="tile"><span class="lab">Belasting apart</span><span class="val" style="color:var(${val("belasting_tekort")>0?"--bad":"--ok"})">${val("belasting_tekort")>0?"− "+eur(val("belasting_tekort")).replace("€ ","€ "):"Op orde"}</span><span class="sub">${val("belasting_tekort")>0?"moet nog apart voor btw en inkomstenbelasting":"btw en inkomstenbelasting gedekt"}</span></div>
+    <div class="tile"><span class="lab">Buffers op doel</span><span class="val">${val("pct_buffers")!=null?Math.round(val("pct_buffers"))+"%":"–"}</span><span class="sub">operationeel, zakelijk en privé</span></div></div>`:"";
+  const actieKaart=a=>`<div class="card" style="gap:8px"><div class="row" style="gap:8px;align-items:center"><span class="pill ${a.prioriteit===1?"bad":a.prioriteit===2?"warn":"info"}">Prioriteit ${a.prioriteit}</span><b style="font:600 15px var(--font-display)">${esc(a.titel)}</b></div>
+    <p class="msg" style="margin:0"><b>${esc(a.actie)}</b></p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:6px 16px">${[["Waarom",a.waarom],["Voordeel",a.voordeel],["Risico",a.risico],["Effect",a.effect]].filter(x=>x[1]).map(([k,v])=>`<div><div class="sub">${k}</div><div style="font-size:13.5px">${esc(v)}</div></div>`).join("")}</div>
+    ${a.data?`<div class="sub">Op basis van: ${esc(a.data)}</div>`:""}</div>`;
+  const lijst=(t,arr,k)=>`<div class="card" style="gap:8px"><h3 style="margin:0;font:600 14px var(--font-display);display:flex;align-items:center;gap:8px"><i style="width:8px;height:8px;border-radius:50%;background:var(--${k==="info"?"accent":k})"></i>${t}</h3>${arr?.length?`<ul style="margin:0;padding-left:18px;display:grid;gap:4px">${arr.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:'<p class="sub" style="margin:0">Niets bijzonders.</p>'}</div>`;
+  const posMap=new Map((fb?.posities||[]).map(p=>[p.product,p]));
+  const aandelen=A?.aandelen?.length?`<section class="card"><h2>Per positie</h2><p class="lead">Beoordeeld op je regels, spreiding en grootte. Zonder actuele koersen of jaarcijfers: de waarde komt uit je laatste DEGIRO-export.</p><div class="tbl"><table><thead><tr><th class="l">Positie</th><th>Waarde</th><th>Gewicht</th><th class="l">Oordeel</th><th class="l">Onderbouwing</th><th class="l">Voorstel</th></tr></thead><tbody>
+    ${A.aandelen.map(x=>{const p=posMap.get(x.product);return `<tr><td class="l"><b>${esc(x.product)}</b>${p?`<div class="sub">${esc(p.soort)}${p.inBuitenRegel?` · <span style="color:var(--bad)">${esc(p.inBuitenRegel)}</span>`:""}</div>`:""}</td><td>${p?eur(p.waarde):"–"}</td><td>${p?String(p.gewicht).replace(".",",")+"%":"–"}</td><td class="l"><span class="pill ${OORDEEL_PILL[x.oordeel]||"info"}">${esc(x.oordeel)}</span></td><td class="l" style="white-space:normal;min-width:220px">${esc(x.onderbouwing)}</td><td class="l" style="white-space:normal">${esc(x.voorstel)}</td></tr>`}).join("")}</tbody></table></div></section>`:"";
+  const regels=fb?.regelchecks?.length?`<section class="card"><h2>Je regels getoetst</h2><div class="grid" style="gap:6px">${fb.regelchecks.map(c=>`<div class="row" style="align-items:flex-start;gap:8px"><span class="pill ${c.gehaald?"ok":"bad"}">${c.gehaald?"Gehaald":"Niet gehaald"}</span><span class="msg" style="flex:1"><b>${esc(c.regel)}</b> · ${esc(c.toelichting)}</span></div>`).join("")}</div>${fb.waarschuwingen.length?`<div class="grid" style="gap:4px;margin-top:4px">${fb.waarschuwingen.map(w=>`<p class="sub" style="margin:0">Let op: ${esc(w)}</p>`).join("")}</div>`:""}</section>`:"";
+  const P=CFG.profiel||{};const fld=(k,l,stap,eenh,hint)=>`<label for="pr_${k}">${l}<input id="pr_${k}" type="number" step="${stap}" min="0" value="${P[k]??""}" placeholder="${({horizonJaren:10,maxDaling:35,maxPerAandeel:10,maxCrypto:10,doelKern:70,maandinleg:0})[k]}"><span class="sub" style="font-size:11px">${eenh}${hint?" · "+hint:""}</span></label>`;
+  const intake=`<section class="card" id="intake"><h2>Je beleggingsregels</h2><p class="lead">${R.standaard?`Nog ${R.standaard} van de 6 regels op de standaardwaarde (grijs). Vul ze in, dan toetst de adviseur alles aan jouw keuzes.`:`Ingevuld op ${fmtD(R.ingevuld)}. Pas aan wanneer je situatie verandert.`}</p>
+    <div class="form" style="align-items:start">${fld("horizonJaren","Beleggingshorizon","1","jaar","geld dat je binnen 3 jaar nodig hebt hoort niet belegd")}${fld("maxDaling","Maximale tijdelijke daling","5","% die je accepteert","20, 35 of 50")}${fld("maxPerAandeel","Max. per losse positie","1","% van je beleggingen")}${fld("maxCrypto","Max. crypto","1","% van je beleggingen")}${fld("doelKern","Wereldwijde ETF als kern","5","% van je beleggingen")}${fld("maandinleg","Vaste maandinleg","50","euro per maand")}
+    <label for="pr_doelen" style="grid-column:1/-1">Doelen (bijv. woning: bedrag en jaar)<input id="pr_doelen" value="${esc(P.doelen||"")}" placeholder="Bijv. eigen woning € 60.000 eigen inbreng in 2028"></label>
+    <label for="pr_uit" style="grid-column:1/-1">Wat je niet wilt (sectoren of producten)<input id="pr_uit" value="${esc(P.uitsluitingen||"")}" placeholder="Bijv. geen tabak, geen hefboomproducten"></label></div>
+    <div class="row"><button type="button" class="pri" data-act="savprof">Regels opslaan</button></div></section>`;
+  const log=L.filter(d=>d.status==="ok"&&d!==ok);
+  const logboek=`<section class="card"><h2>Eerdere adviezen</h2>${log.length?log.map(d=>`<details><summary style="cursor:pointer"><b>${fmtD(d.datum.slice(0,10))}</b> · ${esc(d.advies?.gezondheid?.oordeel||"")} · ${d.advies?.acties?.length||0} acties</summary><p class="msg">${esc(d.advies?.samenvatting||"")}</p><ol style="margin:0;padding-left:18px">${(d.advies?.acties||[]).map(a=>`<li>${esc(a.titel)}: ${esc(a.actie)}</li>`).join("")}</ol></details>`).join(""):'<p class="sub" style="margin:0">Nog geen eerdere adviezen. Elke maand komt er hier één bij, zodat je later kunt terugzien wat je deed en wat het opleverde.</p>'}</section>`;
+  const status=ADV_UI.bezig?`<div class="card" style="border-color:var(--accent)"><div class="row"><span class="pill info">Bezig</span><span class="msg">De adviseur analyseert je cijfers en controleert elk getal. Dit duurt 1 tot 2 minuten.</span></div></div>`
+    :ADV_UI.fout?`<div class="card" style="border-color:var(--bad-soft)"><div class="row"><span class="pill bad">Niet gelukt</span><span class="msg">${esc(ADV_UI.fout)}</span></div></div>`
+    :laatst&&laatst.status!=="ok"&&laatst!==L.find(d=>d.status==="ok")&&(!ok||laatst.id>ok.id)?`<div class="card" style="border-color:var(--warn-soft)"><div class="row"><span class="pill warn">Let op</span><span class="msg">De laatste analyse (${fmtD(laatst.datum.slice(0,10))}) is niet goedgekeurd: ${esc(laatst.melding||"getallen kwamen niet overeen")}. Hieronder staat het laatste goedgekeurde advies.</span></div></div>`:"";
+  const head=`<div class="head"><div><h1>Mijn adviseur</h1><div class="big" style="color:var(--${A?gk:"muted"})">${A?esc(g):"Nog geen advies"}</div><div class="sub">${ok?`Analyse ${fmtD(ok.datum.slice(0,10))} · cijfers van ${fmtD(ok.feitenDatum)}`:"Wordt elke maand vernieuwd"}${bron?" · "+bron:""}</div></div>
+    <div class="row" style="gap:8px"><span class="pill dim" title="Voor eigen gebruik: het systeem rekent en licht toe, jij beslist en voert zelf uit.">Beslissingsondersteuning, geen gereguleerd advies</span><button type="button" class="pri" data-act="analyse" ${ADV_UI.bezig?"disabled":""}>${ADV_UI.bezig?"Bezig…":ok?"Analyseer opnieuw":"Maak mijn eerste advies"}</button></div></div>`;
+  const body=A?`<section class="card"><h2>Deze maand in het kort</h2><p class="lead" style="font-size:15px">${esc(A.samenvatting)}</p><p class="sub" style="margin:0">${esc(A.gezondheid.toelichting)}</p></section>
+    <section class="grid" style="gap:12px"><h2 style="margin:4px 0 0;font:600 17px var(--font-display)">Wat ik deze maand zou doen</h2>${A.acties.length?A.acties.map(actieKaart).join(""):'<div class="card"><p class="msg ok" style="margin:0">Geen acties nodig deze maand.</p></div>'}${A.nietsDoen?`<p class="sub" style="margin:0">Niets doen: ${esc(A.nietsDoen)}</p>`:""}</section>
+    <section class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px">${lijst("Wat goed gaat",A.goed,"ok")}${lijst("Wat aandacht vraagt",A.aandacht,"warn")}${lijst("Kansen",A.kansen,"info")}</section>
+    ${aandelen}`
+    :`<section class="card"><h2>Hoe dit werkt</h2><p class="lead">Elke maand berekent dit dashboard je verdeling, buffers, belastingreserve en de spreiding van je beleggingen. De adviseur zet dat om in maximaal 5 concrete acties en een oordeel per positie. Elk getal in het advies wordt gecontroleerd tegen je eigen cijfers; klopt er één niet, dan wordt het advies niet getoond. ${R.standaard?"Vul eerst je beleggingsregels hieronder in, of maak meteen een advies met de standaardregels.":""}</p></section>`;
+  return `${head}${status}${tiles}${body}${regels}${intake}${logboek}<p class="notes">De adviseur gebruikt je laatst ingelezen saldi en DEGIRO-export, geen actuele koersen. Hij handelt nooit zelf en ziet geen rekeningnummers. Fiscale punten blijven voor je boekhouder.</p>`}
 
 /* ---------- import ---------- */
 function importDlg(){const f=$("dlgform");
@@ -791,7 +925,7 @@ async function doImport(r,fname){const test=!!$("itest");const extra=test?{test:
   db.doc(ROOT).onSnapshot(s=>{CFG=s.exists?s.data():null;ready.cfg=true;render()},e=>{$("main").innerHTML=`<div class="empty">Laden lukte niet (${esc(e.code)}). Alleen de eigenaar kan deze gegevens zien.</div>`});
   const sub=(name,set)=>col(name).onSnapshot(q=>{set(q.docs.map(d=>({...d.data(),_id:d.id})));ready[name]=true;render()},()=>{});
   db.doc("v/prognose").onSnapshot(s=>{PROG=s.exists?s.data():null;render()},()=>{});
-  sub("saldi",v=>SALDI=v);sub("pf",v=>PF=v);sub("inleg",v=>INLEG=v);sub("flows",v=>FLOWS=v);
+  sub("saldi",v=>SALDI=v);sub("pf",v=>PF=v);db.doc("v").collection("advies").onSnapshot(q=>{const srv=q.docs.map(d=>d.data());const ids=new Set(srv.map(d=>d.id));ADVIEZEN=[...srv,...ADVIEZEN.filter(d=>!ids.has(d.id))];render()},()=>{});db.doc("v/feiten").get().then(s=>{if(s.exists)FEITEN_OPGESLAGEN=JSON.stringify(s.data())}).catch(()=>{});sub("inleg",v=>INLEG=v);sub("flows",v=>FLOWS=v);
   go();
 })();
 </script>
