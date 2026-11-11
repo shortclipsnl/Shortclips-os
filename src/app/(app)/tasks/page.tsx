@@ -12,11 +12,19 @@ import { ColleagueToggle, QuickTaskLines, TaskItem, type TaskItemData } from "./
 import { HandoverBoard, type HandoverNote } from "./handover-board";
 import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
 import { taskHref } from "@/lib/task-links";
+import { taskSignal } from "@/lib/task-signals";
 
 export const metadata: Metadata = { title: "Taken" };
 export const dynamic = "force-dynamic";
 
 const OPEN = ["todo", "in_progress", "blocked"] as const;
+
+/**
+ * Controletaken (opscontrol:) die niet op de takenpagina horen: alleen de
+ * klantherinnering voor feedback blijft. Video's versturen, inplannen of
+ * goedkeuren weet het team zelf.
+ */
+const NOT_HIDDEN_OPS = sql`not (coalesce(${tasks.dedupeKey}, '') like 'opscontrol:%' and coalesce(${tasks.dedupeKey}, '') not like '%klantfeedback:feedback-ontbreekt:%' and coalesce(${tasks.dedupeKey}, '') not like '%klantfeedback:te-laat-bij-klant:%')`;
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<{ persoon?: string }> }) {
   const viewer = await requireInternal();
@@ -30,7 +38,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     db
       .select({ id: tasks.id, assigneeId: tasks.assigneeId, dueOn: tasks.dueOn })
       .from(tasks)
-      .where(and(isNull(tasks.deletedAt), inArray(tasks.status, [...OPEN]), sql`not (${tasks.source} = 'automation' and ${tasks.entityType} = 'ai_insight')`, scopeToClients(viewer, tasks.clientId))),
+      .where(and(isNull(tasks.deletedAt), inArray(tasks.status, [...OPEN]), sql`not (${tasks.source} = 'automation' and ${tasks.entityType} = 'ai_insight')`, NOT_HIDDEN_OPS, scopeToClients(viewer, tasks.clientId))),
     db
       .select({ id: handoverNotes.id, body: handoverNotes.body, authorId: handoverNotes.authorId, forUserId: handoverNotes.forUserId, resolvedById: handoverNotes.resolvedById, createdAt: handoverNotes.createdAt, resolvedAt: handoverNotes.resolvedAt })
       .from(handoverNotes)
@@ -101,11 +109,16 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       .from(tasks)
       .leftJoin(clients, eq(clients.id, tasks.clientId))
       .leftJoin(users, eq(users.id, tasks.assigneeId))
-      .where(and(where, sql`not (${tasks.source} = 'automation' and ${tasks.entityType} = 'ai_insight')`))
+      .where(and(where, sql`not (${tasks.source} = 'automation' and ${tasks.entityType} = 'ai_insight')`, NOT_HIDDEN_OPS))
       .orderBy(asc(tasks.dueOn), desc(tasks.priority))
       .limit(400);
     // Doorklikken naar waar de taak over gaat (bijv. de scriptsessie).
-    return rows.map(({ entityType, entityId, dedupeKey, ...t }) => ({ ...t, href: taskHref({ entityType, entityId, dedupeKey }) }));
+    // Feedbackherinnering en maandrapportage krijgen een compacte, opvallende weergave.
+    return rows.map(({ entityType, entityId, dedupeKey, ...t }) => ({
+      ...t,
+      href: taskHref({ entityType, entityId, dedupeKey }),
+      signal: taskSignal({ title: t.title, description: t.description, dedupeKey, entityType, clientName: t.clientName }),
+    }));
   }
 
   const selected = persoon && persoon !== "algemeen" && persoon !== "overdracht" ? team.find((u) => u.id === persoon) : null;

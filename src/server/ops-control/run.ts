@@ -167,6 +167,15 @@ async function reconcile(
       continue;
     }
     if (!f) continue;
+
+    // Punt zonder taak (alles behalve feedbackherinneringen): een eerder
+    // aangemaakte controletaak verdwijnt van de takenpagina.
+    if (!f.createTask && !f.linkedTaskId && row?.taskId && !isLinkedKey(row.itemKey)) {
+      const t = taskById.get(row.taskId);
+      if (t && !t.deletedAt && t.status !== "done" && t.status !== "cancelled") {
+        await db.update(tasks).set({ status: "cancelled", updatedAt: nowTs }).where(eq(tasks.id, row.taskId));
+      }
+    }
     if (d.item === "none") continue;
 
     // Eigen taak die niet meer bij het punt hoort: sleutel vrijgeven.

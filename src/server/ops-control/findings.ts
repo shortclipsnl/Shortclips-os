@@ -9,7 +9,7 @@ import { integrationHealth } from "@/server/integrations/registry";
 import { CORE_STAFF_EMAILS } from "@/server/core-staff";
 import { addWorkingDays } from "@/lib/workdays";
 import { isClosedKey, SCRIPTING_TASK_PREFIX } from "@/lib/scripting-task-plan";
-import { OPS_TASK_PREFIX, type Finding, type OpsDomain } from "@/lib/ops-control/plan";
+import { OPS_TASK_CATEGORIES, OPS_TASK_PREFIX, type Finding, type OpsDomain } from "@/lib/ops-control/plan";
 
 /**
  * Verzamelt wat de controle moet bewaken, uit de bestaande bronnen van de Hub:
@@ -34,12 +34,11 @@ const CATEGORY: Record<string, CatRule> = {
   "Feedback ontbreekt": { domain: "klantfeedback", verifiable: false, snooze: 2 },
   "Te laat bij klant": { domain: "klantfeedback", verifiable: false, snooze: 2 },
   "Klant vraagt aandacht": { domain: "klantcommunicatie", verifiable: false, snooze: 5 },
-  "Video klaar maar niet verstuurd": { domain: "klantcommunicatie", verifiable: true, snooze: 0 },
-  "Video niet gepubliceerd": { domain: "klantcommunicatie", verifiable: true, snooze: 0 },
   "Opname voorbereiden": { domain: "opname", verifiable: true, snooze: 0 },
   "Scripts controleren": { domain: "scripting", verifiable: true, snooze: 0 },
 };
-// Bewust niet in de controle: koppelingen (eigen melding aan Jarno), contracten
+// Bewust niet in de controle: video's versturen, inplannen of publiceren (weet het
+// team zelf), koppelingen (eigen melding aan Jarno), contracten
 // (commercieel) en dalende resultaten (analyse, geen dagelijkse taak). Die blijven
 // op Aandachtspunten staan.
 
@@ -181,6 +180,6 @@ function fromQuality(it: QualityItem, clientIdByName: Map<string, string>): Find
     clientId, clientLabel: it.clientName ?? null, ownerId: it.ownerId ?? null,
     action: it.action.slice(0, 200), reason: it.reason,
     href: it.href ?? null, priority: it.priority === "hoog" ? "hoog" : "normaal", severity,
-    verifiable: rule.verifiable, snoozeWorkdays: rule.snooze, createTask: true, jarnoReason,
+    verifiable: rule.verifiable, snoozeWorkdays: rule.snooze, createTask: OPS_TASK_CATEGORIES.has(it.category), jarnoReason,
   };
 }

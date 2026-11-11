@@ -39,6 +39,18 @@ export const opsTaskKey = (itemKey: string) => `${OPS_TASK_PREFIX}${itemKey}`;
 /** Sleutel voor een taak die niet meer bij een open punt hoort (unieke index vrijgeven). */
 export const opsRetiredKey = (itemKey: string, taskId: string) => `${OPS_TASK_PREFIX}gesloten:${itemKey}:${taskId}`.slice(0, 200);
 
+/**
+ * Welke controlepunten als taak op de takenpagina komen. Alleen de
+ * klantherinnering voor openstaande feedback: video's versturen, inplannen of
+ * goedkeuren weet het team zelf. Overige punten blijven zichtbaar op
+ * Aandachtspunten en in de operationele controle, maar zonder taak.
+ */
+export const OPS_TASK_CATEGORIES: ReadonlySet<string> = new Set(["Feedback ontbreekt", "Te laat bij klant"]);
+const FEEDBACK_ITEM_SLUGS = ["klantfeedback:feedback-ontbreekt:", "klantfeedback:te-laat-bij-klant:"];
+/** Is deze taaksleutel (opscontrol:…) een klantherinnering voor feedback? */
+export const isFeedbackReminderKey = (key: string | null | undefined) =>
+  Boolean(key?.startsWith(OPS_TASK_PREFIX) && FEEDBACK_ITEM_SLUGS.some((s) => key.includes(s)));
+
 /** Wat de controle in de bronnen heeft gevonden. */
 export type Finding = {
   key: string;

@@ -3,10 +3,11 @@
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpRight, Check, ChevronDown, Copy, Loader2, Pencil, Plus, Trash2, Users, X } from "lucide-react";
+import { ArrowUpRight, BarChart3, BellRing, Check, ChevronDown, Copy, Loader2, Pencil, Plus, Send, Trash2, Users, X } from "lucide-react";
 import { createTask, createTasksBulk, deleteTask, setTaskStatus, updateTask } from "@/server/actions/tasks";
-import { Button, ClientLogo, ErrorNote, TeamAvatar } from "@/components/ui";
+import { Button, ClientLogo, ErrorNote, LinkButton, TeamAvatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import type { TaskSignal } from "@/lib/task-signals";
 
 /**
  * Kort, vrolijk "belletje" wanneer een taak wordt afgevinkt — puur via de Web
@@ -60,6 +61,8 @@ export type TaskItemData = {
   clientLogo: string | null;
   /** Waar de taak over gaat (bijv. de scriptsessie op Scripting), of null. */
   href?: string | null;
+  /** Automatische melding (feedbackherinnering, maandrapportage) → compacte weergave met actieknop. */
+  signal?: TaskSignal | null;
 };
 
 const PRIORITIES = [
@@ -269,6 +272,7 @@ export function TaskItem({
   const [celebration, setCelebration] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [reminderCopied, setReminderCopied] = useState(false);
   const [editErr, setEditErr] = useState<string | null>(null);
   // Bewerkvelden — voorgevuld met de huidige taakgegevens.
   const [eTitle, setETitle] = useState(task.title);
@@ -321,6 +325,11 @@ export function TaskItem({
     catch { /* klembord niet beschikbaar */ }
   }
 
+  async function copyReminder(message: string) {
+    try { await navigator.clipboard.writeText(message); } catch { /* klembord niet beschikbaar */ }
+    setReminderCopied(true);
+  }
+
   function toggleDone() {
     if (!done) {
       // Afvinken: meteen groen vinkje + geluidje + een kort schouderklopje, en
@@ -345,15 +354,13 @@ export function TaskItem({
     run(() => setTaskStatus(task.id, "todo"));
   }
 
-  return (
-    <li className="relative px-4 py-2.5">
-      <div className="flex flex-wrap items-center gap-3">
-      {celebration ? (
-        <span className="pointer-events-none absolute left-9 top-0 z-10 -translate-y-1.5 whitespace-nowrap rounded-full bg-[var(--color-good)] px-2.5 py-1 text-xs font-semibold text-white shadow-[var(--shadow-raised)] [animation:scNotifIn_.2s_ease-out]">
-          {celebration}
-        </span>
-      ) : null}
-      {/* Afvinkknop met positief belletje bij afronden. */}
+  const signal = task.signal ?? null;
+  const signalAccent = signal?.kind === "maandrapport" ? "var(--color-brand-500)" : "var(--color-warn)";
+
+  // Gedeelde onderdelen van de taakregel (gewone taak en automatische melding).
+  // Afvinkknop met positief belletje bij afronden.
+  const checkbox = (
+    <>
       <button
         type="button"
         disabled={!canWrite || pending}
@@ -370,28 +377,10 @@ export function TaskItem({
       >
         {pending ? <Loader2 className="size-3.5 animate-spin text-[var(--color-ink-faint)]" /> : <Check className="size-3.5" strokeWidth={3} />}
       </button>
-      <span className="min-w-40 flex-1">
-        {task.href ? (
-          <Link href={task.href} className={cn("group/tl flex w-fit items-center gap-1 text-sm font-medium hover:text-[var(--color-brand-600)] hover:underline", done && "text-[var(--color-ink-faint)] line-through")} title="Open waar deze taak over gaat">
-            {task.title}
-            <ArrowUpRight className="size-3.5 shrink-0 text-[var(--color-ink-faint)] group-hover/tl:text-[var(--color-brand-600)]" />
-          </Link>
-        ) : (
-          <span className={cn("block text-sm font-medium", done && "text-[var(--color-ink-faint)] line-through")}>
-            {task.title}
-          </span>
-        )}
-        {task.clientSlug ? (
-          <Link href={`/clients/${task.clientSlug}`} className="mt-0.5 inline-flex items-center gap-1 text-xs text-[var(--color-ink-muted)] hover:underline">
-            <ClientLogo name={task.clientName ?? "?"} logoUrl={task.clientLogo} color={task.clientColor} size={14} />
-            {task.clientName}
-          </Link>
-        ) : (
-          <span className="mt-0.5 block text-xs text-[var(--color-ink-faint)]">intern</span>
-        )}
-      </span>
-
-      {/* Prioriteit als kleine stip — rustig in de regel, details in bewerken. */}
+    </>
+  );
+  const prioBadge = (
+    <>
       {task.priority !== "normal" ? (
         <span
           className="hidden shrink-0 items-center gap-1 text-2xs font-medium sm:inline-flex"
@@ -403,12 +392,20 @@ export function TaskItem({
         </span>
       ) : null}
 
+    </>
+  );
+  const avatarEl = (
+    <>
       {task.assigneeName ? (
         <span className="hidden shrink-0 items-center gap-1.5 text-xs text-[var(--color-ink-muted)] sm:inline-flex" title={`Toegewezen aan ${task.assigneeName}`}>
           <TeamAvatar name={task.assigneeName} avatarUrl={task.assigneeAvatar} size={28} />
         </span>
       ) : null}
 
+    </>
+  );
+  const actionsEl = (
+    <>
       {canWrite ? (
         <>
           <button
@@ -433,11 +430,106 @@ export function TaskItem({
           </button>
         </>
       ) : null}
+    </>
+  );
+
+  return (
+    <li className="relative px-4 py-2.5">
+      {celebration ? (
+        <span className="pointer-events-none absolute left-9 top-0 z-10 -translate-y-1.5 whitespace-nowrap rounded-full bg-[var(--color-good)] px-2.5 py-1 text-xs font-semibold text-white shadow-[var(--shadow-raised)] [animation:scNotifIn_.2s_ease-out]">
+          {celebration}
+        </span>
+      ) : null}
+      {signal ? (
+        <div
+          className="flex flex-wrap items-center gap-3 rounded-[var(--radius-md)] border border-l-[3px] px-3 py-2"
+          style={{
+            borderColor: `color-mix(in srgb, ${signalAccent} 30%, transparent)`,
+            borderLeftColor: signalAccent,
+            background: `color-mix(in srgb, ${signalAccent} 8%, transparent)`,
+          }}
+        >
+      {checkbox}
+      <span
+        className="grid size-8 shrink-0 place-items-center rounded-full"
+        style={{ color: signalAccent, background: `color-mix(in srgb, ${signalAccent} 18%, transparent)` }}
+        aria-hidden
+      >
+        {signal?.kind === "maandrapport" ? <BarChart3 className="size-4" /> : <BellRing className="size-4" />}
+      </span>
+      <span className="min-w-40 flex-1">
+        {task.href ? (
+          <Link href={task.href} className={cn("group/tl flex w-fit items-center gap-1 text-sm font-semibold hover:text-[var(--color-brand-600)] hover:underline", done && "text-[var(--color-ink-faint)] line-through")} title="Open waar deze melding over gaat">
+            {signal?.title}
+            <ArrowUpRight className="size-3.5 shrink-0 text-[var(--color-ink-faint)] group-hover/tl:text-[var(--color-brand-600)]" />
+          </Link>
+        ) : (
+          <span className={cn("block text-sm font-semibold", done && "text-[var(--color-ink-faint)] line-through")}>{signal?.title}</span>
+        )}
+        <span className="mt-0.5 block text-xs text-[var(--color-ink-muted)]">
+          {signal?.text}
+          {signal?.meta ? <span className="text-[var(--color-ink-faint)]"> · {signal.meta}</span> : null}
+        </span>
+      </span>
+      {prioBadge}
+      {avatarEl}
+      {!done && signal?.kind === "feedback" ? (
+        reminderCopied ? (
+          <span className="flex shrink-0 items-center gap-2">
+            <span className="hidden text-2xs font-medium text-[var(--color-good)] sm:inline">Bericht gekopieerd</span>
+            {canWrite ? (
+              <Button size="sm" onClick={toggleDone} disabled={pending}>
+                <Check className="size-4" /> Verstuurd, afronden
+              </Button>
+            ) : null}
+          </span>
+        ) : (
+          <Button size="sm" onClick={() => copyReminder(signal.message)} title="Kopieert een vriendelijk herinneringsbericht om in WhatsApp te plakken">
+            <Send className="size-4" /> Herinnering versturen
+          </Button>
+        )
+      ) : null}
+      {!done && signal?.kind === "maandrapport" ? (
+        <LinkButton size="sm" href={signal.actionHref}>
+          <BarChart3 className="size-4" /> Bekijk rapportage
+        </LinkButton>
+      ) : null}
+      {actionsEl}
+        </div>
+      ) : (
+      <div className="flex flex-wrap items-center gap-3">
+      {checkbox}
+      <span className="min-w-40 flex-1">
+        {task.href ? (
+          <Link href={task.href} className={cn("group/tl flex w-fit items-center gap-1 text-sm font-medium hover:text-[var(--color-brand-600)] hover:underline", done && "text-[var(--color-ink-faint)] line-through")} title="Open waar deze taak over gaat">
+            {task.title}
+            <ArrowUpRight className="size-3.5 shrink-0 text-[var(--color-ink-faint)] group-hover/tl:text-[var(--color-brand-600)]" />
+          </Link>
+        ) : (
+          <span className={cn("block text-sm font-medium", done && "text-[var(--color-ink-faint)] line-through")}>
+            {task.title}
+          </span>
+        )}
+        {task.clientSlug ? (
+          <Link href={`/clients/${task.clientSlug}`} className="mt-0.5 inline-flex items-center gap-1 text-xs text-[var(--color-ink-muted)] hover:underline">
+            <ClientLogo name={task.clientName ?? "?"} logoUrl={task.clientLogo} color={task.clientColor} size={14} />
+            {task.clientName}
+          </Link>
+        ) : (
+          <span className="mt-0.5 block text-xs text-[var(--color-ink-faint)]">intern</span>
+        )}
+      </span>
+
+      {/* Prioriteit als kleine stip — rustig in de regel, details in bewerken. */}
+      {prioBadge}
+      {avatarEl}
+      {actionsEl}
       </div>
+      )}
 
       {/* Beschrijving (bv. het voorbeeldbericht bij een na-opname-taak) met een
           kopieerknop — zichtbaar zolang je niet aan het bewerken bent. */}
-      {task.description && !editing ? (
+      {task.description && !editing && !signal ? (
         <div className="mt-2 ml-9 rounded-[var(--radius-sm)] border border-[var(--color-line)] bg-[var(--color-surface-2)] p-2.5">
           <p className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--color-ink-muted)]">{task.description}</p>
           <button
