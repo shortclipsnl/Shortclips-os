@@ -1,12 +1,9 @@
 /**
- * PandaDoc-import: neemt de bestaande sjablonen en historische offertes over in
- * de Offertes-module. Vereist PANDADOC_API_KEY in de omgeving.
+ * Volledige PandaDoc-import: haalt alle offertes (ook historische) op, met
+ * status, ontvangers, activiteit, PDF en bedrag, en koppelt ze aan leads.
+ * Vereist PANDADOC_API_KEY. In PandaDoc wordt niets gewijzigd.
  *
- *   npm run quotes:import-pandadoc -- --dry-run   # alleen rapporteren
- *   npm run quotes:import-pandadoc                # daadwerkelijk importeren
- *
- * LET OP: nog niet tegen een echt PandaDoc-account getest; draai eerst --dry-run
- * en controleer het rapport.
+ *   npm run quotes:import-pandadoc
  */
 import { importPandaDoc, pandadocConfigured } from "@/server/quotes/pandadoc";
 
@@ -15,20 +12,11 @@ async function main() {
     console.error("✗ PANDADOC_API_KEY ontbreekt. Zet 'm in de omgeving en probeer opnieuw.");
     process.exit(1);
   }
-  const dryRun = process.argv.includes("--dry-run");
-  const skipPdf = process.argv.includes("--skip-pdf");
-  const importTemplates = process.argv.includes("--with-templates");
-  console.log(`→ PandaDoc-import ${dryRun ? "(dry-run, schrijft niets weg)" : "(schrijft weg)"}${skipPdf ? " · zonder PDF-download" : ""}${importTemplates ? " · incl. sjablonen" : ""}…`);
-  const report = await importPandaDoc({ dryRun, skipPdf, importTemplates });
-  console.log("\n=== Rapport ===");
-  console.log(`Sjablonen:  ${report.templates.imported} geïmporteerd, ${report.templates.skipped} overgeslagen (bestonden al)`);
-  console.log(`Offertes:   ${report.documents.imported} geïmporteerd, ${report.documents.skipped} overgeslagen, ${report.documents.pdfMissing} zonder PDF`);
-  if (report.notes.length) {
-    console.log("\nLet op / niet beschikbaar:");
-    for (const n of report.notes) console.log(`  · ${n}`);
-  }
-  console.log("\n✓ Klaar. Vergelijk een paar offertes visueel + inhoudelijk vóór je PandaDoc opzegt.");
-  process.exit(0);
+  console.log("→ PandaDoc-import (alle documenten)…");
+  const r = await importPandaDoc();
+  console.log(`\n${r.seen} gezien · ${r.synced} bijgewerkt (${r.created} nieuw) · ${r.skipped} ongewijzigd · ${r.failed} mislukt`);
+  for (const e of r.errors) console.log(`  ✗ ${e}`);
+  process.exit(r.failed && !r.synced ? 1 : 0);
 }
 
 main().catch((e) => {

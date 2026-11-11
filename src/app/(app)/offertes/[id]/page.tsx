@@ -10,6 +10,10 @@ import { signhostConfigured } from "@/server/quotes/signhost";
 import { PageHeader } from "@/components/ui";
 import { QuoteDocument, QUOTE_DOCUMENT_CSS, type QuoteDocData } from "@/components/quotes/quote-document";
 import { QuoteEditor } from "./quote-editor";
+import { PandaDocQuoteDetail } from "./pandadoc-detail";
+import { and, asc, isNull } from "drizzle-orm";
+import { db } from "@/db/client";
+import { salesLeads } from "@/db/schema";
 import type { QuoteContent } from "@/lib/quotes";
 
 export const metadata: Metadata = { title: "Offerte" };
@@ -40,6 +44,16 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
   const detail = await getQuoteDetail(id);
   if (!detail) notFound();
   const { quote, lines, events } = detail;
+
+  // PandaDoc-offertes: alleen-lezen weergave met PDF, tijdlijn en leadkoppeling.
+  if (quote.source === "pandadoc") {
+    const leads = await db
+      .select({ id: salesLeads.id, company: salesLeads.company, status: salesLeads.status })
+      .from(salesLeads)
+      .where(and(isNull(salesLeads.deletedAt)))
+      .orderBy(asc(salesLeads.company));
+    return <PandaDocQuoteDetail quote={quote} events={events} lead={detail.lead} client={detail.client} leads={leads} />;
+  }
   const link = quote.publicToken ? publicQuoteLink(quote.publicToken) : null;
   const company = await getCompanyInfo();
   const status = STATUS_LABEL[quote.status] ?? STATUS_LABEL.concept!;

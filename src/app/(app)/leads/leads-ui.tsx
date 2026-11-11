@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { AlarmClock, Check, FolderOpen, Loader2, Plus, Search, Trophy, Users, XCircle } from "lucide-react";
 import { createLead, setLeadFollowUp, setLeadSource, setLeadStatus } from "@/server/actions/leads";
 import type { LeadRow } from "@/server/leads";
+import type { LeadQuoteSummary } from "@/server/quotes";
+import Link from "next/link";
 import { LEAD_STATUS } from "@/lib/statuses";
 import { Stat } from "@/components/ui";
 import { ConvertButton } from "./convert-dialog";
@@ -116,7 +118,8 @@ function fmtDate(d: string | null) {
 
 const OPEN_SET = new Set(["lead", "offerte", "onderhandeling"]);
 
-export function LeadsBoard({ rows, sources }: { rows: LeadRow[]; sources: string[] }) {
+export function LeadsBoard({ rows, sources, quotes = {}, focusId = null }: { rows: LeadRow[]; sources: string[]; quotes?: Record<string, LeadQuoteSummary>; focusId?: string | null }) {
+  const focused = focusId ? rows.find((r) => r.id === focusId) ?? null : null;
   const today = new Date().toISOString().slice(0, 10);
   const currentYear = String(new Date().getFullYear());
 
@@ -129,12 +132,12 @@ export function LeadsBoard({ rows, sources }: { rows: LeadRow[]; sources: string
 
   // Standaard tonen we het lopende jaar (bijv. 2026) — niet alles. Is er voor dit
   // jaar nog niets, dan het nieuwste jaar met leads.
-  const [year, setYear] = useState<string>(() => (years.includes(currentYear) ? currentYear : (years[0] ?? "alle")));
-  const [status, setStatus] = useState<string>("open");
+  const [year, setYear] = useState<string>(() => (focused ? "alle" : years.includes(currentYear) ? currentYear : (years[0] ?? "alle")));
+  const [status, setStatus] = useState<string>(focused ? "alle" : "open");
   const [source, setSource] = useState<string>("alle");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(focused?.company ?? "");
 
   // Rijen van de gekozen jaargang — basis voor zowel de tegels als de tabel.
   const yearRows = useMemo(
@@ -237,11 +240,12 @@ export function LeadsBoard({ rows, sources }: { rows: LeadRow[]; sources: string
       <div className="mb-2 text-xs text-[var(--color-ink-faint)]">{filtered.length} van {yearRows.length} leads{year === "alle" ? "" : ` in ${year}`}</div>
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <table className="w-full min-w-[920px] text-sm">
+        <table className="w-full min-w-[1080px] text-sm">
           <thead>
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] text-left text-xs text-[var(--color-ink-faint)]">
               <th className="px-3 py-2 font-medium">Lead</th>
               <th className="px-2 py-2 font-medium">Status</th>
+              <th className="px-2 py-2 font-medium">Offerte</th>
               <th className="px-2 py-2 font-medium">Bron</th>
               <th className="px-2 py-2 text-center font-medium">Score</th>
               <th className="px-2 py-2 font-medium">Contact</th>
@@ -251,9 +255,9 @@ export function LeadsBoard({ rows, sources }: { rows: LeadRow[]; sources: string
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r) => <LeadRowView key={r.id} r={r} today={today} />)}
+            {filtered.map((r) => <LeadRowView key={r.id} r={r} today={today} quote={quotes[r.id] ?? null} focused={r.id === focusId} />)}
             {filtered.length === 0 ? (
-              <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen leads met deze filters.</td></tr>
+              <tr><td colSpan={9} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen leads met deze filters.</td></tr>
             ) : null}
           </tbody>
         </table>
@@ -262,7 +266,7 @@ export function LeadsBoard({ rows, sources }: { rows: LeadRow[]; sources: string
   );
 }
 
-function LeadRowView({ r, today }: { r: LeadRow; today: string }) {
+function LeadRowView({ r, today, quote, focused }: { r: LeadRow; today: string; quote: LeadQuoteSummary | null; focused?: boolean }) {
   const [status, setStatusLocal] = useState(r.status as Status);
   const [followUp, setFollowUp] = useState(r.followUpOn ?? "");
   const [pending, start] = useTransition();
@@ -280,7 +284,7 @@ function LeadRowView({ r, today }: { r: LeadRow; today: string }) {
   const overdue = ["lead", "offerte", "onderhandeling"].includes(status) && followUp && followUp <= today;
 
   return (
-    <tr className="border-b border-[var(--color-line)] last:border-0 hover:bg-[var(--color-surface-sunken)]/40"
+    <tr className={`border-b border-[var(--color-line)] last:border-0 hover:bg-[var(--color-surface-sunken)]/40 ${focused ? "bg-[var(--color-info-soft)]" : ""}`}
       style={{ boxShadow: `inset 3px 0 0 ${overdue ? "var(--color-bad)" : LEAD_STATUS[status]?.dot ?? "transparent"}` }}>
       <td className="px-3 py-2">
         <div className="font-medium text-[var(--color-ink)]">{r.company}</div>
@@ -297,6 +301,7 @@ function LeadRowView({ r, today }: { r: LeadRow; today: string }) {
           {pending ? <Loader2 className="pointer-events-none absolute right-1.5 size-3 animate-spin opacity-60" /> : null}
         </div>
       </td>
+      <td className="px-2 py-2"><QuoteCell q={quote} /></td>
       <td className="px-2 py-2"><SourceCell id={r.id} source={r.source} /></td>
       <td className="px-2 py-2 text-center">
         {r.leadScore != null ? (
@@ -360,4 +365,32 @@ function ConvertCell({ id, convertedSlug }: { id: string; convertedSlug: string 
     );
   }
   return <ConvertButton leadId={id} />;
+}
+
+const QUOTE_META: Record<string, { label: string; color: string }> = {
+  concept: { label: "Concept", color: "var(--color-ink-muted)" },
+  verzonden: { label: "Verzonden", color: "var(--color-info)" },
+  bekeken: { label: "Bekeken", color: "var(--color-violet)" },
+  geaccepteerd: { label: "Ondertekend", color: "var(--color-good)" },
+  ondertekend: { label: "Ondertekend", color: "var(--color-good)" },
+  afgewezen: { label: "Afgewezen", color: "var(--color-bad)" },
+  verlopen: { label: "Verlopen", color: "var(--color-warn)" },
+};
+const shortDate = (d: Date | string | null) => (d ? new Date(d).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }) : null);
+const eur = (n: number) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+
+/** Gekoppelde offerte uit PandaDoc: status, bedrag, verzonden, bekeken, getekend. */
+function QuoteCell({ q }: { q: LeadQuoteSummary | null }) {
+  if (!q) return <span className="text-xs text-[var(--color-ink-faint)]">–</span>;
+  const meta = QUOTE_META[q.status] ?? QUOTE_META.concept!;
+  const detail = q.signedAt ? `getekend ${shortDate(q.signedAt)}` : q.firstOpenedAt ? `bekeken ${shortDate(q.firstOpenedAt)} · ${q.openCount}×` : q.sentAt ? `verzonden ${shortDate(q.sentAt)} · niet geopend` : null;
+  return (
+    <Link href={`/offertes/${q.id}`} className="group block min-w-[150px]" title="Offerte openen">
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: meta.color }}>
+        <span className="size-1.5 rounded-full" style={{ background: meta.color }} />{meta.label}
+        {q.amount != null ? <span className="font-medium text-[var(--color-ink)] tabular-nums">· {eur(q.amount)}</span> : null}
+      </span>
+      {detail ? <span className="block text-2xs text-[var(--color-ink-faint)] group-hover:underline">{detail}{q.count > 1 ? ` · ${q.count} offertes` : ""}</span> : null}
+    </Link>
+  );
 }

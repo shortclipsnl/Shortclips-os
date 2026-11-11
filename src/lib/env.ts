@@ -129,9 +129,13 @@ const schema = z.object({
   SIGNHOST_APP_KEY: z.string().optional(),
 
   // --- Offertes: PandaDoc-import/migratie ---
-  // Officiële PandaDoc API-sleutel (Workspace → API). Alleen nodig om de
-  // bestaande sjablonen en historische offertes over te nemen; daarna niet meer.
+  // Officiële PandaDoc API-sleutel (Settings → Integrations → API, productie).
+  // PandaDoc is het leidende offertesysteem; het portaal synchroniseert hiermee.
   PANDADOC_API_KEY: z.string().optional(),
+  // Gedeelde sleutel van de PandaDoc-webhook (Settings → Integrations → Webhooks).
+  // Zonder deze sleutel is /api/webhooks/pandadoc dicht en loopt alles via de
+  // periodieke synchronisatie.
+  PANDADOC_WEBHOOK_KEY: z.string().optional(),
 
   // --- Achtergrondtaken ---
   CRON_SECRET: z.string().optional(),

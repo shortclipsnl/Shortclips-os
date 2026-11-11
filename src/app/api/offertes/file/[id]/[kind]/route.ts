@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /** Serveert het ondertekende document of het ontvangstbewijs van een offerte.
  *  Uitsluitend de eigenaar. */
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string; kind: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string; kind: string }> }) {
   const viewer = await getViewer();
   if (!canManageQuotes(viewer)) return new NextResponse("Niet toegestaan", { status: 403 });
   const { id, kind } = await params;
@@ -25,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="Offerte-${q.number}-${kind}.pdf"`,
+      "Content-Disposition": `${req.nextUrl.searchParams.get("download") ? "attachment" : "inline"}; filename="Offerte-${q.number}-${kind}.pdf"`,
       "Cache-Control": "private, no-store",
     },
   });

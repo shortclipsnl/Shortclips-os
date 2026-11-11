@@ -28,6 +28,7 @@ import { runMonthlyInsightTasks } from "@/server/jobs/insight-tasks";
 import { runIntegrationHealthCheck } from "@/server/jobs/integration-health";
 import { runEmergencyExport } from "@/server/jobs/emergency-export";
 import { runLeadImapSync } from "@/server/jobs/leads-imap-sync";
+import { runPandaDocSync } from "@/server/jobs/pandadoc-sync";
 import { runProfitabilitySignals } from "@/server/jobs/profitability-signals";
 import { runContentHealthSignals } from "@/server/jobs/content-health-signals";
 import { runScriptReviewReminders } from "@/server/jobs/script-review-reminders";
@@ -153,6 +154,9 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "integrations.health_check": runIntegrationHealthCheck,
   "emergency.export": runEmergencyExport,
   "leads.sync_mailbox": runLeadImapSync,
+  // PandaDoc → Offertes: elk uur de wijzigingen, om 03:00 alles (vangnet naast de webhook).
+  "pandadoc.sync": () => runPandaDocSync(),
+  "pandadoc.sync_full": () => runPandaDocSync({ full: true }),
   "profit.signals": runProfitabilitySignals,
   "content_health.signals": runContentHealthSignals,
   "script_review.reminders": runScriptReviewReminders,

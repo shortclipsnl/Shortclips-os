@@ -126,6 +126,27 @@ export const quotes = pgTable(
     isReadOnly: boolean("is_read_only").notNull().default(false),
     originalPdfPath: text("original_pdf_path"),
 
+    /* --- PandaDoc-synchronisatie (PandaDoc is leidend) --- */
+    /** Ruwe PandaDoc-status, bijv. "document.viewed". */
+    pandadocStatus: varchar("pandadoc_status", { length: 40 }),
+    /** Laatste wijziging in PandaDoc (date_modified): bepaalt of PDF opnieuw moet. */
+    pandadocModifiedAt: timestamp("pandadoc_modified_at", { withTimezone: true }),
+    /** Status waarvoor de opgeslagen PDF is opgehaald. */
+    pdfForStatus: varchar("pdf_for_status", { length: 40 }),
+    /** Type dienstverlening, afgeleid uit titel/inhoud (organisch, advertenties). */
+    serviceType: varchar("service_type", { length: 60 }),
+    /** Bedrag incl. btw (amount = excl. btw). */
+    amountInclVat: numeric("amount_incl_vat", { precision: 12, scale: 2 }),
+    /** Herkomst van het bedrag: "pricing" (PandaDoc-prijstabel) of "pdf" (gecontroleerd uit de PDF gelezen). */
+    amountSource: varchar("amount_source", { length: 20 }),
+    /** Verzender in PandaDoc (verantwoordelijke), als e-mail + naam. */
+    senderEmail: varchar("sender_email", { length: 320 }),
+    senderName: varchar("sender_name", { length: 160 }),
+    /** Hoe de lead gekoppeld is: email | domein | naam | handmatig. Handmatig wordt nooit overschreven. */
+    leadMatch: varchar("lead_match", { length: 20 }),
+    syncedAt: timestamp("synced_at", { withTimezone: true }),
+    syncError: text("sync_error"),
+
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
     ...softDelete,
@@ -171,12 +192,19 @@ export const quoteEvents = pgTable(
       .notNull()
       .references(() => quotes.id, { onDelete: "cascade" }),
     type: varchar("type", { length: 30 }).notNull(),
+    /** Externe sleutel (PandaDoc audittrail-id) om dubbele gebeurtenissen te voorkomen. */
+    externalId: varchar("external_id", { length: 80 }),
+    /** Wie de handeling deed (e-mail), bij PandaDoc-gebeurtenissen. */
+    actor: varchar("actor", { length: 320 }),
     ip: varchar("ip", { length: 64 }),
     userAgent: text("user_agent"),
     meta: jsonb("meta"),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().default(sql`now()`),
   },
-  (t) => [index("quote_events_quote_idx").on(t.quoteId, t.occurredAt)],
+  (t) => [
+    index("quote_events_quote_idx").on(t.quoteId, t.occurredAt),
+    unique("quote_events_external_unique").on(t.externalId),
+  ],
 );
 
 export const quoteTemplatesRelations = relations(quoteTemplates, ({ many }) => ({
