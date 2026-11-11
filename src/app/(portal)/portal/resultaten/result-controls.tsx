@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { CalendarRange, Check, Download, Share2 } from "lucide-react";
+import { useState, useTransition } from "react";
+import { CalendarRange, Check, Download, Loader2, Share2 } from "lucide-react";
 import { PORTAL_MONTH_PERIODS, PORTAL_PERIODS } from "@/lib/portal-periods";
 
 /**
@@ -28,10 +28,21 @@ export function ResultControls({
   const [van, setVan] = useState(from ?? "");
   const [tot, setTot] = useState(to ?? "");
   const [copied, setCopied] = useState(false);
+  const [pending, startTransition] = useTransition();
 
-  const go = (q: string) => router.push(`${basePath}?${q}`);
+  // Periode wisselen: navigeer naar de nieuwe query én forceer een verse
+  // serverophaling. router.refresh() voorkomt dat de client-routercache dezelfde
+  // (oude) cijfers blijft tonen bij een wijziging van alleen de query-parameters.
+  const go = (q: string) =>
+    startTransition(() => {
+      router.push(`${basePath}?${q}`);
+      router.refresh();
+    });
   const applyCustom = () => {
-    if (van && tot && van <= tot) go(`periode=custom&van=${van}&tot=${tot}`);
+    if (van && tot && van <= tot) {
+      setOpen(false);
+      go(`periode=custom&van=${van}&tot=${tot}`);
+    }
   };
 
   // Rapport doorsturen/delen: op mobiel het OS-deelvenster (mail, WhatsApp, …),
@@ -58,16 +69,18 @@ export function ResultControls({
 
   return (
     <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-      <div className="inline-flex flex-wrap gap-1 rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] p-1">
+      <div aria-busy={pending} className={`inline-flex flex-wrap items-center gap-1 rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] p-1 transition-opacity ${pending ? "opacity-60" : ""}`}>
         {[...PORTAL_MONTH_PERIODS, ...PORTAL_PERIODS].map((p) => {
           const active = p.key === periodKey;
           return (
             <button
               key={p.key}
               type="button"
+              disabled={pending}
               onClick={() => go(`periode=${p.key}`)}
-              className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${active ? "bg-[var(--sc-cta)] text-[var(--sc-cta-ink)]" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors disabled:cursor-wait ${active ? "bg-[var(--sc-cta)] text-[var(--sc-cta-ink)]" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"}`}
             >
+              {active && pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
               {p.label}
             </button>
           );
@@ -112,10 +125,10 @@ export function ResultControls({
           <button
             type="button"
             onClick={applyCustom}
-            disabled={!van || !tot || van > tot}
-            className="sc-btn-cta rounded-lg px-3.5 py-1.5 text-[13px] font-semibold disabled:opacity-40"
+            disabled={!van || !tot || van > tot || pending}
+            className="sc-btn-cta inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-semibold disabled:opacity-40"
           >
-            Toepassen
+            {pending ? <Loader2 className="size-3.5 animate-spin" /> : null} Toepassen
           </button>
         </div>
       ) : null}
