@@ -550,7 +550,6 @@ const PROFIELEN: Record<string, Profiel> = {
 };
 
 const OPEN_PUNTEN = [
-  "Editors: les 1.6 noemt Sem, Fabian, Noah en Senna; het organigram ook Quinn. Quinn staat er nu bij als editor. Klopt dat?",
   "Editors zien de pagina niet: zij hebben alleen de compacte editorweergave. Hun verantwoordelijkheden staan er voor jouw overzicht. Wil je ze in het editorportaal tonen?",
   "Rutger: de afbeelding 'Los je altijd zelf op' (les 1.13) zegt dat hij extra video's of een extra draaidag zelf afhandelt, de tekst eronder dat een toezegging daarover niveau 4 is. De pagina volgt de tekst: regie houden, toezeggen via Jarno.",
   "Verwijzing: lessen 1.10 t/m 1.14 en Klanten + communicatie 1.4 verwijzen naar 'SOP 1.10 Beslisrechten', maar die les heet nu 1.8.",
