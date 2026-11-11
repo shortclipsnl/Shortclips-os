@@ -2,11 +2,13 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, notifications } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
+import { getActiveAiTasks } from "@/server/ai-tasks";
 import { Avatar } from "@/components/ui";
 import { GlobalSearch } from "./global-search";
 import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
 import { NotificationBell, type BellNotification } from "./notification-bell";
+import { AiTasksIndicator } from "./ai-tasks-indicator";
 
 export async function Topbar({ viewer }: { viewer: Viewer }) {
   // Recente meldingen voor de bel-dropdown (klikbaar → direct naar de melding).
@@ -44,11 +46,16 @@ export async function Topbar({ viewer }: { viewer: Viewer }) {
     .limit(50);
   const unreadCount = unread.length;
 
+  // Lopende AI-taken (achtergrond) voor de uniforme indicator in de header.
+  const aiTasks = await getActiveAiTasks(viewer).catch(() => ({ count: 0, items: [] }));
+
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-[var(--color-line)] bg-[var(--color-canvas)]/85 px-5 backdrop-blur">
       <div className="flex-1">
         <GlobalSearch />
       </div>
+
+      <AiTasksIndicator initial={aiTasks} />
 
       <ThemeToggle />
 
