@@ -47,6 +47,11 @@ export type ClientProfit = {
   overigeKosten: number;
   /** Intern uurtarief staat nog op 0 — scriptingkosten zijn dan niet berekend. */
   internRateMissing: boolean;
+  /** Geen activiteit/gegevens deze maand: geen omzet, kosten, shorts of opnames.
+   *  Dan rekenen we géén (fantoom)kosten toe en markeren we de klant niet als verlies. */
+  dataMissing: boolean;
+  /** Wél activiteit maar geen omzet geregistreerd — omzet ontbreekt (niet per se verlies). */
+  omzetMissing: boolean;
   directeKosten: number;
   brutowinst: number;
   brutomarge: number | null;
@@ -185,16 +190,27 @@ export async function getClientProfitability(period: string, trusted = false): P
     const shootCost = n(r.shootCost);
     const strategyCost = n(r.strategyCost);
     const otherCost = n(r.otherCost);
-    const videographerCost = Math.round(vgCost(r.clientId, vgHours) * 100) / 100;
+    const vgH = vgHours.get(r.clientId) ?? 0;
+    const sh = shorts.get(r.clientId) ?? 0;
+    // Heeft deze klant deze maand überhaupt activiteit of gegevens? Zo niet, dan
+    // rekenen we géén fantoomkosten toe (geen videograaf-standaarddag, geen
+    // interne uren) en markeren we 'm niet als verliesgevend.
+    const heeftActiviteit = omzet > 0 || editCost > 0 || shootCost > 0 || otherCost > 0 || vgH > 0 || sh > 0;
+    const dataMissing = !heeftActiviteit;
+    const omzetMissing = heeftActiviteit && omzet === 0;
+    // Videograafkosten: logde uren × tarief; geen uren maar wél activiteit = 1
+    // standaarddag; geen activiteit = 0 (geen verzonnen kosten).
+    const videographerCost = vgH > 0 ? Math.round(vgH * settings.vgUurtarief * 100) / 100 : heeftActiviteit ? vgDay : 0;
+    const scriptingCostRow = heeftActiviteit ? scriptingCost : 0;
     // Overige directe kosten = extra opname-/productiekosten (strategie vervangen door interne uren).
     const overigeKosten = shootCost + otherCost;
-    const directeKosten = editCost + videographerCost + scriptingCost + overigeKosten;
+    const directeKosten = editCost + videographerCost + scriptingCostRow + overigeKosten;
     const brutowinst = omzet - directeKosten;
-    const brutomarge = pct(brutowinst, omzet);
+    // Zonder omzet kunnen we geen betrouwbare marge berekenen (niet uitgaan van €0).
+    const brutomarge = omzet > 0 ? pct(brutowinst, omzet) : null;
     // Overhead naar rato van omzetaandeel (geschat).
     const overhead = overheadIncluded && totalOmzet > 0 ? Math.round((omzet / totalOmzet) * ohPool) : 0;
     const nettoGeschat = brutowinst - overhead;
-    const sh = shorts.get(r.clientId) ?? 0;
 
     const p = prevByClient.get(r.clientId);
     const prevOmzet = p ? n(p.revenue) + n(p.extraRevenue) : null;
@@ -202,11 +218,13 @@ export async function getClientProfitability(period: string, trusted = false): P
 
     return {
       clientId: r.clientId, name: r.name, slug: r.slug, logoUrl: r.logoUrl, color: r.color,
-      omzet, editCost, shootCost, strategyCost, otherCost, videographerCost, scriptingCost, overigeKosten, internRateMissing,
+      omzet, editCost, shootCost, strategyCost, otherCost, videographerCost, scriptingCost: scriptingCostRow, overigeKosten, internRateMissing,
+      dataMissing, omzetMissing,
       directeKosten, brutowinst, brutomarge,
       shorts: sh, gemOmzetPerShort: sh > 0 ? Math.round(omzet / sh) : null,
-      overhead, nettoGeschat, nettoMarge: pct(nettoGeschat, omzet),
-      kleur: marginColor(brutomarge, settings),
+      overhead, nettoGeschat, nettoMarge: omzet > 0 ? pct(nettoGeschat, omzet) : null,
+      // Bij ontbrekende data geen rood (geen onterechte verliesmelding): neutraal/aandacht.
+      kleur: dataMissing || omzetMissing ? "warn" : marginColor(brutomarge, settings),
       prevOmzet,
       prevBrutomarge: prevOmzet != null && prevOmzet !== 0 && prevBruto != null ? pct(prevBruto, prevOmzet) : null,
       prevEditCost: p ? n(p.editCost) : null,
@@ -287,6 +305,9 @@ export function computeProfitabilitySignals(overview: ProfitabilityOverview, ded
   const s = overview.settings;
   for (const r of overview.rows) {
     if (r.omzet <= 0 && r.directeKosten <= 0) continue; // geen activiteit → geen melding
+    // Ontbrekende gegevens zijn geen verlies: nooit een verliesmelding op basis
+    // van onvolledige data (geen omzet geregistreerd of helemaal geen data).
+    if (r.dataMissing || r.omzetMissing) continue;
     const key = (kind: string) => `profit_${kind}:${r.clientId}:${dedupeSuffix}`;
 
     // Verliesgevend

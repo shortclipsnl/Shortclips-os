@@ -126,6 +126,7 @@ export default async function WinstgevendheidPage({ searchParams }: { searchPara
                     <span className="size-2 shrink-0 rounded-full" style={{ background: DOT[r.kleur] }} />
                     <ClientLogo name={r.name} logoUrl={r.logoUrl} color={r.color} size={22} />
                     {r.name}
+                    {r.dataMissing ? <span className="ml-1 rounded-full bg-[var(--color-warn-soft)] px-1.5 py-px text-2xs font-semibold text-[var(--color-warn)]" title="Geen omzet, kosten, shorts of opnames deze maand">gegevens ontbreken</span> : r.omzetMissing ? <span className="ml-1 rounded-full bg-[var(--color-warn-soft)] px-1.5 py-px text-2xs font-semibold text-[var(--color-warn)]" title="Wel activiteit, maar geen omzet geregistreerd">omzet ontbreekt</span> : null}
                   </Link>
                 </td>
                 <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{r.shorts}{r.gemOmzetPerShort ? <span className="block text-2xs text-[var(--color-ink-faint)]">{eur(r.gemOmzetPerShort)}/short</span> : null}</td>
@@ -135,7 +136,7 @@ export default async function WinstgevendheidPage({ searchParams }: { searchPara
                 <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{r.internRateMissing ? <span className="text-[var(--color-warn)]" title="Intern uurtarief staat nog op 0 — stel het in bij Instellingen.">nog instellen</span> : eur(r.scriptingCost)}</td>
                 <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{eur(r.overigeKosten)}</td>
                 <td className="sc-td text-right font-medium tabular-nums">{eur(r.directeKosten)}</td>
-                <td className="sc-td text-right font-semibold tabular-nums" style={{ color: r.brutowinst >= 0 ? "var(--color-ink)" : "var(--color-bad)" }}>{eur(r.brutowinst)}</td>
+                <td className="sc-td text-right font-semibold tabular-nums" style={{ color: r.dataMissing || r.omzetMissing ? "var(--color-ink-faint)" : r.brutowinst >= 0 ? "var(--color-ink)" : "var(--color-bad)" }}>{r.dataMissing || r.omzetMissing ? "—" : eur(r.brutowinst)}</td>
                 <td className="sc-td text-right font-semibold tabular-nums" style={{ color: DOT[r.kleur] }}>{r.brutomarge != null ? `${r.brutomarge}%` : "—"}</td>
                 <td className="sc-td text-right tabular-nums text-[var(--color-ink-muted)]">{overhead.heeftData && settings.includeOverhead ? eur(r.nettoGeschat) : "—"}</td>
               </tr>
