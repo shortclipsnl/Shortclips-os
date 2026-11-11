@@ -12,6 +12,7 @@ import { listClientsForScripts, clientLearnedText } from "@/server/ai/knowledge"
 import { gatherFeedbackContext } from "@/server/script-control";
 import { getClientWinningPatterns } from "@/server/scripts/winning-patterns";
 import { loadDna, dnaToText, type ContentDna } from "./content-dna";
+import { buildPerformanceContext } from "./performance";
 
 export type OverviewClient = {
   id: string;
@@ -87,6 +88,7 @@ export type RunRow = {
   summary: string | null;
   trends: unknown;
   sources: unknown;
+  strategicAdvice: unknown;
   ideasCount: number;
   newCount: number;
   errorMessage: string | null;
@@ -123,6 +125,7 @@ export async function getClientContentResearch(viewer: Viewer, clientId: string)
         summary: contentResearchRuns.summary,
         trends: contentResearchRuns.trends,
         sources: contentResearchRuns.sources,
+        strategicAdvice: contentResearchRuns.strategicAdvice,
         ideasCount: contentResearchRuns.ideasCount,
         newCount: contentResearchRuns.newCount,
         errorMessage: contentResearchRuns.errorMessage,
@@ -163,7 +166,7 @@ export async function getClientContentResearch(viewer: Viewer, clientId: string)
  * onderzoek en wat er bij deze klant aantoonbaar werkt (Video Intelligence).
  */
 export async function buildContentContext(viewer: Viewer, clientId: string, clientName: string): Promise<string> {
-  const [dnaBundle, feedback, learned, patterns, savedIdeas, lastRun] = await Promise.all([
+  const [dnaBundle, feedback, learned, patterns, savedIdeas, lastRun, performance] = await Promise.all([
     loadDna(clientId),
     gatherFeedbackContext(clientId).catch(() => null),
     clientLearnedText(clientId).catch(() => ""),
@@ -180,9 +183,11 @@ export async function buildContentContext(viewer: Viewer, clientId: string, clie
       .where(and(eq(contentResearchRuns.clientId, clientId), eq(contentResearchRuns.status, "klaar"), isNull(contentResearchRuns.deletedAt)))
       .orderBy(desc(contentResearchRuns.finishedAt))
       .limit(1),
+    buildPerformanceContext(clientId).catch(() => ({ text: "", hasData: false, laatsteRapportage: null })),
   ]);
 
   const parts: string[] = [`Klant: ${clientName}`];
+  if (performance.text) parts.push(performance.text);
   const dnaText = dnaToText(dnaBundle.dna);
   if (dnaText) parts.push(`CONTENT DNA:\n${dnaText}`);
   if (dnaBundle.manualNotes.trim()) parts.push(`HANDMATIGE AANTEKENINGEN:\n${dnaBundle.manualNotes.trim()}`);

@@ -8,6 +8,7 @@ import { gatherFeedbackContext } from "@/server/script-control";
 import { notify } from "@/server/notifications";
 import { recordActivity } from "@/server/audit";
 import { researchAndIdeate } from "./generate";
+import { buildPerformanceContext } from "./performance";
 import { dnaToText, loadDna, mergeDna, saveDna } from "./content-dna";
 
 const STALE_RUNNING_MIN = 10;
@@ -120,10 +121,11 @@ export async function runContentResearchJob(runId: string): Promise<{ ok: boolea
   if (!client) return fail("Klant niet gevonden.");
 
   try {
-    const [contextText, existing, priorText] = await Promise.all([
+    const [contextText, existing, priorText, performance] = await Promise.all([
       buildResearchContext(client.id),
       existingIdeasText(client.id),
       priorScriptsText(client.id),
+      buildPerformanceContext(client.id).catch(() => ({ text: "", hasData: false, laatsteRapportage: null })),
     ]);
     const { dna, manualNotes } = await loadDna(client.id);
 
@@ -136,6 +138,7 @@ export async function runContentResearchJob(runId: string): Promise<{ ok: boolea
       dnaText: dnaToText(dna),
       existingIdeasText: existing.text,
       priorScriptsText: priorText,
+      performanceText: performance.text,
     });
     if (!res.ok) {
       return fail(res.reason === "no_provider" ? "Er is nog geen AI-sleutel ingesteld." : res.error ?? "Onderzoek mislukt.");
@@ -158,6 +161,7 @@ export async function runContentResearchJob(runId: string): Promise<{ ok: boolea
         concept: idea.concept,
         hooks: idea.hooks as unknown as Record<string, unknown>,
         waaromWerkt: idea.waaromWerkt || null,
+        doel: idea.doel || null,
         inspiratieUrl: idea.inspiratieUrl,
         inspiratieLabel: idea.inspiratieLabel,
         categorie: idea.categorie as never,
@@ -184,6 +188,7 @@ export async function runContentResearchJob(runId: string): Promise<{ ok: boolea
         summary: res.data.trends.join("\n").slice(0, 4000) || null,
         trends: res.data.trends as unknown as Record<string, unknown>,
         sources: res.data.sources as unknown as Record<string, unknown>,
+        strategicAdvice: res.data.strategischAdvies as unknown as Record<string, unknown>,
         ideasCount: res.data.ideeen.length,
         newCount,
         finishedAt: new Date(),

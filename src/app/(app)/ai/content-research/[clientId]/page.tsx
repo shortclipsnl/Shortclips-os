@@ -8,6 +8,7 @@ import { ClientLogo, EmptyState, InfoNote, PageHeader } from "@/components/ui";
 import { ClientTabs, type TabDef } from "@/app/(app)/clients/[slug]/tabs";
 import { StartResearchButton } from "../start-research-button";
 import { IdeaCard, type IdeaView } from "../idea-card";
+import { StrategicAdvice, type AdviceItem } from "../strategic-advice";
 import { ResearchPanel, type RunView } from "../research-panel";
 import { DnaForm } from "../dna-form";
 import { ContentChat } from "../content-chat";
@@ -40,6 +41,7 @@ export default async function ContentResearchClientPage({
     concept: i.concept,
     hooks: Array.isArray(i.hooks) ? (i.hooks as string[]) : [],
     waaromWerkt: i.waaromWerkt,
+    doel: i.doel,
     inspiratieUrl: i.inspiratieUrl,
     inspiratieLabel: i.inspiratieLabel,
     categorie: i.categorie,
@@ -67,6 +69,12 @@ export default async function ContentResearchClientPage({
   }));
   const running = runs.some((r) => r.status === "bezig");
 
+  // Strategisch advies uit de meest recente afgeronde ronde (op basis van resultaten).
+  const latestDone = data.runs.find((r) => r.status === "klaar");
+  const advies: AdviceItem[] = Array.isArray(latestDone?.strategicAdvice)
+    ? (latestDone!.strategicAdvice as AdviceItem[])
+    : [];
+
   const current = tab ?? "ideeen";
   const tabs: TabDef[] = [
     { key: "ideeen", label: "Ideeën", count: activeIdeas.length },
@@ -93,6 +101,8 @@ export default async function ContentResearchClientPage({
       {!aiReady ? <div className="mb-5"><InfoNote>De AI staat uit (ANTHROPIC_API_KEY ontbreekt).</InfoNote></div> : null}
 
       <ClientTabs tabs={tabs} />
+
+      {current === "ideeen" ? <StrategicAdvice items={advies} /> : null}
 
       {current === "ideeen" ? (
         activeIdeas.length === 0 ? (

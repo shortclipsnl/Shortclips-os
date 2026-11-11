@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Star, ThumbsDown, Bookmark, Archive, PenLine, MessageSquare, ExternalLink, Loader2 } from "lucide-react";
+import { Star, ThumbsDown, Bookmark, Archive, PenLine, MessageSquare, ExternalLink, Loader2, Target } from "lucide-react";
 import { Badge, buttonClass, type Tone } from "@/components/ui";
 import {
   archiveIdea,
@@ -20,6 +20,7 @@ export type IdeaView = {
   concept: string;
   hooks: string[];
   waaromWerkt: string | null;
+  doel: string | null;
   inspiratieUrl: string | null;
   inspiratieLabel: string | null;
   categorie: string;
@@ -103,6 +104,13 @@ export function IdeaCard({ idea }: { idea: IdeaView }) {
 
       {idea.waaromWerkt ? (
         <p className="text-xs text-[var(--color-ink-muted)]"><span className="font-medium text-[var(--color-ink)]">Waarom dit werkt:</span> {idea.waaromWerkt}</p>
+      ) : null}
+
+      {idea.doel ? (
+        <p className="inline-flex items-start gap-1.5 rounded-md bg-[var(--color-info-soft)] px-2 py-1 text-xs text-[var(--color-info)]">
+          <Target className="mt-0.5 size-3.5 shrink-0" />
+          <span><span className="font-semibold">Doel:</span> {idea.doel}</span>
+        </p>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-3 text-xs">

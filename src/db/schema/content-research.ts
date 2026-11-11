@@ -45,6 +45,11 @@ export const contentResearchRuns = pgTable(
     ideasCount: integer("ideas_count").notNull().default(0),
     /** Aantal nieuwe (niet-duplicaat) ideeën uit deze ronde. */
     newCount: integer("new_count").notNull().default(0),
+    /**
+     * Strategisch advies o.b.v. de echte resultaten/maandrapportages:
+     * { kleur: 'doorgaan'|'verbeteren'|'vermijden', punt, bewijs, zekerheid }[].
+     */
+    strategicAdvice: jsonb("strategic_advice").notNull().default(sql`'[]'::jsonb`),
     /** Laatste foutmelding (bij status 'mislukt'). */
     errorMessage: text("error_message"),
     /** Wie deze ronde startte (null = automatisch/cron). */
@@ -71,6 +76,8 @@ export const contentIdeas = pgTable(
     /** Minimaal twee mogelijke openingszinnen: string[]. */
     hooks: jsonb("hooks").notNull().default(sql`'[]'::jsonb`),
     waaromWerkt: text("waarom_werkt"),
+    /** Waartoe dit idee dient — het doel voor de klant (bekendheid, vertrouwen, aanvragen …). */
+    doel: text("doel"),
     /** Echte inspiratiebron (indien beschikbaar). */
     inspiratieUrl: text("inspiratie_url"),
     inspiratieLabel: varchar("inspiratie_label", { length: 240 }),
