@@ -12,7 +12,7 @@ import { nlHolidaySet } from "@/lib/holidays";
 import { addWorkingDays, subWorkingDays } from "@/lib/workdays";
 import { TEAM_WORKDAY } from "@/lib/werkdag";
 import { reportReadSummary, reportWorkSummary, reportWorkText } from "@/server/reports/today";
-import { BATCH_PREFIX } from "@/lib/maandcontrole";
+import { STAP_PREFIX } from "@/lib/maandcontrole";
 
 /**
  * Werkoverzicht per medewerker: één bron voor "Wat moet ik vandaag doen" en
@@ -199,27 +199,28 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
     // Controletaken van maandrapportages worden hieronder gebundeld tot één item.
     if ((t.dedupeKey ?? "").startsWith("report_review:")) continue;
     const due = iso(t.dueOn);
-    const cat: WorkCategory = (t.dedupeKey ?? "").startsWith(BATCH_PREFIX) ? "publicatie" : t.category === "klantcontact" ? "klantcontact" : t.category === "scripting" || (t.dedupeKey ?? "").startsWith("scripting:") ? "scripting" : "intern";
+    const maandTaak = (t.dedupeKey ?? "").startsWith(STAP_PREFIX);
+    const cat: WorkCategory = maandTaak ? "publicatie" : t.category === "klantcontact" ? "klantcontact" : t.category === "scripting" || (t.dedupeKey ?? "").startsWith("scripting:") ? "scripting" : "intern";
     const urgent = t.priority === "urgent" || t.priority === "high";
     const { state, daysLate } = stateOf(due, urgent ? "today" : "week");
     items.push({
       key: `task-${t.id}`, category: cat, title: t.title.replace(/^[^|]+\|\s*/, "").trim() || t.title,
-      detail: t.status === "blocked" ? "Geblokkeerd" : (t.dedupeKey ?? "").startsWith(BATCH_PREFIX) ? (t.description ?? "").split("\n")[0] || null : null,
+      detail: t.status === "blocked" ? "Geblokkeerd" : maandTaak ? (t.description ?? "").split("\n")[0] || null : null,
       clientName: t.clientName, href: taskHref({ entityType: t.entityType, entityId: t.entityId, dedupeKey: t.dedupeKey }) ?? "/tasks",
       due, state, daysLate, taskId: t.id, source: "taak", flag: null,
       status: t.status === "in_progress" ? "bezig" : t.status === "blocked" ? "geblokkeerd" : "open",
-      // De maandcontrole op de controledag zelf bovenaan, zodat hij niet wegzakt.
-      urgent: urgent || state === "late" || ((t.dedupeKey ?? "").startsWith(BATCH_PREFIX) && state === "today"),
+      // Maandrapportagetaken op de controledag zelf bovenaan, zodat ze niet wegzakken.
+      urgent: urgent || state === "late" || (maandTaak && state === "today"),
     });
   }
 
   // 1b) Maandrapportages: één compact item (controleren, publiceren, mislukt)
   //     in plaats van een losse melding per klant.
-  //     Wie een open maandtaak (controle) heeft, ziet het controleren via die
-  //     taak; dit item telt dan alleen nog publiceren en mislukt mee.
-  const heeftMaandtaak = taskRows.some((t) => (t.dedupeKey ?? "").startsWith(BATCH_PREFIX));
+  //     Controleren, goedkeuren en versturen staan per klant als eigen taak op
+  //     de takenlijst; dit item telt dan alleen nog mislukte generaties mee.
+  const heeftMaandtaak = taskRows.some((t) => (t.dedupeKey ?? "").startsWith(STAP_PREFIX));
   const repRaw = await reportWorkSummary(person, today).catch(() => null);
-  const rep = repRaw && heeftMaandtaak ? { ...repRaw, teControleren: 0 } : repRaw;
+  const rep = repRaw && heeftMaandtaak ? { ...repRaw, teControleren: 0, tePubliceren: 0 } : repRaw;
   if (rep && (rep.teControleren || rep.tePubliceren || rep.mislukt)) {
     const { title, detail } = reportWorkText(rep);
     const now = rep.mislukt > 0 || rep.tePubliceren > 0;

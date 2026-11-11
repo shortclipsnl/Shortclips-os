@@ -1,4 +1,4 @@
-import { batchHref, parseBatchKey } from "@/lib/maandcontrole";
+import { STAP_PREFIX, batchHref, parseBatchKey } from "@/lib/maandcontrole";
 import { dayIdFromKey, scriptingTaskHref, SCRIPTING_TASK_PREFIX } from "@/lib/scripting-task-plan";
 
 /**
@@ -16,11 +16,12 @@ export function taskHref(t: { entityType: string | null; entityId: string | null
   if (t.entityType === "deliverable" && t.entityId && t.dedupeKey?.startsWith("feedbackronde:")) {
     return `/videos/${t.entityId}`;
   }
-  // Actiepunt uit een maandrapportage → terug naar dat rapport.
-  if (t.entityType === "client_report" && t.entityId && t.dedupeKey?.startsWith("report_action:")) {
+  // Actiepunt of processtap (controleren, goedkeuren, versturen) van een
+  // maandrapportage → direct naar dat rapport.
+  if (t.entityType === "client_report" && t.entityId && (t.dedupeKey?.startsWith("report_action:") || t.dedupeKey?.startsWith(STAP_PREFIX))) {
     return `/analytics/maandrapportages/${t.entityId}`;
   }
-  // Maandcontrole (één taak per maand) → pagina Maandrapportages, die maand.
+  // Oude verzameltaak maandcontrole (één taak per maand) → pagina Maandrapportages.
   const batch = parseBatchKey(t.dedupeKey);
   if (t.entityType === "report_batch" && batch) return batchHref(batch.period);
   // Taak uit de operationele controle → direct naar het onderdeel met het probleem.

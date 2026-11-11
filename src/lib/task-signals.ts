@@ -1,5 +1,5 @@
 import { isFeedbackReminderKey } from "@/lib/ops-control/plan";
-import { batchHref, parseBatchKey } from "@/lib/maandcontrole";
+import { batchHref, parseBatchKey, parseStapKey } from "@/lib/maandcontrole";
 import { periodLabel } from "@/lib/format";
 
 /**
@@ -9,13 +9,14 @@ import { periodLabel } from "@/lib/format";
  */
 export type TaskSignal =
   | { kind: "feedback"; title: string; text: string; meta: string | null; message: string }
-  | { kind: "maandrapport"; title: string; text: string; meta: string | null; actionHref: string };
+  | { kind: "maandrapport"; title: string; text: string; meta: string | null; actionHref: string; status?: string | null };
 
 type TaskLike = {
   title: string;
   description: string | null;
   dedupeKey: string | null;
   entityType: string | null;
+  entityId?: string | null;
   clientName: string | null;
 };
 
@@ -65,6 +66,20 @@ export function taskSignal(t: TaskLike): TaskSignal | null {
       text: "Klant heeft nog geen feedback gegeven. Stuur een herinnering.",
       meta: meta || null,
       message: feedbackReminderMessage(),
+    };
+  }
+
+  // Maandrapportage per klant en processtap: klantnaam voorop, wat er moet
+  // gebeuren, de status en een directe knop naar de rapportage.
+  const stap = parseStapKey(key);
+  if (stap) {
+    return {
+      kind: "maandrapport",
+      title: t.clientName ?? "Klant",
+      text: t.title,
+      meta: null,
+      status: t.description?.split("\n")[0]?.trim() || null,
+      actionHref: t.entityId ? `/analytics/maandrapportages/${t.entityId}` : "/analytics/maandrapportages",
     };
   }
 

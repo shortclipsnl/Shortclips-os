@@ -22,6 +22,12 @@ function filename(name: string, period: string, versie: "klant" | "intern"): str
     : `Shortclips_Maandrapportage_${safe}_${period.replace("-", "_")}.pdf`;
 }
 
+function withConceptBar(html: string, definitief: boolean): string {
+  const tekst = `CONCEPT · nog niet goedgekeurd · niet naar de klant versturen${definitief ? "" : " · voorlopige cijfers"}`;
+  const bar = `<div style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#f59e0b;color:#3b2300;font:600 10px/1 Poppins,Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;text-align:center;padding:6px 0">${tekst}</div>`;
+  return html.replace("<body>", `<body>${bar}`);
+}
+
 /**
  * Interne PDF-route voor beide versies:
  *  ?versie=klant  (standaard) de klantversie;
@@ -56,9 +62,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         clientName: data.clientName, logoUrl: data.logoUrl, periodLabel: data.periodLabel,
         totals: data.totals as never, analysis: data.analysis, klanttekst: data.klanttekst, videos: data.klantVideos,
       });
+  // Klantversie die nog niet is goedgekeurd: op elke pagina een duidelijke
+  // CONCEPT-balk, zodat een concept nooit per ongeluk als definitief wordt gedeeld.
+  const concept = versie === "klant" && !APPROVED_STATUSES.includes(data.status);
+  const finalHtml = concept ? withConceptBar(html, data.definitief) : html;
   let pdf: Uint8Array;
   try {
-    pdf = await htmlToPdf(html);
+    pdf = await htmlToPdf(finalHtml);
   } catch (e) {
     return NextResponse.json({ error: "PDF genereren is mislukt (Chrome beschikbaar?).", detail: e instanceof Error ? e.message : String(e) }, { status: 503 });
   }

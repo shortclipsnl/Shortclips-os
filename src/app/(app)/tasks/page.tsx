@@ -117,7 +117,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     return rows.map(({ entityType, entityId, dedupeKey, ...t }) => ({
       ...t,
       href: taskHref({ entityType, entityId, dedupeKey }),
-      signal: taskSignal({ title: t.title, description: t.description, dedupeKey, entityType, clientName: t.clientName }),
+      signal: taskSignal({ title: t.title, description: t.description, dedupeKey, entityType, entityId, clientName: t.clientName }),
     }));
   }
 

@@ -65,6 +65,14 @@ export type TaskItemData = {
   signal?: TaskSignal | null;
 };
 
+/** Kleur van de statusregel van een maandrapportagetaak (oranje = wacht op cijfers of aanpassing). */
+function rapportStatusTone(status: string): string {
+  const s = status.toLowerCase();
+  if (s.includes("voorlopig") || s.includes("definitieve") || s.includes("aanpassing")) return "bg-[var(--color-warn-soft)] text-[#8a5300]";
+  if (s.startsWith("goedgekeurd")) return "bg-[var(--color-good-soft)] text-[var(--color-good)]";
+  return "bg-[var(--color-info-soft)] text-[var(--color-info)]";
+}
+
 const PRIORITIES = [
   { value: "low", label: "Laag" },
   { value: "normal", label: "Normaal" },
@@ -470,6 +478,12 @@ export function TaskItem({
           {signal?.text}
           {signal?.meta ? <span className="text-[var(--color-ink-faint)]"> · {signal.meta}</span> : null}
         </span>
+        {signal?.kind === "maandrapport" && signal.status && !done ? (
+          <span className="mt-1 flex flex-wrap items-center gap-1.5 text-2xs">
+            <span className="text-[var(--color-ink-faint)]">Status:</span>
+            <span className={cn("rounded-full px-2 py-0.5 font-medium", rapportStatusTone(signal.status))}>{signal.status}</span>
+          </span>
+        ) : null}
       </span>
       {prioBadge}
       {avatarEl}

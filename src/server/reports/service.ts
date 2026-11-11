@@ -7,8 +7,8 @@ import { periodLabel } from "./analysis";
 import { checkReportQuality, type Beoordeling, type QualityIssue } from "./quality";
 import { duplicateIssue, findDuplicateMetricClients, monthVideos, platformSplit, thumbnailsFor, type MaandCijfers, type MonthVideo, type Vergelijking } from "./metrics";
 import type { MonthlyAnalysis, VideoAnalyse } from "./analysis";
-import { controllersFor, listBatches, type BatchInfo } from "./batch";
-import { controleFase, type ControleFase } from "@/lib/maandcontrole";
+import { controllersFor, listStepTasks, type StapTaakInfo } from "./batch";
+import { cijfersDefinitief, controleFase, type ControleFase } from "@/lib/maandcontrole";
 
 export type ReportStatus =
   | "gegevens_verzamelen" | "analyse_bezig" | "klaar_voor_controle" | "aanpassing_nodig" | "goedgekeurd" | "gepubliceerd" | "mislukt";
@@ -82,6 +82,8 @@ export type ReportRow = {
   controllerId: string | null;
   /** Stap in de maandcontrole (null = wordt gegenereerd of mislukt). */
   fase: ControleFase | null;
+  /** Cijfers van de volledige maand (gegenereerd na de laatste dag van de maand). */
+  definitief: boolean;
 };
 
 export type TeamReadStat = { userId: string; name: string; assigned: number; read: number; openReportIds: string[] };
@@ -93,8 +95,8 @@ export type ReportOverview = {
   periods: string[];
   team: Record<string, TeamReadStat[]>;
   teamOnly: boolean;
-  /** Maandtaken (controle) per maand en medewerker: eigenaar ziet alles, anderen de eigen. */
-  batches: BatchInfo[];
+  /** Taken per klant, maand en stap (controleren, goedkeuren, versturen). */
+  stapTaken: StapTaakInfo[];
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -175,11 +177,11 @@ export async function listMonthlyReports(viewer: Viewer): Promise<ReportOverview
     acts.set(t.entityId, cur);
   }
 
-  const [controllers, batches] = await Promise.all([
+  const [controllers, stapTaken] = await Promise.all([
     controllersFor(rows.map((r) => ({ id: r.id, pmId: r.pmId }))),
-    listBatches(viewer.id, true),
+    listStepTasks(),
   ]);
-  const batchBy = new Map(batches.map((b) => [`${b.period}|${b.userId}`, b]));
+  const controleTaak = new Map(stapTaken.filter((t) => t.stap === "controleren").map((t) => [`${t.clientId}|${t.period}`, t]));
 
   const reports: ReportRow[] = rows.map((r) => {
     const m = (r.metrics ?? {}) as { posts?: number; views?: number };
@@ -233,11 +235,12 @@ export async function listMonthlyReports(viewer: Viewer): Promise<ReportOverview
       }).filter((i) => i.severity === "blok").length,
       controllerId: controllers.get(r.id) ?? null,
       fase: null,
+      definitief: cijfersDefinitief(r.period, r.generatedAt),
     };
   }).map((row) => {
     const b = (rows.find((x) => x.id === row.id)?.beoordeling ?? {}) as Beoordeling;
     const gestart = Boolean((b.positief ?? "").trim() || (b.verbeteren ?? "").trim() || (b.volgendeMaand ?? "").trim() || (b.klanttekst ?? "").trim()) || row.feedbackOpen > 0;
-    const batch = row.controllerId ? batchBy.get(`${row.period}|${row.controllerId}`) : undefined;
+    const batch = controleTaak.get(`${row.clientId}|${row.period}`);
     return {
       ...row,
       fase: controleFase({
@@ -280,7 +283,7 @@ export async function listMonthlyReports(viewer: Viewer): Promise<ReportOverview
     periods,
     team,
     teamOnly,
-    batches: isOwnerViewer(viewer) ? batches : batches.filter((b) => b.userId === viewer.id),
+    stapTaken: isOwnerViewer(viewer) ? stapTaken : stapTaken.filter((t) => t.assigneeId === viewer.id),
   };
 }
 
@@ -471,6 +474,8 @@ export type ReportPdfData = {
   pmName: string | null;
   ontbrekend: string[];
   approvedAt: string | null;
+  /** Cijfers van de volledige maand (gegenereerd na de laatste dag van de maand). */
+  definitief: boolean;
   /** Video's van de maand met miniatuur en (als beschikbaar) het AI-inzicht per video. */
   videos: Array<MonthVideo & { thumb: string | null; inzicht: string | null; les: string | null; analyse: VideoAnalyse | null }>;
   /** Alleen de video's die in de klantversie mogen (zonder de handmatig verborgen video's). */
@@ -484,7 +489,7 @@ export async function loadReportPdfData(reportId: string): Promise<ReportPdfData
     .select({
       clientId: clientReports.clientId, status: clientReports.status, period: clientReports.period,
       metrics: clientReports.metrics, analysis: clientReports.analysis, beoordeling: clientReports.beoordeling,
-      ontbrekendeGegevens: clientReports.ontbrekendeGegevens, approvedAt: clientReports.approvedAt,
+      ontbrekendeGegevens: clientReports.ontbrekendeGegevens, approvedAt: clientReports.approvedAt, generatedAt: clientReports.generatedAt,
       clientName: clients.name, logoUrl: clients.logoUrl, pmName: users.fullName,
     })
     .from(clientReports)
@@ -523,6 +528,7 @@ export async function loadReportPdfData(reportId: string): Promise<ReportPdfData
     pmName: r.pmName,
     ontbrekend: Array.isArray(r.ontbrekendeGegevens) ? (r.ontbrekendeGegevens as string[]) : [],
     approvedAt: r.approvedAt ? r.approvedAt.toISOString() : null,
+    definitief: cijfersDefinitief(r.period, r.generatedAt),
   };
 }
 

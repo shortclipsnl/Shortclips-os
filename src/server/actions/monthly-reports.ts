@@ -18,7 +18,18 @@ import { currentMonthPeriod, previousMonthPeriod, periodLabel } from "@/server/r
 import { checkReportQuality, canApprove, type Beoordeling } from "@/server/reports/quality";
 import { saveStrategyProfile } from "@/server/reports/strategy";
 import { syncReportBatches } from "@/server/reports/batch";
-import { parseBatchKey } from "@/lib/maandcontrole";
+import { cijfersDefinitief, laatsteWerkdag, maandCompleetVanaf, parseBatchKey, parseStapKey } from "@/lib/maandcontrole";
+import { nlHolidaySet } from "@/lib/holidays";
+
+/** Vanaf de laatste werkdag van een maand mag het rapport (met voorlopige cijfers) gemaakt worden. */
+function kanRapportMaken(period: string): boolean {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  if (period < currentMonthPeriod()) return true;
+  if (period > currentMonthPeriod()) return false;
+  return today >= laatsteWerkdag(period, nlHolidaySet([Number(period.slice(0, 4))]));
+}
+const TE_VROEG = "Een maandrapport kan pas gemaakt worden vanaf de laatste werkdag van de maand.";
+const fmtDatum = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("nl-NL", { day: "numeric", month: "long", timeZone: "UTC" });
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -49,7 +60,7 @@ export async function startMonthlyReport(clientId: string, period?: string, mode
     // Standaard de vorige kalendermaand (het rapport gaat over de afgelopen maand).
     const p = period ?? previousMonthPeriod(currentMonthPeriod());
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(p)) return { ok: false, message: "Ongeldige maand." };
-    if (p >= currentMonthPeriod()) return { ok: false, message: "Een maandrapport kan pas gemaakt worden als de maand voorbij is." };
+    if (!kanRapportMaken(p)) return { ok: false, message: TE_VROEG };
     const now = new Date();
     // Rij vast klaarzetten zodat de UI meteen status 'analyse_bezig' toont.
     const [existing] = await db.select({ id: clientReports.id, status: clientReports.status, startedAt: clientReports.startedAt, deletedAt: clientReports.deletedAt }).from(clientReports).where(and(eq(clientReports.clientId, clientId), eq(clientReports.period, p), eq(clientReports.periodType, "month"))).limit(1);
@@ -167,13 +178,18 @@ export async function generatePersonalText(reportId: string): Promise<ActionResu
  */
 export async function approveMonthlyReport(reportId: string): Promise<ActionResult> {
   return guard(async () => {
-    // De verantwoordelijke medewerker (recht reports:write) controleert en keurt
-    // goed; publiceren naar het klantportaal is een aparte, expliciete stap.
+    // De projectmanager controleert; Jarno (eigenaar) doet de definitieve
+    // controle en keurt goed. Versturen naar het klantportaal is een aparte,
+    // expliciete stap.
     const viewer = await requirePermission("reports:write");
+    if (!isOwner(viewer)) return { ok: false, message: "Goedkeuren doet Jarno. Rond jouw controle af; hij krijgt dan automatisch een taak." };
     const [r] = await db.select().from(clientReports).where(and(eq(clientReports.id, reportId), isNull(clientReports.deletedAt))).limit(1);
     if (!r) return { ok: false, message: "Rapport niet gevonden." };
     assertClientAccess(viewer, r.clientId);
     if (r.status !== "klaar_voor_controle" && r.status !== "aanpassing_nodig") return { ok: false, message: "Dit rapport kan in deze status niet goedgekeurd worden." };
+    if (!cijfersDefinitief(r.period, r.generatedAt)) {
+      return { ok: false, message: `De cijfers zijn nog voorlopig. Vanaf ${fmtDatum(maandCompleetVanaf(r.period))} worden ze automatisch ververst met de complete maand; daarna kun je goedkeuren.` };
+    }
     const issues = checkReportQuality({
       clientName: "",
       analysis: r.analysis as never,
@@ -279,6 +295,8 @@ export async function publishMonthlyReport(reportId: string): Promise<ActionResu
     await publishToPortal(viewer, r);
     revalidatePath(`/analytics/maandrapportages/${reportId}`);
     revalidatePath("/analytics/maandrapportages");
+    revalidatePath("/tasks");
+    after(() => syncReportBatches().catch(() => undefined));
     return { ok: true };
   });
 }
@@ -292,6 +310,7 @@ export async function unpublishMonthlyReport(reportId: string): Promise<ActionRe
     assertClientAccess(viewer, row.clientId);
     await db.update(clientReports).set({ status: "goedgekeurd", isPublished: false, publishedAt: null, updatedAt: new Date() }).where(eq(clientReports.id, reportId));
     revalidatePath(`/analytics/maandrapportages/${reportId}`);
+    after(() => syncReportBatches().catch(() => undefined));
     return { ok: true };
   });
 }
@@ -316,7 +335,7 @@ export async function queueMonthlyReports(period: string): Promise<ActionResult 
   return guard(async () => {
     const viewer = await requirePermission("reports:write");
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) return { ok: false, message: "Ongeldige maand." };
-    if (period >= currentMonthPeriod()) return { ok: false, message: "Een maandrapport kan pas gemaakt worden als de maand voorbij is." };
+    if (!kanRapportMaken(period)) return { ok: false, message: TE_VROEG };
     if (!aiConfigured()) return { ok: false, message: "Er is nog geen AI-sleutel ingesteld (ANTHROPIC_API_KEY)." };
     const active = await db.select({ id: clients.id }).from(clients).where(and(isNull(clients.deletedAt), inArray(clients.status, [...ACTIVE_CLIENT_STATUSES])));
     let queued = 0;
@@ -420,7 +439,7 @@ export async function setReportControleDag(taskId: string, dueOn: string | null)
     if (!isUuid(taskId)) return { ok: false, message: "Taak niet gevonden." };
     if (dueOn !== null && !/^\d{4}-\d{2}-\d{2}$/.test(dueOn)) return { ok: false, message: "Ongeldige datum." };
     const [t] = await db.select({ id: tasks.id, assigneeId: tasks.assigneeId, dedupeKey: tasks.dedupeKey }).from(tasks).where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt))).limit(1);
-    if (!t || !parseBatchKey(t.dedupeKey)) return { ok: false, message: "Taak niet gevonden." };
+    if (!t || !(parseBatchKey(t.dedupeKey) || parseStapKey(t.dedupeKey))) return { ok: false, message: "Taak niet gevonden." };
     if (t.assigneeId !== viewer.id && !isOwner(viewer)) return { ok: false, message: "Alleen de verantwoordelijke kan de controledag wijzigen." };
     await db.update(tasks).set({ dueOn, updatedAt: new Date() }).where(eq(tasks.id, taskId));
     revalidatePath("/analytics/maandrapportages");
