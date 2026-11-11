@@ -62,12 +62,11 @@ export const MEDEWERKERS = [
   { email: "milou@shortclips.nl", naam: "Milou", functie: "Content Creative & Social Media Manager" },
   { email: "jiska@shortclips.nl", naam: "Jiska", functie: "Content Creative & Social Media Manager" },
   { email: "rutger@shortclips.nl", naam: "Rutger", functie: "Videograaf" },
-  { email: "max@shortclips.nl", naam: "Max", functie: "Grafisch Vormgever" },
-  { email: "nynke@shortclips.nl", naam: "Nynke", functie: "Freelance Video Presentator" },
   { email: "fabian@shortclips.nl", naam: "Fabian", functie: "Short Video Editor" },
   { email: "noah@shortclips.nl", naam: "Noah", functie: "Short Video Editor" },
   { email: "quinn@shortclips.nl", naam: "Quinn", functie: "Short Video Editor" },
   { email: "sem@shortclips.nl", naam: "Sem", functie: "Short Video Editor" },
+  { email: "senna@shortclips.nl", naam: "Senna", functie: "Short Video Editor" },
   { email: "jarno@shortclips.nl", naam: "Jarno", functie: "Eigenaar - Head of Growth" },
 ] as const;
 
@@ -106,14 +105,13 @@ const K = (href: string): Koppeling => KOPPELINGEN.find((k) => k.href === href) 
 const MI = "milou@shortclips.nl";
 const JI = "jiska@shortclips.nl";
 const RU = "rutger@shortclips.nl";
-const MA = "max@shortclips.nl";
-const NY = "nynke@shortclips.nl";
 const FA = "fabian@shortclips.nl";
 const NO = "noah@shortclips.nl";
 const QU = "quinn@shortclips.nl";
 const SE = "sem@shortclips.nl";
+const SN = "senna@shortclips.nl";
 const JA = "jarno@shortclips.nl";
-const EDITORS = [FA, NO, QU, SE];
+const EDITORS = [FA, NO, QU, SE, SN];
 
 const v = (p: Omit<Verantwoordelijkheid, "actief">): Verantwoordelijkheid => ({ ...p, actief: true });
 const kort = (p: string) => p.split("@")[0];
@@ -225,7 +223,7 @@ const VERANTWOORDELIJKHEDEN: Verantwoordelijkheid[] = [
     wanneer: "Op iedere draaidag",
     verwachting: "100% van de geplande video's wordt opgenomen.",
     afgerond: "Alle geplande video's en benodigde beelden zijn opgenomen.",
-    betrokken: [NY], bevoegdheden: ["Kleine tekstwijzigingen tijdens de opname", "Scènes opnieuw opnemen als de kwaliteit daardoor verbetert", "Extra B-roll opnemen", "De presentator begeleiden"],
+    betrokken: [], bevoegdheden: ["Kleine tekstwijzigingen tijdens de opname", "Scènes opnieuw opnemen als de kwaliteit daardoor verbetert", "Extra B-roll opnemen", "De presentator begeleiden"],
     escalatie: "Een toezegging over extra video's of een extra draaidag.", vervanger: null, koppeling: K("/productions") }),
   v({ id: "ru-kwaliteit", persoon: RU, titel: "Beeld, audio en apparatuur",
     wat: "Verantwoordelijk voor camera-instellingen, licht, audio en apparatuur. Scherp, stabiel en goed belicht beeld volgens de Shortclips-standaard.",
@@ -255,47 +253,6 @@ const VERANTWOORDELIJKHEDEN: Verantwoordelijkheid[] = [
     afgerond: "Beelden en briefing staan klaar en de editor kan beginnen.",
     betrokken: [MI, JI], bevoegdheden: [],
     escalatie: "", vervanger: null, koppeling: K("/videos") }),
-
-  // ---------------- Max: Grafisch Vormgever (1.7) ----------------
-  v({ id: "ma-social", persoon: MA, titel: "Social media designs",
-    wat: "Social media posts, campagnevisuals en templates voor social media ontwerpen.",
-    wanneer: "Volgens de afgesproken planning",
-    verwachting: "Een consistente uitstraling op alle kanalen.",
-    afgerond: "Ontwerp overzichtelijk en volgens planning aangeleverd.",
-    betrokken: [MI, JI], bevoegdheden: ["Ontwerpkeuzes binnen de huisstijl"], escalatie: "", vervanger: null, koppeling: null }),
-  v({ id: "ma-branding", persoon: MA, titel: "Branding Shortclips",
-    wat: "De huisstijl van Shortclips bewaken en nieuwe branding-uitingen, logo's, iconen en visuele elementen ontwikkelen.",
-    wanneer: "Doorlopend",
-    verwachting: "Een professionele en herkenbare uitstraling.",
-    afgerond: "Uiting past bij de huisstijl van Shortclips.",
-    betrokken: [JA], bevoegdheden: [], escalatie: "", vervanger: null, koppeling: null }),
-  v({ id: "ma-uitingen", persoon: MA, titel: "Grafische uitingen",
-    wat: "Presentaties, documenten, drukwerk, promotiemateriaal, kantooruitingen en merchandise ontwerpen.",
-    wanneer: "Volgens de afgesproken planning",
-    verwachting: "Correcte bestanden, weinig correctierondes.",
-    afgerond: "Bestanden aangeleverd volgens planning.",
-    betrokken: [], bevoegdheden: [], escalatie: "", vervanger: null, koppeling: null }),
-  v({ id: "ma-klantbranding", persoon: MA, titel: "Klantbranding",
-    wat: "Grafische bestanden voor klanten ontwerpen en de huisstijl van klantaccounts bewaken op websites, social media en campagnes.",
-    wanneer: "Bij iedere designvraag voor een klant",
-    verwachting: "Een consistente uitstraling over alle kanalen van de klant.",
-    afgerond: "Ontwerp past bij de huisstijl van de klant.",
-    betrokken: [MI, JI], bevoegdheden: [], escalatie: "", vervanger: null, koppeling: K("/clients") }),
-
-  // ---------------- Nynke: Freelance Video Presentator (1.9) ----------------
-  v({ id: "ny-presentatie", persoon: NY, titel: "Presenteren voor de camera",
-    wat: "Scripts duidelijk, natuurlijk en foutloos presenteren met energie, en de tone of voice afstemmen op klant en doelgroep.",
-    wanneer: "Op iedere opnamedag waarop je presenteert",
-    verwachting: "Scripts komen geloofwaardig tot leven, consistent gedurende de hele dag.",
-    afgerond: "Alle scripts overtuigend opgenomen.",
-    betrokken: [RU], bevoegdheden: ["Tone of voice afstemmen op klant en doelgroep", "Een scène opnieuw opnemen wanneer nodig"],
-    escalatie: "", vervanger: null, koppeling: K("/productions") }),
-  v({ id: "ny-opname", persoon: NY, titel: "Voorbereiding en uitvoering op de set",
-    wat: "Goed voorbereid naar iedere opnamedag komen, de aanwijzingen van het productieteam volgen en efficiënt werken.",
-    wanneer: "Voor en tijdens iedere opnamedag",
-    verwachting: "Op tijd aanwezig, weinig takes nodig, flexibel tijdens de opnames.",
-    afgerond: "Opnamedag verlopen volgens planning.",
-    betrokken: [RU], bevoegdheden: [], escalatie: "", vervanger: null, koppeling: K("/productions") }),
 
   // ---------------- Editors (1.6) ----------------
   ...EDITORS.flatMap((p): Verantwoordelijkheid[] => {
@@ -448,10 +405,6 @@ const CONTROLES: Controle[] = [
   ctl(RU, "wekelijks", "Apparatuur compleet en onderhouden", null),
   ctl(RU, "maandelijks", "Eén procesverbetering aandragen", null),
 
-  ctl(MA, "wekelijks", "Ontwerpen volgens planning opleveren", null),
-
-  ctl(NY, "wekelijks", "Opnamedagen waarop je presenteert voorbereiden", "/productions"),
-
   ...EDITORS.flatMap((p) => [
     ctl(p, "dagelijks", "Je montages en openstaande feedback", "/videos"),
     ctl(p, "wekelijks", "Je editor deadlines van deze week", "/videos"),
@@ -486,12 +439,11 @@ const AFWEZIGHEID: Record<string, Afwezigheid> = {
     beslisser: "Op locatie beslis je zelf. Veiligheidssituaties meld je altijd direct. [[Wie beslist over niveau 4 als Jarno afwezig is, is nog niet vastgelegd.]]",
     vervanger: null,
   },
-  [MA]: { doorloopt: [], beslisser: "", vervanger: null },
-  [NY]: { doorloopt: [], beslisser: "", vervanger: null },
   [FA]: { doorloopt: [], beslisser: "", vervanger: null },
   [NO]: { doorloopt: [], beslisser: "", vervanger: null },
   [QU]: { doorloopt: [], beslisser: "", vervanger: null },
   [SE]: { doorloopt: [], beslisser: "", vervanger: null },
+  [SN]: { doorloopt: [], beslisser: "", vervanger: null },
   [JA]: { doorloopt: [], beslisser: "", vervanger: null },
 };
 
@@ -573,40 +525,11 @@ const PROFIELEN: Record<string, Profiel> = {
     ],
     bron: "Team Shortclips · 1.5 KPI's Videograaf en 1.13 Beslissingsbevoegdheid Rutger",
   },
-  [MA]: {
-    functie: "Grafisch Vormgever",
-    doel: "Je bent verantwoordelijk voor alle grafische en visuele uitingen van Shortclips en haar klanten, met een sterke en consistente huisstijl, online en offline.",
-    kpis: [
-      { titel: "Ontwerpen volgens huisstijl", norm: "Altijd" },
-      { titel: "Deadlines", norm: "Behaald volgens de afgesproken planning" },
-      { titel: "Bestanden", norm: "Correct en overzichtelijk aangeleverd" },
-      { titel: "Creatieve kwaliteit en consistente branding", norm: "Volgens de Shortclips-standaard" },
-      { titel: "Correctierondes", norm: "Zo weinig mogelijk" },
-    ],
-    samenwerking: [
-      { met: "Milou en Jiska", wanneer: "Bij ontwerpen voor klanten en social media." },
-      { met: "Jarno", wanneer: "Bij branding en de uitstraling van Shortclips zelf." },
-    ],
-    bron: "Team Shortclips · 1.7 KPI's Grafisch designer",
-  },
-  [NY]: {
-    functie: "Freelance Video Presentator",
-    doel: "Je presenteert short video content voor klanten van Shortclips, met een natuurlijke presentatie, sterke energie en een overtuigende delivery voor de camera.",
-    kpis: [
-      { titel: "Natuurlijke presentatie en energie", norm: "Op iedere opname" },
-      { titel: "Foutloze delivery", norm: "Weinig takes nodig" },
-      { titel: "Op tijd aanwezig", norm: "Altijd" },
-      { titel: "Samenwerking en flexibiliteit op de set", norm: "Professioneel" },
-    ],
-    samenwerking: [
-      { met: "Rutger", wanneer: "Op de set volg je zijn aanwijzingen en stem je de aanpak af." },
-    ],
-    bron: "Team Shortclips · 1.9 KPI's Video presentator",
-  },
   [FA]: EDITOR_PROFIEL,
   [NO]: EDITOR_PROFIEL,
   [QU]: EDITOR_PROFIEL,
   [SE]: EDITOR_PROFIEL,
+  [SN]: EDITOR_PROFIEL,
   [JA]: {
     functie: "Eigenaar - Head of Growth",
     doel: "Je bent eindverantwoordelijk voor koers, groei en toekomst van Shortclips: strategie, sales, financiën, kwaliteitsstandaard, systemen en team. De dagelijkse uitvoering ligt bij het team.",
@@ -627,16 +550,13 @@ const PROFIELEN: Record<string, Profiel> = {
 };
 
 const OPEN_PUNTEN = [
-  "Functies: Rutger is Videograaf (bevestigd, nu overal aangepast). Voor Max en Nynke gebruikt de kennisbank Grafisch Vormgever en Freelance Video Presentator, de website Brand Designer en Presentatrice. De pagina volgt de kennisbank; welke is juist?",
-  "Editors: les 1.6 noemt Sem, Fabian en Noah; het organigram ook Quinn. In het portaal is ook Senna actief als editor. Quinn staat er nu bij als editor, Senna niet. Klopt dat?",
+  "Editors: les 1.6 noemt Sem, Fabian, Noah en Senna; het organigram ook Quinn. Quinn staat er nu bij als editor. Klopt dat?",
   "Editors zien de pagina niet: zij hebben alleen de compacte editorweergave. Hun verantwoordelijkheden staan er voor jouw overzicht. Wil je ze in het editorportaal tonen?",
   "Rutger: de afbeelding 'Los je altijd zelf op' (les 1.13) zegt dat hij extra video's of een extra draaidag zelf afhandelt, de tekst eronder dat een toezegging daarover niveau 4 is. De pagina volgt de tekst: regie houden, toezeggen via Jarno.",
   "Verwijzing: lessen 1.10 t/m 1.14 en Klanten + communicatie 1.4 verwijzen naar 'SOP 1.10 Beslisrechten', maar die les heet nu 1.8.",
   "Monday: de kennisbank zegt nog 'leg vast in Monday' en de relatieronde draait op een Monday-scan. Op de pagina staat 'vastleggen in het portaal' en de relatieronde gekoppeld aan Aandachtspunten.",
   "Afwezigheid Jarno: in de kennisbank staat niet wie over niveau 4 beslist als jij afwezig bent. Eerder stond hier Christian en 'Milou beslist tot €250 voor het hele team'; dat is weggehaald omdat het nergens is vastgelegd.",
-  "Vervangers: voor Rutger, Max, Nynke en de editors is in de kennisbank geen vervanger vastgelegd.",
-  "Joy (Freelance Video Presentator in les 1.9) heeft geen account in het portaal en staat daarom niet op de pagina.",
-  "Beslisrechten voor Max en Nynke staan niet in de kennisbank; er staan voor hen daarom geen beslisregels op de pagina.",
+  "Vervangers: voor Rutger en de editors is in de kennisbank geen vervanger vastgelegd.",
 ];
 
 export function standaardConfig(): Config {
