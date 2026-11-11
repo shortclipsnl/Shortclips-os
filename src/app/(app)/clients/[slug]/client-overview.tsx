@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, BookOpen, Clapperboard, Mail, Phone } from "lucide-react";
+import { ArrowUpRight, BookOpen, Clapperboard, Film, Mail, Phone } from "lucide-react";
 import type { ClientHub } from "@/server/clients";
 import type { DocButtonSlot } from "@/components/client-docs/doc-buttons";
 import { daysUntil, formatDateFull, relativeDays } from "@/lib/format";
@@ -145,10 +145,21 @@ export function ClientOverview({
             </Link>
           }
         />
-        <div className="grid flex-1 gap-3 sm:grid-cols-2">
+        <div className="grid flex-1 gap-3 sm:grid-cols-3">
           {docSlots.map((s) => (
             <DocTile key={s.kind} slot={s} />
           ))}
+          {/* Alle video's van deze klant per opnamesessie (zelfde bron als het klantportaal). */}
+          <Link
+            href={`/clients/${c.slug}/videos`}
+            className="flex min-h-[112px] flex-col justify-between gap-4 rounded-[var(--radius-lg)] border border-[var(--color-ink)] bg-[var(--color-surface)] p-5 text-[var(--color-ink)] transition hover:bg-[var(--color-surface-2)]"
+          >
+            <Film className="size-6" strokeWidth={1.6} />
+            <span className="flex items-center justify-between gap-2 text-[15px] font-semibold">
+              Short video&apos;s
+              <ArrowUpRight className="size-4" strokeWidth={1.8} />
+            </span>
+          </Link>
         </div>
       </section>
     </div>
