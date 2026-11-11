@@ -7,7 +7,7 @@ const TEAM = [
   { name: "Jarno", role: "Founder & Creative Director", img: "/team/jarno.png" },
   { name: "Milou", role: "Content Creative", img: "/team/milou.png" },
   { name: "Jiska", role: "Content Creative", img: "/team/jeska.png" },
-  { name: "Rutger", role: "Head of Content", img: "/team/rutger.png" },
+  { name: "Rutger", role: "Videograaf", img: "/team/rutger.png" },
   { name: "Nynke", role: "Presentatrice", img: "/team/nynke.png" },
   { name: "Quinn", role: "Short Video Creative", img: "/team/quinn.png" },
   { name: "Fabian", role: "Short Video Creative", img: "/team/fabian.png" },

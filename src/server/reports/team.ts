@@ -53,7 +53,7 @@ export async function readersForReport(reportId: string): Promise<Array<{ userId
     .where(and(eq(scripts.clientId, r.clientId), isNull(scripts.deletedAt), isNotNull(scripts.creatorId), gte(scripts.updatedAt, from)));
   for (const w of writers) add(w.id, "scriptschrijver");
 
-  // Vaste lezers (bv. Head of Content): nemen elke goedgekeurde rapportage door,
+  // Vaste lezers (bv. de videograaf): nemen elke goedgekeurde rapportage door,
   // los van welke klant. Ingesteld in app_settings "reports.extra_readers".
   for (const id of await extraReaders()) add(id, "vaste lezer");
 

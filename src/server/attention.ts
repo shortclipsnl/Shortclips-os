@@ -42,7 +42,7 @@ const REOPEN_AFTER_DAYS = 3;
 const DONE_VISIBLE_DAYS = 7;
 
 const ROLE_LABEL: Record<string, string> = {
-  jarno: "Founder", milou: "Content Creative", jiska: "Content Creative", rutger: "Head of Content",
+  jarno: "Founder", milou: "Content Creative", jiska: "Content Creative", rutger: "Videograaf",
 };
 
 export async function listAttentionTeam(): Promise<TeamMember[]> {

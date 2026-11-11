@@ -137,7 +137,7 @@ export default async function TeamPage() {
           <span className="font-semibold leading-tight">{p.fullName}</span>
           {p.status === "suspended" ? <Badge tone="neutral">Gedeactiveerd</Badge> : null}
         </div>
-        {/* De vaste short-video-editors (Quinn, Noah, Sam, Senna, Fabian) tonen
+        {/* De vaste short-video-editors (Quinn, Noah, Sem, Senna, Fabian) tonen
             we als "Short Video Editor", niet als creative. */}
         <div className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{isBoardEditorName(p.fullName) ? "Short Video Editor" : p.jobTitle ?? ROLE_LABELS[p.role] ?? p.role}</div>
         {birthdayLabel(p.email) ? (

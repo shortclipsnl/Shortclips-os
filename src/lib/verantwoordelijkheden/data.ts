@@ -627,16 +627,14 @@ const PROFIELEN: Record<string, Profiel> = {
 };
 
 const OPEN_PUNTEN = [
-  "Functie Rutger: de kennisbank noemt hem Videograaf (organigram: Content Creative (Videograaf)), het portaal en de website Head of Content. De pagina volgt nu de kennisbank.",
-  "Functies: de kennisbank gebruikt Grafisch Vormgever (Max), Freelance Video Presentator (Nynke) en Short Video Editor; in het portaal stonden Brand Designer, Presentatrice en Short Video Creative. De pagina volgt nu de kennisbank.",
-  "Editors: les 1.6 noemt Sem, Fabian en Noah; het organigram ook Quinn. In het portaal is ook Senna actief als editor en heeft Sem twee accounts (sam@ is geschorst). Quinn staat er nu bij als editor, Senna niet. Klopt dat?",
+  "Functies: Rutger is Videograaf (bevestigd, nu overal aangepast). Voor Max en Nynke gebruikt de kennisbank Grafisch Vormgever en Freelance Video Presentator, de website Brand Designer en Presentatrice. De pagina volgt de kennisbank; welke is juist?",
+  "Editors: les 1.6 noemt Sem, Fabian en Noah; het organigram ook Quinn. In het portaal is ook Senna actief als editor. Quinn staat er nu bij als editor, Senna niet. Klopt dat?",
   "Editors zien de pagina niet: zij hebben alleen de compacte editorweergave. Hun verantwoordelijkheden staan er voor jouw overzicht. Wil je ze in het editorportaal tonen?",
   "Rutger: de afbeelding 'Los je altijd zelf op' (les 1.13) zegt dat hij extra video's of een extra draaidag zelf afhandelt, de tekst eronder dat een toezegging daarover niveau 4 is. De pagina volgt de tekst: regie houden, toezeggen via Jarno.",
   "Verwijzing: lessen 1.10 t/m 1.14 en Klanten + communicatie 1.4 verwijzen naar 'SOP 1.10 Beslisrechten', maar die les heet nu 1.8.",
   "Monday: de kennisbank zegt nog 'leg vast in Monday' en de relatieronde draait op een Monday-scan. Op de pagina staat 'vastleggen in het portaal' en de relatieronde gekoppeld aan Aandachtspunten.",
   "Afwezigheid Jarno: in de kennisbank staat niet wie over niveau 4 beslist als jij afwezig bent. Eerder stond hier Christian en 'Milou beslist tot €250 voor het hele team'; dat is weggehaald omdat het nergens is vastgelegd.",
   "Vervangers: voor Rutger, Max, Nynke en de editors is in de kennisbank geen vervanger vastgelegd.",
-  "Naam Milou: les 1.4 noemt Milou Schuursma, haar account in het portaal Milou Sjoerdsma. Welke is juist?",
   "Joy (Freelance Video Presentator in les 1.9) heeft geen account in het portaal en staat daarom niet op de pagina.",
   "Beslisrechten voor Max en Nynke staan niet in de kennisbank; er staan voor hen daarom geen beslisregels op de pagina.",
 ];

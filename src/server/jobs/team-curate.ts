@@ -23,7 +23,7 @@ const TEAM: Record<string, { title: string; internal: boolean }> = {
   jarno: { title: "Founder & Creative Director", internal: true },
   milou: { title: "Content Creative", internal: true },
   jiska: { title: "Content Creative", internal: true },
-  rutger: { title: "Head of Content", internal: true },
+  rutger: { title: "Videograaf", internal: true },
   fabian: { title: "Short Video Creative", internal: false },
   max: { title: "Brand Designer", internal: false },
   nynke: { title: "Presentatrice", internal: false },

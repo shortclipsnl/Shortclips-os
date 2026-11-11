@@ -251,7 +251,7 @@ export async function listScripting(viewer: Viewer, opts: { trusted?: boolean; k
 
   // Verantwoordelijken die scripts schrijven: het vaste kernteam (Jarno, Milou,
   // Jiska), ongeacht hun exacte rol — behalve de videograaf. Rutger schrijft geen
-  // scripts; hij staat als "Head of Content" wél in het kernteam maar heeft rol
+  // scripts; hij staat als "Videograaf" wél in het kernteam maar heeft rol
   // content_creator (niet videographer), dus sluiten we hem hier expliciet op
   // e-mail uit. Zo staat Jiska er altijd bij, ook als haar rol afwijkt.
   const writerOptions: WriterOption[] = (

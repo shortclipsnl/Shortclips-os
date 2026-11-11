@@ -232,7 +232,7 @@ export async function getWorkOverview(person: Viewer, opts: { trusted?: boolean 
     });
   }
 
-  // 1c) Doornemen (teamleden zonder controlerecht, bv. Head of Content): één item.
+  // 1c) Doornemen (teamleden zonder controlerecht, bv. de videograaf): één item.
   const lees = await reportReadSummary(person).catch(() => null);
   if (lees) {
     items.push({

@@ -115,7 +115,7 @@ export default async function VideosPage({
   // Editor wijzigen: iedereen met videos:assign én het vaste kantoorteam (Milou,
   // Jiska, Rutger) — zij sturen de editing net als de eigenaar aan.
   const canAssign = viewer.permissions.has("videos:assign") || isCoreStaff(viewer.email);
-  // Edit-boards zijn alleen voor de vaste editors: Quinn, Noah, Sam, Senna, Fabian.
+  // Edit-boards zijn alleen voor de vaste editors: Quinn, Noah, Sem, Senna, Fabian.
   const boardEditors = editors.filter((e) => isBoardEditor(e.fullName));
   // Editors (freelance) zien alleen hun eigen editbord met de fases — niet de
   // deadlinebewaking, aandachtsblokken of de werkvoorraad/tarieven eronder.
