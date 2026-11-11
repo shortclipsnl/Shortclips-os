@@ -14,8 +14,8 @@ import { WorkloadSection } from "../editing/workload-section";
 import { Card, PageHeader } from "@/components/ui";
 import { EditorBoardTable } from "./editor-board-table";
 import { AutofillEditorsButton } from "./autofill-editors";
-import { KlantberichtButton } from "./klantbericht-button";
-import { getKlantbericht } from "@/server/klantbericht";
+import { getWhatsappStandaarden } from "@/server/whatsapp-bericht";
+import { canUseWhatsappBericht } from "@/server/whatsapp-bericht-access";
 import { ClientStatusTabs } from "@/components/client-status-tabs";
 import { parseClientStatusFilter } from "@/lib/client-status";
 
@@ -129,14 +129,14 @@ export default async function VideosPage({
   // gegroepeerd per fase met de editor erbij.
   // Feedbackrondes: alleen voor het kernteam (Jarno, Milou, Jiska, Rutger).
   const showFeedbackRounds = canManageFeedbackRounds(viewer);
+  // WhatsApp-bericht eerste versies: per opname twee opties (videolink + PDF of
+  // Shortclips portaal), alleen voor het kantoorteam.
+  const showWhatsapp = showAllBoard && canUseWhatsappBericht(viewer);
   const allEditorVideos = showAllBoard
-    ? (await listEditorBoard(viewer, { allEditors: true, withFeedbackRounds: showFeedbackRounds })).filter((v) =>
+    ? (await listEditorBoard(viewer, { allEditors: true, withFeedbackRounds: showFeedbackRounds, withWhatsappBericht: showWhatsapp })).filter((v) =>
         klantenFilter === "alle" ? true : klantenFilter === "actief" ? v.clientActive : !v.clientActive)
     : [];
-  // "Kopieer klantbericht": zichtbaar zodra er eerste versies klaarstaan om naar de
-  // klant te sturen (fase Interne review of Feedback klant).
-  const readyForClient = allEditorVideos.some((v) => v.phase === "interne_controle" || v.phase === "bij_klant");
-  const klantbericht = readyForClient ? await getKlantbericht() : null;
+  const whatsapp = showWhatsapp ? { standaarden: await getWhatsappStandaarden(), canManage: canManageOperations(viewer) } : null;
 
   return (
     <div className="mx-auto max-w-[1500px]">
@@ -153,7 +153,6 @@ export default async function VideosPage({
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-white">
             <h2 className="text-sm font-bold tracking-tight">Alle editing-opdrachten</h2>
             <div className="flex flex-wrap items-center gap-3">
-              {klantbericht ? <KlantberichtButton text={klantbericht} canManage={canManageOperations(viewer)} /> : null}
               {canAssign ? <AutofillEditorsButton /> : null}
               <span className="text-xs text-white/80">{allEditorVideos.length} video&apos;s · per fase, met editor, deadline, downloadlink en script</span>
             </div>
@@ -167,6 +166,7 @@ export default async function VideosPage({
               canEditFiles={showAllBoard}
               viewerId={viewer.id}
               showFeedbackRounds={showFeedbackRounds}
+              whatsapp={whatsapp}
             />
           ) : (
             <p className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-6 text-center text-sm text-[var(--color-ink-muted)]">

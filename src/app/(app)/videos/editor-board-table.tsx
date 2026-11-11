@@ -14,6 +14,7 @@ import { askEditorQuestion, assignEditor, attachBriefingToProject, changeVideoSt
 import { FEEDBACK_ROUND_OPTIONS, extraFeedbackRoundText, isExtraFeedbackRound } from "@/lib/feedback-rounds";
 import { fileToBase64 } from "../ai/_shared";
 import type { EditorBoardVideo } from "@/server/editor-board";
+import { WhatsappBerichtKnoppen, type WhatsappStandaarden } from "./whatsapp-bericht";
 
 type Editor = { id: string; fullName: string };
 
@@ -103,6 +104,7 @@ export function EditorBoardTable({
   showTabs = true,
   editorView = false,
   showFeedbackRounds = false,
+  whatsapp = null,
 }: {
   videos: EditorBoardVideo[];
   editors: Editor[];
@@ -121,6 +123,8 @@ export function EditorBoardTable({
   /** Kolom Feedbackrondes tonen (alleen kernteam; de server stuurt de waarde
    *  ook alleen dan mee). */
   showFeedbackRounds?: boolean;
+  /** WhatsApp-bericht eerste versies (alleen kantoorteam): standaardteksten + beheerrecht. */
+  whatsapp?: { standaarden: WhatsappStandaarden; canManage: boolean } | null;
 }) {
   const withFeedback = showFeedbackRounds && !editorView;
   const grid = gridFor(editorView, withFeedback);
@@ -277,7 +281,7 @@ export function EditorBoardTable({
                 <EditPhaseHeader label={meta.label} color={meta.color} count={list.length} open={open} onToggle={() => toggle(ph)} />
                 {open ? (
                   list.length > 0 ? (
-                    list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} canEditFiles={canEditFiles} viewerId={viewerId} phaseColor={meta.color} editorView={editorView} grid={grid} showFeedbackRounds={withFeedback} />)
+                    list.map((v) => <Row key={v.id} v={v} editors={editors} canEdit={canEdit} canAssign={canAssign} canEditFiles={canEditFiles} viewerId={viewerId} phaseColor={meta.color} editorView={editorView} grid={grid} showFeedbackRounds={withFeedback} whatsapp={editorView ? null : whatsapp} />)
                   ) : (
                     <p className="border-b border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2.5 text-2xs text-[var(--color-ink-faint)]">Nog geen video&apos;s in deze fase.</p>
                   )
@@ -354,7 +358,10 @@ function TextTab({ active, onClick, children }: { active: boolean; onClick: () =
   );
 }
 
-function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorView = false, grid, showFeedbackRounds = false }: { v: EditorBoardVideo; editors: Editor[]; canEdit: boolean; canAssign: boolean; canEditFiles?: boolean; viewerId?: string; phaseColor: string; editorView?: boolean; grid: string; showFeedbackRounds?: boolean }) {
+/** Fases waarin de eerste versies naar de klant gaan: hier staat het WhatsApp-bericht. */
+const WHATSAPP_PHASES = new Set<EditPhase>(["interne_controle", "bij_klant"]);
+
+function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorView = false, grid, showFeedbackRounds = false, whatsapp = null }: { v: EditorBoardVideo; editors: Editor[]; canEdit: boolean; canAssign: boolean; canEditFiles?: boolean; viewerId?: string; phaseColor: string; editorView?: boolean; grid: string; showFeedbackRounds?: boolean; whatsapp?: { standaarden: WhatsappStandaarden; canManage: boolean } | null }) {
   // Downloadlink + script mogen editors ook bewerken (los van `canEdit`): wie
   // `videos:write` heeft, of wie zelf de toegewezen editor van deze rij is.
   // Bronmateriaal (downloadlink, script) beheert alleen Team Shortclips; de
@@ -388,6 +395,10 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorV
             <div className="font-semibold text-[var(--color-ink)]">Opnamedatum: {v.opnameDate ? fmtLong(v.opnameDate) : "nog niet gepland"}</div>
             <div className="text-[var(--color-ink-muted)]">Beeldmateriaal: {v.footageReady ? "staat klaar" : v.opnameDate && v.opnameDate > todayIso() ? "beschikbaar na de opname" : "wordt klaargezet door Team Shortclips"}</div>
           </div>
+        ) : null}
+        {/* WhatsApp-bericht eerste versies: twee opties, per opname. */}
+        {whatsapp && v.whatsappBericht && WHATSAPP_PHASES.has(v.phase) ? (
+          <WhatsappBerichtKnoppen videoId={v.id} clientName={v.clientName} concept={v.whatsappBericht} standaarden={whatsapp.standaarden} canManage={whatsapp.canManage} />
         ) : null}
       </div>
 

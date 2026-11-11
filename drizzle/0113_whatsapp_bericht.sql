@@ -1,0 +1,1 @@
+ALTER TABLE "deliverables" ADD COLUMN "whatsapp_bericht" jsonb;

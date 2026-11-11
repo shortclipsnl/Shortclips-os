@@ -1,4 +1,5 @@
 import "server-only";
+import { sanitizeConcept, type WhatsappBerichtConcept } from "@/lib/whatsapp-bericht";
 import { isActiveClientStatus } from "@/lib/client-status";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -163,6 +164,9 @@ export type EditorBoardVideo = {
   feedbackRounds: number | null;
   /** Feedbacktermijn van de klant bij fase Feedback klant (alleen in het teamoverzicht). */
   feedbackTerm: FeedbackTermView | null;
+  /** Concept WhatsApp-bericht eerste versies. Alleen gevuld voor het
+   *  kantoorteam (zie `canUseWhatsappBericht`); anders null. */
+  whatsappBericht: WhatsappBerichtConcept | null;
 };
 
 const TOTAL_WORKDAYS = 14; // opname → klantoplevering
@@ -175,7 +179,7 @@ const TOTAL_WORKDAYS = 14; // opname → klantoplevering
  */
 export async function listEditorBoard(
   viewer: Viewer,
-  opts: { allEditors?: boolean; withFeedbackRounds?: boolean } = {},
+  opts: { allEditors?: boolean; withFeedbackRounds?: boolean; withWhatsappBericht?: boolean } = {},
 ): Promise<EditorBoardVideo[]> {
   const holidays = nlHolidaySet();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
@@ -196,6 +200,7 @@ export async function listEditorBoard(
       briefing: deliverables.briefing,
       currentVersion: deliverables.currentVersion,
       feedbackRounds: deliverables.feedbackRounds,
+      whatsappBericht: deliverables.whatsappBericht,
       clientName: clients.name,
       clientSlug: clients.slug,
       clientColor: clients.color,
@@ -410,6 +415,7 @@ export async function listEditorBoard(
       progress: null,
       feedbackRounds: opts.withFeedbackRounds ? Number(r.feedbackRounds ?? 0) : null,
       feedbackTerm: null,
+      whatsappBericht: opts.withWhatsappBericht ? sanitizeConcept(r.whatsappBericht) : null,
     };
   });
 

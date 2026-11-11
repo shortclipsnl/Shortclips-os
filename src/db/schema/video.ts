@@ -14,6 +14,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { pk, softDelete, timestamps } from "./_shared";
+import type { WhatsappBerichtConcept } from "../../lib/whatsapp-bericht";
 import {
   approvalKindEnum,
   approvalStatusEnum,
@@ -95,6 +96,10 @@ export const deliverables = pgTable(
     /** Feedbackrondes (0-6), handmatig bijgehouden door het kernteam op het
      *  editingoverzicht. Vanaf 2 gelden extra kosten volgens de prijslijst. */
     feedbackRounds: integer("feedback_rounds").notNull().default(0),
+    /** WhatsApp-bericht eerste versies: concept per opname (gekozen optie,
+     *  videolink, aangepaste tekst, checklist). Zie src/lib/whatsapp-bericht.ts.
+     *  Wijzigt nooit de standaardtekst voor andere medewerkers. */
+    whatsappBericht: jsonb("whatsapp_bericht").$type<WhatsappBerichtConcept>(),
     editCost: numeric("edit_cost", { precision: 10, scale: 2 })
       .notNull()
       .default("0"),
