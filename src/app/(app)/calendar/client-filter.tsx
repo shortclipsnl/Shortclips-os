@@ -55,7 +55,7 @@ export function CalendarClientFilter({
         aria-expanded={open}
       >
         <Users className="size-3.5" />
-        {open ? "Verberg klanten" : `Toon alle klanten (${clients.length})`}
+        {open ? "Sluiten" : `Kies een klant (${clients.length})`}
         <ChevronDown className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 

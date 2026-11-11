@@ -10,9 +10,8 @@ import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { listCalendar, monthGrid, type CalendarItem } from "@/server/calendar";
 import { listClients } from "@/server/clients";
 import { SharePlanningButton } from "./share-planning";
-import { DeadlineOverview } from "./deadline-overview";
 import { StartDeadlineButton } from "./deadline-actions";
-import { activeDeadlineFor, listTeamDeadlines, sortByUrgency } from "@/server/planning-deadlines";
+import { activeDeadlineFor } from "@/server/planning-deadlines";
 import { ContentPlanningPdfButton } from "@/components/content-planning/pdf-button";
 import { Badge, Card, ClientLogo, EmptyState, GuidelineNote, PageHeader } from "@/components/ui";
 import { ListChecks } from "lucide-react";
@@ -74,7 +73,7 @@ export default async function CalendarPage({
     ["Mon", "Tue", "Wed", "Thu", "Fri"].includes(amsWeekday) &&
     amsMinutesOfDay >= 14 * 60 + 30 &&
     amsMinutesOfDay < 17 * 60;
-  const emphasizePublicatiecheck = isCoreStaff(viewer.email) && inPostingWindow;
+  const todayAms = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
 
   const params = await searchParams;
 
@@ -132,6 +131,14 @@ export default async function CalendarPage({
     .filter((c) => (listFilter === "zelf" ? c.weHandlePosting === false : true))
     .sort((a, b) => a.name.localeCompare(b.name));
   const weekItems = rawWeekItems.filter((i) => inMode(i));
+
+  // Publicatiecheck automatisch openen zodra er vandaag een publicatie verschuldigd
+  // is: de geplande publicatietijd is bereikt en de video staat nog niet online.
+  const minOf = (t: string | null) => (t ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : 0);
+  const publicatieVerschuldigd = [...items, ...weekItems].some(
+    (i) => i.scheduledOn === todayAms && i.videoStatus !== "published" && minOf(i.scheduledAt) <= amsMinutesOfDay,
+  );
+  const emphasizePublicatiecheck = isCoreStaff(viewer.email) && (publicatieVerschuldigd || inPostingWindow);
   const weekByDay = new Map<string, CalendarItem[]>();
   for (const item of weekItems) {
     const list = weekByDay.get(item.scheduledOn) ?? [];
@@ -160,11 +167,6 @@ export default async function CalendarPage({
   }
 
   // Deadlines contentplanning (21 dagen) per klant, binnen de klantscope.
-  const deadlineSort = params.deadlines === "naam" ? "naam" : "kortste";
-  const deadlineRowsRaw = await listTeamDeadlines(viewer);
-  const deadlineRows = deadlineSort === "naam"
-    ? [...deadlineRowsRaw].sort((a, b) => a.clientName.localeCompare(b.clientName, "nl"))
-    : sortByUrgency(deadlineRowsRaw);
   let selectedHasDeadline = true;
   if (selectedClient && canWrite && !(await activeDeadlineFor(selectedClient.id))) {
     // Alleen tonen als er al planning met de klant gedeeld is.
@@ -300,14 +302,6 @@ export default async function CalendarPage({
             ) : null}
           </div>
         }
-      />
-
-      {/* Deadlines contentplanning: welke klanten bijna hun deadline bereiken. */}
-      <DeadlineOverview
-        rows={deadlineRows}
-        sort={deadlineSort}
-        sortHref={{ kortste: withParam("deadlines", undefined), naam: withParam("deadlines", "naam") }}
-        canWrite={canWrite}
       />
 
       {/* Compacte publicatiecheck — herinnering bij het inplannen/publiceren. */}

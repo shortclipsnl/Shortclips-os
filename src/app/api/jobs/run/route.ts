@@ -1,6 +1,7 @@
 import { frameLibraryCoverage, syncFrameLibrary } from "@/server/jobs/frameio-library";
 import { NextResponse } from "next/server";
 import { runFinanceSyncHealth } from "@/server/jobs/finance-sync";
+import { runPublicationDueCheck } from "@/server/jobs/publication-reminders";
 import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 import { runCleaningFridayReminder, runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runDailyTeamTodoReminder, runNextDayTodoReminder, runEditorDeadlineReminders, runEditorEscalations, recordDeadlinePerformance, runEditorFridayWrapUp, runFinanceMonthReminder, runFinanceWeeklySummary, runHourlySignals, runPostShootReminder, runScriptTodoReminders, runTaskDeadlineReminders, runVrijdagcheckNotification } from "@/server/jobs/maintenance";
@@ -100,6 +101,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "finance.month_reminder": runFinanceMonthReminder,
   "finance.weekly_summary": runFinanceWeeklySummary,
   "finance.sync_health": runFinanceSyncHealth,
+  "publications.due_check": runPublicationDueCheck,
   "signals.hourly": runHourlySignals,
   "frameio.pull_projects": pullFrameProjects,
   "frameio.pull_comments": pullFrameComments,
