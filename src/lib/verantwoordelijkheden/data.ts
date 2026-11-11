@@ -62,11 +62,6 @@ export const MEDEWERKERS = [
   { email: "milou@shortclips.nl", naam: "Milou", functie: "Content Creative & Social Media Manager" },
   { email: "jiska@shortclips.nl", naam: "Jiska", functie: "Content Creative & Social Media Manager" },
   { email: "rutger@shortclips.nl", naam: "Rutger", functie: "Videograaf" },
-  { email: "fabian@shortclips.nl", naam: "Fabian", functie: "Short Video Editor" },
-  { email: "noah@shortclips.nl", naam: "Noah", functie: "Short Video Editor" },
-  { email: "quinn@shortclips.nl", naam: "Quinn", functie: "Short Video Editor" },
-  { email: "sem@shortclips.nl", naam: "Sem", functie: "Short Video Editor" },
-  { email: "senna@shortclips.nl", naam: "Senna", functie: "Short Video Editor" },
   { email: "jarno@shortclips.nl", naam: "Jarno", functie: "Eigenaar - Head of Growth" },
 ] as const;
 
@@ -111,7 +106,10 @@ const QU = "quinn@shortclips.nl";
 const SE = "sem@shortclips.nl";
 const SN = "senna@shortclips.nl";
 const JA = "jarno@shortclips.nl";
-const EDITORS = [FA, NO, QU, SE, SN];
+/** Besluit 11 nov: deze pagina is alleen voor Jarno, Milou, Jiska en Rutger. De editorblokken
+ *  blijven hieronder staan maar zijn uitgeschakeld; editors hebben hun eigen editorportaal. */
+const EDITORS: string[] = [];
+void [FA, NO, QU, SE, SN];
 
 const v = (p: Omit<Verantwoordelijkheid, "actief">): Verantwoordelijkheid => ({ ...p, actief: true });
 const kort = (p: string) => p.split("@")[0];
