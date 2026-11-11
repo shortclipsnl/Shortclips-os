@@ -93,7 +93,6 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/ai-editor", label: "AI Editor", icon: "Clapperboard", permissions: ["ai_editor:read"], match: "/ai-editor" },
       { href: "/ai/geschiedenis", label: "AI-geschiedenis", icon: "History", permissions: ["ai:history_read"], match: "/ai/geschiedenis" },
       // Voor het team pas zichtbaar zodra de R2-opslag is ingesteld (zie layout).
-      { href: "/transfer", label: "Bestanden versturen", icon: "Send", permissions: ["transfer:read"], match: "/transfer" },
     ],
   },
   {

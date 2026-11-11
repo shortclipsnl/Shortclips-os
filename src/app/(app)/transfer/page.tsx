@@ -1,49 +1,41 @@
 import type { Metadata } from "next";
-import { CheckCircle2, AlertTriangle } from "lucide-react";
-import { requirePermission, isOwner } from "@/server/auth/context";
-import { r2Configured, r2HealthCheck } from "@/server/transfer/r2";
-import { getTransferCosts } from "@/server/transfer/service";
-import { PageHeader, LinkButton } from "@/components/ui";
-import { TransferUploader } from "./transfer-ui";
-import { TransferCosts } from "./costs";
+import { ExternalLink, Send } from "lucide-react";
+import { requireInternal } from "@/server/auth/context";
+import { PageHeader } from "@/components/ui";
 
-export const metadata: Metadata = { title: "Transfer" };
+export const metadata: Metadata = { title: "Bestanden versturen" };
 export const dynamic = "force-dynamic";
-// Een transfer aanmaken en de R2-delen signen kan bij veel bestanden even duren.
-export const maxDuration = 120;
 
+/**
+ * Shortclips Transfer is uitgefaseerd: grote bestanden versturen we voortaan
+ * uitsluitend via WeTransfer. Deze pagina biedt alleen nog een knop naar
+ * WeTransfer; de interne upload-/verstuurfunctionaliteit is verwijderd.
+ */
 export default async function TransferPage() {
-  const viewer = await requirePermission("transfer:read");
-  const owner = isOwner(viewer);
-  const costs = owner ? await getTransferCosts() : null;
-  // Alleen de eigenaar ziet de opslagstatus (en doet de R2-setup).
-  const health = owner ? await r2HealthCheck() : null;
-
+  await requireInternal();
   return (
-    <div className="mx-auto max-w-[760px]">
+    <div className="mx-auto max-w-[640px]">
       <PageHeader
-        title="Shortclips Transfer"
-        description="Sleep bestanden erin, upload ze en kopieer de downloadlink. De ontvanger heeft geen account nodig."
-        actions={<LinkButton href="/transfer/mijn" variant="secondary" size="sm">Mijn transfers</LinkButton>}
+        title="Bestanden versturen"
+        description="Grote bestanden versturen we extern via WeTransfer."
       />
-      {health ? (
-        health.ok ? (
-          <div className="mb-4 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-good)]/30 bg-[var(--color-good-soft)] px-3 py-2 text-sm text-[#14633a]">
-            <CheckCircle2 className="size-4 shrink-0" />
-            <span>Opslag verbonden — bucket <code className="font-mono">{health.bucket}</code>. Uploaden en downloaden werkt.</span>
-          </div>
-        ) : (
-          <div className="mb-4 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--color-warn)]/30 bg-[var(--color-warn-soft)] px-3 py-2 text-sm text-[#8a5300]">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            <div>
-              <p>{health.message}</p>
-              <p className="mt-1 text-xs">Stappenplan: <code className="font-mono">docs/TRANSFER-SETUP.md</code>. Vul de R2-sleutels in bij de omgevingsvariabelen (lokaal <code className="font-mono">.env.local</code>, productie in Vercel).</p>
-            </div>
-          </div>
-        )
-      ) : null}
-      <TransferUploader storageReady={r2Configured()} canWrite={viewer.permissions.has("transfer:write")} />
-      {costs ? <div className="mt-6"><TransferCosts costs={costs} /></div> : null}
+      <div className="sc-card flex flex-col items-center gap-4 p-7 text-center">
+        <span className="grid size-12 place-items-center rounded-full bg-[var(--color-brand-50)] text-[var(--color-brand-700)]">
+          <Send className="size-6" />
+        </span>
+        <p className="max-w-sm text-sm text-[var(--color-ink-muted)]">
+          Shortclips Transfer is vervangen door WeTransfer. Gebruik WeTransfer om grote bestanden naar klanten of collega&apos;s te sturen.
+          Uploads voor scripts en klantvideo&apos;s binnen het portaal blijven gewoon werken.
+        </p>
+        <a
+          href="https://wetransfer.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+        >
+          <ExternalLink className="size-4" /> Open WeTransfer
+        </a>
+      </div>
     </div>
   );
 }

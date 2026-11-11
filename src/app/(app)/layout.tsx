@@ -5,7 +5,6 @@ import { editorMayOpenPath } from "@/lib/editor-routes";
 import { NAVIGATION } from "@/components/layout/nav-config";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SectionTabs } from "@/components/layout/section-tabs";
-import { env } from "@/lib/env";
 import { Topbar } from "@/components/layout/topbar";
 import { AssistantWidget } from "@/components/ai/assistant-widget";
 import { NotificationPopper } from "@/components/notifications/notification-popper";
@@ -66,9 +65,6 @@ export default async function AppLayout({
       if (item.manageOperations && !canManageOperations(viewer)) {
         return false;
       }
-      // Bestanden versturen: voor het team pas zichtbaar zodra de R2-opslag is
-      // ingesteld; de eigenaar ziet 'm altijd (om het in te kunnen stellen).
-      if (item.href === "/transfer" && !owner && !(env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY)) return false;
       // Rechten-gebaseerde items.
       return (
         !item.permissions ||
