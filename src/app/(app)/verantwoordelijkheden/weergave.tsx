@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
-import { ArrowUpRight, CalendarClock, ChevronDown, CircleCheck, Flag, MessageCircle, Palmtree, ShieldCheck, Siren, UserRound } from "lucide-react";
+import { ArrowUpRight, BookOpen, CalendarClock, ChevronDown, CircleCheck, Flag, Handshake, MessageCircle, Palmtree, ShieldCheck, Siren, Target, UserRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 import {
-  FREQUENTIES, NIVEAUS, kaal, naamVan,
+  FREQUENTIES, KENNISBANK_TEAM, NIVEAUS, kaal, naamVan,
   type Config, type Categorie, type Koppeling, type Niveau,
 } from "@/lib/verantwoordelijkheden/data";
 import type { Telling } from "@/server/verantwoordelijkheden";
@@ -77,16 +77,37 @@ export function Weergave({ config, email, markeer, tellingen }: {
   const afw = config.afwezigheid[email];
   // Blok 2: alle bevoegdheden uit de verantwoordelijkheden, zonder dubbelingen.
   const zelf = [...new Map(items.flatMap((r) => r.bevoegdheden).map((x) => [kaal(x).toLowerCase(), x])).values()];
-  const naarJarno = beslissingen.filter((b) => b.niveau !== "zelf").length;
+  const naarJarno = beslissingen.filter((b) => b.niveau === "escaleren").length;
+  const profiel = config.profielen?.[email];
+  const kpis = profiel?.kpis ?? [];
+  const samen = profiel?.samenwerking ?? [];
 
   return (
     <div>
+      {/* Mijn rol */}
+      {profiel && (
+        <section className="sc-card mb-5 p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Mijn rol</div>
+              <h2 className="mt-0.5 text-lg font-semibold text-[var(--color-ink)]">{profiel.functie}</h2>
+              {profiel.doel ? <p className="mt-1 max-w-[760px] text-sm leading-relaxed text-[var(--color-ink-muted)]"><T t={profiel.doel} markeer={markeer} /></p> : null}
+            </div>
+            <Link href={KENNISBANK_TEAM} className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-line)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink-muted)] transition hover:text-[var(--color-ink)]">
+              <BookOpen className="size-3.5" /> Kennisbank
+            </Link>
+          </div>
+          {profiel.bron ? <p className="mt-2 text-2xs text-[var(--color-ink-faint)]">Bron: {profiel.bron}</p> : null}
+        </section>
+      )}
+
       {/* Kerncijfers: in één oogopslag */}
-      <div className="mb-8 grid grid-cols-3 gap-2 sm:gap-3">
+      <div className="mb-8 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         {[
           { n: items.length, l: "verantwoordelijkheden", c: "text-[var(--color-ink)]" },
+          { n: kpis.length, l: "KPI's", c: "text-[var(--color-ink)]" },
           { n: zelf.length, l: "zelf beslissen", c: "text-[#1d6b4c]" },
-          { n: naarJarno, l: "situaties naar Jarno", c: "text-[#a3271c]" },
+          { n: naarJarno, l: "altijd naar Jarno", c: "text-[#a3271c]" },
         ].map((s) => (
           <div key={s.l} className="sc-card px-3 py-3 sm:px-4">
             <div className={cn("text-2xl font-bold tabular-nums", s.c)}>{s.n}</div>
@@ -160,59 +181,8 @@ export function Weergave({ config, email, markeer, tellingen }: {
         )}
       </Blok>
 
-      <div className="grid gap-x-5 lg:grid-cols-[1fr_1.4fr]">
-        {/* Blok 2 */}
-        <Blok nr={2} titel="Dit beslis ik zelfstandig">
-          <div className={cn("rounded-xl border p-4", KLEUR.zelf.soft, KLEUR.zelf.rand)}>
-            <p className={cn("mb-3 text-sm font-semibold", KLEUR.zelf.tekst)}>Geen toestemming van Jarno nodig.</p>
-            <ul className="space-y-2">
-              {zelf.map((x) => (
-                <li key={x} className="flex items-start gap-2 text-sm text-[var(--color-ink)]">
-                  <CircleCheck className={cn("mt-0.5 size-4 shrink-0", KLEUR.zelf.tekst)} />
-                  <span><T t={x} markeer={markeer} /></span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Blok>
-
-        {/* Blok 3 */}
-        <Blok nr={3} titel="Wanneer schakel ik Jarno in?">
-          <div className="space-y-2.5">
-            {(Object.keys(NIVEAUS) as Niveau[]).map((nv) => {
-              const lijst = beslissingen.filter((b) => b.niveau === nv);
-              if (lijst.length === 0) return null;
-              const k = KLEUR[nv];
-              const Icon = k.icon;
-              return (
-                <div key={nv} className={cn("rounded-xl border p-4", k.soft, k.rand)}>
-                  <div className="mb-2 flex flex-wrap items-baseline gap-x-2">
-                    <Icon className={cn("size-4 self-center", k.tekst)} />
-                    <span className={cn("text-sm font-bold", k.tekst)}>{NIVEAUS[nv].label}</span>
-                    <span className="text-xs text-[var(--color-ink-muted)]">{NIVEAUS[nv].uitleg}</span>
-                  </div>
-                  <ul className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
-                    {lijst.map((b) => (
-                      <li key={b.id} className="flex items-start gap-2 text-sm text-[var(--color-ink)]">
-                        <span className={cn("mt-[7px] size-1.5 shrink-0 rounded-full", k.dot)} />
-                        <T t={b.situatie} markeer={markeer} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-            <p className="text-xs text-[var(--color-ink-muted)]">
-              Moet iets naar Jarno? Gebruik het escalatieformat in de{" "}
-              <Link href="/beslissingshulp#jarno" className="font-medium text-[var(--color-brand-700)] hover:underline">Beslissingshulp</Link>{" "}
-              en kom altijd met een eigen voorstel.
-            </p>
-          </div>
-        </Blok>
-      </div>
-
-      {/* Blok 4 */}
-      <Blok nr={4} titel="Mijn vaste controlemomenten" sub="Uit je bestaande taken en overzichten, geen extra takenlijst">
+      {/* Blok 2: werkzaamheden */}
+      <Blok nr={2} titel="Mijn werkzaamheden" sub="Wat je vast controleert of uitvoert; open punten staan op Vandaag">
         <div className="grid gap-3 md:grid-cols-3">
           {FREQUENTIES.map((f) => {
             const lijst = controles.filter((c) => c.frequentie === f.key);
@@ -258,9 +228,100 @@ export function Weergave({ config, email, markeer, tellingen }: {
         </div>
       </Blok>
 
+      <div className="grid gap-x-5 lg:grid-cols-2">
+        {/* Blok 3: KPI's */}
+        <Blok nr={3} titel="Mijn KPI's" sub="Hierop wordt gestuurd">
+          {kpis.length === 0 ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">Nog geen KPI&apos;s vastgelegd in de kennisbank.</p>
+          ) : (
+            <ul className="sc-card divide-y divide-[var(--color-line)]">
+              {kpis.map((k) => (
+                <li key={k.titel} className="flex items-start gap-2.5 px-3.5 py-2.5">
+                  <Target className="mt-0.5 size-4 shrink-0 text-[var(--color-ink-faint)]" />
+                  <span className="min-w-0 flex-1 text-sm font-medium text-[var(--color-ink)]">{k.titel}</span>
+                  <span className="max-w-[55%] text-right text-[13px] text-[var(--color-ink-muted)]"><T t={k.norm} markeer={markeer} /></span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Blok>
+
+        {/* Blok 4: samenwerking */}
+        <Blok nr={4} titel="Samenwerking" sub="Met wie, en wanneer je overdraagt">
+          {samen.length === 0 ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">Nog niets vastgelegd.</p>
+          ) : (
+            <ul className="sc-card divide-y divide-[var(--color-line)]">
+              {samen.map((x, i) => (
+                <li key={`${x.met}-${i}`} className="flex items-start gap-2.5 px-3.5 py-2.5">
+                  <Handshake className="mt-0.5 size-4 shrink-0 text-[var(--color-ink-faint)]" />
+                  <span className="min-w-0 text-sm text-[var(--color-ink)]">
+                    <strong className="font-semibold">{x.met}</strong>
+                    <span className="text-[var(--color-ink-muted)]"> · <T t={x.wanneer} markeer={markeer} /></span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Blok>
+      </div>
+
+      <div className="grid gap-x-5 lg:grid-cols-[1fr_1.4fr]">
+        {/* Blok 2 */}
+        <Blok nr={5} titel="Dit beslis ik zelfstandig">
+          <div className={cn("rounded-xl border p-4", KLEUR.zelf.soft, KLEUR.zelf.rand)}>
+            <p className={cn("mb-3 text-sm font-semibold", KLEUR.zelf.tekst)}>Geen toestemming nodig. Bij niveau 2 leg je het vast in het portaal.</p>
+            {zelf.length === 0 ? <p className="text-sm text-[var(--color-ink-muted)]">Nog niets vastgelegd in de kennisbank.</p> : null}
+            <ul className="space-y-2">
+              {zelf.map((x) => (
+                <li key={x} className="flex items-start gap-2 text-sm text-[var(--color-ink)]">
+                  <CircleCheck className={cn("mt-0.5 size-4 shrink-0", KLEUR.zelf.tekst)} />
+                  <span><T t={x} markeer={markeer} /></span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Blok>
+
+        {/* Blok 3 */}
+        <Blok nr={6} titel="Wanneer overleg ik of gaat het naar Jarno?">
+          <div className="space-y-2.5">
+            {beslissingen.length === 0 ? <p className="sc-card p-4 text-sm text-[var(--color-ink-muted)]">Nog geen beslisregels vastgelegd. Twijfel je? Overleg met je vaste contactpersoon.</p> : null}
+            {(Object.keys(NIVEAUS) as Niveau[]).map((nv) => {
+              const lijst = beslissingen.filter((b) => b.niveau === nv);
+              if (lijst.length === 0) return null;
+              const k = KLEUR[nv];
+              const Icon = k.icon;
+              return (
+                <div key={nv} className={cn("rounded-xl border p-4", k.soft, k.rand)}>
+                  <div className="mb-2 flex flex-wrap items-baseline gap-x-2">
+                    <Icon className={cn("size-4 self-center", k.tekst)} />
+                    <span className={cn("text-sm font-bold", k.tekst)}>{NIVEAUS[nv].label}</span>
+                    <span className="text-xs text-[var(--color-ink-muted)]">{NIVEAUS[nv].uitleg}</span>
+                  </div>
+                  <ul className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                    {lijst.map((b) => (
+                      <li key={b.id} className="flex items-start gap-2 text-sm text-[var(--color-ink)]">
+                        <span className={cn("mt-[7px] size-1.5 shrink-0 rounded-full", k.dot)} />
+                        <T t={b.situatie} markeer={markeer} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+            <p className="text-xs text-[var(--color-ink-muted)]">
+              Moet iets naar Jarno? Gebruik het escalatieformat in de{" "}
+              <Link href="/beslissingshulp#jarno" className="font-medium text-[var(--color-brand-700)] hover:underline">Beslissingshulp</Link>{" "}
+              en kom altijd met een eigen voorstel.
+            </p>
+          </div>
+        </Blok>
+      </div>
+
       {/* Jarno afwezig */}
       {afw && (afw.doorloopt.length > 0 || afw.beslisser) && (
-        <Blok nr={5} titel="Wat doe ik als Jarno afwezig is?">
+        <Blok nr={7} titel="Wat doe ik als Jarno afwezig is?">
           <div className="sc-card grid gap-4 p-4 md:grid-cols-[1.3fr_1fr]">
             <div>
               <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[var(--color-ink)]">

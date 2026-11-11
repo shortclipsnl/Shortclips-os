@@ -6,7 +6,7 @@ import { Button } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import {
   FREQUENTIES, KOPPELINGEN, MEDEWERKERS, NIVEAUS, naamVan,
-  type Beslissing, type Config, type Controle, type Frequentie, type Koppeling, type Niveau, type Verantwoordelijkheid,
+  type Beslissing, type Config, type Controle, type Frequentie, type Koppeling, type Niveau, type Profiel, type Verantwoordelijkheid,
 } from "@/lib/verantwoordelijkheden/data";
 import {
   herstelVoorstel, keurVerantwoordelijkhedenGoed, opslaanVerantwoordelijkheden, zetVerantwoordelijkhedenOpConcept,
@@ -19,7 +19,8 @@ const NIVEAU_KLEUR: Record<Niveau, string> = {
   overleg: "border-[#f1d2a8] bg-[var(--color-warn-soft)] text-[#8a5300]",
   escaleren: "border-[#f0c3bf] bg-[var(--color-bad-soft)] text-[#a3271c]",
 };
-const ALLE_PERSONEN = [...MEDEWERKERS.map((m) => ({ email: m.email, naam: m.naam })), { email: "jarno@shortclips.nl", naam: "Jarno" }];
+const ALLE_PERSONEN = MEDEWERKERS.map((m) => ({ email: m.email, naam: m.naam }));
+const paren = (t: string) => regels(t).map((r) => { const [a, ...rest] = r.split("|"); return [a.trim(), rest.join("|").trim()] as const; }).filter(([a]) => a);
 
 function Sectie({ titel, sub, actie, children }: { titel: string; sub?: string; actie?: ReactNode; children: ReactNode }) {
   return (
@@ -93,6 +94,8 @@ export function Beheer({ start }: { start: Config }) {
   const besl = config.beslissingen.filter((r) => r.persoon === persoon);
   const ctrl = config.controles.filter((r) => r.persoon === persoon);
   const afw = config.afwezigheid[persoon] ?? { doorloopt: [], beslisser: "", vervanger: null };
+  const prof: Profiel = config.profielen?.[persoon] ?? { functie: MEDEWERKERS.find((m) => m.email === persoon)?.functie ?? "", doel: "", kpis: [], samenwerking: [], bron: "" };
+  const zetP = (x: Partial<Profiel>) => wijzig((c) => ({ ...c, profielen: { ...c.profielen, [persoon]: { ...prof, ...x } } }));
   const goedgekeurd = config.status === "goedgekeurd";
 
   return (
@@ -113,7 +116,7 @@ export function Beheer({ start }: { start: Config }) {
               <Undo2 className="size-4" /> Terug naar concept
             </Button>
           ) : (
-            <Button variant="secondary" size="sm" disabled={bezig} onClick={() => voer(keurVerantwoordelijkhedenGoed, "Goedgekeurd: het team ziet zijn pagina", "Verdeling goedkeuren? Milou, Jiska en Rutger zien daarna direct hun eigen pagina.")}>
+            <Button variant="secondary" size="sm" disabled={bezig} onClick={() => voer(keurVerantwoordelijkhedenGoed, "Goedgekeurd: het team ziet zijn pagina", "Verdeling goedkeuren? Het team ziet daarna direct de eigen pagina.")}>
               <ShieldCheck className="size-4" /> Goedkeuren en activeren
             </Button>
           )}
@@ -155,6 +158,23 @@ export function Beheer({ start }: { start: Config }) {
           </button>
         ))}
       </div>
+
+      {/* Rol, KPI's en samenwerking */}
+      <Sectie titel="Rol, KPI's en samenwerking" sub="De kop van de persoonlijke pagina. Houd dit gelijk aan Kennisbank › Team Shortclips.">
+        <div key={`${persoon}-${config.bijgewerktOp ?? "voorstel"}-profiel`} className="grid gap-3 md:grid-cols-2">
+          <Veld label="Functie"><input className="sc-input w-full" defaultValue={prof.functie} onBlur={(e) => zetP({ functie: e.target.value })} /></Veld>
+          <Veld label="Bron in de kennisbank"><input className="sc-input w-full" defaultValue={prof.bron} onBlur={(e) => zetP({ bron: e.target.value })} /></Veld>
+          <Veld label="Rol in het kort" className="md:col-span-2"><textarea className="sc-input w-full" rows={2} defaultValue={prof.doel} onBlur={(e) => zetP({ doel: e.target.value })} /></Veld>
+          <Veld label="KPI's (één per regel: KPI | norm)">
+            <textarea className="sc-input w-full" rows={6} defaultValue={prof.kpis.map((k) => `${k.titel} | ${k.norm}`).join("\n")}
+              onBlur={(e) => zetP({ kpis: paren(e.target.value).map(([titel, norm]) => ({ titel, norm })) })} />
+          </Veld>
+          <Veld label="Samenwerking (één per regel: met wie | wanneer)">
+            <textarea className="sc-input w-full" rows={6} defaultValue={prof.samenwerking.map((k) => `${k.met} | ${k.wanneer}`).join("\n")}
+              onBlur={(e) => zetP({ samenwerking: paren(e.target.value).map(([met, wanneer]) => ({ met, wanneer })) })} />
+          </Veld>
+        </div>
+      </Sectie>
 
       {/* Verantwoordelijkheden */}
       <Sectie
@@ -233,7 +253,7 @@ export function Beheer({ start }: { start: Config }) {
       {/* Beslissingsmatrix */}
       <Sectie
         titel="Beslissingsmatrix"
-        sub="Groen: zelf oplossen. Oranje: overleggen met Jarno. Rood: direct escaleren."
+        sub="Groen: zelf beslissen (niveau 1 en 2). Oranje: eerst intern overleggen (niveau 3). Rood: altijd naar Jarno (niveau 4)."
         actie={
           <Button variant="secondary" size="sm" onClick={() => wijzig((c) => ({ ...c, beslissingen: [...c.beslissingen, { id: nieuwId("b"), persoon, situatie: "Nieuwe situatie", niveau: "zelf", actief: true }] }))}>
             <Plus className="size-4" /> Situatie
@@ -260,7 +280,7 @@ export function Beheer({ start }: { start: Config }) {
 
       {/* Controlemomenten */}
       <Sectie
-        titel="Vaste controlemomenten"
+        titel="Werkzaamheden (dagelijks, wekelijks, maandelijks)"
         sub="Koppel aan een bestaande pagina, dan telt het portaal live wat er openstaat. Er worden geen extra taken aangemaakt."
         actie={
           <Button variant="secondary" size="sm" onClick={() => wijzig((c) => ({ ...c, controles: [...c.controles, { id: nieuwId("c"), persoon, frequentie: "wekelijks", titel: "Nieuwe controle", koppeling: null, actief: true }] }))}>
