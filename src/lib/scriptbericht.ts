@@ -185,6 +185,20 @@ export function checkMessage(input: CheckInput): CheckResult {
   return { ok: true };
 }
 
+/** Scriptingstatus waar de opname op komt zodra het bericht naar de klant gaat. */
+export const STATUS_NA_VERSTUREN = "scripts_bij_klant";
+
+/**
+ * Nieuwe scriptingstatus na het kopiëren van het bericht, of null als er niets
+ * hoeft te veranderen. Al "Controle bij klant" of al "Final" blijft staan;
+ * elke andere status (ook "Nog aanvullen" na een nieuwe ronde) gaat naar
+ * "Controle bij klant", want de scripts liggen dan bij de klant.
+ */
+export function statusNaKopieren(huidig: string | null | undefined): string | null {
+  if (huidig === STATUS_NA_VERSTUREN || huidig === "final") return null;
+  return STATUS_NA_VERSTUREN;
+}
+
 /** Een templatetekst moet de linkplek bevatten, anders kan de link nergens in. */
 export function validateTemplate(text: string): string | null {
   const t = text.trim();

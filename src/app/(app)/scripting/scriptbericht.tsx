@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type Dispatch, type SetStateAction } from "react";
 import { AlertTriangle, Check, CheckCircle2, Copy, FileText, LayoutDashboard, Link2, Loader2, MessageCircle, RotateCcw, Settings2, X } from "lucide-react";
 import { Button, ClientLogo } from "@/components/ui";
@@ -12,6 +13,7 @@ import {
   checkMessage,
   insertedValue,
   renderTemplate,
+  statusNaKopieren,
   swapLink,
   type ForeignLink,
   type SavedScriptbericht,
@@ -29,6 +31,8 @@ export type ScriptberichtRow = {
   clientColor: string | null;
   scheduledOn: string;
   done: boolean;
+  /** Huidige scriptingstatus van de opname. */
+  status: string;
   reviewId: string | null;
   /** Automatisch opgehaalde link naar de scripts in het klantportaal. */
   portalLink: string | null;
@@ -214,6 +218,8 @@ function ScriptberichtDialog({
   });
   const [copied, setCopied] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [statusNote, setStatusNote] = useState<string | null>(null);
+  const router = useRouter();
   const [view, setView] = useState<"bericht" | "beheer">("bericht");
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -242,6 +248,7 @@ function ScriptberichtDialog({
   function selectDay(id: string) {
     setDayId(id);
     setCopied(false);
+    setStatusNote(null);
     setSaveErr(null);
     const r = rows.find((x) => x.id === id);
     const last = r ? savedById[r.id]?.methode : null;
@@ -274,6 +281,12 @@ function ScriptberichtDialog({
         setSaveErr(res.message ?? "Opslaan mislukt.");
         return;
       }
+      if (res.statusChangedTo) {
+        setStatusNote(`Status van ${forRow.clientName} staat nu op Controle bij klant.`);
+        router.refresh();
+      } else if (res.statusMessage) {
+        setSaveErr(res.statusMessage);
+      }
       setSavedById((prev) => {
         const cur = prev[forRow.id] ?? forRow.saved;
         const links = { ...cur.links };
@@ -288,7 +301,7 @@ function ScriptberichtDialog({
         return { ...prev, [forRow.id]: { ...cur, methode, links, texts } };
       });
     },
-    [canWrite, templates, setSavedById],
+    [canWrite, templates, setSavedById, router],
   );
 
   function applyLink(raw: string) {
@@ -513,6 +526,8 @@ function ScriptberichtDialog({
                   <p className="flex items-center gap-1.5 text-xs text-[var(--color-ink-muted)]"><Link2 className="size-3.5" /> Klik buiten het linkveld of druk op Enter om de link in het bericht te zetten.</p>
                 ) : !check.ok ? (
                   <p className="flex items-start gap-1.5 text-xs font-medium text-[var(--color-bad)]"><AlertTriangle className="mt-px size-3.5 shrink-0" /> {check.reason}</p>
+                ) : copied ? (
+                  <p role="status" className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-good)]"><Check className="size-3.5" /> Bericht gekopieerd!</p>
                 ) : check.hint ? (
                   <p className="flex items-start gap-1.5 text-xs text-[#8a5300]"><AlertTriangle className="mt-px size-3.5 shrink-0" /> {check.hint}</p>
                 ) : (
@@ -520,6 +535,13 @@ function ScriptberichtDialog({
                 )
               ) : null}
               {saveErr ? <p className="text-xs text-[var(--color-bad)]">{saveErr}</p> : null}
+              {statusNote ? <p className="flex items-center gap-1.5 text-xs text-[var(--color-good)]"><CheckCircle2 className="size-3.5" /> {statusNote}</p> : null}
+              {row && editor && !statusNote && (row.status === "controle_jarno" || row.status === "feedback_jarno") ? (
+                <p className="flex items-start gap-1.5 text-xs text-[#8a5300]"><AlertTriangle className="mt-px size-3.5 shrink-0" /> Deze scripts staan nog op {row.status === "controle_jarno" ? "Controle Jarno" : "Feedback verwerken"}. Weet je zeker dat ze naar de klant kunnen?</p>
+              ) : null}
+              {row && editor && canWrite && !statusNote && statusNaKopieren(row.status) ? (
+                <p className="text-2xs text-[var(--color-ink-faint)]">Na het kopiëren gaat de status van deze opname automatisch naar Controle bij klant.</p>
+              ) : null}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-1">
                   {row && editor ? (
@@ -534,9 +556,6 @@ function ScriptberichtDialog({
                   ) : null}
                 </div>
                 <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
-                  {copied ? (
-                    <span role="status" className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-good)]"><Check className="size-3.5" /> Bericht gekopieerd!</span>
-                  ) : null}
                   <Button type="button" variant="primary" className="flex-1 sm:flex-none" onClick={onCopy} disabled={!row || !editor || !check?.ok || linkPending}>
                     <Copy className="size-4" /> Kopieer WhatsAppbericht
                   </Button>

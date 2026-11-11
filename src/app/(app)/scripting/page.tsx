@@ -58,6 +58,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
     clientColor: r.clientColor,
     scheduledOn: r.scheduledOn,
     done: r.done,
+    status: r.status,
     reviewId: r.reviewId,
     portalLink: portalScriptLink(r.reviewId),
     saved: sbSaved.get(r.id) ?? EMPTY_SAVED,

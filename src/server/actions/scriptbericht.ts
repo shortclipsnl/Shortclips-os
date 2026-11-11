@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { appSettings, clients, productionDays, scriptReviews } from "@/db/schema";
 import { assertClientAccess, isOwner, requireInternal, requirePermission } from "@/server/auth/context";
+import { setScriptingStatus } from "@/server/actions/scripting";
 import {
   DEFAULT_TEMPLATES,
   METHODES,
@@ -12,6 +13,7 @@ import {
   normaliseTemplates,
   renderTemplate,
   reviewIdFromLink,
+  statusNaKopieren,
   validateTemplate,
   type ScriptberichtMethode,
   type Templates,
@@ -26,6 +28,11 @@ import {
 } from "@/server/scriptbericht";
 
 export type ScriptberichtResult = { ok: boolean; message?: string };
+export type SaveScriptberichtResult = ScriptberichtResult & {
+  /** Nieuwe scriptingstatus als die door het kopiëren is aangepast. */
+  statusChangedTo?: string;
+  statusMessage?: string;
+};
 
 /**
  * Persoonlijk bericht en/of link van één opname opslaan. Raakt nooit het
@@ -39,7 +46,7 @@ export async function saveScriptbericht(input: {
   /** Weglaten = alleen de link opslaan. */
   text?: string;
   copied?: boolean;
-}): Promise<ScriptberichtResult> {
+}): Promise<SaveScriptberichtResult> {
   try {
     const viewer = await requirePermission("scripts:write");
     if (!METHODES.includes(input.methode)) return { ok: false, message: "Onbekende berichtvorm." };
@@ -47,7 +54,7 @@ export async function saveScriptbericht(input: {
     if (link && !isValidUrl(link)) return { ok: false, message: "Ongeldige link." };
 
     const [day] = await db
-      .select({ id: productionDays.id, clientId: productionDays.clientId })
+      .select({ id: productionDays.id, clientId: productionDays.clientId, status: productionDays.scriptingStatus })
       .from(productionDays)
       .where(eq(productionDays.id, input.productionDayId))
       .limit(1);
@@ -82,6 +89,18 @@ export async function saveScriptbericht(input: {
       .insert(appSettings)
       .values({ key: dayKey(day.id), value: next, category: DAY_CATEGORY, description: "Scriptbericht (WhatsApp) per opname: persoonlijke tekst en link.", updatedById: viewer.id })
       .onConflictDoUpdate({ target: appSettings.key, set: { value: next, updatedById: viewer.id, updatedAt: new Date() } });
+
+    // Bericht gekopieerd = scripts gaan naar de klant: status automatisch op
+    // "Controle bij klant". Via de bestaande statusactie, zodat taken en
+    // meldingen (bijv. Controle Jarno) precies meelopen als bij een klik.
+    if (input.copied) {
+      const nieuw = statusNaKopieren(day.status);
+      if (nieuw) {
+        const res = await setScriptingStatus(day.id, nieuw).catch(() => ({ ok: false, message: undefined as string | undefined }));
+        if (res.ok) return { ok: true, statusChangedTo: nieuw };
+        return { ok: true, statusMessage: "Bericht gekopieerd, maar de status kon niet automatisch worden aangepast. Zet hem zelf op Controle bij klant." };
+      }
+    }
     return { ok: true };
   } catch (error) {
     console.error("[scriptbericht] opslaan mislukt", error);

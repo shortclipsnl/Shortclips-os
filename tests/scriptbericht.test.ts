@@ -126,3 +126,14 @@ describe("controle voor het kopiëren", () => {
     expect(r.ok).toBe(false);
   });
 });
+
+describe("status na kopiëren", async () => {
+  const { statusNaKopieren } = await import("@/lib/scriptbericht");
+  it("zet alles op Controle bij klant, behalve als die al zo staat of final is", () => {
+    for (const s of ["concepting", "scriptmeeting", "controle_jarno", "feedback_jarno", "afwachting_klant", "nog_aanvullen"]) {
+      expect(statusNaKopieren(s)).toBe("scripts_bij_klant");
+    }
+    expect(statusNaKopieren("scripts_bij_klant")).toBeNull();
+    expect(statusNaKopieren("final")).toBeNull();
+  });
+});
