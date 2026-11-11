@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ExternalLink, MapPin } from "lucide-react";
+import { AlertTriangle, CalendarDays, Clock, ExternalLink, ListChecks, MapPin, User, Video } from "lucide-react";
 import { requireInternal } from "@/server/auth/context";
 import { getProductionDay } from "@/server/productions";
 import { getBriefingForShoot } from "@/server/briefing/service";
@@ -169,31 +169,60 @@ export default async function ProductionPage({
         </div>
 
         <div className="space-y-5">
-          <Card>
-            <CardHeader title="Praktisch" />
-            <dl className="mt-4 space-y-3 text-sm">
-              <Row label="Klant">
-                <Link href={`/clients/${day.clientSlug}`} className="flex items-center gap-2 hover:underline">
+          {/* Info ter voorbereiding op de opname — scanbaar voor de videograaf:
+              de kernpunten (datum, tijd, locatie) springen eruit, met icoontjes
+              en duidelijke kopjes. Subtiele lichtblauwe achtergrond zodat het blok
+              direct opvalt zonder dat de pagina te druk wordt. */}
+          <Card className="border-[var(--st-blue)]/25 bg-[var(--st-blue-bg)]">
+            <div className="flex items-center gap-2">
+              <span className="grid size-7 place-items-center rounded-lg bg-[var(--st-blue)]/15 text-[var(--st-blue)]"><ListChecks className="size-4" /></span>
+              <h2 className="text-sm font-semibold text-[var(--color-ink)]">Info ter voorbereiding op de opname</h2>
+            </div>
+
+            {/* Kernpunten groot: wanneer en waar — in één oogopslag. */}
+            <div className="mt-4 grid grid-cols-2 gap-2.5">
+              <PrepTile icon={<CalendarDays className="size-4" />} label="Datum" value={formatDateFull(day.scheduledOn)} />
+              <PrepTile icon={<Clock className="size-4" />} label="Tijd" value={day.startTime ? `${day.startTime.slice(0, 5)}–${day.endTime?.slice(0, 5) ?? "?"}` : "—"} />
+              <div className="col-span-2">
+                <PrepTile
+                  icon={<MapPin className="size-4" />}
+                  label="Locatie"
+                  value={day.locationName ?? (day.locationAddress ? "" : "—")}
+                  sub={
+                    day.locationAddress ? (
+                      <a
+                        href={`https://maps.google.com/?q=${encodeURIComponent(day.locationAddress)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-[var(--color-brand-600)] hover:underline"
+                      >
+                        <MapPin className="size-3.5" /> {day.locationAddress}
+                      </a>
+                    ) : null
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Wie: klant + videograaf, secundair. */}
+            <dl className="mt-4 space-y-2.5 border-t border-[var(--st-blue)]/20 pt-3.5 text-sm">
+              <IconRow icon={<User className="size-4" />} label="Klant">
+                <Link href={`/clients/${day.clientSlug}`} className="inline-flex items-center gap-2 font-medium hover:underline">
                   <Avatar name={day.clientName} color={day.clientColor} size={20} />
                   {day.clientName}
                 </Link>
-              </Row>
-              <Row label="Datum">{formatDateFull(day.scheduledOn)}</Row>
-              <Row label="Tijd">
-                {day.startTime ? `${day.startTime.slice(0, 5)}–${day.endTime?.slice(0, 5) ?? "?"}` : "—"}
-              </Row>
-              <Row label="Videograaf">{day.videographerName ?? "—"}</Row>
-              <Row label="Locatie">{day.locationName ?? "—"}</Row>
+              </IconRow>
+              <IconRow icon={<Video className="size-4" />} label="Videograaf">
+                <span className="font-medium">{day.videographerName ?? "—"}</span>
+              </IconRow>
             </dl>
-            {day.locationAddress ? (
-              <a
-                href={`https://maps.google.com/?q=${encodeURIComponent(day.locationAddress)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-brand-600)] hover:underline"
-              >
-                <MapPin className="size-4" /> {day.locationAddress}
-              </a>
+
+            {/* Aandachtspunt: alleen tonen als de opname nog niet rond is. */}
+            {atRisk ? (
+              <p className="mt-3 flex items-start gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-bad-soft)] px-2.5 py-2 text-xs font-medium text-[#a3271c]">
+                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                Let op: {unapproved.length > 0 ? `${plural(unapproved.length, "script", "scripts")} nog niet goedgekeurd` : ""}{unapproved.length > 0 && openBlockers.length > 0 ? " · " : ""}{openBlockers.length > 0 ? `${plural(openBlockers.length, "blokkerend punt", "blokkerende punten")} open` : ""}.
+              </p>
             ) : null}
           </Card>
 
@@ -249,11 +278,27 @@ export default async function ProductionPage({
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+/** Groot, scanbaar kernpunt (datum/tijd/locatie) met icoon en kopje. */
+function PrepTile({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4">
-      <dt className="shrink-0 text-[var(--color-ink-muted)]">{label}</dt>
-      <dd className="text-right font-medium">{children}</dd>
+    <div className="rounded-[var(--radius-md)] border border-[var(--st-blue)]/20 bg-[var(--color-surface)] p-3">
+      <div className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-[var(--st-blue)]">
+        {icon} {label}
+      </div>
+      {value ? <p className="mt-1 text-sm font-semibold leading-snug text-[var(--color-ink)]">{value}</p> : null}
+      {sub}
+    </div>
+  );
+}
+
+/** Secundaire regel met icoon, kopje en waarde. */
+function IconRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <dt className="inline-flex shrink-0 items-center gap-1.5 text-[var(--color-ink-muted)]">
+        <span className="text-[var(--st-blue)]">{icon}</span> {label}
+      </dt>
+      <dd className="text-right">{children}</dd>
     </div>
   );
 }
