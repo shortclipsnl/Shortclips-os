@@ -18,6 +18,16 @@ const BROLL_RE = /^b[\s-]?roll\s*[:\-–]?\s*/i;
 const TIB_RE = /^(tekst in beeld|tib)\b/i;
 const MIDDEN_LABEL_RE = /^MIDDENSTUK/i;
 
+/** "B-roll: keuken, details van de woning en entree" → losse, afvinkbare beelden. */
+export function splitBroll(t: string): string[] {
+  return t
+    .replace(/[.;]+\s*$/, "")
+    .split(/,\s+|;\s+|\s+en\s+(?=[^,]*$)/)
+    .map((x) => x.trim().replace(/^(en|of)\s+/i, ""))
+    .filter((x) => x.length > 1)
+    .map((x) => x.charAt(0).toUpperCase() + x.slice(1));
+}
+
 function emptyPart(): DraaiboekPart {
   return { tekst: "", aanwijzingen: [] };
 }
@@ -52,8 +62,7 @@ export function scriptToVideo(s: ParsedScript, nr: number): DraaiboekVideo {
       if (!t) continue;
       if (TIB_RE.test(t)) continue;
       if (BROLL_RE.test(t)) {
-        const b = t.replace(BROLL_RE, "").trim();
-        if (b) broll.push(b);
+        broll.push(...splitBroll(t.replace(BROLL_RE, "")));
         continue;
       }
       if (BEELD_RE.test(t)) {
@@ -67,6 +76,16 @@ export function scriptToVideo(s: ParsedScript, nr: number): DraaiboekVideo {
       out.push(t);
     }
     if (out.length) target.tekst = [target.tekst, out.join("\n")].filter(Boolean).join("\n");
+  }
+
+  // Geen middenstuk in het script (bv. een teamvideo met alleen een uitleg)? Dan
+  // de Shortclip uitleg tonen, zodat de videograaf weet wat er opgenomen moet worden.
+  if (!parts.middenstuk.tekst.trim()) {
+    const uitleg = s.sections
+      .filter((x) => x.kind === "uitleg" || (x.kind === "intro" && hasHook))
+      .flatMap((x) => x.lines.map(lineText))
+      .filter((t) => t && !TIB_RE.test(t));
+    if (uitleg.length) parts.middenstuk.tekst = uitleg.join("\n");
   }
 
   return {

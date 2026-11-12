@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDraaiboekContent, mergeHints } from "@/server/draaiboek/build";
+import { buildDraaiboekContent, mergeHints, splitBroll } from "@/server/draaiboek/build";
 import { sessionProgress } from "@/server/draaiboek/types";
 import type { ParsedScriptPdf } from "@/server/briefing/script-pdf";
 
@@ -47,7 +47,7 @@ describe("draaiboek uit script", () => {
   it("maakt beeld- en regieregels korte aanwijzingen, B-roll apart, en laat tekst in beeld weg", () => {
     expect(v.hook.aanwijzingen).toEqual(["medium shot bij oud kozijn"]);
     expect(v.middenstuk.aanwijzingen).toEqual(["Presentatrice wijst naar de naad"]);
-    expect(v.broll).toEqual(["close-up van de afdichting"]);
+    expect(v.broll).toEqual(["Close-up van de afdichting"]);
     expect(JSON.stringify(c)).not.toContain("Tekst in beeld");
     expect(JSON.stringify(c)).not.toContain("Uitleg die");
   });
@@ -59,11 +59,15 @@ describe("draaiboek uit script", () => {
     const m = merged.videos[0]!;
     expect(m.hook.aanwijzingen).toEqual(["medium shot bij oud kozijn", "Energienota in beeld houden"]);
     expect(m.cta.aanwijzingen).toEqual(["Recht in de camera"]);
-    expect(m.broll).toEqual(["close-up van de afdichting", "Glas in detail"]);
+    expect(m.broll).toEqual(["Close-up van de afdichting", "Glas in detail"]);
   });
 
   it("toont één voortgang over de hele sessie", () => {
     expect(sessionProgress(c, {})).toMatchObject({ done: 0, total: 4, pct: 0 });
     expect(sessionProgress(c, { v1: { hook: true, middenstuk: true } })).toMatchObject({ done: 2, total: 4, pct: 50 });
+  });
+
+  it("splitst een B-roll-opsomming in losse beelden", () => {
+    expect(splitBroll("keuken, details van de woning, rolmaat, gesprekken aan tafel en entree van Univé.")).toEqual(["Keuken", "Details van de woning", "Rolmaat", "Gesprekken aan tafel", "Entree van Univé"]);
   });
 });

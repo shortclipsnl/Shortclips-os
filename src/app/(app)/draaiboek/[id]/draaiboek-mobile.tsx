@@ -187,11 +187,11 @@ function NoteComposer({ dayId, videoKey, onSaved }: { dayId: string; videoKey: s
   return (
     <div>
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => begin("notitie")} className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] text-[15px] font-semibold text-[var(--color-ink)]">
-          <Mic className="size-5" /> Notitie inspreken
+        <button type="button" onClick={() => begin("notitie")} className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-2 text-[14px] font-semibold text-[var(--color-ink)]">
+          <Mic className="size-5 shrink-0" /> Notitie inspreken
         </button>
-        <button type="button" onClick={() => begin("blokkade")} className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-bad)]/40 bg-[var(--color-bad-soft)] text-[15px] font-semibold text-[#a3271c]">
-          <AlertOctagon className="size-5" /> Blokkade inspreken
+        <button type="button" onClick={() => begin("blokkade")} className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-bad)]/40 bg-[var(--color-bad-soft)] px-2 text-[14px] font-semibold text-[#a3271c]">
+          <AlertOctagon className="size-5 shrink-0" /> Blokkade inspreken
         </button>
       </div>
       <button type="button" onClick={() => setTyping(true)} className="mt-2 inline-flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)]">
@@ -231,7 +231,7 @@ function ScriptText({ text }: { text: string }) {
   return (
     <div className={`${SCRIPT_FONT} space-y-1 text-[18px] leading-[1.55] text-[var(--color-ink)]`}>
       {text.split("\n").map((l, i) => {
-        const isLabel = l.length < 40 && l === l.toUpperCase() && /[A-Z]/.test(l);
+        const isLabel = l.length < 40 && l === l.toUpperCase() && /[A-Z]/.test(l) && !/[!?.,:;]$/.test(l) && l.split(/\s+/).length <= 4;
         return isLabel ? <p key={i} className="pt-1 font-sans text-xs font-bold tracking-wide text-[var(--color-ink-muted)]">{l}</p> : <p key={i}>{l}</p>;
       })}
     </div>

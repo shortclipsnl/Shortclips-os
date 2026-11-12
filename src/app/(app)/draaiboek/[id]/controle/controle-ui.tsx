@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, Save, Send, Smartphone } from "lucide-react";
 import { ClientLogo } from "@/components/ui";
 import { approveAndSendDraaiboekAction, generateDraaiboekAction, saveDraaiboekAction } from "@/server/actions/draaiboek";
@@ -33,31 +33,46 @@ function StatusBadge({ view }: { view: DraaiboekView }) {
 }
 
 /** Grote, direct bewerkbare scripttekst. */
+function useAutoHeight(value: string) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [value]);
+  return ref;
+}
+
 function BigText({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const ref = useAutoHeight(value);
   return (
     <textarea
+      ref={ref}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      rows={Math.max(2, value.split("\n").length + 1)}
-      className="w-full resize-y rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3 font-[Arial,Helvetica,sans-serif] text-[17px] leading-[1.6] text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
+      rows={2}
+      className="w-full resize-none overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3 font-[Arial,Helvetica,sans-serif] text-[17px] leading-[1.6] text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
     />
   );
 }
 
 function HintsField({ value, onChange, label }: { value: string[]; onChange: (v: string[]) => void; label: string }) {
   const [text, setText] = useState(value.join("\n"));
+  const ref = useAutoHeight(text);
   return (
     <label className="mt-2 block">
       <span className="text-xs font-medium text-[var(--color-ink-muted)]">{label} <span className="font-normal text-[var(--color-ink-faint)]">(één per regel, kort houden)</span></span>
       <textarea
+        ref={ref}
         value={text}
         onChange={(e) => {
           setText(e.target.value);
           onChange(lines(e.target.value));
         }}
-        rows={Math.max(1, text.split("\n").length)}
-        className="mt-1 w-full resize-y rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] bg-[var(--color-surface-sunken)] px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
+        rows={1}
+        className="mt-1 w-full resize-none overflow-hidden rounded-[var(--radius-sm)] border border-dashed border-[var(--color-line-strong)] bg-[var(--color-surface-sunken)] px-3 py-2 text-sm text-[var(--color-ink)] focus:border-[var(--color-brand-500)] focus:outline-none"
       />
     </label>
   );
@@ -204,10 +219,10 @@ export function ControleView({ view, videographers }: { view: DraaiboekView; vid
 
           {/* Vaste actiebalk onderaan: controleren, opslaan en versturen. */}
           <div className="fixed inset-x-0 bottom-0 z-30 border-t lg:left-60 border-[var(--color-line)] bg-[var(--color-surface)]/95 backdrop-blur">
-            <div className="mx-auto flex max-w-[1100px] flex-wrap items-center gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1 text-sm">
+            <div className="mx-auto flex max-w-[1100px] flex-wrap items-center gap-3 px-4 py-3 lg:pr-48">
+              <div className="min-w-[160px] flex-1 text-sm">
                 {msg ? <span className={msg.ok ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}>{msg.text}</span> : dirty ? <span className="text-[var(--color-ink-muted)]">Niet opgeslagen wijzigingen</span> : view.status === "verstuurd" ? (
-                  <Link href={`/draaiboek/${day.id}`} className="inline-flex items-center gap-1.5 text-[var(--color-ink-muted)] hover:underline"><Smartphone className="size-4" /> Bekijk zoals de videograaf het ziet</Link>
+                  <Link href={`/draaiboek/${day.id}`} className="inline-flex items-center gap-1.5 text-[var(--color-ink-muted)] hover:underline"><Smartphone className="size-4" /> Bekijk als videograaf</Link>
                 ) : null}
               </div>
               <button type="button" disabled={pending} onClick={() => setConfirmRegen(true)} className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)] disabled:opacity-60">
