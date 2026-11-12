@@ -12,8 +12,9 @@ import { scriptGeneratorSystem } from "@/server/scripts/scripthandboek";
 import { adScriptGeneratorSystem, adFormatRules, FUNNEL_GUIDE, FUNNEL_LABEL, type Funnel } from "@/server/scripts/advertentiehandboek";
 import { getClientAiProfile, captionProfileToText, clientLearnedText, centralKnowledgeText, type CaptionProfile } from "@/server/ai/knowledge";
 import { gatherFeedbackContext, estimateSpeakingTime, DEFAULT_WPM } from "@/server/script-control";
-import { getClientWinningPatterns } from "@/server/scripts/winning-patterns";
 import { contentMemoryTextForClient } from "@/server/content-memory";
+import { getClientPerformanceInsights } from "@/server/scripts/winning-patterns";
+import { insightsToPromptText, insightsBasis } from "@/server/scripts/performance-analysis";
 import { getClientDriveScriptPdfs } from "@/server/scripts/drive-scripts";
 import { getIntelligenceOverview } from "@/server/video-intelligence/intelligence";
 import { learnedFeedbackText, saveScriptFeedback, listScriptFeedback, deleteScriptFeedback, type FeedbackScope, type LearnedRule } from "@/server/scripts/script-feedback";
@@ -22,7 +23,7 @@ import { getMetaRules, refreshMetaRules } from "@/server/scripts/meta-rules";
 export type ContentType = "organisch" | "advertentie";
 export type GeneratedScript = { onderwerp: string; tekst: string; contentType?: ContentType; funnel?: Funnel };
 type Result =
-  | { ok: true; scripts: GeneratedScript[]; klantnaam: string; scores?: ScriptScore[] }
+  | { ok: true; scripts: GeneratedScript[]; klantnaam: string; scores?: ScriptScore[]; basis?: string[] }
   | { ok: false; message: string };
 
 const MAX_SCRIPTS = 8;
@@ -122,7 +123,7 @@ function parseScriptsJson(raw: string): ScriptsPayload | null {
   );
 }
 
-type ClientCtx = { name: string; slug: string; extra: string; wpm: number | null; location: string | null };
+type ClientCtx = { name: string; slug: string; extra: string; wpm: number | null; location: string | null; basis: string[] };
 
 /**
  * Korte in-memory cache van de (zware) klantcontext per klant+contenttype, zodat
@@ -147,13 +148,30 @@ async function clientContextCached(
   return value;
 }
 
+/** Verbeterpunten en acties uit de laatst goedgekeurde maandrapportage, als briefingtekst. */
+function reportLines(report: { period: string; strategische_acties: unknown; verbeterpunten: unknown } | null): string {
+  if (!report) return "";
+  const toList = (v: unknown): string[] =>
+    (Array.isArray(v) ? v : [])
+      .map((x) => (typeof x === "string" ? x : x && typeof x === "object" ? String((x as Record<string, unknown>).titel ?? (x as Record<string, unknown>).actie ?? (x as Record<string, unknown>).tekst ?? (x as Record<string, unknown>).omschrijving ?? "") : ""))
+      .map((x) => x.trim()).filter(Boolean).slice(0, 5);
+  const acties = toList(report.strategische_acties);
+  const verbeter = toList(report.verbeterpunten);
+  if (!acties.length && !verbeter.length) return "";
+  return [
+    `Uit de goedgekeurde maandrapportage van ${report.period}:`,
+    acties.length ? `Strategische acties:\n- ${acties.join("\n- ")}` : "",
+    verbeter.length ? `Verbeterpunten:\n- ${verbeter.join("\n- ")}` : "",
+  ].filter(Boolean).join("\n");
+}
+
 /**
  * Verzamelt de volledige live klantcontext voor de schrijver: stijl, afspraken,
  * geleerde voorkeuren, best presterende hooks (echte cijfers), Video Intelligence,
  * eerder gebruikte onderwerpen (tegen herhaling) en de algemene Shortclips-richtlijnen.
  * Dezelfde bron als de scriptcontrole, zodat genereren en controleren gelijk denken.
  */
-async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission>>, clientId: string, contentType: ContentType = "organisch"): Promise<{ name: string; slug: string; extra: string; wpm: number | null; location: string | null } | null> {
+async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission>>, clientId: string, contentType: ContentType = "organisch"): Promise<ClientCtx | null> {
   const [c] = await db
     .select({ id: clients.id, name: clients.name, slug: clients.slug })
     .from(clients)
@@ -163,11 +181,12 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
   assertClientAccess(viewer, c.id);
   const isAd = contentType === "advertentie";
   const todayStr = new Date().toISOString().slice(0, 10);
-  const [profile, learned, feedback, patterns, central, intel, recent, learnedFb, nextShoot] = await Promise.all([
+  const [profile, learned, feedback, perf, central, intel, recent, learnedFb, nextShoot, strategy, report] = await Promise.all([
     getClientAiProfile(c.id),
     clientLearnedText(c.id),
     gatherFeedbackContext(c.id),
-    getClientWinningPatterns(viewer, c.id).catch(() => null),
+    // Echte resultaten uit Metricool: wat werkt (hook, CTA, lengte, kijktijd) en wat niet.
+    getClientPerformanceInsights(viewer, c.id).catch((e) => { console.warn("[scriptcontext] Metricool-analyse mislukt", e); return null; }),
     centralKnowledgeText(["schrijfstijl", "branding", "kwaliteit"]).catch(() => ""),
     getIntelligenceOverview(viewer, c.slug).catch(() => null),
     // Eerdere scripts van hetzelfde contenttype (advertentie vs organisch),
@@ -185,6 +204,15 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
       .where(and(eq(productionDays.clientId, c.id), isNull(productionDays.deletedAt), ne(productionDays.status, "cancelled"), gte(productionDays.scheduledOn, todayStr)))
       .orderBy(asc(productionDays.scheduledOn)).limit(1)
       .then((rows) => rows[0] ?? null)
+      .catch(() => null),
+    // Doel van de klant (uit het strategieprofiel van de maandrapportages).
+    db.execute(sql`select primary_goal, strategy_note from client_strategy_profiles where client_id = ${c.id} limit 1`)
+      .then((res) => (((res as unknown as { rows?: unknown[] }).rows ?? res) as Array<{ primary_goal: string | null; strategy_note: string | null }>)[0] ?? null)
+      .catch(() => null),
+    // Laatste GOEDGEKEURDE maandrapportage: verbeterpunten en strategische acties.
+    db.execute(sql`select period, strategische_acties, analysis->'verbeterpunten' as verbeterpunten from client_reports
+      where client_id = ${c.id} and deleted_at is null and status in ('goedgekeurd','gepubliceerd') order by period desc limit 1`)
+      .then((res) => (((res as unknown as { rows?: unknown[] }).rows ?? res) as Array<{ period: string; strategische_acties: unknown; verbeterpunten: unknown }>)[0] ?? null)
       .catch(() => null),
   ]);
 
@@ -211,8 +239,10 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
     feedback.recenteKlantopmerkingen.length ? `Recente klantopmerkingen op eerdere video's:\n- ${feedback.recenteKlantopmerkingen.join("\n- ")}` : "",
     feedback.recenteScriptfeedback.length ? `Recente klantfeedback op eerdere SCRIPTS (uit de scriptcontrole in het portaal — verwerk dit en maak deze opmerkingen niet opnieuw):\n- ${feedback.recenteScriptfeedback.join("\n- ")}` : "",
     learned ? `Geleerde voorkeuren en correcties van deze klant:\n${learned}` : "",
-    patterns && patterns.count > 0 ? `Best presterende hooks van deze klant (echte cijfers${isAd ? " — organisch bereik, GEEN bewijs dat een advertentie converteert; gebruik als inspiratie, niet als resultaat" : " — spiegelen, niet kopiëren"}):\n${patterns.top.map((p) => `- "${p.hook}" (${p.views} views)`).join("\n")}` : "",
+    perf ? insightsToPromptText(perf, { isAd }) : "",
     memoryText,
+    strategy?.primary_goal ? `Hoofddoel van de content voor deze klant: ${strategy.primary_goal}.${strategy.strategy_note ? ` Strategie: ${strategy.strategy_note}` : ""} Kies onderwerpen en CTA's die dit doel dienen.` : "",
+    reportLines(report),
     viLines,
     recent.length ? `Eerder geschreven ${isAd ? "advertentiescripts" : "onderwerpen"} voor deze klant (voorkom herhaling, tenzij je een sterk format bewust opnieuw gebruikt):\n- ${recent.map((r) => r.title).join("\n- ")}` : "",
     isAd ? "LET OP: dit zijn advertentiescripts. Schrijf vanuit het advertentiedoel en de funnelfase, niet vanuit organisch bereik. Gebruik alleen daadwerkelijk beschikbare commerciële gegevens; verzin geen cijfers, prijzen of claims." : "",
@@ -220,7 +250,13 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
     learnedFb || "",
     central ? `Algemene Shortclips-richtlijnen:\n${central}` : "",
   ].filter(Boolean).join("\n\n");
-  return { name: c.name, slug: c.slug, extra, wpm: intel?.speech?.avgWpm && intel.speech.avgWpm > 60 ? intel.speech.avgWpm : null, location };
+  const basis = [
+    ...(perf ? insightsBasis(perf) : ["Metricool-resultaten konden niet worden geladen"]),
+    recent.length ? `${recent.length} eerdere onderwerpen gecontroleerd op herhaling` : "",
+    strategy?.primary_goal ? `Klantdoel meegenomen: ${strategy.primary_goal}` : "",
+    report ? `Maandrapportage ${report.period} meegenomen` : "",
+  ].filter(Boolean);
+  return { name: c.name, slug: c.slug, extra, wpm: intel?.speech?.avgWpm && intel.speech.avgWpm > 60 ? intel.speech.avgWpm : null, location, basis };
 }
 
 /**
@@ -357,9 +393,10 @@ export async function generateScripts(input: {
 
     let extra = "";
     let klantnaam = (input.clientName ?? "").trim();
+    let basis: string[] | undefined;
     if (input.clientId) {
       const ctx = await clientContextCached(viewer, input.clientId, contentType);
-      if (ctx) { extra = ctx.extra; klantnaam = ctx.name; }
+      if (ctx) { extra = ctx.extra; klantnaam = ctx.name; basis = ctx.basis; }
     } else {
       // Zonder vaste klant: toch de centrale geleerde regels voor dit contenttype meenemen.
       const centralLearned = await learnedFeedbackText(null, contentType).catch(() => "");
@@ -502,7 +539,7 @@ export async function generateScripts(input: {
 
     const done = Date.now();
     console.log(`[generateScripts] ${count} script(s), ${contentType}: generatie ${tQuality - tGen}ms, kwaliteitslus ${done - tQuality}ms, totaal ${done - tGen}ms (AI-fase).`);
-    return { ok: true, scripts: improved, klantnaam, scores };
+    return { ok: true, scripts: improved, klantnaam, scores, basis };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;
