@@ -14,6 +14,7 @@ import { parseClientStatusFilter } from "@/lib/client-status";
 import { ScriptberichtButton, type ScriptberichtRow } from "./scriptbericht";
 import { getSavedScriptberichten, getScriptberichtTemplates, portalScriptLink } from "@/server/scriptbericht";
 import { EMPTY_SAVED } from "@/lib/scriptbericht";
+import { canManageDraaiboek, draaiboekStatusMap } from "@/server/draaiboek/service";
 
 export const metadata: Metadata = { title: "Scripting" };
 export const dynamic = "force-dynamic";
@@ -46,9 +47,10 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
 
   // Scriptbericht (WhatsApp): centrale templates + per opname de opgeslagen
   // persoonlijke versie en link; portaallink automatisch uit de scriptcontrole.
-  const [{ templates: sbTemplates, custom: sbCustom }, sbSaved] = await Promise.all([
+  const [{ templates: sbTemplates, custom: sbCustom }, sbSaved, draaiboeken] = await Promise.all([
     getScriptberichtTemplates(),
     getSavedScriptberichten(rows.map((r) => r.id)),
+    draaiboekStatusMap(rows.map((r) => r.id)),
   ]);
   const sbRows: ScriptberichtRow[] = rows.map((r) => ({
     id: r.id,
@@ -149,7 +151,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
 
       {/* key op de actieve filter: zo herstart het board met de juiste filter
           zodra je op een blok bovenin klikt (anders blijft de begin-filter staan). */}
-      <ScriptingBoard key={`${filter ?? "alle"}:${statusFilter ?? "alle"}:${focusId ?? ""}`} focusId={focusId} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} defaultStatus={statusFilter} viewerId={viewer.id} viewerName={viewer.fullName} />
+      <ScriptingBoard key={`${filter ?? "alle"}:${statusFilter ?? "alle"}:${focusId ?? ""}`} focusId={focusId} rows={rows} clientOptions={clientOptions} writerOptions={writerOptions} canWrite={canWrite} defaultFilter={filter} defaultStatus={statusFilter} viewerId={viewer.id} viewerName={viewer.fullName} draaiboeken={draaiboeken} canDraaiboek={canManageDraaiboek(viewer)} />
 
       {/* Vaste verantwoordelijke per klant — zodat in één oogopslag duidelijk is
           wie standaard de scripts van welke klant op zich neemt. Deze persoon

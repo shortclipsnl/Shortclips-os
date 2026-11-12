@@ -3,6 +3,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { DraaiboekCell } from "./draaiboek-cell";
+import type { DraaiboekSummary } from "@/server/draaiboek/service";
 import { AlarmClock, AlertTriangle, CalendarClock, ChevronDown, FileClock, Loader2, MessageSquareText, UserPlus, ScrollText, ExternalLink, FileCheck2, X } from "lucide-react";
 import { setScriptingNote, setScriptingStatus, setScriptWriter } from "@/server/actions/scripting";
 import { SCRIPTING_ORDER, SCRIPTING_STATUS, SCRIPT_STATUS } from "@/lib/statuses";
@@ -108,7 +110,7 @@ const FLAG_COLOR: Record<string, string> = {
   done: "var(--color-good)",
 };
 
-export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, defaultFilter, defaultStatus, viewerId, viewerName, focusId }: { rows: ScriptingRow[]; clientOptions: string[]; writerOptions: WriterOption[]; canWrite: boolean; defaultFilter?: string; defaultStatus?: string; viewerId?: string; viewerName?: string; focusId?: string }) {
+export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, defaultFilter, defaultStatus, viewerId, viewerName, focusId, draaiboeken = {}, canDraaiboek = false }: { rows: ScriptingRow[]; clientOptions: string[]; writerOptions: WriterOption[]; canWrite: boolean; defaultFilter?: string; defaultStatus?: string; viewerId?: string; viewerName?: string; focusId?: string; draaiboeken?: Record<string, DraaiboekSummary>; canDraaiboek?: boolean }) {
   // Vanuit een taak (?sessie=<opname>): alle filters open, zodat de regel zeker
   // zichtbaar is, en daarna ernaartoe scrollen en kort oplichten.
   const focusRow = focusId ? rows.find((r) => r.id === focusId) ?? null : null;
@@ -270,6 +272,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
               <th className="px-2 py-2 font-medium">Scriptingstatus</th>
               <th className="px-2 py-2 font-medium">Klantportaal</th>
               <th className="px-2 py-2 font-medium">Scripts</th>
+              <th className="px-2 py-2 font-medium">Draaiboek</th>
               <th className="px-2 py-2 font-medium">Notitie</th>
             </tr>
           </thead>
@@ -279,12 +282,12 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                 {/* Ruimte tussen de weekgroepen, zodat het beter scanbaar is. */}
                 {gi > 0 ? (
                   <tr aria-hidden>
-                    <td colSpan={8} className="h-6 bg-[var(--color-surface)]" />
+                    <td colSpan={9} className="h-6 bg-[var(--color-surface)]" />
                   </tr>
                 ) : null}
                 {/* Week-kop in volle kleur, zodat je van week naar week kunt scannen. */}
                 <tr>
-                  <td colSpan={8} className="p-0">
+                  <td colSpan={9} className="p-0">
                     <div
                       className="flex items-center gap-2 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-white"
                       style={{ background: WEEK_COLOR[g.order] ?? "var(--color-ink-muted)" }}
@@ -329,6 +332,9 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
                       <ScriptsCell row={r} />
                     </td>
                     <td className="px-2 py-2 align-top">
+                      <DraaiboekCell row={r} summary={draaiboeken[r.id] ?? null} canManage={canDraaiboek} />
+                    </td>
+                    <td className="px-2 py-2 align-top">
                       <NoteCell id={r.id} note={r.note} status={r.status} canWrite={canWrite} />
                     </td>
                   </tr>
@@ -336,7 +342,7 @@ export function ScriptingBoard({ rows, clientOptions, writerOptions, canWrite, d
               </Fragment>
             ))}
             {groups.length === 0 ? (
-              <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
+              <tr><td colSpan={9} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen opnames met deze filters.</td></tr>
             ) : null}
           </tbody>
         </table>
