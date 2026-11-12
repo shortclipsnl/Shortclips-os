@@ -7,8 +7,6 @@ import { LinkButton, PageHeader } from "@/components/ui";
 import { ClientsBoard, type BoardClient } from "./clients-board";
 import { getRetentionOverview, retentionContext } from "@/server/client-retention";
 import { isEditorRole } from "@/server/auth/context";
-import { listOnboardings } from "@/server/onboarding";
-import { OnboardingOverview } from "./onboarding-overview";
 
 export const metadata: Metadata = { title: "Klanten" };
 export const dynamic = "force-dynamic";
@@ -56,7 +54,6 @@ export default async function ClientsPage() {
   // "mijn klanten".
   const covering = await coveringForUser(viewer.id);
   const coveringIds = covering.map((c) => c.absentId);
-  const onboardings = isEditorRole(viewer) ? [] : await listOnboardings().catch(() => []);
   const myCount = clients.filter((c) => c.coordinatorId === viewer.id || (!!c.coordinatorId && coveringIds.includes(c.coordinatorId))).length;
 
   return (
@@ -75,7 +72,6 @@ export default async function ClientsPage() {
           alles vanaf het begin en hoeft er later niets te worden aangevuld.
         </p>
       ) : null}
-      <OnboardingOverview rows={onboardings} />
       <ClientsBoard clients={clients} viewerId={viewer.id} coveringIds={coveringIds} coveringNames={covering.map((c) => c.absentName)} defaultPod={myCount > 0 ? "mijn" : "alle"} />
     </div>
   );
