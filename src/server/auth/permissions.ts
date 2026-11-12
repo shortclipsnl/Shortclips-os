@@ -76,9 +76,6 @@ export const PERMISSIONS = {
   // Content Research
   "content_research:read": "AI Content Research bekijken (ideeën per klant)",
   "content_research:write": "Onderzoek starten en ideeën beheren",
-  "ai_editor:read": "Shortclips AI Editor bekijken",
-  "ai_editor:run": "Advertentievideo's laten monteren met de AI Editor",
-  "ai_editor:style": "Stijlbeheer van de AI Editor (montageprofiel, referenties)",
 
   // Beheer
   "integrations:read": "Koppelingen en hun status bekijken",
@@ -184,8 +181,6 @@ export const ROLE_DEFINITIONS: Array<{
       // Content Research: net als het contentteam onderzoek bekijken en starten.
       "content_research:read",
       "content_research:write",
-      "ai_editor:read",
-      "ai_editor:run",
       "integrations:read",
       "integrations:write",
       "automations:read",
@@ -227,8 +222,6 @@ export const ROLE_DEFINITIONS: Array<{
       "video_intelligence:run",
       "content_research:read",
       "content_research:write",
-      "ai_editor:read",
-      "ai_editor:run",
       "integrations:read",
       "automations:read",
       "ai:history_read",
@@ -256,9 +249,6 @@ export const ROLE_DEFINITIONS: Array<{
       // Content Research: onderzoek starten en ideeën beheren.
       "content_research:read",
       "content_research:write",
-      // Eigen advertenties monteren met de AI Editor.
-      "ai_editor:read",
-      "ai_editor:run",
       // Het contentteam (o.a. Jiska, Rutger) stuurt ook de editing aan: fases,
       // prioriteit en deadlines wijzigen (videos:write), editors toewijzen
       // (videos:assign) en een video intern afronden/goedkeuren — de fase
