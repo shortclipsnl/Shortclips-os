@@ -1,13 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, Loader2, Search, Users } from "lucide-react";
+import { BookOpen, Check, Clapperboard, Film, Search, UserRound, Users } from "lucide-react";
 import { ClientLogo, TeamAvatar } from "@/components/ui";
-import { formatDate } from "@/lib/format";
-import { setClientStatus } from "@/server/actions/clients";
-import { ClientDocButtons, type DocButtonSlot } from "@/components/client-docs/doc-buttons";
+import { type DocButtonSlot } from "@/components/client-docs/doc-buttons";
 
 export type BoardClient = {
   id: string;
@@ -28,39 +25,6 @@ export type BoardClient = {
   /** Klantgezondheid (tevredenheid) en, apart, het contractmoment. */
   health?: { status: "gezond" | "aandacht" | "direct"; reasons: string[]; commercial: { label: string; tone: "neutraal" | "aandacht" | "urgent" } | null } | null;
 };
-
-const HEALTH = {
-  gezond: { label: "Gezond", dot: "var(--color-good)", cls: "bg-[var(--color-good-soft)] text-[#1d6b4c]" },
-  aandacht: { label: "Aandacht nodig", dot: "var(--color-warn)", cls: "bg-[var(--color-warn-soft)] text-[#8a5300]" },
-  direct: { label: "Directe aandacht", dot: "var(--color-bad)", cls: "bg-[var(--color-bad-soft)] text-[#a3271c]" },
-} as const;
-
-/** Status met de redenen als tooltip (de hele kaart linkt al naar de klant). */
-function HealthChip({ h }: { h: NonNullable<BoardClient["health"]> }) {
-  const s = HEALTH[h.status];
-  return (
-    <>
-      <span title={h.reasons.join("\n")} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-medium ${s.cls}`}>
-        <span className="size-1.5 rounded-full" style={{ background: s.dot }} />{s.label}
-      </span>
-      {h.commercial ? (
-        <span title="Contractmoment (commercieel, staat los van tevredenheid)" className={`inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-medium ${h.commercial.tone === "urgent" ? "bg-[var(--color-bad-soft)] text-[#a3271c]" : h.commercial.tone === "aandacht" ? "bg-[var(--color-warn-soft)] text-[#8a5300]" : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"}`}>{h.commercial.label}</span>
-      ) : null}
-    </>
-  );
-}
-
-/** Kleine gekleurde chip voor scanbaarheid. */
-function Chip({ children, tone }: { children: React.ReactNode; tone: "blue" | "indigo" | "amber" | "grey" | "green" }) {
-  const cls = {
-    blue: "bg-[var(--color-info-soft)] text-[#0060a8]",
-    indigo: "bg-[var(--color-indigo-ink)] text-white",
-    amber: "bg-[var(--color-warn-soft)] text-[#8a5300]",
-    green: "bg-[var(--color-good-soft)] text-[#1d6b4c]",
-    grey: "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]",
-  }[tone];
-  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-medium ${cls}`}>{children}</span>;
-}
 
 const STOPPED = new Set(["paused", "churned"]);
 
@@ -203,7 +167,7 @@ export function ClientsBoard({ clients, viewerId, defaultPod = "alle", coveringN
       {shown.length === 0 ? (
         <Empty />
       ) : (
-        <div className="grid gap-2.5 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
           {shown.map((c) => <ClientCard key={c.id} c={c} />)}
         </div>
       )}
@@ -215,57 +179,49 @@ function Empty() {
   return <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-line)] px-4 py-10 text-center text-sm text-[var(--color-ink-faint)]">Geen klanten in deze weergave</p>;
 }
 
+/** Compacte klantkaart: alleen wat het team dagelijks nodig heeft. Status,
+ *  lopende video's, opnamedatum en contractmoment staan op de klantpagina;
+ *  actief/niet-actief wisselen gaat via Klant bewerken of Klantenbeheer. */
 function ClientCard({ c }: { c: BoardClient }) {
-  const stopped = STOPPED.has(c.status);
-  const [pending, start] = useTransition();
-  const router = useRouter();
-  // Klik op het status-icoontje = actief ↔ niet-actief wisselen. Niet-actief
-  // zetten we als "paused"; weer aan = "active".
-  const toggle = () =>
-    start(async () => {
-      await setClientStatus(c.slug, stopped ? "active" : "paused");
-      router.refresh();
-    });
-
+  const btn =
+    "inline-flex min-h-[40px] min-w-0 items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border px-2 text-xs font-medium transition";
+  const live = `${btn} border-[var(--color-line-strong)] bg-[var(--color-surface-sunken)] text-[var(--color-ink)] hover:border-[var(--color-ink)]`;
   return (
-    <div className="min-w-0 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5 hover:shadow-[var(--shadow-raised)]">
-    <div className="flex min-w-0 items-center gap-3">
-      <Link href={`/clients/${c.slug}`} className="flex min-w-0 flex-1 items-center gap-3">
-        <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={52} />
+    <div className="flex min-w-0 flex-col gap-4 rounded-[var(--radius-lg)] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 transition hover:shadow-[var(--shadow-raised)]">
+      <Link href={`/clients/${c.slug}`} className="flex min-w-0 items-center gap-3">
+        <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={48} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium">{c.name}</span>
-          <span className="mt-1 flex flex-wrap items-center gap-1">
-            {c.health && !stopped ? <HealthChip h={c.health} /> : null}
-            <Chip tone="blue">{c.shortsPerMonth > 0 ? `${c.shortsPerMonth} shorts/mnd` : "shorts ?"}</Chip>
-            {c.inProduction > 0 ? <Chip tone="amber">{c.inProduction} lopend</Chip> : null}
-            {c.nextShoot ? <Chip tone="green">opname {formatDate(c.nextShoot)}</Chip> : null}
-            <Chip tone="grey">{c.coordinatorName ?? "geen verantwoordelijke"}</Chip>
+          <span className="block truncate text-[15px] font-semibold">{c.name}</span>
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-[var(--color-ink-muted)]">
+            <UserRound className="size-3.5 shrink-0" strokeWidth={1.75} />
+            <span className="truncate">{c.coordinatorName ?? "Geen contactpersoon"}</span>
           </span>
         </span>
+        <span className="shrink-0 text-right" title="Shorts per maand">
+          <span className="block text-2xl font-bold leading-none">{c.shortsPerMonth > 0 ? c.shortsPerMonth : "?"}</span>
+          <span className="mt-1 block text-2xs text-[var(--color-ink-muted)]">shorts p/m</span>
+        </span>
       </Link>
-      {/* Duidelijke klikbare schakelaar rechts: Actief ↔ Niet actief. */}
-      <button
-        type="button"
-        onClick={toggle}
-        disabled={pending}
-        aria-label={stopped ? "Op actief zetten" : "Op niet-actief zetten"}
-        title={stopped ? "Niet actief — klik om te activeren" : "Actief — klik om op niet-actief te zetten"}
-        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-          stopped
-            ? "bg-[var(--color-bad-soft)] text-[#a3271c] hover:brightness-95"
-            : "bg-[var(--color-good-soft)] text-[#1d6b4c] hover:brightness-95"
-        }`}
-      >
-        {pending ? (
-          <Loader2 className="size-3.5 animate-spin" />
-        ) : (
-          <span className="size-2 rounded-full" style={{ background: stopped ? "var(--color-bad)" : "var(--color-good)" }} />
-        )}
-        {stopped ? "Niet actief" : "Actief"}
-      </button>
-    </div>
-      {/* De twee vaste PDF's van deze klant en de video's, direct te openen. */}
-      <ClientDocButtons slots={c.docs} size="xs" className="mt-2 pl-[64px]" videosHref={`/clients/${c.slug}/videos`} />
+      <div className="grid grid-cols-3 gap-2">
+        {c.docs.map((s) => {
+          const Icon = s.kind === "klanten_guide" ? BookOpen : Clapperboard;
+          return s.url ? (
+            <a key={s.kind} href={s.url} target="_blank" rel="noopener noreferrer" title={`${s.label} openen (PDF)`} className={live}>
+              <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
+              <span className="truncate">{s.label}</span>
+            </a>
+          ) : (
+            <span key={s.kind} title={`${s.label} is nog niet geüpload`} className={`${btn} cursor-not-allowed border-dashed border-[var(--color-line-strong)] text-[var(--color-ink-faint)]`}>
+              <Icon className="size-3.5 shrink-0" strokeWidth={1.75} />
+              <span className="truncate">{s.label}</span>
+            </span>
+          );
+        })}
+        <Link href={`/clients/${c.slug}/videos`} title="Alle short video's van deze klant per opnamesessie" className={live}>
+          <Film className="size-3.5 shrink-0" strokeWidth={1.75} />
+          <span className="truncate">Video&apos;s</span>
+        </Link>
+      </div>
     </div>
   );
 }
