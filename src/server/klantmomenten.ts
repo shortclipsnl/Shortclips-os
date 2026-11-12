@@ -58,7 +58,7 @@ const SEED: Record<string, MomentData> = {
   "donker-groep": { startEstimate: "2025-11-18", foundedYear: 1961, foundedSource: "Website klant" },
   luxewagen: { startEstimate: "2023-01-01", foundedYear: 2001, foundedSource: "Eigen opgave klant", note: "Spelling contactpersoon controleren: Venema of Veenema." },
   "shades-by-erik-kuster": { startConfirmed: "2026-02-20" },
-  "365werk": { foundedYear: 2013, foundedSource: "Website klant", note: "Klant sinds staat op 1 okt 2026, maar de eerste offerte is op 27 feb 2026 getekend. Controleer de startdatum." },
+  "365werk": { foundedYear: 2013, foundedSource: "Website klant" },
   "makelaardij-friesland": { startEstimate: "2025-04-01", foundedOn: "1998-06-01", foundedYear: 1998, foundedSource: "Openbaar register" },
   "hoekstra-transport": { startConfirmed: "2026-06-10", foundedYear: 1929, foundedSource: "Website klant" },
   "marco-van-beek-premium-cars": { startEstimate: "2023-07-01", foundedYear: 1939, foundedSource: "Website klant" },
