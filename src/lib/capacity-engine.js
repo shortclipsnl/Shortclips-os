@@ -25,13 +25,15 @@ E.TODAY = new Date().toISOString().slice(0, 10);
   const DAYS = ["", "ma", "di", "wo", "do", "vr", "za", "zo"];
   E.fmtDay = (s) => { const d = toD(s); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`; };
   E.fmtDayLong = (s) => `${DAYS[E.dow(s)]} ${E.fmtDay(s)}`;
+  // Weeklabel met datums in plaats van weeknummer: "16 – 20 nov" of "30 nov – 4 dec".
+  E.fmtWeek = (a, b) => { const x = toD(a), y = toD(b); return x.getUTCMonth() === y.getUTCMonth() ? `${x.getUTCDate()} – ${E.fmtDay(b)}` : `${E.fmtDay(a)} – ${E.fmtDay(b)}`; };
   E.monthName = (m) => ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"][m];
 
   E.weeks = (count) => {
     const out = []; let m = E.mondayOf(E.TODAY);
     for (let i = 0; i < count; i++) {
       const days = [0, 1, 2, 3, 4].map((k) => E.addDays(m, k));
-      out.push({ monday: m, friday: days[4], num: E.isoWeek(m), days, label: `Week ${E.isoWeek(m)}`, range: `${E.fmtDay(m)} t/m ${E.fmtDay(days[4])}` });
+      out.push({ monday: m, friday: days[4], num: E.isoWeek(m), days, label: E.fmtWeek(m, days[4]), range: `${E.fmtDay(m)} t/m ${E.fmtDay(days[4])}` });
       m = E.addDays(m, 7);
     }
     return out;

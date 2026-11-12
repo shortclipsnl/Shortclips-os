@@ -369,7 +369,12 @@ export async function loadCapacityData(): Promise<CapacityData> {
     if (c.lastVg && !vgActive.has(c.lastVg)) c.lastVg = null;
   }
 
-  people.sort((a, b) => (a.employment === b.employment ? a.name.localeCompare(b.name) : a.employment === "vast" ? -1 : 1));
+  // Vast eerst, dan freelance. Binnen vast staat Jarno onderaan (Rutger is de vaste videograaf).
+  const isJarno = (n: string) => /^jarno\b/i.test(n.trim());
+  people.sort((a, b) =>
+    a.employment !== b.employment ? (a.employment === "vast" ? -1 : 1)
+    : isJarno(a.name) !== isJarno(b.name) ? (isJarno(a.name) ? 1 : -1)
+    : a.name.localeCompare(b.name));
 
   return {
     today,

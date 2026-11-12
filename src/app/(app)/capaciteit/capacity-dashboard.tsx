@@ -26,7 +26,8 @@ const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((
 const SNOOZE_KEY = "cap-snoozed-v1";
 
 export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEdit: boolean }) {
-  const [mode, setMode] = useState<"overzicht" | "week">("overzicht");
+  // Altijd per week (met datums), doorlopend tot en met februari.
+  const mode = "week" as "overzicht" | "week";
   const [filter, setFilter] = useState<"alle" | "videografie" | "editing">("alle");
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [showAll, setShowAll] = useState(false);
@@ -65,7 +66,7 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
   }, [data, snoozed]);
   const { st, P, R, RP, WMAP, HW, SIG } = model;
   const RR = mode === "overzicht" ? RP : R;
-  const cols: number[] = mode === "overzicht" ? P.map((_: any, i: number) => i) : [0, 1, 2, 3, 4, 5, 6, 7];
+  const cols: number[] = R.weeks.map((_: any, i: number) => i).filter((i: number) => R.weeks[i].monday <= P[P.length - 1].friday);
   const G = st.settings.greenBelow, O = st.settings.orangeMax;
   const lvl = (pct: number) => (pct > O ? "rood" : pct >= G ? "oranje" : "groen");
 
@@ -151,7 +152,7 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
           <div className="cap-rfree"><span className={`cap-dot ${tk}`} /><b>{tp === null ? "?" : `${tp}%`} bezet</b> · {Math.round(free)} {unit} vrij komende 4 weken</div>
         </div>
         <div className="cap-scroll">
-          <table className="cap-radar">
+          <table className="cap-radar" style={{ minWidth: 220 + cols.length * 86 }}>
             <thead>
               <tr>
                 <th className="rl" />
@@ -160,7 +161,7 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
                   return (
                     <th key={i} className={i === 0 ? "now" : ""}>
                       {w.label}
-                      <small>{mode === "overzicht" ? w.sub : E.fmtDay(w.monday)}</small>
+                      <small>{i === 0 ? "deze week" : i === 1 ? "volgende week" : w.monday.slice(0, 4) !== data.today.slice(0, 4) ? w.monday.slice(0, 4) : "\u00a0"}</small>
                     </th>
                   );
                 })}
@@ -204,7 +205,7 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
               })}
               <tr>
                 <td className="rl">
-                  <div className="cap-who"><span className="cap-av open">?</span><span><span className="nm">{vg ? "Nog geen videograaf" : "Nog geen editor"}</span><span className="sub">{vg ? "Opnames" : "Video's"} zonder toewijzing</span></span></div>
+                  <div className="cap-who"><span className="cap-av open">?</span><span><span className="nm">{vg ? "Freelance videograaf" : "Nog geen editor"}</span><span className="sub">{vg ? "Opnames" : "Video's"} zonder toewijzing</span></span></div>
                 </td>
                 {cols.map((i) => {
                   const c = open[i];
@@ -235,8 +236,6 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
     );
   };
 
-  const flPeople = data.people.filter((p) => p.employment === "freelance");
-  const flKnown = flPeople.filter((p) => p.pattern).length;
 
   return (
     <div className="cap">
@@ -281,26 +280,13 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
       <div className="cap-bar">
         <h2 className="text-sm font-bold">Capaciteitsradar</h2>
         <div className="cap-seg">
-          <button className={mode === "overzicht" ? "on" : ""} onClick={() => setMode("overzicht")}>Overzicht</button>
-          <button className={mode === "week" ? "on" : ""} onClick={() => setMode("week")}>Per week</button>
-        </div>
-        <div className="cap-seg">
-          {(["alle", "videografie", "editing"] as const).map((f) => (
+          {(["alle", "editing", "videografie"] as const).map((f) => (
             <button key={f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{{ alle: "Alles", videografie: "Videografie", editing: "Editing" }[f]}</button>
           ))}
         </div>
       </div>
-      <div className="cap-sources">
-        <span className="lbl">Automatisch gekoppeld</span>
-        <span className="it"><span className="cap-dot groen" />Google Agenda</span>
-        <span className="it"><span className="cap-dot groen" />Editing</span>
-        <span className="it"><span className="cap-dot groen" />Klanten en pakketten</span>
-        <span className="it"><span className="cap-dot groen" />Vakantie</span>
-        <span className="it"><span className={`cap-dot ${flKnown === flPeople.length ? "groen" : "oranje"}`} />Capaciteit freelancers {flKnown}/{flPeople.length}</span>
-        <span className="sync">Bijgewerkt {data.generatedAt}</span>
-      </div>
-      {filter !== "editing" ? block("vg") : null}
       {filter !== "videografie" ? block("ed") : null}
+      {filter !== "editing" ? block("vg") : null}
       <div className="cap-legend">
         <span><i style={{ background: "var(--color-good-soft)", border: "1px solid #bfe3d2" }} />Ruimte (&lt;{G}%)</span>
         <span><i style={{ background: "#fbe6c4" }} />Bijna vol ({G} t/m {O}%)</span>
@@ -506,7 +492,7 @@ function DrawerBody({ d, R, RP, WMAP, K, P, st, SIG, data, setDrawer, peaks }: a
     <>
       {head("Opnames komende 4 weken", "Uit Google Agenda")}
       <div className="cap-db"><div className="cap-list">{[...K.shoots].sort((a: any, b: any) => a.date.localeCompare(b.date)).map((x: any) => (
-        <div className="cap-li" key={x.id}><div className="d">{E.fmtDayLong(x.date)}</div><div className="m"><b>{x.clientName}</b><small>{x.vg ? data.people.find((p: any) => p.id === x.vg)?.name ?? "Videograaf" : "Nog geen videograaf"} · {N(x.hours)} uur · {x.shorts} video&apos;s</small></div>{prodLink(x.id)}</div>
+        <div className="cap-li" key={x.id}><div className="d">{E.fmtDayLong(x.date)}</div><div className="m"><b>{x.clientName}</b><small>{x.vg ? data.people.find((p: any) => p.id === x.vg)?.name ?? "Videograaf" : "Freelance videograaf"} · {N(x.hours)} uur · {x.shorts} video&apos;s</small></div>{prodLink(x.id)}</div>
       ))}</div></div>
     </>
   );
