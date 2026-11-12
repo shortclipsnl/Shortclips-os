@@ -64,6 +64,12 @@ export const clients = pgTable(
      *  dat zelf (false)? Bij false geen inplannen/publiceren-signalen in
      *  Kwaliteit & Aandachtspunten, en zichtbaar in de contentplanning. */
     weHandlePosting: boolean("we_handle_posting").notNull().default(true),
+    /** Standaardkeuze per kanaal: via Metricool (true) of handmatig posten (false, standaard). Per publicatie te wijzigen. */
+    metricoolPublishing: boolean("metricool_publishing").notNull().default(false),
+    /** Laatste bevestiging in de Metricool-app (autoPublish uit). Standaard aan. */
+    metricoolFinalConfirm: boolean("metricool_final_confirm").notNull().default(true),
+    /** Moet de klant elke publicatie ook goedkeuren? */
+    clientPublicationApproval: boolean("client_publication_approval").notNull().default(false),
     /** Tonen op de resultatenpagina? Standaard true. Op false voor records die
      *  geen echte klant van ons zijn (bijv. historisch meegekomen),
      *  zodat ze niet in de resultaten (overzicht, tegels, lijst) verschijnen. */

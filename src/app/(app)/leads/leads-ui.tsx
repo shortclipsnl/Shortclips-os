@@ -118,7 +118,7 @@ function fmtDate(d: string | null) {
 
 const OPEN_SET = new Set(["lead", "offerte", "onderhandeling"]);
 
-export function LeadsBoard({ rows, sources, quotes = {}, focusId = null }: { rows: LeadRow[]; sources: string[]; quotes?: Record<string, LeadQuoteSummary>; focusId?: string | null }) {
+export function LeadsBoard({ rows, sources, quotes = {}, focusId = null, showAmounts = true, canOpenQuotes = true }: { rows: LeadRow[]; sources: string[]; quotes?: Record<string, LeadQuoteSummary>; focusId?: string | null; showAmounts?: boolean; canOpenQuotes?: boolean }) {
   const focused = focusId ? rows.find((r) => r.id === focusId) ?? null : null;
   const today = new Date().toISOString().slice(0, 10);
   const currentYear = String(new Date().getFullYear());
@@ -255,7 +255,7 @@ export function LeadsBoard({ rows, sources, quotes = {}, focusId = null }: { row
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r) => <LeadRowView key={r.id} r={r} today={today} quote={quotes[r.id] ?? null} focused={r.id === focusId} />)}
+            {filtered.map((r) => <LeadRowView key={r.id} r={r} today={today} quote={quotes[r.id] ?? null} focused={r.id === focusId} showAmounts={showAmounts} canOpenQuotes={canOpenQuotes} />)}
             {filtered.length === 0 ? (
               <tr><td colSpan={9} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen leads met deze filters.</td></tr>
             ) : null}
@@ -266,7 +266,7 @@ export function LeadsBoard({ rows, sources, quotes = {}, focusId = null }: { row
   );
 }
 
-function LeadRowView({ r, today, quote, focused }: { r: LeadRow; today: string; quote: LeadQuoteSummary | null; focused?: boolean }) {
+function LeadRowView({ r, today, quote, focused, showAmounts = true, canOpenQuotes = true }: { r: LeadRow; today: string; quote: LeadQuoteSummary | null; focused?: boolean; showAmounts?: boolean; canOpenQuotes?: boolean }) {
   const [status, setStatusLocal] = useState(r.status as Status);
   const [followUp, setFollowUp] = useState(r.followUpOn ?? "");
   const [pending, start] = useTransition();
@@ -301,7 +301,7 @@ function LeadRowView({ r, today, quote, focused }: { r: LeadRow; today: string; 
           {pending ? <Loader2 className="pointer-events-none absolute right-1.5 size-3 animate-spin opacity-60" /> : null}
         </div>
       </td>
-      <td className="px-2 py-2"><QuoteCell q={quote} /></td>
+      <td className="px-2 py-2"><QuoteCell q={quote} showAmount={showAmounts} linkable={canOpenQuotes} /></td>
       <td className="px-2 py-2"><SourceCell id={r.id} source={r.source} /></td>
       <td className="px-2 py-2 text-center">
         {r.leadScore != null ? (
@@ -380,17 +380,27 @@ const shortDate = (d: Date | string | null) => (d ? new Date(d).toLocaleDateStri
 const eur = (n: number) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
 
 /** Gekoppelde offerte uit PandaDoc: status, bedrag, verzonden, bekeken, getekend. */
-function QuoteCell({ q }: { q: LeadQuoteSummary | null }) {
+function QuoteCell({ q, showAmount = true, linkable = true }: { q: LeadQuoteSummary | null; showAmount?: boolean; linkable?: boolean }) {
   if (!q) return <span className="text-xs text-[var(--color-ink-faint)]">–</span>;
   const meta = QUOTE_META[q.status] ?? QUOTE_META.concept!;
   const detail = q.signedAt ? `getekend ${shortDate(q.signedAt)}` : q.firstOpenedAt ? `bekeken ${shortDate(q.firstOpenedAt)} · ${q.openCount}×` : q.sentAt ? `verzonden ${shortDate(q.sentAt)} · niet geopend` : null;
   return (
-    <Link href={`/offertes/${q.id}`} className="group block min-w-[150px]" title="Offerte openen">
+    linkable ? (
+      <Link href={`/offertes/${q.id}`} className="group block min-w-[150px]" title="Offerte openen">
       <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: meta.color }}>
         <span className="size-1.5 rounded-full" style={{ background: meta.color }} />{meta.label}
-        {q.amount != null ? <span className="font-medium text-[var(--color-ink)] tabular-nums">· {eur(q.amount)}</span> : null}
+        {showAmount && q.amount != null ? <span className="font-medium text-[var(--color-ink)] tabular-nums">· {eur(q.amount)}</span> : null}
       </span>
       {detail ? <span className="block text-2xs text-[var(--color-ink-faint)] group-hover:underline">{detail}{q.count > 1 ? ` · ${q.count} offertes` : ""}</span> : null}
     </Link>
+    ) : (
+      <div className="block min-w-[150px]">
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: meta.color }}>
+        <span className="size-1.5 rounded-full" style={{ background: meta.color }} />{meta.label}
+        {showAmount && q.amount != null ? <span className="font-medium text-[var(--color-ink)] tabular-nums">· {eur(q.amount)}</span> : null}
+      </span>
+      {detail ? <span className="block text-2xs text-[var(--color-ink-faint)] group-hover:underline">{detail}{q.count > 1 ? ` · ${q.count} offertes` : ""}</span> : null}
+    </div>
+    )
   );
 }

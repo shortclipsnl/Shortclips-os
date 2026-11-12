@@ -3,7 +3,7 @@ import { notInactiveClient } from "@/server/client-activity";
 import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientReports, clients } from "@/db/schema";
-import { addWorkingDays, snapToWorkingDay } from "@/lib/workdays";
+import { laatsteWerkdag, maandCompleetVanaf, nthWorkday } from "@/lib/maandcontrole";
 import { nlHolidaySet } from "@/lib/holidays";
 import { ensureMonthlyReport } from "@/server/reports/run";
 import { syncReportBatches } from "@/server/reports/batch";
@@ -24,29 +24,18 @@ function amsterdamToday(): string {
 
 function firstWorkday(): string {
   const period = currentMonthPeriod();
-  return snapToWorkingDay(`${period}-01`, nlHolidaySet([Number(period.slice(0, 4))]));
+  return nthWorkday(period, 1, nlHolidaySet([Number(period.slice(0, 4))]));
 }
 
-/** De eerste ~3 werkdagen van de huidige maand (voor de 1e-werkdag-planning + herkansing). */
+/** De eerste 3 werkdagen van de huidige maand (vangnet voor ontbrekende rapporten van de vorige maand). */
 function isWithinMonthStart(today: string): boolean {
   const period = currentMonthPeriod();
   const holidays = nlHolidaySet([Number(period.slice(0, 4))]);
-  const first = snapToWorkingDay(`${period}-01`, holidays);
-  return [0, 1, 2].some((n) => addWorkingDays(first, n, holidays) === today);
+  return [1, 2, 3].some((n) => nthWorkday(period, n, holidays) === today);
 }
 
-/**
- * Maandelijkse automatische rapportage: op de eerste werkdag van de maand (met
- * een paar dagen herkansing) wordt voor de VORIGE kalendermaand per actieve klant
- * een rapport klaargezet. Idempotent: klanten met een reeds opgesteld rapport
- * worden overgeslagen. Eén storing blokkeert de rest niet.
- */
-export async function runMonthlyReports(): Promise<{ eligible: boolean; period: string; scanned: number; started: number; failed: number; bijgewerkt: number }> {
-  const today = amsterdamToday();
-  const period = previousMonthPeriod(currentMonthPeriod());
-  const bijgewerkt = await requeueOutdatedReports(period);
-  if (!isWithinMonthStart(today)) return { eligible: false, period, scanned: 0, started: 0, failed: 0, bijgewerkt };
-
+/** Zet voor elke actieve klant zonder rapport een rapport voor `period` in de wachtrij. */
+async function queueMissing(period: string, retryFailed: boolean): Promise<{ scanned: number; started: number }> {
   const active = await db
     .select({ id: clients.id })
     .from(clients)
@@ -57,7 +46,6 @@ export async function runMonthlyReports(): Promise<{ eligible: boolean; period: 
   // reports.process_queue. Zo kan één lange run nooit halverwege worden
   // afgebroken (wat eerder rapporten op 'analyse bezig' liet hangen).
   let started = 0;
-  const failed = 0;
   for (const c of active) {
     if (started >= MAX_PER_RUN * 10) break;
     const [existing] = await db
@@ -68,14 +56,74 @@ export async function runMonthlyReports(): Promise<{ eligible: boolean; period: 
     if (!existing) {
       await db.insert(clientReports).values({ clientId: c.id, periodType: "month", period, title: `Maandrapport ${periodLabel(period)}`, status: "gegevens_verzamelen" }).onConflictDoNothing();
       started++;
-    } else if (existing.status === "mislukt" && today === firstWorkday()) {
-      // Mislukt (bv. nog geen cijfers): op de eerste werkdag één keer opnieuw.
+    } else if (existing.status === "mislukt" && retryFailed) {
       await db.update(clientReports).set({ status: "gegevens_verzamelen", errorMessage: null, updatedAt: new Date() }).where(eq(clientReports.id, existing.id));
       started++;
     }
   }
+  return { scanned: active.length, started };
+}
 
-  return { eligible: true, period, scanned: active.length, started, failed, bijgewerkt };
+/**
+ * Rapporten met voorlopige cijfers (gegenereerd vóór de 1e van de volgende
+ * maand) opnieuw in de wachtrij zetten zodra de maand compleet is, zodat de
+ * definitieve maandresultaten er staan vóór goedkeuring. De beoordeling,
+ * feedback en eerdere versies blijven bewaard; goedgekeurde rapporten blijven
+ * ongemoeid (die kunnen nooit voorlopig zijn).
+ */
+export async function requeueVoorlopigeReports(period: string): Promise<number> {
+  const grens = maandCompleetVanaf(period);
+  const rows = await db
+    .update(clientReports)
+    .set({ status: "gegevens_verzamelen", errorMessage: null, updatedAt: new Date() })
+    .where(and(
+      eq(clientReports.periodType, "month"),
+      eq(clientReports.period, period),
+      isNull(clientReports.deletedAt),
+      inArray(clientReports.status, ["klaar_voor_controle", "aanpassing_nodig"]),
+      or(isNull(clientReports.generatedAt), sql`(${clientReports.generatedAt} at time zone 'Europe/Amsterdam')::date < ${grens}::date`),
+      notInactiveClient(clientReports.clientId),
+    ))
+    .returning({ id: clientReports.id });
+  return rows.length;
+}
+
+/**
+ * Maandelijkse automatische rapportage.
+ *  - Op de laatste werkdag van de maand (controledag) wordt voor de LOPENDE
+ *    maand per actieve klant een rapport met voorlopige cijfers klaargezet, zodat
+ *    het team kan voorbereiden en controleren.
+ *  - Zodra de maand voorbij is worden die rapporten ververst met de complete
+ *    maandcijfers (definitief); ontbrekende rapporten van de vorige maand worden
+ *    in de eerste werkdagen alsnog gemaakt.
+ * Idempotent: klanten met een reeds opgesteld rapport worden overgeslagen.
+ */
+export async function runMonthlyReports(): Promise<{ eligible: boolean; period: string; scanned: number; started: number; failed: number; bijgewerkt: number }> {
+  const today = amsterdamToday();
+  const huidig = currentMonthPeriod();
+  const vorige = previousMonthPeriod(huidig);
+  const holidays = nlHolidaySet([Number(huidig.slice(0, 4))]);
+
+  // Vorige maand: verouderd analyseformaat en voorlopige cijfers verversen.
+  const bijgewerkt = (await requeueOutdatedReports(vorige)) + (await requeueVoorlopigeReports(vorige));
+
+  let scanned = 0;
+  let started = 0;
+  let eligible = false;
+  if (isWithinMonthStart(today)) {
+    eligible = true;
+    const r = await queueMissing(vorige, today === firstWorkday());
+    scanned += r.scanned; started += r.started;
+  }
+  // Lopende maand: vanaf de laatste werkdag voorlopige rapporten klaarzetten.
+  let period = vorige;
+  if (today >= laatsteWerkdag(huidig, holidays)) {
+    eligible = true;
+    period = huidig;
+    const r = await queueMissing(huidig, false);
+    scanned += r.scanned; started += r.started;
+  }
+  return { eligible, period, scanned, started, failed: 0, bijgewerkt };
 }
 
 /**

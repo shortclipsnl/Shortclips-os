@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { isOwner } from "@/server/auth/context";
 import { aiConfigured } from "@/server/ai/client";
-import { currentMonthPeriod, previousMonthPeriod } from "@/server/reports/analysis";
+import { currentMonthPeriod } from "@/server/reports/analysis";
+import { actueleRapportMaand, laatsteWerkdag, maandCompleet, maandCompleetVanaf } from "@/lib/maandcontrole";
+import { nlHolidaySet } from "@/lib/holidays";
 import { listMonthlyReports, requireReportsAccess } from "@/server/reports/service";
 import { PageHeader } from "@/components/ui";
 import { ReportList } from "./report-list";
@@ -17,7 +19,17 @@ export default async function MaandrapportagesPage({ searchParams }: { searchPar
   const overview = await listMonthlyReports(viewer);
   const canWrite = viewer.permissions.has("reports:write");
   const huidigeMaand = currentMonthPeriod();
-  const vorigeMaand = previousMonthPeriod(huidigeMaand);
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  const jaar = Number(today.slice(0, 4));
+  const holidays = nlHolidaySet([jaar - 1, jaar, jaar + 1]);
+  // Bovenaan staat altijd de actuele maand: vanaf de laatste werkdag de lopende
+  // maand, daarvoor de vorige (waarvan controle en goedkeuring nog lopen).
+  const actueleMaand = actueleRapportMaand(today, holidays);
+  const planning = {
+    controleDag: laatsteWerkdag(actueleMaand, holidays),
+    definitiefVanaf: maandCompleetVanaf(actueleMaand),
+    compleet: maandCompleet(actueleMaand, today),
+  };
 
   return (
     <div className="mx-auto max-w-[1400px]">
@@ -25,7 +37,7 @@ export default async function MaandrapportagesPage({ searchParams }: { searchPar
         title="Maandrapportages"
         description={overview.teamOnly
           ? "De goedgekeurde maandrapportages van onze klanten. Open de interne versie, neem de inzichten door en pak de acties op."
-          : "Per klant per maand een interne versie en een klantversie. Genereren, controleren, goedkeuren en publiceren doe je hier, direct vanuit de tabel."}
+          : "Per klant per maand een interne versie en een klantversie. Controleren, goedkeuren en versturen doe je hier, direct vanuit de tabel."}
       />
       <ReportList
         overview={overview}
@@ -33,8 +45,10 @@ export default async function MaandrapportagesPage({ searchParams }: { searchPar
         canWrite={canWrite}
         owner={isOwner(viewer)}
         aiReady={aiConfigured()}
-        vorigeMaand={vorigeMaand}
+        actueleMaand={actueleMaand}
         huidigeMaand={huidigeMaand}
+        huidigOpen={today >= laatsteWerkdag(huidigeMaand, holidays)}
+        planning={planning}
         initial={{ maand: one("maand"), status: one("status"), weergave: one("weergave"), klantstatus: one("klantstatus"), klant: one("klant"), zoek: one("zoek") }}
       />
     </div>

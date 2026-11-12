@@ -1,14 +1,17 @@
 import "server-only";
-import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
+  calendarEvents,
   clientContacts,
   clientIntegrations,
+  clientKnowledge,
   clientOnboardings,
   clients,
   contracts,
   driveMappings,
   productionDays,
+  quotes,
   salesLeads,
   tasks,
   users,
@@ -22,8 +25,16 @@ import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
 import { isInactiveClientStatus } from "@/lib/client-status";
 import {
+  BRIEFING_FIELDS,
+  BRIEFING_SOURCE,
   buildWelcomeMessage,
+  canDisableStep,
   computeSteps,
+  FIRST_SHOOTS_REQUIRED,
+  isKickoffTitle,
+  isWhatsappGroupLink,
+  LATE_SIGNALS,
+  whatsappGroupName,
   DRIVE_SUBFOLDERS,
   driveFolderName,
   isSimilarCompany,
@@ -35,6 +46,7 @@ import {
   planFollowups,
   withRetry,
   type FollowupPlan,
+  type PhaseView,
   type OnboardingFacts,
 } from "@/lib/onboarding-plan";
 
@@ -107,7 +119,42 @@ export type ConvertForm = {
   similarClients: { id: string; slug: string; name: string; status: string }[];
   pms: PmOption[];
   defaultPmId: string | null;
+  /** Interne teamleden om te betrekken (videograaf, andere projectmanager). */
+  team: PmOption[];
+  /** Gekoppelde offerte uit PandaDoc (laatste), zonder bedrag. */
+  quote: { status: string; title: string; signedAt: string | null } | null;
+  /** Alleen de eigenaar ziet bedragen (wordt in de action gezet). */
+  canSeeAmounts?: boolean;
 };
+
+/** Interne teamleden die bij een klant betrokken kunnen worden. */
+export async function listTeamOptions(): Promise<PmOption[]> {
+  const rows = await db
+    .select({ id: users.id, name: users.fullName, email: users.email, role: users.primaryRole })
+    .from(users)
+    .where(and(isNull(users.deletedAt), eq(users.status, "active"), inArray(users.primaryRole, ["owner", "admin", "project_coordinator", "content_creator", "videographer", "operational_manager"])));
+  return rows
+    .filter((r) => /@shortclips\.nl$/i.test(r.email))
+    .map(({ id, name, email }) => ({ id, name, email }))
+    .sort((a, b) => a.name.localeCompare(b.name, "nl"));
+}
+
+const SIGNED = ["ondertekend", "geaccepteerd"];
+const LIVE_QUOTE = ["concept", "verzonden", "bekeken"];
+
+/** Beste offertestatus voor een lead: getekend wint, anders de laatste lopende. */
+async function quoteForLead(leadId: string | null) {
+  if (!leadId) return null;
+  const rows = await db
+    .select({ status: quotes.status, title: quotes.title, acceptedAt: quotes.acceptedAt, updatedAt: quotes.updatedAt })
+    .from(quotes)
+    .where(eq(quotes.leadId, leadId))
+    .orderBy(desc(quotes.updatedAt));
+  const signed = rows.find((r) => SIGNED.includes(r.status));
+  const pick = signed ?? rows.find((r) => LIVE_QUOTE.includes(r.status)) ?? rows[0];
+  if (!pick) return null;
+  return { status: pick.status as string, title: pick.title, signedAt: signed?.acceptedAt ? signed.acceptedAt.toISOString() : null };
+}
 
 export async function getConvertForm(leadId: string): Promise<ConvertForm | null> {
   const [lead] = await db.select().from(salesLeads).where(eq(salesLeads.id, leadId)).limit(1);
@@ -128,7 +175,12 @@ export async function getConvertForm(leadId: string): Promise<ConvertForm | null
   const pms = await listProjectManagers();
   const milou = pms.find((p) => p.email.toLowerCase() === "milou@shortclips.nl");
 
+  const team = await listTeamOptions();
+  const quote = await quoteForLead(lead.id);
+
   return {
+    team,
+    quote,
     lead: {
       id: lead.id,
       company: lead.company,
@@ -171,6 +223,8 @@ export type ConvertInput = {
   confirmSimilar: boolean;
   /** Koppel aan deze bestaande klant in plaats van een nieuwe aan te maken. */
   linkToClientId?: string | null;
+  /** Betrokken teamleden (user-id's) naast de projectmanager. */
+  team?: string[];
 };
 
 export type ConvertResult =
@@ -216,9 +270,10 @@ export async function convertLead(viewer: { id: string; email: string }, input: 
     contractMonths: input.contractMonths,
     publisher: input.publisher,
     notes: input.notes?.trim() || null,
+    team: (input.team ?? []).filter((id) => id !== input.coordinatorId).slice(0, 12),
   };
   const welcomeFile = WELCOME_FILES[input.contentFocus];
-  const welcomeMessage = buildWelcomeMessage({ contactName: input.contactName, pmName: pm.name });
+  const welcomeMessage = buildWelcomeMessage({ contactName: input.contactName, pmName: pm.name, publisher: input.publisher });
   const startLog: OnboardingLogEntry = { at: nowIso(), step: "client_created", event: "gestart", detail: `Omgezet door ${viewer.email}`, actor: viewer.email };
 
   const result = await db.transaction(async (tx) => {
@@ -447,19 +502,28 @@ export async function runTaskStep(clientId: string): Promise<{ created: number }
   const href = `/clients/${client.slug}?tab=onboarding`;
   const contactLine = contact?.name && !/aanvullen/i.test(contact.name) ? contact.name : "contactpersoon";
 
+  const team = row.details?.team?.length
+    ? await db.select({ name: users.fullName }).from(users).where(inArray(users.id, row.details.team))
+    : [];
+  const groupMembers = [pm?.name ?? "projectmanager", ...team.map((t) => t.name), contactLine].join(", ");
+
   const descriptions: Record<string, string> = {
     whatsapp: [
-      `Groepsnaam: Shortclips x ${client.name}`,
+      `Groepsnaam: ${whatsappGroupName(client.name)}`,
       `Contactpersoon: ${contactLine}${contact?.phone ? `, ${contact.phone}` : " (telefoonnummer ontbreekt nog, vul aan bij Contactpersoon)"}`,
-      `In de groep: ${pm?.name ?? "projectmanager"} en ${contactLine}`,
-      "Eerste bericht: het welkomstconcept op het tabblad Onboarding van de klant.",
-      welcome ? `Welkomstbestand: ${welcome}` : null,
-      "Maak de groep handmatig aan in WhatsApp Business.",
-    ].filter(Boolean).join("\n"),
-    welkomstbericht: "Het concept staat op het tabblad Onboarding van de klant. Controleer, pas aan waar nodig en verstuur het zelf.",
-    welkomstbestand: welcome ? `Deel het welkomstbestand: ${welcome}` : "Deel het welkomstbestand met de klant.",
+      `In de groep: ${groupMembers}`,
+      "Maak de groep aan in WhatsApp Business en plak daarna de groepslink op het tabblad Onboarding. Dan gaat deze taak vanzelf op klaar.",
+    ].join("\n"),
+    frame: `Maak in Frame.io een project aan met precies de naam "${client.name}". De Hub koppelt het binnen twee uur vanzelf, of klik op "Nu zoeken" op het tabblad Onboarding.`,
+    welkomstbericht: [
+      "Het concept staat op het tabblad Onboarding van de klant. Controleer, pas aan waar nodig en verstuur het zelf in de WhatsApp groep.",
+      welcome ? `Stuur het welkomstbestand mee: ${welcome}` : "Stuur het welkomstbestand mee.",
+      "Klik daarna op \"Verstuurd\" op het tabblad Onboarding.",
+    ].join("\n"),
     portaal: `Controleer het e-mailadres${contact?.email ? ` (${contact.email})` : ""} en maak de login aan via Beheer van deze klant.`,
-    opnamedag: "Plan de kennismaking of eerste opnamedag. Staat de opname in Google Agenda, dan gaat deze taak vanzelf op klaar.",
+    kickoff: `Plan de kickoff (ca. 45 minuten) in de agenda Team Shortclips met "Kickoff" en de klantnaam in de titel, bijvoorbeeld "Kickoff | ${client.name}". De Hub herkent het event en zet de stap vanzelf op klaar.`,
+    briefing: "Vul tijdens of direct na de kickoff de klantbriefing in op het tabblad Onboarding. Die komt in het klantgeheugen, zodat de Scriptgenerator en Content Research hem gebruiken.",
+    opnamedag: `Leg in de kickoff de eerste ${FIRST_SHOOTS_REQUIRED} opnamedagen vast. Staan ze in Google Agenda, dan gaat deze taak vanzelf op klaar.`,
   };
 
   let created = 0;
@@ -577,55 +641,120 @@ async function taskDone(clientId: string, key: string): Promise<boolean> {
   return t?.status === "done";
 }
 
+function fmtKickoff(d: Date): string {
+  return d.toLocaleString("nl-NL", { timeZone: "Europe/Amsterdam", weekday: "short", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+}
+
+/** Kickoff in de agenda (event met "kickoff" in de titel, gekoppeld aan de klant). */
+async function kickoffEvent(clientId: string): Promise<Date | null> {
+  const rows = await db
+    .select({ title: calendarEvents.title, startsAt: calendarEvents.startsAt })
+    .from(calendarEvents)
+    .where(and(eq(calendarEvents.clientId, clientId), or(isNull(calendarEvents.status), ne(calendarEvents.status, "cancelled"))))
+    .orderBy(asc(calendarEvents.startsAt));
+  const hit = rows.find((r) => isKickoffTitle(r.title));
+  return hit?.startsAt ?? null;
+}
+
+/** Briefing uit het klantgeheugen: alleen regels die via de onboarding zijn ingevuld. */
+export async function getBriefing(clientId: string): Promise<Record<string, string>> {
+  const rows = await db
+    .select({ category: clientKnowledge.category, body: clientKnowledge.body })
+    .from(clientKnowledge)
+    .where(and(eq(clientKnowledge.clientId, clientId), eq(clientKnowledge.source, BRIEFING_SOURCE), isNull(clientKnowledge.deletedAt)));
+  const out: Record<string, string> = {};
+  for (const f of BRIEFING_FIELDS) {
+    const hit = rows.find((r) => r.category === f.category);
+    if (hit?.body.trim()) out[f.key] = hit.body;
+  }
+  return out;
+}
+
 async function collectFacts(clientId: string) {
   const row = await getOnb(clientId);
   if (!row) return null;
   const [client] = await db.select({ coordinatorId: clients.coordinatorId }).from(clients).where(eq(clients.id, clientId)).limit(1);
   const [contact] = await db
-    .select({ phone: clientContacts.phone })
+    .select({ name: clientContacts.fullName, email: clientContacts.email, phone: clientContacts.phone })
     .from(clientContacts)
     .where(and(eq(clientContacts.clientId, clientId), isNull(clientContacts.deletedAt)))
     .orderBy(desc(clientContacts.isPrimary))
     .limit(1);
-  const [login] = await db
-    .select({ id: users.id })
+  const logins = await db
+    .select({ id: users.id, lastLoginAt: users.lastLoginAt })
     .from(users)
-    .where(and(eq(users.clientId, clientId), eq(users.primaryRole, "client"), isNull(users.deletedAt)))
-    .limit(1);
-  const [shoot] = await db
-    .select({ id: productionDays.id })
+    .where(and(eq(users.clientId, clientId), eq(users.primaryRole, "client"), isNull(users.deletedAt)));
+  const shootRows = await db
+    .select({ on: productionDays.scheduledOn })
     .from(productionDays)
-    .where(and(eq(productionDays.clientId, clientId), ne(productionDays.status, "cancelled")))
+    .where(and(eq(productionDays.clientId, clientId), ne(productionDays.status, "cancelled")));
+  const [frame] = await db
+    .select({ id: clientIntegrations.id, externalId: clientIntegrations.externalId, name: clientIntegrations.externalName })
+    .from(clientIntegrations)
+    .where(and(eq(clientIntegrations.clientId, clientId), eq(clientIntegrations.provider, "frameio")))
     .limit(1);
   const mapped = await clientDriveMapping(clientId);
+  const quote = await quoteForLead(row.leadId);
+  const kick = await kickoffEvent(clientId);
+  const briefing = await getBriefing(clientId);
+  const d = row.details ?? ({} as OnboardingDetails);
+
+  const missing: string[] = [];
+  if (!contact?.name?.trim() || /aanvullen/i.test(contact.name)) missing.push("naam contactpersoon");
+  if (!contact?.email?.trim()) missing.push("e-mailadres");
+  if (!contact?.phone?.trim()) missing.push("telefoonnummer");
+
   const ds = row.steps?.drive;
+  const whatsappTask = await taskDone(clientId, "whatsapp");
   const facts: OnboardingFacts = {
+    contract: quote && SIGNED.includes(quote.status) ? "ondertekend" : quote && LIVE_QUOTE.includes(quote.status) ? "open" : "geen",
+    contractManual: Boolean(d.confirmed?.contract),
+    missingClientData: missing,
+    hasCoordinator: Boolean(client?.coordinatorId),
+    hasPortalLogin: logins.length > 0,
     driveStatus: mapped ? "klaar" : ds?.status === "mislukt" ? "mislukt" : ds?.status === "bezig" ? "bezig" : "open",
     driveError: ds?.error ?? null,
-    hasCoordinator: Boolean(client?.coordinatorId),
-    hasWelcomeFile: Boolean(row.welcomeFileId),
+    frameLinked: Boolean(frame),
+    frameManual: Boolean(d.confirmed?.frame),
+    tasksCreated: row.steps?.tasks?.status === "klaar",
     hasWelcomeMessage: Boolean(row.welcomeMessage?.trim()),
-    hasPortalLogin: Boolean(login),
-    whatsappDone: await taskDone(clientId, "whatsapp"),
+    hasWelcomeFile: Boolean(row.welcomeFileId),
+    whatsappDone: Boolean(d.whatsappLink) || whatsappTask,
     hasPhone: Boolean(contact?.phone?.trim()),
-    hasShoot: Boolean(shoot),
-    shootTaskDone: await taskDone(clientId, "opnamedag"),
+    welcomeSent: await taskDone(clientId, "welkomstbericht"),
+    portalUsed: logins.some((l) => l.lastLoginAt),
+    kickoff: kick
+      ? { at: fmtKickoff(kick), source: "agenda" }
+      : d.kickoffManual?.at
+        ? { at: fmtKickoff(new Date(d.kickoffManual.at)), source: "handmatig" }
+        : { at: null, source: null },
+    briefingMissing: BRIEFING_FIELDS.filter((f) => f.required && !briefing[f.key]).map((f) => f.title.toLowerCase()),
+    briefingTouched: Object.keys(briefing).length > 0,
+    shoots: new Set(shootRows.map((r) => String(r.on))).size,
+    disabled: d.disabledSteps ?? [],
   };
-  return { row, facts };
+  return { row, facts, extra: { frame: frame ?? null, contact: contact ?? null, briefing, quote, kickoffAt: kick } };
 }
 
 /**
- * Voortgang bijwerken: opname in de agenda → opnamedag-taak afronden; portaal-
- * login aangemaakt → portaaltaak afronden; alles klaar → onboarding afgerond.
+ * Voortgang bijwerken: wat in de Hub of de agenda al gebeurd is, rondt de
+ * bijbehorende taak af (één bron, niet dubbel afvinken). Alle verplichte
+ * stappen klaar → onboarding afgerond.
  */
 export async function refreshOnboarding(clientId: string) {
   const got = await collectFacts(clientId);
   if (!got) return null;
   const { row, facts } = got;
+  const briefingDone = facts.briefingMissing.length === 0;
 
   const autoClose: { key: string; when: boolean; reason: string }[] = [
-    { key: "opnamedag", when: facts.hasShoot, reason: "Opname staat in de agenda" },
+    { key: "whatsapp", when: facts.whatsappDone, reason: "WhatsApp groep bevestigd" },
+    { key: "frame", when: facts.frameLinked || Boolean(facts.frameManual), reason: "Frame.io project gekoppeld" },
+    { key: "welkomstbestand", when: facts.welcomeSent, reason: "Welkomstbericht en -bestand verstuurd" },
     { key: "portaal", when: facts.hasPortalLogin, reason: "Portaallogin is aangemaakt" },
+    { key: "kickoff", when: Boolean(facts.kickoff.at), reason: facts.kickoff.source === "agenda" ? "Kickoff staat in de agenda" : "Kickoff handmatig vastgelegd" },
+    { key: "briefing", when: briefingDone, reason: "Briefing staat in het klantgeheugen" },
+    { key: "opnamedag", when: facts.shoots >= FIRST_SHOOTS_REQUIRED, reason: `${FIRST_SHOOTS_REQUIRED} opnamedagen staan in de agenda` },
   ];
   const log = [...(row.log ?? [])];
   let changed = false;
@@ -641,57 +770,105 @@ export async function refreshOnboarding(clientId: string) {
       changed = true;
     }
   }
-  if (facts.hasShoot) facts.shootTaskDone = true;
 
   const view = computeSteps(facts);
   if (view.complete && !row.completedAt) {
-    log.push({ at: nowIso(), step: "done", event: "klaar", detail: "Onboarding afgerond", actor: "systeem" });
+    log.push({ at: nowIso(), step: "done", event: "klaar", detail: "Onboarding afgerond: alle verplichte stappen zijn klaar", actor: "systeem" });
     await db.update(clientOnboardings).set({ completedAt: new Date(), log: log.slice(-60), updatedAt: new Date() }).where(eq(clientOnboardings.id, row.id));
+    await notifyCompleted(clientId).catch(() => undefined);
   } else if (changed) {
     await db.update(clientOnboardings).set({ log: log.slice(-60), updatedAt: new Date() }).where(eq(clientOnboardings.id, row.id));
   }
   return view;
 }
 
+async function notifyCompleted(clientId: string) {
+  const [client] = await db.select({ name: clients.name, slug: clients.slug, coordinatorId: clients.coordinatorId }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  if (!client?.coordinatorId) return;
+  await notify({
+    userIds: [client.coordinatorId],
+    clientId,
+    type: "onboarding_completed",
+    level: "info",
+    title: `Onboarding ${client.name} afgerond`,
+    body: "Alle verplichte stappen zijn klaar. De klant is klaar voor de samenwerking.",
+    href: `/clients/${client.slug}?tab=onboarding`,
+    dedupeKey: `onboarding_completed:${clientId}`,
+    allowInactiveClient: true,
+  });
+}
+
 export type OnboardingView = {
   clientId: string;
+  clientName: string;
   startedAt: string;
   completedAt: string | null;
   startedBy: string | null;
+  pmName: string | null;
+  teamNames: string[];
   details: OnboardingDetails;
   welcomeMessage: string | null;
   welcomeFile: { id: string; name: string; url: string } | null;
   driveUrl: string | null;
+  frame: { name: string | null } | null;
+  whatsapp: { groupName: string; link: string | null; members: string[]; phone: string | null };
+  kickoff: { at: string | null; source: "agenda" | "handmatig" | null };
+  briefing: Record<string, string>;
+  shoots: number;
   steps: ReturnType<typeof computeSteps>["steps"];
+  phases: PhaseView[];
+  requiredOpen: { key: string; label: string }[];
   done: number;
   total: number;
   needsAction: boolean;
+  disableable: string[];
   log: OnboardingLogEntry[];
   followups: FollowupView[];
 };
 
-export async function getOnboardingView(clientId: string): Promise<OnboardingView | null> {
+export async function getOnboardingView(clientId: string, viewer?: { isOwner: boolean }): Promise<OnboardingView | null> {
   await refreshOnboarding(clientId).catch(() => undefined);
   const got = await collectFacts(clientId);
   if (!got) return null;
-  const { row, facts } = got;
+  const { row, facts, extra } = got;
   const v = computeSteps(facts);
   const mapped = await clientDriveMapping(clientId);
+  const [client] = await db.select({ name: clients.name, coordinatorId: clients.coordinatorId }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  const [pm] = client?.coordinatorId ? await db.select({ name: users.fullName }).from(users).where(eq(users.id, client.coordinatorId)).limit(1) : [];
+  const team = row.details?.team?.length ? await db.select({ name: users.fullName }).from(users).where(inArray(users.id, row.details.team)) : [];
   const [by] = row.startedById ? await db.select({ name: users.fullName }).from(users).where(eq(users.id, row.startedById)).limit(1) : [];
   const wf = Object.values(WELCOME_FILES).find((w) => w.id === row.welcomeFileId);
+  const contactName = extra.contact?.name && !/aanvullen/i.test(extra.contact.name) ? extra.contact.name : null;
+  const isOwner = viewer?.isOwner ?? false;
   return {
     clientId,
+    clientName: client?.name ?? "",
     startedAt: row.createdAt.toISOString(),
     completedAt: row.completedAt?.toISOString() ?? null,
     startedBy: by?.name ?? null,
+    pmName: pm?.name ?? null,
+    teamNames: team.map((t) => t.name),
     details: row.details,
     welcomeMessage: row.welcomeMessage,
     welcomeFile: row.welcomeFileId ? { id: row.welcomeFileId, name: wf?.name ?? "Welkomstbestand", url: `https://drive.google.com/file/d/${row.welcomeFileId}/view` } : null,
     driveUrl: mapped ? `https://drive.google.com/drive/folders/${mapped.folderId}` : null,
+    frame: extra.frame ? { name: extra.frame.name } : null,
+    whatsapp: {
+      groupName: whatsappGroupName(client?.name ?? ""),
+      link: row.details?.whatsappLink ?? null,
+      members: [pm?.name, ...team.map((t) => t.name), contactName].filter((x): x is string => Boolean(x)),
+      phone: extra.contact?.phone ?? null,
+    },
+    kickoff: facts.kickoff,
+    briefing: extra.briefing,
+    shoots: facts.shoots,
     steps: v.steps,
+    phases: v.phases,
+    requiredOpen: v.requiredOpen.map((x) => ({ key: x.key, label: x.label })),
     done: v.done,
     total: v.total,
     needsAction: v.needsAction,
+    disableable: v.steps.filter((x) => x.key !== "done" && canDisableStep(x.key, isOwner)).map((x) => x.key),
     log: [...(row.log ?? [])].reverse().slice(0, 12),
     followups: await getFollowupsView(clientId).catch(() => []),
   };
@@ -706,18 +883,144 @@ export async function saveWelcomeMessage(clientId: string, text: string) {
   await db.update(clientOnboardings).set({ welcomeMessage: text.slice(0, 4000), updatedAt: new Date() }).where(eq(clientOnboardings.clientId, clientId));
 }
 
+/* ------------------------------------------------------------------ *
+ * Acties vanaf het tabblad Onboarding
+ * ------------------------------------------------------------------ */
+
+async function patchDetails(clientId: string, patch: Partial<OnboardingDetails>, log?: Omit<OnboardingLogEntry, "at">) {
+  const row = await getOnb(clientId);
+  if (!row) return false;
+  const details = { ...(row.details ?? {}), ...patch } as OnboardingDetails;
+  const entries = log ? [...(row.log ?? []), { at: nowIso(), ...log }].slice(-60) : row.log;
+  await db.update(clientOnboardings).set({ details, log: entries, updatedAt: new Date() }).where(eq(clientOnboardings.id, row.id));
+  return true;
+}
+
+export async function saveWhatsappLink(clientId: string, link: string, actor: string): Promise<{ ok: boolean; message?: string }> {
+  const clean = link.trim();
+  if (!isWhatsappGroupLink(clean)) return { ok: false, message: "Plak de groepslink uit WhatsApp (begint met https://chat.whatsapp.com/)." };
+  await patchDetails(clientId, { whatsappLink: clean }, { step: "whatsapp", event: "klaar", detail: `WhatsApp groep bevestigd door ${actor}`, actor });
+  await refreshOnboarding(clientId);
+  return { ok: true };
+}
+
+/** "Verstuurd": rondt de taken voor welkomstbericht en -bestand af. */
+export async function markWelcomeSent(clientId: string, actor: string) {
+  for (const key of ["welkomstbericht", "welkomstbestand"]) {
+    await db
+      .update(tasks)
+      .set({ status: "done", completedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(tasks.dedupeKey, onboardingTaskDedupe(clientId, key)), ne(tasks.status, "done"), isNull(tasks.deletedAt)));
+  }
+  // Oudere onboardings zonder taak: alsnog een afgeronde taak vastleggen, zodat de stap klaar is.
+  const [exists] = await db.select({ id: tasks.id }).from(tasks).where(eq(tasks.dedupeKey, onboardingTaskDedupe(clientId, "welkomstbericht"))).limit(1);
+  if (!exists) {
+    const row = await getOnb(clientId);
+    const [c] = await db.select({ name: clients.name, coordinatorId: clients.coordinatorId }).from(clients).where(eq(clients.id, clientId)).limit(1);
+    if (row && c) {
+      await db
+        .insert(tasks)
+        .values({ clientId, title: `Welkomstbericht en -bestand versturen aan ${c.name}`, status: "done", completedAt: new Date(), category: "klantcontact", assigneeId: c.coordinatorId, entityType: "client_onboarding", entityId: row.id, source: "automation", dedupeKey: onboardingTaskDedupe(clientId, "welkomstbericht") })
+        .onConflictDoNothing();
+    }
+  }
+  const row = await getOnb(clientId);
+  if (row) {
+    await db
+      .update(clientOnboardings)
+      .set({ log: [...(row.log ?? []), { at: nowIso(), step: "welcome_sent", event: "klaar", detail: `Welkomstbericht verstuurd door ${actor}`, actor }].slice(-60), updatedAt: new Date() })
+      .where(eq(clientOnboardings.id, row.id));
+  }
+  await refreshOnboarding(clientId);
+}
+
+export async function confirmStepManually(clientId: string, step: "contract" | "frame", actor: string) {
+  const row = await getOnb(clientId);
+  if (!row) return;
+  const confirmed = { ...(row.details?.confirmed ?? {}), [step]: { by: actor, at: nowIso() } };
+  await patchDetails(clientId, { confirmed }, { step, event: "klaar", detail: `${step === "contract" ? "Contract" : "Frame.io project"} handmatig bevestigd door ${actor}`, actor });
+  await refreshOnboarding(clientId);
+}
+
+export async function setKickoffManual(clientId: string, at: string | null, actor: string): Promise<{ ok: boolean; message?: string }> {
+  if (at && Number.isNaN(new Date(at).getTime())) return { ok: false, message: "Kies een geldige datum en tijd." };
+  await patchDetails(
+    clientId,
+    { kickoffManual: at ? { at: new Date(at).toISOString(), by: actor } : null },
+    { step: "kickoff", event: at ? "klaar" : "gewijzigd", detail: at ? `Kickoff handmatig vastgelegd door ${actor}` : `Handmatige kickoff gewist door ${actor}`, actor },
+  );
+  await refreshOnboarding(clientId);
+  return { ok: true };
+}
+
+export async function setStepDisabled(clientId: string, step: string, disabled: boolean, viewer: { email: string; isOwner: boolean }): Promise<{ ok: boolean; message?: string }> {
+  if (!canDisableStep(step, viewer.isOwner)) return { ok: false, message: "Deze stap is verplicht. Alleen Jarno kan hem uitzetten." };
+  const row = await getOnb(clientId);
+  if (!row) return { ok: false, message: "Onboarding niet gevonden." };
+  const cur = new Set(row.details?.disabledSteps ?? []);
+  if (disabled) cur.add(step);
+  else cur.delete(step);
+  await patchDetails(clientId, { disabledSteps: [...cur] }, { step, event: disabled ? "uitgezet" : "aangezet", detail: `Stap ${disabled ? "uitgezet" : "weer aangezet"} door ${viewer.email}`, actor: viewer.email });
+  await refreshOnboarding(clientId);
+  return { ok: true };
+}
+
+/**
+ * Briefing opslaan in het klantgeheugen. Per veld één regel met bron
+ * "onboarding"; een nieuwe versie vervangt de vorige (geen dubbele regels).
+ */
+export async function saveBriefing(clientId: string, values: Record<string, string>, viewer: { id: string; email: string }) {
+  for (const f of BRIEFING_FIELDS) {
+    const body = (values[f.key] ?? "").trim().slice(0, 4000);
+    const [existing] = await db
+      .select({ id: clientKnowledge.id, body: clientKnowledge.body })
+      .from(clientKnowledge)
+      .where(and(eq(clientKnowledge.clientId, clientId), eq(clientKnowledge.source, BRIEFING_SOURCE), eq(clientKnowledge.category, f.category), isNull(clientKnowledge.deletedAt)))
+      .limit(1);
+    if (existing) {
+      if (!body) await db.update(clientKnowledge).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(clientKnowledge.id, existing.id));
+      else if (body !== existing.body) await db.update(clientKnowledge).set({ body, updatedAt: new Date() }).where(eq(clientKnowledge.id, existing.id));
+    } else if (body) {
+      await db.insert(clientKnowledge).values({ clientId, category: f.category, title: f.title, body, source: BRIEFING_SOURCE, isPinned: f.required, createdById: viewer.id });
+    }
+  }
+  const row = await getOnb(clientId);
+  if (row) {
+    await db
+      .update(clientOnboardings)
+      .set({ log: [...(row.log ?? []), { at: nowIso(), step: "briefing", event: "opgeslagen", detail: `Briefing opgeslagen in het klantgeheugen door ${viewer.email}`, actor: viewer.email }].slice(-60), updatedAt: new Date() })
+      .where(eq(clientOnboardings.id, row.id));
+  }
+  await refreshOnboarding(clientId);
+}
+
+/* ------------------------------------------------------------------ *
+ * Overzicht
+ * ------------------------------------------------------------------ */
+
 /** Overzicht voor de klantenpagina: lopende onboardings plus die van de laatste 14 dagen. */
 export type OnboardingListRow = {
   clientId: string;
   slug: string;
   name: string;
   pm: string | null;
+  pmId: string | null;
   startOn: string | null;
   done: number;
   total: number;
-  status: "Afgerond" | "Actie nodig" | "Bezig";
+  workdays: number;
+  status: "Afgerond" | "Blokkade" | "Actie nodig" | "Bezig";
   next: string | null;
 };
+
+function workdaysSince(from: string, to: string, holidays: Set<string>): number {
+  let n = 0;
+  for (let d = from; d < to && n < 400; ) {
+    d = addWorkingDays(d, 1, holidays);
+    if (d <= to) n++;
+  }
+  return n;
+}
 
 export async function listOnboardings(): Promise<OnboardingListRow[]> {
   const since = new Date(Date.now() - 14 * 86400_000);
@@ -725,10 +1028,12 @@ export async function listOnboardings(): Promise<OnboardingListRow[]> {
     .select({
       clientId: clientOnboardings.clientId,
       completedAt: clientOnboardings.completedAt,
+      createdAt: clientOnboardings.createdAt,
       slug: clients.slug,
       name: clients.name,
       startOn: clients.startedOn,
       pm: users.fullName,
+      pmId: clients.coordinatorId,
     })
     .from(clientOnboardings)
     .innerJoin(clients, eq(clients.id, clientOnboardings.clientId))
@@ -737,37 +1042,81 @@ export async function listOnboardings(): Promise<OnboardingListRow[]> {
     .orderBy(desc(clientOnboardings.createdAt))
     .limit(30);
 
+  const holidays = nlHolidaySet();
+  const today = todayAmsterdam();
   const out: OnboardingListRow[] = [];
   for (const r of rows) {
     const got = await collectFacts(r.clientId);
     if (!got) continue;
     const v = computeSteps(got.facts);
-    const today = todayAmsterdam();
-    const [late] = await db
-      .select({ id: tasks.id })
-      .from(tasks)
-      .where(and(eq(tasks.clientId, r.clientId), eq(tasks.entityType, "client_onboarding"), ne(tasks.status, "done"), isNull(tasks.deletedAt), sql`${tasks.dueOn} < ${today}`))
-      .limit(1);
-    const firstOpen = v.steps.find((s) => s.status !== "klaar");
+    const started = r.createdAt.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+    const wd = workdaysSince(started, today, holidays);
+    const late = LATE_SIGNALS.some((l) => wd > l.afterWorkdays && v.steps.find((x) => x.key === l.step)?.status !== "klaar" && v.steps.find((x) => x.key === l.step)?.status !== "uit");
+    const failed = v.steps.find((x) => x.status === "mislukt");
+    const firstOpen = failed ?? v.requiredOpen[0] ?? v.steps.find((x) => x.status !== "klaar" && x.status !== "uit" && x.key !== "done");
     out.push({
       clientId: r.clientId,
       slug: r.slug,
       name: r.name,
       pm: r.pm,
+      pmId: r.pmId,
       startOn: r.startOn,
       done: v.done,
       total: v.total,
-      status: r.completedAt || v.complete ? "Afgerond" : v.needsAction || late ? "Actie nodig" : "Bezig",
+      workdays: wd,
+      status: r.completedAt || v.complete ? "Afgerond" : failed ? "Blokkade" : late ? "Actie nodig" : "Bezig",
       next: firstOpen ? `${firstOpen.label}${firstOpen.detail ? `: ${firstOpen.detail}` : ""}` : null,
     });
   }
   return out;
 }
 
+/**
+ * Signalen bij vertraging, alleen als het echt blijft liggen. Eén melding per
+ * stap per klant (dedupe), naar de projectmanager; bij de opnamedagen ook naar
+ * Jarno. Verdwijnt vanzelf uit beeld zodra de stap klaar is.
+ */
+async function lateSignals(clientId: string): Promise<number> {
+  const got = await collectFacts(clientId);
+  if (!got) return 0;
+  const v = computeSteps(got.facts);
+  const [client] = await db.select({ name: clients.name, slug: clients.slug, coordinatorId: clients.coordinatorId }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  if (!client) return 0;
+  const started = got.row.createdAt.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  const wd = workdaysSince(started, todayAmsterdam(), nlHolidaySet());
+  const [owner] = await db.select({ id: users.id }).from(users).where(and(sql`lower(${users.email}) = ${OWNER_EMAIL}`, isNull(users.deletedAt))).limit(1);
+  let sent = 0;
+
+  // Zonder projectmanager kan niemand verder: direct naar Jarno.
+  if (!client.coordinatorId && owner) {
+    sent += await notify({
+      userIds: [owner.id], clientId, type: "onboarding_late", level: "warning",
+      title: `Onboarding ${client.name}: nog geen projectmanager`, body: "Kies een projectmanager bij de klant, dan komen de taken bij de juiste persoon.",
+      href: `/clients/${client.slug}?tab=overzicht`, dedupeKey: `onboarding_late:${clientId}:pm`, allowInactiveClient: true,
+    }).then((x) => (x ? 1 : 0));
+  }
+
+  for (const l of LATE_SIGNALS) {
+    const st = v.steps.find((x) => x.key === l.step);
+    if (!st || st.status === "klaar" || st.status === "uit" || wd <= l.afterWorkdays) continue;
+    const ids = [client.coordinatorId, l.escalate ? owner?.id : null].filter((x): x is string => Boolean(x));
+    if (!ids.length) continue;
+    const ok = await notify({
+      userIds: [...new Set(ids)], clientId, type: "onboarding_late", level: "warning",
+      title: `Onboarding ${client.name}: ${l.label.toLowerCase()}`,
+      body: `${wd} werkdagen na de start. ${st.detail ?? ""}`.trim(),
+      href: `/clients/${client.slug}?tab=onboarding`, dedupeKey: `onboarding_late:${clientId}:${l.step}`, allowInactiveClient: true,
+    });
+    if (ok) sent++;
+  }
+  return sent;
+}
+
 /** Elk uur (na de agenda-sync): voortgang van alle lopende onboardings bijwerken. */
-export async function syncOpenOnboardings(): Promise<{ ok: boolean; checked: number; completed: number; followupsCreated: number }> {
+export async function syncOpenOnboardings(): Promise<{ ok: boolean; checked: number; completed: number; followupsCreated: number; signals: number }> {
   const open = await db.select({ clientId: clientOnboardings.clientId }).from(clientOnboardings).where(isNull(clientOnboardings.completedAt));
   let completed = 0;
+  let signals = 0;
   for (const o of open) {
     try {
       // Een eerder mislukte Drive-stap één keer per uur opnieuw proberen (veilig: idempotent).
@@ -775,12 +1124,13 @@ export async function syncOpenOnboardings(): Promise<{ ok: boolean; checked: num
       if (row?.steps?.drive?.status === "mislukt" && (row.steps.drive.attempts ?? 0) < 12) await runDriveStep(o.clientId);
       const v = await refreshOnboarding(o.clientId);
       if (v?.complete) completed++;
+      else signals += await lateSignals(o.clientId);
     } catch (e) {
       console.error("[onboarding.sync]", o.clientId, e);
     }
   }
   const f = await syncAllFollowups().catch(() => ({ created: 0 }));
-  return { ok: true, checked: open.length, completed, followupsCreated: f.created };
+  return { ok: true, checked: open.length, completed, followupsCreated: f.created, signals };
 }
 
 export const PAKKET_LABEL: Record<string, string> = Object.fromEntries(PAKKETTEN.map((p) => [p.value, p.label]));

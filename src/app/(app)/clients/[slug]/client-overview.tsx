@@ -137,7 +137,14 @@ export function ClientOverview({
 
       {/* 4. Documenten */}
       <section className="sc-card flex flex-col gap-3 p-6">
-        <BlockHeader title="Documenten" />
+        <BlockHeader
+          title="Documenten"
+          action={
+            <Link href={`/contentgeheugen?klant=${c.slug}`} className="inline-flex items-center gap-1 rounded-[var(--radius-md)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink)] transition hover:border-[var(--color-ink-faint)]">
+              Contentgeheugen <ArrowUpRight className="size-3.5" strokeWidth={1.8} />
+            </Link>
+          }
+        />
         <div className="grid flex-1 gap-3 sm:grid-cols-2">
           {docSlots.map((s) => (
             <DocTile key={s.kind} slot={s} />

@@ -353,6 +353,25 @@ body {
   --sc-inset: var(--color-surface-sunken);
   --sc-header-bg: color-mix(in srgb, var(--color-surface) 88%, transparent);
 }
+/* Interne pagina's die portaalcomponenten hergebruiken (zoals de videobibliotheek
+   achter de knop "Short video's"): dezelfde hulp-tokens, maar de kleuren volgen
+   het interne thema (licht of donker). */
+.sc-lib {
+  --sc-accent: var(--color-brand-700);
+  --sc-line: var(--color-line);
+  --sc-fill: var(--color-surface-sunken);
+  --sc-fill-strong: var(--color-surface-2);
+  --st-green: #17784c;
+  --st-green-bg: #e3f4ec;
+  --st-orange: #b4470b;
+  --st-orange-bg: #fdeedd;
+  --st-blue: #1b55c9;
+  --st-blue-bg: #e6eefc;
+  --st-red: #b42318;
+  --st-red-bg: #fdeceb;
+  --st-grey: #5b5b74;
+  --st-grey-bg: #efeee9;
+}
 /* Portaalkaarten = interne kaarten: surface + lijn + subtiele schaduw. */
 .portal-studio .sc-glass {
   background: var(--color-surface);

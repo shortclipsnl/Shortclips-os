@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   BarChart3,
+  BrainCircuit,
   CalendarDays,
   CalendarRange,
   FileBarChart,
@@ -18,6 +19,8 @@ import {
   X,
 } from "lucide-react";
 
+import { PORTAL_CONTENTGEHEUGEN_LIVE } from "@/lib/feature-flags";
+
 const ITEMS = [
   { href: "/portal", label: "Overzicht", short: "Overzicht", icon: LayoutDashboard },
   { href: "/portal/videos", label: "Video's", short: "Video's", icon: Video },
@@ -26,6 +29,7 @@ const ITEMS = [
   { href: "/portal/planning", label: "Opnameplanning", short: "Opnames", icon: CalendarRange },
   { href: "/portal/resultaten", label: "Resultaten", short: "Resultaten", icon: BarChart3 },
   { href: "/portal/analyses", label: "Maandanalyses", short: "Analyses", icon: FileBarChart },
+  ...(PORTAL_CONTENTGEHEUGEN_LIVE ? [{ href: "/portal/contentgeheugen", label: "Contentgeheugen", short: "Geheugen", icon: BrainCircuit }] : []),
   { href: "/portal/mijlpalen", label: "Onze mijlpalen", short: "Mijlpalen", icon: Trophy },
   { href: "/portal/werkwijze", label: "Zo werken wij", short: "Werkwijze", icon: Repeat },
   { href: "/portal/samenwerking", label: "Samenwerking & Afspraken", short: "Afspraken", icon: Handshake },

@@ -49,6 +49,7 @@ function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: ()
   const [pmId, setPmId] = useState("");
   const [publisher, setPublisher] = useState<"shortclips" | "klant">("shortclips");
   const [notes, setNotes] = useState("");
+  const [team, setTeam] = useState<string[]>([]);
 
   // Na omzetten pas bij sluiten de lijst verversen (anders verdwijnt dit venster).
   const onClose = () => {
@@ -107,6 +108,7 @@ function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: ()
         notes: notes.trim() || null,
         confirmSimilar: Boolean(opts.confirmSimilar),
         linkToClientId: opts.linkToClientId ?? null,
+        team: team.filter((id) => id !== pmId),
       });
       if (res.ok) {
         // Direct door naar de onboarding van de klant: daar staat wat er is gebeurd.
@@ -123,7 +125,7 @@ function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: ()
   const field = "sc-input h-9 w-full text-sm";
   const lbl = "mb-1 block text-xs font-medium text-[var(--color-ink-muted)]";
   const chip = (on: boolean) =>
-    `rounded-full border px-3 py-1.5 text-xs font-medium ${on ? "border-[var(--color-brand-500)] bg-[var(--color-brand-500)] text-white" : "border-[var(--color-line-strong)] text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"}`;
+    `rounded-full border px-3 py-1.5 text-xs font-medium ${on ? "border-[var(--color-indigo-ink)] bg-[var(--color-indigo-ink)] text-white" : "border-[var(--color-line-strong)] text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"}`;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/40 p-4 text-left text-[var(--color-ink)]" onClick={() => !pending && onClose()}>
@@ -165,12 +167,12 @@ function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: ()
                 {done.driveOk ? <Check className="size-4 text-[var(--color-good)]" /> : <AlertTriangle className="size-4 text-[var(--color-warn)]" />}
                 {done.driveOk ? "Google Drive-map met de standaardmappen" : `Drive-map mislukt: ${done.driveMsg ?? "probeer opnieuw op de klantpagina"}`}
               </li>
-              <li className="flex items-center gap-2"><Check className="size-4 text-[var(--color-good)]" /> {done.tasks} taken en één melding voor {pmName}</li>
+              <li className="flex items-center gap-2"><Check className="size-4 text-[var(--color-good)]" /> {done.tasks} taken en één melding voor {pmName} (o.a. WhatsApp groep, Frame.io, kickoff)</li>
               <li className="flex items-center gap-2"><Check className="size-4 text-[var(--color-good)]" /> Welkomstbericht als concept, welkomstbestand gekoppeld</li>
             </ul>
             <p className="text-xs text-[var(--color-ink-muted)]">Er is niets naar de klant verstuurd.</p>
             <div className="flex justify-end">
-              <a href={`/clients/${done.slug}?tab=onboarding`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-500)] px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
+              <a href={`/clients/${done.slug}?tab=onboarding`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-3 py-2 text-xs font-semibold text-white hover:opacity-90">
                 Naar de onboarding
               </a>
             </div>
@@ -204,10 +206,12 @@ function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: ()
                   ))}
                 </div>
               </div>
-              <div>
-                <label className={lbl} htmlFor="cv-monthly">Maandbedrag excl. btw (€)</label>
-                <input id="cv-monthly" inputMode="decimal" className={field} value={monthly} placeholder="Uit de offerte" onChange={(e) => setMonthly(e.target.value)} />
-              </div>
+              {form.canSeeAmounts ? (
+                <div>
+                  <label className={lbl} htmlFor="cv-monthly">Maandbedrag excl. btw (€)</label>
+                  <input id="cv-monthly" inputMode="decimal" className={field} value={monthly} placeholder="Uit de offerte" onChange={(e) => setMonthly(e.target.value)} />
+                </div>
+              ) : null}
               <div>
                 <label className={lbl} htmlFor="cv-start">Startdatum samenwerking</label>
                 <input id="cv-start" type="date" className={field} value={startOn} onChange={(e) => setStartOn(e.target.value)} />
@@ -230,6 +234,21 @@ function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: ()
                 </div>
               </div>
               <div className="sm:col-span-2">
+                <span className={lbl}>Betrokken teamleden (komen in de WhatsApp groep)</span>
+                <div className="flex flex-wrap gap-2">
+                  {form.team.filter((t) => t.id !== pmId).map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={chip(team.includes(t.id))}
+                      onClick={() => setTeam((cur) => (cur.includes(t.id) ? cur.filter((x) => x !== t.id) : [...cur, t.id]))}
+                    >
+                      {t.name.split(" ")[0]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="sm:col-span-2">
                 <span className={lbl}>Wie publiceert de content?</span>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" className={chip(publisher === "shortclips")} onClick={() => setPublisher("shortclips")}>Shortclips</button>
@@ -244,6 +263,13 @@ function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: ()
 
             <div className="mx-5 space-y-1.5 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-4 py-3 text-xs">
               <p className="font-semibold">Controles</p>
+              {form.quote && ["ondertekend", "geaccepteerd"].includes(form.quote.status) ? (
+                <p className="flex items-center gap-1.5 text-[var(--color-good)]"><Check className="size-3.5" /> Offerte ondertekend in PandaDoc{form.quote.signedAt ? ` op ${new Date(form.quote.signedAt).toLocaleDateString("nl-NL", { day: "numeric", month: "long" })}` : ""}</p>
+              ) : form.quote ? (
+                <p className="flex items-start gap-1.5 text-[var(--color-warn)]"><AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> Offerte nog niet ondertekend in PandaDoc. Omzetten kan; de stap Contract wacht dan op de handtekening.</p>
+              ) : (
+                <p className="flex items-start gap-1.5 text-[var(--color-warn)]"><AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> Geen PandaDoc-offerte gekoppeld aan deze lead.</p>
+              )}
               <p className="flex items-center gap-1.5 text-[var(--color-good)]"><Check className="size-3.5" /> Lead is nog niet eerder omgezet</p>
               {form.similarClients.length === 0 ? (
                 <p className="flex items-center gap-1.5 text-[var(--color-good)]"><Check className="size-3.5" /> Geen bestaande klant met een gelijkende naam</p>
@@ -253,7 +279,7 @@ function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: ()
               {!phone.trim() ? (
                 <p className="flex items-start gap-1.5 text-[var(--color-warn)]"><AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> Telefoonnummer ontbreekt. Omzetten kan; de WhatsApp-taak wacht dan op het nummer.</p>
               ) : null}
-              {!monthly.trim() ? (
+              {form.canSeeAmounts && !monthly.trim() ? (
                 <p className="flex items-start gap-1.5 text-[var(--color-warn)]"><AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> Maandbedrag ontbreekt. Vul het later aan bij Contract &amp; facturatie.</p>
               ) : null}
             </div>
@@ -277,7 +303,7 @@ function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: ()
             {err ? <p className="mx-5 mt-3 text-xs font-medium text-[var(--color-bad)]">{err}</p> : null}
 
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-              <span className="text-2xs text-[var(--color-ink-muted)]">Na bevestigen: klant, Drive-map, taken en welkomstconcept. Er gaat niets naar de klant.</span>
+              <span className="text-2xs text-[var(--color-ink-muted)]">Na bevestigen: klant, Drive-map, taken, welkomstconcept en de onboardingchecklist. Er gaat niets naar de klant.</span>
               <div className="flex gap-2">
                 <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>Annuleren</Button>
                 <Button type="button" disabled={pending || !company.trim() || !pmId} onClick={() => submit({ confirmSimilar: false })}>

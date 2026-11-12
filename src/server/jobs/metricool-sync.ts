@@ -101,14 +101,14 @@ export async function linkMetricoolBrands(triggeredById?: string, source: Source
               provider: "metricool",
               externalId: String(brand.id),
               externalName: brand.label,
-              config: { userId: brand.userId },
+              config: { userId: brand.userId, networks: brand.networks },
               lastSyncedAt: new Date(),
             })
             .onConflictDoUpdate({
               target: [clientIntegrations.clientId, clientIntegrations.provider, clientIntegrations.externalId],
               set: {
                 externalName: brand.label,
-                config: { userId: brand.userId },
+                config: { userId: brand.userId, networks: brand.networks },
                 lastSyncedAt: new Date(),
                 updatedAt: new Date(),
               },
@@ -412,10 +412,52 @@ export async function pullMetricoolPosts(
         ctx.counters.processed++;
         ctx.counters.created += count;
         ctx.log(`Merk ${link.blogId}: ${count} posts/reels bijgewerkt.`);
+        // Gepubliceerde video's aan de contentplanning koppelen, zodat planning,
+        // resultaten en de Script Engine over dezelfde video praten.
+        const linked = await linkPublicationsToPlanning(link.clientId).catch((e) => {
+          ctx.log(`Merk ${link.blogId}: koppelen aan contentplanning mislukt (${e instanceof Error ? e.message : e}).`, "warn");
+          return 0;
+        });
+        if (linked) ctx.log(`Merk ${link.blogId}: ${linked} publicatie(s) gekoppeld aan de contentplanning.`);
       }
     },
     { triggeredById },
   );
+}
+
+/**
+ * Koppelt gepubliceerde posts zonder planningsitem aan het juiste item in de
+ * contentplanning: zelfde klant, zelfde caption-opening (eerste 30 letters/
+ * cijfers, unicode genormaliseerd) en gepland binnen 21 dagen van de
+ * publicatiedatum. Bij meerdere kandidaten wint de dichtstbijzijnde datum.
+ * Zet alleen de koppeling; statussen en meldingen blijven onaangeroerd.
+ */
+export async function linkPublicationsToPlanning(clientId: string): Promise<number> {
+  const res = await db.execute(sql`
+    with pub as (
+      select id, published_at,
+             left(lower(regexp_replace(normalize(caption, NFKC), '[^a-zA-Z0-9]', '', 'g')), 30) as k
+      from publications
+      where client_id = ${clientId} and deleted_at is null and calendar_item_id is null and caption is not null
+    ),
+    cal as (
+      select id, scheduled_on,
+             left(lower(regexp_replace(normalize(caption, NFKC), '[^a-zA-Z0-9]', '', 'g')), 30) as k
+      from content_calendar
+      where client_id = ${clientId} and deleted_at is null and caption is not null
+    ),
+    pick as (
+      select distinct on (pub.id) pub.id as pub_id, cal.id as cal_id
+      from pub join cal on cal.k = pub.k and length(pub.k) >= 15
+      where pub.published_at is null
+         or abs((pub.published_at at time zone 'Europe/Amsterdam')::date - cal.scheduled_on) <= 21
+      order by pub.id, abs(coalesce((pub.published_at at time zone 'Europe/Amsterdam')::date, cal.scheduled_on) - cal.scheduled_on)
+    )
+    update publications p set calendar_item_id = pick.cal_id, updated_at = now()
+    from pick where p.id = pick.pub_id
+    returning p.id
+  `);
+  return ((res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[])).length;
 }
 
 /** Koppelen + cijfers ophalen in één keer (account-dagcijfers + per-video). */

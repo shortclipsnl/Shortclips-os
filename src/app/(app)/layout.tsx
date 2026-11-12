@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { requireInternal, isOwner, isEditorRole, canManageClients, canManageQuotes, canManageOperations } from "@/server/auth/context";
+import { requireInternal, isOwner, isEditorRole, canManageClients, canAccessLeads, canManageQuotes, canManageOperations } from "@/server/auth/context";
 import { editorMayOpenPath } from "@/lib/editor-routes";
 import { NAVIGATION } from "@/components/layout/nav-config";
 import { heeftVerantwoordelijkhedenPagina } from "@/lib/verantwoordelijkheden/data";
@@ -59,6 +59,10 @@ export default async function AppLayout({
       }
       // Offertemodule: eigenaar + aangewezen teamleden (bijv. Milou).
       if (item.quotesAccess && !canManageQuotes(viewer)) {
+        return false;
+      }
+      // Leads: eigenaar + Milou en Jiska (zij volgen leads op en zetten om naar klant).
+      if (item.leadsAccess && !canAccessLeads(viewer)) {
         return false;
       }
       // Operationeel beheer (koppelingen, portaal-instellingen): eigenaar + de

@@ -1,5 +1,6 @@
 "use client";
 
+import { cijfersDefinitief } from "@/lib/maandcontrole";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -103,7 +104,8 @@ export function ReviewUI({
 
   const st = STATUS_META[report.status] ?? STATUS_META.gegevens_verzamelen!;
   const blokken = report.quality.filter((q) => q.severity === "blok");
-  const canApprove = owner && blokken.length === 0 && (report.status === "klaar_voor_controle" || report.status === "aanpassing_nodig");
+  const definitief = cijfersDefinitief(report.period, report.generatedAt);
+  const canApprove = owner && definitief && blokken.length === 0 && (report.status === "klaar_voor_controle" || report.status === "aanpassing_nodig");
   const myRead = report.reads.find((r) => r.userId === viewerId);
   const m = report.metrics as Record<string, number | null | undefined>;
   const v = report.vergelijking;
@@ -188,7 +190,7 @@ export function ReviewUI({
             />
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t border-[var(--color-line)] pt-3">
-            {owner && !approved ? <button type="button" disabled={pending || !canApprove} title={canApprove ? "" : "Rond eerst de verplichte controlepunten af"} onClick={() => run(() => approveMonthlyReport(report.id), "Goedgekeurd. Het team krijgt een melding om dit door te nemen. Publiceer de klantversie wanneer je zover bent.")} className={buttonClass({ variant: "primary", size: "sm" })}><Check className="size-3.5" /> Goedkeuren</button> : null}
+            {owner && !approved ? <button type="button" disabled={pending || !canApprove} title={canApprove ? "" : !definitief ? "De cijfers zijn nog voorlopig; goedkeuren kan zodra de volledige maand binnen is" : "Rond eerst de verplichte controlepunten af"} onClick={() => run(() => approveMonthlyReport(report.id), "Goedgekeurd. Het team krijgt een melding om dit door te nemen. Publiceer de klantversie wanneer je zover bent.")} className={buttonClass({ variant: "primary", size: "sm" })}><Check className="size-3.5" /> Goedkeuren</button> : null}
             {!owner && canWrite && !approved ? <span className="text-xs text-[var(--color-ink-muted)]">Goedkeuren doet Jarno.</span> : null}
             {canWrite && report.status === "goedgekeurd" ? <button type="button" disabled={pending} onClick={() => { if (window.confirm(`De klantversie publiceren in het klantportaal van ${report.clientName}? De klant krijgt daarvan een melding.`)) run(() => publishMonthlyReport(report.id), "De klantversie staat nu in het klantportaal."); }} className={buttonClass({ variant: "primary", size: "sm" })}><Send className="size-3.5" /> Publiceren in klantportaal</button> : null}
             {canWrite && report.status === "gepubliceerd" ? <button type="button" disabled={pending} onClick={() => run(() => unpublishMonthlyReport(report.id))} className={buttonClass({ variant: "ghost", size: "sm" })}>Uit portaal halen</button> : null}

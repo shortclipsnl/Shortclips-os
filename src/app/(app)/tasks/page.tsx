@@ -11,6 +11,7 @@ import { Card, EmptyState, PageHeader, TeamAvatar } from "@/components/ui";
 import { ColleagueToggle, QuickTaskLines, TaskItem, type TaskItemData } from "./tasks-ui";
 import { HandoverBoard, type HandoverNote } from "./handover-board";
 import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
+import { syncClientMomentTasksIfStale } from "@/server/klantmomenten";
 import { taskHref } from "@/lib/task-links";
 import { taskSignal } from "@/lib/task-signals";
 
@@ -32,6 +33,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const spPersoon = (await searchParams).persoon;
   // Vangnet: scriptingtaken bijwerken met de actuele scriptingstatussen.
   await syncScriptingTasksIfStale();
+  // Vangnet: klantmomenten die binnen een week vallen als taak klaarzetten.
+  await syncClientMomentTasksIfStale();
 
   const [team, allOpen, handoverRows] = await Promise.all([
     listAssignableUsers(),
@@ -117,7 +120,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     return rows.map(({ entityType, entityId, dedupeKey, ...t }) => ({
       ...t,
       href: taskHref({ entityType, entityId, dedupeKey }),
-      signal: taskSignal({ title: t.title, description: t.description, dedupeKey, entityType, clientName: t.clientName }),
+      signal: taskSignal({ title: t.title, description: t.description, dedupeKey, entityType, entityId, clientName: t.clientName, clientSlug: t.clientSlug }),
     }));
   }
 

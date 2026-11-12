@@ -32,6 +32,16 @@ export type OnboardingDetails = {
   contractMonths: number | null;
   publisher: "shortclips" | "klant";
   notes: string | null;
+  /** Betrokken teamleden (user-id's) naast de projectmanager. */
+  team?: string[];
+  /** Opgeslagen WhatsApp-groepslink (chat.whatsapp.com/...). */
+  whatsappLink?: string | null;
+  /** Stappen die voor deze klant uit staan. */
+  disabledSteps?: string[];
+  /** Handmatig vastgelegde kickoff (als die niet in de agenda staat). */
+  kickoffManual?: { at: string; by: string } | null;
+  /** Handmatige bevestigingen (contract zonder PandaDoc, Frame.io zonder koppeling). */
+  confirmed?: Partial<Record<"contract" | "frame", { by: string; at: string }>>;
 };
 
 export const clientOnboardings = pgTable(

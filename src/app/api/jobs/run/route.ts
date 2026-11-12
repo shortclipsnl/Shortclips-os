@@ -18,8 +18,10 @@ import {
   pullFrameProjects,
 } from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
+import { runPublishingReconcile } from "@/server/jobs/publishing-reconcile";
 import { syncOpenOnboardings } from "@/server/onboarding";
 import { runScriptingTaskSync } from "@/server/scripting-tasks";
+import { runKlantmomentenSync } from "@/server/klantmomenten";
 import { runScriptVersionSync } from "@/server/script-versions";
 import { runFrequentSync, runNightlyExternalSync, runNightlySync } from "@/server/jobs/orchestrator";
 import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
@@ -36,6 +38,7 @@ import { runTransferCleanup } from "@/server/jobs/transfer-cleanup";
 import { runCaptionsAutoGenerate } from "@/server/jobs/captions-autogen";
 import { runCaptionDriveLink } from "@/server/jobs/caption-drive-link";
 import { runBriefingAutoGenerate } from "@/server/jobs/briefing-autogen";
+import { runContentMemoryRefresh } from "@/server/content-memory";
 import { runContentResearchAdvance, runContentResearchWeekly } from "@/server/jobs/content-research-autogen";
 import { runContentResearchNotify } from "@/server/jobs/content-research-notify";
 import { runMonthlyReports, runReportQueue } from "@/server/jobs/report-monthly";
@@ -95,6 +98,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   // Feedbacktermijn klant: rondes bijwerken en op de laatste termijndag (vanaf
   // 09:00, werkdagen) de vaste verantwoordelijke een melding + taak geven.
   "feedback.reminders": runFeedbackReminders,
+  // Klantmomenten: een week vooraf taak + melding voor de verantwoordelijke.
+  "klantmomenten.sync": runKlantmomentenSync,
   "reminders.cleaning_friday": runCleaningFridayReminder,
   "goals.recompute": runGoalsRecompute,
   "goals.seed": runGoalsSeed,
@@ -105,6 +110,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "finance.weekly_summary": runFinanceWeeklySummary,
   "finance.sync_health": runFinanceSyncHealth,
   "publications.due_check": runPublicationDueCheck,
+  "publications.metricool_reconcile": runPublishingReconcile,
   "vermogen.advies_maand": runVermogenAdvies,
   "signals.hourly": runHourlySignals,
   "frameio.pull_projects": pullFrameProjects,
@@ -121,6 +127,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
     await runScriptingTaskSync().catch((e) => console.error("[scripting.task_sync]", e));
     // Klantonboarding: opname in de agenda → opnamedag-stap klaar, alles klaar → afgerond.
     await syncOpenOnboardings().catch((e) => console.error("[onboarding.sync]", e));
+    // Publiceren via Metricool: gewijzigde berichten direct uit Metricool halen.
+    await runPublishingReconcile().catch((e) => console.error("[publications.metricool_reconcile]", e));
     return res;
   },
   "scripting.task_sync": runScriptingTaskSync,
@@ -168,6 +176,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "content_research.weekly": runContentResearchWeekly,
   // Overdag elke 5 min: handmatig gestarte rondes afmaken (licht als er niets loopt).
   "content_research.advance": runContentResearchAdvance,
+  "content_memory.refresh": runContentMemoryRefresh,
   "content_research.notify": runContentResearchNotify,
   "reports.generate_monthly": runMonthlyReports,
   "reports.review_reminders": runReportReviewReminders,

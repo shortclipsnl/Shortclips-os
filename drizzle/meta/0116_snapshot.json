@@ -1,5 +1,5 @@
 {
-  "id": "b9131354-d365-4495-9088-d5822a485a0e",
+  "id": "0c1fc72b-386c-4b26-b4d4-e80eb24fde5a",
   "prevId": "f4904e27-239c-4938-a4aa-225f62a2529f",
   "version": "7",
   "dialect": "postgresql",
@@ -18991,6 +18991,354 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.draaiboek_notes": {
+      "name": "draaiboek_notes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "draaiboek_id": {
+          "name": "draaiboek_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "video_key": {
+          "name": "video_key",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'notitie'"
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "audio": {
+          "name": "audio",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "audio_mime": {
+          "name": "audio_mime",
+          "type": "varchar(60)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "duration_sec": {
+          "name": "duration_sec",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_id": {
+          "name": "created_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "draaiboek_notes_draaiboek_idx": {
+          "name": "draaiboek_notes_draaiboek_idx",
+          "columns": [
+            {
+              "expression": "draaiboek_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "video_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "draaiboek_notes_draaiboek_id_draaiboeken_id_fk": {
+          "name": "draaiboek_notes_draaiboek_id_draaiboeken_id_fk",
+          "tableFrom": "draaiboek_notes",
+          "tableTo": "draaiboeken",
+          "columnsFrom": [
+            "draaiboek_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "draaiboek_notes_created_by_id_users_id_fk": {
+          "name": "draaiboek_notes_created_by_id_users_id_fk",
+          "tableFrom": "draaiboek_notes",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.draaiboeken": {
+      "name": "draaiboeken",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "production_day_id": {
+          "name": "production_day_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(24)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'concept'"
+        },
+        "source_hash": {
+          "name": "source_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_file_name": {
+          "name": "source_file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "content": {
+          "name": "content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "progress": {
+          "name": "progress",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "generated_at": {
+          "name": "generated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sent_to_id": {
+          "name": "sent_to_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sent_by_id": {
+          "name": "sent_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "finish_note": {
+          "name": "finish_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "draaiboeken_sent_to_idx": {
+          "name": "draaiboeken_sent_to_idx",
+          "columns": [
+            {
+              "expression": "sent_to_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "draaiboeken_production_day_id_production_days_id_fk": {
+          "name": "draaiboeken_production_day_id_production_days_id_fk",
+          "tableFrom": "draaiboeken",
+          "tableTo": "production_days",
+          "columnsFrom": [
+            "production_day_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "draaiboeken_client_id_clients_id_fk": {
+          "name": "draaiboeken_client_id_clients_id_fk",
+          "tableFrom": "draaiboeken",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "draaiboeken_sent_to_id_users_id_fk": {
+          "name": "draaiboeken_sent_to_id_users_id_fk",
+          "tableFrom": "draaiboeken",
+          "tableTo": "users",
+          "columnsFrom": [
+            "sent_to_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "draaiboeken_sent_by_id_users_id_fk": {
+          "name": "draaiboeken_sent_by_id_users_id_fk",
+          "tableFrom": "draaiboeken",
+          "tableTo": "users",
+          "columnsFrom": [
+            "sent_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "draaiboeken_production_day_unique": {
+          "name": "draaiboeken_production_day_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "production_day_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.quote_events": {
       "name": "quote_events",
       "schema": "",
@@ -21400,163 +21748,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.content_competitors": {
-      "name": "content_competitors",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "client_id": {
-          "name": "client_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "naam": {
-          "name": "naam",
-          "type": "varchar(160)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "url": {
-          "name": "url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "tiktok": {
-          "name": "tiktok",
-          "type": "varchar(160)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "instagram": {
-          "name": "instagram",
-          "type": "varchar(160)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "youtube": {
-          "name": "youtube",
-          "type": "varchar(160)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "notitie": {
-          "name": "notitie",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "bron": {
-          "name": "bron",
-          "type": "varchar(12)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'team'"
-        },
-        "actief": {
-          "name": "actief",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "laatste_observatie": {
-          "name": "laatste_observatie",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "laatste_observatie_op": {
-          "name": "laatste_observatie_op",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_id": {
-          "name": "created_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "content_competitors_client_idx": {
-          "name": "content_competitors_client_idx",
-          "columns": [
-            {
-              "expression": "client_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "content_competitors_client_id_clients_id_fk": {
-          "name": "content_competitors_client_id_clients_id_fk",
-          "tableFrom": "content_competitors",
-          "tableTo": "clients",
-          "columnsFrom": [
-            "client_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "content_competitors_created_by_id_users_id_fk": {
-          "name": "content_competitors_created_by_id_users_id_fk",
-          "tableFrom": "content_competitors",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.content_ideas": {
       "name": "content_ideas",
       "schema": "",
@@ -21653,64 +21844,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "onderbouwing": {
-          "name": "onderbouwing",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "opportunity": {
-          "name": "opportunity",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "opportunity_score": {
-          "name": "opportunity_score",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "middenstuk": {
-          "name": "middenstuk",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "middenstuk_richting": {
-          "name": "middenstuk_richting",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cta_commercieel": {
-          "name": "cta_commercieel",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cta_interactie": {
-          "name": "cta_interactie",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "invalshoek": {
-          "name": "invalshoek",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "herhaal_reden": {
-          "name": "herhaal_reden",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "status": {
           "name": "status",
           "type": "content_idea_status",
@@ -21718,18 +21851,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'nieuw'"
-        },
-        "forwarded_at": {
-          "name": "forwarded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "forwarded_by_id": {
-          "name": "forwarded_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         },
         "rejection_reason": {
           "name": "rejection_reason",
@@ -21740,24 +21861,6 @@
         "forwarded_script_id": {
           "name": "forwarded_script_id",
           "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "script_link": {
-          "name": "script_link",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "resultaat": {
-          "name": "resultaat",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "keuring": {
-          "name": "keuring",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -21859,19 +21962,6 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "content_ideas_forwarded_by_id_users_id_fk": {
-          "name": "content_ideas_forwarded_by_id_users_id_fk",
-          "tableFrom": "content_ideas",
-          "tableTo": "users",
-          "columnsFrom": [
-            "forwarded_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
         "content_ideas_forwarded_script_id_scripts_id_fk": {
           "name": "content_ideas_forwarded_script_id_scripts_id_fk",
           "tableFrom": "content_ideas",
@@ -21937,36 +22027,6 @@
         },
         "manual_notes": {
           "name": "manual_notes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "style": {
-          "name": "style",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "style_sources": {
-          "name": "style_sources",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "style_fingerprint": {
-          "name": "style_fingerprint",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "style_updated_at": {
-          "name": "style_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "style_notes": {
-          "name": "style_notes",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -22107,38 +22167,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'[]'::jsonb"
-        },
-        "data_basis": {
-          "name": "data_basis",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "briefing": {
-          "name": "briefing",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "kandidaten": {
-          "name": "kandidaten",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "heartbeat_at": {
-          "name": "heartbeat_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         },
         "error_message": {
           "name": "error_message",
@@ -24282,8 +24310,7 @@
         "opgeslagen",
         "afgewezen",
         "gearchiveerd",
-        "doorgestuurd",
-        "gebruikt"
+        "doorgestuurd"
       ]
     },
     "public.content_research_run_status": {

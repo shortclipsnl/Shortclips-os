@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { and, eq, isNull } from "drizzle-orm";
 import { closeDatabase, freshDatabase } from "./helpers/db";
-import { buildWelcomeMessage, computeSteps, isSimilarCompany, nextFriday, planFollowups, withRetry, type OnboardingFacts } from "@/lib/onboarding-plan";
+import { buildWelcomeMessage, canDisableStep, computeSteps, isKickoffTitle, isSimilarCompany, isWhatsappGroupLink, nextFriday, planFollowups, withRetry, type OnboardingFacts } from "@/lib/onboarding-plan";
 
 /* ------------------------------------------------------------------ *
  * Drive nabootsen: geen echte mappen tijdens de test. Te sturen per test.
@@ -60,21 +60,48 @@ describe("onboarding: vaste regels", () => {
     expect(m).not.toMatch(/[–—]/);
   });
 
-  it("telt de voortgang en rondt pas af als alles klaar is", () => {
+  it("telt de voortgang en rondt pas af als alle verplichte stappen klaar zijn", () => {
     const base: OnboardingFacts = {
-      driveStatus: "klaar", hasCoordinator: true, hasWelcomeFile: true, hasWelcomeMessage: true,
-      hasPortalLogin: false, whatsappDone: false, hasPhone: false, hasShoot: false, shootTaskDone: false,
+      contract: "open", missingClientData: ["telefoonnummer"], hasCoordinator: true, hasPortalLogin: false,
+      driveStatus: "klaar", frameLinked: false, tasksCreated: true, hasWelcomeMessage: true, hasWelcomeFile: true,
+      whatsappDone: false, hasPhone: false, welcomeSent: false, portalUsed: false,
+      kickoff: { at: null, source: null }, briefingMissing: ["doelstellingen", "doelgroep"], briefingTouched: false, shoots: 0, disabled: [],
     };
     const a = computeSteps(base);
+    expect(a.total).toBe(15);
     expect(a.done).toBe(5);
-    expect(a.total).toBe(9);
     expect(a.complete).toBe(false);
     expect(a.steps.find((s) => s.key === "whatsapp")!.status).toBe("wacht");
-    const b = computeSteps({ ...base, driveStatus: "mislukt", driveError: "x" });
-    expect(b.needsAction).toBe(true);
-    const c = computeSteps({ ...base, hasPortalLogin: true, whatsappDone: true, hasShoot: true });
+    expect(a.steps.find((s) => s.key === "contract")!.status).toBe("wacht");
+    expect(a.phases.map((p) => p.key)).toEqual([1, 2, 3, 4]);
+    expect(computeSteps({ ...base, driveStatus: "mislukt", driveError: "x" }).needsAction).toBe(true);
+    // Alles verplicht klaar; het optionele "klant heeft ingelogd" blokkeert niet.
+    const ready = {
+      ...base, contract: "ondertekend" as const, missingClientData: [], hasPortalLogin: true, frameLinked: true, whatsappDone: true, hasPhone: true,
+      welcomeSent: true, kickoff: { at: "di 9 dec 10:00", source: "agenda" as const }, briefingMissing: [], briefingTouched: true, shoots: 3,
+    };
+    const c = computeSteps(ready);
     expect(c.complete).toBe(true);
-    expect(c.done).toBe(9);
+    expect(c.steps.find((s) => s.key === "portal_used")!.status).toBe("wacht");
+    // Twee opnamedagen is nog niet genoeg.
+    expect(computeSteps({ ...ready, shoots: 2 }).complete).toBe(false);
+    // Een uitgezette stap telt niet mee.
+    const off = computeSteps({ ...ready, shoots: 0, disabled: ["first_shoot"] });
+    expect(off.complete).toBe(true);
+    expect(off.total).toBe(14);
+  });
+
+  it("herkent kickoffs, WhatsApp-links en wie wat mag uitzetten", () => {
+    expect(isKickoffTitle("Kickoff | Aquasel")).toBe(true);
+    expect(isKickoffTitle("Kick-off Aquasel")).toBe(true);
+    expect(isKickoffTitle("Kick off met Aquasel")).toBe(true);
+    expect(isKickoffTitle("Opname Aquasel 8 shorts")).toBe(false);
+    expect(isWhatsappGroupLink("https://chat.whatsapp.com/AbCdEf123456")).toBe(true);
+    expect(isWhatsappGroupLink("https://wa.me/31612345678")).toBe(false);
+    expect(canDisableStep("portal_used", false)).toBe(true);
+    expect(canDisableStep("kickoff", false)).toBe(false);
+    expect(canDisableStep("kickoff", true)).toBe(true);
+    expect(canDisableStep("pm_linked", true)).toBe(false);
   });
 
   it("plant de vervolgmomenten op vaste regels", () => {
@@ -188,10 +215,10 @@ describe("onboarding: lead omzetten tegen een echte database", () => {
     driveState.failCreates = 10; // alle pogingen in deze ronde mislukken
     const first = await onb.runOnboardingAutomation(c!.id);
     expect(first.drive.ok).toBe(false);
-    expect(first.tasks).toBe(5);
+    expect(first.tasks).toBe(7);
     const open = await db.select().from(s.tasks).where(and(eq(s.tasks.clientId, c!.id), isNull(s.tasks.deletedAt)));
     const onbTasks = open.filter((t) => !t.dedupeKey!.includes("vervolg_"));
-    expect(onbTasks).toHaveLength(5);
+    expect(onbTasks).toHaveLength(7);
     expect(onbTasks.every((t) => t.assigneeId === milouId && t.category === "klantcontact")).toBe(true);
     // De eerste factuur staat meteen klaar bij de facturatie-eigenaar (Milou).
     const factuur = open.find((t) => t.dedupeKey!.endsWith("vervolg_factuur"));
@@ -210,7 +237,7 @@ describe("onboarding: lead omzetten tegen een echte database", () => {
     const top = driveState.folders.filter((f) => f.parent === ROOT);
     expect(top.map((f) => f.name)).toEqual(["TESTBEDRIJF NOORD"]);
     expect(driveState.folders.filter((f) => f.parent === top[0]!.id)).toHaveLength(7);
-    expect(await db.select().from(s.tasks).where(eq(s.tasks.clientId, c!.id))).toHaveLength(6);
+    expect(await db.select().from(s.tasks).where(eq(s.tasks.clientId, c!.id))).toHaveLength(8);
     expect(await db.select().from(s.notifications).where(and(eq(s.notifications.userId, milouId), eq(s.notifications.type, "onboarding_assigned")))).toHaveLength(1);
   });
 
@@ -224,23 +251,79 @@ describe("onboarding: lead omzetten tegen een echte database", () => {
     expect(driveState.folders.filter((f) => f.parent === ROOT).length).toBe(before);
   });
 
-  it("voortgang: opname in de agenda rondt de opnamedag af, alles klaar = afgerond", async () => {
+  it("voortgang: elke stap gaat vanzelf op klaar en sluit de taak, alles verplicht klaar = afgerond", async () => {
     const [c] = await db.select().from(s.clients).where(eq(s.clients.name, "Testbedrijf Noord"));
-    let v = await onb.getOnboardingView(c!.id);
-    expect(v!.done).toBe(5);
-    expect(v!.steps.find((x) => x.key === "whatsapp")!.status).toBe("wacht");
+    const id = c!.id;
+    const status = (v: Awaited<ReturnType<typeof onb.getOnboardingView>>, key: string) => v!.steps.find((x) => x.key === key)!.status;
+    const taskStatus = async (key: string) => (await db.select({ st: s.tasks.status }).from(s.tasks).where(eq(s.tasks.dedupeKey, `onboarding:${id}:${key}`)))[0]?.st;
 
-    await db.insert(s.productionDays).values({ clientId: c!.id, title: "Opname", scheduledOn: "2026-12-03" });
-    await db.update(s.tasks).set({ status: "done", completedAt: new Date() }).where(eq(s.tasks.dedupeKey, `onboarding:${c!.id}:whatsapp`));
-    await db.insert(s.users).values({ email: "pieter@test.nl", fullName: "Pieter de Vries", primaryRole: "client", clientId: c!.id, status: "active" });
+    let v = await onb.getOnboardingView(id);
+    expect(v!.phases).toHaveLength(4);
+    expect(status(v, "whatsapp")).toBe("wacht");
+    expect(status(v, "contract")).toBe("open");
+    expect(v!.whatsapp.groupName).toBe("Shortclips x Testbedrijf Noord");
 
+    // Telefoonnummer aanvullen en WhatsApp-groepslink opslaan.
+    await db.update(s.clientContacts).set({ phone: "0612345678" }).where(eq(s.clientContacts.clientId, id));
+    expect((await onb.saveWhatsappLink(id, "https://wa.me/123", "milou@shortclips.nl")).ok).toBe(false);
+    expect((await onb.saveWhatsappLink(id, "https://chat.whatsapp.com/AbCdEf123456", "milou@shortclips.nl")).ok).toBe(true);
+    expect(await taskStatus("whatsapp")).toBe("done");
+
+    // Welkomstbericht verstuurd, portaallogin, Frame.io-project, getekende offerte.
+    await onb.markWelcomeSent(id, "milou@shortclips.nl");
+    expect(await taskStatus("welkomstbericht")).toBe("done");
+    await db.insert(s.users).values({ email: "pieter@test.nl", fullName: "Pieter de Vries", primaryRole: "client", clientId: id, status: "active" });
+    await db.insert(s.clientIntegrations).values({ clientId: id, provider: "frameio", externalId: "proj-1", externalName: "Testbedrijf Noord" });
+    await db.insert(s.quotes).values({ number: "2026-099", title: "Offerte Testbedrijf Noord", status: "ondertekend", leadId, acceptedAt: new Date() });
+
+    // Kickoff in de agenda en briefing in het klantgeheugen.
+    await db.insert(s.calendarEvents).values({ calendarId: "team", externalId: "ev-1", title: "Kickoff | Testbedrijf Noord", startsAt: new Date("2026-12-02T09:00:00Z"), clientId: id });
+    await onb.saveBriefing(id, { goal: "Meer aanvragen in Friesland", audience: "Huiseigenaren 35-65", tone: "" }, { id: milouId, email: "milou@shortclips.nl" });
+    const kennis = await db.select().from(s.clientKnowledge).where(and(eq(s.clientKnowledge.clientId, id), isNull(s.clientKnowledge.deletedAt)));
+    expect(kennis.map((k) => k.category).sort()).toEqual(["audience", "goal"]);
+    // Opnieuw opslaan vervangt, maakt niets dubbel.
+    await onb.saveBriefing(id, { goal: "Meer aanvragen in heel Noord-Nederland", audience: "Huiseigenaren 35-65" }, { id: milouId, email: "milou@shortclips.nl" });
+    expect(await db.select().from(s.clientKnowledge).where(and(eq(s.clientKnowledge.clientId, id), isNull(s.clientKnowledge.deletedAt)))).toHaveLength(2);
+
+    v = await onb.getOnboardingView(id);
+    expect(v!.completedAt).toBeNull();
+    expect(v!.requiredOpen.map((r) => r.key)).toEqual(["first_shoot"]);
+    expect(await taskStatus("kickoff")).toBe("done");
+    expect(await taskStatus("briefing")).toBe("done");
+    expect(await taskStatus("frame")).toBe("done");
+
+    // Drie opnamedagen: onboarding rondt af.
+    for (const d of ["2026-12-03", "2027-01-07", "2027-02-04"]) await db.insert(s.productionDays).values({ clientId: id, title: "Opname", scheduledOn: d });
     const sync = await onb.syncOpenOnboardings();
     expect(sync.completed).toBe(1);
-    v = await onb.getOnboardingView(c!.id);
-    expect(v!.done).toBe(9);
+    v = await onb.getOnboardingView(id);
     expect(v!.completedAt).not.toBeNull();
-    const [shootTask] = await db.select().from(s.tasks).where(eq(s.tasks.dedupeKey, `onboarding:${c!.id}:opnamedag`));
-    expect(shootTask!.status).toBe("done");
+    expect(await taskStatus("opnamedag")).toBe("done");
+    const done = await db.select().from(s.notifications).where(and(eq(s.notifications.userId, milouId), eq(s.notifications.type, "onboarding_completed")));
+    expect(done).toHaveLength(1);
+  });
+
+  it("signaleert vertraging één keer en alleen bij wie het aangaat", async () => {
+    const [l] = await db.insert(s.salesLeads).values({ company: "Traag Bedrijf", contactName: "Anna Traag", email: "anna@traag.nl", phone: "0611111111", status: "onderhandeling" }).returning({ id: s.salesLeads.id });
+    const r = await onb.convertLead({ id: jarnoId, email: "jarno@shortclips.nl" }, { ...input(), leadId: l!.id, company: "Traag Bedrijf", phone: "0611111111" });
+    expect(r.ok).toBe(true);
+    const clientId = r.ok ? r.clientId : "";
+    await onb.runOnboardingAutomation(clientId);
+    // Drie weken geleden gestart: WhatsApp, kickoff en opnamedagen zijn te laat.
+    await db.update(s.clientOnboardings).set({ createdAt: new Date(Date.now() - 21 * 86400_000) }).where(eq(s.clientOnboardings.clientId, clientId));
+    const first = await onb.syncOpenOnboardings();
+    expect(first.signals).toBe(3);
+    const late = await db.select().from(s.notifications).where(and(eq(s.notifications.clientId, clientId), eq(s.notifications.type, "onboarding_late")));
+    expect(late.filter((n) => n.userId === milouId)).toHaveLength(3);
+    // Alleen de opnamedagen gaan ook naar Jarno.
+    expect(late.filter((n) => n.userId === jarnoId)).toHaveLength(1);
+    const second = await onb.syncOpenOnboardings();
+    expect(second.signals).toBe(0);
+    // Een verplichte stap uitzetten mag alleen de eigenaar.
+    expect((await onb.setStepDisabled(clientId, "kickoff", true, { email: "milou@shortclips.nl", isOwner: false })).ok).toBe(false);
+    expect((await onb.setStepDisabled(clientId, "portal_used", true, { email: "milou@shortclips.nl", isOwner: false })).ok).toBe(true);
+    const v = await onb.getOnboardingView(clientId);
+    expect(v!.steps.find((x) => x.key === "portal_used")!.status).toBe("uit");
   });
 
   it("vervolgtaken komen pas in beeld als het zover is en schuiven mee met het contract", async () => {

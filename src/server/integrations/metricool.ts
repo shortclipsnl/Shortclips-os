@@ -11,7 +11,13 @@ import { apiFetch } from "./http";
  */
 const BASE = "https://app.metricool.com/api/v2";
 
-export type MetricoolBrand = { id: number; label: string; userId: number };
+export type MetricoolBrand = {
+  id: number;
+  label: string;
+  userId: number;
+  /** Kanalen die bij dit merk in Metricool gekoppeld zijn (instagram, tiktok, facebook, youtube, ...). */
+  networks: string[];
+};
 export type DailyPoint = { date: string; value: number };
 
 /** Eén gepubliceerde post/reel met zijn eigen cijfers (per-video). */
@@ -52,14 +58,14 @@ export class MetricoolService {
 
   /** Alle merken van het account (merk-id + label + user-id). */
   async listBrands(): Promise<MetricoolBrand[]> {
-    const res = await apiFetch<{ data?: Array<{ id: number; label: string; userId: number }> }>(
+    const res = await apiFetch<{ data?: Array<{ id: number; label: string; userId: number; networksData?: Record<string, unknown> }> }>(
       "metricool",
       `${BASE}/settings/brands`,
       { headers: this.headers },
     );
     return (res.data ?? [])
       .filter((b) => b.id && b.label && b.label !== "undefined")
-      .map((b) => ({ id: b.id, label: b.label, userId: b.userId }));
+      .map((b) => ({ id: b.id, label: b.label, userId: b.userId, networks: brandNetworks(b.networksData) }));
   }
 
   /**
@@ -120,6 +126,14 @@ export class MetricoolService {
       return [];
     }
   }
+}
+
+/** networksData {instagramData: "...", tiktokData: "..."} → ["instagram", "tiktok"]. Lege waarden tellen niet. */
+export function brandNetworks(networksData: Record<string, unknown> | undefined | null): string[] {
+  if (!networksData) return [];
+  return Object.entries(networksData)
+    .filter(([k, v]) => k.endsWith("Data") && v !== null && v !== undefined && String(v).trim() !== "")
+    .map(([k]) => k.slice(0, -4).toLowerCase());
 }
 
 const num = (v: unknown): number => {

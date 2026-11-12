@@ -18,9 +18,6 @@ export function parseBatchKey(key: string | null | undefined): { period: string;
 }
 export const batchHref = (period: string) => `/analytics/maandrapportages?maand=${period}&weergave=mijn-controle`;
 
-/** Op welke werkdag van de nieuwe maand de controle standaard staat. */
-export const CONTROLE_WERKDAG = 2;
-
 /** De maand ná een rapportperiode (YYYY-MM). */
 export function nextPeriod(period: string): string {
   const [y, m] = period.split("-").map(Number);
@@ -36,15 +33,110 @@ export function nthWorkday(month: string, n: number, holidays?: Holidays): strin
   return n <= 1 ? firstWorkday : addWorkingDays(firstWorkday, n - 1, holidays);
 }
 
+/** Laatste kalenderdag van een maand (YYYY-MM-DD). */
+export function lastCalendarDay(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  return new Date(Date.UTC(y!, m!, 0)).toISOString().slice(0, 10);
+}
+
 /**
- * Standaard controledag: de tweede werkdag van de maand na de rapportperiode.
- * Ligt die al in het verleden (rapporten kwamen later binnen), dan de
- * eerstvolgende werkdag vanaf vandaag.
+ * Laatste werkdag van de rapportmaand: de controledag van de maandrapportage.
+ * Valt de laatste kalenderdag op ma-vr, dan die dag; op zaterdag of zondag de
+ * vrijdag ervoor (een feestdag schuift ook terug naar de werkdag ervoor).
+ * Voorbeeld: november 2026 eindigt op maandag 30 november → 30 november.
+ */
+export function laatsteWerkdag(period: string, holidays?: Holidays): string {
+  return snapToWorkingDay(lastCalendarDay(period), holidays);
+}
+
+/** De eerste dag waarop alle gegevens van de maand binnen zijn: de 1e van de volgende maand. */
+export function maandCompleetVanaf(period: string): string {
+  return `${nextPeriod(period)}-01`;
+}
+
+/** Of de rapportmaand volledig voorbij is (vandaag ligt in een latere maand). */
+export function maandCompleet(period: string, today: string): boolean {
+  return today >= maandCompleetVanaf(period);
+}
+
+/**
+ * Of de cijfers van een rapport definitief zijn: gegenereerd op of na de 1e van
+ * de volgende maand (Amsterdamse datum). Eerder gegenereerd = voorlopig, omdat
+ * resultaten op de laatste dag nog kunnen veranderen.
+ */
+export function cijfersDefinitief(period: string, generatedAt: string | Date | null | undefined): boolean {
+  if (!generatedAt) return false;
+  const d = typeof generatedAt === "string" ? new Date(generatedAt) : generatedAt;
+  const dag = d.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  return dag >= maandCompleetVanaf(period);
+}
+
+/**
+ * De actuele rapportagemaand voor de pagina: vanaf de laatste werkdag van een
+ * maand is dat die maand zelf, daarvoor nog de vorige maand (waarvan de controle
+ * en goedkeuring dan nog lopen).
+ */
+export function actueleRapportMaand(today: string, holidays?: Holidays): string {
+  const huidig = today.slice(0, 7);
+  if (today >= laatsteWerkdag(huidig, holidays)) return huidig;
+  const [y, m] = huidig.split("-").map(Number);
+  const d = new Date(Date.UTC(y!, m! - 2, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Controledag (deadline van de controletaak): de laatste werkdag van de
+ * rapportmaand. Ligt die al in het verleden, dan vandaag of de eerstvolgende werkdag.
  */
 export function defaultControleDag(period: string, today: string, holidays?: Holidays): string {
-  const dag = nthWorkday(nextPeriod(period), CONTROLE_WERKDAG, holidays);
+  const dag = laatsteWerkdag(period, holidays);
   if (dag >= today) return dag;
   return snapToWorkingDay(today, holidays) === today ? today : addWorkingDays(today, 1, holidays);
+}
+
+/**
+ * Goedkeuringsdag: de eerste werkdag waarop de definitieve cijfers er zijn
+ * (eerste werkdag van de volgende maand), of later als die al voorbij is.
+ */
+export function defaultGoedkeurDag(period: string, today: string, holidays?: Holidays): string {
+  const dag = nthWorkday(nextPeriod(period), 1, holidays);
+  if (dag >= today) return dag;
+  return snapToWorkingDay(today, holidays) === today ? today : addWorkingDays(today, 1, holidays);
+}
+
+/* ------------------------------------------------------------------ *
+ * Taken per klant per processtap
+ * ------------------------------------------------------------------ */
+
+/** Sleutel van een stap-taak: `maandrapport:<clientId>:<YYYY-MM>:<stap>`. Eén per klant, maand en stap. */
+export const STAP_PREFIX = "maandrapport:";
+export type RapportStap = "controleren" | "goedkeuren" | "versturen";
+export const stapKey = (clientId: string, period: string, stap: RapportStap) => `${STAP_PREFIX}${clientId}:${period}:${stap}`;
+export function parseStapKey(key: string | null | undefined): { clientId: string; period: string; stap: RapportStap } | null {
+  if (!key?.startsWith(STAP_PREFIX)) return null;
+  const [clientId, period, stap] = key.slice(STAP_PREFIX.length).split(":");
+  if (!clientId || !period || !/^\d{4}-\d{2}$/.test(period)) return null;
+  if (stap !== "controleren" && stap !== "goedkeuren" && stap !== "versturen") return null;
+  return { clientId, period, stap };
+}
+
+/** Korte maandnaam zonder jaar ("november"). */
+export function maandNaam(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  return new Date(Date.UTC(y!, m! - 1, 1)).toLocaleDateString("nl-NL", { month: "long", timeZone: "UTC" });
+}
+
+/**
+ * Compacte taaktitel: "Maandrapportage november • Interne en klantversie controleren".
+ * De klantnaam staat los (vet) op de takenpagina.
+ */
+export function stapTitel(period: string, stap: RapportStap, ookGoedkeuren: boolean): string {
+  const wat = stap === "controleren"
+    ? (ookGoedkeuren ? "Interne en klantversie controleren en goedkeuren" : "Interne en klantversie voorbereiden en controleren")
+    : stap === "goedkeuren"
+      ? "Interne en klantversie controleren en goedkeuren"
+      : "Klantversie versturen naar klantportaal";
+  return `Maandrapportage ${maandNaam(period)} • ${wat}`;
 }
 
 /* ------------------------------------------------------------------ *
@@ -75,7 +167,7 @@ export const FASE_LABEL: Record<ControleFase, string> = {
   ingepland: "Controle ingepland",
   in_controle: "Wordt gecontroleerd",
   klaar_voor_goedkeuring: "Klaar voor goedkeuring",
-  goedgekeurd: "Goedgekeurd, nog publiceren",
+  goedgekeurd: "Goedgekeurd, nog versturen",
   beschikbaar: "Goedgekeurd en beschikbaar voor klant",
 };
 
@@ -87,7 +179,7 @@ export type FaseInput = {
   gestart: boolean;
   /** Aantal verplichte controlepunten dat nog openstaat. */
   openChecks: number;
-  /** De maandtaak van de controleur: bestaat die, en heeft hij een controledag. */
+  /** De controletaak van deze klant en maand: bestaat die, en heeft hij een controledag. */
   batch: { exists: boolean; planned: boolean } | null;
 };
 

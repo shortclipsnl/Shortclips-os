@@ -19,6 +19,7 @@ import { getContractAttention } from "@/server/contracts";
 import { ContractAttentionBlock } from "../contracten/attention-block";
 import { getOpsOverview } from "@/server/ops-control/overview";
 import { OpsControlCard } from "./ops-control-card";
+import { CapacityTodayCard } from "./capacity-today-card";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
@@ -139,6 +140,9 @@ export default async function DashboardPage() {
       {/* Operationele controle (08:45, 13:30 stil en 15:30): status per onderdeel en open punten. */}
       {ops ? <OpsControlCard data={ops} /> : null}
 
+      {/* Productiecapaciteit: aantal knelpunten komende 3 maanden, details op Productie › Capaciteit. */}
+      {viewer.permissions.has("team:read") ? <CapacityTodayCard /> : null}
+
       {/* Dagstart: werkdagbalk + Vandaag, Eerstvolgende werkdag en Deze week afronden. */}
       <Dagstart
         personName={work.person.fullName}
@@ -153,6 +157,7 @@ export default async function DashboardPage() {
         laterCount={work.laterCount}
         workday={work.workday}
       />
+
 
       {/* Weekplanning: opnames en meetings die eraan komen. */}
       <WeekPlanning shoots={weekShoots} meetings={meetings} uploads={uploads} />

@@ -20,6 +20,8 @@ export type NavItem = {
   manageClients?: boolean;
   /** Zichtbaar voor de eigenaar + aangewezen teamleden van de offertemodule. */
   quotesAccess?: boolean;
+  /** Zichtbaar voor de eigenaar + Milou en Jiska (leadopvolging en omzetten). */
+  leadsAccess?: boolean;
   /** Zichtbaar voor de eigenaar + de operationeel beheerder (Milou). Voor de
    *  voorheen eigenaar-only operationele surfaces (koppelingen, portaal-instellingen). */
   manageOperations?: boolean;
@@ -74,11 +76,16 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/scripting", label: "Scripting", icon: "ScrollText", permissions: ["scripts:read"], match: "/scripting" },
       { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },
       { href: "/productions", label: "Opnames", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
+      { href: "/draaiboek", label: "Draaiboek", icon: "ClipboardList", permissions: ["productions:read"], match: "/draaiboek" },
       { href: "/videos", label: "Editing", editorLabel: "Editing Planning", icon: "Scissors", permissions: ["videos:read"], match: "/videos" },
+      // Wie zit vol, wie heeft ruimte en welke opnames komen eraan (niet voor editors).
+      { href: "/capaciteit", label: "Capaciteit", icon: "Gauge", permissions: ["productions:read", "team:read"], match: "/capaciteit" },
       // Persoonlijke klantenbibliotheek voor editors (eigen klanten + Editing Guide).
       { href: "/mijn-klanten", label: "Mijn klanten", icon: "BookOpen", match: "/mijn-klanten", editorsOnly: true },
       { href: "/showcase", label: "Showcase", icon: "Trophy", permissions: ["videos:read"], match: "/showcase", editorsOnly: true },
       { href: "/analytics", label: "Resultaten", icon: "TrendingUp", permissions: ["analytics:read"], match: "/analytics" },
+      // Contentgeheugen: wat per klant aantoonbaar werkt (formats, hooks, CTA's, video's).
+      { href: "/contentgeheugen", label: "Contentgeheugen", icon: "BrainCircuit", permissions: ["analytics:read"], match: "/contentgeheugen" },
       { href: "/analytics/maandrapportages", label: "Maandrapportages", icon: "FileText", permissions: ["reports:read", "reports:team_read"], match: "/analytics/maandrapportages" },
       { href: "/video-intelligence", label: "Video Intelligence", icon: "Sparkles", permissions: ["video_intelligence:read"], match: "/video-intelligence", section: "/analytics" },
     ],
@@ -102,7 +109,6 @@ export const NAVIGATION: NavGroup[] = [
     accent: "var(--color-warn)",
     items: [
       { href: "/team", label: "Teamoverzicht", icon: "Users", permissions: ["team:read", "editors:read"], match: "/team" },
-      { href: "/capaciteit", label: "Teamcapaciteit", icon: "Gauge", permissions: ["team:read", "editors:read"], match: "/capaciteit", section: "/team" },
       { href: "/doelen", label: "Doelen", icon: "Target", match: "/doelen", section: "/team" },
       { href: "/verlof", label: "Vakantie", icon: "Palmtree", match: "/verlof" },
       { href: "/meetings", label: "Teammeetings", icon: "Presentation", match: "/meetings" },
@@ -118,7 +124,7 @@ export const NAVIGATION: NavGroup[] = [
     title: "Sales",
     accent: "var(--color-lime)",
     items: [
-      { href: "/leads", label: "Leads", icon: "Target", ownerOnly: true, match: "/leads" },
+      { href: "/leads", label: "Leads", icon: "Target", leadsAccess: true, match: "/leads" },
       { href: "/offertes", label: "Offertes", icon: "FileSignature", quotesAccess: true, match: "/offertes" },
       // Interne prijslijst 2027: fase 1 alleen de eigenaar. Uitrol naar het team pas na akkoord van Jarno.
       { href: "/prijslijst", label: "Interne prijslijst 2027", icon: "Tags", ownerOnly: true, match: "/prijslijst" },

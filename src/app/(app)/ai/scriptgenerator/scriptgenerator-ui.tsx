@@ -171,6 +171,8 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
 
   // Resultaat (bewerkbaar)
   const [scripts, setScripts] = useState<EditorScript[] | null>(null);
+  // Waarop de scripts zijn gebaseerd (Metricool-resultaten, historie, doel).
+  const [basis, setBasis] = useState<string[]>([]);
   const [klantnaam, setKlantnaam] = useState("");
   const [opnamedag, setOpnamedag] = useState(todayNl());
   const [genClientId, setGenClientId] = useState<string>("");
@@ -295,6 +297,7 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
       if (res.ok) {
         const newItems = res.scripts.map((s: GeneratedScript) => ({ id: uid(), onderwerp: s.onderwerp, tekst: s.tekst, versions: [] as Version[], contentType: s.contentType ?? contentType, funnel: s.funnel }));
         setScripts(newItems);
+        setBasis(res.basis ?? []);
         setKlantnaam(res.klantnaam || effectiveClientName || "");
         const gcid = showOther ? "" : clientId;
         setGenClientId(gcid);
@@ -676,6 +679,16 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
             </div>
           );
         })()}
+
+        {/* Gebaseerd op: welke data de schrijver meekreeg (alleen bij een gekozen klant). */}
+        {basis.length > 0 ? (
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2.5 text-xs">
+            <div className="mb-1 text-2xs font-bold uppercase tracking-wide text-[var(--color-ink-muted)]">Gebaseerd op</div>
+            <ul className="space-y-0.5 text-[var(--color-ink)]">
+              {basis.map((b) => <li key={b}>{b}</li>)}
+            </ul>
+          </div>
+        ) : null}
 
         {/* Scripts — iteratief bewerkbaar */}
         {scripts.map((s, i) => {

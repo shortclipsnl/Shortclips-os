@@ -21,6 +21,7 @@ export * from "./client-library";
 export * from "./script-review";
 export * from "./caption-sets";
 export * from "./briefing";
+export * from "./draaiboek";
 export * from "./quotes";
 export * from "./ai-editor";
 export * from "./transfer";

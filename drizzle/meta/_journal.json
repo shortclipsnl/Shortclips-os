@@ -817,8 +817,22 @@
     {
       "idx": 116,
       "version": "7",
-      "when": 1794495116427,
-      "tag": "0116_content_research_v2",
+      "when": 1794491876930,
+      "tag": "0116_videograaf_draaiboek",
+      "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1794496000000,
+      "tag": "0117_metricool_publiceren",
+      "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1794506844068,
+      "tag": "0118_content_research_v2",
       "breakpoints": true
     }
   ]

@@ -3,7 +3,7 @@
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpRight, BarChart3, BellRing, Check, ChevronDown, Copy, Loader2, Pencil, Plus, Send, Trash2, Users, X } from "lucide-react";
+import { ArrowUpRight, BarChart3, BellRing, Gift, Check, ChevronDown, Copy, Loader2, Pencil, Plus, Send, Trash2, Users, X } from "lucide-react";
 import { createTask, createTasksBulk, deleteTask, setTaskStatus, updateTask } from "@/server/actions/tasks";
 import { Button, ClientLogo, ErrorNote, LinkButton, TeamAvatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -64,6 +64,14 @@ export type TaskItemData = {
   /** Automatische melding (feedbackherinnering, maandrapportage) → compacte weergave met actieknop. */
   signal?: TaskSignal | null;
 };
+
+/** Kleur van de statusregel van een maandrapportagetaak (oranje = wacht op cijfers of aanpassing). */
+function rapportStatusTone(status: string): string {
+  const s = status.toLowerCase();
+  if (s.includes("voorlopig") || s.includes("definitieve") || s.includes("aanpassing")) return "bg-[var(--color-warn-soft)] text-[#8a5300]";
+  if (s.startsWith("goedgekeurd")) return "bg-[var(--color-good-soft)] text-[var(--color-good)]";
+  return "bg-[var(--color-info-soft)] text-[var(--color-info)]";
+}
 
 const PRIORITIES = [
   { value: "low", label: "Laag" },
@@ -355,7 +363,7 @@ export function TaskItem({
   }
 
   const signal = task.signal ?? null;
-  const signalAccent = signal?.kind === "maandrapport" ? "var(--color-brand-500)" : "var(--color-warn)";
+  const signalAccent = signal?.kind === "maandrapport" ? "var(--color-brand-500)" : signal?.kind === "klantmoment" ? "var(--color-indigo-ink)" : "var(--color-warn)";
 
   // Gedeelde onderdelen van de taakregel (gewone taak en automatische melding).
   // Afvinkknop met positief belletje bij afronden.
@@ -455,7 +463,7 @@ export function TaskItem({
         style={{ color: signalAccent, background: `color-mix(in srgb, ${signalAccent} 18%, transparent)` }}
         aria-hidden
       >
-        {signal?.kind === "maandrapport" ? <BarChart3 className="size-4" /> : <BellRing className="size-4" />}
+        {signal?.kind === "maandrapport" ? <BarChart3 className="size-4" /> : signal?.kind === "klantmoment" ? <Gift className="size-4" /> : <BellRing className="size-4" />}
       </span>
       <span className="min-w-40 flex-1">
         {task.href ? (
@@ -470,6 +478,12 @@ export function TaskItem({
           {signal?.text}
           {signal?.meta ? <span className="text-[var(--color-ink-faint)]"> · {signal.meta}</span> : null}
         </span>
+        {signal?.kind === "maandrapport" && signal.status && !done ? (
+          <span className="mt-1 flex flex-wrap items-center gap-1.5 text-2xs">
+            <span className="text-[var(--color-ink-faint)]">Status:</span>
+            <span className={cn("rounded-full px-2 py-0.5 font-medium", rapportStatusTone(signal.status))}>{signal.status}</span>
+          </span>
+        ) : null}
       </span>
       {prioBadge}
       {avatarEl}
@@ -492,6 +506,11 @@ export function TaskItem({
       {!done && signal?.kind === "maandrapport" ? (
         <LinkButton size="sm" href={signal.actionHref}>
           <BarChart3 className="size-4" /> Bekijk rapportage
+        </LinkButton>
+      ) : null}
+      {!done && signal?.kind === "klantmoment" && signal.actionHref ? (
+        <LinkButton size="sm" variant="secondary" href={signal.actionHref}>
+          <Gift className="size-4" /> Naar klant
         </LinkButton>
       ) : null}
       {actionsEl}

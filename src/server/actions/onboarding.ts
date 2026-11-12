@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireOwner, requirePermission, ForbiddenError } from "@/server/auth/context";
+import { isOwner, requireLeadsAccess, requirePermission, ForbiddenError } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import {
   convertLead,
@@ -11,8 +11,15 @@ import {
   runOnboardingAutomation,
   refreshOnboarding,
   saveWelcomeMessage,
+  saveWhatsappLink,
+  markWelcomeSent,
+  confirmStepManually,
+  setKickoffManual,
+  setStepDisabled,
+  saveBriefing,
   type ConvertForm,
 } from "@/server/onboarding";
+import { linkFrameProjectsNow } from "@/server/jobs/frameio-library";
 
 function forbidden(e: unknown): { ok: false; message: string } | null {
   if (e instanceof ForbiddenError) return { ok: false, message: e.message };
@@ -22,10 +29,15 @@ function forbidden(e: unknown): { ok: false; message: string } | null {
 /** Gegevens voor het controlevenster "Omzetten naar klant". */
 export async function loadConvertForm(leadId: string): Promise<{ ok: true; form: ConvertForm } | { ok: false; message: string }> {
   try {
-    await requireOwner();
+    const viewer = await requireLeadsAccess();
     const form = await getConvertForm(leadId);
     if (!form) return { ok: false, message: "Lead niet gevonden." };
-    return { ok: true, form };
+    // Bedragen alleen voor de eigenaar.
+    if (!isOwner(viewer)) form.lead.expectedMonthly = null;
+    // Zet een projectmanager zelf om, dan staat die standaard als projectmanager.
+    const self = form.pms.find((p) => p.id === viewer.id);
+    if (self) form.defaultPmId = self.id;
+    return { ok: true, form: { ...form, canSeeAmounts: isOwner(viewer) } };
   } catch (e) {
     return forbidden(e) ?? { ok: false, message: "Gegevens ophalen mislukt. Probeer het opnieuw." };
   }
@@ -48,6 +60,7 @@ const convertSchema = z.object({
   notes: z.string().max(2000).nullable(),
   confirmSimilar: z.boolean(),
   linkToClientId: z.string().uuid().nullable().optional(),
+  team: z.array(z.string().uuid()).max(12).optional(),
 });
 
 export type ConvertActionResult =
@@ -60,11 +73,13 @@ export type ConvertActionResult =
  */
 export async function convertLeadWithOnboarding(raw: unknown): Promise<ConvertActionResult> {
   try {
-    const viewer = await requireOwner();
+    const viewer = await requireLeadsAccess();
     const parsed = convertSchema.safeParse(raw);
     if (!parsed.success) return { ok: false, message: "Niet alle velden zijn goed ingevuld." };
+    // Het maandbedrag vult alleen de eigenaar in; voor het team blijft het leeg.
+    const input = isOwner(viewer) ? parsed.data : { ...parsed.data, monthlyRevenue: null };
 
-    const res = await convertLead({ id: viewer.id, email: viewer.email }, parsed.data);
+    const res = await convertLead({ id: viewer.id, email: viewer.email }, input);
     if (!res.ok) return res;
 
     if (res.existing && !parsed.data.linkToClientId) {
@@ -129,4 +144,72 @@ export async function saveWelcomeMessageAction(clientId: string, slug: string, t
   } catch (e) {
     return forbidden(e) ?? { ok: false, message: "Opslaan mislukt." };
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Tabblad Onboarding: stappen afhandelen
+ * ------------------------------------------------------------------ */
+
+type Simple = { ok: boolean; message?: string };
+
+async function withClientWrite<T extends Simple>(slug: string, fn: (viewer: Awaited<ReturnType<typeof requirePermission>>) => Promise<T>): Promise<Simple> {
+  try {
+    const viewer = await requirePermission("clients:write");
+    const r = await fn(viewer);
+    revalidatePath(`/clients/${slug}`);
+    revalidatePath("/clients");
+    revalidatePath("/dashboard");
+    revalidatePath("/tasks");
+    return r;
+  } catch (e) {
+    console.error("[onboarding.action]", e);
+    return forbidden(e) ?? { ok: false, message: "Dat is niet gelukt. Probeer het opnieuw." };
+  }
+}
+
+export async function saveWhatsappLinkAction(clientId: string, slug: string, link: string) {
+  return withClientWrite(slug, (v) => saveWhatsappLink(clientId, link, v.email));
+}
+
+export async function markWelcomeSentAction(clientId: string, slug: string) {
+  return withClientWrite(slug, async (v) => {
+    await markWelcomeSent(clientId, v.email);
+    return { ok: true };
+  });
+}
+
+export async function confirmStepAction(clientId: string, slug: string, step: "contract" | "frame") {
+  return withClientWrite(slug, async (v) => {
+    if (step !== "contract" && step !== "frame") return { ok: false, message: "Onbekende stap." };
+    await confirmStepManually(clientId, step, v.email);
+    return { ok: true };
+  });
+}
+
+export async function setKickoffAction(clientId: string, slug: string, at: string | null) {
+  return withClientWrite(slug, (v) => setKickoffManual(clientId, at, v.email));
+}
+
+export async function setStepDisabledAction(clientId: string, slug: string, step: string, disabled: boolean) {
+  return withClientWrite(slug, (v) => setStepDisabled(clientId, step, disabled, { email: v.email, isOwner: isOwner(v) }));
+}
+
+const briefingSchema = z.record(z.string(), z.string().max(4000));
+
+export async function saveBriefingAction(clientId: string, slug: string, values: unknown) {
+  return withClientWrite(slug, async (v) => {
+    const parsed = briefingSchema.safeParse(values);
+    if (!parsed.success) return { ok: false, message: "De briefing is te lang of ongeldig." };
+    await saveBriefing(clientId, parsed.data, { id: v.id, email: v.email });
+    return { ok: true };
+  });
+}
+
+/** Frame.io nu doorzoeken op een project met de klantnaam (anders elke twee uur vanzelf). */
+export async function findFrameProjectAction(clientId: string, slug: string) {
+  return withClientWrite(slug, async () => {
+    const r = await linkFrameProjectsNow(clientId);
+    await refreshOnboarding(clientId);
+    return r.linked ? { ok: true, message: `Gekoppeld: ${r.name}` } : { ok: false, message: r.message };
+  });
 }
