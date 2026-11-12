@@ -58,6 +58,15 @@ const WANT: Network[] = ["instagram", "tiktok", "youtube", "facebook"];
 
 type Brand = { blogId: string; userId: string; networks: Network[] } | null;
 
+/** Merken uit Metricool, 10 minuten bewaard voor het tonen; bij inplannen altijd vers. */
+let brandCache: { at: number; brands: Awaited<ReturnType<typeof metricool.listBrands>> } | null = null;
+async function cachedBrands(fresh: boolean) {
+  if (!fresh && brandCache && Date.now() - brandCache.at < 10 * 60_000) return brandCache.brands;
+  const brands = await metricool.listBrands();
+  brandCache = { at: Date.now(), brands };
+  return brands;
+}
+
 async function brandFor(clientId: string, live: boolean): Promise<Brand> {
   const [link] = await db
     .select({ blogId: clientIntegrations.externalId, config: clientIntegrations.config })
@@ -68,9 +77,10 @@ async function brandFor(clientId: string, live: boolean): Promise<Brand> {
   const cfg = (link.config ?? {}) as { userId?: number | string; networks?: string[] };
   let networks = (cfg.networks ?? []).filter((n): n is Network => (NETWORKS as readonly string[]).includes(n));
   // Bij inplannen altijd de actuele kanalen uit Metricool, nooit een oude kopie.
-  if (live && metricool.isConfigured) {
+  // Ook als de kanalen nog nooit zijn opgeslagen (vóór de eerste nachtelijke koppeling).
+  if ((live || cfg.networks === undefined) && metricool.isConfigured) {
     try {
-      const b = (await metricool.listBrands()).find((x) => String(x.id) === String(link.blogId));
+      const b = (await cachedBrands(live)).find((x) => String(x.id) === String(link.blogId));
       if (!b) return null;
       networks = b.networks.filter((n): n is Network => (NETWORKS as readonly string[]).includes(n));
     } catch {
