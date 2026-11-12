@@ -23,7 +23,8 @@ ALTER TABLE "content_ideas" ADD COLUMN "opportunity" jsonb DEFAULT '{}'::jsonb N
 ALTER TABLE "content_ideas" ADD COLUMN "opportunity_score" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 ALTER TABLE "content_ideas" ADD COLUMN "middenstuk" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
 ALTER TABLE "content_ideas" ADD COLUMN "middenstuk_richting" text;--> statement-breakpoint
-ALTER TABLE "content_ideas" ADD COLUMN "cta" text;--> statement-breakpoint
+ALTER TABLE "content_ideas" ADD COLUMN "cta_commercieel" text;--> statement-breakpoint
+ALTER TABLE "content_ideas" ADD COLUMN "cta_interactie" text;--> statement-breakpoint
 ALTER TABLE "content_ideas" ADD COLUMN "invalshoek" text;--> statement-breakpoint
 ALTER TABLE "content_ideas" ADD COLUMN "herhaal_reden" text;--> statement-breakpoint
 ALTER TABLE "content_ideas" ADD COLUMN "forwarded_at" timestamp with time zone;--> statement-breakpoint

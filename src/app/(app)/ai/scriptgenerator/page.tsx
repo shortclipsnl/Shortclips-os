@@ -7,7 +7,7 @@ import { listClientsForScripts } from "@/server/ai/knowledge";
 import { aiConfigured } from "@/server/ai/client";
 import { InfoNote, PageHeader } from "@/components/ui";
 import { clientLearnedText } from "@/server/ai/knowledge";
-import { loadCompetitors, loadPriorScripts } from "@/server/content-research/sources";
+import { loadCompetitors, loadPriorScripts, loadToneOfVoice } from "@/server/content-research/sources";
 import { ScriptGeneratorChat } from "./scriptgenerator-ui";
 
 export const metadata: Metadata = { title: "Scriptgenerator" };
@@ -34,10 +34,11 @@ async function briefFromIdea(
     .limit(1);
   if (!idea || !hasClientAccess(viewer, idea.clientId)) return undefined;
 
-  const [competitors, prior, memory] = await Promise.all([
+  const [competitors, prior, memory, tone] = await Promise.all([
     loadCompetitors(idea.clientId).catch(() => []),
     loadPriorScripts(idea.clientId).catch(() => ({ count: 0, recent: [], texts: [] })),
     clientLearnedText(idea.clientId).catch(() => ""),
+    loadToneOfVoice(idea.clientId).catch(() => ""),
   ]);
 
   const allHooks = Array.isArray(idea.hooks) ? (idea.hooks as string[]) : [];
@@ -67,14 +68,16 @@ async function briefFromIdea(
     idea.concept ? `Concept: ${idea.concept}` : "",
     hooks[0] ? `Gekozen hook: ${hooks[0]}` : "",
     hooks.length > 1 ? `Alternatieve hooks:\n- ${hooks.slice(1).join("\n- ")}` : "",
-    middenstuk.length ? `Middenstuk, dit moet erin:\n- ${middenstuk.join("\n- ")}` : "",
+    middenstuk.length ? `Uitgeschreven middenstuk (voorstel, letterlijk):\n${middenstuk.join("\n")}` : "",
     idea.middenstukRichting ? `Richting voor het middenstuk (van het team, leidend):\n${idea.middenstukRichting}` : "",
-    idea.cta ? `Call to action: ${idea.cta}` : "",
+    idea.ctaCommercieel ? `Call to action, commercieel: ${idea.ctaCommercieel}` : "",
+    idea.ctaInteractie ? `Call to action, interactie: ${idea.ctaInteractie}` : "",
     idea.invalshoek ? `Creatieve invalshoek: ${idea.invalshoek}` : "",
     idea.doel ? `Doel van de video: ${idea.doel}` : "",
     evidence.length ? `Onderbouwing uit Content Research:\n${evidence.map((e) => `- (${e.zekerheid}) ${e.tekst}${e.url ? ` ${e.url}` : ""}`).join("\n")}` : idea.waaromWerkt ? `Waarom dit werkt: ${idea.waaromWerkt}` : "",
     compExamples.length ? `Voorbeelden bij concurrenten (inspiratie, niet kopiëren):\n${compExamples.join("\n")}` : "",
     similar.length ? `Eerdere scripts over een vergelijkbaar onderwerp (niet herhalen, wel van leren):\n${similar.map((s) => `- ${s.name}`).join("\n")}` : "",
+    tone ? `Tone of voice van de klant (schrijf hierin):\n${tone.split("\n").filter((l) => !l.startsWith("- ") && !l.startsWith("Zo communiceert")).slice(0, 6).join("\n")}` : "",
     memory ? `Uit het klantgeheugen:\n${memory.split("\n").slice(0, 6).join("\n")}` : "",
     idea.inspiratieUrl ? `Inspiratiebron: ${idea.inspiratieUrl}` : "",
   ].filter(Boolean);

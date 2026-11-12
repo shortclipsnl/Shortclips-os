@@ -3,11 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/server/auth/context";
 import { aiConfigured } from "@/server/ai/client";
-import { getClientContentResearch } from "@/server/content-research/service";
+import { getClientContentResearch, listContentResearchOverview } from "@/server/content-research/service";
 import { EmptyState, InfoNote, PageHeader } from "@/components/ui";
 import { ClientTabs, type TabDef } from "@/app/(app)/clients/[slug]/tabs";
 import { StartResearchButton } from "../start-research-button";
-import { ClientBand, IdeaCard, type IdeaView } from "../idea-card";
+import { ClientBand, IdeaRow, type IdeaView } from "../idea-card";
+import { ClientLogoStrip } from "../client-logo-strip";
 import { toIdeaView } from "@/server/content-research/idea-view";
 import { CompetitorsPanel } from "../competitors-panel";
 import { IdeaFilter } from "../idea-filter";
@@ -41,7 +42,7 @@ export default async function ContentResearchClientPage({
   const viewer = await requirePermission("content_research:read");
   const { clientId } = await params;
   const { tab, seed, filter } = await searchParams;
-  const data = await getClientContentResearch(viewer, clientId);
+  const [data, overview] = await Promise.all([getClientContentResearch(viewer, clientId), listContentResearchOverview(viewer)]);
   if (!data) notFound();
 
   const aiReady = aiConfigured();
@@ -102,13 +103,16 @@ export default async function ContentResearchClientPage({
         actions={<StartResearchButton clientId={clientId} running={running} variant="primary" label="Onderzoek opnieuw" />}
       />
 
+      <ClientLogoStrip activeId={clientId} clients={overview.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name, logoUrl: c.logoUrl, color: c.color, newIdeas: c.newIdeas }))} />
+
       <div className="sc-card mb-4 overflow-hidden"><ClientBand client={clientLook} size="lg" /></div>
 
       {!aiReady ? <div className="mb-5"><InfoNote>De AI staat uit (ANTHROPIC_API_KEY ontbreekt).</InfoNote></div> : null}
 
       <ClientTabs tabs={tabs} />
 
-      {current === "ideeen" ? <StrategicAdvice items={advies} /> : null}
+      {/* Strategisch advies staat bij Onderzoek: het ideeëntabblad blijft rustig. */}
+      {current === "onderzoek" ? <StrategicAdvice items={advies} /> : null}
 
       {current === "ideeen" ? (
         <div className="space-y-4">
@@ -119,14 +123,9 @@ export default async function ContentResearchClientPage({
               description={running ? "De ideeën verschijnen zodra het onderzoek klaar is (meestal binnen 10 minuten)." : "Kies een andere weergave of start een nieuw onderzoek."}
             />
           ) : (
-            <>
-              <p className="text-xs text-[var(--color-ink-faint)]">
-                Gesorteerd op Content Opportunity Score (0–100), met variatie in soort idee. Klik op een score voor de opbouw en welk deel op echte data rust. Een score is een prioritering, geen voorspelling van weergaven.
-              </p>
-              <div className="grid gap-4 md:grid-cols-2">
-                {shownIdeas.map((idea) => <IdeaCard key={idea.id} idea={idea} client={clientLook} />)}
-              </div>
-            </>
+            <ol className="sc-card divide-y divide-[var(--color-line)] overflow-hidden">
+              {shownIdeas.map((idea, n) => <IdeaRow key={idea.id} idea={idea} n={n + 1} clientName={data.client.name} />)}
+            </ol>
           )}
         </div>
       ) : null}

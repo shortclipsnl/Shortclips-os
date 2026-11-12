@@ -3,6 +3,7 @@ import { requirePermission } from "@/server/auth/context";
 import { aiConfigured } from "@/server/ai/client";
 import { listContentResearchOverview, listWeeklyIdeasByClient } from "@/server/content-research/service";
 import { WeeklyTop } from "./weekly-top";
+import { ClientLogoStrip } from "./client-logo-strip";
 import { InfoNote, PageHeader } from "@/components/ui";
 import { OverviewGrid } from "./overview-grid";
 
@@ -27,6 +28,8 @@ export default async function ContentResearchOverviewPage() {
           <InfoNote>De AI staat uit (ANTHROPIC_API_KEY ontbreekt). Onderzoek starten kan pas zodra de sleutel is ingesteld.</InfoNote>
         </div>
       ) : null}
+
+      <ClientLogoStrip clients={clients.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name, logoUrl: c.logoUrl, color: c.color, newIdeas: c.newIdeas }))} />
 
       <WeeklyTop groups={weekly} />
 

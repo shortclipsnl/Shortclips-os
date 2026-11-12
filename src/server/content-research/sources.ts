@@ -1,7 +1,9 @@
 import "server-only";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientKnowledge, contentCompetitors, contentIdeas } from "@/db/schema";
+import { clientKnowledge, contentCompetitors, contentIdeas, publications } from "@/db/schema";
+import { getClientAiProfile, type CaptionProfile } from "@/server/ai/knowledge";
+import { loadDna } from "./content-dna";
 import { listClientDriveScriptLinks, getClientDriveScriptTexts } from "@/server/scripts/drive-scripts";
 import { analysePosts, type PostAnalysis, type PostRow } from "./post-performance";
 
@@ -120,19 +122,67 @@ export async function loadClientMemoryCount(clientId: string): Promise<number> {
   return row?.n ?? 0;
 }
 
+/* ------------------------------- Tone of voice ------------------------------- */
+
+/**
+ * Hoe deze klant communiceert, uit bestaande bronnen (geen extra invoer):
+ * Content DNA, het captionprofiel, tone-of-voice-inzichten uit het klantgeheugen
+ * en de laatste echte captions die namens de klant zijn gepubliceerd.
+ */
+export async function loadToneOfVoice(clientId: string): Promise<string> {
+  const [dnaBundle, profile, memory, captions] = await Promise.all([
+    loadDna(clientId).catch(() => null),
+    getClientAiProfile(clientId).catch(() => null),
+    db
+      .select({ title: clientKnowledge.title, body: clientKnowledge.body })
+      .from(clientKnowledge)
+      .where(and(
+        eq(clientKnowledge.clientId, clientId),
+        isNull(clientKnowledge.deletedAt),
+        sql`${clientKnowledge.category} in ('tone_of_voice', 'avoid_words', 'hook_style', 'recurring_correction')`,
+      ))
+      .limit(12)
+      .catch(() => []),
+    db
+      .select({ caption: publications.caption })
+      .from(publications)
+      .where(and(eq(publications.clientId, clientId), isNull(publications.deletedAt), sql`length(coalesce(${publications.caption}, '')) > 30`))
+      .orderBy(desc(publications.publishedAt))
+      .limit(8)
+      .catch(() => []),
+  ]);
+  const lines: string[] = [];
+  const dna = dnaBundle?.dna;
+  if (dna?.toneOfVoice) lines.push(`Tone of voice (Content DNA): ${dna.toneOfVoice}`);
+  if (dna?.gewensteUitstraling) lines.push(`Gewenste uitstraling: ${dna.gewensteUitstraling}`);
+  if (dna?.doelgroep) lines.push(`Doelgroep: ${dna.doelgroep}`);
+  if (dna?.creatieveBeperkingen?.length) lines.push(`Niet doen: ${dna.creatieveBeperkingen.join(" · ")}`);
+  const cp = (profile?.captionProfile ?? {}) as CaptionProfile;
+  if (cp.toneOfVoice) lines.push(`Tone of voice (captionprofiel): ${cp.toneOfVoice}`);
+  if (cp.schrijfstijl) lines.push(`Schrijfstijl: ${cp.schrijfstijl}`);
+  for (const m of memory) lines.push(`Klantgeheugen: ${m.title}: ${m.body}`);
+  const seen = new Set<string>();
+  const samples = captions
+    .map((c) => (c.caption ?? "").replace(/\s+/g, " ").trim().slice(0, 280))
+    .filter((c) => c && !seen.has(c) && seen.add(c))
+    .slice(0, 6);
+  if (samples.length) lines.push(`Zo communiceert de klant zelf (recente captions):\n- ${samples.join("\n- ")}`);
+  return lines.join("\n");
+}
+
 /* ------------------------- Eerdere ideeën + hun uitkomst ------------------------- */
 
 /**
  * Eerdere ideeën met hun status. Zo weet het onderzoek wat al voorgesteld,
  * gebruikt of afgewezen is, en wat na publicatie goed presteerde.
  */
-export async function loadIdeaHistory(clientId: string): Promise<{ text: string; hashes: Set<string>; afgewezen: number }> {
+export async function loadIdeaHistory(clientId: string): Promise<{ text: string; rejectedText: string; hashes: Set<string>; afgewezen: number }> {
   const rows = await db
     .select({ titel: contentIdeas.titel, concept: contentIdeas.concept, status: contentIdeas.status, hash: contentIdeas.dedupeHash, reden: contentIdeas.rejectionReason })
     .from(contentIdeas)
     .where(and(eq(contentIdeas.clientId, clientId), isNull(contentIdeas.deletedAt)))
     .orderBy(desc(contentIdeas.createdAt))
-    .limit(120);
+    .limit(200);
   const hashes = new Set(rows.map((r) => r.hash).filter((h): h is string => Boolean(h)));
   const label: Record<string, string> = {
     nieuw: "voorgesteld, nog niet beoordeeld",
@@ -146,5 +196,7 @@ export async function loadIdeaHistory(clientId: string): Promise<{ text: string;
   const text = rows
     .map((r) => `- [${label[r.status] ?? r.status}] ${r.titel}${r.reden ? ` (reden: ${r.reden})` : ""}${r.concept ? `: ${r.concept.slice(0, 120)}` : ""}`)
     .join("\n");
-  return { text, hashes, afgewezen: rows.filter((r) => r.status === "afgewezen").length };
+  const rejected = rows.filter((r) => r.status === "afgewezen");
+  const rejectedText = rejected.map((r) => `- ${r.titel}${r.reden ? ` (reden: ${r.reden})` : ""}`).join("\n");
+  return { text, rejectedText, hashes, afgewezen: rejected.length };
 }

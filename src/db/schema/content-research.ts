@@ -116,14 +116,16 @@ export const contentIdeas = pgTable(
     /** Gewogen totaal 0–100 (berekend in code, niet door de AI). */
     opportunityScore: integer("opportunity_score").notNull().default(0),
     /**
-     * Wat er in het middenstuk van het script moet: 3–5 korte punten (info,
-     * voorbeelden, wat de klant moet aanleveren of laten zien): string[].
+     * Het uitgeschreven middenstuk: wat de persoon letterlijk zegt, één korte
+     * zin per regel (vaste Shortclips-scriptstijl): string[].
      */
     middenstuk: jsonb("middenstuk").notNull().default(sql`'[]'::jsonb`),
     /** Eigen richting van het team voor het middenstuk (gaat mee naar de Script Engine). */
     middenstukRichting: text("middenstuk_richting"),
-    /** Voorgestelde call to action. */
-    cta: text("cta"),
+    /** Commerciële call to action (aanvragen, leads, websitebezoek). */
+    ctaCommercieel: text("cta_commercieel"),
+    /** Interactie-call to action (reacties, herkenning, betrokkenheid). */
+    ctaInteractie: text("cta_interactie"),
     /** Creatieve invalshoek: waarmee we ons onderscheiden van wat anderen doen. */
     invalshoek: text("invalshoek"),
     /** Gevuld als een eerder behandeld onderwerp bewust opnieuw wordt aanbevolen. */

@@ -16,7 +16,8 @@ export type IdeaView = {
   hooks: string[];
   middenstuk: string[];
   middenstukRichting: string | null;
-  cta: string | null;
+  ctaCommercieel: string | null;
+  ctaInteractie: string | null;
   waaromWerkt: string | null;
   doel: string | null;
   inspiratieUrl: string | null;
@@ -47,7 +48,8 @@ export function toIdeaView(i: typeof contentIdeas.$inferSelect): IdeaView {
     hooks: Array.isArray(i.hooks) ? (i.hooks as string[]) : [],
     middenstuk: Array.isArray(i.middenstuk) ? (i.middenstuk as string[]) : [],
     middenstukRichting: i.middenstukRichting,
-    cta: i.cta,
+    ctaCommercieel: i.ctaCommercieel,
+    ctaInteractie: i.ctaInteractie,
     waaromWerkt: i.waaromWerkt,
     doel: i.doel,
     inspiratieUrl: i.inspiratieUrl,

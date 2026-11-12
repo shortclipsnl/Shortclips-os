@@ -19,6 +19,7 @@ import {
   loadIdeaHistory,
   loadPostAnalysis,
   loadPriorScripts,
+  loadToneOfVoice,
   priorScriptsToText,
 } from "./sources";
 import { normalizeOpportunity, opportunityTotal } from "./opportunity";
@@ -131,7 +132,7 @@ async function buildInternalContext(clientId: string): Promise<string> {
 
 /** Alle databronnen in één keer, plus een eerlijke telling voor de UI. */
 async function gatherSources(clientId: string, opts: { readScriptTexts: boolean }) {
-  const [internal, posts, report, prior, competitors, memory, history] = await Promise.all([
+  const [internal, posts, report, prior, competitors, memory, history, tone] = await Promise.all([
     buildInternalContext(clientId),
     loadPostAnalysis(clientId).catch(() => null),
     buildPerformanceContext(clientId).catch(() => ({ text: "", hasData: false, laatsteRapportage: null })),
@@ -139,6 +140,7 @@ async function gatherSources(clientId: string, opts: { readScriptTexts: boolean 
     loadCompetitors(clientId).catch(() => []),
     loadClientMemoryCount(clientId).catch(() => 0),
     loadIdeaHistory(clientId),
+    loadToneOfVoice(clientId).catch(() => ""),
   ]);
   const postsText = posts ? postAnalysisToText(posts) : "";
   const performanceText = [postsText, report.text].filter(Boolean).join("\n\n");
@@ -163,6 +165,7 @@ async function gatherSources(clientId: string, opts: { readScriptTexts: boolean 
     competitorsText: competitorsToText(competitors),
     competitors,
     history,
+    tone,
     dataBasis,
   };
 }
@@ -248,6 +251,8 @@ export async function runContentResearchJob(runId: string, opts: { budgetMs?: nu
       existingIdeasText: src.history.text,
       priorScriptsText: src.priorText,
       performanceText: src.performanceText,
+      toneText: src.tone,
+      rejectedText: src.history.rejectedText,
       // Is deze fase al eens afgebroken (tijdslimiet)? Dan het snellere model.
       model: phase2Attempts >= 1 ? aiModel() : undefined,
     });
@@ -275,7 +280,8 @@ export async function runContentResearchJob(runId: string, opts: { budgetMs?: nu
         concept: idea.concept,
         hooks: idea.hooks as unknown as Record<string, unknown>,
         middenstuk: idea.middenstuk as unknown as Record<string, unknown>,
-        cta: idea.cta || null,
+        ctaCommercieel: idea.ctaCommercieel || null,
+        ctaInteractie: idea.ctaInteractie || null,
         waaromWerkt: idea.waaromWerkt || null,
         doel: idea.doel || null,
         inspiratieUrl: idea.inspiratieUrl,

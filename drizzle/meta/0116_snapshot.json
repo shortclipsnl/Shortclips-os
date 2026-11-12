@@ -1,5 +1,5 @@
 {
-  "id": "9ce971d0-6df9-4e5c-8a50-8ce54b6e44c8",
+  "id": "870d4d23-041c-4d51-aedf-614909139f09",
   "prevId": "f4904e27-239c-4938-a4aa-225f62a2529f",
   "version": "7",
   "dialect": "postgresql",
@@ -21687,8 +21687,14 @@
           "primaryKey": false,
           "notNull": false
         },
-        "cta": {
-          "name": "cta",
+        "cta_commercieel": {
+          "name": "cta_commercieel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cta_interactie": {
+          "name": "cta_interactie",
           "type": "text",
           "primaryKey": false,
           "notNull": false

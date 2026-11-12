@@ -18,9 +18,10 @@ export type IdeaDraft = {
   uitvoerbaarheid: string;
   score: number;
   scoreReason: string;
-  /** Wat er in het middenstuk van het script moet (3–5 punten). */
+  /** Het uitgeschreven middenstuk: letterlijke tekst, één korte zin per regel. */
   middenstuk: string[];
-  cta: string;
+  ctaCommercieel: string;
+  ctaInteractie: string;
   /** Waarmee wij ons onderscheiden van wat de concurrent/markt doet. */
   invalshoek: string;
   onderbouwing: Evidence[];
@@ -144,16 +145,19 @@ Je bent de creatieve contentstrateeg van Shortclips en kent deze klant goed. Je 
 HARDE REGELS:
 - Verzin GEEN cijfers of nepvoorbeelden. Een inspiratiebron-URL geef je alléén als die echt in de briefing/bronnen staat; anders een lege string. Lege of niet-bekende velden zijn een lege string.
 - Vergelijk ieder idee INHOUDELIJK met de reeds bestaande ideeën en eerdere scripts (hieronder). Stel niets voor dat daar inhoudelijk op lijkt, en niets uit de lijst afgekeurde concepten.
-- Liever 4 uitstekende ideeën dan 8 matige. Maximaal 5 per week. Zorg voor variatie in categorie en format: niet alles uit één succesvol format.
+- Precies 5 ideeën, tenzij er echt minder sterke ideeën zijn. Zorg voor variatie in categorie en format: niet alles uit één succesvol format.
 - Een eerder behandeld onderwerp mag ALLEEN opnieuw als daar een duidelijke reden voor is (bijv. die video presteerde aantoonbaar ver boven de eigen mediaan, of een nieuwe invalshoek). Vul dan "herhaalReden" in; anders null.
 - Concurrentie is inspiratie, geen kopie: beschrijf in "invalshoek" hoe wij het onderwerp op een eigen, onderscheidende manier uitwerken.
 - "onderbouwing" bevat 1 tot 4 punten, elk met type (eigen_data = uit de EIGEN STATISTIEKEN, concurrent, markt, nieuw = nog niet eerder behandeld, herhaling), zekerheid (bewezen = staat letterlijk in de data/bron; aanname; hypothese) en een url als die echt in de bronnen staat. Verzin geen bewijs.
 - "opportunity": scoor elk onderdeel 0–10 en zet basis op "data" alleen als het rust op de eigen statistieken of een concrete bron; anders "inschatting". Toelichting per onderdeel maximaal 15 woorden.
-- Elk idee is direct bruikbaar voor de scriptschrijver (vaste Shortclips-scriptopbouw: uitleg, hook, middenstuk, call to action):
+- TONE OF VOICE: schrijf hooks, middenstuk en CTA's precies in de taal en stijl van DEZE klant (zie TONE OF VOICE VAN DE KLANT: Content DNA, klantgeheugen, eerdere scripts en hoe de klant zelf in captions communiceert). Formeel of informeel (je/u), woordkeuze, energie en humor zoals de klant dat doet. Geen generieke marketingtaal.
+- Elk idee is direct bruikbaar als script (vaste Shortclips-scriptopbouw: uitleg, hook, middenstuk, call to action):
   * "concept": in maximaal 3 zinnen wat we filmen en waarom dat interessant is voor de doelgroep.
-  * "hooks": precies 3 STERK VERSCHILLENDE openingszinnen om uit te kiezen (bijv. een vraag, een stellige of prikkelende uitspraak, en een visuele/situatie-opening). Kort, spreektaal, geen aanhalingstekens.
-  * "middenstuk": 3 tot 5 korte punten met wat er inhoudelijk in het middenstuk moet: de kerninformatie, het voorbeeld of bewijs, en wat de klant moet aanleveren of laten zien. Concreet, geen algemeenheden.
-  * "cta": één concrete call to action die past bij het doel.
+  * "hooks": precies 3 STERK VERSCHILLENDE openingszinnen om uit te kiezen (bijv. een vraag, een stellige of prikkelende uitspraak, en een visuele/situatie-opening). Letterlijk uit te spreken, kort, spreektaal, geen aanhalingstekens.
+  * "middenstuk": het UITGESCHREVEN middenstuk, letterlijk wat de persoon in beeld zegt, 5 tot 9 regels, één korte zin per regel, direct opneembaar. Geen beschrijving of opsomming van onderwerpen, geen regieaanwijzingen, geen aanhalingstekens. Gebruik [plaatshouder] voor gegevens die de klant moet aanleveren (prijs, aantal, naam) en verzin die gegevens niet.
+  * "ctaCommercieel": één uitgeschreven call to action gericht op aanvragen, leads, websitebezoek of conversie.
+  * "ctaInteractie": één uitgeschreven call to action gericht op reacties, herkenning, discussie of betrokkenheid.
+- Ideeën uit NIET RELEVANT BEVONDEN zijn door het team afgewezen: stel die NOOIT opnieuw voor, ook niet als variant met een andere titel. Leer van de reden.
 - Schrijf compact: concept maximaal 3 zinnen, onderbouwing per punt maximaal 2 zinnen. Geen herhaling tussen velden.
 - LENGTEBUDGET (het antwoord wordt anders afgekapt en is dan onbruikbaar): trends maximaal 5 korte zinnen; strategischAdvies maximaal 4 punten; concurrenten maximaal 6, observatie maximaal 2 zinnen; bronnen maximaal 10; Content DNA-lijsten maximaal 5 korte items. Het hele antwoord blijft onder de 4.000 woorden.
 - Elk idee is STERK onderbouwd: "onderbouwing" verwijst waar mogelijk naar wat bij deze klant aantoonbaar werkte (zie PRESTATIES), en "doel" benoemt concreet wat dit idee voor de klant oplevert (bijv. meer bekendheid, vertrouwen opbouwen, aanvragen, sollicitanten, verkoop).
@@ -169,8 +173,16 @@ function buildIdeaUser(input: {
   existingIdeasText: string;
   priorScriptsText: string;
   performanceText: string;
+  toneText: string;
+  rejectedText: string;
 }): string {
   return `Klant: ${input.clientName}
+
+TONE OF VOICE VAN DE KLANT (schrijf hooks, middenstuk en CTA's in deze stijl):
+${input.toneText.slice(0, 5000) || "(nog niet vastgelegd: leid de stijl af uit de eerdere scripts en het Content DNA, en houd het neutraal-professioneel)"}
+
+NIET RELEVANT BEVONDEN (nooit opnieuw voorstellen, ook niet als variant):
+${input.rejectedText.slice(0, 3000) || "(geen)"}
 
 ${input.performanceText ? `${input.performanceText.slice(0, 8000)}\n\n` : ""}ONDERZOEKSBRIEFING:
 ${input.briefing.slice(0, 20000)}
@@ -210,8 +222,9 @@ Geef JSON in exact dit formaat:
       "titel": "",
       "concept": "wat we concreet filmen",
       "hooks": ["hook 1 (vraag)", "hook 2 (stelling)", "hook 3 (visueel/situatie)"],
-      "middenstuk": ["kernpunt 1", "kernpunt 2", "kernpunt 3"],
-      "cta": "",
+      "middenstuk": ["Letterlijke zin 1.", "Letterlijke zin 2.", "Letterlijke zin 3.", "Letterlijke zin 4.", "Letterlijke zin 5."],
+      "ctaCommercieel": "",
+      "ctaInteractie": "",
       "doel": "wat dit idee voor de klant oplevert (bekendheid|vertrouwen|aanvragen|sollicitanten|verkoop|...)",
       "inspiratieUrl": "",
       "categorie": "humor|educatief|teamcontent|trends|productcontent|seizoen|overig",
@@ -327,7 +340,8 @@ const RESEARCH_SCHEMA = obj({
     concept: str_,
     hooks: strArr,
     middenstuk: strArr,
-    cta: str_,
+    ctaCommercieel: str_,
+    ctaInteractie: str_,
     doel: str_,
     inspiratieUrl: str_,
     categorie: str_,
@@ -365,6 +379,10 @@ export async function ideateFromBriefing(input: {
   existingIdeasText: string;
   priorScriptsText: string;
   performanceText?: string;
+  /** Hoe de klant communiceert: tone of voice, voorbeelden uit captions en scripts. */
+  toneText?: string;
+  /** Door het team als niet relevant afgewezen ideeën (met reden). */
+  rejectedText?: string;
   /** Sneller model als terugval (na een eerdere time-out). Standaard het sterke model. */
   model?: string;
 }): Promise<{ ok: true; data: ResearchOutput } | { ok: false; reason: "no_provider" | "error"; error?: string }> {
@@ -378,6 +396,8 @@ export async function ideateFromBriefing(input: {
       existingIdeasText: input.existingIdeasText,
       priorScriptsText: input.priorScriptsText,
       performanceText,
+      toneText: input.toneText ?? "",
+      rejectedText: input.rejectedText ?? "",
     })),
     model: input.model ?? aiModelStrong(),
     // Ruim boven de verwachte ~8k tokens, zodat het JSON-antwoord nooit wordt
@@ -407,8 +427,9 @@ export async function ideateFromBriefing(input: {
         titel: titel.slice(0, 240),
         concept: str(o.concept),
         hooks: strList(o.hooks, 3),
-        middenstuk: strList(o.middenstuk, 5),
-        cta: str(o.cta).slice(0, 300),
+        middenstuk: strList(o.middenstuk, 12),
+        ctaCommercieel: str(o.ctaCommercieel).slice(0, 300),
+        ctaInteractie: str(o.ctaInteractie).slice(0, 300),
         waaromWerkt: str(o.waaromWerkt),
         doel: str(o.doel),
         inspiratieUrl: /^https?:\/\//.test(url) ? url : null,
