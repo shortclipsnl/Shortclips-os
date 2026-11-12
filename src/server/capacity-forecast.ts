@@ -16,7 +16,8 @@ import { EDITOR_LEAD_DAYS, CLIENT_LEAD_DAYS } from "@/lib/edit-deadline";
  *
  *  - Opnames: production_days (uit Google Agenda), met videograaf, editor,
  *    start- en eindtijd, geplande shorts en editingfase.
- *  - Editors: capacity_people (eenheid shorts per 4 weken) → video's per week.
+ *  - Editors: afgeleid uit de editingplanning (drukste week), het teamgemiddelde
+ *    en eventueel capacity_people; afwezigheid uit Vakantie en het eigen portaal.
  *  - Videografen: capacity_people (werkdagen per week, of opnames per 4 weken).
  *  - Verlof: goedgekeurde leave_requests.
  *  - Pakketten: clients.monthly_video_quota en de vaste editor (editor_name).
@@ -169,6 +170,9 @@ export async function loadCapacityData(): Promise<CapacityData> {
   const stale: CapacityData["stale"] = [];
   const lastByClient = new Map<string, { vg: string | null; date: string; dur: number; travel: number }>();
   const weekStart = mondayOf(today);
+  // Editingplanning: video's per editor per week (op opnamedatum), voor de
+  // afgeleide editorcapaciteit. Alleen opnames die al geweest zijn.
+  const edWeekVideos = new Map<string, Map<string, number>>();
 
   for (const r of pdRows.sort((a, b) => (a.date < b.date ? -1 : 1))) {
     const durRaw = hoursBetween(r.start as string | null, r.end as string | null);
@@ -203,6 +207,17 @@ export async function loadCapacityData(): Promise<CapacityData> {
         videoEditor = videoEditor ?? v.editor;
       }
       if (!Object.keys(counts).length) continue; // alle video's klaar
+    }
+    if (r.date < today) {
+      const ed = r.editor ?? vids?.find((v) => v.editor)?.editor ?? null;
+      if (ed) {
+        // Eén opname is één batch (6 tot 8 video's); geïmporteerde losse video's kunnen meer tonen.
+        const n = Math.min(8, vids && vids.some((v) => v.frame) ? vids.filter((v) => v.frame).length : shorts);
+        const wk = mondayOf(r.date);
+        const m = edWeekVideos.get(ed) ?? new Map<string, number>();
+        m.set(wk, (m.get(wk) ?? 0) + n);
+        edWeekVideos.set(ed, m);
+      }
     }
     if (r.date < today && (counts || r.editStatus !== "afgerond")) {
       const clientDue = r.editDueOn ?? addWorkingDays(r.date, CLIENT_LEAD_DAYS, holidaysSet);
@@ -254,7 +269,7 @@ export async function loadCapacityData(): Promise<CapacityData> {
   const allIds = [...new Set([...vgIds, ...edIds])];
   const userRows = allIds.length
     ? await db
-        .select({ id: users.id, name: users.fullName, isStaff: users.isStaff, status: users.status })
+        .select({ id: users.id, name: users.fullName, isStaff: users.isStaff, status: users.status, periods: users.availabilityPeriods })
         .from(users)
         // Alleen actieve portaalaccounts; werk van niet-actieve mensen komt bij "nog geen".
         .where(and(inArray(users.id, allIds), isNull(users.deletedAt), eq(users.status, "active")))
@@ -271,7 +286,36 @@ export async function loadCapacityData(): Promise<CapacityData> {
     arr.push([l.startOn, l.endOn]);
     leaveBy.set(l.userId, arr);
   }
+  // Niet beschikbaar volgens het eigen portaal (Vandaag › Beschikbaarheid) telt als afwezig.
+  for (const u of userRows) {
+    for (const per of u.periods ?? []) {
+      if (!per.from) continue; // terugkerende vrije tekst zonder datum: niet te rekenen
+      const end = per.to && per.to >= per.from ? per.to : per.from;
+      if (end < weekStart || per.from > until) continue;
+      const arr = leaveBy.get(u.id) ?? [];
+      arr.push([per.from, end]);
+      leaveBy.set(u.id, arr);
+    }
+  }
   const capBy = new Map(capRows.filter((c) => c.userId).map((c) => [c.userId!, c]));
+
+  // Editorcapaciteit volgt de data, niet een vast getal: het hoogste van
+  //  - de drukste week die al in de editingplanning voor deze editor stond,
+  //  - het teamgemiddelde (zolang er voor iemand nog weinig is ingepland),
+  //  - een eventueel door de eigenaar ingestelde waarde.
+  const MIN_EDITOR_WEEK = 6; // één batch van een draaidag
+  const manualWeek = (id: string): number | null => {
+    const c = capBy.get(id);
+    const v = c?.unit === "shorts_4w" ? num(c?.limitMax) ?? num(c?.limitOrange) ?? num(c?.limitGreen) : null;
+    return v && v > 0 ? v / 4 : null;
+  };
+  const peakWeek = (id: string): number => Math.max(0, ...(edWeekVideos.get(id)?.values() ?? []));
+  const ownBase = (id: string) => Math.max(manualWeek(id) ?? 0, peakWeek(id));
+  const known = userRows.filter((u) => edIds.has(u.id)).map((u) => ownBase(u.id)).filter((v) => v > 0).sort((a, b) => a - b);
+  const teamStandard = Math.max(
+    MIN_EDITOR_WEEK,
+    known.length ? Math.round((known.length % 2 ? known[(known.length - 1) / 2]! : (known[known.length / 2 - 1]! + known[known.length / 2]!) / 2) * 10) / 10 : MIN_EDITOR_WEEK,
+  );
 
   const people: CapPerson[] = [];
   for (const u of userRows) {
@@ -298,14 +342,17 @@ export async function loadCapacityData(): Promise<CapacityData> {
       });
     }
     if (edIds.has(u.id) && !(vgIds.has(u.id) && !capRows.some((c) => c.userId === u.id && c.unit === "shorts_4w"))) {
-      // 100% = het plafond (max), anders oranje of groen. De kleurgrenzen (80/100%)
-      // zorgen zelf al voor de waarschuwing vóór het plafond.
-      const cap4w = cap?.unit === "shorts_4w" ? num(cap?.limitMax) ?? num(cap?.limitOrange) ?? num(cap?.limitGreen) : null;
-      const perWeek = cap4w && cap4w > 0 ? Math.round((cap4w / 4) * 10) / 10 : null;
+      // 100% = het plafond. De capaciteit groeit vanzelf mee met wat er werkelijk
+      // voor deze editor wordt ingepland; afwezigheid uit het portaal gaat eraf.
+      const peak = peakWeek(u.id);
+      const manual = manualWeek(u.id);
+      const raw = Math.max(peak, manual ?? 0, teamStandard);
+      const perWeek = Math.round(raw * 10) / 10;
+      const src = peak >= raw ? "drukste week tot nu toe" : manual && manual >= raw ? "ingesteld" : "teamgemiddelde, groeit mee met de planning";
       people.push({
         id: u.id, name: first, role: "editor", employment: explicit ?? "freelance",
-        shortsPerWeek: perWeek, pattern: perWeek ? [1, 2, 3, 4, 5] : null, leave,
-        capacityNote: perWeek ? `${String(perWeek).replace(".", ",")} video's per week` : "Capaciteit niet vastgelegd",
+        shortsPerWeek: perWeek, pattern: [1, 2, 3, 4, 5], leave,
+        capacityNote: `${String(perWeek).replace(".", ",")} video's per week (${src})`,
       });
     }
   }

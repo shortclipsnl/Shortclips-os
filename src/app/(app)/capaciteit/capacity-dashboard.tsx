@@ -485,7 +485,7 @@ function DrawerBody({ d, R, RP, WMAP, K, P, st, SIG, data, setDrawer, peaks }: a
           <div className="cap-chips">{row.cells.slice(0, 8).map((c: any, wi: number) => (
             <button key={wi} className={`cap-pill cap-wk ${c.key}`} onClick={() => setDrawer({ type: "cell", kind: vg ? "vg" : "ed", pid: p.id, i: wi, r: "w" })}><span>wk {c.wk.num}</span>{pillText(c)}</button>
           ))}</div>
-          {p.leave?.length ? <><div className="cap-dsec">Afwezig (uit Vakantie)</div><div className="cap-chips">{p.leave.map(([a, b]: string[]) => <span className="cap-chip" key={a}>{E.fmtDay(a)} t/m {E.fmtDay(b)}</span>)}</div></> : null}
+          {p.leave?.length ? <><div className="cap-dsec">Afwezig (uit Vakantie en eigen beschikbaarheid)</div><div className="cap-chips">{p.leave.map(([a, b]: string[]) => <span className="cap-chip" key={a}>{E.fmtDay(a)} t/m {E.fmtDay(b)}</span>)}</div></> : null}
           <div className="cap-dsec">{vg ? "Geplande opnames" : "Lopende en verwachte opdrachten"}</div>
           {items.length ? (
             <div className="cap-list">{items.slice(0, 20).map((x: any) => (
