@@ -9,8 +9,8 @@ import { HistoryList, type HistoryRow } from "./history-list";
 export const metadata: Metadata = { title: "AI-geschiedenis" };
 export const dynamic = "force-dynamic";
 
-const TOOL_LABEL: Record<string, string> = { caption: "Caption", briefing: "Briefing", message: "Klantbericht" };
-const TOOL_HREF: Record<string, string> = { caption: "/ai/caption", briefing: "/ai/briefing", message: "/ai/bericht" };
+const TOOL_LABEL: Record<string, string> = { caption: "Caption", briefing: "Briefing", message: "Klantbericht", contentgeheugen: "Contentgeheugen" };
+const TOOL_HREF: Record<string, string> = { caption: "/ai/caption", briefing: "/ai/briefing", message: "/ai/bericht", contentgeheugen: "/contentgeheugen" };
 
 export default async function GeschiedenisPage() {
   const viewer = await requirePermission("ai:history_read");

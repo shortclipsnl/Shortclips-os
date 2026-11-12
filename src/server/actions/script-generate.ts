@@ -13,6 +13,7 @@ import { adScriptGeneratorSystem, adFormatRules, FUNNEL_GUIDE, FUNNEL_LABEL, typ
 import { getClientAiProfile, captionProfileToText, clientLearnedText, centralKnowledgeText, type CaptionProfile } from "@/server/ai/knowledge";
 import { gatherFeedbackContext, estimateSpeakingTime, DEFAULT_WPM } from "@/server/script-control";
 import { getClientWinningPatterns } from "@/server/scripts/winning-patterns";
+import { contentMemoryTextForClient } from "@/server/content-memory";
 import { getClientDriveScriptPdfs } from "@/server/scripts/drive-scripts";
 import { getIntelligenceOverview } from "@/server/video-intelligence/intelligence";
 import { learnedFeedbackText, saveScriptFeedback, listScriptFeedback, deleteScriptFeedback, type FeedbackScope, type LearnedRule } from "@/server/scripts/script-feedback";
@@ -192,6 +193,9 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
     ? [nextShoot.locationName, nextShoot.locationAddress].filter(Boolean).join(" — ")
     : null;
 
+  // Contentgeheugen: formats, hooks, CTA's en succesformules met echte cijfers.
+  const memoryText = await contentMemoryTextForClient(viewer, c.id, { isAd }).catch(() => "");
+
   const viLines = intel
     ? [
         intel.speech?.avgWpm ? `Gemiddelde spreeksnelheid uit Video Intelligence: ${intel.speech.avgWpm} wpm (houd de lengte hierop af).` : "",
@@ -208,6 +212,7 @@ async function clientContext(viewer: Awaited<ReturnType<typeof requirePermission
     feedback.recenteScriptfeedback.length ? `Recente klantfeedback op eerdere SCRIPTS (uit de scriptcontrole in het portaal — verwerk dit en maak deze opmerkingen niet opnieuw):\n- ${feedback.recenteScriptfeedback.join("\n- ")}` : "",
     learned ? `Geleerde voorkeuren en correcties van deze klant:\n${learned}` : "",
     patterns && patterns.count > 0 ? `Best presterende hooks van deze klant (echte cijfers${isAd ? " — organisch bereik, GEEN bewijs dat een advertentie converteert; gebruik als inspiratie, niet als resultaat" : " — spiegelen, niet kopiëren"}):\n${patterns.top.map((p) => `- "${p.hook}" (${p.views} views)`).join("\n")}` : "",
+    memoryText,
     viLines,
     recent.length ? `Eerder geschreven ${isAd ? "advertentiescripts" : "onderwerpen"} voor deze klant (voorkom herhaling, tenzij je een sterk format bewust opnieuw gebruikt):\n- ${recent.map((r) => r.title).join("\n- ")}` : "",
     isAd ? "LET OP: dit zijn advertentiescripts. Schrijf vanuit het advertentiedoel en de funnelfase, niet vanuit organisch bereik. Gebruik alleen daadwerkelijk beschikbare commerciële gegevens; verzin geen cijfers, prijzen of claims." : "",

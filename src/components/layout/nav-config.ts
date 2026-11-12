@@ -79,6 +79,8 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/mijn-klanten", label: "Mijn klanten", icon: "BookOpen", match: "/mijn-klanten", editorsOnly: true },
       { href: "/showcase", label: "Showcase", icon: "Trophy", permissions: ["videos:read"], match: "/showcase", editorsOnly: true },
       { href: "/analytics", label: "Resultaten", icon: "TrendingUp", permissions: ["analytics:read"], match: "/analytics" },
+      // Contentgeheugen: wat per klant aantoonbaar werkt (formats, hooks, CTA's, video's).
+      { href: "/contentgeheugen", label: "Contentgeheugen", icon: "BrainCircuit", permissions: ["analytics:read"], match: "/contentgeheugen" },
       { href: "/analytics/maandrapportages", label: "Maandrapportages", icon: "FileText", permissions: ["reports:read", "reports:team_read"], match: "/analytics/maandrapportages" },
       { href: "/video-intelligence", label: "Video Intelligence", icon: "Sparkles", permissions: ["video_intelligence:read"], match: "/video-intelligence", section: "/analytics" },
     ],

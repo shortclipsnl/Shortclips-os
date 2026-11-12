@@ -13,6 +13,7 @@
     { "path": "/api/jobs/run?job=metricool.link_brands", "schedule": "10 4 * * *" },
     { "path": "/api/jobs/run?job=metricool.pull_metrics", "schedule": "15 4 * * *" },
     { "path": "/api/jobs/run?job=metricool.pull_posts_recent", "schedule": "25 4 * * *" },
+    { "path": "/api/jobs/run?job=content_memory.refresh", "schedule": "*/20 5-6 * * *" },
     { "path": "/api/jobs/run?job=reminders.next_day_todo&slot=zomer", "schedule": "45 14 * * 1-5" },
     { "path": "/api/jobs/run?job=reminders.next_day_todo&slot=winter", "schedule": "45 15 * * 1-5" },
     { "path": "/api/jobs/run?job=vrijdagcheck.notify", "schedule": "0 7 * * 5" },
