@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clients,
@@ -17,6 +17,8 @@ import { gatherFeedbackContext } from "@/server/script-control";
 import { getClientWinningPatterns } from "@/server/scripts/winning-patterns";
 import { loadDna, dnaToText, type ContentDna } from "./content-dna";
 import { buildPerformanceContext } from "./performance";
+import { loadStoredStyle, type StoredStyle } from "./style";
+import { styleToText } from "./style-core";
 
 export type OverviewClient = {
   id: string;
@@ -135,6 +137,9 @@ export async function listWeeklyIdeasByClient(viewer: Viewer, perClient = 5): Pr
       isNull(contentIdeas.deletedAt),
       inArray(contentIdeas.status, ["nieuw", "favoriet", "opgeslagen", "doorgestuurd"]),
       gte(contentIdeas.createdAt, since),
+      // Alleen ideeën die door de kwaliteitskeuring kwamen (80+, stijl-fit 8+).
+      isNotNull(contentIdeas.keuring),
+      gte(contentIdeas.opportunityScore, 80),
       inArray(contentIdeas.clientId, clientsList.map((c) => c.id)),
       scope ?? undefined,
     ))
@@ -161,6 +166,7 @@ export type RunRow = {
   sources: unknown;
   strategicAdvice: unknown;
   dataBasis: unknown;
+  kandidaten: unknown;
   heartbeatAt: Date | null;
   ideasCount: number;
   newCount: number;
@@ -180,6 +186,8 @@ export type ClientResearch = {
   competitors: Array<typeof contentCompetitors.$inferSelect>;
   /** Loopt er nu een onderzoek (bezig én recente hartslag)? */
   running: boolean;
+  /** Stijlprofiel uit de echte scripts + teamcorrecties. */
+  style: StoredStyle;
 };
 
 /** Volledige per-klant weergave (intern). Hard gescoopt op klanttoegang. */
@@ -192,7 +200,7 @@ export async function getClientContentResearch(viewer: Viewer, clientId: string)
   if (!client) return null;
   assertClientAccess(viewer, client.id);
 
-  const [runs, ideas, dnaBundle, conversations, competitors] = await Promise.all([
+  const [runs, ideas, dnaBundle, conversations, competitors, style] = await Promise.all([
     db
       .select({
         id: contentResearchRuns.id,
@@ -203,6 +211,7 @@ export async function getClientContentResearch(viewer: Viewer, clientId: string)
         sources: contentResearchRuns.sources,
         strategicAdvice: contentResearchRuns.strategicAdvice,
         dataBasis: contentResearchRuns.dataBasis,
+        kandidaten: contentResearchRuns.kandidaten,
         heartbeatAt: contentResearchRuns.heartbeatAt,
         ideasCount: contentResearchRuns.ideasCount,
         newCount: contentResearchRuns.newCount,
@@ -238,13 +247,14 @@ export async function getClientContentResearch(viewer: Viewer, clientId: string)
       .from(contentCompetitors)
       .where(and(eq(contentCompetitors.clientId, clientId), isNull(contentCompetitors.deletedAt)))
       .orderBy(desc(contentCompetitors.actief), contentCompetitors.naam),
+    loadStoredStyle(clientId),
   ]);
 
   const latest = runs[0];
   const running = Boolean(
     latest && latest.status === "bezig" && (Date.now() - (latest.heartbeatAt ?? latest.createdAt).getTime()) / 60000 < STALE_MIN,
   );
-  return { client, runs, ideas, dna: dnaBundle.dna, manualNotes: dnaBundle.manualNotes, conversations, competitors, running };
+  return { client, runs, ideas, dna: dnaBundle.dna, manualNotes: dnaBundle.manualNotes, conversations, competitors, running, style };
 }
 
 /**
@@ -253,7 +263,7 @@ export async function getClientContentResearch(viewer: Viewer, clientId: string)
  * onderzoek en wat er bij deze klant aantoonbaar werkt (Video Intelligence).
  */
 export async function buildContentContext(viewer: Viewer, clientId: string, clientName: string): Promise<string> {
-  const [dnaBundle, feedback, learned, patterns, savedIdeas, lastRun, performance] = await Promise.all([
+  const [dnaBundle, feedback, learned, patterns, savedIdeas, lastRun, performance, style] = await Promise.all([
     loadDna(clientId),
     gatherFeedbackContext(clientId).catch(() => null),
     clientLearnedText(clientId).catch(() => ""),
@@ -271,9 +281,12 @@ export async function buildContentContext(viewer: Viewer, clientId: string, clie
       .orderBy(desc(contentResearchRuns.finishedAt))
       .limit(1),
     buildPerformanceContext(clientId).catch(() => ({ text: "", hasData: false, laatsteRapportage: null })),
+    loadStoredStyle(clientId).catch(() => null),
   ]);
 
   const parts: string[] = [`Klant: ${clientName}`];
+  const styleText = style ? styleToText(style.profile, style.notes) : "";
+  if (styleText) parts.push(`STIJLPROFIEL UIT DE ECHTE SCRIPTS (schrijf hooks in deze stijl):\n${styleText}`);
   if (performance.text) parts.push(performance.text);
   const dnaText = dnaToText(dnaBundle.dna);
   if (dnaText) parts.push(`CONTENT DNA:\n${dnaText}`);

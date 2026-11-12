@@ -8,6 +8,9 @@ import { aiConfigured } from "@/server/ai/client";
 import { InfoNote, PageHeader } from "@/components/ui";
 import { clientLearnedText } from "@/server/ai/knowledge";
 import { loadCompetitors, loadPriorScripts, loadToneOfVoice } from "@/server/content-research/sources";
+import { loadStoredStyle } from "@/server/content-research/style";
+import { readKeuring } from "@/server/content-research/quality";
+import { styleToText } from "@/server/content-research/style-core";
 import { ScriptGeneratorChat } from "./scriptgenerator-ui";
 
 export const metadata: Metadata = { title: "Scriptgenerator" };
@@ -34,11 +37,12 @@ async function briefFromIdea(
     .limit(1);
   if (!idea || !hasClientAccess(viewer, idea.clientId)) return undefined;
 
-  const [competitors, prior, memory, tone] = await Promise.all([
+  const [competitors, prior, memory, tone, style] = await Promise.all([
     loadCompetitors(idea.clientId).catch(() => []),
     loadPriorScripts(idea.clientId).catch(() => ({ count: 0, recent: [], texts: [] })),
     clientLearnedText(idea.clientId).catch(() => ""),
     loadToneOfVoice(idea.clientId).catch(() => ""),
+    loadStoredStyle(idea.clientId).catch(() => null),
   ]);
 
   const allHooks = Array.isArray(idea.hooks) ? (idea.hooks as string[]) : [];
@@ -74,10 +78,16 @@ async function briefFromIdea(
     idea.ctaInteractie ? `Call to action, interactie: ${idea.ctaInteractie}` : "",
     idea.invalshoek ? `Creatieve invalshoek: ${idea.invalshoek}` : "",
     idea.doel ? `Doel van de video: ${idea.doel}` : "",
+    readKeuring(idea.keuring)?.aanscherpen?.length
+      ? `Aanscherpen volgens de eindredactie (verwerk dit in het script):\n${readKeuring(idea.keuring)!.aanscherpen!.map((a) => `- ${a}`).join("\n")}`
+      : "",
     evidence.length ? `Onderbouwing uit Content Research:\n${evidence.map((e) => `- (${e.zekerheid}) ${e.tekst}${e.url ? ` ${e.url}` : ""}`).join("\n")}` : idea.waaromWerkt ? `Waarom dit werkt: ${idea.waaromWerkt}` : "",
     compExamples.length ? `Voorbeelden bij concurrenten (inspiratie, niet kopiëren):\n${compExamples.join("\n")}` : "",
     similar.length ? `Eerdere scripts over een vergelijkbaar onderwerp (niet herhalen, wel van leren):\n${similar.map((s) => `- ${s.name}`).join("\n")}` : "",
-    tone ? `Tone of voice van de klant (schrijf hierin):\n${tone.split("\n").filter((l) => !l.startsWith("- ") && !l.startsWith("Zo communiceert")).slice(0, 6).join("\n")}` : "",
+    style && styleToText(style.profile, style.notes)
+      ? `Stijl van deze klant (uit onze eerdere scripts; schrijf precies zo):\n${styleToText(style.profile, style.notes).slice(0, 5000)}`
+      : "",
+    tone ? `Aanvullend (klantgeheugen):\n${tone.split("\n").slice(0, 6).join("\n")}` : "",
     memory ? `Uit het klantgeheugen:\n${memory.split("\n").slice(0, 6).join("\n")}` : "",
     idea.inspiratieUrl ? `Inspiratiebron: ${idea.inspiratieUrl}` : "",
   ].filter(Boolean);

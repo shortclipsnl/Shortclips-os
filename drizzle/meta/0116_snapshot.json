@@ -1,5 +1,5 @@
 {
-  "id": "870d4d23-041c-4d51-aedf-614909139f09",
+  "id": "b9131354-d365-4495-9088-d5822a485a0e",
   "prevId": "f4904e27-239c-4938-a4aa-225f62a2529f",
   "version": "7",
   "dialect": "postgresql",
@@ -21755,6 +21755,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "keuring": {
+          "name": "keuring",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "dedupe_hash": {
           "name": "dedupe_hash",
           "type": "varchar(64)",
@@ -21935,6 +21941,36 @@
           "primaryKey": false,
           "notNull": false
         },
+        "style": {
+          "name": "style",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "style_sources": {
+          "name": "style_sources",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "style_fingerprint": {
+          "name": "style_fingerprint",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "style_updated_at": {
+          "name": "style_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "style_notes": {
+          "name": "style_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "updated_by_id": {
           "name": "updated_by_id",
           "type": "uuid",
@@ -22082,6 +22118,12 @@
         "briefing": {
           "name": "briefing",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kandidaten": {
+          "name": "kandidaten",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },

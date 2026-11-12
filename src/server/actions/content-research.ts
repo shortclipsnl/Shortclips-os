@@ -10,7 +10,8 @@ import { requirePermission, assertClientAccess, ForbiddenError } from "@/server/
 import { aiConfigured, runChat, type ChatMessage } from "@/server/ai/client";
 import { SHORTCLIPS_IDENTITY } from "@/server/ai/identity";
 import { auditLog } from "@/server/audit";
-import { kickNextPhase, latestRun, runContentResearchJob, startContentResearchRun } from "@/server/content-research/run";
+import { latestRun, runContentResearchJob, startContentResearchRun } from "@/server/content-research/run";
+import { ensureStyleProfile, saveStyleNotes } from "@/server/content-research/style";
 import { buildContentContext } from "@/server/content-research/service";
 import {
   addAcceptedConcept,
@@ -64,12 +65,12 @@ export async function startResearch(clientId: string): Promise<ActionResult & { 
 
     // Een vastgelopen ronde hervatten we (de briefing blijft bewaard), anders nieuw.
     const runId = last && last.status === "bezig" && last.stale ? last.id : await startContentResearchRun(clientId, viewer.id);
-    // Fase 1 draait na de response (overleeft navigatie). Fase 2 start daarna in
-    // een eigen aanroep; lukt dat niet, dan pakt de cron het binnen 5 minuten op.
+    // De fases draaien na de response (overleeft navigatie). Wat niet meer in deze
+    // aanroep past, start in een eigen aanroep; anders pakt de cron het op.
     after(async () => {
       try {
-        const res = await runContentResearchJob(runId, { budgetMs: 240_000 });
-        if (res.ok && res.phase === "wacht") await kickNextPhase();
+        // Past de volgende fase niet meer, dan start de job zelf de doorstart.
+        await runContentResearchJob(runId, { budgetMs: 240_000 });
       } catch {
         /* status blijft 'bezig' → de cron pikt 'm op */
       }
@@ -418,6 +419,44 @@ export async function saveIdeaFromChat(input: { clientId: string; titel: string;
     await auditLog({ viewer, action: "content_research.idea_from_chat", entityType: "content_idea", entityId: input.clientId, clientId: input.clientId });
     revalidatePath(`/ai/content-research/${input.clientId}`);
     return { ok: true };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+/** Teamcorrecties op het stijlprofiel ("dit past wel/niet bij de klant"). */
+export async function saveStyleCorrections(clientId: string, notes: string): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("content_research:write");
+    assertClientAccess(viewer, clientId);
+    await saveStyleNotes(clientId, notes.trim().slice(0, 4000), viewer.id);
+    await auditLog({ viewer, action: "content_research.style_notes", entityType: "client", entityId: clientId, clientId });
+    revalidatePath(`/ai/content-research/${clientId}`);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
+/** Stijlprofiel nu opnieuw opbouwen uit de scripts in Drive (draait na de response). */
+export async function refreshStyleProfile(clientId: string): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("content_research:write");
+    assertClientAccess(viewer, clientId);
+    if (!aiConfigured()) return { ok: false, message: "Er is nog geen AI-sleutel ingesteld (ANTHROPIC_API_KEY)." };
+    const [c] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, clientId)).limit(1);
+    if (!c) return { ok: false, message: "Klant niet gevonden." };
+    after(async () => {
+      try {
+        await ensureStyleProfile(clientId, c.name, { force: true });
+        revalidatePath(`/ai/content-research/${clientId}`);
+      } catch {
+        /* volgende onderzoeksronde probeert het opnieuw */
+      }
+    });
+    return { ok: true, message: "Het stijlprofiel wordt opnieuw opgebouwd uit de scripts (±1 minuut)." };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     throw e;

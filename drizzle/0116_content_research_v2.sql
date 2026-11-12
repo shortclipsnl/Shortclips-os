@@ -31,8 +31,15 @@ ALTER TABLE "content_ideas" ADD COLUMN "forwarded_at" timestamp with time zone;-
 ALTER TABLE "content_ideas" ADD COLUMN "forwarded_by_id" uuid;--> statement-breakpoint
 ALTER TABLE "content_ideas" ADD COLUMN "script_link" text;--> statement-breakpoint
 ALTER TABLE "content_ideas" ADD COLUMN "resultaat" jsonb;--> statement-breakpoint
+ALTER TABLE "content_ideas" ADD COLUMN "keuring" jsonb;--> statement-breakpoint
+ALTER TABLE "content_research_profiles" ADD COLUMN "style" jsonb;--> statement-breakpoint
+ALTER TABLE "content_research_profiles" ADD COLUMN "style_sources" jsonb;--> statement-breakpoint
+ALTER TABLE "content_research_profiles" ADD COLUMN "style_fingerprint" varchar(64);--> statement-breakpoint
+ALTER TABLE "content_research_profiles" ADD COLUMN "style_updated_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "content_research_profiles" ADD COLUMN "style_notes" text;--> statement-breakpoint
 ALTER TABLE "content_research_runs" ADD COLUMN "data_basis" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
 ALTER TABLE "content_research_runs" ADD COLUMN "briefing" text;--> statement-breakpoint
+ALTER TABLE "content_research_runs" ADD COLUMN "kandidaten" jsonb;--> statement-breakpoint
 ALTER TABLE "content_research_runs" ADD COLUMN "attempts" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 ALTER TABLE "content_research_runs" ADD COLUMN "heartbeat_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "content_competitors" ADD CONSTRAINT "content_competitors_client_id_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

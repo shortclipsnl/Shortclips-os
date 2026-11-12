@@ -62,6 +62,12 @@ export const contentResearchRuns = pgTable(
      * binnen de tijdslimiet van Vercel en overleeft een onderzoek een time-out.
      */
     briefing: text("briefing"),
+    /**
+     * Kandidaat-ideeën uit fase "ideeen" (ruim, ±10) en na de keuring de
+     * uitslag per kandidaat. Alleen kandidaten die de keuring halen worden
+     * ideeën; de rest blijft hier met reden bewaard (archief, transparantie).
+     */
+    kandidaten: jsonb("kandidaten"),
     /** Aantal (her)starts van de huidige fase; na 3 pogingen → 'mislukt'. */
     attempts: integer("attempts").notNull().default(0),
     /** Laatste fase waarin de ronde zelf actief bezig was (hartslag voor time-outs). */
@@ -145,6 +151,14 @@ export const contentIdeas = pgTable(
      * publicatie → postmetingen): { posts, views, relatief, platforms[], gemetenOp }.
      */
     resultaat: jsonb("resultaat"),
+    /**
+     * Kwaliteitskeuring (aparte, strenge AI-beoordeling na het genereren):
+     * { totaal, geslaagd, onderdelen: { stijlFit, bewezenPatroon, relevantie,
+     * originaliteit, uitvoerbaarheid } (score 0-10, basis, toelichting),
+     * oordeel, stijlProblemen[] }. Alleen ideeën met totaal >= 80 én
+     * stijl-fit >= 8 worden aan het team getoond.
+     */
+    keuring: jsonb("keuring"),
     /** Genormaliseerd concept voor duplicaatdetectie tussen rondes. */
     dedupeHash: varchar("dedupe_hash", { length: 64 }),
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
@@ -208,6 +222,20 @@ export const contentResearchProfiles = pgTable(
     autoSummary: text("auto_summary"),
     /** Handmatige aantekeningen van het team (blijven behouden). */
     manualNotes: text("manual_notes"),
+    /**
+     * Stijlprofiel uit de ECHTE Shortclips-scripts van deze klant (Drive) plus
+     * geleerde scriptregels en klantfeedback: hoe wij voor deze klant schrijven,
+     * letterlijke voorbeeldhooks, wat wel en niet past. Bron voor het genereren
+     * én de keuring. Captions en eigen posts van de klant zijn GEEN stijlbron.
+     */
+    style: jsonb("style"),
+    /** Welke scriptbestanden het profiel lazen: { name, modifiedAt }[]. */
+    styleSources: jsonb("style_sources"),
+    /** Vingerafdruk van de gelezen bestanden: bij wijziging wordt het profiel ververst. */
+    styleFingerprint: varchar("style_fingerprint", { length: 64 }),
+    styleUpdatedAt: timestamp("style_updated_at", { withTimezone: true }),
+    /** Correcties van het team op de stijl ("dit past wel/niet"). Gaat altijd voor. */
+    styleNotes: text("style_notes"),
     updatedById: uuid("updated_by_id").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
   },

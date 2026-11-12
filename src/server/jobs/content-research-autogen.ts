@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, contentResearchRuns } from "@/db/schema";
 import {
@@ -14,7 +14,7 @@ import { syncIdeaOutcomes } from "@/server/content-research/outcomes";
 const MIN_DAYS_BETWEEN = 6;
 
 /**
- * Pakt precies één stuk werk op, zodat elke cron-aanroep ruim binnen de 5
+ * Pakt precies één stuk werk op (één of meer fases van één ronde), zodat elke cron-aanroep ruim binnen de 5
  * minuten van Vercel blijft:
  *   1. een ronde die op fase 2 wacht of waarvan de hartslag stil is (time-out);
  *   2. anders (alleen in de wekelijkse modus) een nieuwe ronde voor de volgende
@@ -29,7 +29,6 @@ async function advanceOne(opts: { startNew: boolean }): Promise<{ action: string
       id: contentResearchRuns.id,
       clientId: contentResearchRuns.clientId,
       phase: contentResearchRuns.phase,
-      briefing: sql<boolean>`${contentResearchRuns.briefing} is not null`,
       heartbeatAt: contentResearchRuns.heartbeatAt,
       startedAt: contentResearchRuns.startedAt,
       updatedAt: contentResearchRuns.updatedAt,
@@ -42,8 +41,10 @@ async function advanceOne(opts: { startNew: boolean }): Promise<{ action: string
   for (const r of open) {
     const last = r.heartbeatAt ?? r.startedAt ?? r.updatedAt;
     const idleMin = (Date.now() - last.getTime()) / 60000;
-    const waitingForPhase2 = Boolean(r.briefing) && r.phase === "wacht";
-    if (waitingForPhase2 || idleMin >= STALE_MIN) {
+    // "wacht_<fase>" (en het oude "wacht"): de vorige fase is klaar, de
+    // volgende past niet meer in dezelfde aanroep en wacht op ons.
+    const waiting = r.phase.startsWith("wacht");
+    if (waiting || idleMin >= STALE_MIN) {
       // Claimen: alleen de aanroep die de hartslag als eerste verzet, gaat door.
       // Voorkomt dat cron, "advance" en de directe doorstart dezelfde fase dubbel doen.
       const claimed = await db

@@ -35,7 +35,7 @@
     { "path": "/api/jobs/run?job=scripts.version_sync", "schedule": "50 7-20 * * *" },
     { "path": "/api/jobs/run?job=briefing.auto_generate", "schedule": "25 7-20 * * *" },
     { "path": "/api/jobs/run?job=transfers.cleanup", "schedule": "30 3 * * *" },
-    { "path": "/api/jobs/run?job=content_research.weekly", "schedule": "*/5 4-9 * * 1" },
+    { "path": "/api/jobs/run?job=content_research.weekly", "schedule": "*/5 0-9 * * 1" },
     { "path": "/api/jobs/run?job=content_research.advance", "schedule": "*/5 5-17 * * 1-5" },
     { "path": "/api/jobs/run?job=content_research.notify", "schedule": "0 8 * * 1" },
     { "path": "/api/jobs/run?job=content_research.notify", "schedule": "0 9 * * 1" },

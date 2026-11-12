@@ -28,15 +28,29 @@ export type RunView = {
     maandrapportage?: string | null;
     eerdereIdeeen?: number;
     afgewezen?: number;
+    stijlBronnen?: string[];
+    bewezenHooks?: number;
+    kandidaten?: number;
+    geslaagd?: number;
+    getoond?: number;
   };
+  /** Uitslag van de keuring per kandidaat (null bij oudere rondes). */
+  keuring: Array<{ titel: string; totaal: number; stijlFit: number | null; oordeel: string; getoond: boolean; reden: string | null }> | null;
   finishedAt: string | null;
   createdAt: string;
 };
 
 const PHASE_LABEL: Record<string, string> = {
+  stijl: "Stijl uit de scripts lezen",
+  wacht_zoeken: "Stijl klaar, onderzoek start zo",
   zoeken: "Markt en concurrenten onderzoeken",
-  wacht: "Onderzoek klaar, ideeënfase start zo",
-  ideeen: "Ideeën uitwerken en scoren",
+  wacht_ideeen: "Onderzoek klaar, ideeën starten zo",
+  wacht: "Onderzoek klaar, ideeën starten zo",
+  ideeen: "Kandidaat-ideeën schrijven",
+  wacht_keuring: "Kandidaten klaar, keuring start zo",
+  keuring: "Ideeën keuren (80+)",
+  wacht_verbeteren: "Keuring klaar, verbeterronde start zo",
+  verbeteren: "Bijna-goede ideeën verbeteren en herkeuren",
   opslaan: "Opslaan",
   klaar: "Klaar",
 };
@@ -54,8 +68,8 @@ function fmt(iso: string | null): string {
 /** Welke databronnen deze ronde écht had. Groen = gebruikt, grijs = niet beschikbaar. */
 function DataBasis({ d }: { d: RunView["dataBasis"] }) {
   const items: Array<{ label: string; value: string; ok: boolean }> = [
-    { label: "Eigen statistieken", value: d.posts ? `${d.posts} video's${d.postsPeriode ? ` (${d.postsPeriode})` : ""}${d.postZekerheid === "indicatie" ? ", indicatie" : ""}` : "geen postmetingen", ok: Boolean(d.posts) },
-    { label: "Eerdere scripts (Drive)", value: d.driveScripts ? `${d.driveScripts} documenten${d.scriptsGelezen ? `, ${d.scriptsGelezen} inhoudelijk gelezen` : ""}` : "geen gevonden", ok: Boolean(d.driveScripts) },
+    { label: "Eigen video's (Metricool)", value: d.posts ? `${d.posts} video's${d.postsPeriode ? ` (${d.postsPeriode})` : ""}${d.postZekerheid === "indicatie" ? ", indicatie" : ""}` : "geen videometingen", ok: Boolean(d.posts) },
+    { label: "Stijl uit eigen scripts", value: d.scriptsGelezen ? `${d.scriptsGelezen} scripts gelezen${d.bewezenHooks ? `, ${d.bewezenHooks} bewezen hooks` : ""}` : d.driveScripts ? `${d.driveScripts} in Drive, nog niet gelezen` : "geen gevonden", ok: Boolean(d.scriptsGelezen) },
     { label: "Concurrenten", value: d.concurrenten ? `${d.concurrenten} in onderzoek` : "nog geen", ok: Boolean(d.concurrenten) },
     { label: "Klantgeheugen", value: d.klantgeheugen ? `${d.klantgeheugen} inzichten` : "nog leeg", ok: Boolean(d.klantgeheugen) },
     { label: "Maandrapportage", value: d.maandrapportage ?? "geen goedgekeurde", ok: Boolean(d.maandrapportage) },
@@ -71,6 +85,31 @@ function DataBasis({ d }: { d: RunView["dataBasis"] }) {
         </p>
       ))}
     </div>
+  );
+}
+
+/** Alle kandidaten van een ronde met hun score: wat door de keuring kwam en waarom de rest niet. */
+function KeuringUitslag({ items }: { items: NonNullable<RunView["keuring"]> }) {
+  const afgewezen = items.filter((i) => !i.getoond);
+  return (
+    <details className="rounded-md border border-[var(--color-line)] p-3">
+      <summary className="cursor-pointer text-xs font-medium text-[var(--color-ink)]">
+        Keuring: {items.length - afgewezen.length} getoond, {afgewezen.length} afgewezen (minimaal 80 en stijl-fit 8)
+      </summary>
+      <ul className="mt-2 space-y-1.5">
+        {items.map((it, i) => (
+          <li key={i} className="flex items-start gap-2 text-xs">
+            <span className={`w-8 shrink-0 text-right font-semibold tabular-nums ${it.getoond ? "text-[var(--color-good)]" : "text-[var(--color-ink-faint)]"}`}>{it.totaal || "–"}</span>
+            <span className="min-w-0">
+              <span className={it.getoond ? "font-medium text-[var(--color-ink)]" : "text-[var(--color-ink-muted)]"}>{it.titel}</span>
+              {it.stijlFit != null ? <span className="text-[var(--color-ink-faint)]"> · stijl {it.stijlFit}/10</span> : null}
+              {!it.getoond && it.reden ? <span className="block text-[var(--color-ink-faint)]">Niet getoond: {it.reden}</span> : null}
+              {it.oordeel ? <span className="block text-[var(--color-ink-muted)]">{it.oordeel}</span> : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -109,7 +148,9 @@ export function ResearchPanel({ clientId, runs }: { clientId: string; runs: RunV
                     <span className="text-xs text-[var(--color-ink-faint)]">{fmt(r.finishedAt ?? r.createdAt)}</span>
                   </div>
                   {r.status === "klaar" ? (
-                    <span className="text-xs text-[var(--color-ink-muted)]">{r.newCount} nieuw · {r.ideasCount} totaal</span>
+                    <span className="text-xs text-[var(--color-ink-muted)]">
+                      {r.keuring ? `${r.newCount} van ${r.ideasCount} kandidaten door de keuring` : `${r.newCount} nieuw · ${r.ideasCount} totaal`}
+                    </span>
                   ) : null}
                 </div>
 
@@ -118,6 +159,8 @@ export function ResearchPanel({ clientId, runs }: { clientId: string; runs: RunV
                 ) : null}
 
                 {r.dataBasis && Object.keys(r.dataBasis).length > 0 ? <DataBasis d={r.dataBasis} /> : null}
+
+                {r.keuring && r.keuring.length > 0 ? <KeuringUitslag items={r.keuring} /> : null}
 
                 {r.trends.length > 0 ? (
                   <div>

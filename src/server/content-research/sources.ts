@@ -1,8 +1,7 @@
 import "server-only";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clientKnowledge, contentCompetitors, contentIdeas, publications } from "@/db/schema";
-import { getClientAiProfile, type CaptionProfile } from "@/server/ai/knowledge";
+import { clientKnowledge, contentCompetitors, contentIdeas } from "@/db/schema";
 import { loadDna } from "./content-dna";
 import { listClientDriveScriptLinks, getClientDriveScriptTexts } from "@/server/scripts/drive-scripts";
 import { analysePosts, type PostAnalysis, type PostRow } from "./post-performance";
@@ -15,6 +14,22 @@ import { analysePosts, type PostAnalysis, type PostRow } from "./post-performanc
 
 /* ----------------------------- A. Statistieken ----------------------------- */
 
+/**
+ * Alleen VIDEO's tellen mee. Klanten plaatsen ook zelf foto- en tekstposts op
+ * Facebook en Instagram ("HALLOOOO, WAT EEN TOPPER"); die scoorden soms hoog en
+ * trokken de ideeën en hooks een stijl in die niet bij onze video's past.
+ * Video herkennen we aan echte kijkdata (duur, kijktijd, afkijkpercentage) of
+ * het platform (TikTok is altijd video). Facebook-"posts"-links zonder kijkdata
+ * zijn foto/tekst.
+ */
+export const VIDEO_FILTER = sql`(
+  p.platform = 'tiktok'
+  or coalesce(p.duration_seconds, 0) > 0
+  or coalesce(m.avg_watch_seconds, 0) > 0
+  or coalesce(m.watch_time_seconds, 0) > 0
+  or m.completion_rate is not null
+)`;
+
 export async function loadPostAnalysis(clientId: string, days = 365): Promise<PostAnalysis> {
   const res = await db.execute(sql`
     select p.id as publication_id, p.platform as platform, p.published_at as published_at,
@@ -22,7 +37,7 @@ export async function loadPostAnalysis(clientId: string, days = 365): Promise<Po
            m.views, m.likes, m.comments, m.shares, m.saves, m.completion_rate, m.avg_watch_seconds
     from publications p
     join lateral (
-      select views, likes, comments, shares, saves, completion_rate, avg_watch_seconds
+      select views, likes, comments, shares, saves, completion_rate, avg_watch_seconds, watch_time_seconds
       from social_metrics sm
       where sm.publication_id = p.id
       order by sm.measured_on desc
@@ -31,6 +46,7 @@ export async function loadPostAnalysis(clientId: string, days = 365): Promise<Po
     where p.client_id = ${clientId}
       and p.deleted_at is null
       and coalesce(p.published_at, p.created_at) > now() - (${days} || ' days')::interval
+      and ${VIDEO_FILTER}
   `);
   const rows = ((res as unknown as { rows?: unknown[] }).rows ?? res) as Array<Record<string, unknown>>;
   const num = (v: unknown) => (v == null ? 0 : Number(v) || 0);
@@ -125,48 +141,32 @@ export async function loadClientMemoryCount(clientId: string): Promise<number> {
 /* ------------------------------- Tone of voice ------------------------------- */
 
 /**
- * Hoe deze klant communiceert, uit bestaande bronnen (geen extra invoer):
- * Content DNA, het captionprofiel, tone-of-voice-inzichten uit het klantgeheugen
- * en de laatste echte captions die namens de klant zijn gepubliceerd.
+ * Aanvullende toon-informatie naast het stijlprofiel uit de scripts: Content
+ * DNA en tone-of-voice-inzichten uit het klantgeheugen. Bewust GEEN captions
+ * of eigen posts van de klant meer: dat is de toon van de klant op Facebook,
+ * niet die van onze video's, en dat leverde hooks op die niet bij de klant
+ * pasten.
  */
 export async function loadToneOfVoice(clientId: string): Promise<string> {
-  const [dnaBundle, profile, memory, captions] = await Promise.all([
+  const [dnaBundle, memory] = await Promise.all([
     loadDna(clientId).catch(() => null),
-    getClientAiProfile(clientId).catch(() => null),
     db
       .select({ title: clientKnowledge.title, body: clientKnowledge.body })
       .from(clientKnowledge)
       .where(and(
         eq(clientKnowledge.clientId, clientId),
         isNull(clientKnowledge.deletedAt),
-        sql`${clientKnowledge.category} in ('tone_of_voice', 'avoid_words', 'hook_style', 'recurring_correction')`,
+        sql`${clientKnowledge.category} in ('tone_of_voice', 'avoid_words', 'hook_style', 'recurring_correction', 'organisch_correctie')`,
       ))
-      .limit(12)
-      .catch(() => []),
-    db
-      .select({ caption: publications.caption })
-      .from(publications)
-      .where(and(eq(publications.clientId, clientId), isNull(publications.deletedAt), sql`length(coalesce(${publications.caption}, '')) > 30`))
-      .orderBy(desc(publications.publishedAt))
-      .limit(8)
+      .limit(15)
       .catch(() => []),
   ]);
   const lines: string[] = [];
   const dna = dnaBundle?.dna;
-  if (dna?.toneOfVoice) lines.push(`Tone of voice (Content DNA): ${dna.toneOfVoice}`);
-  if (dna?.gewensteUitstraling) lines.push(`Gewenste uitstraling: ${dna.gewensteUitstraling}`);
   if (dna?.doelgroep) lines.push(`Doelgroep: ${dna.doelgroep}`);
+  if (dna?.gewensteUitstraling) lines.push(`Gewenste uitstraling: ${dna.gewensteUitstraling}`);
   if (dna?.creatieveBeperkingen?.length) lines.push(`Niet doen: ${dna.creatieveBeperkingen.join(" · ")}`);
-  const cp = (profile?.captionProfile ?? {}) as CaptionProfile;
-  if (cp.toneOfVoice) lines.push(`Tone of voice (captionprofiel): ${cp.toneOfVoice}`);
-  if (cp.schrijfstijl) lines.push(`Schrijfstijl: ${cp.schrijfstijl}`);
   for (const m of memory) lines.push(`Klantgeheugen: ${m.title}: ${m.body}`);
-  const seen = new Set<string>();
-  const samples = captions
-    .map((c) => (c.caption ?? "").replace(/\s+/g, " ").trim().slice(0, 280))
-    .filter((c) => c && !seen.has(c) && seen.add(c))
-    .slice(0, 6);
-  if (samples.length) lines.push(`Zo communiceert de klant zelf (recente captions):\n- ${samples.join("\n- ")}`);
   return lines.join("\n");
 }
 

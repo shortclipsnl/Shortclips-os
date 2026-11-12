@@ -16,6 +16,7 @@ import { rankWithVariety } from "@/server/content-research/opportunity";
 import { StrategicAdvice, type AdviceItem } from "../strategic-advice";
 import { ResearchPanel, type RunView } from "../research-panel";
 import { DnaForm } from "../dna-form";
+import { StylePanel } from "../style-panel";
 import { ContentChat } from "../content-chat";
 
 export const metadata: Metadata = { title: "AI Content Research" };
@@ -31,6 +32,20 @@ const FILTERS: Record<string, (s: string) => boolean> = {
   doorgestuurd: (s) => s === "doorgestuurd",
   archief: (s) => !ACTIVE_IDEA.has(s),
 };
+
+/** De keuringsuitslag van een ronde (alle kandidaten, ook de afgewezen). */
+function candidatesView(raw: unknown): RunView["keuring"] {
+  const k = raw as { beoordeeld?: Array<{ titel: string; keuring?: { totaal?: number; onderdelen?: { stijlFit?: { score?: number } }; oordeel?: string }; getoond: boolean; reden: string | null }> } | null;
+  if (!k?.beoordeeld) return null;
+  return k.beoordeeld.map((b) => ({
+    titel: b.titel,
+    totaal: b.keuring?.totaal ?? 0,
+    stijlFit: b.keuring?.onderdelen?.stijlFit?.score ?? null,
+    oordeel: b.keuring?.oordeel ?? "",
+    getoond: b.getoond,
+    reden: b.reden,
+  }));
+}
 
 export default async function ContentResearchClientPage({
   params,
@@ -72,6 +87,7 @@ export default async function ContentResearchClientPage({
     newCount: r.newCount,
     errorMessage: r.errorMessage,
     dataBasis: (r.dataBasis ?? {}) as RunView["dataBasis"],
+    keuring: candidatesView(r.kandidaten),
     finishedAt: r.finishedAt ? r.finishedAt.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
   }));
@@ -89,7 +105,7 @@ export default async function ContentResearchClientPage({
     { key: "ideeen", label: "Ideeën", count: activeIdeas.length },
     { key: "concurrenten", label: "Concurrenten", count: data.competitors.filter((c) => c.actief).length },
     { key: "onderzoek", label: "Onderzoek & historie", count: runs.length },
-    { key: "dna", label: "Content DNA" },
+    { key: "dna", label: "Stijl & DNA" },
     { key: "chat", label: "Spar met AI" },
   ];
 
@@ -152,7 +168,19 @@ export default async function ContentResearchClientPage({
 
       {current === "onderzoek" ? <ResearchPanel clientId={clientId} runs={runs} /> : null}
 
-      {current === "dna" ? <DnaForm clientId={clientId} dna={data.dna} manualNotes={data.manualNotes} /> : null}
+      {current === "dna" ? (
+        <div className="space-y-4">
+          <StylePanel
+            clientId={clientId}
+            canWrite={viewer.permissions.has("content_research:write")}
+            profile={data.style.profile}
+            sources={data.style.sources.map((s) => ({ name: s.name, modifiedAt: s.modifiedAt }))}
+            updatedAt={data.style.updatedAt ? data.style.updatedAt.toISOString() : null}
+            notes={data.style.notes}
+          />
+          <DnaForm clientId={clientId} dna={data.dna} manualNotes={data.manualNotes} />
+        </div>
+      ) : null}
 
       {current === "chat" ? (
         <ContentChat clientId={clientId} conversations={data.conversations.map((c) => ({ id: c.id, title: c.title }))} aiReady={aiReady} seed={seed} />

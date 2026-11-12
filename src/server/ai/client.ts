@@ -189,16 +189,20 @@ export async function runStructured<T>(input: {
   try {
     const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
     const model = input.model ?? aiModel();
-    const response = await client.messages.create({
-      model,
-      max_tokens: input.maxTokens ?? 16000,
-      system: input.system,
-      messages: [{ role: "user", content: input.user }],
-      output_config: {
-        format: { type: "json_schema", schema: input.schema },
-        ...(input.effort ? { effort: input.effort } : {}),
-      },
-    });
+    // Streamen: bij een ruime max_tokens weigert de SDK een gewone aanroep
+    // ("streaming is required for operations that may take longer than 10 minutes").
+    const response = await client.messages
+      .stream({
+        model,
+        max_tokens: input.maxTokens ?? 16000,
+        system: input.system,
+        messages: [{ role: "user", content: input.user }],
+        output_config: {
+          format: { type: "json_schema", schema: input.schema },
+          ...(input.effort ? { effort: input.effort } : {}),
+        },
+      })
+      .finalMessage();
     if (response.stop_reason === "refusal") return { ok: false, reason: "error", error: "Het model weigerde dit verzoek." };
     if (response.stop_reason === "max_tokens") return { ok: false, reason: "error", error: "Het AI-antwoord was te lang en is afgekapt." };
     const text = response.content

@@ -12,6 +12,7 @@ import {
   favoriteIdea, forwardIdeaToGenerator, markIdeaUsed, rejectIdea, resetIdea, saveIdea, saveMiddenstukRichting,
 } from "@/server/actions/content-research";
 import { OPPORTUNITY_PARTS, dataShare } from "@/server/content-research/opportunity";
+import { QUALITY_PARTS } from "@/server/content-research/quality";
 import type { IdeaView } from "@/server/content-research/idea-view";
 import { useLogoColor } from "@/lib/use-logo-color";
 import { MiddenstukRichting } from "./middenstuk-richting";
@@ -140,7 +141,7 @@ export function IdeaRow({ idea, n, clientName, detailsHref }: { idea: IdeaView; 
           </span>
           {idea.hooks[hook] ? <span className="mt-0.5 block truncate text-xs text-[var(--color-ink-muted)]">{idea.hooks[hook]}</span> : null}
         </button>
-        <span className="hidden w-9 shrink-0 text-right text-lg font-bold tabular-nums text-[var(--color-ink)] sm:block" title="Content Opportunity Score">{idea.opportunityScore || "–"}</span>
+        <span className="hidden w-9 shrink-0 text-right text-lg font-bold tabular-nums text-[var(--color-ink)] sm:block" title={idea.keuring ? "Kwaliteitsscore (keuring): stijl-fit, bewezen patroon, relevantie, originaliteit, uitvoerbaarheid" : "Content Opportunity Score"}>{idea.opportunityScore || "–"}</span>
         <button type="button" onClick={copy} className={buttonClass({ variant: "secondary", size: "sm" })} aria-label="Idee kopiëren">
           {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
           <span className="hidden md:inline">{copied ? "Gekopieerd" : "Kopiëren"}</span>
@@ -279,7 +280,37 @@ function WhyThisIdea({ idea }: { idea: IdeaView }) {
           {idea.resultaat.relatief != null ? `, ${idea.resultaat.relatief.toFixed(1).replace(".", ",")}x eigen mediaan` : ""}
         </p>
       ) : null}
-      {idea.opportunity ? (
+      {idea.keuring ? (
+        <div>
+          <p className="mb-1.5 text-2xs text-[var(--color-ink-muted)]">
+            Kwaliteitsscore {idea.keuring.totaal}: door de keuring (minimaal 80, stijl-fit minimaal 8). Zegt dat het idee sterk onderbouwd is en bij de klant past, geen voorspelling van weergaven.
+          </p>
+          <ul className="space-y-1">
+            {QUALITY_PARTS.map((p) => {
+              const part = idea.keuring!.onderdelen[p.key];
+              if (!part) return null;
+              return (
+                <li key={p.key} className="text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-36 shrink-0 text-[var(--color-ink-muted)]" title={p.uitleg}>{p.label} <span className="text-2xs">({p.gewicht}%)</span></span>
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--color-line)]"><span className="block h-full rounded-full bg-[var(--color-indigo-ink)]" style={{ width: `${part.score * 10}%` }} /></span>
+                    <span className="w-5 text-right tabular-nums">{part.score}</span>
+                    <Badge tone={part.basis === "data" ? "good" : part.basis === "scripts" ? "info" : "neutral"} className="!px-1.5 !py-0 text-2xs">{part.basis}</Badge>
+                  </div>
+                  {part.toelichting ? <p className="ml-36 pl-2 text-2xs text-[var(--color-ink-muted)]">{part.toelichting}</p> : null}
+                </li>
+              );
+            })}
+          </ul>
+          {idea.keuring.oordeel ? <p className="mt-2 text-xs text-[var(--color-ink)]"><span className="font-medium">Oordeel eindredactie:</span> {idea.keuring.oordeel}</p> : null}
+          {idea.keuring.aanscherpen?.length ? (
+            <div className="mt-2 text-xs text-[var(--color-ink-muted)]">
+              <span className="font-medium text-[var(--color-ink)]">Aanscherpen bij uitwerken:</span>
+              <ul className="mt-0.5 list-disc pl-4">{idea.keuring.aanscherpen.map((a, i) => <li key={i}>{a}</li>)}</ul>
+            </div>
+          ) : null}
+        </div>
+      ) : idea.opportunity ? (
         <div>
           <p className="mb-1.5 text-2xs text-[var(--color-ink-muted)]">Opportunity Score {idea.opportunityScore}: {share}% rust op echte data, de rest is een inschatting. Geen voorspelling van weergaven.</p>
           <ul className="space-y-1">

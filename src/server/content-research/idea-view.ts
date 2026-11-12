@@ -1,5 +1,6 @@
 import type { contentIdeas } from "@/db/schema";
 import type { Opportunity } from "./opportunity";
+import { readKeuring, type Keuring } from "./quality";
 
 /**
  * Wat de UI van een idee nodig heeft (serialiseerbaar, dus zonder Date-objecten).
@@ -32,6 +33,9 @@ export type IdeaView = {
   herhaalReden: string | null;
   onderbouwing: Evidence[];
   opportunity: Opportunity | null;
+  /** Kwaliteitskeuring (nieuwe ideeën). Oudere ideeën hebben alleen een opportunity. */
+  keuring: Keuring | null;
+  /** Kwaliteitsscore 0-100 (keuring), of de oude Opportunity Score. */
   opportunityScore: number;
   forwardedAt: string | null;
   scriptLink: string | null;
@@ -64,6 +68,7 @@ export function toIdeaView(i: typeof contentIdeas.$inferSelect): IdeaView {
     herhaalReden: i.herhaalReden,
     onderbouwing: Array.isArray(i.onderbouwing) ? (i.onderbouwing as Evidence[]) : [],
     opportunity: i.opportunity && Object.keys(i.opportunity as object).length ? (i.opportunity as Opportunity) : null,
+    keuring: readKeuring(i.keuring),
     // Oudere ideeën (vóór de Opportunity Score) krijgen hun AI-score als benadering.
     opportunityScore: i.opportunityScore || i.score * 10,
     forwardedAt: i.forwardedAt ? i.forwardedAt.toISOString() : null,
