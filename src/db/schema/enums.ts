@@ -355,6 +355,7 @@ export const contentIdeaStatusEnum = pgEnum("content_idea_status", [
   "afgewezen",    // Niet interessant (met reden → AI leert)
   "gearchiveerd", // Uit beeld, maar niet verwijderd
   "doorgestuurd", // Doorgestuurd naar de scriptgenerator
+  "gebruikt",     // Al gebruikt (eerder uitgevoerd of elders opgepakt)
 ]);
 
 /** Soort idee. */

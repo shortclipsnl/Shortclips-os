@@ -1,5 +1,5 @@
 import { relations, sql } from "drizzle-orm";
-import { index, integer, jsonb, pgTable, text, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
 import { pk, softDelete, timestamps } from "./_shared";
 import {
   contentIdeaCategoryEnum,
@@ -50,6 +50,22 @@ export const contentResearchRuns = pgTable(
      * { kleur: 'doorgaan'|'verbeteren'|'vermijden', punt, bewijs, zekerheid }[].
      */
     strategicAdvice: jsonb("strategic_advice").notNull().default(sql`'[]'::jsonb`),
+    /**
+     * Welke databronnen deze ronde ECHT had (transparantie, geen schatting):
+     * { posts, postsPeriode, platforms[], driveScripts, scriptsGelezen,
+     *   concurrenten, klantgeheugen, maandrapportage, afgewezen }.
+     */
+    dataBasis: jsonb("data_basis").notNull().default(sql`'{}'::jsonb`),
+    /**
+     * Ruwe briefing uit fase 1 (web-onderzoek). Wordt bewaard zodat fase 2
+     * (ideeën) in een aparte aanroep kan draaien: zo blijft elke stap ruim
+     * binnen de tijdslimiet van Vercel en overleeft een onderzoek een time-out.
+     */
+    briefing: text("briefing"),
+    /** Aantal (her)starts van de huidige fase; na 3 pogingen → 'mislukt'. */
+    attempts: integer("attempts").notNull().default(0),
+    /** Laatste fase waarin de ronde zelf actief bezig was (hartslag voor time-outs). */
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
     /** Laatste foutmelding (bij status 'mislukt'). */
     errorMessage: text("error_message"),
     /** Wie deze ronde startte (null = automatisch/cron). */
@@ -86,11 +102,38 @@ export const contentIdeas = pgTable(
     /** Interne AI-kwaliteitsinschatting 1–10 (géén view-garantie). */
     score: integer("score").notNull().default(0),
     scoreReason: text("score_reason"),
+    /**
+     * Onderbouwing per bron: { type: 'eigen_data'|'concurrent'|'markt'|'nieuw'|'herhaling',
+     * tekst, zekerheid: 'bewezen'|'aanname'|'hypothese', url? }[].
+     */
+    onderbouwing: jsonb("onderbouwing").notNull().default(sql`'[]'::jsonb`),
+    /**
+     * Content Opportunity Score, per onderdeel 0–10 met de basis ervan:
+     * { relevantie, eerdereResultaten, concurrentie, originaliteit, doelaansluiting,
+     *   uitvoerbaarheid: { score, basis: 'data'|'inschatting', toelichting } }.
+     */
+    opportunity: jsonb("opportunity").notNull().default(sql`'{}'::jsonb`),
+    /** Gewogen totaal 0–100 (berekend in code, niet door de AI). */
+    opportunityScore: integer("opportunity_score").notNull().default(0),
+    /** Creatieve invalshoek: waarmee we ons onderscheiden van wat anderen doen. */
+    invalshoek: text("invalshoek"),
+    /** Gevuld als een eerder behandeld onderwerp bewust opnieuw wordt aanbevolen. */
+    herhaalReden: text("herhaal_reden"),
     status: contentIdeaStatusEnum("status").notNull().default("nieuw"),
+    /** Moment van doorsturen naar de Scriptgenerator (voorkomt dubbel doorsturen). */
+    forwardedAt: timestamp("forwarded_at", { withTimezone: true }),
+    forwardedById: uuid("forwarded_by_id").references(() => users.id, { onDelete: "set null" }),
     /** Reden bij afwijzing — hiervan leert het Content DNA. */
     rejectionReason: text("rejection_reason"),
     /** Gekoppeld script na "Maak script". */
     forwardedScriptId: uuid("forwarded_script_id").references(() => scripts.id, { onDelete: "set null" }),
+    /** Link naar het script-PDF in Drive als het script vanuit dit idee is opgeslagen. */
+    scriptLink: text("script_link"),
+    /**
+     * Resultaat na publicatie (automatisch gekoppeld via script → oplevering →
+     * publicatie → postmetingen): { posts, views, relatief, platforms[], gemetenOp }.
+     */
+    resultaat: jsonb("resultaat"),
     /** Genormaliseerd concept voor duplicaatdetectie tussen rondes. */
     dedupeHash: varchar("dedupe_hash", { length: 64 }),
     createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
@@ -101,6 +144,40 @@ export const contentIdeas = pgTable(
     index("content_ideas_client_idx").on(t.clientId, t.status),
     index("content_ideas_run_idx").on(t.runId),
   ],
+);
+
+/**
+ * Concurrenten en vergelijkbare bedrijven per klant. Door het onderzoek
+ * voorgesteld (bron 'ai', status 'voorgesteld') of door het team toegevoegd.
+ * Alleen openbare profielen/links; GEEN gescrapete statistieken.
+ */
+export const contentCompetitors = pgTable(
+  "content_competitors",
+  {
+    id: pk(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    naam: varchar("naam", { length: 160 }).notNull(),
+    /** Website of hoofdprofiel. */
+    url: text("url"),
+    tiktok: varchar("tiktok", { length: 160 }),
+    instagram: varchar("instagram", { length: 160 }),
+    youtube: varchar("youtube", { length: 160 }),
+    /** Waarom relevant (zelfde markt, regio, doelgroep, inspirerend format …). */
+    notitie: text("notitie"),
+    /** 'ai' = voorgesteld door het onderzoek, 'team' = handmatig. */
+    bron: varchar("bron", { length: 12 }).notNull().default("team"),
+    /** Meegenomen in het onderzoek (false = genegeerd/verwijderd door het team). */
+    actief: boolean("actief").notNull().default(true),
+    /** Laatst gesignaleerde observaties uit het onderzoek (vrije tekst + bronlinks). */
+    laatsteObservatie: text("laatste_observatie"),
+    laatsteObservatieOp: timestamp("laatste_observatie_op", { withTimezone: true }),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+    ...softDelete,
+  },
+  (t) => [index("content_competitors_client_idx").on(t.clientId)],
 );
 
 export const contentResearchProfiles = pgTable(
@@ -168,6 +245,10 @@ export const contentIdeasRelations = relations(contentIdeas, ({ one }) => ({
   client: one(clients, { fields: [contentIdeas.clientId], references: [clients.id] }),
   run: one(contentResearchRuns, { fields: [contentIdeas.runId], references: [contentResearchRuns.id] }),
   forwardedScript: one(scripts, { fields: [contentIdeas.forwardedScriptId], references: [scripts.id] }),
+}));
+
+export const contentCompetitorsRelations = relations(contentCompetitors, ({ one }) => ({
+  client: one(clients, { fields: [contentCompetitors.clientId], references: [clients.id] }),
 }));
 
 export const contentResearchProfilesRelations = relations(contentResearchProfiles, ({ one }) => ({

@@ -138,6 +138,11 @@ async function main() {
     // toe, dus zonder deze baseline houdt content_creator in productie z'n oude,
     // beperkte set en kan het team de fase op het editing-board niet wijzigen.
     ["content_creator", "videos:write"],
+    // Content Research (nov 2026): de operationeel beheerder (Milou) werkt net als
+    // de content strategists dagelijks met de wekelijkse ideeën. De rol bestond al
+    // toen het recht werd toegevoegd, dus 4b kende het nooit toe.
+    ["operational_manager", "content_research:read"],
+    ["operational_manager", "content_research:write"],
     ["content_creator", "videos:assign"],
     ["content_creator", "videos:approve"],
   ];

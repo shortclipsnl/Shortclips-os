@@ -18,6 +18,30 @@ export type IdeaDraft = {
   uitvoerbaarheid: string;
   score: number;
   scoreReason: string;
+  /** Waarmee wij ons onderscheiden van wat de concurrent/markt doet. */
+  invalshoek: string;
+  onderbouwing: Evidence[];
+  opportunity: unknown;
+  herhaalReden: string | null;
+};
+
+/** Eén onderbouwing van een idee, met de herkomst en hoe zeker die is. */
+export type Evidence = {
+  type: "eigen_data" | "concurrent" | "markt" | "nieuw" | "herhaling";
+  tekst: string;
+  zekerheid: "bewezen" | "aanname" | "hypothese";
+  url: string | null;
+};
+
+/** Door het onderzoek gevonden concurrent/vergelijkbaar bedrijf. */
+export type CompetitorSuggestion = {
+  naam: string;
+  url: string | null;
+  tiktok: string | null;
+  instagram: string | null;
+  youtube: string | null;
+  notitie: string;
+  observatie: string;
 };
 
 export type Source = { label: string; url: string };
@@ -37,6 +61,7 @@ export type ResearchOutput = {
   contentDna: ContentDna;
   briefing: string;
   strategischAdvies: StrategicAdvice[];
+  concurrenten: CompetitorSuggestion[];
 };
 
 const CATEGORIES = ["humor", "educatief", "teamcontent", "trends", "productcontent", "seizoen", "overig"] as const;
@@ -75,31 +100,38 @@ function strList(v: unknown, cap = 20): string[] {
 
 const RESEARCH_SYSTEM = `${SHORTCLIPS_IDENTITY}
 
-Je bent de contentonderzoeker van Shortclips. Je voert ECHT web-onderzoek uit (zoeken en pagina's ophalen) naar actuele, relevante trends en voorbeelden voor de branche van deze klant, en schrijft een grondige BRIEFING in gewone tekst (GEEN JSON).
+Je bent de contentonderzoeker van Shortclips. Je voert ECHT web-onderzoek uit (zoeken en pagina's ophalen) naar de markt en de concurrenten van deze klant, en schrijft een grondige BRIEFING in gewone tekst (GEEN JSON).
 
 HARDE REGELS:
-- Gebruik uitsluitend controleerbare, actuele bronnen. Verzin NOOIT cijfers (volgers, weergaven, bereik) en verzin NOOIT TikTok-/Reels-voorbeelden. Niet verifieerbaar? Laat het weg of schrijf het expliciet.
-- Je kunt geen TikTok-video's "bekijken" — gebruik openbare trendartikelen, roundups, branche- en concurrentpagina's en publieke profielen, en benoem concreet welke pagina je gebruikte.
-- Maak onderscheid tussen feit, inschatting en aanname.
-- Blijf specifiek voor DEZE klant en branche; geen algemene marketingpraat.
-- Sluit af met een lijst BRONNEN (titel — URL) met echte, werkende links.`;
+- Gebruik uitsluitend controleerbare, actuele bronnen. Verzin NOOIT cijfers (volgers, weergaven, likes) en verzin NOOIT video's. Kun je een cijfer niet op een openbare pagina zien, schrijf dan "niet zichtbaar" in plaats van een schatting.
+- Je kunt TikTok-/Instagram-video's niet afspelen. Werk met wat openbaar leesbaar is: profielpagina's, video-titels en beschrijvingen, openbare weergavetellers als die op de pagina staan, websites, nieuws, Meta Advertentiebibliotheek, YouTube. Benoem bij elke observatie de exacte URL.
+- Maak steeds onderscheid tussen FEIT (staat zo op de bron), AANNAME en HYPOTHESE.
+- Neem nooit video's of scripts letterlijk over: beschrijf het onderwerp, het format en de hook-structuur, niet de tekst.
+- Blijf specifiek voor DEZE klant, markt en regio.`;
 
-function buildResearchUser(ctx: { clientName: string; sector: string | null; contextText: string; performanceText: string }): string {
-  return `Onderzoek relevante, actuele contentkansen voor deze klant en schrijf een briefing.
+function buildResearchUser(ctx: {
+  clientName: string;
+  sector: string | null;
+  contextText: string;
+  performanceText: string;
+  competitorsText: string;
+}): string {
+  return `Onderzoek de markt van deze klant en schrijf een briefing.
 
 KLANT: ${ctx.clientName}${ctx.sector ? ` (branche: ${ctx.sector})` : ""}
 ${ctx.performanceText ? `\n${ctx.performanceText.slice(0, 6000)}\n` : ""}
-CONTEXT (intern — eerdere scripts, feedback, voorkeuren, prestaties):
-${ctx.contextText.slice(0, 12000)}
+${ctx.competitorsText ? `\n${ctx.competitorsText.slice(0, 3000)}\n` : ""}
+CONTEXT (intern: klantgeheugen, Content DNA, feedback, eerdere scripts):
+${ctx.contextText.slice(0, 10000)}
 
-Onderzoek en beschrijf, met concrete bronverwijzingen:
-- TikTok-/Reels-trends in deze branche (en breder, creatieve formats uit andere branches die passen).
-- Wat werkt bij vergelijkbare bedrijven/concurrenten (en wat we daarvan kunnen lenen).
-- Veelgestelde vragen / pijnpunten van de doelgroep.
-- Seizoens- of actualiteitskansen op dit moment.
-- Opvallende, originele invalshoeken die passen bij deze klant.
+Onderzoek en beschrijf, met bij elke observatie de URL:
+1. CONCURRENTEN: 3 tot 6 relevante concurrenten of vergelijkbare bedrijven (zelfde markt, liefst Nederland/regio; ook inspirerende bedrijven uit aangrenzende markten). Begin bij de bekende concurrenten hierboven, vul aan waar nodig. Geef per bedrijf: naam, website, TikTok/Instagram/YouTube-handle als je die vindt.
+2. WAT DOEN ZIJ OP SHORT VIDEO: recente video's of formats die je openbaar kunt zien. Welke onderwerpen en formats komen terug? Welke video valt op ten opzichte van hun andere video's (alleen als de weergaven openbaar zichtbaar zijn, anders zeggen dat het niet te zien is)? Welke hook-structuren gebruiken ze?
+3. KANSEN DIE ONZE KLANT NOG NIET BENUT: onderwerpen of formats die bij concurrenten terugkomen maar niet in de eerdere scripts van onze klant.
+4. VRAGEN VAN DE DOELGROEP: actuele vragen, pijnpunten en zoekgedrag in deze markt.
+5. SEIZOEN EN ACTUALITEIT: wat speelt er de komende weken in deze markt.
 
-Schrijf kopjes: TRENDS, WAT WERKT BIJ ANDEREN, VRAGEN VAN DE DOELGROEP, SEIZOEN/ACTUEEL, ORIGINELE INVALSHOEKEN, en sluit af met BRONNEN (titel — URL).`;
+Schrijf kopjes: CONCURRENTEN, WAT DOEN ZIJ, KANSEN, VRAGEN VAN DE DOELGROEP, SEIZOEN/ACTUEEL, en sluit af met BRONNEN (titel — URL).`;
 }
 
 const IDEA_SYSTEM = `${SHORTCLIPS_IDENTITY}
@@ -109,7 +141,12 @@ Je bent de creatieve contentstrateeg van Shortclips en kent deze klant goed. Je 
 HARDE REGELS:
 - Verzin GEEN cijfers of nepvoorbeelden. Een inspiratiebron-URL geef je alléén als die echt in de briefing/bronnen staat; anders null.
 - Vergelijk ieder idee INHOUDELIJK met de reeds bestaande ideeën en eerdere scripts (hieronder). Stel niets voor dat daar inhoudelijk op lijkt, en niets uit de lijst afgekeurde concepten.
-- Liever 4 uitstekende ideeën dan 10 matige. Maximaal 10.
+- Liever 4 uitstekende ideeën dan 8 matige. Maximaal 6 per week. Zorg voor variatie in categorie en format: niet alles uit één succesvol format.
+- Een eerder behandeld onderwerp mag ALLEEN opnieuw als daar een duidelijke reden voor is (bijv. die video presteerde aantoonbaar ver boven de eigen mediaan, of een nieuwe invalshoek). Vul dan "herhaalReden" in; anders null.
+- Concurrentie is inspiratie, geen kopie: beschrijf in "invalshoek" hoe wij het onderwerp op een eigen, onderscheidende manier uitwerken.
+- "onderbouwing" bevat 1 tot 4 punten, elk met type (eigen_data = uit de EIGEN STATISTIEKEN, concurrent, markt, nieuw = nog niet eerder behandeld, herhaling), zekerheid (bewezen = staat letterlijk in de data/bron; aanname; hypothese) en een url als die echt in de bronnen staat. Verzin geen bewijs.
+- "opportunity": scoor elk onderdeel 0–10 en zet basis op "data" alleen als het rust op de eigen statistieken of een concrete bron; anders "inschatting". Toelichting per onderdeel maximaal 15 woorden.
+- Schrijf compact: concept maximaal 3 zinnen, onderbouwing per punt maximaal 2 zinnen. Geen herhaling tussen velden.
 - Elk idee is STERK onderbouwd: "waaromWerkt" verwijst waar mogelijk naar wat bij deze klant aantoonbaar werkte (zie PRESTATIES), en "doel" benoemt concreet wat dit idee voor de klant oplevert (bijv. meer bekendheid, vertrouwen opbouwen, aanvragen, sollicitanten, verkoop).
 - De "score" (1–10) is een interne kwaliteitsinschatting van relevantie, originaliteit, creatieve kracht en uitvoerbaarheid — GEEN voorspelling van weergaven.
 - Geef daarnaast STRATEGISCH ADVIES op basis van de PRESTATIES: wat moeten we DOORGAAN (werkt bewezen), VERBETEREN (kan beter) en VERMIJDEN (werkt niet). Onderbouw elk advies met concreet bewijs uit de data en label de zekerheid (bewezen = volgt direct uit de cijfers; waarschijnlijk; hypothese = te testen). Verzin geen bewijs; is er nog geen data, baseer je dan op de branche-briefing en markeer het als hypothese.
@@ -132,7 +169,7 @@ ${input.briefing.slice(0, 20000)}
 HUIDIG CONTENT DNA (voorkeuren/afgekeurd/uitstraling):
 ${input.dnaText.slice(0, 4000) || "(nog geen DNA)"}
 
-AL BESTAANDE IDEEËN (niet herhalen, ook niet qua inhoud):
+EERDERE IDEEËN EN HUN STATUS (niet herhalen, ook niet qua inhoud; leer van "niet relevant"):
 ${input.existingIdeasText.slice(0, 6000) || "(geen)"}
 
 EERDERE SCRIPTS/ONDERWERPEN (niet herhalen):
@@ -170,56 +207,117 @@ Geef UITSLUITEND geldige JSON in exact dit formaat:
       "inspiratieLabel": null,
       "categorie": "humor|educatief|teamcontent|trends|productcontent|seizoen|overig",
       "uitvoerbaarheid": "eenvoudig|gemiddeld|uitgebreid",
+      "invalshoek": "hoe wij dit eigen en onderscheidend maken",
+      "herhaalReden": null,
+      "onderbouwing": [
+        { "type": "eigen_data|concurrent|markt|nieuw|herhaling", "tekst": "", "zekerheid": "bewezen|aanname|hypothese", "url": null }
+      ],
+      "opportunity": {
+        "relevantie": { "score": 7, "basis": "inschatting", "toelichting": "" },
+        "eerdereResultaten": { "score": 7, "basis": "data|inschatting", "toelichting": "" },
+        "concurrentie": { "score": 7, "basis": "data|inschatting", "toelichting": "" },
+        "originaliteit": { "score": 7, "basis": "inschatting", "toelichting": "" },
+        "doelaansluiting": { "score": 7, "basis": "inschatting", "toelichting": "" },
+        "uitvoerbaarheid": { "score": 7, "basis": "inschatting", "toelichting": "" }
+      },
       "score": 8,
       "scoreReason": "korte onderbouwing"
     }
+  ],
+  "concurrenten": [
+    { "naam": "", "url": null, "tiktok": null, "instagram": null, "youtube": null, "notitie": "waarom relevant", "observatie": "wat ze op short video doen, met URL" }
   ],
   "bronnen": [ { "label": "", "url": "" } ]
 }`;
 }
 
 /**
- * Twee-fasen generatie: (1) echt web-onderzoek met Sonnet → vrije briefing,
- * (2) de briefing + klantcontext → originele ideeën + bijgewerkt Content DNA met
- * Opus (sterker/origineler). Spiegelt het bewezen sales-research-patroon.
+ * Verwijdert losse UTF-16-surrogaten (halve emoji's door het afknippen van
+ * captions/teksten). Die maken het verzoek aan de AI ongeldige JSON
+ * ("unexpected end of hex escape") en laten het hele onderzoek mislukken.
  */
-export async function researchAndIdeate(input: {
+export function wellFormed(text: string): string {
+  return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+}
+
+function evidenceList(v: unknown): Evidence[] {
+  if (!Array.isArray(v)) return [];
+  const TYPES = ["eigen_data", "concurrent", "markt", "nieuw", "herhaling"] as const;
+  const ZEK = ["bewezen", "aanname", "hypothese"] as const;
+  return v
+    .map((x): Evidence | null => {
+      const o = (x ?? {}) as Record<string, unknown>;
+      const tekst = str(o.tekst);
+      if (!tekst) return null;
+      const type = (TYPES as readonly string[]).includes(str(o.type)) ? (str(o.type) as Evidence["type"]) : "markt";
+      const zekerheid = (ZEK as readonly string[]).includes(str(o.zekerheid)) ? (str(o.zekerheid) as Evidence["zekerheid"]) : "hypothese";
+      const url = str(o.url);
+      return { type, tekst: tekst.slice(0, 400), zekerheid, url: /^https?:\/\//.test(url) ? url : null };
+    })
+    .filter((x): x is Evidence => x !== null)
+    .slice(0, 4);
+}
+
+function handle(v: unknown): string | null {
+  const s = str(v);
+  return s ? s.slice(0, 160) : null;
+}
+
+/**
+ * Fase 1: echt web-onderzoek (Sonnet + web search/fetch) naar markt en
+ * concurrenten → vrije briefing. Wordt op de onderzoeksronde bewaard zodat fase 2
+ * in een aparte aanroep kan draaien.
+ */
+export async function runResearchBriefing(input: {
   clientName: string;
   sector: string | null;
   contextText: string;
+  performanceText: string;
+  competitorsText: string;
+  /** Aantal zoek- en ophaalacties (standaard 12). */
+  maxUses?: number;
+}) {
+  return runResearch({
+    system: RESEARCH_SYSTEM,
+    user: wellFormed(buildResearchUser(input)),
+    maxUses: input.maxUses ?? 12,
+    maxTokens: 12000,
+  });
+}
+
+/**
+ * Fase 2: briefing + klantcontext → ideeën, Opportunity-onderdelen, strategisch
+ * advies, Content DNA en concurrentvoorstellen (Opus, zuivere JSON, geen web).
+ */
+export async function ideateFromBriefing(input: {
+  clientName: string;
+  briefing: string;
   dnaText: string;
   existingIdeasText: string;
   priorScriptsText: string;
-  /** Prestaties uit echte cijfers + goedgekeurde maandrapportages (sturend). */
   performanceText?: string;
+  /** Sneller model als terugval (na een eerdere time-out). Standaard het sterke model. */
+  model?: string;
 }): Promise<{ ok: true; data: ResearchOutput } | { ok: false; reason: "no_provider" | "error"; error?: string }> {
   const performanceText = input.performanceText ?? "";
-  // ── Fase 1 — echt web-onderzoek → briefing in gewone tekst ──
-  const briefing = await runResearch({
-    system: RESEARCH_SYSTEM,
-    user: buildResearchUser({ clientName: input.clientName, sector: input.sector, contextText: input.contextText, performanceText }),
-    maxUses: 12,
-    maxTokens: 12000,
-  });
-  if (!briefing.ok) return briefing;
-
-  // ── Fase 2 — briefing → ideeën + Content DNA (Opus, zuivere JSON, geen web) ──
   const ideaInput = {
     system: IDEA_SYSTEM,
-    user: buildIdeaUser({
+    user: wellFormed(buildIdeaUser({
       clientName: input.clientName,
-      briefing: briefing.text,
+      briefing: input.briefing,
       dnaText: input.dnaText,
       existingIdeasText: input.existingIdeasText,
       priorScriptsText: input.priorScriptsText,
       performanceText,
-    }),
-    model: aiModelStrong(),
-    maxTokens: 12000,
+    })),
+    model: input.model ?? aiModelStrong(),
+    // Ruim boven de verwachte ~8k tokens, zodat het JSON-antwoord nooit wordt
+    // afgekapt (een afgekapt antwoord = onleesbare JSON = dubbele aanroep).
+    maxTokens: 16000,
   };
-  type Raw = { trends?: unknown; contentDna?: unknown; ideeen?: unknown[]; bronnen?: unknown[]; strategischAdvies?: unknown[] };
+  type Raw = { trends?: unknown; contentDna?: unknown; ideeen?: unknown[]; bronnen?: unknown[]; strategischAdvies?: unknown[]; concurrenten?: unknown[] };
   let parsed = await runJsonPrompt<Raw>(ideaInput);
-  if (!parsed.ok) parsed = await runJsonPrompt<Raw>(ideaInput);
+  if (!parsed.ok && parsed.reason === "error" && !/credit balance/i.test(parsed.error ?? "")) parsed = await runJsonPrompt<Raw>(ideaInput);
   if (!parsed.ok) return parsed;
 
   const rawIdeas = Array.isArray(parsed.data.ideeen) ? parsed.data.ideeen : [];
@@ -228,29 +326,34 @@ export async function researchAndIdeate(input: {
       const o = (raw ?? {}) as Record<string, unknown>;
       const titel = str(o.titel);
       if (!titel) return null;
+      const url = str(o.inspiratieUrl);
       return {
         titel: titel.slice(0, 240),
         concept: str(o.concept),
         hooks: strList(o.hooks, 5),
         waaromWerkt: str(o.waaromWerkt),
         doel: str(o.doel),
-        inspiratieUrl: str(o.inspiratieUrl) || null,
+        inspiratieUrl: /^https?:\/\//.test(url) ? url : null,
         inspiratieLabel: str(o.inspiratieLabel).slice(0, 240) || null,
         categorie: normCategory(o.categorie),
         uitvoerbaarheid: normEffort(o.uitvoerbaarheid),
         score: normScore(o.score),
         scoreReason: str(o.scoreReason),
+        invalshoek: str(o.invalshoek).slice(0, 600),
+        onderbouwing: evidenceList(o.onderbouwing),
+        opportunity: o.opportunity ?? {},
+        herhaalReden: str(o.herhaalReden) || null,
       };
     })
     .filter((x): x is IdeaDraft => x !== null)
-    .slice(0, 10);
+    .slice(0, 6);
 
   const sources: Source[] = Array.isArray(parsed.data.bronnen)
     ? parsed.data.bronnen
         .map((b) => {
           const o = (b ?? {}) as Record<string, unknown>;
           const url = str(o.url);
-          if (!url) return null;
+          if (!/^https?:\/\//.test(url)) return null;
           return { label: str(o.label) || url, url };
         })
         .filter((x): x is Source => x !== null)
@@ -274,6 +377,27 @@ export async function researchAndIdeate(input: {
         .slice(0, 9)
     : [];
 
+  const concurrenten: CompetitorSuggestion[] = Array.isArray(parsed.data.concurrenten)
+    ? parsed.data.concurrenten
+        .map((c): CompetitorSuggestion | null => {
+          const o = (c ?? {}) as Record<string, unknown>;
+          const naam = str(o.naam);
+          if (!naam) return null;
+          const url = str(o.url);
+          return {
+            naam: naam.slice(0, 160),
+            url: /^https?:\/\//.test(url) ? url : null,
+            tiktok: handle(o.tiktok),
+            instagram: handle(o.instagram),
+            youtube: handle(o.youtube),
+            notitie: str(o.notitie).slice(0, 500),
+            observatie: str(o.observatie).slice(0, 1500),
+          };
+        })
+        .filter((x): x is CompetitorSuggestion => x !== null)
+        .slice(0, 8)
+    : [];
+
   return {
     ok: true,
     data: {
@@ -281,8 +405,9 @@ export async function researchAndIdeate(input: {
       ideeen,
       sources,
       contentDna: normalizeDna(parsed.data.contentDna),
-      briefing: briefing.text,
+      briefing: input.briefing,
       strategischAdvies,
+      concurrenten,
     },
   };
 }

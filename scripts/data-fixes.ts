@@ -87,6 +87,19 @@ async function main() {
   `);
   console.log(`[data-fixes] Milou als operationeel beheerder: ${mr} rol(len) gewijzigd.`);
 
+  // Content Research: rondes die onder de oude opzet (twee fases in één aanroep)
+  // door de Vercel-tijdslimiet bleven hangen op "bezig". Afsluiten als mislukt,
+  // zodat ze niet als lopend onderzoek tonen en niet alsnog (met AI-kosten) worden
+  // hervat voor klanten die inmiddels niet meer actief zijn. Idempotent: matcht
+  // alleen rondes zonder briefing die al meer dan een dag "bezig" zijn.
+  const crStuck = await db.execute(sql`
+    UPDATE content_research_runs
+    SET status = 'mislukt', phase = 'klaar', finished_at = now(), updated_at = now(),
+        error_message = 'Afgebroken door de tijdslimiet (oude opzet). Wordt bij de volgende weekronde opnieuw onderzocht.'
+    WHERE status = 'bezig' AND briefing IS NULL AND created_at < now() - interval '1 day'
+  `);
+  console.log(`[data-fixes] Vastgelopen Content Research-rondes afgesloten: ${(crStuck as unknown as { rowCount?: number }).rowCount ?? 0}.`);
+
   // Testklanten opruimen: soft-delete (omkeerbaar), naam-exact. Verdwijnen daarna
   // uit Onboarding en de klantenlijst; echte klanten blijven ongemoeid.
   const onboardingTest = await db.execute(sql`

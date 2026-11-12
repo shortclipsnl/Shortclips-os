@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Loader2, Download, PenLine, Plus, Minus, Trash2, ArrowLeft, Sparkles, FileText, Mic, MicOff, Upload, Wand2, X, Lightbulb, Cloud, History, RotateCcw, Save, ShieldCheck, Clock, Megaphone, Sprout, Link2, AlertTriangle, ChevronDown, BookmarkPlus, ShieldAlert, ListChecks } from "lucide-react";
 import { generateScripts, reviseScript, suggestTopics, saveScriptsToLibrary, saveScriptToDrive, checkScriptQuality, listShootDaysForClient, rememberScriptFeedback, refreshMetaRulesAction, getMetaRulesInfo, listScriptClientsAction, getClientDriveScriptInfoAction, generateScriptNeeds, type GeneratedScript, type QualityResult, type ScriptScore, type ContentType, type FeedbackScope } from "@/server/actions/script-generate";
 import { ClientLogo } from "@/components/ui";
+import { linkIdeaScript } from "@/server/actions/content-research";
 
 type ShootDay = { id: string; scheduledOn: string; title: string };
 type Funnel = "TOF" | "MOF" | "BOF";
@@ -137,7 +138,7 @@ const QUALITY_TARGET = 9;
 
 /* ---------------- component ---------------- */
 
-export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialClientId, initialBrief }: { clients: Client[]; aiReady: boolean; initialClientId?: string; initialBrief?: string }) {
+export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialClientId, initialBrief, initialIdeaId }: { clients: Client[]; aiReady: boolean; initialClientId?: string; initialBrief?: string; initialIdeaId?: string }) {
   // Klantenlijst in state zodat die live kan verversen (nieuwe klanten verschijnen
   // zonder de pagina te herladen) — bij openen en zodra het venster weer focus krijgt.
   const [clients, setClients] = useState<Client[]>(initialClients);
@@ -386,6 +387,11 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
       force: opts.force,
     });
     if (!res.ok) { setErr(res.message); return { ok: false, blocked: 0 }; }
+    // Content Research: koppel het opgeslagen script aan het idee waar het uit
+    // voortkwam, zodat de resultaten later aan dat idee terug te koppelen zijn.
+    if (initialIdeaId && res.saved[0]) {
+      linkIdeaScript({ ideaId: initialIdeaId, scriptId: res.saved[0].scriptId }).catch(() => undefined);
+    }
     // Bewaar de script-id's op de kaarten, zodat opnieuw opslaan bijwerkt (geen duplicaat).
     setScripts((prev) => prev ? prev.map((s, i) => { const hit = res.saved.find((x) => x.index === i); return hit ? { ...s, scriptId: hit.scriptId } : s; }) : prev);
     setBlockedApproved(res.blocked);
@@ -434,7 +440,10 @@ export function ScriptGeneratorChat({ clients: initialClients, aiReady, initialC
     setDriveMsg(null);
     try {
       const res = await saveScriptToDrive({ clientId: genClientId, klantnaam, opnamedag, scripts: scripts.map((s) => ({ onderwerp: s.onderwerp, tekst: s.tekst })) });
-      if (res.ok) setDriveMsg({ text: `Opgeslagen in de Drive-map "${res.folderName}" van de klant als "${res.fileName}".`, link: res.link });
+      if (res.ok) {
+        setDriveMsg({ text: `Opgeslagen in de Drive-map "${res.folderName}" van de klant als "${res.fileName}".`, link: res.link });
+        if (initialIdeaId) linkIdeaScript({ ideaId: initialIdeaId, driveLink: res.link }).catch(() => undefined);
+      }
       else setErr(res.message);
     } finally {
       setDriveSaving(false);

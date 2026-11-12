@@ -16,14 +16,28 @@ export type RunView = {
   ideasCount: number;
   newCount: number;
   errorMessage: string | null;
+  dataBasis: {
+    posts?: number;
+    postsPeriode?: string | null;
+    platforms?: string[];
+    postZekerheid?: string;
+    driveScripts?: number;
+    scriptsGelezen?: number;
+    concurrenten?: number;
+    klantgeheugen?: number;
+    maandrapportage?: string | null;
+    eerdereIdeeen?: number;
+    afgewezen?: number;
+  };
   finishedAt: string | null;
   createdAt: string;
 };
 
 const PHASE_LABEL: Record<string, string> = {
-  zoeken: "Web-onderzoek…",
-  ideeen: "Ideeën bedenken…",
-  opslaan: "Opslaan…",
+  zoeken: "Markt en concurrenten onderzoeken",
+  wacht: "Onderzoek klaar, ideeënfase start zo",
+  ideeen: "Ideeën uitwerken en scoren",
+  opslaan: "Opslaan",
   klaar: "Klaar",
 };
 const STATUS: Record<string, { label: string; tone: Tone }> = {
@@ -35,6 +49,29 @@ const STATUS: Record<string, { label: string; tone: Tone }> = {
 function fmt(iso: string | null): string {
   if (!iso) return "";
   return new Date(iso).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+/** Welke databronnen deze ronde écht had. Groen = gebruikt, grijs = niet beschikbaar. */
+function DataBasis({ d }: { d: RunView["dataBasis"] }) {
+  const items: Array<{ label: string; value: string; ok: boolean }> = [
+    { label: "Eigen statistieken", value: d.posts ? `${d.posts} video's${d.postsPeriode ? ` (${d.postsPeriode})` : ""}${d.postZekerheid === "indicatie" ? ", indicatie" : ""}` : "geen postmetingen", ok: Boolean(d.posts) },
+    { label: "Eerdere scripts (Drive)", value: d.driveScripts ? `${d.driveScripts} documenten${d.scriptsGelezen ? `, ${d.scriptsGelezen} inhoudelijk gelezen` : ""}` : "geen gevonden", ok: Boolean(d.driveScripts) },
+    { label: "Concurrenten", value: d.concurrenten ? `${d.concurrenten} in onderzoek` : "nog geen", ok: Boolean(d.concurrenten) },
+    { label: "Klantgeheugen", value: d.klantgeheugen ? `${d.klantgeheugen} inzichten` : "nog leeg", ok: Boolean(d.klantgeheugen) },
+    { label: "Maandrapportage", value: d.maandrapportage ?? "geen goedgekeurde", ok: Boolean(d.maandrapportage) },
+    { label: "Eerdere ideeën", value: `${d.eerdereIdeeen ?? 0} (${d.afgewezen ?? 0} niet relevant)`, ok: Boolean(d.eerdereIdeeen) },
+  ];
+  return (
+    <div className="grid gap-1.5 rounded-md bg-[var(--color-surface-sunken)] p-3 sm:grid-cols-2">
+      {items.map((it) => (
+        <p key={it.label} className="flex items-center gap-2 text-xs">
+          <span className={`size-1.5 shrink-0 rounded-full ${it.ok ? "bg-[var(--color-good)]" : "bg-[var(--color-ink-faint)]"}`} />
+          <span className="text-[var(--color-ink-muted)]">{it.label}:</span>
+          <span className="text-[var(--color-ink)]">{it.value}</span>
+        </p>
+      ))}
+    </div>
+  );
 }
 
 export function ResearchPanel({ clientId, runs }: { clientId: string; runs: RunView[] }) {
@@ -52,7 +89,7 @@ export function ResearchPanel({ clientId, runs }: { clientId: string; runs: RunV
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-[var(--color-ink-muted)]">
-          Elk onderzoek doorzoekt actuele, échte bronnen en vertaalt die naar nieuwe ideeën. Bestaande ideeën blijven bewaard.
+          Elke maandag automatisch, of handmatig. Per ronde zie je welke data er echt was en welke bronnen zijn gebruikt. Alle eerdere ideeën blijven bewaard (filter Archief bij Ideeën).
         </p>
         <StartResearchButton clientId={clientId} running={running} variant="primary" label="Onderzoek opnieuw" />
       </div>
@@ -79,6 +116,8 @@ export function ResearchPanel({ clientId, runs }: { clientId: string; runs: RunV
                 {r.status === "mislukt" && r.errorMessage ? (
                   <p className="text-xs text-[var(--color-bad)]">{r.errorMessage}</p>
                 ) : null}
+
+                {r.dataBasis && Object.keys(r.dataBasis).length > 0 ? <DataBasis d={r.dataBasis} /> : null}
 
                 {r.trends.length > 0 ? (
                   <div>

@@ -10,8 +10,8 @@ const JISKA = "jiska@shortclips.nl";
 
 /**
  * Wekelijkse melding dat er nieuwe content-ideeën klaarstaan.
- * - Maandag ~10:00 Amsterdam: Milou én Jiska.
- * - Dinsdag ~10:00 Amsterdam: Milou.
+ * - Maandag ~10:00 Amsterdam: Milou én Jiska, alleen als er echt nieuwe ideeën zijn.
+ *   (De dinsdagherinnering is vervallen: geen onnodige meldingen.)
  * De cron draait op twee UTC-tijden (zomer-/wintertijd); de lokale-uur-check laat
  * er precies één om 10:xx Amsterdam doorkomen. Dedupe = één melding per persoon
  * per dag.
@@ -24,11 +24,11 @@ export async function runContentResearchNotify() {
     const hour = Number(hhmm.slice(0, 2));
     const dayKey = now.toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
 
-    if (hour !== 10 || (weekday !== "Mon" && weekday !== "Tue")) {
-      ctx.log(`Lokaal ${weekday} ${hhmm} (Amsterdam) — niet ma/di 10:xx, overgeslagen.`);
+    if (hour !== 10 || weekday !== "Mon") {
+      ctx.log(`Lokaal ${weekday} ${hhmm} (Amsterdam), niet maandag 10:xx: overgeslagen.`);
       return;
     }
-    const emails = weekday === "Mon" ? [MILOU, JISKA] : [MILOU];
+    const emails = [MILOU, JISKA];
 
     // Hoeveel nieuwe ideeën/klanten de afgelopen 7 dagen (vooral uit maandag­onderzoek).
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -44,9 +44,11 @@ export async function runContentResearchNotify() {
       .from(users)
       .where(and(isNull(users.deletedAt), eq(users.status, "active"), inArray(sql`lower(${users.email})`, emails)));
 
-    const body = ideeen > 0
-      ? `Er staan ${ideeen} nieuwe content-ideeën klaar voor ${klanten} klant${klanten === 1 ? "" : "en"}. Bekijk, spar en stuur de beste door naar de scriptgenerator.`
-      : "Bekijk de nieuwste content-ideeën per klant, spar met de AI en stuur de beste door naar de scriptgenerator.";
+    if (ideeen === 0) {
+      ctx.log("Geen nieuwe ideeën deze week: geen melding.");
+      return;
+    }
+    const body = `Er staan ${ideeen} nieuwe content-ideeën klaar voor ${klanten} klant${klanten === 1 ? "" : "en"}, gesorteerd op Opportunity Score. Werk de beste uit in de Script Engine.`;
 
     for (const r of recipients) {
       ctx.counters.processed++;

@@ -56,9 +56,13 @@ export function OverviewGrid({ clients, canWrite }: { clients: OverviewClient[];
 
               <div className="flex items-center gap-4 text-sm">
                 <span className="tabular-nums"><span className="font-semibold text-[var(--color-ink)]">{c.totalIdeas}</span> <span className="text-[var(--color-ink-muted)]">ideeën</span></span>
-                {c.newIdeas > 0 ? <Badge tone="info">{c.newIdeas} nieuw</Badge> : null}
-                {c.running ? <Badge tone="info">Onderzoek bezig…</Badge> : null}
+                {c.newSinceLast > 0 ? <Badge tone="info">{c.newSinceLast} nieuw sinds vorige analyse</Badge> : c.newIdeas > 0 ? <Badge tone="info">{c.newIdeas} nieuw</Badge> : null}
+                {c.topScore > 0 ? <span className="text-xs text-[var(--color-ink-muted)]">beste <span className="font-semibold text-[var(--color-ink)]">{c.topScore}</span></span> : null}
+                {c.running ? <Badge tone="info">Onderzoek bezig</Badge> : null}
               </div>
+              {c.lastError && !c.running ? (
+                <p className="text-2xs text-[var(--color-bad)]" title={c.lastError}>Laatste onderzoek mislukt: {c.lastError.slice(0, 90)}{c.lastError.length > 90 ? "…" : ""}</p>
+              ) : null}
 
               <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
                 <LinkButton href={`/ai/content-research/${c.id}?tab=ideeen`} variant="primary" size="sm"><Lightbulb className="size-4" /> Bekijk ideeën{c.totalIdeas > 0 ? ` (${c.totalIdeas})` : ""}</LinkButton>
