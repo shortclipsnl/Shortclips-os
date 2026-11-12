@@ -246,16 +246,9 @@ export async function loadRadarData(): Promise<RadarData> {
   // 2. Actieve editors en videografen zonder werk (om aan te kunnen toewijzen).
   for (const u of userRows) if (u.role === "editor") addUser(u.id, "edit");
   for (const u of userRows) if (u.role === "videographer") addUser(u.id, "video");
-  // 3. Freelancers die alleen in de capaciteitslijst staan (nog geen account).
-  for (const c of capRows) {
-    if (c.userId || seen.has(`cp:${c.id}`)) continue;
-    const kind = c.unit === "opnames_4w" ? "video" : c.unit === "shorts_4w" ? "edit" : null;
-    if (!kind || !num(c.limitMax)) continue;
-    if (people.some((p) => firstName(p.name) === firstName(c.name))) continue;
-    seen.add(`cp:${c.id}`);
-    const display = c.name.match(/\(([^)]+)\)/)?.[1]?.trim() || c.name.replace(/freelance videograaf/i, "").trim() || c.name;
-    people.push(makePerson(`cp:${c.id}`, display, kind, null));
-  }
+  // Alleen actieve portaalaccounts. Freelancers die (nog) niet inzetbaar zijn,
+  // zoals iemand die alleen in de capaciteitslijst staat of op niet actief is
+  // gezet, verschijnen vanzelf zodra hun account op actief staat.
 
   // Werk van mensen die niet (meer) in beeld zijn, wordt niet weggegooid maar
   // komt bij "nog geen videograaf" terecht (zie engine).
