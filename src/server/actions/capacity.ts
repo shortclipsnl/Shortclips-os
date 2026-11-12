@@ -45,6 +45,7 @@ export async function updateCapacityLimits(input: z.input<typeof schema>): Promi
       .where(eq(capacityPeople.id, id));
 
     revalidatePath("/capaciteit");
+    revalidatePath("/capaciteit/team");
     return { ok: true };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };

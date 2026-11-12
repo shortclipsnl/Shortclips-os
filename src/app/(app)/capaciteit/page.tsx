@@ -1,22 +1,36 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { requireInternal, isOwner } from "@/server/auth/context";
-import { loadRadarData } from "@/server/capacity-radar";
-import { RadarView } from "./radar-view";
+import { loadCapacityData } from "@/server/capacity-forecast";
+import { ErrorNote } from "@/components/ui";
+import { CapacityDashboard } from "./capacity-dashboard";
 
 export const metadata: Metadata = { title: "Capaciteit" };
 export const dynamic = "force-dynamic";
 
 /**
- * Productie › Capaciteit: wie zit vol, wie heeft ruimte en welke opnames komen
- * eraan. Volledig automatisch berekend uit de opnameplanning (Google Agenda),
- * de Editingpagina en de capaciteit per persoon. Alleen lezen; wijzigen gaat
- * via de opname of de Editingpagina. De eigenaar kan capaciteit en grenzen
- * instellen.
+ * Productie › Capaciteit: capaciteitsradar voor videografie en editing.
+ * Leest uitsluitend bestaande data (opnames uit Google Agenda, editingfases,
+ * klantpakketten, verlof en de capaciteitsgrenzen per persoon) en wijzigt niets.
+ * De grenzen per persoon stel je in op /capaciteit/team (alleen eigenaar).
  */
 export default async function CapacityPage() {
   const viewer = await requireInternal();
-  if (viewer.isEditorOnly) redirect("/dashboard");
-  const data = await loadRadarData();
-  return <RadarView data={data} canEdit={isOwner(viewer)} />;
+  // Editors zien de radar van het hele team niet.
+  if (viewer.isEditorOnly) notFound();
+  let data: Awaited<ReturnType<typeof loadCapacityData>> | null = null;
+  try {
+    data = await loadCapacityData();
+  } catch (error) {
+    console.error("[capaciteit] laden mislukt", error);
+  }
+  return (
+    <div className="mx-auto max-w-[1240px]">
+      {data ? (
+        <CapacityDashboard data={data} canEdit={isOwner(viewer)} />
+      ) : (
+        <ErrorNote>De capaciteitsradar kon niet geladen worden. Probeer het over een minuut opnieuw.</ErrorNote>
+      )}
+    </div>
+  );
 }
