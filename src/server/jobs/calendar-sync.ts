@@ -876,6 +876,9 @@ export async function syncCalendarIfStale(maxAgeMinutes = 5): Promise<void> {
       after(async () => {
         try {
           await runCalendarSync();
+          // Publiceren via Metricool: gewijzigde berichten direct uit Metricool halen.
+          const { runPublishingReconcile } = await import("./publishing-reconcile");
+          await runPublishingReconcile();
         } catch {
           /* fout wordt al in de job-log vastgelegd */
         }

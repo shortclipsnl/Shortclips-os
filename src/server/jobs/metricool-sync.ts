@@ -101,14 +101,14 @@ export async function linkMetricoolBrands(triggeredById?: string, source: Source
               provider: "metricool",
               externalId: String(brand.id),
               externalName: brand.label,
-              config: { userId: brand.userId },
+              config: { userId: brand.userId, networks: brand.networks },
               lastSyncedAt: new Date(),
             })
             .onConflictDoUpdate({
               target: [clientIntegrations.clientId, clientIntegrations.provider, clientIntegrations.externalId],
               set: {
                 externalName: brand.label,
-                config: { userId: brand.userId },
+                config: { userId: brand.userId, networks: brand.networks },
                 lastSyncedAt: new Date(),
                 updatedAt: new Date(),
               },

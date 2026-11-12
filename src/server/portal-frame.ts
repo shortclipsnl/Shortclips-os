@@ -73,6 +73,16 @@ export function prettySessionName(raw: string | null): string {
 export async function getPortalFrameLibrary(viewer: Viewer): Promise<PortalFrameLibrary> {
   const clientId = viewer.clientId;
   if (!clientId) return { connected: false, sessions: [], totalVideos: 0, reviewUrl: null, lastSyncedAt: null };
+  return getFrameLibraryForClient(clientId);
+}
+
+/**
+ * Dezelfde videobibliotheek per klant, los van wie er kijkt. Wordt gedeeld door
+ * het klantportaal en de interne klantenpagina (knop "Short video's"), zodat
+ * beide exact dezelfde sessies, video's en Frame-koppeling tonen. De aanroeper
+ * is verantwoordelijk voor de toegangscontrole op de klant.
+ */
+export async function getFrameLibraryForClient(clientId: string): Promise<PortalFrameLibrary> {
 
   const [links, rows] = await Promise.all([
     db

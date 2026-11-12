@@ -6,6 +6,7 @@ import { contentCalendar } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 import { isCoreStaff } from "@/server/core-staff";
 import { getPublicationCheckSummaries } from "@/server/publication-checks";
+import { getPublishingSummaries } from "@/server/publishing";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { listCalendar, monthGrid, type CalendarItem } from "@/server/calendar";
 import { listClients } from "@/server/clients";
@@ -226,6 +227,9 @@ export default async function CalendarPage({
       .map((i) => i.deliverableId as string),
   )];
   const pubCheckSummaries = await getPublicationCheckSummaries(pubCheckIds);
+  // Publiceren via Metricool: status per kanaal (alleen bij berichten op "Via Metricool").
+  const publishSummaries = await getPublishingSummaries([...items, ...weekItems].map((i) => i.id));
+  const pubFor = (i: CalendarItem) => publishSummaries.get(i.id) ?? null;
   const pubCheckFor = (i: CalendarItem) =>
     i.videoStatus === "published" && i.deliverableId ? pubCheckSummaries.get(i.deliverableId) ?? null : null;
 
@@ -233,6 +237,7 @@ export default async function CalendarPage({
   const toChipItem = (i: CalendarItem) => ({
     id: i.id,
     title: i.title,
+    status: i.status,
     caption: i.caption,
     clientName: i.clientName,
     clientSlug: i.clientSlug,
@@ -244,6 +249,7 @@ export default async function CalendarPage({
     platforms: (i.platforms as string[]) ?? [],
     deliverableId: i.deliverableId,
     pubCheck: pubCheckFor(i),
+    pub: pubFor(i),
   });
 
   const dLabel = (d: string) => {
@@ -524,6 +530,7 @@ export default async function CalendarPage({
                     item={{
                       id: i.id,
                       title: i.title,
+                      status: i.status,
                       caption: i.caption,
                       clientName: i.clientName,
                       clientSlug: i.clientSlug,
@@ -535,6 +542,7 @@ export default async function CalendarPage({
                       platforms: (i.platforms as string[]) ?? [],
                       deliverableId: i.deliverableId,
                       pubCheck: pubCheckFor(i),
+    pub: pubFor(i),
                     }}
                   />
                   {canWriteCal ? (
@@ -620,6 +628,7 @@ export default async function CalendarPage({
                         item={{
                           id: i.id,
                           title: i.title,
+                          status: i.status,
                           caption: i.caption,
                           clientName: i.clientName,
                           clientSlug: i.clientSlug,
@@ -631,6 +640,7 @@ export default async function CalendarPage({
                           platforms: (i.platforms as string[]) ?? [],
                           deliverableId: i.deliverableId,
                           pubCheck: pubCheckFor(i),
+    pub: pubFor(i),
                         }}
                       />
                     ))}

@@ -18,6 +18,7 @@ import {
   pullFrameProjects,
 } from "@/server/jobs/frameio-sync";
 import { runCalendarSync } from "@/server/jobs/calendar-sync";
+import { runPublishingReconcile } from "@/server/jobs/publishing-reconcile";
 import { syncOpenOnboardings } from "@/server/onboarding";
 import { runScriptingTaskSync } from "@/server/scripting-tasks";
 import { runScriptVersionSync } from "@/server/script-versions";
@@ -106,6 +107,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "finance.weekly_summary": runFinanceWeeklySummary,
   "finance.sync_health": runFinanceSyncHealth,
   "publications.due_check": runPublicationDueCheck,
+  "publications.metricool_reconcile": runPublishingReconcile,
   "vermogen.advies_maand": runVermogenAdvies,
   "signals.hourly": runHourlySignals,
   "frameio.pull_projects": pullFrameProjects,
@@ -122,6 +124,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
     await runScriptingTaskSync().catch((e) => console.error("[scripting.task_sync]", e));
     // Klantonboarding: opname in de agenda → opnamedag-stap klaar, alles klaar → afgerond.
     await syncOpenOnboardings().catch((e) => console.error("[onboarding.sync]", e));
+    // Publiceren via Metricool: gewijzigde berichten direct uit Metricool halen.
+    await runPublishingReconcile().catch((e) => console.error("[publications.metricool_reconcile]", e));
     return res;
   },
   "scripting.task_sync": runScriptingTaskSync,

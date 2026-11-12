@@ -70,6 +70,9 @@ const schema = z.object({
   // Metricool: één user-token (X-Mc-Auth) voor het hele account. De user-id en
   // de merk-id's (blogId) worden automatisch uit /settings/brands gehaald.
   METRICOOL_USER_TOKEN: z.string().optional(),
+  // Noodschakelaar voor publiceren via Metricool. Alleen bij exact "true"
+  // worden echte posts aangemaakt; anders draait alles als proef (dry-run).
+  METRICOOL_PUBLISHING_ENABLED: z.string().optional(),
 
   // --- AI ---
   // Zonder sleutel blijven de AI Tools slapend (net als e-mail): de schermen

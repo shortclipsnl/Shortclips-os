@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  uniqueIndex,
   boolean,
   date,
   index,
@@ -89,6 +90,11 @@ export const contentCalendar = pgTable(
     }),
     /** Optioneel gekoppelde opnamedag, zodat een caption bij de juiste opname hoort. */
     productionDayId: uuid("production_day_id"),
+    /** Handmatig gekoppelde video uit de Frame-bibliotheek (`frame_assets`).
+     *  Leeg = automatisch koppelen op titel. Er wordt alleen een verwijzing
+     *  bewaard, nooit een kopie: bij een nieuwere versie in dezelfde sessie
+     *  toont de planning automatisch die versie. */
+    frameAssetId: uuid("frame_asset_id"),
     title: varchar("title", { length: 240 }).notNull(),
     scheduledOn: date("scheduled_on").notNull(),
     scheduledAt: time("scheduled_at"),
@@ -150,10 +156,38 @@ export const publications = pgTable(
     /** Lengte van de video in seconden (uit Metricool). */
     durationSeconds: integer("duration_seconds"),
     failureReason: text("failure_reason"),
+    /* --- Publiceren via Metricool (zie src/lib/publish-guard.ts) --- */
+    /** "handmatig" (team post zelf, er gaat niets naar Metricool) of "metricool". Standaard handmatig. */
+    publishMode: varchar("publish_mode", { length: 12 }).notNull().default("handmatig"),
+    /** Vrijgave door een medewerker: zonder vrijgave gaat er nooit iets naar Metricool. */
+    releasedAt: timestamp("released_at", { withTimezone: true }),
+    releasedById: uuid("released_by_id").references(() => users.id, { onDelete: "set null" }),
+    /** Vingerafdruk van video, caption, kanaal en tijdstip op het moment van vrijgeven. */
+    releasedFingerprint: varchar("released_fingerprint", { length: 64 }),
+    /** Exacte videoversie die is vrijgegeven. */
+    videoVersionId: uuid("video_version_id"),
+    /** Door Shortclips aangemaakte Metricool-post. Het id wijzigt bij elke update, de UUID niet. */
+    metricoolPostId: varchar("metricool_post_id", { length: 64 }),
+    metricoolPostUuid: varchar("metricool_post_uuid", { length: 64 }),
+    /** niet_verstuurd | wordt_verstuurd | ingepland | in_de_wacht | gepubliceerd | mislukt | geannuleerd */
+    syncStatus: varchar("sync_status", { length: 20 }).notNull().default("niet_verstuurd"),
+    /** Vingerafdruk waarmee de post nu in Metricool staat. */
+    sentFingerprint: varchar("sent_fingerprint", { length: 64 }),
+    attempts: integer("attempts").notNull().default(0),
+    nextRetryAt: timestamp("next_retry_at", { withTimezone: true }),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    /** Pas gezet als de post in de Metricool-statistieken is teruggevonden. */
+    publishedConfirmedAt: timestamp("published_confirmed_at", { withTimezone: true }),
     ...timestamps,
     ...softDelete,
   },
   (t) => [
+    /** Eén actieve publicatie per planningitem per kanaal: dubbel kan niet. */
+    uniqueIndex("publications_item_platform_unique")
+      .on(t.calendarItemId, t.platform)
+      .where(sql`${t.deletedAt} IS NULL AND ${t.calendarItemId} IS NOT NULL`),
+    index("publications_sync_idx").on(t.syncStatus, t.nextRetryAt),
     index("publications_client_idx").on(t.clientId, t.publishedAt),
     index("publications_platform_idx").on(t.platform, t.status),
     unique("publications_external_unique").on(t.platform, t.externalPostId),

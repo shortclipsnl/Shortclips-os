@@ -820,6 +820,13 @@
       "when": 1794491876930,
       "tag": "0116_videograaf_draaiboek",
       "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1794496000000,
+      "tag": "0117_metricool_publiceren",
+      "breakpoints": true
     }
   ]
 }
