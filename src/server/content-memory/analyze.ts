@@ -16,6 +16,8 @@
  *  - Het blijft correlatie, geen bewezen oorzaak.
  */
 
+import { embedUrl as platformEmbedUrl, type Platform } from "@/lib/resultaten-overzicht";
+
 export const MIN_AGE_DAYS = 7;
 export const MIN_VIDEOS = 8;
 const BETTER = 1.2;
@@ -68,6 +70,10 @@ export type MemoryVideo = {
   format: string | null;
   durationSeconds: number | null;
   views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
   interactions: number;
   engagementRate: number;
   avgWatchSeconds: number | null;
@@ -80,6 +86,8 @@ export type MemoryVideo = {
   /** Gecombineerde prestatie (1 = normaal voor deze klant). */
   perf: number;
   externalUrl: string | null;
+  /** Officiële speler van het platform, zodat de video in het portaal afspeelt. */
+  embedUrl: string | null;
   thumbnail: string | null;
   why: string;
 };
@@ -111,6 +119,24 @@ export type SuccessFormula = {
   examples: MemoryVideo[];
 };
 
+/**
+ * Een terugkerend succes, direct gekoppeld aan de video's die het dragen.
+ * Alleen gevuld bij voldoende data en minstens "aannemelijk" bewijs.
+ */
+export type MemorySuccess = {
+  kind: "format" | "hook" | "cta" | "lengte" | "formule" | "kijktijd";
+  /** Korte titel, bijvoorbeeld "Prijs in de hook". */
+  title: string;
+  /** Eén korte conclusie in gewone taal. */
+  conclusion: string;
+  /** Mediaan prestatie t.o.v. normaal (1 = normaal). */
+  perf: number;
+  hits: number;
+  n: number;
+  evidence: Evidence;
+  videos: MemoryVideo[];
+};
+
 export type ContentMemory = {
   sufficient: boolean;
   videoCount: number;
@@ -136,6 +162,7 @@ export type ContentMemory = {
   lengths: MemoryGroup[];
   formulas: SuccessFormula[];
   patterns: string[];
+  successes: MemorySuccess[];
 };
 
 /* ------------------------------------------------------------------ *
@@ -238,6 +265,28 @@ export function captionKey(caption: string | null | undefined): string {
   return normalizeText(caption).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 40);
 }
 
+/** Afspeel-URL binnen het portaal (zelfde spelers als de Resultatenpagina, plus YouTube Shorts). */
+export function videoEmbedUrl(platform: string, url: string | null): string | null {
+  if (!url) return null;
+  if (platform === "youtube") {
+    const id = url.match(/(?:shorts\/|youtu\.be\/|[?&]v=)([\w-]{6,})/)?.[1];
+    return id ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0` : null;
+  }
+  return platformEmbedUrl(platform as Platform, url);
+}
+
+const PLATFORM_NAME: Record<string, string> = { instagram: "Instagram", tiktok: "TikTok", facebook: "Facebook", youtube: "YouTube", linkedin: "LinkedIn" };
+
+const HOOK_TITLE: Record<string, string> = {
+  Vraag: "Een vraag als hook",
+  Prijs: "Prijs in de hook",
+  Getal: "Een getal in de hook",
+  Nieuwsgierigheid: "Nieuwsgierigheid wekken",
+  "Spreekt kijker aan": "Kijker direct aanspreken",
+  Rondleiding: "Rondleiding als opening",
+  Stelling: "Stelling als opening",
+};
+
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const fmtX = (x: number) => `${x.toFixed(1).replace(".", ",")}x`;
 
@@ -256,7 +305,7 @@ function evidenceOf(n: number, hitRate: number, halvesAgree: boolean | null): Ev
 
 function whyText(v: Omit<MemoryVideo, "why">, overallWatch: number | null): string {
   const bits: string[] = [];
-  if (v.viewScore >= 1.5) bits.push(`${fmtX(v.viewScore)} de normale views op ${v.platform}`);
+  if (v.viewScore >= 1.5) bits.push(`${fmtX(v.viewScore)} de normale views op ${PLATFORM_NAME[v.platform] ?? v.platform}`);
   if (v.engScore >= 1.3) bits.push(`${fmtX(v.engScore)} de normale interactie`);
   if (v.avgWatchSeconds != null && overallWatch && v.avgWatchSeconds >= overallWatch * 1.15)
     bits.push(`langer bekeken dan normaal (${Math.round(v.avgWatchSeconds)} tegen ${Math.round(overallWatch)} sec)`);
@@ -304,6 +353,10 @@ export function analyzeMemory(pubs: MemoryInput[], now: Date = new Date()): Cont
       format: p.format,
       durationSeconds: p.durationSeconds,
       views: p.views,
+      likes: p.likes,
+      comments: p.comments,
+      shares: p.shares,
+      saves: p.saves,
       interactions,
       engagementRate: er(p),
       avgWatchSeconds: p.avgWatchSeconds,
@@ -313,6 +366,7 @@ export function analyzeMemory(pubs: MemoryInput[], now: Date = new Date()): Cont
       engScore: r2(engScore),
       perf: r2(0.6 * Math.min(viewScore, 6) + 0.4 * Math.min(engScore, 4)),
       externalUrl: p.externalUrl,
+      embedUrl: videoEmbedUrl(p.platform, p.externalUrl),
       thumbnail: p.thumbnail,
     };
     return { ...base, why: whyText(base, overallWatch) };
@@ -420,22 +474,53 @@ export function analyzeMemory(pubs: MemoryInput[], now: Date = new Date()): Cont
     .slice(0, 4);
 
   if (items.length < MIN_VIDEOS) {
-    return { ...base, sufficient: false, all: sorted, topVideos, flopVideos: [], topHooks, formats, hooks, ctas, lengths, formulas: [], patterns: [] };
+    return { ...base, sufficient: false, all: sorted, topVideos, flopVideos: [], topHooks, formats, hooks, ctas, lengths, formulas: [], patterns: [], successes: [] };
   }
 
   // Sterkste patronen in gewone taal (alleen waar minstens 4 video's het dragen).
+  // Dezelfde selectie als gestructureerde successen, gekoppeld aan de video's.
   const patterns: string[] = [];
+  const successes: MemorySuccess[] = [];
+  const winners = (vs: MemoryVideo[]) => { const w = vs.filter((v) => v.perf >= 1); return (w.length ? w : vs).slice(0, 3); };
+  const successTitle = (g: MemoryGroup) =>
+    g.dimension === "format" ? g.label : g.dimension === "hook" ? HOOK_TITLE[g.label] ?? `Hook: ${g.label.toLowerCase()}` : g.dimension === "cta" ? `CTA: ${g.label.toLowerCase()}` : `Video's van ${g.label.toLowerCase()}`;
+  const advice: Record<MemoryGroup["dimension"], string> = { format: "Vaker inplannen.", hook: "Gebruik deze opening vaker.", cta: "Sluit vaker zo af.", lengte: "Houd deze lengte aan." };
   const solid = (g: MemoryGroup) => g.evidence === "aannemelijk" || g.evidence === "sterk";
   const subject = (g: MemoryGroup) =>
     g.dimension === "format" ? `Het format "${g.label}"` : g.dimension === "hook" ? `Hooks met ${g.label.toLowerCase()}` : g.dimension === "cta" ? `De CTA "${g.label.toLowerCase()}"` : `Video's van ${g.label.toLowerCase()}`;
   for (const g of [...formats, ...hooks, ...ctas, ...lengths].filter((g) => g.verdict === "beter" && solid(g)).sort((a, b) => b.medianPerf - a.medianPerf).slice(0, 5)) {
     patterns.push(`${subject(g)} ${g.dimension === "hook" || g.dimension === "lengte" ? "presteren" : "presteert"} ${fmtX(g.medianPerf)} normaal; ${Math.round(g.hitRate * g.n)} van de ${g.n} video's scoorden boven gemiddeld.`);
+    const hits = Math.round(g.hitRate * g.n);
+    // "Geen duidelijke CTA" of een gewone stelling is geen herbruikbaar succes.
+    if (g.label !== "Geen duidelijke CTA" && g.label !== "Stelling") successes.push({ kind: g.dimension, title: successTitle(g), conclusion: `${hits} van ${g.n} video's scoorden boven gemiddeld. ${advice[g.dimension]}`, perf: g.medianPerf, hits, n: g.n, evidence: g.evidence, videos: winners(g.examples) });
   }
   for (const f of formulas.slice(0, 2)) {
     patterns.push(`Terugkerende succesformule: ${f.format ? `${f.format} + ` : ""}hook met ${f.hookType.toLowerCase()} + CTA "${f.cta.toLowerCase()}" (${f.hits} van ${f.n} video's sterk).`);
+    successes.push({
+      kind: "formule",
+      title: [f.format, `hook met ${f.hookType.toLowerCase()}`, `CTA ${f.cta.toLowerCase()}`].filter(Boolean).join(" + "),
+      conclusion: `${f.hits} van ${f.n} video's met deze combinatie scoorden sterk. Herhaal de combinatie.`,
+      perf: f.medianPerf,
+      hits: f.hits,
+      n: f.n,
+      evidence: evidenceOf(f.n, f.hits / f.n, null),
+      videos: winners(f.examples),
+    });
   }
   const watchUp = [...hooks, ...lengths].filter((g) => g.medianWatchSeconds != null && overallWatch && g.medianWatchSeconds >= overallWatch * 1.15 && g.n >= 4)[0];
-  if (watchUp && overallWatch) patterns.push(`${subject(watchUp)} worden langer bekeken: ${watchUp.medianWatchSeconds} sec tegen ${Math.round(overallWatch * 10) / 10} sec normaal.`);
+  if (watchUp && overallWatch) {
+    patterns.push(`${subject(watchUp)} worden langer bekeken: ${watchUp.medianWatchSeconds} sec tegen ${Math.round(overallWatch * 10) / 10} sec normaal.`);
+    successes.push({
+      kind: "kijktijd",
+      title: `Langer bekeken: ${successTitle(watchUp).charAt(0).toLowerCase()}${successTitle(watchUp).slice(1)}`,
+      conclusion: `${String(watchUp.medianWatchSeconds).replace(".", ",")} sec kijktijd tegen ${String(Math.round(overallWatch * 10) / 10).replace(".", ",")} sec normaal.`,
+      perf: watchUp.medianPerf,
+      hits: Math.round(watchUp.hitRate * watchUp.n),
+      n: watchUp.n,
+      evidence: watchUp.evidence,
+      videos: winners(watchUp.examples),
+    });
+  }
 
-  return { ...base, sufficient: true, all: sorted, topVideos, flopVideos, topHooks, formats, hooks, ctas, lengths, formulas, patterns };
+  return { ...base, sufficient: true, all: sorted, topVideos, flopVideos, topHooks, formats, hooks, ctas, lengths, formulas, patterns, successes };
 }
