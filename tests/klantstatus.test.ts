@@ -85,7 +85,7 @@ afterAll(async () => {
 });
 
 describe("A. actieve klant", () => {
-  it("krijgt automatische taken, scriptingtaken en meldingen zoals altijd", async () => {
+  it("krijgt automatische taken en meldingen zoals altijd (scripting-autotaken staan uit)", async () => {
     const { syncScriptingTasks } = await import("@/server/scripting-tasks");
     const { notify } = await import("@/server/notifications");
     await syncScriptingTasks([dayActief, dayWisselt]);
@@ -93,9 +93,10 @@ describe("A. actieve klant", () => {
     await dailyContractSignal(wisselt, "00000000-0000-4000-8000-000000000002");
 
     const a = await openTasks(actief);
-    expect(a.filter((t) => t.dedupeKey?.startsWith("scripting:"))).toHaveLength(1);
+    // Scripting-autotaken zijn bewust uitgezet (Scriptingpagina is de plek daarvoor).
+    expect(a.filter((t) => t.dedupeKey?.startsWith("scripting:"))).toHaveLength(0);
     expect(a.filter((t) => t.title === "Verlenging bespreken")).toHaveLength(1);
-    expect((await openTasks(wisselt)).filter((t) => t.source === "automation")).toHaveLength(2);
+    expect((await openTasks(wisselt)).filter((t) => t.source === "automation")).toHaveLength(1);
 
     const sent = await notify({ userIds: [jiska], clientId: actief, type: "content_gap", title: "Signaal", dedupeKey: "test:a1" });
     expect(sent).toBe(1);
@@ -122,7 +123,7 @@ describe("B. klant wordt niet actief", () => {
     result = await setStatus(wisselt, "paused");
     expect(result.direction).toBe("deactivated");
     expect(result.cancelledTasks).toBe(1); // contract-taak
-    expect(result.scriptingClosed).toBe(1);
+    expect(result.scriptingClosed).toBe(0); // er worden geen scriptingtaken meer aangemaakt
     expect(result.mutedNotifications).toBe(1);
     expect(result.stoppedReports).toBe(1);
 
@@ -137,7 +138,7 @@ describe("B. klant wordt niet actief", () => {
 
     // Niets verwijderd: geannuleerde taken en het rapport bestaan nog.
     const cancelled = await db.select().from(tasks).where(and(eq(tasks.clientId, wisselt), eq(tasks.status, "cancelled")));
-    expect(cancelled.length).toBe(2);
+    expect(cancelled.length).toBe(1); // de contract-taak (scripting-autotaken bestaan niet meer)
     expect(cancelled.every((t) => t.deletedAt === null)).toBe(true);
     const [rep] = await db.select().from(clientReports).where(eq(clientReports.clientId, wisselt));
     expect(rep!.status).toBe("mislukt");
@@ -229,17 +230,16 @@ describe("C. klant wordt weer actief", () => {
     const { syncScriptingTasks } = await import("@/server/scripting-tasks");
     const r = await setStatus(wisselt, "active");
     expect(r.direction).toBe("reactivated");
-    expect(r.scriptingCreated).toBe(1);
+    expect(r.scriptingCreated).toBe(0); // scripting-autotaken staan uit
 
     // Beoordelingstaak vervalt.
     const open = await openTasks(wisselt);
     expect(open.some((t) => t.dedupeKey?.startsWith("klantstatus_review:"))).toBe(false);
 
-    // Scripting: precies één open taak, ook na nog een sync.
+    // Scripting: autotaken staan uit, dus ook na een sync geen scriptingtaak.
     await syncScriptingTasks([dayWisselt]);
     const scripting = (await openTasks(wisselt)).filter((t) => t.dedupeKey?.startsWith("scripting:"));
-    expect(scripting).toHaveLength(1);
-    expect(scripting[0]!.dueOn! < inDays(30)).toBe(true);
+    expect(scripting).toHaveLength(0);
 
     // Het contractsignaal maakt weer één nieuwe taak (de geannuleerde blokkeert niet), en niet twee.
     await dailyContractSignal(wisselt, "00000000-0000-4000-8000-000000000002");
