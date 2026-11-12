@@ -9,7 +9,9 @@ import { users } from "@/db/schema";
 import { auditLog } from "@/server/audit";
 import { notify } from "@/server/notifications";
 import { dummyVerify, hashPassword, verifyPassword } from "./password";
-import { createSession, destroySession, revokeAllSessions } from "./session";
+import { createSession, destroySession, readSession, revokeAllSessions } from "./session";
+import { loginCodeRequired, startLoginChallenge, trustThisDevice, verifyLoginChallenge } from "./login-code";
+import { forgetThisDevicePush } from "@/server/client-app";
 import { requireOwner, requireViewer, ForbiddenError } from "@/server/auth/context";
 
 const loginSchema = z.object({
@@ -19,7 +21,12 @@ const loginSchema = z.object({
   next: z.string().nullish(),
 });
 
-export type LoginState = { error?: string };
+export type LoginState = {
+  error?: string;
+  /** "code" = wachtwoord klopt, nu nog de inlogcode uit de e-mail invoeren. */
+  step?: "code";
+  maskedEmail?: string;
+};
 
 /** Eenvoudige rem op brute force, per proces (IP-gebaseerd). */
 const attempts = new Map<string, { count: number; resetAt: number }>();
@@ -137,6 +144,17 @@ export async function loginAction(
   }
 
   attempts.delete(ip);
+
+  // Tweestapsverificatie voor klanten waar dit aanstaat: op een nieuw apparaat
+  // eerst een code per e-mail. De sessie wordt pas na een juiste code gemaakt.
+  if (await loginCodeRequired(user)) {
+    await db.update(users).set({ failedLoginCount: 0, lockedUntil: null }).where(eq(users.id, user.id));
+    const challenge = await startLoginChallenge(user, { ip, userAgent: h.get("user-agent") });
+    if (!challenge.ok) return { error: challenge.message };
+    await auditLog({ action: "auth.login_code_sent", entityType: "user", entityId: user.id, clientId: user.clientId });
+    return { step: "code", maskedEmail: challenge.maskedEmail };
+  }
+
   await db
     .update(users)
     .set({ lastLoginAt: new Date(), failedLoginCount: 0, lockedUntil: null })
@@ -165,7 +183,41 @@ export async function loginAction(
   redirect(target);
 }
 
+/**
+ * Tweede stap van inloggen: de code uit de e-mail. Bij een juiste code wordt de
+ * sessie aangemaakt en dit apparaat onthouden, zodat de code hier niet opnieuw
+ * gevraagd wordt.
+ */
+export async function verifyLoginCodeAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  const code = String(formData.get("code") ?? "");
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "onbekend";
+
+  if (rateLimited(ip)) {
+    return { step: "code", error: "Te veel pogingen. Probeer het over tien minuten opnieuw." };
+  }
+
+  const result = await verifyLoginChallenge(code);
+  if (!result.ok) {
+    recordFailure(ip);
+    return result.expired ? { error: result.message } : { step: "code", error: result.message };
+  }
+
+  attempts.delete(ip);
+  await db
+    .update(users)
+    .set({ lastLoginAt: new Date(), failedLoginCount: 0, lockedUntil: null })
+    .where(eq(users.id, result.userId));
+  await createSession(result.userId, { ip, userAgent: h.get("user-agent") });
+  await trustThisDevice(result.userId, h.get("user-agent"));
+  await auditLog({ action: "auth.login_code_verified", entityType: "user", entityId: result.userId });
+  redirect("/portal");
+}
+
 export async function logoutAction() {
+  // Dit apparaat krijgt na uitloggen geen pushmeldingen meer voor dit account.
+  const current = await readSession();
+  if (current) await forgetThisDevicePush(current.id);
   await destroySession();
   redirect("/login");
 }

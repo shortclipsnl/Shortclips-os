@@ -18,6 +18,14 @@ export const metadata: Metadata = {
   description:
     "Eén platform voor de complete videoworkflow van ShortClips: klanten, scripts, opnames, edit, goedkeuring, planning, publicatie en resultaten.",
   robots: { index: false, follow: false },
+  // Klant-app (PWA): naam en icoon op het beginscherm van iPhone en Android.
+  applicationName: "Shortclips",
+  appleWebApp: { capable: true, title: "Shortclips", statusBarStyle: "default" },
+  icons: {
+    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {

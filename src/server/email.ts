@@ -72,8 +72,9 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
 export function portalEmailHtml(opts: {
   heading: string;
   body: string;
-  ctaLabel: string;
-  ctaUrl: string;
+  /** Zonder knop (bijv. een inlogcode) laat je beide weg. */
+  ctaLabel?: string;
+  ctaUrl?: string;
 }): string {
   const navy = "#00003b";
   const orange = "#FF6A00";
@@ -87,7 +88,7 @@ export function portalEmailHtml(opts: {
         <tr><td style="padding:28px;">
           <h1 style="margin:0 0 12px;font-size:20px;line-height:1.3;color:${navy};">${escapeHtml(opts.heading)}</h1>
           <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#334155;">${escapeHtml(opts.body)}</p>
-          <a href="${escapeAttr(opts.ctaUrl)}" style="display:inline-block;background:${orange};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:10px;">${escapeHtml(opts.ctaLabel)}</a>
+          ${opts.ctaUrl && opts.ctaLabel ? `<a href="${escapeAttr(opts.ctaUrl)}" style="display:inline-block;background:${orange};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 22px;border-radius:10px;">${escapeHtml(opts.ctaLabel)}</a>` : ""}
         </td></tr>
         <tr><td style="padding:0 28px 28px;">
           <p style="margin:0;font-size:12px;line-height:1.5;color:#94a3b8;">Je ontvangt deze mail omdat je toegang hebt tot het ShortClips-portaal.</p>

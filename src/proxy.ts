@@ -16,7 +16,19 @@ import type { NextRequest } from "next/server";
 // iCal-token in de URL) — anders zou de geplande import of de agenda-abonnee van
 // Google (die geen sessie heeft) nooit binnenkomen. De overige /api/vermogen-routes
 // blijven sessiebeschermd (eigenaar), dus die staan hier bewust niet bij.
-const PUBLIC_PATHS = ["/login", "/api/webhooks", "/api/health", "/api/jobs", "/api/kosten", "/api/vermogen/import", "/api/editor/agenda"];
+// Manifest en service worker moeten zonder sessie bereikbaar zijn: de telefoon
+// haalt ze op bij het installeren en bij elke pushmelding. Ze bevatten geen data.
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/webhooks",
+  "/api/health",
+  "/api/jobs",
+  "/api/kosten",
+  "/api/vermogen/import",
+  "/api/editor/agenda",
+  "/manifest.webmanifest",
+  "/sw.js",
+];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

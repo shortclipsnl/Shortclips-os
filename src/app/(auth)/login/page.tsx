@@ -79,7 +79,7 @@ export default async function LoginPage({
             Inloggen
           </h2>
           <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            Gebruik je ShortClips-account.
+            Gebruik je Shortclips-account.
           </p>
 
           {params.reden === "geen-klant" ? (

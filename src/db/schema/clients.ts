@@ -74,6 +74,10 @@ export const clients = pgTable(
      *  geen echte klant van ons zijn (bijv. historisch meegekomen),
      *  zodat ze niet in de resultaten (overzicht, tegels, lijst) verschijnen. */
     showInResults: boolean("show_in_results").notNull().default(true),
+    /** Klantportaal: inloggen op een nieuw apparaat vraagt een eenmalige code
+     *  per e-mail (tweestapsverificatie). Per klant aan te zetten, bijv. voor
+     *  grote merken en agencies. */
+    portalLoginCodeRequired: boolean("portal_login_code_required").notNull().default(false),
     monthlyRevenue: numeric("monthly_revenue", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),

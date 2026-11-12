@@ -264,8 +264,8 @@ function ClientCard({ c }: { c: BoardClient }) {
         {stopped ? "Niet actief" : "Actief"}
       </button>
     </div>
-      {/* De twee vaste PDF's van deze klant, direct te openen. */}
-      {c.docs.length > 0 ? <ClientDocButtons slots={c.docs} size="xs" className="mt-2 pl-[64px]" /> : null}
+      {/* De twee vaste PDF's van deze klant en de video's, direct te openen. */}
+      <ClientDocButtons slots={c.docs} size="xs" className="mt-2 pl-[64px]" videosHref={`/clients/${c.slug}/videos`} />
     </div>
   );
 }

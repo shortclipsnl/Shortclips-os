@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, inArray, isNull, isNotNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients, users } from "@/db/schema";
+import { revokeClientAppAccess } from "@/server/auth/client-app-access";
 
 /**
  * Houdt de portaaltoegang gelijk met de samenwerkingsstatus:
@@ -25,6 +26,8 @@ export async function enforcePortalAccess(): Promise<{ ok: boolean; suspended: n
       .where(and(eq(users.primaryRole, "client"), eq(users.status, "active"), inArray(users.clientId, inactiveIds)))
       .returning({ id: users.id });
     suspended = r.length;
+    // Geblokkeerd = ook geen pushmeldingen en geen vertrouwde apparaten meer.
+    for (const u of r) await revokeClientAppAccess(u.id);
   }
 
   const active = await db

@@ -213,7 +213,7 @@ export default async function PortalPlanningPage() {
           <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Je opnames en scriptmeetings — automatisch bijgewerkt vanuit ons team.</p>
         </div>
         {/* Opnames annuleren: compact, direct zichtbaar rechtsboven. */}
-        <div className="shrink-0 rounded-[14px] border border-[var(--st-orange)]/40 p-3.5 shadow-[var(--shadow-card)] sm:max-w-[300px]" style={{ background: "color-mix(in srgb, var(--st-orange) 9%, transparent)" }}>
+        <div className="w-full rounded-[14px] border border-[var(--st-orange)]/40 p-3.5 shadow-[var(--shadow-card)] sm:w-auto sm:max-w-[300px] sm:shrink-0" style={{ background: "color-mix(in srgb, var(--st-orange) 9%, transparent)" }}>
           <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-[var(--st-orange)]"><CalendarClock className="size-4" /> Opname wijzigen of annuleren</div>
           <p className="mt-1 text-[12.5px] leading-snug text-[var(--color-ink-muted)]">Gratis tot <strong className="text-[var(--color-ink)]">{settings.cancelNoticeDays} werkdagen</strong> ervoor; daarna {settings.cancelFee}. Laat het je vaste contactpersoon zo snel mogelijk weten.</p>
         </div>

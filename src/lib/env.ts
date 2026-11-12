@@ -168,6 +168,16 @@ const schema = z.object({
   // Afzender, bijv. "ShortClips <portal@shortclips.nl>". Domein moet in Resend
   // geverifieerd zijn.
   MAIL_FROM: z.string().optional(),
+
+  // --- Pushmeldingen (klant-app / PWA) ---
+  // VAPID-sleutelpaar voor Web Push. Genereer één keer met:
+  //   npx web-push generate-vapid-keys
+  // De publieke sleutel gaat naar de browser, de private sleutel blijft geheim.
+  // Zonder deze waarden blijft push slapend: meldingen verschijnen wél in het
+  // portaal en per e-mail. VAPID_SUBJECT = contactadres voor de pushdiensten.
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default("mailto:info@shortclips.nl"),
 });
 
 // Basis-URL bepalen vóór validatie. Volgorde:
@@ -257,6 +267,11 @@ export function integrationConfig() {
       configured: Boolean(env.METRICOOL_USER_TOKEN),
       required: ["METRICOOL_USER_TOKEN"],
       optional: [],
+    },
+    push: {
+      configured: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY),
+      required: ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"],
+      optional: ["VAPID_SUBJECT"],
     },
     email: {
       configured: Boolean(env.RESEND_API_KEY && env.MAIL_FROM),

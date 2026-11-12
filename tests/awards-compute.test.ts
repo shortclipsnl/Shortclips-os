@@ -60,9 +60,11 @@ describe("awards telfunctie", () => {
   it("nextAward en highestEarned", () => {
     expect(nextAward(0)!.key).toBe("eerste_cut");
     expect(nextAward(5)!.key).toBe("op_ritme");
-    expect(nextAward(1000)).toBeNull();
+    expect(nextAward(1000)!.key).toBe("ultimate_legend");
+    expect(nextAward(2500)).toBeNull();
     expect(highestEarned(0)).toBeNull();
     expect(highestEarned(60)!.key).toBe("vaste_kracht");
     expect(highestEarned(1000)!.key).toBe("legend");
+    expect(highestEarned(2500)!.key).toBe("ultimate_legend");
   });
 });

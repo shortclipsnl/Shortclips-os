@@ -9,6 +9,7 @@ import { Avatar, Badge, Card, ClientLogo, EmptyState, InfoNote, LinkButton, Page
 import { CLIENT_STATUS } from "@/lib/statuses";
 import { ClientRowActions } from "./row-actions";
 import { ClientPortalManager } from "../klantportalen/portalen-beheer";
+import { ClientAppPanel } from "../klantportalen/client-app-panel";
 
 export const metadata: Metadata = { title: "Klanten" };
 export const dynamic = "force-dynamic";
@@ -231,6 +232,7 @@ async function PortalenTab({ viewer }: { viewer: Awaited<ReturnType<typeof requi
                       invitedAt: u.invitedAt ? u.invitedAt.toISOString() : null,
                     }))}
                   />
+                  <ClientAppPanel clientId={c.id} name={c.name} />
                 </div>
               </Card>
             );

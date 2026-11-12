@@ -1,4 +1,4 @@
-import { BookOpen, Clapperboard } from "lucide-react";
+import { BookOpen, Clapperboard, Film } from "lucide-react";
 import type { ClientDocumentKind } from "@/db/schema";
 
 /**
@@ -13,7 +13,18 @@ export type DocButtonSlot = { kind: ClientDocumentKind; label: string; url: stri
 
 const ICON: Record<ClientDocumentKind, typeof BookOpen> = { klanten_guide: BookOpen, editing_guide: Clapperboard };
 
-export function ClientDocButtons({ slots, size = "sm", className = "" }: { slots: DocButtonSlot[]; size?: "xs" | "sm"; className?: string }) {
+export function ClientDocButtons({
+  slots,
+  size = "sm",
+  className = "",
+  videosHref,
+}: {
+  slots: DocButtonSlot[];
+  size?: "xs" | "sm";
+  className?: string;
+  /** Link naar het videooverzicht van de klant (knop "Short video's"). */
+  videosHref?: string;
+}) {
   const pad = size === "xs" ? "px-2.5 py-1 text-2xs gap-1" : "px-3 py-1.5 text-xs gap-1.5";
   const icon = size === "xs" ? "size-3.5" : "size-4";
   return (
@@ -53,6 +64,16 @@ export function ClientDocButtons({ slots, size = "sm", className = "" }: { slots
           </a>
         );
       })}
+      {videosHref ? (
+        <a
+          href={videosHref}
+          title="Alle video's van deze klant per opnamesessie"
+          className={`inline-flex items-center whitespace-nowrap rounded-full border border-[var(--color-ink)] bg-[var(--color-surface)] font-semibold text-[var(--color-ink)] transition hover:opacity-90 ${pad}`}
+        >
+          <Film className={icon} strokeWidth={1.75} />
+          Short video&apos;s
+        </a>
+      ) : null}
     </span>
   );
 }
