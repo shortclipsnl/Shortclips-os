@@ -366,7 +366,7 @@ function WaitingStrip({ items, isSelf, personName }: { items: WaitingItem[]; isS
         <Hourglass className="size-4 text-[var(--color-warn)]" />
         <h2 className="text-sm font-semibold">{isSelf ? "Ik wacht op de klant" : `${personName.split(" ")[0]} wacht op de klant`}</h2>
         <span className="rounded-full bg-[var(--color-neutral-soft)] px-2 py-0.5 text-xs font-semibold tabular-nums text-[var(--color-ink-muted)]">{items.length}</span>
-        <span className="ml-auto hidden text-xs text-[var(--color-ink-muted)] sm:inline">Langer dan 3 werkdagen stil? Stuur een herinnering via Klantbericht.</span>
+        <span className="ml-auto hidden text-xs text-[var(--color-ink-muted)] sm:inline">Langer dan 3 werkdagen stil? Stuur de klant een herinnering.</span>
       </div>
       {items.length === 0 ? (
         <p className="px-4 py-3 text-sm text-[var(--color-ink-muted)]">Er ligt niets bij je klanten.</p>

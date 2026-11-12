@@ -1,34 +1,7 @@
-import type { Metadata } from "next";
-import { requirePermission } from "@/server/auth/context";
-import { listAiOutputs } from "@/server/ai/knowledge";
-import { aiConfigured } from "@/server/ai/client";
-import { PageHeader } from "@/components/ui";
-import { BerichtAssistent } from "./bericht-ui";
-import type { ReplyDraft } from "@/server/actions/ai-tools";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Klantbericht Assistent" };
-export const dynamic = "force-dynamic";
-// Langere functie-timeout voor AI-generatie (anders kapt Vercel het af).
-export const maxDuration = 300;
-
-export default async function BerichtPage() {
-  const viewer = await requirePermission("ai:read");
-  const outputs = await listAiOutputs(viewer, "message");
-  const recent = outputs.map((o) => ({
-    id: o.id,
-    title: o.title,
-    clientName: o.clientName,
-    createdAt: o.createdAt.toISOString(),
-    output: o.output as ReplyDraft,
-  }));
-
-  return (
-    <div className="mx-auto max-w-[1100px]">
-      <PageHeader
-        title="AI Klantbericht Assistent"
-        description="Sleep een screenshot erin of plak het bericht — de assistent herkent zelf de klant en het kanaal en stelt een conceptantwoord op in de Shortclips-stijl."
-      />
-      <BerichtAssistent aiReady={aiConfigured()} recent={recent} />
-    </div>
-  );
+// De Klantbericht-tool is uit het portaal gehaald (werd niet gebruikt).
+// Oude links komen netjes op het dashboard uit; opgeslagen data blijft bewaard.
+export default function BerichtPage() {
+  redirect("/dashboard");
 }

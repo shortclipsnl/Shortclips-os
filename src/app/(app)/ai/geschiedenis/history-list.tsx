@@ -19,7 +19,6 @@ const TOOLS = [
   { key: "", label: "Alles" },
   { key: "caption", label: "Captions" },
   { key: "briefing", label: "Briefings" },
-  { key: "message", label: "Klantberichten" },
 ];
 
 export function HistoryList({ rows }: { rows: HistoryRow[] }) {

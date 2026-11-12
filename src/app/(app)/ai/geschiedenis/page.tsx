@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import { aiOutputs, clients } from "@/db/schema";
 import { requirePermission, scopeToClients } from "@/server/auth/context";
@@ -19,7 +19,8 @@ export default async function GeschiedenisPage() {
       .select({ id: aiOutputs.id, tool: aiOutputs.tool, title: aiOutputs.title, createdAt: aiOutputs.createdAt, clientName: clients.name })
       .from(aiOutputs)
       .innerJoin(clients, eq(clients.id, aiOutputs.clientId))
-      .where(and(isNull(aiOutputs.deletedAt), scopeToClients(viewer, aiOutputs.clientId)))
+      // Klantbericht is uit de Tools gehaald; oude berichten blijven in de database maar tonen we niet meer.
+      .where(and(isNull(aiOutputs.deletedAt), ne(aiOutputs.tool, "message"), scopeToClients(viewer, aiOutputs.clientId)))
       .orderBy(desc(aiOutputs.createdAt))
       .limit(200);
 
@@ -37,7 +38,7 @@ export default async function GeschiedenisPage() {
 
   return (
     <div className="mx-auto max-w-[1000px]">
-      <PageHeader title="AI-geschiedenis" description="Alle gegenereerde captions, briefings, en klantberichten op één plek — terug te vinden en opnieuw te openen." />
+      <PageHeader title="AI-geschiedenis" description="Alle gegenereerde captions en briefings op één plek — terug te vinden en opnieuw te openen." />
       <div className="mb-4">
         <InfoNote>Alles wat de AI Tools maken wordt automatisch opgeslagen in het dashboard (database), per klant. Niets gaat verloren als je een scherm sluit.</InfoNote>
       </div>

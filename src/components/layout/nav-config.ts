@@ -100,7 +100,6 @@ export const NAVIGATION: NavGroup[] = [
     items: [
       { href: "/ai/scriptgenerator", label: "Scriptgenerator", icon: "PenLine", permissions: ["ai:read"], match: "/ai/scriptgenerator" },
       { href: "/ai/caption", label: "Caption Maker", icon: "Sparkles", permissions: ["ai:read"], match: "/ai/caption" },
-      { href: "/ai/bericht", label: "Klantbericht", icon: "MessagesSquare", permissions: ["ai:read"], match: "/ai/bericht" },
       { href: "/ai/content-research", label: "Content Research", icon: "Lightbulb", permissions: ["content_research:read"], match: "/ai/content-research" },
       // Editor Briefing maak je centraal vanaf de Editing-pagina.
       { href: "/ai/geschiedenis", label: "AI-geschiedenis", icon: "History", permissions: ["ai:history_read"], match: "/ai/geschiedenis" },
