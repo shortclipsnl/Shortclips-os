@@ -5,13 +5,12 @@ import { asc, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients as clientsTable } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
-import { getDefaultVideographer, getMonthShootStats, getShootOverview, nextShootPerClient, shootsInRange, unplannedClients } from "@/server/productions";
+import { getDefaultVideographer, getMonthShootStats, getShootOverview, nextShootPerClient, shootsInRange } from "@/server/productions";
 import { listAssignableUsers } from "@/server/clients";
 import { missingShootAppointments } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { Badge, Card, ClientLogo, PageHeader, Stat, TeamAvatar } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { UnplannedList } from "./unplanned-list";
 import { SCRIPTING_STATUS } from "@/lib/statuses";
 import { ShootAgenda, type AgendaShoot } from "./shoot-agenda";
 import { VideographerCell, type PersonOption } from "./prod-cells";
@@ -37,14 +36,13 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
   const todayIso = new Date().toLocaleDateString("en-CA");
 
   const canAssign = viewer.permissions.has("productions:write");
-  const [shoots, monthStats, nextPerClient, overview, assignable, defaultVg, unplanned] = await Promise.all([
+  const [shoots, monthStats, nextPerClient, overview, assignable, defaultVg] = await Promise.all([
     shootsInRange(viewer, startIso, endIso),
     getMonthShootStats(viewer),
     nextShootPerClient(viewer),
     getShootOverview(viewer),
     canAssign ? listAssignableUsers() : Promise.resolve([]),
     getDefaultVideographer(),
-    unplannedClients(viewer),
   ]);
 
   // Ontbrekende opnames uit Google Agenda (herkend maar geen klant, of mogelijk
@@ -132,8 +130,6 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
           icon={<CalendarCheck />}
         />
       </div>
-
-      {unplanned.length > 0 ? <UnplannedList items={unplanned} canWrite={canAssign} /> : null}
 
       {/* Mogelijk ontbrekende opnames uit Google Agenda: herkend maar nog niet
           gekoppeld, of mogelijk gemist. In één klik aan een klant koppelen →
