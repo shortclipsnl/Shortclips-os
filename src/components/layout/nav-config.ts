@@ -20,6 +20,8 @@ export type NavItem = {
   manageClients?: boolean;
   /** Zichtbaar voor de eigenaar + aangewezen teamleden van de offertemodule. */
   quotesAccess?: boolean;
+  /** Zichtbaar voor de eigenaar + Milou en Jiska (leadopvolging en omzetten). */
+  leadsAccess?: boolean;
   /** Zichtbaar voor de eigenaar + de operationeel beheerder (Milou). Voor de
    *  voorheen eigenaar-only operationele surfaces (koppelingen, portaal-instellingen). */
   manageOperations?: boolean;
@@ -121,7 +123,7 @@ export const NAVIGATION: NavGroup[] = [
     title: "Sales",
     accent: "var(--color-lime)",
     items: [
-      { href: "/leads", label: "Leads", icon: "Target", ownerOnly: true, match: "/leads" },
+      { href: "/leads", label: "Leads", icon: "Target", leadsAccess: true, match: "/leads" },
       { href: "/offertes", label: "Offertes", icon: "FileSignature", quotesAccess: true, match: "/offertes" },
       // Interne prijslijst 2027: fase 1 alleen de eigenaar. Uitrol naar het team pas na akkoord van Jarno.
       { href: "/prijslijst", label: "Interne prijslijst 2027", icon: "Tags", ownerOnly: true, match: "/prijslijst" },

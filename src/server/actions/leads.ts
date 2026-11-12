@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { clients, salesLeads } from "@/db/schema";
-import { requireOwner, ForbiddenError } from "@/server/auth/context";
+import { requireLeadsAccess, ForbiddenError } from "@/server/auth/context";
 import { dispatch } from "@/server/automation";
 import { createClient } from "@/server/actions/clients";
 import { imapLeads } from "@/server/integrations/imap-leads";
@@ -16,7 +16,7 @@ export type ActionResult = { ok: boolean; message?: string; slug?: string };
 /** "Nu synchroniseren": leest direct de IMAP-leadsmap uit (alleen eigenaar). */
 export async function syncLeadsFromMail(): Promise<ActionResult> {
   return wrap(async () => {
-    await requireOwner();
+    await requireLeadsAccess();
     if (!imapLeads.isConfigured) {
       return { ok: false, message: "De IMAP-koppeling is nog niet ingesteld. Zet IMAP_HOST, IMAP_USER en IMAP_PASSWORD (Beheer → Koppelingen)." };
     }
@@ -42,7 +42,7 @@ const statusSchema = z.object({
 /** Leadstatus wijzigen — zoals een statuskolom. */
 export async function setLeadStatus(input: z.infer<typeof statusSchema>): Promise<ActionResult> {
   return wrap(async () => {
-    await requireOwner();
+    await requireLeadsAccess();
     const p = statusSchema.safeParse(input);
     if (!p.success) return { ok: false, message: "Ongeldige status." };
     await db.update(salesLeads).set({ status: p.data.status, updatedAt: new Date() }).where(eq(salesLeads.id, p.data.id));
@@ -74,7 +74,7 @@ const createLeadSchema = z.object({
 /** Handmatig een nieuwe lead toevoegen vanuit het leadsoverzicht. */
 export async function createLead(input: z.infer<typeof createLeadSchema>): Promise<ActionResult> {
   return wrap(async () => {
-    await requireOwner();
+    await requireLeadsAccess();
     const p = createLeadSchema.safeParse(input);
     if (!p.success) return { ok: false, message: p.error.issues[0]?.message };
     const v = p.data;
@@ -102,7 +102,7 @@ const sourceSchema = z.object({
 /** De bron van een lead zetten (waar de lead binnenkwam). */
 export async function setLeadSource(input: z.infer<typeof sourceSchema>): Promise<ActionResult> {
   return wrap(async () => {
-    await requireOwner();
+    await requireLeadsAccess();
     const p = sourceSchema.safeParse(input);
     if (!p.success) return { ok: false, message: "Ongeldige bron." };
     await db.update(salesLeads).set({ source: p.data.source || null, updatedAt: new Date() }).where(eq(salesLeads.id, p.data.id));
@@ -114,7 +114,7 @@ export async function setLeadSource(input: z.infer<typeof sourceSchema>): Promis
 /** Opvolgdatum zetten of wissen. */
 export async function setLeadFollowUp(input: z.infer<typeof followUpSchema>): Promise<ActionResult> {
   return wrap(async () => {
-    await requireOwner();
+    await requireLeadsAccess();
     const p = followUpSchema.safeParse(input);
     if (!p.success) return { ok: false, message: "Ongeldige datum." };
     await db.update(salesLeads).set({ followUpOn: p.data.followUpOn, updatedAt: new Date() }).where(eq(salesLeads.id, p.data.id));
@@ -132,7 +132,7 @@ export async function setLeadFollowUp(input: z.infer<typeof followUpSchema>): Pr
  */
 export async function convertLeadToClient(leadId: string): Promise<ActionResult> {
   return wrap(async () => {
-    await requireOwner();
+    await requireLeadsAccess();
 
     const [lead] = await db.select().from(salesLeads).where(eq(salesLeads.id, leadId)).limit(1);
     if (!lead) return { ok: false, message: "Lead niet gevonden." };

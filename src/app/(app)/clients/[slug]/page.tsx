@@ -8,7 +8,7 @@ import {
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
-import { isEditorRole, requireInternal } from "@/server/auth/context";
+import { isOwner, isEditorRole, requireInternal } from "@/server/auth/context";
 import { getClientHub, type ClientHub } from "@/server/clients";
 import { listEditingProjects, type EditingProject } from "@/server/editing-board";
 import { ResultsToggle } from "./results-toggle";
@@ -140,7 +140,7 @@ export default async function ClientPage({
   // zijn. Een tab die hier wegvalt, kan ook niet geselecteerd worden, dus zijn
   // paneel hieronder rendert dan evenmin.
   // Klantonboarding: tabblad vooraan zolang de onboarding loopt, daarna achteraan.
-  const onboarding = isEditorRole(viewer) ? null : await getOnboardingView(c.id).catch(() => null);
+  const onboarding = isEditorRole(viewer) ? null : await getOnboardingView(c.id, { isOwner: isOwner(viewer) }).catch(() => null);
   const onboardingOpen = Boolean(onboarding && !onboarding.completedAt);
   const onboardingTab: TabDef[] = onboarding
     ? [{ key: "onboarding", label: onboardingOpen ? `Onboarding ${onboarding.done}/${onboarding.total}` : "Onboarding" }]

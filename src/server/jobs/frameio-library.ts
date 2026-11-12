@@ -419,3 +419,32 @@ export async function frameLibraryCoverage() {
   return { ok: true, clients: (rows as unknown as { rows?: unknown[] }).rows ?? rows };
 }
 
+
+/**
+ * Onboarding: direct zoeken naar een Frame.io-project met de klantnaam en het
+ * koppelen (zelfde regels als de sync, die elke twee uur draait). Maakt nooit
+ * iets aan in Frame.io en koppelt alleen bij precies één passende klant.
+ */
+export async function linkFrameProjectsNow(
+  clientId: string,
+  source: FrameLibrarySource = frameio,
+): Promise<{ linked: boolean; name?: string; message?: string }> {
+  const [client] = await db.select({ name: clients.name }).from(clients).where(eq(clients.id, clientId)).limit(1);
+  if (!client) return { linked: false, message: "Klant niet gevonden." };
+  if (!source.isConfigured) return { linked: false, message: "De Frame.io-koppeling is niet ingesteld." };
+  const ctx: JobContext = { jobId: "onboarding", log: () => undefined, counters: { processed: 0, created: 0, updated: 0, failed: 0 } };
+  try {
+    await linkProjects(source, ctx);
+  } catch (e) {
+    console.error("[onboarding.frame]", clientId, e);
+    return { linked: false, message: "Frame.io is nu niet bereikbaar. Probeer het later opnieuw." };
+  }
+  const [hit] = await db
+    .select({ name: clientIntegrations.externalName })
+    .from(clientIntegrations)
+    .where(and(eq(clientIntegrations.clientId, clientId), eq(clientIntegrations.provider, "frameio")))
+    .limit(1);
+  return hit
+    ? { linked: true, name: hit.name ?? client.name }
+    : { linked: false, message: `Nog geen project gevonden met de naam "${client.name}". Controleer de schrijfwijze in Frame.io.` };
+}

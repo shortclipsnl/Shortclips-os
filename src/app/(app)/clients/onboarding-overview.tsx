@@ -3,8 +3,9 @@ import type { OnboardingListRow } from "@/server/onboarding";
 import { formatDate } from "@/lib/format";
 
 const TONE: Record<OnboardingListRow["status"], string> = {
-  "Actie nodig": "border-[var(--color-bad)] text-[var(--color-bad)]",
-  Bezig: "border-[var(--color-warn)] text-[var(--color-warn)]",
+  Blokkade: "border-[var(--color-bad)] text-[var(--color-bad)]",
+  "Actie nodig": "border-[var(--color-warn)] text-[var(--color-warn)]",
+  Bezig: "border-[var(--color-line-strong)] text-[var(--color-ink-muted)]",
   Afgerond: "border-[var(--color-good)] text-[var(--color-good)]",
 };
 
@@ -37,11 +38,14 @@ export function OnboardingOverview({ rows }: { rows: OnboardingListRow[] }) {
                   {r.next && r.status !== "Afgerond" ? <p className="max-w-[360px] truncate text-xs text-[var(--color-ink-muted)]">{r.next}</p> : null}
                 </td>
                 <td className="px-3 py-2.5 text-[var(--color-ink-muted)]">{r.pm ?? "–"}</td>
-                <td className="px-3 py-2.5 text-[var(--color-ink-muted)]">{r.startOn ? formatDate(r.startOn) : "–"}</td>
+                <td className="px-3 py-2.5 text-[var(--color-ink-muted)]">
+                  {r.startOn ? formatDate(r.startOn) : "–"}
+                  {r.status !== "Afgerond" ? <span className="block text-2xs text-[var(--color-ink-faint)]">{r.workdays} werkdagen bezig</span> : null}
+                </td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-2">
                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--color-surface-sunken)]">
-                      <div className="h-full rounded-full bg-[var(--color-brand-500)]" style={{ width: `${Math.round((r.done / r.total) * 100)}%` }} />
+                      <div className={`h-full rounded-full ${r.status === "Blokkade" ? "bg-[var(--color-bad)]" : r.status === "Afgerond" ? "bg-[var(--color-good)]" : "bg-[var(--color-indigo-ink)]"}`} style={{ width: `${Math.round((r.done / Math.max(1, r.total)) * 100)}%` }} />
                     </div>
                     <span className="text-xs tabular-nums text-[var(--color-ink-muted)]">{r.done}/{r.total}</span>
                   </div>

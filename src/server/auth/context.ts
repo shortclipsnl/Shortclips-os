@@ -255,6 +255,24 @@ export async function requireManageClients(): Promise<Viewer> {
 }
 
 /**
+ * Leads en klantonboarding: Milou en Jiska volgen leads op en zetten gewonnen
+ * leads om naar klant. Bedragen (offertewaarde, maandbedrag) blijven alleen
+ * zichtbaar voor de eigenaar. Uitbreiden = een e-mail toevoegen.
+ */
+export const LEADS_TEAM_EMAILS = ["milou@shortclips.nl", "jiska@shortclips.nl"] as const;
+export function canAccessLeads(viewer: Viewer | null): boolean {
+  if (!viewer) return false;
+  return isOwner(viewer) || (LEADS_TEAM_EMAILS as readonly string[]).includes(viewer.email.toLowerCase());
+}
+export async function requireLeadsAccess(): Promise<Viewer> {
+  const viewer = await requireInternal();
+  if (!canAccessLeads(viewer)) {
+    throw new ForbiddenError("Leads zijn alleen voor de eigenaar, Milou en Jiska.");
+  }
+  return viewer;
+}
+
+/**
  * Offertemodule: naast de eigenaar mogen deze aangewezen teamleden offertes
  * maken, versturen en de tracking zien — zodat het doorgaat als de eigenaar er
  * niet is. Bewust een expliciete lijst (niet alle coördinatoren), zodat alleen
