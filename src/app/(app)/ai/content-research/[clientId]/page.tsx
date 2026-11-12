@@ -7,10 +7,11 @@ import { getClientContentResearch } from "@/server/content-research/service";
 import { EmptyState, InfoNote, PageHeader } from "@/components/ui";
 import { ClientTabs, type TabDef } from "@/app/(app)/clients/[slug]/tabs";
 import { StartResearchButton } from "../start-research-button";
-import { ClientBand, IdeaCard, type Evidence, type IdeaView } from "../idea-card";
+import { ClientBand, IdeaCard, type IdeaView } from "../idea-card";
+import { toIdeaView } from "@/server/content-research/idea-view";
 import { CompetitorsPanel } from "../competitors-panel";
 import { IdeaFilter } from "../idea-filter";
-import { rankWithVariety, type Opportunity } from "@/server/content-research/opportunity";
+import { rankWithVariety } from "@/server/content-research/opportunity";
 import { StrategicAdvice, type AdviceItem } from "../strategic-advice";
 import { ResearchPanel, type RunView } from "../research-panel";
 import { DnaForm } from "../dna-form";
@@ -44,35 +45,7 @@ export default async function ContentResearchClientPage({
   if (!data) notFound();
 
   const aiReady = aiConfigured();
-  const ideas: IdeaView[] = data.ideas.map((i) => ({
-    id: i.id,
-    clientId: i.clientId,
-    titel: i.titel,
-    concept: i.concept,
-    hooks: Array.isArray(i.hooks) ? (i.hooks as string[]) : [],
-    middenstuk: Array.isArray(i.middenstuk) ? (i.middenstuk as string[]) : [],
-    cta: i.cta,
-    waaromWerkt: i.waaromWerkt,
-    doel: i.doel,
-    inspiratieUrl: i.inspiratieUrl,
-    inspiratieLabel: i.inspiratieLabel,
-    categorie: i.categorie,
-    uitvoerbaarheid: i.uitvoerbaarheid,
-    score: i.score,
-    scoreReason: i.scoreReason,
-    status: i.status,
-    rejectionReason: i.rejectionReason,
-    invalshoek: i.invalshoek,
-    herhaalReden: i.herhaalReden,
-    onderbouwing: Array.isArray(i.onderbouwing) ? (i.onderbouwing as Evidence[]) : [],
-    opportunity: i.opportunity && Object.keys(i.opportunity as object).length ? (i.opportunity as Opportunity) : null,
-    // Oudere ideeën (vóór de Opportunity Score) krijgen hun AI-score als benadering.
-    opportunityScore: i.opportunityScore || i.score * 10,
-    forwardedAt: i.forwardedAt ? i.forwardedAt.toISOString() : null,
-    scriptLink: i.scriptLink,
-    resultaat: (i.resultaat as IdeaView["resultaat"]) ?? null,
-    createdAt: i.createdAt.toISOString(),
-  }));
+  const ideas: IdeaView[] = data.ideas.map(toIdeaView);
   const activeIdeas = ideas.filter((i) => ACTIVE_IDEA.has(i.status));
   const currentFilter = filter && FILTERS[filter] ? filter : "alle";
   const filtered = currentFilter === "alle" ? activeIdeas : ideas.filter((i) => FILTERS[currentFilter]!(i.status));

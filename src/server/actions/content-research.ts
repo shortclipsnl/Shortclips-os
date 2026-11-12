@@ -198,6 +198,25 @@ export async function linkIdeaScript(input: { ideaId: string; scriptId?: string 
   }
 }
 
+/**
+ * Eigen richting voor het middenstuk ("laat vooral de prijzen zien", "met Bas in
+ * beeld"). Wordt bewaard op het idee en gaat mee naar de Script Engine en de kopie.
+ */
+export async function saveMiddenstukRichting(ideaId: string, text: string): Promise<ActionResult> {
+  try {
+    const { idea } = await loadIdeaScoped(requirePermission("content_research:write"), ideaId);
+    if (!idea) return { ok: false, message: "Idee niet gevonden." };
+    const value = (text ?? "").trim().slice(0, 1000) || null;
+    await db.update(contentIdeas).set({ middenstukRichting: value, updatedAt: new Date() }).where(eq(contentIdeas.id, ideaId));
+    revalidatePath(`/ai/content-research/${idea.clientId}`);
+    revalidatePath("/ai/content-research");
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    throw e;
+  }
+}
+
 /* ---------------- Concurrenten per klant ---------------- */
 
 function cleanHandle(v: string | undefined | null): string | null {

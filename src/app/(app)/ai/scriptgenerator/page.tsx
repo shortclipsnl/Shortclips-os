@@ -68,6 +68,7 @@ async function briefFromIdea(
     hooks[0] ? `Gekozen hook: ${hooks[0]}` : "",
     hooks.length > 1 ? `Alternatieve hooks:\n- ${hooks.slice(1).join("\n- ")}` : "",
     middenstuk.length ? `Middenstuk, dit moet erin:\n- ${middenstuk.join("\n- ")}` : "",
+    idea.middenstukRichting ? `Richting voor het middenstuk (van het team, leidend):\n${idea.middenstukRichting}` : "",
     idea.cta ? `Call to action: ${idea.cta}` : "",
     idea.invalshoek ? `Creatieve invalshoek: ${idea.invalshoek}` : "",
     idea.doel ? `Doel van de video: ${idea.doel}` : "",

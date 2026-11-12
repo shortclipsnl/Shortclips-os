@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requirePermission } from "@/server/auth/context";
 import { aiConfigured } from "@/server/ai/client";
-import { listContentResearchOverview, listWeeklyTopIdeas } from "@/server/content-research/service";
+import { listContentResearchOverview, listWeeklyIdeasByClient } from "@/server/content-research/service";
 import { WeeklyTop } from "./weekly-top";
 import { InfoNote, PageHeader } from "@/components/ui";
 import { OverviewGrid } from "./overview-grid";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ContentResearchOverviewPage() {
   const viewer = await requirePermission("content_research:read");
-  const [clients, weekly] = await Promise.all([listContentResearchOverview(viewer), listWeeklyTopIdeas(viewer)]);
+  const [clients, weekly] = await Promise.all([listContentResearchOverview(viewer), listWeeklyIdeasByClient(viewer)]);
   const canWrite = viewer.permissions.has("content_research:write");
   const aiReady = aiConfigured();
 
@@ -19,7 +19,7 @@ export default async function ContentResearchOverviewPage() {
     <div className="mx-auto max-w-[1100px]">
       <PageHeader
         title="Content Research"
-        description="Elke maandag automatisch per actieve klant: eigen resultaten, eerdere scripts, concurrenten en het klantgeheugen samen, vertaald naar onderbouwde video-ideeën. Je ziet alleen de klanten waar je toegang toe hebt."
+        description="Elke maandag per actieve klant vijf onderbouwde video-ideeën. Je ziet alleen de klanten waar je toegang toe hebt."
       />
 
       {!aiReady ? (
@@ -28,9 +28,18 @@ export default async function ContentResearchOverviewPage() {
         </div>
       ) : null}
 
-      <WeeklyTop ideas={weekly} />
+      <WeeklyTop groups={weekly} />
 
-      <OverviewGrid clients={clients} canWrite={canWrite} />
+      {/* Alle klanten (onderzoek starten, niet-actieve klanten): ingeklapt, zodat
+          de pagina draait om de ideeën van deze week. */}
+      <details className="group">
+        <summary className="cursor-pointer list-none text-sm font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+          Alle klanten en onderzoek starten ({clients.length})
+        </summary>
+        <div className="mt-4">
+          <OverviewGrid clients={clients} canWrite={canWrite} />
+        </div>
+      </details>
     </div>
   );
 }

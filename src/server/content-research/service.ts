@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, gte, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clients,
@@ -10,6 +10,7 @@ import {
 } from "@/db/schema";
 import { STALE_MIN } from "./run";
 import { rankWithVariety } from "./opportunity";
+import { toIdeaView, type IdeaView } from "./idea-view";
 import { assertClientAccess, scopeToClients, type Viewer } from "@/server/auth/context";
 import { listClientsForScripts, clientLearnedText } from "@/server/ai/knowledge";
 import { gatherFeedbackContext } from "@/server/script-control";
@@ -35,17 +36,9 @@ export type OverviewClient = {
   topScore: number;
 };
 
-export type WeeklyIdea = {
-  id: string;
-  clientId: string;
-  clientName: string;
-  logoUrl: string | null;
-  color: string | null;
-  titel: string;
-  hook: string | null;
-  categorie: string;
-  opportunityScore: number;
-  createdAt: string;
+export type WeeklyGroup = {
+  client: { id: string; name: string; logoUrl: string | null; color: string | null };
+  ideas: IdeaView[];
 };
 
 /** Overzicht: alle klanten (met actief-vlag) + hun idee-tellingen en laatste onderzoek. */
@@ -127,48 +120,35 @@ export async function listContentResearchOverview(viewer: Viewer): Promise<Overv
 }
 
 /**
- * Het weekoverzicht: de sterkste open ideeën van de afgelopen 8 dagen over alle
- * klanten waar deze medewerker toegang toe heeft, met variatie in de top.
+ * "Nieuwe ideeën deze week": per actieve klant (waar deze medewerker toegang toe
+ * heeft) de vijf sterkste open ideeën van de afgelopen 8 dagen, met variatie.
  */
-export async function listWeeklyTopIdeas(viewer: Viewer, limit = 12): Promise<WeeklyIdea[]> {
-  const clientsList = await listClientsForScripts(viewer);
-  const names = new Map(clientsList.filter((c) => c.active).map((c) => [c.id, c.name]));
-  const looks = new Map(clientsList.map((c) => [c.id, { logoUrl: c.logoUrl, color: c.color }]));
-  if (names.size === 0) return [];
+export async function listWeeklyIdeasByClient(viewer: Viewer, perClient = 5): Promise<WeeklyGroup[]> {
+  const clientsList = (await listClientsForScripts(viewer)).filter((c) => c.active);
+  if (clientsList.length === 0) return [];
   const scope = scopeToClients(viewer, contentIdeas.clientId);
   const since = new Date(Date.now() - 8 * 24 * 3600_000);
   const rows = await db
-    .select({
-      id: contentIdeas.id,
-      clientId: contentIdeas.clientId,
-      titel: contentIdeas.titel,
-      hooks: contentIdeas.hooks,
-      categorie: contentIdeas.categorie,
-      opportunityScore: contentIdeas.opportunityScore,
-      createdAt: contentIdeas.createdAt,
-    })
+    .select()
     .from(contentIdeas)
-    .where(and(isNull(contentIdeas.deletedAt), eq(contentIdeas.status, "nieuw"), gte(contentIdeas.createdAt, since), scope ?? undefined))
+    .where(and(
+      isNull(contentIdeas.deletedAt),
+      inArray(contentIdeas.status, ["nieuw", "favoriet", "opgeslagen", "doorgestuurd"]),
+      gte(contentIdeas.createdAt, since),
+      inArray(contentIdeas.clientId, clientsList.map((c) => c.id)),
+      scope ?? undefined,
+    ))
     .orderBy(desc(contentIdeas.opportunityScore))
-    .limit(200);
-  const mapped = rows
-    .filter((r) => names.has(r.clientId))
-    .map((r) => ({
-      id: r.id,
-      clientId: r.clientId,
-      clientName: names.get(r.clientId)!,
-      logoUrl: looks.get(r.clientId)?.logoUrl ?? null,
-      color: looks.get(r.clientId)?.color ?? null,
-      titel: r.titel,
-      hook: Array.isArray(r.hooks) && typeof r.hooks[0] === "string" ? (r.hooks[0] as string) : null,
-      categorie: String(r.categorie),
-      opportunityScore: r.opportunityScore,
-      createdAt: r.createdAt.toISOString(),
+    .limit(1000);
+  const byClient = new Map<string, IdeaView[]>();
+  for (const r of rows) byClient.set(r.clientId, [...(byClient.get(r.clientId) ?? []), toIdeaView(r)]);
+  return clientsList
+    .filter((c) => byClient.has(c.id))
+    .sort((a, b) => a.name.localeCompare(b.name, "nl"))
+    .map((c) => ({
+      client: { id: c.id, name: c.name, logoUrl: c.logoUrl, color: c.color },
+      ideas: rankWithVariety(byClient.get(c.id)!).slice(0, perClient),
     }));
-  // Variatie over klanten: niet de hele top voor één klant (rankWithVariety
-  // spreidt op het veld "categorie", hier dus op klant).
-  const byClient = rankWithVariety(mapped.map((m) => ({ ...m, kind: m.categorie, categorie: m.clientId })), 0.8);
-  return byClient.slice(0, limit).map(({ kind, ...m }) => ({ ...m, categorie: kind }));
 }
 
 export type IdeaRow = typeof contentIdeas.$inferSelect;

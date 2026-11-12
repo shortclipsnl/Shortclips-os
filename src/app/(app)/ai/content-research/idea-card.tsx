@@ -9,42 +9,15 @@ import {
 } from "lucide-react";
 import { Badge, buttonClass, ClientLogo, type Tone } from "@/components/ui";
 import {
-  favoriteIdea, forwardIdeaToGenerator, markIdeaUsed, rejectIdea, resetIdea, saveIdea,
+  favoriteIdea, forwardIdeaToGenerator, markIdeaUsed, rejectIdea, resetIdea, saveIdea, saveMiddenstukRichting,
 } from "@/server/actions/content-research";
-import { OPPORTUNITY_PARTS, dataShare, type Opportunity } from "@/server/content-research/opportunity";
+import { OPPORTUNITY_PARTS, dataShare } from "@/server/content-research/opportunity";
 import { useLogoColor } from "@/lib/use-logo-color";
+import { MiddenstukRichting } from "./middenstuk-richting";
+import type { IdeaView } from "@/server/content-research/idea-view";
 
-export type Evidence = { type: string; tekst: string; zekerheid: string; url: string | null };
+export type { Evidence, IdeaView } from "@/server/content-research/idea-view";
 export type IdeaClient = { name: string; logoUrl: string | null; color: string | null };
-
-export type IdeaView = {
-  id: string;
-  clientId: string;
-  titel: string;
-  concept: string;
-  hooks: string[];
-  middenstuk: string[];
-  cta: string | null;
-  waaromWerkt: string | null;
-  doel: string | null;
-  inspiratieUrl: string | null;
-  inspiratieLabel: string | null;
-  categorie: string;
-  uitvoerbaarheid: string;
-  score: number;
-  scoreReason: string | null;
-  status: string;
-  rejectionReason: string | null;
-  invalshoek: string | null;
-  herhaalReden: string | null;
-  onderbouwing: Evidence[];
-  opportunity: Opportunity | null;
-  opportunityScore: number;
-  forwardedAt: string | null;
-  scriptLink: string | null;
-  resultaat: { posts: number; views: number; relatief: number | null } | null;
-  createdAt: string;
-};
 
 const STATUS_LABEL: Record<string, { label: string; tone: Tone }> = {
   nieuw: { label: "Nieuw", tone: "info" },
@@ -78,6 +51,7 @@ export function ideaToText(idea: IdeaView, clientName?: string, hookIndex = 0): 
     idea.concept ? `IDEE\n${idea.concept}` : "",
     hooks.length ? `HOOK\n${hooks[0]}${hooks.length > 1 ? `\nAlternatieven:\n- ${hooks.slice(1).join("\n- ")}` : ""}` : "",
     idea.middenstuk.length ? `MIDDENSTUK\n- ${idea.middenstuk.join("\n- ")}` : "",
+    idea.middenstukRichting ? `RICHTING MIDDENSTUK (team)\n${idea.middenstukRichting}` : "",
     idea.cta ? `CALL TO ACTION\n${idea.cta}` : "",
     idea.invalshoek ? `INVALSHOEK\n${idea.invalshoek}` : "",
     idea.doel ? `VERWACHTE DOELSTELLING\n${idea.doel} (verwachting, geen garantie)` : "",
@@ -110,6 +84,7 @@ export function IdeaCard({ idea, client, showClient = false }: { idea: IdeaView;
   const [showScore, setShowScore] = useState(false);
   const [showWhy, setShowWhy] = useState(false);
   const [hook, setHook] = useState(0);
+  const [richting, setRichting] = useState(idea.middenstukRichting ?? "");
   const [notice, setNotice] = useState<string | null>(null);
 
   const st = STATUS_LABEL[idea.status] ?? STATUS_LABEL.nieuw;
@@ -125,6 +100,8 @@ export function IdeaCard({ idea, client, showClient = false }: { idea: IdeaView;
 
   function toScriptEngine() {
     start(async () => {
+      // Zorg dat de laatste richting is opgeslagen vóór de brief wordt opgebouwd.
+      if ((idea.middenstukRichting ?? "") !== richting.trim()) await saveMiddenstukRichting(idea.id, richting);
       const res = await forwardIdeaToGenerator(idea.id);
       if (res.ok && res.url) {
         if (res.alreadyForwarded) setNotice("Dit idee is al eerder doorgestuurd. Je opent dezelfde uitwerking; er wordt geen tweede overdracht gemaakt.");
@@ -135,7 +112,7 @@ export function IdeaCard({ idea, client, showClient = false }: { idea: IdeaView;
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(ideaToText(idea, client.name, hook));
+      await navigator.clipboard.writeText(ideaToText({ ...idea, middenstukRichting: richting || null }, client.name, hook));
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -241,6 +218,8 @@ export function IdeaCard({ idea, client, showClient = false }: { idea: IdeaView;
             </ol>
           </div>
         ) : null}
+
+        <MiddenstukRichting ideaId={idea.id} initial={idea.middenstukRichting} onChange={setRichting} />
 
         {/* 4. Call to action */}
         {idea.cta ? (

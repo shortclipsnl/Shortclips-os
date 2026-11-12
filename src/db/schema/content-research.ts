@@ -120,6 +120,8 @@ export const contentIdeas = pgTable(
      * voorbeelden, wat de klant moet aanleveren of laten zien): string[].
      */
     middenstuk: jsonb("middenstuk").notNull().default(sql`'[]'::jsonb`),
+    /** Eigen richting van het team voor het middenstuk (gaat mee naar de Script Engine). */
+    middenstukRichting: text("middenstuk_richting"),
     /** Voorgestelde call to action. */
     cta: text("cta"),
     /** Creatieve invalshoek: waarmee we ons onderscheiden van wat anderen doen. */

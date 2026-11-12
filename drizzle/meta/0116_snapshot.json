@@ -1,5 +1,5 @@
 {
-  "id": "8a49e541-bd87-42cb-b927-0d490dd6b652",
+  "id": "9ce971d0-6df9-4e5c-8a50-8ce54b6e44c8",
   "prevId": "f4904e27-239c-4938-a4aa-225f62a2529f",
   "version": "7",
   "dialect": "postgresql",
@@ -21680,6 +21680,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'[]'::jsonb"
+        },
+        "middenstuk_richting": {
+          "name": "middenstuk_richting",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "cta": {
           "name": "cta",
