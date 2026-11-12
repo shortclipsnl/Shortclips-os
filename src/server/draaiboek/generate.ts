@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { draaiboeken, productionDays } from "@/db/schema";
+import { draaiboeken, productionDays, shootScriptSources } from "@/db/schema";
 import { shootReviewPdf } from "@/server/captions/generate";
 import { parseScriptPdf } from "@/server/briefing/script-pdf";
 import { runJsonPrompt } from "@/server/ai/client";
@@ -17,7 +17,7 @@ Regels:
 - Richting geven, niet voorschrijven: de videograaf kiest zelf camerastandpunten en uitvoering. Laat een onderdeel leeg als er niets belangrijks is.
 Antwoord uitsluitend met JSON: {"videos":[{"nr":1,"hook":[],"middenstuk":[],"cta":[],"broll":[]}]}`;
 
-export type GenerateResult = { ok: true } | { ok: false; reason: "not_found" | "no_pdf" | "no_scripts" | "error"; message?: string };
+export type GenerateResult = { ok: true } | { ok: false; reason: "not_found" | "no_pdf" | "drive_unreachable" | "no_scripts" | "error"; message?: string };
 
 /**
  * Bouwt (of herbouwt) het draaiboek van één opname uit de actuele script-PDF.
@@ -35,7 +35,15 @@ export async function generateDraaiboek(productionDayId: string): Promise<Genera
   if (!day) return { ok: false, reason: "not_found" };
 
   const pdf = await shootReviewPdf(productionDayId);
-  if (!pdf) return { ok: false, reason: "no_pdf" };
+  if (!pdf) {
+    // Wel een gekoppelde Drive-PDF, maar niet op te halen: meestal is de Google Drive-koppeling verlopen.
+    const [linked] = await db
+      .select({ id: shootScriptSources.productionDayId })
+      .from(shootScriptSources)
+      .where(and(eq(shootScriptSources.productionDayId, productionDayId), eq(shootScriptSources.status, "gekoppeld")))
+      .limit(1);
+    return { ok: false, reason: linked ? "drive_unreachable" : "no_pdf" };
+  }
 
   let content: DraaiboekContent;
   try {

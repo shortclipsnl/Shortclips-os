@@ -49,6 +49,8 @@ export async function generateDraaiboekAction(productionDayId: string): Promise<
       await auditLog({ viewer, action: "draaiboek.generated", entityType: "production_day", entityId: id, clientId: day.clientId }).catch(() => undefined);
       return { ok: true, message: "Draaiboek gemaakt. Controleer het en verstuur het daarna." };
     }
+    if (res.reason === "drive_unreachable")
+      return { ok: false, message: "De script-PDF staat in Google Drive, maar kon niet worden opgehaald. Controleer de Google Drive-koppeling via Instellingen > Koppelingen en probeer het daarna opnieuw." };
     if (res.reason === "no_pdf") return { ok: false, message: "Er is nog geen script-PDF gekoppeld aan deze opname. Koppel eerst de script-PDF." };
     return { ok: false, message: res.message ?? "Het draaiboek kon niet worden gemaakt." };
   }) as Promise<DraaiboekActionResult>;
