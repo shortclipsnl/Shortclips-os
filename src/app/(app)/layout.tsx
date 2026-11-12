@@ -70,6 +70,11 @@ export default async function AppLayout({
       if (item.manageOperations && !canManageOperations(viewer)) {
         return false;
       }
+      // Draaiboek: alleen voor de videograaf (Rutger, freelance videografen) en Jarno.
+      // Milou en Jiska werken met draaiboeken vanuit Scripting (controle en versturen).
+      if (item.videographerOnly && !owner && viewer.primaryRole !== "videographer" && (viewer.email ?? "").toLowerCase() !== "rutger@shortclips.nl") {
+        return false;
+      }
       // Mijn verantwoordelijkheden: alleen Milou, Jiska en Rutger (en Jarno als beheerder).
       if (item.verantwoordelijkhedenAccess && !owner && !heeftVerantwoordelijkhedenPagina(viewer.email)) {
         return false;

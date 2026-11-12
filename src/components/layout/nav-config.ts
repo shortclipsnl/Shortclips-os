@@ -29,6 +29,10 @@ export type NavItem = {
   editorsOnly?: boolean;
   /** Alleen voor de eigenaar en de medewerkers met klantverantwoordelijkheid (Milou, Jiska, Rutger). */
   verantwoordelijkhedenAccess?: boolean;
+  /** Alleen voor videografen (Rutger en freelance videografen) en de eigenaar.
+   *  Milou en Jiska controleren en versturen draaiboeken vanuit Scripting en hebben
+   *  deze pagina niet nodig. */
+  videographerOnly?: boolean;
   /** Afwijkend label in het editorportaal (het interne team houdt `label`). */
   editorLabel?: string;
   /** Externe/zelfstandige pagina: open als gewone link in een nieuw tabblad
@@ -76,7 +80,7 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/scripting", label: "Scripting", icon: "ScrollText", permissions: ["scripts:read"], match: "/scripting" },
       { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },
       { href: "/productions", label: "Opnames", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
-      { href: "/draaiboek", label: "Draaiboek", icon: "ClipboardList", permissions: ["productions:read"], match: "/draaiboek" },
+      { href: "/draaiboek", label: "Draaiboek", icon: "ClipboardList", permissions: ["productions:read"], match: "/draaiboek", videographerOnly: true },
       { href: "/videos", label: "Editing", editorLabel: "Editing Planning", icon: "Scissors", permissions: ["videos:read"], match: "/videos" },
       // Wie zit vol, wie heeft ruimte en welke opnames komen eraan (niet voor editors).
       { href: "/capaciteit", label: "Capaciteit", icon: "Gauge", permissions: ["productions:read", "team:read"], match: "/capaciteit" },
