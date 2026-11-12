@@ -171,6 +171,55 @@ export async function runJsonPrompt<T>(input: AiRunInput): Promise<
 }
 
 /**
+ * Gestructureerd antwoord (structured outputs): de API garandeert dat het
+ * antwoord geldige JSON volgens het schema is. Gebruik dit voor lange JSON-
+ * antwoorden waar één ontsnapt aanhalingsteken anders het hele antwoord
+ * onleesbaar maakt (en een dure tweede aanroep kost). `effort` begrenst het
+ * nadenken: minder denktokens = sneller binnen de tijdslimiet.
+ */
+export async function runStructured<T>(input: {
+  system: string;
+  user: string;
+  model?: string;
+  maxTokens?: number;
+  schema: Record<string, unknown>;
+  effort?: "low" | "medium" | "high";
+}): Promise<{ ok: true; data: T; model: string } | { ok: false; reason: "no_provider" | "error"; error?: string }> {
+  if (!env.ANTHROPIC_API_KEY) return { ok: false, reason: "no_provider" };
+  try {
+    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    const model = input.model ?? aiModel();
+    const response = await client.messages.create({
+      model,
+      max_tokens: input.maxTokens ?? 16000,
+      system: input.system,
+      messages: [{ role: "user", content: input.user }],
+      output_config: {
+        format: { type: "json_schema", schema: input.schema },
+        ...(input.effort ? { effort: input.effort } : {}),
+      },
+    });
+    if (response.stop_reason === "refusal") return { ok: false, reason: "error", error: "Het model weigerde dit verzoek." };
+    if (response.stop_reason === "max_tokens") return { ok: false, reason: "error", error: "Het AI-antwoord was te lang en is afgekapt." };
+    const text = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+    try {
+      return { ok: true, data: JSON.parse(text) as T, model };
+    } catch {
+      return { ok: false, reason: "error", error: "Kon het gestructureerde AI-antwoord niet lezen." };
+    }
+  } catch (error) {
+    if (error instanceof Anthropic.APIError) {
+      return { ok: false, reason: "error", error: `${error.status ?? ""} ${error.message}`.trim() };
+    }
+    return { ok: false, reason: "error", error: String(error) };
+  }
+}
+
+/**
  * Onderzoeksmodus: laat Claude zelf het web doorzoeken en pagina's ophalen
  * (web search + web fetch, server-side bij Anthropic). Zo is de analyse
  * gebaseerd op actuele, controleerbare bronnen in plaats van verzonnen tekst.

@@ -25,6 +25,7 @@ export const maxDuration = 300;
 async function briefFromIdea(
   viewer: Awaited<ReturnType<typeof requirePermission>>,
   ideaId: string,
+  hookIndex = 0,
 ): Promise<{ brief: string; existing: { scriptLink: string | null; hasLibraryScript: boolean } } | undefined> {
   const [idea] = await db
     .select()
@@ -39,7 +40,11 @@ async function briefFromIdea(
     clientLearnedText(idea.clientId).catch(() => ""),
   ]);
 
-  const hooks = Array.isArray(idea.hooks) ? (idea.hooks as string[]) : [];
+  const allHooks = Array.isArray(idea.hooks) ? (idea.hooks as string[]) : [];
+  // De in Content Research gekozen hook komt eerst, de andere als alternatief.
+  const chosen = allHooks[hookIndex] ?? allHooks[0];
+  const hooks = chosen ? [chosen, ...allHooks.filter((h) => h !== chosen)] : [];
+  const middenstuk = Array.isArray(idea.middenstuk) ? (idea.middenstuk as string[]) : [];
   const evidence = Array.isArray(idea.onderbouwing) ? (idea.onderbouwing as Array<{ type: string; tekst: string; zekerheid: string; url: string | null }>) : [];
 
   // Eerdere scripts over een vergelijkbaar onderwerp: simpele woordovereenkomst
@@ -60,8 +65,10 @@ async function briefFromIdea(
   const lines = [
     `Onderwerp: ${idea.titel}`,
     idea.concept ? `Concept: ${idea.concept}` : "",
-    hooks[0] ? `Voorgestelde hook: ${hooks[0]}` : "",
+    hooks[0] ? `Gekozen hook: ${hooks[0]}` : "",
     hooks.length > 1 ? `Alternatieve hooks:\n- ${hooks.slice(1).join("\n- ")}` : "",
+    middenstuk.length ? `Middenstuk, dit moet erin:\n- ${middenstuk.join("\n- ")}` : "",
+    idea.cta ? `Call to action: ${idea.cta}` : "",
     idea.invalshoek ? `Creatieve invalshoek: ${idea.invalshoek}` : "",
     idea.doel ? `Doel van de video: ${idea.doel}` : "",
     evidence.length ? `Onderbouwing uit Content Research:\n${evidence.map((e) => `- (${e.zekerheid}) ${e.tekst}${e.url ? ` ${e.url}` : ""}`).join("\n")}` : idea.waaromWerkt ? `Waarom dit werkt: ${idea.waaromWerkt}` : "",
@@ -76,13 +83,13 @@ async function briefFromIdea(
   };
 }
 
-export default async function ScriptGeneratorPage({ searchParams }: { searchParams: Promise<{ client?: string; idea?: string }> }) {
+export default async function ScriptGeneratorPage({ searchParams }: { searchParams: Promise<{ client?: string; idea?: string; hook?: string }> }) {
   const viewer = await requirePermission("ai:read");
   const clients = await listClientsForScripts(viewer);
-  const { client, idea } = await searchParams;
+  const { client, idea, hook } = await searchParams;
   // Vanaf de scriptingpagina of Content Research kan een klant worden
   // voorgeselecteerd (?client=<id>) en een idee worden doorgegeven (?idea=<id>).
-  const fromIdea = idea ? await briefFromIdea(viewer, idea) : undefined;
+  const fromIdea = idea ? await briefFromIdea(viewer, idea, Math.max(0, Math.min(4, Number(hook) || 0))) : undefined;
 
   return (
     <div className="mx-auto max-w-[900px]">

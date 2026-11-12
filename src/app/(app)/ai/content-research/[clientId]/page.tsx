@@ -4,10 +4,10 @@ import { notFound } from "next/navigation";
 import { requirePermission } from "@/server/auth/context";
 import { aiConfigured } from "@/server/ai/client";
 import { getClientContentResearch } from "@/server/content-research/service";
-import { ClientLogo, EmptyState, InfoNote, PageHeader } from "@/components/ui";
+import { EmptyState, InfoNote, PageHeader } from "@/components/ui";
 import { ClientTabs, type TabDef } from "@/app/(app)/clients/[slug]/tabs";
 import { StartResearchButton } from "../start-research-button";
-import { IdeaCard, type Evidence, type IdeaView } from "../idea-card";
+import { ClientBand, IdeaCard, type Evidence, type IdeaView } from "../idea-card";
 import { CompetitorsPanel } from "../competitors-panel";
 import { IdeaFilter } from "../idea-filter";
 import { rankWithVariety, type Opportunity } from "@/server/content-research/opportunity";
@@ -50,6 +50,8 @@ export default async function ContentResearchClientPage({
     titel: i.titel,
     concept: i.concept,
     hooks: Array.isArray(i.hooks) ? (i.hooks as string[]) : [],
+    middenstuk: Array.isArray(i.middenstuk) ? (i.middenstuk as string[]) : [],
+    cta: i.cta,
     waaromWerkt: i.waaromWerkt,
     doel: i.doel,
     inspiratieUrl: i.inspiratieUrl,
@@ -107,6 +109,7 @@ export default async function ContentResearchClientPage({
     ? (latestDone!.strategicAdvice as AdviceItem[])
     : [];
 
+  const clientLook = { name: data.client.name, logoUrl: data.client.logoUrl, color: data.client.color };
   const current = tab ?? "ideeen";
   const tabs: TabDef[] = [
     { key: "ideeen", label: "Ideeën", count: activeIdeas.length },
@@ -122,14 +125,11 @@ export default async function ContentResearchClientPage({
         breadcrumb={
           <Link href="/ai/content-research" className="text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">← AI Content Research</Link>
         }
-        title={
-          <span className="flex items-center gap-2">
-            <ClientLogo name={data.client.name} logoUrl={data.client.logoUrl} size={28} />
-            {data.client.name}
-          </span>
-        }
+        title="Content Research"
         actions={<StartResearchButton clientId={clientId} running={running} variant="primary" label="Onderzoek opnieuw" />}
       />
+
+      <div className="sc-card mb-4 overflow-hidden"><ClientBand client={clientLook} size="lg" /></div>
 
       {!aiReady ? <div className="mb-5"><InfoNote>De AI staat uit (ANTHROPIC_API_KEY ontbreekt).</InfoNote></div> : null}
 
@@ -151,7 +151,7 @@ export default async function ContentResearchClientPage({
                 Gesorteerd op Content Opportunity Score (0–100), met variatie in soort idee. Klik op een score voor de opbouw en welk deel op echte data rust. Een score is een prioritering, geen voorspelling van weergaven.
               </p>
               <div className="grid gap-4 md:grid-cols-2">
-                {shownIdeas.map((idea) => <IdeaCard key={idea.id} idea={idea} clientName={data.client.name} />)}
+                {shownIdeas.map((idea) => <IdeaCard key={idea.id} idea={idea} client={clientLook} />)}
               </div>
             </>
           )}

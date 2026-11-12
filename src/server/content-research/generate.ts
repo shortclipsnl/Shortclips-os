@@ -1,5 +1,5 @@
 import "server-only";
-import { runResearch, runJsonPrompt, aiModelStrong } from "@/server/ai/client";
+import { runResearch, runStructured, aiModelStrong } from "@/server/ai/client";
 import { SHORTCLIPS_IDENTITY } from "@/server/ai/identity";
 import type { ContentDna } from "./content-dna";
 import { normalizeDna } from "./content-dna";
@@ -18,6 +18,9 @@ export type IdeaDraft = {
   uitvoerbaarheid: string;
   score: number;
   scoreReason: string;
+  /** Wat er in het middenstuk van het script moet (3–5 punten). */
+  middenstuk: string[];
+  cta: string;
   /** Waarmee wij ons onderscheiden van wat de concurrent/markt doet. */
   invalshoek: string;
   onderbouwing: Evidence[];
@@ -139,19 +142,25 @@ const IDEA_SYSTEM = `${SHORTCLIPS_IDENTITY}
 Je bent de creatieve contentstrateeg van Shortclips en kent deze klant goed. Je zet een onderzoeksbriefing om in originele, concrete ideeën voor organische short video's (TikTok/Reels). GEEN standaard-AI-ideeën: elk idee is specifiek voor deze klant en onderbouwd door het onderzoek.
 
 HARDE REGELS:
-- Verzin GEEN cijfers of nepvoorbeelden. Een inspiratiebron-URL geef je alléén als die echt in de briefing/bronnen staat; anders null.
+- Verzin GEEN cijfers of nepvoorbeelden. Een inspiratiebron-URL geef je alléén als die echt in de briefing/bronnen staat; anders een lege string. Lege of niet-bekende velden zijn een lege string.
 - Vergelijk ieder idee INHOUDELIJK met de reeds bestaande ideeën en eerdere scripts (hieronder). Stel niets voor dat daar inhoudelijk op lijkt, en niets uit de lijst afgekeurde concepten.
-- Liever 4 uitstekende ideeën dan 8 matige. Maximaal 6 per week. Zorg voor variatie in categorie en format: niet alles uit één succesvol format.
+- Liever 4 uitstekende ideeën dan 8 matige. Maximaal 5 per week. Zorg voor variatie in categorie en format: niet alles uit één succesvol format.
 - Een eerder behandeld onderwerp mag ALLEEN opnieuw als daar een duidelijke reden voor is (bijv. die video presteerde aantoonbaar ver boven de eigen mediaan, of een nieuwe invalshoek). Vul dan "herhaalReden" in; anders null.
 - Concurrentie is inspiratie, geen kopie: beschrijf in "invalshoek" hoe wij het onderwerp op een eigen, onderscheidende manier uitwerken.
 - "onderbouwing" bevat 1 tot 4 punten, elk met type (eigen_data = uit de EIGEN STATISTIEKEN, concurrent, markt, nieuw = nog niet eerder behandeld, herhaling), zekerheid (bewezen = staat letterlijk in de data/bron; aanname; hypothese) en een url als die echt in de bronnen staat. Verzin geen bewijs.
 - "opportunity": scoor elk onderdeel 0–10 en zet basis op "data" alleen als het rust op de eigen statistieken of een concrete bron; anders "inschatting". Toelichting per onderdeel maximaal 15 woorden.
+- Elk idee is direct bruikbaar voor de scriptschrijver (vaste Shortclips-scriptopbouw: uitleg, hook, middenstuk, call to action):
+  * "concept": in maximaal 3 zinnen wat we filmen en waarom dat interessant is voor de doelgroep.
+  * "hooks": precies 3 STERK VERSCHILLENDE openingszinnen om uit te kiezen (bijv. een vraag, een stellige of prikkelende uitspraak, en een visuele/situatie-opening). Kort, spreektaal, geen aanhalingstekens.
+  * "middenstuk": 3 tot 5 korte punten met wat er inhoudelijk in het middenstuk moet: de kerninformatie, het voorbeeld of bewijs, en wat de klant moet aanleveren of laten zien. Concreet, geen algemeenheden.
+  * "cta": één concrete call to action die past bij het doel.
 - Schrijf compact: concept maximaal 3 zinnen, onderbouwing per punt maximaal 2 zinnen. Geen herhaling tussen velden.
-- Elk idee is STERK onderbouwd: "waaromWerkt" verwijst waar mogelijk naar wat bij deze klant aantoonbaar werkte (zie PRESTATIES), en "doel" benoemt concreet wat dit idee voor de klant oplevert (bijv. meer bekendheid, vertrouwen opbouwen, aanvragen, sollicitanten, verkoop).
+- LENGTEBUDGET (het antwoord wordt anders afgekapt en is dan onbruikbaar): trends maximaal 5 korte zinnen; strategischAdvies maximaal 4 punten; concurrenten maximaal 6, observatie maximaal 2 zinnen; bronnen maximaal 10; Content DNA-lijsten maximaal 5 korte items. Het hele antwoord blijft onder de 4.000 woorden.
+- Elk idee is STERK onderbouwd: "onderbouwing" verwijst waar mogelijk naar wat bij deze klant aantoonbaar werkte (zie PRESTATIES), en "doel" benoemt concreet wat dit idee voor de klant oplevert (bijv. meer bekendheid, vertrouwen opbouwen, aanvragen, sollicitanten, verkoop).
 - De "score" (1–10) is een interne kwaliteitsinschatting van relevantie, originaliteit, creatieve kracht en uitvoerbaarheid — GEEN voorspelling van weergaven.
 - Geef daarnaast STRATEGISCH ADVIES op basis van de PRESTATIES: wat moeten we DOORGAAN (werkt bewezen), VERBETEREN (kan beter) en VERMIJDEN (werkt niet). Onderbouw elk advies met concreet bewijs uit de data en label de zekerheid (bewezen = volgt direct uit de cijfers; waarschijnlijk; hypothese = te testen). Verzin geen bewijs; is er nog geen data, baseer je dan op de branche-briefing en markeer het als hypothese.
 - Werk ook een beknopt, bijgewerkt Content DNA bij op basis van het onderzoek en de context.
-- Geef UITSLUITEND geldige JSON terug, zonder tekst eromheen.`;
+- Lever het antwoord als JSON in exact het formaat hieronder.`;
 
 function buildIdeaUser(input: {
   clientName: string;
@@ -175,7 +184,7 @@ ${input.existingIdeasText.slice(0, 6000) || "(geen)"}
 EERDERE SCRIPTS/ONDERWERPEN (niet herhalen):
 ${input.priorScriptsText.slice(0, 6000) || "(geen)"}
 
-Geef UITSLUITEND geldige JSON in exact dit formaat:
+Geef JSON in exact dit formaat:
 {
   "trends": ["korte trendobservatie met bron waar mogelijk"],
   "strategischAdvies": [
@@ -200,32 +209,31 @@ Geef UITSLUITEND geldige JSON in exact dit formaat:
     {
       "titel": "",
       "concept": "wat we concreet filmen",
-      "hooks": ["openingszin 1", "openingszin 2"],
-      "waaromWerkt": "onderbouwing, waar mogelijk gekoppeld aan wat bij deze klant werkte",
+      "hooks": ["hook 1 (vraag)", "hook 2 (stelling)", "hook 3 (visueel/situatie)"],
+      "middenstuk": ["kernpunt 1", "kernpunt 2", "kernpunt 3"],
+      "cta": "",
       "doel": "wat dit idee voor de klant oplevert (bekendheid|vertrouwen|aanvragen|sollicitanten|verkoop|...)",
-      "inspiratieUrl": null,
-      "inspiratieLabel": null,
+      "inspiratieUrl": "",
       "categorie": "humor|educatief|teamcontent|trends|productcontent|seizoen|overig",
       "uitvoerbaarheid": "eenvoudig|gemiddeld|uitgebreid",
       "invalshoek": "hoe wij dit eigen en onderscheidend maken",
-      "herhaalReden": null,
+      "herhaalReden": "",
       "onderbouwing": [
-        { "type": "eigen_data|concurrent|markt|nieuw|herhaling", "tekst": "", "zekerheid": "bewezen|aanname|hypothese", "url": null }
+        { "type": "eigen_data|concurrent|markt|nieuw|herhaling", "tekst": "", "zekerheid": "bewezen|aanname|hypothese", "url": "" }
       ],
-      "opportunity": {
-        "relevantie": { "score": 7, "basis": "inschatting", "toelichting": "" },
-        "eerdereResultaten": { "score": 7, "basis": "data|inschatting", "toelichting": "" },
-        "concurrentie": { "score": 7, "basis": "data|inschatting", "toelichting": "" },
-        "originaliteit": { "score": 7, "basis": "inschatting", "toelichting": "" },
-        "doelaansluiting": { "score": 7, "basis": "inschatting", "toelichting": "" },
-        "uitvoerbaarheid": { "score": 7, "basis": "inschatting", "toelichting": "" }
-      },
-      "score": 8,
-      "scoreReason": "korte onderbouwing"
+      "opportunity": [
+        { "onderdeel": "relevantie", "score": 7, "basis": "inschatting", "toelichting": "" },
+        { "onderdeel": "eerdereResultaten", "score": 7, "basis": "data|inschatting", "toelichting": "" },
+        { "onderdeel": "concurrentie", "score": 7, "basis": "data|inschatting", "toelichting": "" },
+        { "onderdeel": "originaliteit", "score": 7, "basis": "inschatting", "toelichting": "" },
+        { "onderdeel": "doelaansluiting", "score": 7, "basis": "inschatting", "toelichting": "" },
+        { "onderdeel": "uitvoerbaarheid", "score": 7, "basis": "inschatting", "toelichting": "" }
+      ],
+      "score": 8
     }
   ],
   "concurrenten": [
-    { "naam": "", "url": null, "tiktok": null, "instagram": null, "youtube": null, "notitie": "waarom relevant", "observatie": "wat ze op short video doen, met URL" }
+    { "naam": "", "url": "", "tiktok": "", "instagram": "", "youtube": "", "notitie": "waarom relevant", "observatie": "wat ze op short video doen, met URL" }
   ],
   "bronnen": [ { "label": "", "url": "" } ]
 }`;
@@ -285,6 +293,67 @@ export async function runResearchBriefing(input: {
   });
 }
 
+const str_ = { type: "string" } as const;
+const strArr = { type: "array", items: str_ } as const;
+const obj = (properties: Record<string, unknown>) => ({
+  type: "object",
+  properties,
+  required: Object.keys(properties),
+  additionalProperties: false,
+});
+const arrOf = (properties: Record<string, unknown>) => ({ type: "array", items: obj(properties) });
+
+/**
+ * JSON-schema voor fase 2 (structured outputs): de API garandeert dit formaat.
+ * Bewust plat gehouden (alleen strings, geen enums of null-varianten, de score-
+ * opbouw als lijst): een rijker schema geeft "compiled grammar is too large".
+ * Waarden worden daarna in code genormaliseerd.
+ */
+const RESEARCH_SCHEMA = obj({
+  trends: strArr,
+  strategischAdvies: arrOf({ kleur: str_, punt: str_, bewijs: str_, zekerheid: str_ }),
+  contentDna: obj({
+    toneOfVoice: str_,
+    doelgroep: str_,
+    favorieteFormats: strArr,
+    geaccepteerdeConcepten: strArr,
+    afgekeurdeConcepten: strArr,
+    voorkeuren: strArr,
+    creatieveBeperkingen: strArr,
+    gewensteUitstraling: str_,
+  }),
+  ideeen: arrOf({
+    titel: str_,
+    concept: str_,
+    hooks: strArr,
+    middenstuk: strArr,
+    cta: str_,
+    doel: str_,
+    inspiratieUrl: str_,
+    categorie: str_,
+    uitvoerbaarheid: str_,
+    invalshoek: str_,
+    herhaalReden: str_,
+    onderbouwing: arrOf({ type: str_, tekst: str_, zekerheid: str_, url: str_ }),
+    opportunity: arrOf({ onderdeel: str_, score: { type: "integer" }, basis: str_, toelichting: str_ }),
+    score: { type: "integer" },
+  }),
+  concurrenten: arrOf({ naam: str_, url: str_, tiktok: str_, instagram: str_, youtube: str_, notitie: str_, observatie: str_ }),
+  bronnen: arrOf({ label: str_, url: str_ }),
+});
+
+/** De score-opbouw komt als lijst binnen; zet om naar { onderdeel: {...} }. */
+function opportunityFromList(v: unknown): unknown {
+  if (!Array.isArray(v)) return v ?? {};
+  const out: Record<string, unknown> = {};
+  for (const x of v) {
+    const o = (x ?? {}) as Record<string, unknown>;
+    const key = typeof o.onderdeel === "string" ? o.onderdeel.trim() : "";
+    if (key) out[key] = { score: o.score, basis: o.basis, toelichting: o.toelichting };
+  }
+  return out;
+}
+
 /**
  * Fase 2: briefing + klantcontext → ideeën, Opportunity-onderdelen, strategisch
  * advies, Content DNA en concurrentvoorstellen (Opus, zuivere JSON, geen web).
@@ -316,8 +385,15 @@ export async function ideateFromBriefing(input: {
     maxTokens: 16000,
   };
   type Raw = { trends?: unknown; contentDna?: unknown; ideeen?: unknown[]; bronnen?: unknown[]; strategischAdvies?: unknown[]; concurrenten?: unknown[] };
-  let parsed = await runJsonPrompt<Raw>(ideaInput);
-  if (!parsed.ok && parsed.reason === "error" && !/credit balance/i.test(parsed.error ?? "")) parsed = await runJsonPrompt<Raw>(ideaInput);
+  // Via een verplichte tool-aanroep: de API garandeert geldige JSON. Met vrije
+  // tekst-JSON brak één ontsnapt aanhalingsteken soms het hele antwoord, wat een
+  // tweede dure aanroep kostte (en daarmee de tijdslimiet).
+  const parsed = await runStructured<Raw>({
+    ...ideaInput,
+    schema: RESEARCH_SCHEMA,
+    // Minder denktokens: houdt fase 2 ruim binnen de tijdslimiet van Vercel.
+    effort: "medium",
+  });
   if (!parsed.ok) return parsed;
 
   const rawIdeas = Array.isArray(parsed.data.ideeen) ? parsed.data.ideeen : [];
@@ -330,7 +406,9 @@ export async function ideateFromBriefing(input: {
       return {
         titel: titel.slice(0, 240),
         concept: str(o.concept),
-        hooks: strList(o.hooks, 5),
+        hooks: strList(o.hooks, 3),
+        middenstuk: strList(o.middenstuk, 5),
+        cta: str(o.cta).slice(0, 300),
         waaromWerkt: str(o.waaromWerkt),
         doel: str(o.doel),
         inspiratieUrl: /^https?:\/\//.test(url) ? url : null,
@@ -341,12 +419,12 @@ export async function ideateFromBriefing(input: {
         scoreReason: str(o.scoreReason),
         invalshoek: str(o.invalshoek).slice(0, 600),
         onderbouwing: evidenceList(o.onderbouwing),
-        opportunity: o.opportunity ?? {},
+        opportunity: opportunityFromList(o.opportunity),
         herhaalReden: str(o.herhaalReden) || null,
       };
     })
     .filter((x): x is IdeaDraft => x !== null)
-    .slice(0, 6);
+    .slice(0, 5);
 
   const sources: Source[] = Array.isArray(parsed.data.bronnen)
     ? parsed.data.bronnen

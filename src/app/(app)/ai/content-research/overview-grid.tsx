@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Lightbulb } from "lucide-react";
-import { Badge, Card, ClientLogo, EmptyState, LinkButton } from "@/components/ui";
+import { Badge, Card, EmptyState, LinkButton } from "@/components/ui";
+import { ClientBand } from "./idea-card";
 import { StartResearchButton } from "./start-research-button";
 import type { OverviewClient } from "@/server/content-research/service";
 
@@ -43,16 +44,12 @@ export function OverviewGrid({ clients, canWrite }: { clients: OverviewClient[];
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((c) => (
-            <Card key={c.id} className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <ClientLogo name={c.name} logoUrl={c.logoUrl} color={c.color} size={36} />
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-[var(--color-ink)]">
-                    {c.name}{!c.active ? <Badge tone="neutral">niet-actief</Badge> : null}
-                  </p>
-                  <p className="text-2xs text-[var(--color-ink-faint)]">Laatste onderzoek: {fmtDate(c.lastResearchAt)}</p>
-                </div>
-              </div>
+            <Card key={c.id} className="flex flex-col gap-3 overflow-hidden !p-0">
+              <ClientBand client={{ name: c.name, logoUrl: c.logoUrl, color: c.color }} />
+              <div className="flex flex-1 flex-col gap-3 px-4 pb-4">
+              <p className="flex items-center gap-1.5 text-2xs text-[var(--color-ink-faint)]">
+                Laatste onderzoek: {fmtDate(c.lastResearchAt)}{!c.active ? <Badge tone="neutral">niet-actief</Badge> : null}
+              </p>
 
               <div className="flex items-center gap-4 text-sm">
                 <span className="tabular-nums"><span className="font-semibold text-[var(--color-ink)]">{c.totalIdeas}</span> <span className="text-[var(--color-ink-muted)]">ideeën</span></span>
@@ -69,6 +66,7 @@ export function OverviewGrid({ clients, canWrite }: { clients: OverviewClient[];
                 {/* Status is leidend: alleen actieve klanten kunnen nieuw onderzoek
                     starten. Inactieve klanten houden hun bestaande ideeën. */}
                 {canWrite && c.active ? <StartResearchButton clientId={c.id} running={c.running} variant="ghost" /> : null}
+              </div>
               </div>
             </Card>
           ))}

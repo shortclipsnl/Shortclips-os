@@ -39,6 +39,8 @@ export type WeeklyIdea = {
   id: string;
   clientId: string;
   clientName: string;
+  logoUrl: string | null;
+  color: string | null;
   titel: string;
   hook: string | null;
   categorie: string;
@@ -131,6 +133,7 @@ export async function listContentResearchOverview(viewer: Viewer): Promise<Overv
 export async function listWeeklyTopIdeas(viewer: Viewer, limit = 12): Promise<WeeklyIdea[]> {
   const clientsList = await listClientsForScripts(viewer);
   const names = new Map(clientsList.filter((c) => c.active).map((c) => [c.id, c.name]));
+  const looks = new Map(clientsList.map((c) => [c.id, { logoUrl: c.logoUrl, color: c.color }]));
   if (names.size === 0) return [];
   const scope = scopeToClients(viewer, contentIdeas.clientId);
   const since = new Date(Date.now() - 8 * 24 * 3600_000);
@@ -154,6 +157,8 @@ export async function listWeeklyTopIdeas(viewer: Viewer, limit = 12): Promise<We
       id: r.id,
       clientId: r.clientId,
       clientName: names.get(r.clientId)!,
+      logoUrl: looks.get(r.clientId)?.logoUrl ?? null,
+      color: looks.get(r.clientId)?.color ?? null,
       titel: r.titel,
       hook: Array.isArray(r.hooks) && typeof r.hooks[0] === "string" ? (r.hooks[0] as string) : null,
       categorie: String(r.categorie),
@@ -186,7 +191,7 @@ export type RunRow = {
 };
 
 export type ClientResearch = {
-  client: { id: string; name: string; slug: string; logoUrl: string | null };
+  client: { id: string; name: string; slug: string; logoUrl: string | null; color: string | null };
   runs: RunRow[];
   ideas: IdeaRow[];
   dna: ContentDna;
@@ -200,7 +205,7 @@ export type ClientResearch = {
 /** Volledige per-klant weergave (intern). Hard gescoopt op klanttoegang. */
 export async function getClientContentResearch(viewer: Viewer, clientId: string): Promise<ClientResearch | null> {
   const [client] = await db
-    .select({ id: clients.id, name: clients.name, slug: clients.slug, logoUrl: clients.logoUrl })
+    .select({ id: clients.id, name: clients.name, slug: clients.slug, logoUrl: clients.logoUrl, color: clients.color })
     .from(clients)
     .where(and(eq(clients.id, clientId), isNull(clients.deletedAt)))
     .limit(1);

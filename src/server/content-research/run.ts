@@ -274,6 +274,8 @@ export async function runContentResearchJob(runId: string, opts: { budgetMs?: nu
         titel: idea.titel,
         concept: idea.concept,
         hooks: idea.hooks as unknown as Record<string, unknown>,
+        middenstuk: idea.middenstuk as unknown as Record<string, unknown>,
+        cta: idea.cta || null,
         waaromWerkt: idea.waaromWerkt || null,
         doel: idea.doel || null,
         inspiratieUrl: idea.inspiratieUrl,

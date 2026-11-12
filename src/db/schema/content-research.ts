@@ -115,6 +115,13 @@ export const contentIdeas = pgTable(
     opportunity: jsonb("opportunity").notNull().default(sql`'{}'::jsonb`),
     /** Gewogen totaal 0–100 (berekend in code, niet door de AI). */
     opportunityScore: integer("opportunity_score").notNull().default(0),
+    /**
+     * Wat er in het middenstuk van het script moet: 3–5 korte punten (info,
+     * voorbeelden, wat de klant moet aanleveren of laten zien): string[].
+     */
+    middenstuk: jsonb("middenstuk").notNull().default(sql`'[]'::jsonb`),
+    /** Voorgestelde call to action. */
+    cta: text("cta"),
     /** Creatieve invalshoek: waarmee we ons onderscheiden van wat anderen doen. */
     invalshoek: text("invalshoek"),
     /** Gevuld als een eerder behandeld onderwerp bewust opnieuw wordt aanbevolen. */

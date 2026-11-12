@@ -1,5 +1,5 @@
 {
-  "id": "708b6a6c-25ce-48a5-9877-7599a57e510a",
+  "id": "8a49e541-bd87-42cb-b927-0d490dd6b652",
   "prevId": "f4904e27-239c-4938-a4aa-225f62a2529f",
   "version": "7",
   "dialect": "postgresql",
@@ -21673,6 +21673,19 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "middenstuk": {
+          "name": "middenstuk",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "cta": {
+          "name": "cta",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "invalshoek": {
           "name": "invalshoek",
