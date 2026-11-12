@@ -353,7 +353,13 @@ E.TODAY = new Date().toISOString().slice(0, 10);
         if (best) {
           advice = `Verplaats ${best.item.clientName} (${best.item.videos} video's) naar ${best.to.name}. Daarna: ${best.srcPct === null ? "" : `${p.name} ${best.srcPct}%, `}${best.to.name} maximaal ${best.peak}%.`;
           action = { type: "ed", itemId: best.item.id, to: best.to.id, label: `Verplaatsen naar ${best.to.name}` };
-        } else advice = `Verdeel ${Math.ceil(excess)} video's over een freelance editor; de andere editors zitten deze week ook vol.`;
+        } else {
+          const n = Math.ceil(excess);
+          const room = eds.filter((r) => r.person.id !== p.id && r.cells[i].cap && r.cells[i].cap.value - r.cells[i].load >= 1);
+          advice = room.length
+            ? `Dit werk is al gestart en niet in één keer te verplaatsen. Stem met ${p.name} af of de deadline haalbaar is; ${room.map((r) => r.person.name).join(", ")} ${room.length === 1 ? "heeft" : "hebben"} nog ruimte.`
+            : `Zet een extra freelance editor in voor ${n} ${n === 1 ? "video" : "video's"}; de andere editors zitten deze week ook vol.`;
+        }
         out.push({ id: `ed-${p.id}-${c.wk.monday}`, week: i, sev: 100 + (c.pct === null ? 130 : c.pct) - i * 12 + (c.conflicts.length ? 15 : 0), area: "Editing",
           title: c.pct === null ? `${c.wk.label}: ${p.name} is afwezig, maar er staat ${fmtN(c.load)} video's werk gepland.` : `${c.wk.label}: ${p.name} ${c.pct}% bezet (${fmtN(c.load)} van ${fmtN(c.cap.value)} video's).`,
           advice, action, cell: { kind: "ed", pid: p.id, i } });
