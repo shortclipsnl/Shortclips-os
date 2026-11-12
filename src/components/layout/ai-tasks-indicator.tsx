@@ -13,7 +13,6 @@ const KIND_LABEL: Record<ActiveAiTask["kind"], string> = {
   video_intelligence: "Video-analyse",
   captions: "Captions",
   maandrapport: "Maandrapportage",
-  ai_editor: "AI-editor",
 };
 
 function since(iso: string | null): string {
@@ -27,7 +26,7 @@ function since(iso: string | null): string {
 
 /**
  * Uniforme indicator van de AI-taken die NU op de achtergrond draaien (Content
- * Research, Video-analyse, Captions, Maandrapportages, AI-editor). De taken
+ * Research, Video-analyse, Captions, Maandrapportages). De taken
  * draaien server-side door — ook als je de pagina sluit; deze chip laat zien wat
  * er loopt en verdwijnt zodra alles klaar is. Afrondmeldingen komen via de bel.
  */
