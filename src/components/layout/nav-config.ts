@@ -99,7 +99,6 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/ai/bericht", label: "Klantbericht", icon: "MessagesSquare", permissions: ["ai:read"], match: "/ai/bericht" },
       { href: "/ai/content-research", label: "Content Research", icon: "Lightbulb", permissions: ["content_research:read"], match: "/ai/content-research" },
       // Editor Briefing maak je centraal vanaf de Editing-pagina.
-      { href: "/ai-editor", label: "AI Editor", icon: "Clapperboard", permissions: ["ai_editor:read"], match: "/ai-editor" },
       { href: "/ai/geschiedenis", label: "AI-geschiedenis", icon: "History", permissions: ["ai:history_read"], match: "/ai/geschiedenis" },
       // Voor het team pas zichtbaar zodra de R2-opslag is ingesteld (zie layout).
     ],
