@@ -21,6 +21,7 @@ import { runCalendarSync } from "@/server/jobs/calendar-sync";
 import { runPublishingReconcile } from "@/server/jobs/publishing-reconcile";
 import { syncOpenOnboardings } from "@/server/onboarding";
 import { runScriptingTaskSync } from "@/server/scripting-tasks";
+import { runKlantmomentenSync } from "@/server/klantmomenten";
 import { runScriptVersionSync } from "@/server/script-versions";
 import { runFrequentSync, runNightlyExternalSync, runNightlySync } from "@/server/jobs/orchestrator";
 import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
@@ -97,6 +98,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   // Feedbacktermijn klant: rondes bijwerken en op de laatste termijndag (vanaf
   // 09:00, werkdagen) de vaste verantwoordelijke een melding + taak geven.
   "feedback.reminders": runFeedbackReminders,
+  // Klantmomenten: een week vooraf taak + melding voor de verantwoordelijke.
+  "klantmomenten.sync": runKlantmomentenSync,
   "reminders.cleaning_friday": runCleaningFridayReminder,
   "goals.recompute": runGoalsRecompute,
   "goals.seed": runGoalsSeed,

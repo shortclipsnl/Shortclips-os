@@ -1,6 +1,7 @@
 import { isFeedbackReminderKey } from "@/lib/ops-control/plan";
 import { batchHref, parseBatchKey, parseStapKey } from "@/lib/maandcontrole";
 import { periodLabel } from "@/lib/format";
+import { isKlantmomentKey } from "@/lib/klantmomenten";
 
 /**
  * Automatische meldingen die op de takenpagina als compacte, opvallende regel
@@ -9,7 +10,8 @@ import { periodLabel } from "@/lib/format";
  */
 export type TaskSignal =
   | { kind: "feedback"; title: string; text: string; meta: string | null; message: string }
-  | { kind: "maandrapport"; title: string; text: string; meta: string | null; actionHref: string; status?: string | null };
+  | { kind: "maandrapport"; title: string; text: string; meta: string | null; actionHref: string; status?: string | null }
+  | { kind: "klantmoment"; title: string; text: string; meta: string | null; actionHref: string | null };
 
 type TaskLike = {
   title: string;
@@ -18,6 +20,7 @@ type TaskLike = {
   entityType: string | null;
   entityId?: string | null;
   clientName: string | null;
+  clientSlug?: string | null;
 };
 
 const FEEDBACKRONDE_PREFIX = "feedbackronde:";
@@ -80,6 +83,20 @@ export function taskSignal(t: TaskLike): TaskSignal | null {
       meta: null,
       status: t.description?.split("\n")[0]?.trim() || null,
       actionHref: t.entityId ? `/analytics/maandrapportages/${t.entityId}` : "/analytics/maandrapportages",
+    };
+  }
+
+  // Klantmoment (samenwerkings- of bedrijfsjubileum): een week vooraf.
+  if (isKlantmomentKey(key)) {
+    const moment = line(t.description, "Moment:");
+    const voorstel = line(t.description, "Voorstel:");
+    const indicatie = t.description?.includes("datum is een indicatie") ?? false;
+    return {
+      kind: "klantmoment",
+      title: t.title,
+      text: moment ?? "Klantmoment",
+      meta: [voorstel ? `Voorstel: ${voorstel}` : null, indicatie ? "datum eerst bevestigen" : null].filter(Boolean).join(" · ") || null,
+      actionHref: t.clientSlug ? `/clients/${t.clientSlug}` : null,
     };
   }
 

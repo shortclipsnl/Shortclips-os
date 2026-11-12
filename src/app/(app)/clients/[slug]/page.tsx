@@ -62,6 +62,9 @@ import { RoadmapTab } from "./roadmap-tab";
 import { getClientAgreementOverrides, getPortalSettings } from "@/server/portal-settings";
 import { canManageClientDocs, getCurrentDocs, toSlots, visibleKinds } from "@/server/client-documents";
 import { ClientOverview } from "./client-overview";
+import { ClientMoments } from "./client-moments";
+import { getClientMomentsView } from "@/server/klantmomenten";
+import { todayAmsterdam } from "@/lib/planning-deadline";
 import { ClientDocsPanel } from "@/components/client-docs/docs-panel";
 import { getOnboardingView } from "@/server/onboarding";
 import { OnboardingTab } from "./onboarding-tab";
@@ -262,6 +265,14 @@ export default async function ClientPage({
             nextShoot={nextShoot}
             docSlots={docSlots.map((s) => ({ kind: s.kind, label: s.label, url: s.doc?.url ?? null }))}
             canEditClient={canEditClient}
+          />
+          {/* Klantmomenten: samenwerkings- en bedrijfsjubilea. Een week vooraf krijgt
+              de verantwoordelijke automatisch een taak en een melding. */}
+          <ClientMoments
+            clientId={c.id}
+            view={await getClientMomentsView(c.id, c.startedOn ?? null)}
+            canEdit={canEditClient}
+            today={todayAmsterdam()}
           />
           {/* Beheer (portaallogin, Frame.io, guides uploaden, resultatenvlag,
               klantspecifieke afspraken) blijft volledig werken, maar staat
