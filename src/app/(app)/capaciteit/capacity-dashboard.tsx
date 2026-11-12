@@ -104,6 +104,7 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
     const queueSt = overdue ? { k: "rood", why: `${overdue} project${overdue === 1 ? "" : "en"} over de editordeadline` }
       : q2 !== null && q2 > O ? { k: "rood", why: `Wachtrij ${q2}% van de capaciteit komende 2 weken` }
       : unassigned ? { k: "oranje", why: `${unassigned} video's nog zonder editor` }
+      : data.stale.length ? { k: "oranje", why: `${data.stale.length} opname${data.stale.length === 1 ? "" : "s"} met een status die niet is bijgewerkt` }
       : q2 === null ? { k: "oranje", why: "Capaciteit van editors nog niet vastgelegd" }
       : q2 >= G ? { k: "oranje", why: `Wachtrij ${q2}% van de capaciteit komende 2 weken` } : { k: "groen", why: `Wachtrij ${q2}% van de capaciteit komende 2 weken` };
     const vgK = vgPct === null ? "oranje" : lvl(vgPct), edK = edPct === null ? "oranje" : lvl(edPct);
@@ -112,7 +113,7 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
     const soon = reds.some((x) => x.i < 4);
     const redSt = !combos.length ? "groen" : soon ? "rood" : "oranje";
     return { shoots, queue, fc, vgFree, edFree, vgPct, edPct, vgK, edK, capK, reds, combos, first, shootsSt, queueSt, redSt, conf };
-  }, [R, HW, WMAP, data.today, G, O]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [R, HW, WMAP, data.today, data.stale.length, G, O]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signals = SIG.all;
   const shown = showAll ? signals : signals.slice(0, 3);
@@ -519,6 +520,15 @@ function DrawerBody({ d, R, RP, WMAP, K, P, st, SIG, data, setDrawer, peaks }: a
           <div className="cap-list">{K.conf.filter((x: any) => x.open > 0).map((x: any) => (
             <div className="cap-li" key={x.id}><div className="d">{E.fmtDay(x.editorDue)}</div><div className="m"><b>{x.clientName}</b><small>{phaseText(x.counts)} · {x.editor ? data.people.find((p: any) => p.id === x.editor)?.name ?? "Editor" : "Nog geen editor"}</small></div>{prodLink(x.id)}</div>
           ))}</div>
+          {data.stale.length ? (
+            <>
+              <div className="cap-dsec">Status niet bijgewerkt ({data.stale.length})</div>
+              <p className="cap-note" style={{ marginTop: 0, marginBottom: 8 }}>Deze opnames zijn ruim over de klantdeadline maar staan nog niet op Afgerond. Ze tellen niet mee als werk. Zet de status goed op de Editingpagina.</p>
+              <div className="cap-list">{data.stale.map((x: any) => (
+                <div className="cap-li" key={x.id}><div className="d">{E.fmtDay(x.date)}</div><div className="m"><b>{x.clientName}</b><small>Fase: {x.editStatus.replace(/_/g, " ")}</small></div>{prodLink(x.id)}</div>
+              ))}</div>
+            </>
+          ) : null}
           <div className="cap-dsec">Verwacht uit geplande opnames ({K.fc} video&apos;s)</div>
           <div className="cap-list">{fc.map((x: any) => (
             <div className="cap-li" key={x.id}><div className="d">{E.fmtDay(x.handover)}</div><div className="m"><b>{x.clientName}</b><small>{x.videos} video&apos;s · bij editor {E.fmtDayLong(x.handover)}</small></div>{prodLink(x.id)}</div>

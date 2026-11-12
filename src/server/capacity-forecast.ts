@@ -45,6 +45,8 @@ export type CapacityData = {
   shoots: { id: string; date: string; client: string; clientName: string; start: string | null; dur: number; travel: number; vg: string | null; shorts: number; editor: string | null; estimated: boolean }[];
   projects: { id: string; shootDate: string; client: string; clientName: string; editor: string | null; c: Record<string, number>; editorDue: string; clientDue: string }[];
   settings: { greenBelow: number; orangeMax: number; defaultTravel: number; defaultShootHours: number };
+  /** Opnames ruim over de klantdeadline die nog niet op Afgerond staan. */
+  stale: { id: string; date: string; clientName: string; editStatus: string }[];
   generatedAt: string;
 };
 
@@ -55,6 +57,9 @@ const PHASE_TO_KEY: Record<string, string> = {
   bij_klant: "bijKlant",
   feedback_verwerken: "feedback",
 };
+
+/** Zoveel werkdagen na de klantdeadline geldt een niet-afgeronde opname als "status niet bijgewerkt". */
+const STALE_AFTER_WORKDAYS = 5;
 
 const todayAms = () => new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
 const addDays = (s: string, n: number) => {
@@ -133,6 +138,7 @@ export async function loadCapacityData(): Promise<CapacityData> {
   // ---------- opnames en lopende projecten ----------
   const shoots: CapacityData["shoots"] = [];
   const projects: CapacityData["projects"] = [];
+  const stale: CapacityData["stale"] = [];
   const lastByClient = new Map<string, { vg: string | null; date: string; dur: number; travel: number }>();
   const weekStart = mondayOf(today);
 
@@ -154,12 +160,19 @@ export async function loadCapacityData(): Promise<CapacityData> {
     }
     // Editing: al geschoten en nog niet afgerond → bevestigd project, één toestand per opname.
     if (r.date < today && r.editStatus !== "afgerond") {
+      const clientDue = r.editDueOn ?? addWorkingDays(r.date, CLIENT_LEAD_DAYS, holidaysSet);
+      // Ruim over de klantdeadline en nog niet afgerond: vrijwel altijd een status
+      // die niet is bijgewerkt. Telt niet als werk, wel apart zichtbaar.
+      if (addWorkingDays(clientDue, STALE_AFTER_WORKDAYS, holidaysSet) < today) {
+        stale.push({ id: r.id, date: r.date, clientName: r.clientName, editStatus: r.editStatus });
+        continue;
+      }
       const key = PHASE_TO_KEY[r.editStatus] ?? "beschikbaar";
       projects.push({
         id: r.id, shootDate: r.date, client: r.clientId, clientName: r.clientName, editor: r.editor,
         c: { [key]: shorts },
         editorDue: addWorkingDays(r.date, EDITOR_LEAD_DAYS, holidaysSet),
-        clientDue: r.editDueOn ?? addWorkingDays(r.date, CLIENT_LEAD_DAYS, holidaysSet),
+        clientDue,
       });
     }
   }
@@ -219,19 +232,20 @@ export async function loadCapacityData(): Promise<CapacityData> {
   for (const u of userRows) {
     const cap = capBy.get(u.id);
     const first = u.name.split(" ")[0] ?? u.name;
-    const employment: "vast" | "freelance" = cap?.employment === "freelance" ? "freelance" : cap?.employment === "vast" ? "vast" : u.isStaff ? "vast" : "freelance";
+    // Editors werken als freelancer, tenzij expliciet als vast vastgelegd.
+    const explicit = cap?.employment === "vast" ? "vast" : cap?.employment === "freelance" ? "freelance" : null;
     const leave = leaveBy.get(u.id) ?? [];
 
     if (vgIds.has(u.id)) {
       // Uren per week: werkdagen × 8, of (zonder werkdagen) opnames per 4 weken × 5 uur.
       const wd = num(cap?.workdaysPerWeek);
-      const opn4w = cap?.unit === "opnames_4w" ? num(cap?.limitGreen) : null;
+      const opn4w = cap?.unit === "opnames_4w" ? num(cap?.limitMax) ?? num(cap?.limitOrange) ?? num(cap?.limitGreen) : null;
       let hoursPerWeek: number | null = null;
       let note = "";
-      if (wd && wd > 0) { hoursPerWeek = wd * 8; note = `${wd} werkdagen per week`; }
+      if (wd && wd > 0) { hoursPerWeek = wd * 8; note = `${String(wd).replace(".", ",")} werkdagen per week`; }
       else if (opn4w && opn4w > 0) { hoursPerWeek = (opn4w / 4) * 5; note = `${opn4w} opnames per 4 weken`; }
       people.push({
-        id: u.id, name: first, role: "videograaf", employment,
+        id: u.id, name: first, role: "videograaf", employment: explicit ?? (u.isStaff ? "vast" : "freelance"),
         hoursPerDay: hoursPerWeek ? Math.round((hoursPerWeek / 5) * 10) / 10 : 8,
         dayMax: 8, maxShootsPerDay: 2,
         pattern: hoursPerWeek ? [1, 2, 3, 4, 5] : null,
@@ -239,12 +253,14 @@ export async function loadCapacityData(): Promise<CapacityData> {
       });
     }
     if (edIds.has(u.id) && !(vgIds.has(u.id) && !capRows.some((c) => c.userId === u.id && c.unit === "shorts_4w"))) {
-      const green4w = cap?.unit === "shorts_4w" ? num(cap?.limitGreen) : null;
-      const perWeek = green4w && green4w > 0 ? Math.round((green4w / 4) * 10) / 10 : null;
+      // 100% = het plafond (max), anders oranje of groen. De kleurgrenzen (80/100%)
+      // zorgen zelf al voor de waarschuwing vóór het plafond.
+      const cap4w = cap?.unit === "shorts_4w" ? num(cap?.limitMax) ?? num(cap?.limitOrange) ?? num(cap?.limitGreen) : null;
+      const perWeek = cap4w && cap4w > 0 ? Math.round((cap4w / 4) * 10) / 10 : null;
       people.push({
-        id: u.id, name: first, role: "editor", employment,
+        id: u.id, name: first, role: "editor", employment: explicit ?? "freelance",
         shortsPerWeek: perWeek, pattern: perWeek ? [1, 2, 3, 4, 5] : null, leave,
-        capacityNote: perWeek ? `${perWeek} video's per week` : "Capaciteit niet vastgelegd",
+        capacityNote: perWeek ? `${String(perWeek).replace(".", ",")} video's per week` : "Capaciteit niet vastgelegd",
       });
     }
   }
@@ -271,6 +287,7 @@ export async function loadCapacityData(): Promise<CapacityData> {
     shoots,
     projects,
     settings,
+    stale,
     generatedAt: new Date().toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" }),
   };
 }

@@ -102,7 +102,13 @@ E.TODAY = new Date().toISOString().slice(0, 10);
     const out = {};
     if (total <= 0) return { out, overdue: false };
     let s = E.nextWorkday(start < E.TODAY ? E.TODAY : start);
-    if (end < s) { out[s] = total; return { out, overdue: end < E.TODAY }; }
+    if (end < s) {
+      // Over de deadline: het resterende werk over de eerstvolgende 3 werkdagen
+      // verdelen in plaats van alles op vandaag te zetten.
+      const d3 = [s, E.addWorkdays(s, 1), E.addWorkdays(s, 2)];
+      d3.forEach((d) => { out[d] = (out[d] || 0) + total / 3; });
+      return { out, overdue: end < E.TODAY };
+    }
     const days = []; for (let x = s; x <= end; x = E.addDays(x, 1)) if (E.isWorkday(x)) days.push(x);
     if (!days.length) days.push(s);
     days.forEach((d) => { out[d] = (out[d] || 0) + total / days.length; });
