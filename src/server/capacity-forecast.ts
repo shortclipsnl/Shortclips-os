@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
 import { db } from "@/db/client";
-import { capacityParams, capacityPeople, clients, leaveRequests, productionDays, users } from "@/db/schema";
+import { capacityParams, capacityPeople, clients, deliverables, leaveRequests, productionDays, users } from "@/db/schema";
 import { clientColumnStatusFilter, clientIsActive } from "@/server/client-activity";
 import { editorIdsByKey } from "@/server/editing/integrity";
 import { firstNameKey } from "@/lib/editors";
@@ -48,6 +48,18 @@ export type CapacityData = {
   /** Opnames ruim over de klantdeadline die nog niet op Afgerond staan. */
   stale: { id: string; date: string; clientName: string; editStatus: string }[];
   generatedAt: string;
+};
+
+/** Status per video (Editingpagina) → werkfase in de radar. Niet genoemd = klaar. */
+const VIDEO_STATUS_TO_KEY: Record<string, string> = {
+  recorded: "beschikbaar",
+  footage_upload: "beschikbaar",
+  awaiting_editor: "beschikbaar",
+  editing: "bezig",
+  editor_revision: "feedback",
+  internal_review: "review",
+  client_review: "bijKlant",
+  client_revision: "feedback",
 };
 
 const PHASE_TO_KEY: Record<string, string> = {
@@ -127,6 +139,22 @@ export async function loadCapacityData(): Promise<CapacityData> {
     editorIdsByKey(),
   ]);
 
+  // Video's per opname: de status per video is de bron die het team bijhoudt.
+  const dayIds = pdRows.filter((r) => r.date < todayAms()).map((r) => r.id);
+  const videoRows = dayIds.length
+    ? await db
+        .select({ dayId: deliverables.productionDayId, status: deliverables.status, planned: deliverables.plannedShorts, frame: deliverables.frameAssetId, editor: deliverables.editorId })
+        .from(deliverables)
+        .where(and(isNull(deliverables.deletedAt), inArray(deliverables.productionDayId, dayIds)))
+    : [];
+  const videosByDay = new Map<string, typeof videoRows>();
+  for (const v of videoRows) {
+    if (!v.dayId) continue;
+    const arr = videosByDay.get(v.dayId) ?? [];
+    arr.push(v);
+    videosByDay.set(v.dayId, arr);
+  }
+
   const P = new Map(paramRows.map((p) => [p.key, num(p.value)]));
   const settings = {
     greenBelow: P.get("cap_green_below") ?? 80,
@@ -159,7 +187,24 @@ export async function loadCapacityData(): Promise<CapacityData> {
       });
     }
     // Editing: al geschoten en nog niet afgerond → bevestigd project, één toestand per opname.
-    if (r.date < today && r.editStatus !== "afgerond") {
+    // Fasen per opname bepalen uit de video's; zonder video's terugvallen op de opnamefase.
+    let counts: Record<string, number> | null = null;
+    let videoEditor: string | null = null;
+    const vids = videosByDay.get(r.id);
+    if (r.date < today && vids && vids.length) {
+      const withFrame = vids.some((v) => v.frame);
+      counts = {};
+      for (const v of vids) {
+        if (withFrame && !v.frame && VIDEO_STATUS_TO_KEY[v.status] === "beschikbaar") continue; // plaatshouder naast echte video's
+        const key = VIDEO_STATUS_TO_KEY[v.status];
+        if (!key) continue;
+        const n = v.frame ? 1 : num(v.planned) ?? shorts;
+        counts[key] = (counts[key] ?? 0) + n;
+        videoEditor = videoEditor ?? v.editor;
+      }
+      if (!Object.keys(counts).length) continue; // alle video's klaar
+    }
+    if (r.date < today && (counts || r.editStatus !== "afgerond")) {
       const clientDue = r.editDueOn ?? addWorkingDays(r.date, CLIENT_LEAD_DAYS, holidaysSet);
       // Ruim over de klantdeadline en nog niet afgerond: vrijwel altijd een status
       // die niet is bijgewerkt. Telt niet als werk, wel apart zichtbaar.
@@ -169,8 +214,8 @@ export async function loadCapacityData(): Promise<CapacityData> {
       }
       const key = PHASE_TO_KEY[r.editStatus] ?? "beschikbaar";
       projects.push({
-        id: r.id, shootDate: r.date, client: r.clientId, clientName: r.clientName, editor: r.editor,
-        c: { [key]: shorts },
+        id: r.id, shootDate: r.date, client: r.clientId, clientName: r.clientName, editor: r.editor ?? videoEditor,
+        c: counts ?? { [key]: shorts },
         editorDue: addWorkingDays(r.date, EDITOR_LEAD_DAYS, holidaysSet),
         clientDue,
       });
