@@ -128,7 +128,6 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/offertes", label: "Offertes", icon: "FileSignature", quotesAccess: true, match: "/offertes" },
       // Interne prijslijst 2027: fase 1 alleen de eigenaar. Uitrol naar het team pas na akkoord van Jarno.
       { href: "/prijslijst", label: "Interne prijslijst 2027", icon: "Tags", ownerOnly: true, match: "/prijslijst" },
-      { href: "/ai/bedrijfsonderzoek", label: "Sales Research", icon: "Search", permissions: ["ai:sales_research"], match: "/ai/bedrijfsonderzoek" },
     ],
   },
   {

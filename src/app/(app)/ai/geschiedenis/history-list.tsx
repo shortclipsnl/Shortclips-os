@@ -20,7 +20,6 @@ const TOOLS = [
   { key: "caption", label: "Captions" },
   { key: "briefing", label: "Briefings" },
   { key: "message", label: "Klantberichten" },
-  { key: "research", label: "Bedrijfsonderzoek" },
 ];
 
 export function HistoryList({ rows }: { rows: HistoryRow[] }) {
