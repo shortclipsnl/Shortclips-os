@@ -19,6 +19,7 @@ import { getContractAttention } from "@/server/contracts";
 import { ContractAttentionBlock } from "../contracten/attention-block";
 import { getOpsOverview } from "@/server/ops-control/overview";
 import { OpsControlCard } from "./ops-control-card";
+import { CapacityCard } from "./capacity-card";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
@@ -153,6 +154,9 @@ export default async function DashboardPage() {
         laterCount={work.laterCount}
         workday={work.workday}
       />
+
+      {/* Productiecapaciteit: één compacte samenvatting, details op Productie › Capaciteit. */}
+      <CapacityCard />
 
       {/* Weekplanning: opnames en meetings die eraan komen. */}
       <WeekPlanning shoots={weekShoots} meetings={meetings} uploads={uploads} />
