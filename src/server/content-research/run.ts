@@ -289,6 +289,12 @@ export async function runContentResearchJob(runId: string, opts: { budgetMs?: nu
         /* ---------- 1. Stijlprofiel uit de echte scripts ---------- */
         const posts = await loadPostAnalysis(client.id).catch(() => null);
         const res = await ensureStyleProfile(client.id, client.name, { videoAnalysis: posts });
+        // Zichtbaar maken wat er met de scripts gebeurde (ook als het mislukte).
+        await mergeDataBasis(runId, {
+          stijl: res.diagnose
+            ? { ...res.diagnose, profiel: Boolean(res.profile), ververst: res.changed, fout: res.error ?? null }
+            : { profiel: Boolean(res.profile), ververst: false, fout: res.error ?? null },
+        });
         // Mislukt het profiel, dan gaan we door met het bestaande (of zonder):
         // de keuring blijft streng, dus er komen dan eerder minder ideeën.
         if (!res.ok && isCreditError(res.error)) return fail(res.error ?? "AI-tegoed op");
@@ -304,7 +310,8 @@ export async function runContentResearchJob(runId: string, opts: { budgetMs?: nu
         });
         if (!res.ok) return aiFail(res, "Onderzoek mislukt.");
         briefing = res.text;
-        await beat(runId, { briefing, dataBasis: src.dataBasis as unknown as Record<string, unknown> });
+        await beat(runId, { briefing });
+        await mergeDataBasis(runId, src.dataBasis);
       } else if (phase === "ideeen") {
         /* ---------- 3. Kandidaten ---------- */
         const src = await gatherSources(client.id);
@@ -326,7 +333,8 @@ export async function runContentResearchJob(runId: string, opts: { budgetMs?: nu
         const output: Partial<ResearchOutput> = { ...res.data };
         delete output.briefing;
         candidates = { output: output as Omit<ResearchOutput, "briefing"> };
-        await beat(runId, { kandidaten: candidates as unknown as Record<string, unknown>, dataBasis: src.dataBasis as unknown as Record<string, unknown> });
+        await beat(runId, { kandidaten: candidates as unknown as Record<string, unknown> });
+        await mergeDataBasis(runId, src.dataBasis);
       } else if (phase === "keuring") {
         /* ---------- 4. Keuring ---------- */
         if (!candidates?.output) return fail("Geen kandidaten om te keuren.");
@@ -359,6 +367,24 @@ export async function runContentResearchJob(runId: string, opts: { budgetMs?: nu
   } catch (error) {
     return fail(error instanceof Error ? error.message : String(error));
   }
+}
+
+async function currentDataBasis(runId: string): Promise<Record<string, unknown>> {
+  const [r] = await db
+    .select({ d: contentResearchRuns.dataBasis })
+    .from(contentResearchRuns)
+    .where(eq(contentResearchRuns.id, runId))
+    .limit(1);
+  return (r?.d as Record<string, unknown> | null) ?? {};
+}
+
+/** Voegt velden toe aan de databasis van een ronde zonder eerdere velden te wissen. */
+async function mergeDataBasis(runId: string, patch: object): Promise<void> {
+  const next = { ...(await currentDataBasis(runId)), ...patch };
+  await db
+    .update(contentResearchRuns)
+    .set({ dataBasis: next as unknown as Record<string, unknown>, heartbeatAt: new Date(), updatedAt: new Date() })
+    .where(eq(contentResearchRuns.id, runId));
 }
 
 /** Duplicaten eruit, daarna de strenge keuring van alle kandidaten. */
@@ -569,6 +595,7 @@ async function finalize(ctx: {
       // Volledige gekeurde kandidaten niet dubbel bewaren: de samenvatting volstaat.
       kandidaten: { output: { ...out, ideeen: [] }, beoordeeld, dubbel: dupes, verbeterd: candidates.verbeterd ?? 0 } as unknown as Record<string, unknown>,
       dataBasis: {
+        ...(await currentDataBasis(runId)),
         ...src.dataBasis,
         concurrenten: byName.size,
         kandidaten: out.ideeen.length,

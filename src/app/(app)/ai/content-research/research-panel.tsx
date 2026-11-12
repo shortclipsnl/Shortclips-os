@@ -33,6 +33,7 @@ export type RunView = {
     kandidaten?: number;
     geslaagd?: number;
     getoond?: number;
+    stijl?: { gekozen?: number; gelezen?: number; fouten?: string[]; profiel?: boolean; fout?: string | null };
   };
   /** Uitslag van de keuring per kandidaat (null bij oudere rondes). */
   keuring: Array<{ titel: string; totaal: number; stijlFit: number | null; oordeel: string; getoond: boolean; reden: string | null }> | null;
@@ -69,7 +70,7 @@ function fmt(iso: string | null): string {
 function DataBasis({ d }: { d: RunView["dataBasis"] }) {
   const items: Array<{ label: string; value: string; ok: boolean }> = [
     { label: "Eigen video's (Metricool)", value: d.posts ? `${d.posts} video's${d.postsPeriode ? ` (${d.postsPeriode})` : ""}${d.postZekerheid === "indicatie" ? ", indicatie" : ""}` : "geen videometingen", ok: Boolean(d.posts) },
-    { label: "Stijl uit eigen scripts", value: d.scriptsGelezen ? `${d.scriptsGelezen} scripts gelezen${d.bewezenHooks ? `, ${d.bewezenHooks} bewezen hooks` : ""}` : d.driveScripts ? `${d.driveScripts} in Drive, nog niet gelezen` : "geen gevonden", ok: Boolean(d.scriptsGelezen) },
+    { label: "Stijl uit eigen scripts", value: d.scriptsGelezen ? `${d.scriptsGelezen} scripts gelezen${d.bewezenHooks ? `, ${d.bewezenHooks} bewezen hooks` : ""}` : d.stijl?.fouten?.length ? `scripts niet te lezen: ${d.stijl.fouten[0]}` : d.stijl?.fout ? `stijlprofiel mislukt: ${d.stijl.fout}` : d.driveScripts ? `${d.driveScripts} in Drive, nog niet gelezen` : "geen gevonden", ok: Boolean(d.scriptsGelezen) },
     { label: "Concurrenten", value: d.concurrenten ? `${d.concurrenten} in onderzoek` : "nog geen", ok: Boolean(d.concurrenten) },
     { label: "Klantgeheugen", value: d.klantgeheugen ? `${d.klantgeheugen} inzichten` : "nog leeg", ok: Boolean(d.klantgeheugen) },
     { label: "Maandrapportage", value: d.maandrapportage ?? "geen goedgekeurde", ok: Boolean(d.maandrapportage) },
