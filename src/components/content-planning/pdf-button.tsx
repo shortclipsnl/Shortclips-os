@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
+import { downloadFrom } from "@/lib/save-file";
 
 /**
  * "Download contentplanning als PDF". Haalt de PDF op bij de opgegeven route
@@ -16,18 +17,7 @@ export function ContentPlanningPdfButton({ href, label = "Download contentplanni
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetch(href, { cache: "no-store" });
-      if (!res.ok) throw new Error(res.status === 503 ? "De PDF kon niet worden gemaakt. Probeer het zo nog eens." : "Downloaden is niet gelukt.");
-      const blob = await res.blob();
-      const name = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? "Shortclips_Contentplanning.pdf";
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      await downloadFrom(href, "Shortclips_Contentplanning.pdf");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Downloaden is niet gelukt.");
     } finally {

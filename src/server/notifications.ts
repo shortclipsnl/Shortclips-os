@@ -9,6 +9,7 @@ import { db } from "@/db/client";
 import { notifications, users } from "@/db/schema";
 import { activeCoverMap } from "./leave-cover";
 import { isClientInactive, MANUAL_NOTIFICATION_TYPES } from "./client-activity";
+import { queueClientPush } from "./client-push";
 
 export type NotifyInput = {
   userIds?: string[];
@@ -96,7 +97,14 @@ export async function notify(input: NotifyInput): Promise<number> {
     .insert(notifications)
     .values(values)
     .onConflictDoNothing()
-    .returning({ id: notifications.id });
+    .returning({ id: notifications.id, userId: notifications.userId, type: notifications.type });
+
+  // Klantgebruikers krijgen deze melding (indien gewenst) ook als push in de app.
+  try {
+    await queueClientPush(inserted);
+  } catch {
+    /* push mag het wegschrijven van een melding nooit tegenhouden */
+  }
 
   return inserted.length;
 }

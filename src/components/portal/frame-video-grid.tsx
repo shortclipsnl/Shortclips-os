@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { openExternalDownloadInApp } from "@/lib/save-file";
 import { ChevronLeft, ChevronRight, Download, ExternalLink, Film, MessageSquareText, Play, X } from "lucide-react";
 
 export type GridVideo = {
@@ -98,6 +99,7 @@ export function FrameVideoGrid({ videos, reviewUrl }: { videos: GridVideo[]; rev
                     <a
                       href={`/api/portal/frame/${v.id}/download`}
                       download
+                      onClick={(e) => { if (openExternalDownloadInApp(`/api/portal/frame/${v.id}/download`)) e.preventDefault(); }}
                       className="inline-flex items-center gap-1 rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--color-ink)] hover:bg-[var(--sc-fill-strong)]"
                       title="Download deze video"
                     >
@@ -139,6 +141,7 @@ export function FrameVideoGrid({ videos, reviewUrl }: { videos: GridVideo[]; rev
               <a
                 href={`/api/portal/frame/${current.id}/download`}
                 download
+                onClick={(e) => { if (openExternalDownloadInApp(`/api/portal/frame/${current.id}/download`)) e.preventDefault(); }}
                 className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[#00003b] hover:bg-white/90"
               >
                 <Download className="size-4" /> Video downloaden

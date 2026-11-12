@@ -30,6 +30,14 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Service worker van de klant-app: altijd de nieuwste versie ophalen.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        ],
+      },
+      {
         source: "/:path*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },

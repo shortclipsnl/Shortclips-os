@@ -2,6 +2,7 @@ import "server-only";
 import { and, asc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
+  clientReports,
   clients,
   contentCalendar,
   deliverables,
@@ -20,6 +21,7 @@ import { portalEmailHtml, sendEmail } from "@/server/email";
 import { evaluateDeadlines } from "@/server/planning-deadlines";
 import { dueReminder, longDate, reminderText, todayAmsterdam } from "@/lib/planning-deadline";
 import { withoutInactiveClients } from "@/server/client-activity";
+import { channelEnabled, flushPendingPush } from "@/server/push";
 
 /**
  * Klantnotificaties: meldt de drie momenten waarop een klant iets moet weten of
@@ -42,7 +44,7 @@ import { withoutInactiveClients } from "@/server/client-activity";
 
 type NotifyItem = {
   clientId: string;
-  kind: "video_review" | "script_review" | "opname_reminder" | "video_published" | "file_comment" | "content_plan" | "planning_deadline";
+  kind: "video_review" | "script_review" | "opname_reminder" | "video_published" | "file_comment" | "content_plan" | "planning_deadline" | "results";
   dedupeKey: string;
   title: string;
   body: string;
@@ -64,6 +66,7 @@ export async function runClientNotifications(): Promise<{
   emailed: number;
   emailSkipped: number;
   byKind: Record<string, number>;
+  pushed: number;
 }> {
   const items: NotifyItem[] = [];
 
@@ -275,13 +278,33 @@ export async function runClientNotifications(): Promise<{
     });
   }
 
+  // 7. Nieuwe maandresultaten: een rapport dat de afgelopen drie dagen voor de
+  // klant is gepubliceerd. Eén melding per rapport.
+  const reportsSince = new Date(Date.now() - 3 * 86_400_000);
+  const reportRows = await db
+    .select({ id: clientReports.id, clientId: clientReports.clientId, title: clientReports.title })
+    .from(clientReports)
+    .where(and(eq(clientReports.isPublished, true), gte(clientReports.publishedAt, reportsSince)));
+  for (const r of reportRows) {
+    if (!r.clientId) continue;
+    items.push({
+      clientId: r.clientId,
+      kind: "results",
+      dedupeKey: `portal:results:${r.id}`,
+      title: "Je nieuwe resultaten staan klaar",
+      body: "Bekijk hoe je video's de afgelopen periode hebben gedaan.",
+      href: "/portal/resultaten",
+      ctaLabel: "Bekijk je resultaten",
+    });
+  }
   // Centrale klantstatus: een niet actieve klant krijgt geen portaalmeldingen of
   // e-mails meer (ook niet voor werk dat nog in de pijplijn stond).
   const kept = await withoutInactiveClients(items, (i) => i.clientId);
   items.splice(0, items.length, ...kept);
 
   if (items.length === 0) {
-    return { ok: true, created: 0, emailed: 0, emailSkipped: 0, byKind: {} };
+    const push = await flushPendingPush();
+    return { ok: true, created: 0, emailed: 0, emailSkipped: 0, byKind: {}, pushed: push.pushes };
   }
 
   // Ontvangers per klant: actieve portaalgebruikers, plus de coördinator als
@@ -328,6 +351,8 @@ export async function runClientNotifications(): Promise<{
 
     for (const recipient of recipients) {
       // Nieuwe rij? Dan is dit de eerste keer dat we deze klant hierover melden.
+      // Push alleen klaarzetten als de klant dit soort melding als push wil.
+      const wantsPush = await channelEnabled(recipient.userId, item.kind, "push");
       const inserted = await db
         .insert(notifications)
         .values({
@@ -339,6 +364,7 @@ export async function runClientNotifications(): Promise<{
           body: item.body,
           href: item.href,
           dedupeKey: item.dedupeKey,
+          pushState: wantsPush ? "pending" : null,
         })
         .onConflictDoNothing({ target: [notifications.userId, notifications.dedupeKey] })
         .returning({ id: notifications.id });
@@ -347,6 +373,11 @@ export async function runClientNotifications(): Promise<{
 
       created++;
       byKind[item.kind] = (byKind[item.kind] ?? 0) + 1;
+
+      if (!(await channelEnabled(recipient.userId, item.kind, "email"))) {
+        emailSkipped++;
+        continue;
+      }
 
       const result = await sendEmail({
         to: recipient.email,
@@ -366,5 +397,8 @@ export async function runClientNotifications(): Promise<{
     }
   }
 
-  return { ok: true, created, emailed, emailSkipped, byKind };
+  // Pushmeldingen versturen (met stille uren, daglimiet en bundelen).
+  const push = await flushPendingPush();
+
+  return { ok: true, created, emailed, emailSkipped, byKind, pushed: push.pushes };
 }

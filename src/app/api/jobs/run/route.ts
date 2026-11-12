@@ -69,7 +69,9 @@ import { setupTeamLogins } from "@/server/jobs/team-login-setup";
 import { applyClientLogos } from "@/server/jobs/client-logos-apply";
 import { bootstrapProduction } from "@/server/jobs/bootstrap";
 import { runClientNotifications } from "@/server/jobs/notifications";
+import { flushPendingPush } from "@/server/push";
 import { pruneSessions } from "@/server/auth/session";
+import { pruneLoginChallenges } from "@/server/auth/login-code";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -149,6 +151,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "clients.status_sweep": sweepInactiveClients,
   "portal.coverage": portalAccessReport,
   "portal.notify_clients": runClientNotifications,
+  "portal.push_flush": () => flushPendingPush(),
   "ai.seed_knowledge": seedAiKnowledge,
   "automations.seed": seedAutomationRules,
   "production.advance_phases": runProductionPhaseAdvance,
@@ -197,7 +200,10 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "team.setup_logins": setupTeamLogins,
   "clients.apply_logos": applyClientLogos,
   "bootstrap.production": bootstrapProduction,
-  "maintenance.prune_sessions": async () => ({ removed: await pruneSessions() }),
+  "maintenance.prune_sessions": async () => {
+    await pruneLoginChallenges();
+    return { removed: await pruneSessions() };
+  },
 };
 
 function authorized(request: Request): boolean {

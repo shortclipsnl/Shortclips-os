@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { CalendarRange, Check, Download, Loader2, Share2 } from "lucide-react";
+import { PortalDownloadButton } from "@/components/portal/download-button";
+import { CalendarRange, Check, Loader2, Share2 } from "lucide-react";
 import { PORTAL_MONTH_PERIODS, PORTAL_PERIODS } from "@/lib/portal-periods";
 
 /**
@@ -95,14 +96,13 @@ export function ResultControls({
       </div>
 
       <div className="inline-flex shrink-0 items-center gap-2">
-        <a
+        <PortalDownloadButton
           href={reportHref}
-          target="_blank"
-          rel="noreferrer"
-          className="sc-btn-cta inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors"
-        >
-          <Download className="size-4" /> Download rapport
-        </a>
+          filename="Shortclips_Resultaten.pdf"
+          label="Download rapport"
+          busyLabel="Rapport wordt gemaakt…"
+          className="sc-btn-cta inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors disabled:opacity-70"
+        />
         <button
           type="button"
           onClick={shareReport}

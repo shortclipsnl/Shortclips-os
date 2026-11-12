@@ -208,6 +208,7 @@ export const notificationChannelEnum = pgEnum("notification_channel", [
   "email",
   "whatsapp",
   "slack",
+  "push",
 ]);
 
 export const aiInsightKindEnum = pgEnum("ai_insight_kind", [

@@ -1,5 +1,7 @@
 "use server";
 
+import { scheduleFlush } from "@/server/client-push";
+import { runClientNotifications } from "@/server/jobs/notifications";
 import { revalidatePath } from "next/cache";
 import { syncFeedbackRounds } from "@/server/feedback-rounds";
 import { and, desc, eq, isNull } from "drizzle-orm";
@@ -416,6 +418,10 @@ export async function changeVideoStatus(
 
     // Koppeling met de contentplanning gelijktrekken (één gekoppeld record).
     await syncContentForDeliverable(videoId);
+
+    // Klant direct laten weten dat er een video klaarstaat (portaal, e-mail en
+    // push in de app), in plaats van te wachten op de geplande taak.
+    if (nextStatus === "client_review") scheduleFlush(() => runClientNotifications());
 
     revalidatePath(`/videos/${videoId}`);
     revalidatePath("/videos");

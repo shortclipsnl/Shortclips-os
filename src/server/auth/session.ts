@@ -7,16 +7,31 @@ import { sessions, users } from "@/db/schema";
 import { isProduction } from "@/lib/env";
 
 export const SESSION_COOKIE = "sc_os_session";
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-/** Harde bovengrens: een sessie verloopt altijd 30 dagen na aanmaak, ook bij
- *  dagelijks gebruik (glijdende 7-daagse inactiviteit blijft daarnaast gelden). */
-const SESSION_ABSOLUTE_MAX_MS = 30 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Sessieduur per soort account.
+ *  - Team: 7 dagen glijdend bij inactiviteit, harde grens 30 dagen.
+ *  - Klant (portaal/app): 30 dagen glijdend, harde grens 90 dagen, zodat de
+ *    klant-app niet steeds opnieuw om een wachtwoord vraagt. Klanten zien alleen
+ *    hun eigen omgeving; op een nieuw apparaat kan per klant een e-mailcode
+ *    verplicht zijn.
+ */
+export function sessionPolicy(role: string | null | undefined): { ttlMs: number; absoluteMaxMs: number } {
+  return role === "client"
+    ? { ttlMs: 30 * DAY_MS, absoluteMaxMs: 90 * DAY_MS }
+    : { ttlMs: 7 * DAY_MS, absoluteMaxMs: 30 * DAY_MS };
+}
 /** Bij elke request verlengen zou te veel schrijven; dit is de drempel. */
 const REFRESH_AFTER_MS = 60 * 60 * 1000;
 
 /** Het cookie bevat het token; de database alleen de hash ervan. */
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+export function hashSecret(value: string): string {
+  return hashToken(value);
 }
 
 export function newSessionToken(): string {
@@ -38,10 +53,12 @@ export async function createSession(
   meta: { ip?: string | null; userAgent?: string | null } = {},
 ): Promise<string> {
   const token = newSessionToken();
+  const [owner] = await db.select({ role: users.primaryRole }).from(users).where(eq(users.id, userId)).limit(1);
+  const policy = sessionPolicy(owner?.role);
   await db.insert(sessions).values({
     tokenHash: hashToken(token),
     userId,
-    expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    expiresAt: new Date(Date.now() + policy.ttlMs),
     ipAddress: meta.ip ?? null,
     userAgent: meta.userAgent ?? null,
   });
@@ -52,7 +69,7 @@ export async function createSession(
     sameSite: "lax",
     secure: isProduction,
     path: "/",
-    maxAge: Math.floor(SESSION_TTL_MS / 1000),
+    maxAge: Math.floor(policy.absoluteMaxMs / 1000),
   });
 
   return token;
@@ -95,8 +112,9 @@ export async function readSession(): Promise<SessionUser | null> {
   if (!row) return null;
   if (row.deletedAt || row.status !== "active") return null;
 
-  // Harde 30-dagen-grens vanaf aanmaak, ongeacht activiteit.
-  if (Date.now() - new Date(row.createdAt).getTime() > SESSION_ABSOLUTE_MAX_MS) {
+  // Harde grens vanaf aanmaak, ongeacht activiteit.
+  const policy = sessionPolicy(row.primaryRole);
+  if (Date.now() - new Date(row.createdAt).getTime() > policy.absoluteMaxMs) {
     await db.update(sessions).set({ revokedAt: new Date() }).where(eq(sessions.id, row.sessionId));
     return null;
   }
@@ -107,10 +125,10 @@ export async function readSession(): Promise<SessionUser | null> {
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
 
   if (Date.now() - new Date(row.lastSeenAt).getTime() > REFRESH_AFTER_MS) {
-    const absoluteCap = new Date(row.createdAt).getTime() + SESSION_ABSOLUTE_MAX_MS;
+    const absoluteCap = new Date(row.createdAt).getTime() + policy.absoluteMaxMs;
     await db
       .update(sessions)
-      .set({ lastSeenAt: new Date(), expiresAt: new Date(Math.min(Date.now() + SESSION_TTL_MS, absoluteCap)) })
+      .set({ lastSeenAt: new Date(), expiresAt: new Date(Math.min(Date.now() + policy.ttlMs, absoluteCap)) })
       .where(eq(sessions.id, row.sessionId));
   }
 

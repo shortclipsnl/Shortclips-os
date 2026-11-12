@@ -1,7 +1,8 @@
+import { PortalDownloadButton } from "@/components/portal/download-button";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileDown } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalReportDetail } from "@/server/reports/service";
 import type { Gerealiseerd, Vooruitblik } from "@/server/reports/realized";
@@ -58,14 +59,13 @@ export default async function PortalAnalysisDetailPage({ params }: { params: Pro
           <h1 className="text-xl font-semibold capitalize text-[var(--sc-ink,#fff)]">{report.periodLabel}</h1>
           {report.approvedAt ? <p className="text-xs text-[var(--sc-ink-muted,#9aa3b2)]">Gepubliceerd op {fmtPub(report.approvedAt)}</p> : null}
         </div>
-        <a
+        <PortalDownloadButton
           href={`/api/portal/maandrapport/${id}/pdf`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-full bg-[var(--sc-accent,#2E90FA)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          <FileDown className="size-4" /> Download PDF
-        </a>
+          filename="Shortclips_Maandanalyse.pdf"
+          label="Download PDF"
+          busyLabel="PDF wordt gemaakt…"
+          className="inline-flex items-center gap-2 rounded-full bg-[var(--sc-accent,#2E90FA)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-70"
+        />
       </div>
 
       {/* Samenvatting (persoonlijke klanttekst). */}

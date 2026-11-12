@@ -1,5 +1,7 @@
 "use server";
 
+import { scheduleFlush } from "@/server/client-push";
+import { runClientNotifications } from "@/server/jobs/notifications";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -195,6 +197,8 @@ export async function changeScriptStatus(
         /* leren mag goedkeuren nooit tegenhouden */
       }
     }
+
+    if (nextStatus === "client_review") scheduleFlush(() => runClientNotifications());
 
     revalidatePath(`/scripts/${scriptId}`);
     revalidatePath("/scripts");

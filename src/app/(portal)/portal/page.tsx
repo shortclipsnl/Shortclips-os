@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, CalendarRange, Camera, Check, ClipboardCheck, Clock, Eye, FileText, Film, Mail, MapPin, MessageCircle, MessagesSquare, Phone, Play, Radio, Sparkles } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalData, getPortalPackageProgress } from "@/server/portal";
-import { getPortalFrameLibrary } from "@/server/portal-frame";
+import { getPortalActionCounts, getPortalFrameLibrary } from "@/server/portal-frame";
 import { portalBtn } from "@/components/portal/status-pill";
 import { ProductionTimeline, WhatsNext } from "@/components/portal/client-roadmap";
 import { getPortalRoadmap } from "@/server/client-roadmap";
@@ -134,14 +134,91 @@ const SCRIPT_TONE: Record<"action" | "ready" | "done" | "prep", string> = {
   prep: "bg-[var(--sc-fill)] text-[var(--color-ink-muted)]",
 };
 
+/** "Goedemorgen" / "Goedemiddag" / "Goedenavond" in Nederlandse tijd. */
+function greeting(): string {
+  const h = Number(new Date().toLocaleString("en-GB", { hour: "2-digit", hour12: false, timeZone: TZ }));
+  if (h < 12) return "Goedemorgen";
+  if (h < 18) return "Goedemiddag";
+  return "Goedenavond";
+}
+
+function shortDate(d: Date): string {
+  return d.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short", timeZone: TZ });
+}
+
+/** Mobiel startscherm: wat wacht er op je, en wat komt eraan. Vier tegels, één scherm. */
+function QuickGlance({
+  videos,
+  scripts,
+  shootDate,
+  shootTime,
+  nextPub,
+  views,
+}: {
+  videos: number;
+  scripts: number;
+  shootDate: Date | null;
+  shootTime: string | null;
+  nextPub: { date: Date; title: string } | null;
+  views: number | null;
+}) {
+  const tile = "flex min-h-[92px] flex-col justify-between rounded-[16px] border p-3.5 transition-colors active:scale-[0.99]";
+  const calm = "border-[var(--sc-line)] bg-[var(--color-surface)]";
+  const act = "border-transparent bg-[var(--sc-act)] text-[var(--sc-act-ink)]";
+  return (
+    <div className="grid grid-cols-2 gap-2.5 sm:hidden">
+      <Link href="/portal/videos" className={`${tile} ${videos > 0 ? act : calm}`}>
+        <Film className="size-5" strokeWidth={1.9} />
+        <div>
+          <div className="text-[22px] font-bold leading-none tabular-nums">{videos}</div>
+          <div className="mt-1 text-[12px] font-semibold leading-tight">{videos === 1 ? "video wacht op feedback" : "video's wachten op feedback"}</div>
+        </div>
+      </Link>
+      <Link href="/portal/scripts" className={`${tile} ${scripts > 0 ? act : calm}`}>
+        <FileText className="size-5" strokeWidth={1.9} />
+        <div>
+          <div className="text-[22px] font-bold leading-none tabular-nums">{scripts}</div>
+          <div className="mt-1 text-[12px] font-semibold leading-tight">{scripts === 1 ? "script om goed te keuren" : "scripts om goed te keuren"}</div>
+        </div>
+      </Link>
+      <Link href="/portal/planning" className={`${tile} ${calm}`}>
+        <Camera className="size-5 text-[var(--sc-accent)]" strokeWidth={1.9} />
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Volgende opname</div>
+          <div className="mt-0.5 text-[14px] font-semibold leading-tight">
+            {shootDate ? `${shortDate(shootDate)}${shootTime ? ` · ${shootTime}` : ""}` : "Nog niet gepland"}
+          </div>
+        </div>
+      </Link>
+      <Link href="/portal/content" className={`${tile} ${calm}`}>
+        <CalendarRange className="size-5 text-[var(--sc-accent)]" strokeWidth={1.9} />
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">Volgende publicatie</div>
+          <div className="mt-0.5 truncate text-[14px] font-semibold leading-tight">{nextPub ? shortDate(nextPub.date) : "Nog niet ingepland"}</div>
+        </div>
+      </Link>
+      {views !== null ? (
+        <Link href="/portal/resultaten" className={`col-span-2 flex items-center gap-3 rounded-[16px] border p-3.5 ${calm}`}>
+          <Eye className="size-5 shrink-0 text-[var(--sc-accent)]" strokeWidth={1.9} />
+          <span className="min-w-0 flex-1 text-[13.5px]">
+            <span className="font-bold tabular-nums">{compact(views)}</span> weergaven in de laatste 30 dagen
+          </span>
+          <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function PortalPage() {
   const viewer = await requirePortal();
-  const [data, contact, roadmapRaw, lib, pkg] = await Promise.all([
+  const [data, contact, roadmapRaw, lib, pkg, todo] = await Promise.all([
     getPortalData(viewer),
     getPortalContact(viewer),
     getPortalRoadmap(viewer),
     getPortalFrameLibrary(viewer),
     getPortalPackageProgress(viewer),
+    getPortalActionCounts(viewer).catch(() => ({ videos: 0, scripts: 0 })),
   ]);
 
   const companyName = data.client.name;
@@ -203,15 +280,31 @@ export default async function PortalPage() {
   return (
     <div className="flex flex-col gap-[22px]">
       {/* 1 — Persoonlijke welkomst */}
-      <section className="flex items-start gap-4 px-0.5 pt-1">
-        <ClientLogo name={companyName} logoUrl={data.client.logoUrl} color={data.client.color} size={56} />
+      <section className="flex items-center gap-3 px-0.5 pt-1 sm:items-start sm:gap-4">
+        <span className="sm:hidden"><ClientLogo name={companyName} logoUrl={data.client.logoUrl} color={data.client.color} size={44} /></span>
+        <span className="hidden sm:block"><ClientLogo name={companyName} logoUrl={data.client.logoUrl} color={data.client.color} size={56} /></span>
         <div className="min-w-0">
-          <h1 className="text-[26px] font-bold leading-tight tracking-tight sm:text-[30px]">Hey {greetName}, welkom in jouw Shortclips portaal!</h1>
-          <p className="mt-1.5 max-w-2xl text-[14px] leading-relaxed text-[var(--color-ink-muted)]">
+          <h1 className="text-[22px] font-bold leading-tight tracking-tight sm:hidden">{greeting()}, {greetName}</h1>
+          <h1 className="hidden text-[26px] font-bold leading-tight tracking-tight sm:block sm:text-[30px]">Hey {greetName}, welkom in jouw Shortclips portaal!</h1>
+          <p className="mt-0.5 text-[13px] text-[var(--color-ink-muted)] sm:hidden">
+            {todo.videos + todo.scripts > 0 ? "Er wacht iets op je. Zo ben je snel klaar." : "Alles is bij. Je hoeft nu niets te doen."}
+          </p>
+          <p className="mt-1.5 hidden max-w-2xl text-[14px] leading-relaxed text-[var(--color-ink-muted)] sm:block">
             Dit is jouw persoonlijke omgeving voor onze samenwerking. Hier vind je jouw scripts, video&apos;s, contentplanning, resultaten en alle belangrijke afspraken overzichtelijk op één plek.
           </p>
         </div>
       </section>
+
+      {/* Mobiel: de belangrijkste acties en datums direct onder de begroeting,
+          zonder scrollen. Op desktop staan dezelfde gegevens verderop uitgebreid. */}
+      <QuickGlance
+        videos={todo.videos}
+        scripts={todo.scripts}
+        shootDate={shootDate}
+        shootTime={shootTime}
+        nextPub={nextPub ? { date: dateFromIso(nextPub.scheduledOn), title: nextPub.title } : null}
+        views={hasMetrics ? m.views : null}
+      />
 
       {/* Klantroadmap: wat gebeurt er nu, en waar staat elke productie? */}
       {roadmap ? <WhatsNext roadmap={roadmap} /> : null}
@@ -256,8 +349,10 @@ export default async function PortalPage() {
                 <li key={s.id}>
                   <Link href="/portal/scripts" className="flex items-center gap-3 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-2.5 transition-colors hover:border-[var(--sc-accent)]">
                     <FileText className="size-4 shrink-0 text-[var(--sc-accent)]" />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.title}</span>
-                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${SCRIPT_TONE[st.tone]}`}>{st.label}</span>
+                    <span className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+                      <span className="min-w-0 flex-1 text-sm font-medium sm:truncate">{s.title}</span>
+                      <span className={`w-fit shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${SCRIPT_TONE[st.tone]}`}>{st.label}</span>
+                    </span>
                     <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
                   </Link>
                 </li>
@@ -282,8 +377,9 @@ export default async function PortalPage() {
           van de klant als die is ingesteld, anders naar de videopagina in het portaal. */}
       <Link
         href="/portal/videos"
-        className="sc-glass group flex flex-wrap items-center gap-4 p-5 transition-shadow hover:shadow-[var(--shadow-raised)]"
+        className="sc-glass group flex flex-col items-stretch gap-4 p-5 transition-shadow hover:shadow-[var(--shadow-raised)] sm:flex-row sm:flex-wrap sm:items-center"
       >
+        <div className="flex min-w-0 flex-1 items-start gap-4">
         <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-[var(--st-blue-bg)] text-[var(--st-blue)]">
           <Film className="size-6" strokeWidth={1.8} />
         </span>
@@ -294,7 +390,8 @@ export default async function PortalPage() {
             {pendingReview > 0 ? <span className="ml-1 font-semibold text-[var(--st-orange)]">{pendingReview === 1 ? "1 sessie wacht" : `${pendingReview} sessies wachten`} op jouw feedback.</span> : null}
           </p>
         </div>
-        <span className={`${pendingReview > 0 ? portalBtn.act : portalBtn.cta} shrink-0`}>
+        </div>
+        <span className={`${pendingReview > 0 ? portalBtn.act : portalBtn.cta} shrink-0 justify-center`}>
           <Play className="size-4" fill="currentColor" /> {pendingReview > 0 ? "Bekijk & beoordeel" : "Bekijk video's"} <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
         </span>
       </Link>

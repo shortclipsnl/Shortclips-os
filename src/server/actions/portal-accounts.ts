@@ -22,6 +22,8 @@ import {
 } from "@/server/auth/portal-invites";
 import { emailConfigured, portalEmailHtml, sendEmail } from "@/server/email";
 import { auditLog } from "@/server/audit";
+import { revokeClientAppAccess } from "@/server/auth/client-app-access";
+import { trustThisDevice } from "@/server/auth/login-code";
 
 export type PortalAccountResult = {
   ok: boolean;
@@ -314,7 +316,10 @@ export async function setPortalUserActive(userId: string, active: boolean): Prom
     // Een account zonder wachtwoord kan niet "actief" zijn (nog niet geactiveerd).
     const nextStatus = active ? (u.passwordHash ? "active" : "invited") : "suspended";
     await db.update(users).set({ status: nextStatus, updatedAt: new Date() }).where(eq(users.id, u.id));
-    if (!active) await revokeAllSessions(u.id);
+    if (!active) {
+      await revokeAllSessions(u.id);
+      await revokeClientAppAccess(u.id);
+    }
     await auditLog({ viewer, action: active ? "portal.account_activated" : "portal.account_deactivated", entityType: "client", entityId: u.clientId, clientId: u.clientId });
     revalidatePath("/klantportalen");
     return { ok: true };
@@ -366,7 +371,12 @@ export async function completePortalSetup(input: {
     ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
     userAgent: h.get("user-agent"),
   });
-  redirect("/portal");
+  // De klant opende een link uit de eigen mailbox: dit apparaat is daarmee
+  // bewezen, dus hier geen extra inlogcode nodig.
+  await trustThisDevice(u.id, h.get("user-agent"));
+  // Op een telefoon meteen naar de uitleg om de app te installeren.
+  const ua = h.get("user-agent") ?? "";
+  redirect(/iPhone|iPad|iPod|Android/i.test(ua) ? "/portal/app?welkom=1" : "/portal");
 }
 
 /** Helper voor UI-gating: mag deze viewer portaalaccounts beheren? */

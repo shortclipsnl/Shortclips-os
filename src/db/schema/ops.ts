@@ -92,10 +92,17 @@ export const notifications = pgTable(
      *  de toekomst ligt, popt de melding niet opnieuw op. Verloopt de tijd, dan
      *  komt de melding nog één keer terug. */
     snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
+    /** Pushmelding naar de klant-app: null = geen push (intern of kanaal uit),
+     *  'pending' = wacht op versturen (bijv. stille uren), 'sent' = aangeboden,
+     *  'bundled' = meegenomen in een gebundelde push, 'skipped' = bewust niet
+     *  verstuurd (daglimiet, geen apparaat). */
+    pushState: varchar("push_state", { length: 16 }),
+    pushSentAt: timestamp("push_sent_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [
     index("notifications_user_idx").on(t.userId, t.readAt),
+    index("notifications_push_idx").on(t.pushState),
     unique("notifications_dedupe_unique").on(t.userId, t.dedupeKey),
   ],
 );

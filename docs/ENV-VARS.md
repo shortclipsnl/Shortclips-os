@@ -36,6 +36,7 @@
 | `KOSTEN_IMPORT_TOKEN` | Beveiligt `/api/kosten/import` (DigiBoox-import) | **ja** |
 | `LEADS_WEBHOOK_SECRET` | Beveiligt lead-intake webhook (Meta/Framer) | **ja** |
 | `RESEND_API_KEY` / `MAIL_FROM` | E-mail (klantnotificaties via Resend) | **ja** (key) |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Pushmeldingen klant-app (zie `./KLANT-APP.md`) | **ja** (private key) |
 
 ## Terugzetten na herstel
 Zet al deze variabelen opnieuw in Vercel (scope **Production**, en meestal ook
