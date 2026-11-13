@@ -22,6 +22,8 @@ const PUBLIC_PATHS = [
   "/login",
   "/api/webhooks",
   "/api/health",
+  // Hartslag van de Koppelingsbewaking voor een externe uptime-dienst (geen details).
+  "/api/monitoring/heartbeat",
   "/api/jobs",
   "/api/kosten",
   "/api/vermogen/import",

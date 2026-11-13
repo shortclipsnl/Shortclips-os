@@ -160,6 +160,17 @@ const schema = z.object({
   // geverifieerd zijn.
   MAIL_FROM: z.string().optional(),
 
+  // --- Koppelingsbewaking: storingsmeldingen per e-mail ---
+  // Verstuurd via de eigen mailserver van shortclips.nl (SMTP), los van Google.
+  // Zonder SMTP_* worden de bestaande IMAP-gegevens van info@ hergebruikt
+  // (zelfde mailbox, zelfde server). MONITOR_ALERT_EMAIL = ontvanger; leeg = de
+  // eigenaar(s) van het portaal.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  MONITOR_ALERT_EMAIL: z.string().optional(),
+
   // --- Pushmeldingen (klant-app / PWA) ---
   // VAPID-sleutelpaar voor Web Push. Genereer één keer met:
   //   npx web-push generate-vapid-keys

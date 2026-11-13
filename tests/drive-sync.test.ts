@@ -248,13 +248,15 @@ describe("Drive-synchronisatie", () => {
     expect((await getDriveStatus()).connection).toBe("actief");
   });
 
-  it("niveau 3: ingetrokken toestemming → precies één melding, ook bij herhaalde controles", async () => {
+  it("niveau 3: ingetrokken toestemming → verbroken, en de Koppelingsbewaking meldt (niet de Drive-check zelf)", async () => {
     await setGoogleAuthState("reauth_required", "test");
     await runDriveHealthCheck();
     await runDriveHealthCheck();
-    expect(notified).toHaveLength(1);
-    expect(notified[0]).toContain("Opnieuw verbinden");
+    // De melding (één per storing, per e-mail) komt nu uit src/server/monitoring;
+    // de Drive-check zelf stuurt niets meer, zodat er geen dubbele meldingen zijn.
+    expect(notified).toHaveLength(0);
     const status = await getDriveStatus();
+    expect(status.action).toContain("Opnieuw verbinden");
     expect(status.connection).toBe("verbroken");
     expect(status.canReconnect).toBe(true);
 

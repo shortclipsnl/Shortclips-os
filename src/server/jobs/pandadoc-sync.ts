@@ -12,8 +12,10 @@ import { runJob } from "./runner";
 export async function runPandaDocSync(params: { full?: boolean; triggeredById?: string } = {}) {
   return runJob("system", "pandadoc.sync", { full: !!params.full }, async (ctx) => {
     if (!pandadocConfigured()) {
+      // Niet ingesteld is geen storing: overslaan zonder elk uur een fout te
+      // loggen. De Koppelingsbewaking toont PandaDoc dan als "Niet ingesteld".
       ctx.log("PANDADOC_API_KEY ontbreekt: synchronisatie overgeslagen.", "warn");
-      throw new Error("PandaDoc is nog niet gekoppeld: PANDADOC_API_KEY ontbreekt.");
+      return;
     }
     const hour = Number(new Intl.DateTimeFormat("nl-NL", { hour: "numeric", timeZone: "Europe/Amsterdam" }).format(new Date()));
     const full = params.full || hour === 3;

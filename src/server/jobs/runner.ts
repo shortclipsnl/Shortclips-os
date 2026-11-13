@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { integrationConnections, syncJobs } from "@/db/schema";
 import { logError } from "@/server/audit";
-import { notifyTechnical } from "@/server/notification-digest";
 import type { Provider } from "@/server/integrations/types";
 import { IntegrationError, MissingCredentialsError } from "@/server/integrations/types";
 import { GoogleReauthRequiredError } from "@/server/integrations/google-auth";
@@ -22,13 +21,14 @@ const PROVIDER_LABEL: Record<string, string> = {
   metricool: "Metricool",
 };
 
-/** Echte sync-fout (geen configuratietekort): komt in de dagbundel technische
- *  storingen van de eigenaar, één regel per koppeling. De foutdetails staan in
- *  het logboek op de integratiepagina. */
+/** Echte sync-fout (geen configuratietekort). Bewust géén losse melding meer:
+ *  één mislukte run is meestal tijdelijk. De Koppelingsbewaking
+ *  (src/server/monitoring) probeert eerst zelf te herstellen en meldt de
+ *  beheerder pas als het probleem blijft. De fout staat wel in het logboek. */
 async function notifySyncFailure(provider: Provider, message: string): Promise<void> {
+  void provider;
   void message;
-  const label = PROVIDER_LABEL[provider] ?? provider;
-  await notifyTechnical(`${label} synchroniseert niet`, "critical");
+  void PROVIDER_LABEL;
 }
 
 export type JobContext = {
