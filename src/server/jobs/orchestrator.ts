@@ -8,7 +8,6 @@ import { runAutoPublishDueContent } from "./content-publish";
 import { runTaskArchive } from "./task-archive";
 import { runCalendarSync } from "./calendar-sync";
 import { syncOpenOnboardings } from "@/server/onboarding";
-import { runShootReconciliation } from "./shoot-reconciliation";
 import { runMonthlyReportDrafts } from "./report-drafts";
 import { runContentOnlineNotifications } from "./content-online-notify";
 import { runMonthlyInsightTasks } from "./insight-tasks";
@@ -140,7 +139,8 @@ export async function runNightlyExternalSync() {
   results.push(await step("calendar.sync", () => runCalendarSync()));
   // Direct ná de agenda-sync: controleer of alle opnames ook echt in de planning
   // staan en meld afwijkingen (opname zonder klant / mogelijk gemiste opname).
-  results.push(await step("shoots.reconcile", () => runShootReconciliation()));
+  // shoots.reconcile draait via een eigen cron (05:20): achteraan deze lange
+  // keten haalde hij door time-outs sinds 5 november de beurt niet meer.
   results.push(await step("metricool.sync", () => runMetricoolSync()));
   // Na alle externe syncs: controleer de gezondheid van de koppelingen en meld
   // proactief verouderde/nooit-geslaagde koppelingen aan de verantwoordelijke.
