@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Copy, Download, Eye, Handshake, Heart, Info, Lock, Play, Share2, Trophy, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Copy, Download, Eye, Handshake, Heart, Info, Lock, Play, Share2, Sparkles, Trophy, X } from "lucide-react";
 import { portalBtn } from "@/components/portal/status-pill";
 import { CATEGORIES, METALS, longDateNl, type AwardState, type MilestoneCategory, type MilestonesData } from "@/lib/milestones";
 import { AwardBadge, badgeSvg } from "./award-badge";
+import { CountUp } from "./count-up";
 import { ArchiveModal, InteractionsModal, PlayerModal, TopSix, ViewsModal, type Playable } from "./video-parts";
 
 const nf = new Intl.NumberFormat("nl-NL");
@@ -102,14 +103,41 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
             </div>
           ) : null}
         </div>
+        {data.awards.length > 0 ? (
+          <div className="relative z-[1] mt-6 grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-[auto_auto_1fr] sm:items-center sm:gap-6">
+            <div className="flex items-center gap-3">
+              <span className="ms-hero-chip grid size-10 place-items-center rounded-[12px] text-[#f5d58a]"><Trophy className="size-5" /></span>
+              <div className="leading-tight">
+                <b className="block text-[22px] font-bold"><CountUp value={achieved.length} duration={1200} /></b>
+                <span className="text-[12px] text-white/65">awards behaald</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 place-items-center rounded-[12px] border border-white/15 bg-white/[0.05] text-white/70"><Lock className="size-[18px]" /></span>
+              <div className="leading-tight">
+                <b className="block text-[22px] font-bold"><CountUp value={data.awards.length - achieved.length} duration={1200} /></b>
+                <span className="text-[12px] text-white/65">nog te ontgrendelen</span>
+              </div>
+            </div>
+            <div className="min-w-0">
+              <div className="flex justify-between text-[12px] text-white/65">
+                <span>Jullie awardcollectie</span>
+                <span className="tabular-nums text-white/85">{achieved.length} van {data.awards.length}</span>
+              </div>
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Awards behaald" aria-valuenow={achieved.length} aria-valuemin={0} aria-valuemax={data.awards.length}>
+                <div className="ms-grow ms-gold-bar h-full rounded-full" style={{ width: `${data.awards.length ? Math.max(3, (achieved.length / data.awards.length) * 100) : 0}%` }} />
+              </div>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {/* Kerncijfers */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4" aria-label="Kerncijfers">
-        <Stat icon={Play} label="Gepubliceerde video's" value={fmt(data.totals.videos)} sub={data.totals.firstVideoOn ? `Eerste video op ${longDateNl(data.totals.firstVideoOn)}` : "Sinds de start"} cta="Bekijk alle video's" onClick={data.library.length || data.videos.length ? () => setModal({ kind: "archive" }) : undefined} />
-        <Stat icon={Eye} label="Totaal aantal views" value={fmt(data.totals.views)} sub={avg > 0 ? `Gemiddeld ${fmt(avg)} per video` : "Op alle kanalen"} cta="Bekijk per video" onClick={data.videos.length ? () => setModal({ kind: "views" }) : undefined} />
-        <Stat icon={Heart} label="Totaal aantal interacties" value={fmt(data.totals.interactions)} sub="Likes, reacties, shares en saves" cta="Bekijk de uitsplitsing" onClick={data.videos.length ? () => setModal({ kind: "interactions" }) : undefined} />
-        <Stat icon={Trophy} label="Behaalde mijlpalen" value={fmt(achieved.length)} sub={`${achieved.length} van ${data.awards.length} awards`} cta="Bekijk de awards" onClick={() => document.getElementById("awards")?.scrollIntoView({ behavior: "smooth", block: "start" })} />
+        <Stat icon={Play} label="Gepubliceerde video's" value={data.totals.videos} delay={0} sub={data.totals.firstVideoOn ? `Eerste video op ${longDateNl(data.totals.firstVideoOn)}` : "Sinds de start"} cta="Bekijk alle video's" onClick={data.library.length || data.videos.length ? () => setModal({ kind: "archive" }) : undefined} />
+        <Stat icon={Eye} label="Totaal aantal views" value={data.totals.views} delay={120} sub={avg > 0 ? `Gemiddeld ${fmt(avg)} per video` : "Op alle kanalen"} cta="Bekijk per video" onClick={data.videos.length ? () => setModal({ kind: "views" }) : undefined} />
+        <Stat icon={Heart} label="Totaal aantal interacties" value={data.totals.interactions} delay={240} sub="Likes, reacties, shares en saves" cta="Bekijk de uitsplitsing" onClick={data.videos.length ? () => setModal({ kind: "interactions" }) : undefined} />
+        <Stat icon={Trophy} label="Behaalde mijlpalen" value={achieved.length} delay={360} sub={`${achieved.length} van ${data.awards.length} awards`} cta="Bekijk de awards" onClick={() => document.getElementById("awards")?.scrollIntoView({ behavior: "smooth", block: "start" })} />
       </section>
 
       {/* Volgende mijlpaal + jaaroverzicht */}
@@ -128,7 +156,7 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
             <div>
               <Bar pct={nextMain.progressPct} />
               <div className="mt-2.5 flex flex-wrap justify-between gap-2 text-[13px] text-[var(--color-ink-muted)]">
-                <span>Huidig resultaat <b className="font-semibold tabular-nums text-[var(--color-ink)]">{currentLabel(nextMain)}</b></span>
+                <span>Huidig resultaat <b className="font-semibold tabular-nums text-[var(--color-ink)]"><CountUp value={nextMain.current} /> {unitWord(nextMain)}</b></span>
                 <span>Doel <b className="font-semibold tabular-nums text-[var(--color-ink)]">{targetLabel(nextMain)}</b></span>
               </div>
               <div className="mt-1 flex flex-wrap justify-between gap-2 text-[12.5px] text-[var(--color-ink-faint)]">
@@ -190,7 +218,7 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
         <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h2 className="text-[20px] font-bold tracking-tight">Onze behaalde awards</h2>
-            <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Klik op een award voor de details. Nog niet behaalde awards zie je ingetogen.</p>
+            <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Klik op een award voor de details. Bij elke vergrendelde award zie je wat er nodig is en hoe ver jullie al zijn.</p>
           </div>
           <div role="tablist" aria-label="Categorie" className="flex w-full flex-wrap gap-1 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-1 sm:w-auto">
             {([["alle", "Alle"], ...Object.entries(CATEGORIES).map(([k, v]) => [k, v.label])] as Array<[string, string]>).map(([k, label]) => {
@@ -224,9 +252,9 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
                   <h3 className="text-[15px] font-semibold">{CATEGORIES[c].label}</h3>
                   <span className="text-[12.5px] text-[var(--color-ink-muted)]">{CATEGORIES[c].sub} · {list.filter((a) => a.achieved).length} van {list.length} behaald</span>
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-                  {list.map((a) => (
-                    <AwardTile key={a.key} a={a} onOpen={() => setModal({ kind: "award", key: a.key })} />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+                  {list.map((a, i) => (
+                    <AwardTile key={a.key} a={a} index={i} onOpen={() => setModal({ kind: "award", key: a.key })} />
                   ))}
                 </div>
               </div>
@@ -326,14 +354,14 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
 
 /* ---------- Kleine onderdelen ---------- */
 
-function Stat({ icon: Icon, label, value, sub, cta, onClick }: { icon: typeof Eye; label: string; value: string; sub: string; cta?: string; onClick?: () => void }) {
+function Stat({ icon: Icon, label, value, delay = 0, sub, cta, onClick }: { icon: typeof Eye; label: string; value: number; delay?: number; sub: string; cta?: string; onClick?: () => void }) {
   const body = (
     <>
       <div className="flex items-center gap-2 text-[12.5px] text-[var(--color-ink-muted)]">
         <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-[var(--st-blue-bg)] text-[var(--sc-accent)]"><Icon className="size-[15px]" /></span>
         <span className="leading-tight">{label}</span>
       </div>
-      <div className="text-[22px] font-bold tabular-nums tracking-tight sm:text-[28px]">{value}</div>
+      <div className="text-[22px] font-bold tabular-nums tracking-tight sm:text-[28px]"><CountUp value={value} delay={delay} /></div>
       <div className="text-[12px] text-[var(--color-ink-faint)]">{sub}</div>
       {onClick && cta ? <div className="mt-1 inline-flex items-center gap-1 text-[12.5px] font-semibold text-[var(--sc-accent)]">{cta} <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" /></div> : null}
     </>
@@ -349,7 +377,7 @@ function Stat({ icon: Icon, label, value, sub, cta, onClick }: { icon: typeof Ey
 function YearTile({ n, l }: { n: number; l: string }) {
   return (
     <li className="rounded-[12px] border border-white/10 bg-white/[0.06] px-3 py-2.5 text-[11.5px] text-white/65">
-      <b className="block text-[16px] font-semibold tabular-nums text-white">{fmt(n)}</b>
+      <b className="block text-[16px] font-semibold tabular-nums text-white"><CountUp value={n} duration={1400} /></b>
       {l}
     </li>
   );
@@ -358,7 +386,7 @@ function YearTile({ n, l }: { n: number; l: string }) {
 function Bar({ pct, thin = false }: { pct: number; thin?: boolean }) {
   return (
     <div className={`overflow-hidden rounded-full bg-[var(--sc-fill-strong)] ${thin ? "h-1.5" : "h-2.5"}`} role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-      <div className="ms-bar h-full rounded-full" style={{ width: `${Math.max(2, pct)}%` }} />
+      <div className="ms-bar ms-grow h-full rounded-full" style={{ width: `${Math.max(2, pct)}%` }} />
     </div>
   );
 }
@@ -372,32 +400,69 @@ function Fact({ l, v }: { l: string; v: string }) {
   );
 }
 
-function AwardTile({ a, onOpen }: { a: AwardState; onOpen: () => void }) {
+function AwardTile({ a, index, onOpen }: { a: AwardState; index: number; onOpen: () => void }) {
+  if (a.achieved) {
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        style={{ ["--glow" as string]: METALS[a.metal].glow, ["--d" as string]: `${(index % 5) * 1.3}s` }}
+        aria-label={`${a.name}, behaald`}
+        className="ms-award ms-got ms-unlocked group relative flex flex-col items-center gap-2 overflow-hidden rounded-[16px] border px-3 pb-4 pt-5 text-center transition-all duration-300 hover:-translate-y-0.5"
+      >
+        <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-[var(--st-green-bg)] px-2 py-0.5 text-[10.5px] font-semibold text-[var(--st-green)]">
+          <Check className="size-3" /> Behaald
+        </span>
+        <span className="relative mt-2 block size-[84px] sm:size-[92px]">
+          <AwardBadge award={a} className="ms-badge-got size-full" />
+          <Sparkles aria-hidden className="ms-twinkle absolute -right-1 -top-1 size-4 text-[color:var(--glow)]" />
+        </span>
+        <span className="text-[13px] font-semibold leading-snug">{a.name}</span>
+        <span className="text-[11.5px] font-medium text-[var(--color-ink-muted)]">{a.achievedOn ? `Behaald op ${longDateNl(a.achievedOn)}` : `${METALS[a.metal].label} award`}</span>
+      </button>
+    );
+  }
+  const showCount = a.category !== "samenwerking" && a.threshold > 0;
   return (
     <button
       type="button"
       onClick={onOpen}
-      style={{ ["--glow" as string]: METALS[a.metal].glow }}
-      aria-label={`${a.name}, ${a.achieved ? "behaald" : "nog niet behaald"}`}
-      className={`ms-award group relative flex flex-col items-center gap-2.5 rounded-[16px] border px-3 pb-4 pt-5 text-center transition-all duration-300 hover:-translate-y-0.5 ${a.achieved ? "ms-got border-[var(--sc-line)] bg-[var(--sc-fill)]" : "border-dashed border-[var(--sc-line)]"}`}
+      aria-label={`${a.name}, nog te ontgrendelen, ${Math.round(a.progressPct)} procent`}
+      className="ms-award ms-locked group relative flex flex-col items-center gap-2 overflow-hidden rounded-[16px] border px-3 pb-4 pt-5 text-center transition-all duration-300 hover:-translate-y-0.5"
     >
-      <span className="relative block size-[84px] sm:size-[92px]">
-        <AwardBadge award={a} className={`size-full ${a.achieved ? "ms-badge-got" : "ms-badge-lock"}`} />
-        {!a.achieved ? (
-          <span className="absolute -right-0.5 bottom-0.5 grid size-6 place-items-center rounded-full border border-[var(--sc-line)] bg-[var(--color-surface)] text-[var(--color-ink-faint)]"><Lock className="size-3" /></span>
-        ) : null}
+      <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-white/[0.08] px-2 py-0.5 text-[10.5px] font-semibold text-white/75">
+        <Lock className="size-3" /> Nog te ontgrendelen
       </span>
-      <span className="text-[13px] font-semibold leading-snug">{a.name}</span>
-      {a.achieved ? (
-        <span className="text-[11.5px] font-medium text-[var(--st-green)]">{a.achievedOn ? `Behaald op ${longDateNl(a.achievedOn)}` : "Behaald"}</span>
-      ) : (
-        <>
-          <span className="text-[11.5px] text-[var(--color-ink-faint)]">{a.remainingLine}</span>
-          <span className="h-1 w-full overflow-hidden rounded-full bg-[var(--sc-fill-strong)]"><span className="block h-full rounded-full bg-[var(--color-ink-faint)] opacity-60" style={{ width: `${a.progressPct}%` }} /></span>
-        </>
-      )}
+      <span className="relative mt-2 block size-[84px] sm:size-[92px]">
+        <AwardBadge award={a} className="ms-badge-lock size-full" />
+        <span className="ms-lock-badge absolute inset-0 m-auto grid size-9 place-items-center rounded-full text-white"><Lock className="size-4" /></span>
+      </span>
+      <span className="text-[13px] font-semibold leading-snug text-white">{a.name}</span>
+      <span className="text-[11.5px] leading-snug text-white/60">Doel: {targetLabel(a)}</span>
+      <span className="mt-0.5 w-full">
+        <span className="flex justify-between text-[11px] tabular-nums text-white/70">
+          <span>{showCount ? `${fmt(a.current)} van ${fmt(a.threshold)}` : "Voortgang"}</span>
+          <b className="font-semibold text-white">{Math.floor(a.progressPct)}%</b>
+        </span>
+        <span className="mt-1 block h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+          <span className="ms-grow ms-lock-bar block h-full rounded-full" style={{ width: `${Math.max(2, a.progressPct)}%` }} />
+        </span>
+      </span>
+      <span className="text-[11.5px] font-medium leading-snug text-[#f5d58a]">{lockedLine(a)}</span>
     </button>
   );
+}
+
+function unitWord(a: AwardState): string {
+  if (a.category === "bereik") return "views";
+  if (a.category === "content") return "video's";
+  return "dagen";
+}
+function lockedLine(a: AwardState): string {
+  const left = Math.max(0, a.threshold - a.current);
+  if (a.category === "bereik" && left > 0) return `Nog ${fmt(left)} views te gaan`;
+  if (a.category === "content" && left > 0) return `Nog ${fmt(left)} video${left === 1 ? "" : "'s"} te gaan`;
+  return a.remainingLine;
 }
 
 function nextTitle(a: AwardState): string {
