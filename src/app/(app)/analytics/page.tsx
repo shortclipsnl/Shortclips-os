@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertCircle, ArrowDownRight, ArrowRight, ArrowUpRight, ChevronDown, Monitor, Plug, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowDownRight, ArrowRight, ArrowUpRight, ChevronDown, Monitor, Plug, Presentation, RefreshCw } from "lucide-react";
 import { requirePermission } from "@/server/auth/context";
 import { ClientLogo } from "@/components/ui";
 import { compact, num } from "@/lib/format";
-import { amsterdamToday, deltaPct, parsePeriodKey, PERIODS, resolvePeriod, type PeriodKey } from "@/lib/resultaten-overzicht";
+import { amsterdamToday, deltaPct, parsePeriodKey, PERIODS, rankByCategory, resolvePeriod, TOP_CATEGORIES, type PeriodKey } from "@/lib/resultaten-overzicht";
 import { loadResultsOverview, type ClientResult } from "@/server/resultaten-overzicht";
 import { TopVideos } from "./top-videos";
 import { AutoRefresh } from "./auto-refresh";
@@ -166,13 +166,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const toLink = data.clients.filter((c) => !c.linked);
   const tileClients = linkFilter === "gekoppeld" ? linked : linkFilter === "niet" ? toLink : data.clients;
 
-  // Top 10 per rangschikking; de client-component kiest daaruit.
+  // Top 12 per categorie (zonder dubbelen); de client-component kiest daaruit.
   const cardIds = new Set<string>();
-  const cards = (["views", "reach", "engagement"] as const)
-    .flatMap((s) => {
-      const val = (c: (typeof data.videos)[number]) => (s === "views" ? c.views : s === "reach" ? c.reachValue ?? -1 : c.engagement);
-      return [...data.videos].sort((a, b) => val(b) - val(a)).slice(0, 10);
-    })
+  const cards = TOP_CATEGORIES.flatMap((c) => rankByCategory(data.videos, c.key, 12))
     .filter((c) => (cardIds.has(c.id) ? false : (cardIds.add(c.id), true)));
 
   const hasAnyData = linked.length > 0;
@@ -205,6 +201,13 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
               </Link>
             ))}
           </nav>
+          <Link
+            href={`/resultaten-presentatie${periode !== "30" ? `?periode=${periode}` : ""}`}
+            className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-indigo-ink)] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
+            title="Open de resultaten als presentatie voor een groot scherm of tv"
+          >
+            <Presentation className="size-3.5" /> Presentatiemodus
+          </Link>
           <a
             href="/scherm"
             target="_blank"

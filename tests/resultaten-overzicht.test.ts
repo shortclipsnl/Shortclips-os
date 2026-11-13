@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as lib from "@/lib/resultaten-overzicht";
 import {
   deltaPct, embedUrl, isVideoPost, rankVideos, resolvePeriod, videoCards, type PostRow,
 } from "@/lib/resultaten-overzicht";
@@ -56,5 +57,53 @@ describe("resultatenoverzicht", () => {
   it("maakt afspeelbare embed-links", () => {
     expect(embedUrl("instagram", "https://www.instagram.com/reel/DeuDnuIgfbo/")).toBe("https://www.instagram.com/reel/DeuDnuIgfbo/embed/");
     expect(embedUrl("tiktok", "https://www.tiktok.com/@h/video/7693925885312863521?utm=1")).toContain("/player/v1/7693925885312863521");
+  });
+});
+
+describe("resultatenoverzicht: categorieën", () => {
+  const mk = (o: Partial<PostRow>) => lib.toCard(post(o));
+
+  it("rekent retentie uit kijktijd en lengte, anders uit wat het platform levert", () => {
+    expect(lib.retentionOf({ avgWatchSeconds: 10, durationSeconds: 20, completionRate: null })).toBe(0.5);
+    expect(lib.retentionOf({ avgWatchSeconds: null, durationSeconds: 20, completionRate: 0.3 })).toBe(0.3);
+    expect(lib.retentionOf({ avgWatchSeconds: null, durationSeconds: null, completionRate: null })).toBeNull();
+  });
+
+  it("geeft geen engagementpercentage bij te weinig weergaven", () => {
+    expect(mk({ views: 100 }).engagementRate).toBeNull();
+    expect(mk({ views: 1000, likes: 50, comments: 0, shares: 0, saves: 0 }).engagementRate).toBe(0.05);
+  });
+
+  it("toont in een categorie alleen video's met dat cijfer", () => {
+    const cards = [
+      mk({ id: "a", views: 5000, avgWatchSeconds: 8 }),
+      mk({ id: "b", views: 9000, avgWatchSeconds: null }),
+      mk({ id: "c", views: 700, avgWatchSeconds: 12 }),
+    ];
+    expect(lib.rankByCategory(cards, "kijktijd").map((c) => c.id)).toEqual(["c", "a"]);
+    expect(lib.rankByCategory(cards, "weergaven").map((c) => c.id)).toEqual(["b", "a", "c"]);
+  });
+
+  it("meet een hook tegen het normale niveau van de klant op dat platform", () => {
+    const cards = lib.scoreCards(
+      [
+        mk({ id: "a", views: 3000, hook: "Wist je dit?" }),
+        mk({ id: "b", views: 3000, hook: null }),
+        mk({ id: "c", views: 200, hook: "Te weinig weergaven" }),
+      ],
+      new Map([[lib.baselineKey("c1", "instagram"), 1000]]),
+    );
+    expect(cards.find((c) => c.id === "a")?.hookScore).toBe(3);
+    expect(cards.find((c) => c.id === "b")?.hookScore).toBeNull();
+    expect(cards.find((c) => c.id === "c")?.hookScore).toBeNull();
+    expect(lib.rankByCategory(cards, "hooks").map((c) => c.id)).toEqual(["a"]);
+  });
+
+  it("geeft een totaalscore tussen 0 en 100", () => {
+    const cards = lib.scoreCards([1, 2, 3, 4].map((i) => mk({ id: String(i), views: i * 1000 })), new Map());
+    const scores = cards.map((c) => c.totalScore ?? -1);
+    expect(Math.min(...scores)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...scores)).toBeLessThanOrEqual(100);
+    expect(lib.rankByCategory(cards, "totaal")[0].id).toBe("4");
   });
 });

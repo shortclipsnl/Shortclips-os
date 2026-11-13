@@ -4,6 +4,8 @@
  * afspeel-URL per platform. Geen database, zodat dit los te testen is.
  */
 
+import { compact } from "@/lib/format";
+
 export type PeriodKey = "7" | "30" | "90" | "maand" | "vorigemaand";
 
 export const PERIODS: { key: PeriodKey; label: string }[] = [
@@ -101,6 +103,12 @@ export type PostRow = {
   comments: number;
   shares: number;
   saves: number;
+  /** Gemiddelde kijktijd per weergave (sec); null = platform levert het niet. */
+  avgWatchSeconds?: number | null;
+  /** 0..1 zoals Metricool die levert; null = onbekend. */
+  completionRate?: number | null;
+  /** Openingszin van de caption (bij Shortclips vrijwel altijd de hook). */
+  hook?: string | null;
 };
 
 export type VideoCard = PostRow & {
@@ -110,6 +118,18 @@ export type VideoCard = PostRow & {
   engagement: number;
   alsoOn: Platform[];
   embedUrl: string | null;
+  /** Interacties / weergaven (0..1); null onder MIN_VIEWS_FOR_RATE weergaven. */
+  engagementRate: number | null;
+  /** Deel van de video dat gemiddeld bekeken wordt (0..1); null = onbekend. */
+  retention: number | null;
+  /** Weergaven t.o.v. het normale niveau van die klant op dat platform; null = geen basis. */
+  hookScore: number | null;
+  /** 0..100: weergaven, engagement en retentie samen, binnen de gekozen periode. */
+  totalScore: number | null;
+  /** Frame.io-bestand van deze video, als die zeker gekoppeld is (eigen speler). */
+  assetId: string | null;
+  /** Post-URL's van deze video op alle platforms (crossposts samen). */
+  allUrls: string[];
 };
 
 /** Is deze post een video (reel/short) en geen foto of tekstpost? */
@@ -169,14 +189,36 @@ export const SORTS: { key: SortKey; label: string }[] = [
   { key: "engagement", label: "Betrokkenheid" },
 ];
 
+/** Onder dit aantal weergaven zegt een percentage (engagement) te weinig. */
+export const MIN_VIEWS_FOR_RATE = 500;
+/** Minimum weergaven om een hook als "sterk" te kunnen aanwijzen. */
+export const MIN_VIEWS_FOR_HOOK = 300;
+
+/** Retentie: gem. kijktijd / lengte als beide bekend zijn, anders wat het platform levert. */
+export function retentionOf(p: Pick<PostRow, "avgWatchSeconds" | "durationSeconds" | "completionRate">): number | null {
+  const avg = p.avgWatchSeconds ?? 0;
+  const dur = p.durationSeconds ?? 0;
+  if (avg > 0 && dur > 0) return Math.min(1, avg / dur);
+  if (p.completionRate != null && p.completionRate > 0) return Math.min(1, p.completionRate);
+  return null;
+}
+
 export function toCard(p: PostRow): VideoCard {
+  const engagement = p.likes + p.comments + p.shares + p.saves;
   return {
     ...p,
+    avgWatchSeconds: p.avgWatchSeconds != null && p.avgWatchSeconds > 0 ? p.avgWatchSeconds : null,
     reachValue: reachValue(p),
     savesValue: savesValue(p),
-    engagement: p.likes + p.comments + p.shares + p.saves,
+    engagement,
     alsoOn: [],
     embedUrl: embedUrl(p.platform, p.url),
+    engagementRate: p.views >= MIN_VIEWS_FOR_RATE ? engagement / p.views : null,
+    retention: retentionOf(p),
+    hookScore: null,
+    totalScore: null,
+    assetId: null,
+    allUrls: p.url ? [p.url] : [],
   };
 }
 
@@ -200,6 +242,7 @@ export function videoCards(posts: PostRow[]): VideoCard[] {
     const [best, ...rest] = list;
     if (!best) continue;
     best.alsoOn = [...new Set(rest.map((r) => r.platform).filter((pl) => pl !== best.platform))];
+    best.allUrls = list.flatMap((x) => (x.url ? [x.url] : []));
     out.push(best);
   }
   return out;
@@ -211,4 +254,102 @@ export function rankVideos(cards: VideoCard[], sort: SortKey, limit = 10): Video
     .filter((c) => (sort === "reach" ? c.reachValue !== null : true))
     .sort((a, b) => val(b) - val(a) || b.views - a.views)
     .slice(0, limit);
+}
+
+/* ------------------------------------------------------------------ *
+ * Categorieën voor "Best presterende video's" en de presentatiemodus.
+ * Elke categorie gebruikt alleen video's waarvoor het cijfer echt bestaat.
+ * ------------------------------------------------------------------ */
+
+export type TopCategory = "totaal" | "weergaven" | "kijktijd" | "retentie" | "hooks" | "interacties" | "engagement";
+
+export const TOP_CATEGORIES: { key: TopCategory; label: string; explain: string }[] = [
+  { key: "totaal", label: "Totale prestaties", explain: "Score van 0 tot 100 op weergaven, engagement en retentie samen, vergeleken met alle video's uit deze periode." },
+  { key: "weergaven", label: "Meeste weergaven", explain: "Weergaven volgens de laatste meting." },
+  { key: "kijktijd", label: "Hoogste kijktijd", explain: "Gemiddelde kijktijd per weergave. Alleen video's waarvoor het platform kijktijd levert." },
+  { key: "retentie", label: "Hoogste retentie", explain: "Welk deel van de video kijkers gemiddeld zien. Alleen video's waarvoor het platform dit levert." },
+  { key: "hooks", label: "Beste hooks", explain: "Weergaven ten opzichte van wat normaal is voor die klant op dat platform (laatste 120 dagen). Hoe sterker de opening, hoe verder het algoritme de video verspreidt." },
+  { key: "interacties", label: "Meeste interacties", explain: "Likes, reacties, keren gedeeld en opgeslagen samen." },
+  { key: "engagement", label: "Beste engagement", explain: `Interacties gedeeld door weergaven, vanaf ${MIN_VIEWS_FOR_RATE} weergaven.` },
+];
+
+export function parseCategory(v: string | null | undefined): TopCategory {
+  return TOP_CATEGORIES.some((c) => c.key === v) ? (v as TopCategory) : "totaal";
+}
+
+/** Sleutel voor de normale weergaven van een klant op een platform. */
+export const baselineKey = (clientId: string, platform: string) => `${clientId}|${platform}`;
+
+/** Percentielpositie (0..1) van x binnen een gesorteerde lijst. */
+function pctRank(sorted: number[], x: number): number {
+  if (sorted.length <= 1) return 0.5;
+  let lo = 0;
+  let eq = 0;
+  for (const v of sorted) {
+    if (v < x) lo++;
+    else if (v === x) eq++;
+  }
+  return (lo + Math.max(0, eq - 1) / 2) / (sorted.length - 1);
+}
+
+/**
+ * Vult hookScore en totalScore in. De totaalscore weegt weergaven (40%),
+ * engagement (30%) en retentie (30%); ontbreekt een cijfer, dan tellen de
+ * andere naar verhouding mee. Er wordt niets geschat.
+ */
+export function scoreCards(cards: VideoCard[], baselines: Map<string, number>): VideoCard[] {
+  const asc = (xs: number[]) => [...xs].sort((a, b) => a - b);
+  const views = asc(cards.map((c) => c.views));
+  const rates = asc(cards.flatMap((c) => (c.engagementRate == null ? [] : [c.engagementRate])));
+  const rets = asc(cards.flatMap((c) => (c.retention == null ? [] : [c.retention])));
+  return cards.map((c) => {
+    const parts: [number, number][] = [[pctRank(views, c.views), 0.4]];
+    if (c.engagementRate != null && rates.length >= 3) parts.push([pctRank(rates, c.engagementRate), 0.3]);
+    if (c.retention != null && rets.length >= 3) parts.push([pctRank(rets, c.retention), 0.3]);
+    const w = parts.reduce((s, [, x]) => s + x, 0);
+    const totalScore = cards.length >= 3 ? Math.round((100 * parts.reduce((s, [v, x]) => s + v * x, 0)) / w) : null;
+    const base = baselines.get(baselineKey(c.clientId, c.platform));
+    const hookScore = c.hook && base && base > 0 && c.views >= MIN_VIEWS_FOR_HOOK ? Math.round((c.views / base) * 100) / 100 : null;
+    return { ...c, totalScore, hookScore };
+  });
+}
+
+/** De waarde waarop een categorie rangschikt; null = niet beschikbaar voor deze video. */
+export function categoryValue(c: VideoCard, cat: TopCategory): number | null {
+  switch (cat) {
+    case "totaal": return c.totalScore;
+    case "weergaven": return c.views;
+    case "kijktijd": return c.avgWatchSeconds ?? null;
+    case "retentie": return c.retention;
+    case "hooks": return c.hookScore;
+    case "interacties": return c.engagement;
+    case "engagement": return c.engagementRate;
+  }
+}
+
+export function rankByCategory(cards: VideoCard[], cat: TopCategory, limit = 10): VideoCard[] {
+  return cards
+    .flatMap((c) => {
+      const v = categoryValue(c, cat);
+      return v == null || (cat !== "weergaven" && cat !== "interacties" && v <= 0) ? [] : [{ c, v }];
+    })
+    .sort((a, b) => b.v - a.v || b.c.views - a.c.views)
+    .slice(0, limit)
+    .map((x) => x.c);
+}
+
+/** Leesbare waarde van de categorie, voor het grote getal op een kaart of slide. */
+export function formatCategoryValue(c: VideoCard, cat: TopCategory): { value: string; unit: string } | null {
+  const v = categoryValue(c, cat);
+  if (v == null) return null;
+  const nl = (n: number, d = 0) => n.toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
+  switch (cat) {
+    case "totaal": return { value: String(v), unit: "score" };
+    case "weergaven": return { value: compact(v), unit: "weergaven" };
+    case "kijktijd": return { value: `${nl(v, v < 10 ? 1 : 0)} sec`, unit: "gem. kijktijd" };
+    case "retentie": return { value: `${nl(v * 100)}%`, unit: "retentie" };
+    case "hooks": return { value: `${nl(v, 1)}×`, unit: "normaal bereik" };
+    case "interacties": return { value: compact(v), unit: "interacties" };
+    case "engagement": return { value: `${nl(v * 100, 1)}%`, unit: "engagement" };
+  }
 }

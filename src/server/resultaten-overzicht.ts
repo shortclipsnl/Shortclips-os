@@ -1,7 +1,9 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { type Period, type PostRow, videoCards, type VideoCard } from "@/lib/resultaten-overzicht";
+import { baselineKey, scoreCards, type Period, type PostRow, videoCards, type VideoCard } from "@/lib/resultaten-overzicht";
+import { hookLine } from "@/server/content-memory/analyze";
+import { getFrameAssetByUrl } from "@/server/screen-reel";
 
 /**
  * Data voor de interne resultatenpagina (/analytics), volledig uit de eigen
@@ -76,7 +78,7 @@ export async function loadResultsOverview(p: Period): Promise<Overview> {
   const clientCond = sql`c.deleted_at is null and c.status = 'active' and c.show_in_results = true`;
   const pubDay = sql`(p.published_at at time zone 'Europe/Amsterdam')::date`;
 
-  const [clientRes, dailyRes, seriesRes, postRes, videoRes, updatedRes] = await Promise.all([
+  const [clientRes, dailyRes, seriesRes, postRes, videoRes, updatedRes, baseRes, assetByUrl] = await Promise.all([
     db.execute(sql`
       select c.id, c.name, c.slug, c.color, c.logo_url as "logoUrl",
         (exists (select 1 from daily_metrics d2 where d2.client_id = c.id))::int as linked
@@ -108,11 +110,12 @@ export async function loadResultsOverview(p: Period): Promise<Overview> {
         p.published_at as "publishedAt", p.duration_seconds as "durationSeconds",
         coalesce(p.thumbnail_data, p.thumbnail_url) as thumb,
         coalesce(m.views, 0) as views, coalesce(m.reach, 0) as reach, coalesce(m.likes, 0) as likes,
-        coalesce(m.comments, 0) as comments, coalesce(m.shares, 0) as shares, coalesce(m.saves, 0) as saves
+        coalesce(m.comments, 0) as comments, coalesce(m.shares, 0) as shares, coalesce(m.saves, 0) as saves,
+        m.avg_watch_seconds as "avgWatchSeconds", m.completion_rate as "completionRate"
       from publications p
       join clients c on c.id = p.client_id
       left join lateral (
-        select s.views, s.reach, s.likes, s.comments, s.shares, s.saves
+        select s.views, s.reach, s.likes, s.comments, s.shares, s.saves, s.avg_watch_seconds, s.completion_rate
         from social_metrics s where s.publication_id = p.id
         order by s.measured_on desc limit 1
       ) m on true
@@ -134,6 +137,24 @@ export async function loadResultsOverview(p: Period): Promise<Overview> {
         (select max(updated_at) from daily_metrics),
         (select max(updated_at) from social_metrics)
       ) as ts`),
+
+    // Normaal niveau per klant per platform: mediaan weergaven van de video's
+    // uit de laatste 120 dagen (minstens 3), als maatstaf voor de hook.
+    db.execute(sql`
+      select p.client_id, p.platform::text as platform,
+        percentile_cont(0.5) within group (order by m.views)::float as med, count(*)::int as n
+      from publications p
+      join clients c on c.id = p.client_id
+      join lateral (
+        select s.views from social_metrics s where s.publication_id = p.id order by s.measured_on desc limit 1
+      ) m on true
+      where ${clientCond} and p.deleted_at is null and p.status = 'published'
+        and p.published_at >= now() - interval '120 days'
+        and (coalesce(p.duration_seconds, 0) > 0 or p.external_url ~ '/(reels?|videos?|video)/')
+      group by 1, 2
+      having count(*) >= 3`),
+
+    getFrameAssetByUrl(),
   ]);
 
   const days = dayList(p.from, p.to);
@@ -172,6 +193,9 @@ export async function loadResultsOverview(p: Period): Promise<Overview> {
     thumb: r.thumb ? String(r.thumb) : null,
     views: n(r.views), reach: n(r.reach), likes: n(r.likes),
     comments: n(r.comments), shares: n(r.shares), saves: n(r.saves),
+    avgWatchSeconds: r.avgWatchSeconds == null ? null : n(r.avgWatchSeconds),
+    completionRate: r.completionRate == null ? null : n(r.completionRate),
+    hook: r.caption ? hookLine(String(r.caption)) || null : null,
   }));
   type Agg = { likes: number; comments: number; saves: number; hasIg: boolean; posts: number; byPlatform: Map<string, { views: number; reach: number }> };
   const postAgg = new Map<string, Agg>();
@@ -245,11 +269,21 @@ export async function loadResultsOverview(p: Period): Promise<Overview> {
     series: days.map((_, i) => sum((c) => c.series[i] ?? 0)),
   };
 
+  const baselines = new Map<string, number>();
+  for (const r of rows<{ client_id: string; platform: string; med: unknown }>(baseRes)) {
+    baselines.set(baselineKey(String(r.client_id), String(r.platform)), n(r.med));
+  }
+  // Echte Frame-video erbij als die zeker gekoppeld is (bij crossposts telt elke URL).
+  const videos = scoreCards(videoCards(posts), baselines).map((v) => {
+    const hit = v.allUrls.map((u) => assetByUrl.get(u)).find(Boolean);
+    return { ...v, assetId: hit ?? null };
+  });
+
   const ts = rows<{ ts: unknown }>(updatedRes)[0]?.ts;
   return {
     clients,
     totals,
-    videos: videoCards(posts),
+    videos,
     lastUpdated: ts ? new Date(String(ts)).toISOString() : null,
   };
 }
