@@ -58,10 +58,10 @@ export function captionTitle(caption: string): string {
 
 // Kort in het geheugen bewaren: de cijfers wijzigen hooguit enkele keren per dag
 // en zo blijft het scherm licht, ook als meerdere schermen tegelijk draaien.
-let cache: { at: number; data: ScreenReel } | null = null;
+let cache: { at: number; data: ScreenReel; assetByUrl: Map<string, string> } | null = null;
 const CACHE_MS = 5 * 60_000;
 
-async function buildReel(): Promise<ScreenReel> {
+async function buildReel(): Promise<{ reel: ScreenReel; assetByUrl: Map<string, string> }> {
   const [pubRes, assetRes, latestRes] = await Promise.all([
     db.execute(sql`
       with recent as (
@@ -130,7 +130,12 @@ async function buildReel(): Promise<ScreenReel> {
     frameCreatedAt: r.frame_created_at ? new Date(r.frame_created_at) : null,
   }));
 
-  const picks = pickReel(matchVideosToAssets(groupPublications(pubs), assets), { perClient: 4, max: 36 });
+  const matches = matchVideosToAssets(groupPublications(pubs), assets);
+  // Zeker gekoppelde video's per post-URL: zo kan de resultatenpagina de echte
+  // Frame-video afspelen in plaats van de (vaak geblokkeerde) platformspeler.
+  const assetByUrl = new Map<string, string>();
+  for (const m of matches) for (const pl of m.video.platforms) if (pl.url) assetByUrl.set(pl.url, m.asset.id);
+  const picks = pickReel(matches, { perClient: 4, max: 36 });
 
   const items: ScreenReelItem[] = picks.map((p) => ({
     key: p.video.key,
@@ -154,10 +159,30 @@ async function buildReel(): Promise<ScreenReel> {
   }));
 
   return {
-    items,
-    metricsDate: rows<{ d: string | null }>(latestRes)[0]?.d ?? null,
-    generatedAt: new Date().toISOString(),
+    reel: {
+      items,
+      metricsDate: rows<{ d: string | null }>(latestRes)[0]?.d ?? null,
+      generatedAt: new Date().toISOString(),
+    },
+    assetByUrl,
   };
+}
+
+async function cached() {
+  if (!cache || Date.now() - cache.at > CACHE_MS) {
+    const built = await buildReel();
+    cache = { at: Date.now(), data: built.reel, assetByUrl: built.assetByUrl };
+  }
+  return cache;
+}
+
+/** Frame-bestand per post-URL (alleen zekere koppelingen, laatste 120 dagen). */
+export async function getFrameAssetByUrl(): Promise<Map<string, string>> {
+  try {
+    return (await cached()).assetByUrl;
+  } catch {
+    return new Map();
+  }
 }
 
 /**
@@ -166,9 +191,6 @@ async function buildReel(): Promise<ScreenReel> {
  * heeft (editors met een beperkte klantscope zien alleen hun eigen klanten).
  */
 export async function getScreenReel(viewer: Viewer): Promise<ScreenReel> {
-  if (!cache || Date.now() - cache.at > CACHE_MS) {
-    cache = { at: Date.now(), data: await buildReel() };
-  }
-  const { items, metricsDate, generatedAt } = cache.data;
+  const { items, metricsDate, generatedAt } = (await cached()).data;
   return { items: items.filter((i) => hasClientAccess(viewer, i.clientId)), metricsDate, generatedAt };
 }
