@@ -63,7 +63,9 @@ export async function recordAwards(editorUserId: string, now = new Date()): Prom
         editorId: editorUserId,
         awardKey: e.awardKey,
         achievedAt: e.achievedAt,
-        videoId: e.videoId,
+        // De teller per short ("<deliverable-id>#3") is alleen voor het tellen;
+        // in de database hoort het echte deliverable-id (uuid), anders faalt de insert.
+        videoId: e.videoId ? e.videoId.split("#")[0]! : null,
         celebratedAt: e.awardKey === highestKey ? null : now,
       })),
     )

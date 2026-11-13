@@ -28,6 +28,7 @@ import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
 import { runContentOnlineNotifications } from "@/server/jobs/content-online-notify";
 import { runMonthlyInsightTasks } from "@/server/jobs/insight-tasks";
 import { runIntegrationHealthCheck } from "@/server/jobs/integration-health";
+import { runMonitorWatch } from "@/server/monitoring/watch";
 import { runEmergencyExport } from "@/server/jobs/emergency-export";
 import { runLeadImapSync } from "@/server/jobs/leads-imap-sync";
 import { runPandaDocSync } from "@/server/jobs/pandadoc-sync";
@@ -163,6 +164,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "content.online_notify": runContentOnlineNotifications,
   "insights.monthly_tasks": runMonthlyInsightTasks,
   "integrations.health_check": runIntegrationHealthCheck,
+  // Koppelingsbewaking: elk kwartier meten, zelf herstellen, alleen de beheerder melden.
+  "monitoring.watch": () => runMonitorWatch({ trigger: "cron" }),
   "emergency.export": runEmergencyExport,
   "leads.sync_mailbox": runLeadImapSync,
   // PandaDoc → Offertes: elk uur de wijzigingen, om 03:00 alles (vangnet naast de webhook).

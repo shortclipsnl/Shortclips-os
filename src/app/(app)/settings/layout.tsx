@@ -1,8 +1,9 @@
-import { requireInternal } from "@/server/auth/context";
+import { isOwner, requireInternal } from "@/server/auth/context";
 import { SettingsNav } from "./nav";
 
 const SECTIONS = [
   { href: "/settings", label: "Overzicht", permission: null },
+  { href: "/settings/koppelingsbewaking", label: "Koppelingsbewaking", permission: "owner" },
   { href: "/settings/integrations", label: "Koppelingen", permission: "integrations:read" },
   { href: "/settings/import", label: "Importeren", permission: "import:run" },
   { href: "/settings/users", label: "Gebruikers", permission: "users:read" },
@@ -22,7 +23,8 @@ export default async function SettingsLayout({
 }) {
   const viewer = await requireInternal();
   const items = SECTIONS.filter(
-    (s) => !s.permission || viewer.permissions.has(s.permission),
+    // "owner" = alleen de hoofdbeheerder (Koppelingsbewaking).
+    (s) => !s.permission || (s.permission === "owner" ? isOwner(viewer) : viewer.permissions.has(s.permission)),
   ).map((s) => ({ href: s.href, label: s.label }));
 
   return (

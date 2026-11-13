@@ -5,7 +5,6 @@ import { driveMappings, syncJobs } from "@/db/schema";
 import { drive } from "./drive";
 import { mergeGoogleConfig, mergeGoogleTokenMeta, readGoogleConnection } from "./google-connection";
 import { ACCOUNT_ENTITY, ACCOUNT_FOLDER } from "@/server/jobs/drive-sync";
-import { notifyTechnical } from "@/server/notification-digest";
 
 /**
  * Gezondheid van de Google Drive-koppeling, in drie niveaus:
@@ -184,9 +183,9 @@ export async function runDriveHealthCheck() {
   let notified = false;
 
   if (status.connection === "verbroken" && alerted !== "verbroken") {
-    await notifyTechnical(`Google Drive is niet verbonden. ${status.reason ?? ""} Actie: ${status.action ?? "controleer de koppeling"}`.trim(), "critical");
+    // Melden doet de Koppelingsbewaking (één melding per storing, per e-mail).
     await mergeGoogleConfig({ alertedState: "verbroken", alertedAt: new Date().toISOString() });
-    notified = true;
+    notified = false;
   } else if (status.connection === "actief" && alerted) {
     // Hersteld: volgende verbreking mag weer gemeld worden.
     await mergeGoogleConfig({ alertedState: null, alertedAt: null });

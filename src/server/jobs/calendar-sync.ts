@@ -1,5 +1,4 @@
 import "server-only";
-import { notifyTechnical } from "@/server/notification-digest";
 import { after } from "next/server";
 import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -285,13 +284,9 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
           unreachable++;
           lastError = msg;
           ctx.log(`Agenda "${cal.summary}" overgeslagen (niet bereikbaar): ${msg}`);
-          // Punt 7: duidelijke melding als één agenda niet synchroniseert, zodat
-          // het team het meteen kan oplossen (de andere agenda's gaan door). Eén
-          // melding per agenda per dag.
-          // Technische storing: in de dagbundel van de eigenaar, één regel per
-          // agenda. Agenda-ID's (lange codes) worden ingekort tot iets leesbaars.
-          const calName = /^[0-9a-f]{20,}/i.test(cal.summary) || cal.summary.includes("@group.calendar") ? `agenda ${cal.summary.slice(0, 8)}…` : `agenda "${cal.summary}"`;
-          await notifyTechnical(`Google Agenda: ${calName} niet bereikbaar, opnames daaruit ontbreken mogelijk`, "critical").catch(() => {});
+          // Eén onbereikbare agenda is een gedeeltelijke storing: de
+          // Koppelingsbewaking leest deze logregel en toont hem oranje met de
+          // actie, zonder elke nacht een nieuwe "kritieke" melding.
           continue;
         }
         ctx.log(`Agenda "${cal.summary}": ${events.length} afspraken`);
@@ -368,19 +363,8 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
       // geen geslaagde sync. Eén duidelijke melding en de job op "mislukt", in
       // plaats van stil "succes" met verouderde opnames in het portaal.
       if (calendars.length > 0 && unreachable === calendars.length) {
-        const tokenIssue = /token/i.test(lastError);
-        const dayKey = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
-        await notify({
-          roles: ["owner"],
-          level: "critical",
-          type: "calendar_sync_down",
-          title: "Google Agenda-koppeling ligt plat",
-          body: tokenIssue
-            ? "De Google-toegang is verlopen (token vernieuwen mislukt). Opnames, afspraken en publicaties worden niet meer bijgewerkt. Maak een nieuw Google-token aan (scripts/google-refresh-token.mjs) en zet het als GOOGLE_REFRESH_TOKEN in Vercel."
-            : `Geen enkele agenda kon worden opgehaald: ${lastError}`.slice(0, 300),
-          href: "/settings/integrations",
-          dedupeKey: `calendar_sync_down:${dayKey}`,
-        }).catch(() => {});
+        // Melden doet de Koppelingsbewaking (direct per e-mail als Google
+        // opnieuw toestemming vraagt, anders na een half uur zonder herstel).
         throw new Error(`Geen enkele agenda bereikbaar: ${lastError}`);
       }
 
