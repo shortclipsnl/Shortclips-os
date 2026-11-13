@@ -10,6 +10,7 @@ import {
   metricoolDate,
   type MetricoolService,
 } from "@/server/integrations/metricool";
+import { toDailySeries } from "@/lib/metric-series";
 import { runJob } from "./runner";
 import { downloadThumbnailData } from "@/server/content-memory/thumbnails";
 
@@ -231,7 +232,10 @@ export async function pullMetricoolMetrics(
             perDay.set(date, r);
           };
           for (const { field, subject, metric, sign } of METRIC_MAP[network] ?? []) {
-            const points = await source.timeline(blogId, userId, network, subject, metric, fromISO, toISO);
+            const raw = await source.timeline(blogId, userId, network, subject, metric, fromISO, toISO);
+            // Sommige TikTok-accounts leveren de oplopende totaalstand i.p.v. dagcijfers;
+            // die zetten we om naar per dag, anders tellen we elke dag alle likes opnieuw.
+            const points = network === "Tiktok" && field !== "followers" && field !== "followerDelta" ? toDailySeries(raw) : raw;
             for (const p of points) add(p.date, field as keyof DayAgg, p.value * (sign ?? 1));
           }
           if (perDay.size === 0) continue;

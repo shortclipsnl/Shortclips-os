@@ -25,11 +25,12 @@ export default async function KlantportaalVoorbeeldPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ periode?: string; van?: string; tot?: string }>;
+  searchParams: Promise<{ periode?: string; van?: string; tot?: string; platform?: string }>;
 }) {
   const viewer = await requirePermission("analytics:read");
   const { slug } = await params;
-  const period = parsePortalPeriod(await searchParams);
+  const sp = await searchParams;
+  const period = parsePortalPeriod(sp);
 
   const [client] = await db
     .select({ id: clients.id, name: clients.name })
@@ -61,7 +62,7 @@ export default async function KlantportaalVoorbeeldPage({
           <span className="text-sm text-white/70">{client.name}</span>
         </div>
         <div className="p-5 sm:p-7">
-          <PortalResultsView r={r} basePath={`/analytics/${slug}/klantportaal`} reportHref={`/resultatenrapport/${slug}?${portalPeriodQuery(period)}`} />
+          <PortalResultsView r={r} basePath={`/analytics/${slug}/klantportaal`} reportHref={`/resultatenrapport/${slug}?${portalPeriodQuery(period)}`} initialPlatform={sp.platform ?? "alle"} />
         </div>
       </div>
     </div>

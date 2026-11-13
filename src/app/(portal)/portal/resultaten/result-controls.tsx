@@ -36,7 +36,15 @@ export function ResultControls({
   // (oude) cijfers blijft tonen bij een wijziging van alleen de query-parameters.
   const go = (q: string) =>
     startTransition(() => {
-      router.push(`${basePath}?${q}`);
+      // Gekozen platform behouden bij het wisselen van periode.
+      let extra = "";
+      try {
+        const plat = new URL(window.location.href).searchParams.get("platform");
+        if (plat && /^[a-z]+$/.test(plat)) extra = `&platform=${plat}`;
+      } catch {
+        /* geen URL: alleen de periode */
+      }
+      router.push(`${basePath}?${q}${extra}`);
       router.refresh();
     });
   const applyCustom = () => {

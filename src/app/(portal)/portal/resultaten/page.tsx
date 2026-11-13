@@ -23,10 +23,11 @@ const SECTIONS: Array<{ k: keyof ImprovementContent; label: string; icon: typeof
 export default async function PortalResultatenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periode?: string; van?: string; tot?: string }>;
+  searchParams: Promise<{ periode?: string; van?: string; tot?: string; platform?: string }>;
 }) {
   const viewer = await requirePortal();
-  const period = parsePortalPeriod(await searchParams);
+  const sp = await searchParams;
+  const period = parsePortalPeriod(sp);
   const [r, improvement, videoUpdate] = await Promise.all([
     getPortalResults(viewer, { days: period.days, from: period.from, to: period.to, periodKey: period.key }),
     getApprovedImprovementForClient(viewer),
@@ -37,7 +38,7 @@ export default async function PortalResultatenPage({
 
   return (
     <div className="flex flex-col gap-7">
-      <PortalResultsView r={r} basePath="/portal/resultaten" reportHref={`/resultatenrapport?${portalPeriodQuery(period)}`} />
+      <PortalResultsView r={r} basePath="/portal/resultaten" reportHref={`/resultatenrapport?${portalPeriodQuery(period)}`} initialPlatform={sp.platform ?? "alle"} />
 
       {videoUpdate ? <MonthlyVideoCard update={videoUpdate} /> : null}
 
