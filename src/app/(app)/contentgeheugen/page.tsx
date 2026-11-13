@@ -14,6 +14,7 @@ import { ClientMemoryView } from "@/components/content-memory/client-view";
 import { RefreshMemoryButton } from "@/components/content-memory/refresh-button";
 import { CopyButton, CoverImage, MemoryClientStrip, MemoryPlayerProvider, PlayTrigger, Slider, type PlayerVideo, type StripClient } from "@/components/content-memory/player";
 import { HookAltsPanel, HookAltsProvider, HookPrinciple } from "@/components/content-memory/hook-alternatives";
+import { ThumbBackfill } from "@/components/content-memory/thumb-backfill";
 
 export const metadata: Metadata = { title: "Contentgeheugen" };
 export const dynamic = "force-dynamic";
@@ -80,6 +81,7 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
       </div>
 
       <div className="mt-6">
+        {cm ? <ThumbBackfill clientId={cm.clientId} missing={cm.memory.all.filter((v) => !v.thumbnail).length} /> : null}
         {!cm ? (
           <EmptyState title="Nog geen actieve klant met resultaten" description="Zodra Metricool publicaties en cijfers levert, verschijnt hier het geheugen." />
         ) : asClient ? (

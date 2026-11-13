@@ -11,6 +11,8 @@ export async function refreshContentMemoryAction(clientId: string): Promise<Memo
   try {
     const viewer = await requirePermission("analytics:read");
     assertClientAccess(viewer, clientId);
+    const { backfillThumbnails } = await import("@/server/content-memory/thumbnails");
+    await backfillThumbnails({ clientId, budgetMs: 40_000 }).catch(() => null);
     const res = await refreshContentMemoryAi(clientId, { force: true });
     revalidatePath("/contentgeheugen");
     return res.ok
@@ -45,5 +47,27 @@ export async function hookAlternativesAction(clientId: string, forceKey?: string
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
     return { ok: false, message: "Genereren lukte niet." };
+  }
+}
+
+/**
+ * Omslagen van deze klant aanvullen (ontbrekend of te klein) uit Metricool.
+ * Draait ook 's nachts; de pagina roept dit aan zodra er een video zonder
+ * omslag zichtbaar is, zodat lege kaarten zichzelf herstellen.
+ */
+export async function backfillThumbnailsAction(clientId: string): Promise<{ ok: boolean; updated: number }> {
+  try {
+    const viewer = await requirePermission("analytics:read");
+    assertClientAccess(viewer, clientId);
+    const { backfillThumbnails } = await import("@/server/content-memory/thumbnails");
+    const { clearContentMemoryCache } = await import("@/server/content-memory");
+    const res = await backfillThumbnails({ clientId, budgetMs: 45_000 });
+    if (res.updated) {
+      clearContentMemoryCache(clientId);
+      revalidatePath("/contentgeheugen");
+    }
+    return { ok: true, updated: res.updated };
+  } catch {
+    return { ok: false, updated: 0 };
   }
 }
