@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   // Geen Next.js dev-indicator linksonder (ook niet lokaal); in productie is hij
   // sowieso weg.
   devIndicators: false,
+  // Geen "X-Powered-By: Next.js" meesturen (verraadt het framework aan scanners).
+  poweredByHeader: false,
   // Deze pakketten mogen niet gebundeld worden: pg opent native sockets en
   // PGlite laadt een WASM-bestand vanaf schijf. pdfjs-dist laadt zijn worker
   // vanaf schijf (editor-briefing leest de script-PDF server-side).

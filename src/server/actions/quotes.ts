@@ -438,6 +438,10 @@ export async function handleSignhostPostback(transactionId: string, status: numb
   const [q] = await db.select().from(quotes).where(eq(quotes.signhostTransactionId, transactionId)).limit(1);
   if (!q) return;
   const { signedPdf, receipt } = await fetchSignhostSignedFiles(transactionId, `offerte-${q.number}`);
+  // De postback zelf is niet ondertekend. Alleen als Signhost het ondertekende
+  // document echt teruggeeft, zetten we de offerte op "ondertekend"; een vals
+  // bericht met alleen een transactie-id doet zo niets.
+  if (!signedPdf) return;
   const signedPath = signedPdf ? await putQuotePdf(q.id, "signed", signedPdf).catch(() => null) : null;
   const receiptPath = receipt ? await putQuotePdf(q.id, "receipt", receipt).catch(() => null) : null;
   await db.update(quotes).set({ status: "ondertekend", signedPdfPath: signedPath, signingReceiptPath: receiptPath, isReadOnly: true, updatedAt: new Date() }).where(eq(quotes.id, q.id));

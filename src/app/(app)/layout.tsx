@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { requireInternal, isOwner, isEditorRole, canManageClients, canAccessLeads, canManageQuotes, canManageOperations } from "@/server/auth/context";
+import { requireInternal, isOwner, isEditorRole, isFreelanceVideographer, canManageClients, canAccessLeads, canManageQuotes, canManageOperations } from "@/server/auth/context";
 import { editorMayOpenPath } from "@/lib/editor-routes";
+import { videographerMayOpenPath } from "@/lib/videographer-routes";
 import { NAVIGATION } from "@/components/layout/nav-config";
 import { heeftVerantwoordelijkhedenPagina } from "@/lib/verantwoordelijkheden/data";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -29,6 +30,7 @@ export default async function AppLayout({
   // Een editor ziet alleen wat hij nodig heeft: Vandaag, Editing (zijn eigen
   // projecten) en Showcase (zijn awards). Onze klanten en Productieplanning niet.
   const editorOnly = isEditorRole(viewer);
+  const freelanceVideographer = isFreelanceVideographer(viewer);
   const EDITOR_NAV = new Set(["/dashboard", "/videos", "/showcase", "/mijn-klanten"]);
   // Technische afdwinging (niet alleen het menu verbergen): een editor die een
   // andere URL intypt, komt terug op zijn eigen dashboard.
@@ -45,6 +47,8 @@ export default async function AppLayout({
       if (item.editorsOnly && !editorOnly) return false;
       // Editors: strikte allowlist — alles daarbuiten blijft verborgen.
       if (editorOnly && !EDITOR_NAV.has(item.href)) return false;
+      // Freelance videograaf: alleen menu-items die hij ook mag openen.
+      if (freelanceVideographer && !videographerMayOpenPath(item.href)) return false;
       // Eigenaar-only items: alleen voor Janno.
       if (item.ownerOnly && !owner) return false;
       // Rolgebaseerde zichtbaarheid (geen e-mailuitzonderingen): eigenaar ziet

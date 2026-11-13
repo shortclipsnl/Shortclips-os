@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { roles, teamMembers, userRoles, users } from "@/db/schema";
-import { ForbiddenError, requirePermission } from "@/server/auth/context";
+import { ForbiddenError, isOwner, requirePermission } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 
 export type ActionResult = { ok: boolean; message?: string; id?: string };
@@ -42,6 +42,16 @@ async function roleIdForKey(key: string): Promise<string | null> {
   return r?.id ?? null;
 }
 
+/**
+ * Beheerrollen (eigenaar, beheerder) mogen alleen door de eigenaar worden
+ * toegekend of gewijzigd. Zonder deze rem kon iedereen met "team:write" zichzelf
+ * of een ander tot eigenaar maken en zo bij de financiën komen.
+ */
+const PRIVILEGED_ROLES = ["owner", "admin"];
+function privilegedChangeBlocked(viewer: Parameters<typeof isOwner>[0], ...roles: Array<string | null | undefined>): boolean {
+  return !isOwner(viewer) && roles.some((r) => !!r && PRIVILEGED_ROLES.includes(r));
+}
+
 /** Zorgt dat de gebruiker precies de rol-koppeling heeft die bij primaryRole hoort. */
 async function syncUserRole(userId: string, roleKey: string): Promise<void> {
   const roleId = await roleIdForKey(roleKey);
@@ -58,6 +68,7 @@ export async function createTeamMember(input: TeamMemberInput): Promise<ActionRe
     if (!fullName) return { ok: false, message: "Geef een naam op." };
     if (!email) return { ok: false, message: "Geef een e-mailadres op." };
     if (!ROLE_KEYS.includes(input.primaryRole)) return { ok: false, message: "Onbekende rol." };
+    if (privilegedChangeBlocked(viewer, input.primaryRole)) return { ok: false, message: "Alleen de eigenaar kan een eigenaar of beheerder aanmaken." };
 
     const [exists] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
     if (exists) return { ok: false, message: "Er bestaat al een gebruiker met dit e-mailadres." };
@@ -110,6 +121,10 @@ export async function updateTeamMember(userId: string, input: TeamMemberInput): 
       .where(eq(users.id, userId))
       .limit(1);
     if (!user) return { ok: false, message: "Teamlid niet gevonden." };
+    if (privilegedChangeBlocked(viewer, input.primaryRole, String(user.primaryRole))) {
+      return { ok: false, message: "Alleen de eigenaar kan eigenaar- of beheerdersaccounts wijzigen." };
+    }
+    if (String(user.primaryRole) === "client") return { ok: false, message: "Klantaccounts beheer je via Klantenbeheer, niet via het team." };
 
     const fullName = clean(input.fullName);
     const email = clean(input.email)?.toLowerCase();

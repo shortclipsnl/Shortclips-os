@@ -3,6 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { editorMayOpenPath } from "@/lib/editor-routes";
+import { videographerMayOpenPath } from "@/lib/videographer-routes";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -143,7 +144,9 @@ export async function requireViewer(): Promise<Viewer> {
  * Het pad komt uit de proxy (x-sc-pathname); API-routes doen hun eigen controle.
  */
 async function enforceEditorRoute(viewer: Viewer): Promise<void> {
-  if (!isEditorRole(viewer)) return;
+  const editor = isEditorRole(viewer);
+  const videographer = isFreelanceVideographer(viewer);
+  if (!editor && !videographer) return;
   let path = "";
   try {
     path = (await headers()).get("x-sc-pathname") ?? "";
@@ -151,7 +154,18 @@ async function enforceEditorRoute(viewer: Viewer): Promise<void> {
     return; // buiten een request (bv. job): niets te bewaken
   }
   if (!path || path.startsWith("/api/")) return;
-  if (!editorMayOpenPath(path)) redirect("/dashboard");
+  if (editor && !editorMayOpenPath(path)) redirect("/dashboard");
+  if (videographer && !videographerMayOpenPath(path)) redirect("/dashboard");
+}
+
+/**
+ * Freelance videograaf: hoofdrol videograaf, geen kernteam en geen recht om alle
+ * klanten te zien. Krijgt (net als editors) een strikte pagina-allowlist, zodat
+ * overzichten over alle klanten niet zichtbaar zijn. Rutger valt hier niet onder.
+ */
+export function isFreelanceVideographer(viewer: Viewer | null): boolean {
+  if (!viewer) return false;
+  return viewer.primaryRole === "videographer" && !viewer.permissions.has("clients:read_all") && !isCoreStaff(viewer.email);
 }
 
 /** Interne gebruiker: klantaccounts horen in het portaal, niet in de OS-app. */

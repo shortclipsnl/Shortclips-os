@@ -378,6 +378,8 @@ export async function deleteResearch(id: string): Promise<ActionResult> {
 
 /** Data: lijst eerder onderzochte bedrijven. */
 export async function listResearch() {
+  // Exports uit een "use server"-bestand zijn aanroepbare endpoints: altijd zelf controleren.
+  await requirePermission("ai:sales_research");
   return db
     .select({
       id: salesResearch.id,
