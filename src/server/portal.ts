@@ -23,6 +23,10 @@ import { assertClientAccess, type Viewer } from "@/server/auth/context";
 import { nextShootForClient, upcomingAppointmentsForClient } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { cleanVideoTitle, cleanPlanningTitle } from "@/lib/portal-status";
+import { getPublishedVideoResults, type PortalVideo } from "@/server/portal-videos";
+import { isCumulativeSeries, toDailySeries } from "@/lib/metric-series";
+
+export type { PortalVideo, PortalVideoPlatform } from "@/server/portal-videos";
 
 /**
  * Alles wat het klantportaal toont — en niets meer.
@@ -375,6 +379,36 @@ export type PortalPlatformResult = {
   bestVideo: { title: string; views: number; url: string | null } | null;
 };
 
+/** De vier kanalen waarop Shortclips voor klanten publiceert, in vaste volgorde. */
+export const RESULT_PLATFORMS = ["instagram", "tiktok", "youtube", "facebook"] as const;
+
+/**
+ * Resultaten van één platform in de gekozen periode. `null` betekent: dit
+ * cijfer levert het platform (via de koppeling) niet; we tonen dan "niet
+ * beschikbaar" in plaats van een verzonnen 0.
+ */
+export type PortalPlatformDetail = {
+  platform: string;
+  /** data = cijfers in deze periode; stil = gekoppeld maar geen activiteit; niet-gekoppeld = geen cijfers via de koppeling. */
+  state: "data" | "stil" | "niet-gekoppeld";
+  views: number | null;
+  /** kanaal = dagcijfers van het account; video = som van de video's die in de periode zijn geplaatst. */
+  viewsFrom: "kanaal" | "video" | null;
+  reach: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  interactions: number | null;
+  /** Interacties als percentage van de weergaven (1 decimaal). */
+  engagementRate: number | null;
+  followerGrowth: number | null;
+  /** Aantal video's dat in de periode op dit platform is geplaatst. */
+  videoCount: number;
+  /** Groei t.o.v. de vorige even lange periode; alleen bij vergelijkbare dagcijfers. */
+  growth: { views: number | null; interactions: number | null; followerGrowth: number | null };
+  prev: { views: number | null; interactions: number | null; followerGrowth: number | null };
+};
+
 export type PortalSeriesPoint = { date: string; views: number; reach: number; engagements: number; followers: number };
 
 export type PortalMilestone = { lifetimeViews: number; reached: number | null; next: number | null; progressPct: number };
@@ -390,10 +424,16 @@ export type PortalResults = {
   prev: PortalResultMetrics;
   deltas: { views: number | null; reach: number | null; engagements: number | null; followerGrowth: number | null; publishedVideos: number | null };
   byPlatform: PortalPlatformResult[];
+  /** Altijd de vier vaste platforms, met per cijfer of het beschikbaar is. */
+  platforms: PortalPlatformDetail[];
   series: PortalSeriesPoint[];
+  /** Dagreeks per platform (alleen platforms met dagcijfers). */
+  seriesByPlatform: Record<string, PortalSeriesPoint[]>;
   topVideos: PortalTopVideo[];
-  /** Alle gepubliceerde video's uit de periode met hun cijfers, van veel → weinig weergaven. */
+  /** Alle gepubliceerde video's uit de periode met hun cijfers, van veel → weinig weergaven (één regel per video). */
   allVideos: PortalTopVideo[];
+  /** Dezelfde video's met de uitsplitsing per platform en afspeelgegevens. */
+  videos: PortalVideo[];
   likes: number;
   comments: number;
   valuableInteractions: number;
@@ -495,9 +535,9 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
 
   const metrics: PortalResultMetrics = { views: n("cv"), reach: n("cr"), engagements: n("ce"), followerGrowth: n("cf"), publishedVideos: n("pubc") };
   const prev: PortalResultMetrics = { views: n("pv"), reach: n("pr"), engagements: n("pe"), followerGrowth: n("pf"), publishedVideos: n("pubp") };
-  const likes = n("clk");
-  const comments = n("ccm");
-  const valuableInteractions = n("csh") + n("csv");
+  let likes = n("clk");
+  let comments = n("ccm");
+  let valuableInteractions = n("csh") + n("csv");
   const videoViews = n("cvv");
   const avgWatchSeconds = videoViews > 0 ? Math.round(n("cws") / videoViews) : 0;
 
@@ -513,121 +553,217 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
     publishedVideos: pct(metrics.publishedVideos, prev.publishedVideos),
   };
 
-  const hasData = metrics.views + metrics.reach + metrics.engagements + Math.abs(metrics.followerGrowth) > 0;
+  let hasData = metrics.views + metrics.reach + metrics.engagements + Math.abs(metrics.followerGrowth) > 0;
 
-  // Per-platform, dagelijkse tijdreeks en best presterende video's — parallel.
-  const [platRes, seriesRes, videoRes] = await Promise.all([
+  // Per-platform (huidige + vorige periode), dagreeks per platform, video's en gekoppelde kanalen — parallel.
+  const [platRes, seriesRes, allVideosRaw, linkedRes] = await Promise.all([
     db.execute(sql`
       select platform,
+             (measured_on between ${startIso} and ${endIso}) cur,
              coalesce(sum(views),0)::int v, coalesce(sum(reach),0)::int r,
              coalesce(sum(engagements),0)::int e, coalesce(sum(follower_delta),0)::int f,
-             coalesce(sum(likes),0)::int lk, coalesce(sum(posts_published),0)::int pv
+             coalesce(sum(likes),0)::int lk, coalesce(sum(comments),0)::int cm,
+             coalesce(sum(shares),0)::int sh, coalesce(sum(saves),0)::int sv,
+             count(distinct measured_on)::int days
       from daily_metrics
-      where client_id = ${clientId} and platform is not null and measured_on between ${startIso} and ${endIso}
-      group by platform
-      having coalesce(sum(views),0) + coalesce(sum(reach),0) > 0
-      order by coalesce(sum(views),0) desc
+      where client_id = ${clientId} and platform is not null and measured_on between ${prevStartIso} and ${endIso}
+      group by 1, 2
     `),
     db.execute(sql`
-      select measured_on::text d,
+      select measured_on::text d, platform,
              coalesce(sum(views),0)::int v, coalesce(sum(reach),0)::int r,
-             coalesce(sum(engagements),0)::int e, coalesce(sum(follower_delta),0)::int f
+             coalesce(sum(engagements),0)::int e, coalesce(sum(follower_delta),0)::int f,
+             coalesce(sum(likes),0)::int lk
       from daily_metrics
-      where client_id = ${clientId} and measured_on between ${startIso} and ${endIso}
-      group by measured_on order by measured_on
+      where client_id = ${clientId} and measured_on between ${prevStartIso} and ${endIso}
+      group by measured_on, platform order by measured_on
     `),
+    getPublishedVideoResults(clientId),
     db.execute(sql`
-      with latest as (
-        select distinct on (sm.publication_id)
-          sm.publication_id, sm.platform, sm.views, sm.likes, sm.comments,
-          sm.shares, sm.saves, sm.reach, sm.avg_watch_seconds
-        from social_metrics sm
-        where sm.client_id = ${clientId} and sm.measured_on between ${startIso} and ${endIso}
-        order by sm.publication_id, sm.measured_on desc
-      )
-      select l.publication_id pid, l.platform, l.views, l.likes, l.comments,
-             l.shares, l.saves, l.reach, l.avg_watch_seconds aws,
-             p.external_url url, p.published_at::text pub, p.deliverable_id did, p.caption,
-             p.thumbnail_data pthumb,
-             d.title dtitle, d.thumbnail_url dthumb, cc.cover_url cover
-      from latest l
-      join publications p on p.id = l.publication_id
-        -- Alleen video's die in de gekozen periode geplaatst zijn (zo zijn de
-        -- cijfers per video vergelijkbaar met de periode erboven).
-        and (p.published_at is null or (p.published_at at time zone 'Europe/Amsterdam')::date between ${startIso} and ${endIso})
-      left join deliverables d on d.id = p.deliverable_id
-      left join content_calendar cc on cc.id = p.calendar_item_id
-      order by l.views desc
-      limit 300
+      select distinct lower(n) n from (
+        select jsonb_array_elements_text(case when jsonb_typeof(ci.config->'networks') = 'array' then ci.config->'networks' else '[]'::jsonb end) n
+        from client_integrations ci where ci.client_id = ${clientId} and ci.provider = 'metricool' and ci.is_active
+        union all
+        select distinct platform::text from daily_metrics where client_id = ${clientId} and platform is not null
+      ) x
     `),
   ]);
 
-  const videoRows = rowsOf<Record<string, unknown>>(videoRes);
-  const bestPerPlatform = new Map<string, number>();
-  const bestVideoPerPlatform = new Map<string, { title: string; views: number; url: string | null }>();
-  // Beste video per platform bepalen voor de platformkaarten.
-  const titleFor = (v: Record<string, unknown>): string => {
-    const dt = v.dtitle ? cleanVideoTitle(String(v.dtitle)) : "";
-    if (dt) return dt;
-    const cap = v.caption ? String(v.caption).split("\n")[0]!.trim() : "";
-    if (cap) return cap.length > 70 ? `${cap.slice(0, 67)}…` : cap;
-    return `Video op ${PLATFORM_LABEL(String(v.platform))}`;
-  };
-  for (const v of videoRows) {
-    const plat = String(v.platform);
-    const views = Number(v.views ?? 0);
-    if (views > (bestPerPlatform.get(plat) ?? -1)) {
-      bestPerPlatform.set(plat, views);
-      bestVideoPerPlatform.set(plat, { title: titleFor(v), views, url: v.url ? String(v.url) : null });
+  type PlatAgg = { v: number; r: number; e: number; f: number; lk: number; cm: number; sh: number; sv: number; days: number };
+  const curDaily = new Map<string, PlatAgg>();
+  const prevDaily = new Map<string, PlatAgg>();
+  for (const p of rowsOf<Record<string, unknown>>(platRes)) {
+    const agg: PlatAgg = { v: Number(p.v ?? 0), r: Number(p.r ?? 0), e: Number(p.e ?? 0), f: Number(p.f ?? 0), lk: Number(p.lk ?? 0), cm: Number(p.cm ?? 0), sh: Number(p.sh ?? 0), sv: Number(p.sv ?? 0), days: Number(p.days ?? 0) };
+    (p.cur === true || p.cur === "t" ? curDaily : prevDaily).set(String(p.platform), agg);
+  }
+  const linked = new Set(rowsOf<{ n: string }>(linkedRes).map((r) => String(r.n)));
+  const seriesRows = rowsOf<Record<string, unknown>>(seriesRes);
+
+  // Vangnet: sommige TikTok-accounts leverden de oplopende totaalstand van likes
+  // als "dagcijfer". De koppeling zet dat nu om, maar oudere rijen kunnen het nog
+  // bevatten; dan rekenen we hier met het echte aantal per dag.
+  for (const [map, from, to] of [[curDaily, startIso, endIso], [prevDaily, prevStartIso, prevEndIso]] as const) {
+    for (const [plat, agg] of map) {
+      const days = seriesRows.filter((r) => String(r.platform) === plat && String(r.d) >= from && String(r.d) <= to);
+      for (const [key, col] of [["lk", "lk"], ["e", "e"]] as const) {
+        const pts = days.map((r) => ({ date: String(r.d), value: Number(r[col] ?? 0) }));
+        if (isCumulativeSeries(pts)) agg[key] = toDailySeries(pts).reduce((a, p) => a + p.value, 0);
+      }
     }
   }
 
-  const platRows = rowsOf<Record<string, unknown>>(platRes);
-  const byPlatform: PortalPlatformResult[] = platRows.map((p) => ({
-    platform: String(p.platform),
-    views: Number(p.v ?? 0),
-    reach: Number(p.r ?? 0),
-    engagements: Number(p.e ?? 0),
-    followerGrowth: Number(p.f ?? 0),
-    likes: Number(p.lk ?? 0),
-    videoCount: Number(p.pv ?? 0),
-    bestVideo: bestVideoPerPlatform.get(String(p.platform)) ?? null,
-  }));
+  // Video's die in de periode (of de vorige periode) geplaatst zijn.
+  const inWindow = (d: string, a: string, b: string) => d >= a && d <= b;
+  const videos = allVideosRaw.filter((v) => inWindow(v.publishedAt, startIso, endIso));
+  const prevVideos = allVideosRaw.filter((v) => inWindow(v.publishedAt, prevStartIso, prevEndIso));
+  const postsOn = (list: PortalVideo[], plat: string) => list.flatMap((v) => v.platforms.filter((p) => p.platform === plat));
+  const sumOf = (ps: PortalVideo["platforms"], k: "views" | "likes" | "comments" | "shares" | "saves") => ps.reduce((a, p) => a + p[k], 0);
 
-  const series: PortalSeriesPoint[] = rowsOf<Record<string, unknown>>(seriesRes).map((s) => ({
-    date: String(s.d),
-    views: Number(s.v ?? 0),
-    reach: Number(s.r ?? 0),
-    engagements: Number(s.e ?? 0),
-    followers: Number(s.f ?? 0),
-  }));
+  // Welke platforms tonen: de vier vaste, plus eventueel een ander kanaal met cijfers.
+  const platformKeys: string[] = [...RESULT_PLATFORMS];
+  for (const k of [...curDaily.keys(), ...videos.flatMap((v) => v.platforms.map((p) => p.platform))]) if (!platformKeys.includes(k)) platformKeys.push(k);
 
-  // Top-video's: per video (deliverable) de sterkste publicatie, daarna de beste 3.
-  const byDeliverable = new Map<string, Record<string, unknown>>();
-  for (const v of videoRows) {
-    const key = v.did ? String(v.did) : String(v.pid);
-    const existing = byDeliverable.get(key);
-    if (!existing || Number(v.views ?? 0) > Number(existing.views ?? 0)) byDeliverable.set(key, v);
-  }
-  const toTopVideo = (v: Record<string, unknown>): PortalTopVideo => ({
-    id: String(v.pid),
-    title: titleFor(v),
-    platform: String(v.platform),
-    views: Number(v.views ?? 0),
-    likes: Number(v.likes ?? 0),
-    comments: Number(v.comments ?? 0),
-    shares: Number(v.shares ?? 0),
-    saves: Number(v.saves ?? 0),
-    reach: Number(v.reach ?? 0),
-    avgWatchSeconds: v.aws != null && Number(v.aws) > 0 ? Math.round(Number(v.aws)) : null,
-    publishedAt: v.pub ? String(v.pub).slice(0, 10) : null,
-    url: v.url ? String(v.url) : null,
-    // Bewaarde kopie van de miniatuur gaat voor (de bron-URL verloopt).
-    thumbnailUrl: v.pthumb ? String(v.pthumb) : v.dthumb ? String(v.dthumb) : v.cover ? String(v.cover) : null,
+  const pctOf = (c: number, p: number): number | null => (p > 0 ? Math.round(((c - p) / p) * 100) : null);
+  const platforms: PortalPlatformDetail[] = platformKeys.map((plat) => {
+    const d = curDaily.get(plat);
+    const pd = prevDaily.get(plat);
+    const posts = postsOn(videos, plat);
+    const prevPosts = postsOn(prevVideos, plat);
+    const postViews = sumOf(posts, "views");
+    const dailyComparable = !!d && !!pd && pd.days >= Math.ceil(lenDays * 0.8);
+
+    let views: number | null = null;
+    let viewsFrom: PortalPlatformDetail["viewsFrom"] = null;
+    if (d && d.v > 0) { views = d.v; viewsFrom = "kanaal"; }
+    else if (postViews > 0) { views = postViews; viewsFrom = "video"; }
+    else if (posts.length > 0 || d) { views = 0; viewsFrom = d ? "kanaal" : "video"; }
+
+    // Per cijfer: dagcijfers van het kanaal als het platform die levert, anders de som per video.
+    // Komen de weergaven uit de video's, dan ook de likes e.d. (één bron per platform).
+    const pick = (daily: number | undefined, post: number, measured: boolean): number | null =>
+      viewsFrom !== "video" && daily && daily > 0 ? daily : measured ? post : null;
+    const measuredPosts = posts.length > 0;
+    const likes = pick(d?.lk, sumOf(posts, "likes"), measuredPosts);
+    const comments = pick(d?.cm, sumOf(posts, "comments"), measuredPosts);
+    const shares = pick(d?.sh, sumOf(posts, "shares"), measuredPosts);
+    const postInteractions = sumOf(posts, "likes") + sumOf(posts, "comments") + sumOf(posts, "shares") + sumOf(posts, "saves");
+    // Interacties uit dezelfde bron als de weergaven, zodat de betrokkenheid klopt.
+    // (Facebook levert account-interacties incl. advertenties, maar weergaven alleen per video.)
+    const interactionsFromDaily = viewsFrom !== "video" && !!d && d.e > 0;
+    const interactions = interactionsFromDaily ? d!.e : measuredPosts ? postInteractions : null;
+    const reach = d && d.r > 0 ? d.r : null;
+    const followerGrowth = d && d.days > 0 ? d.f : null;
+    const engagementRate = views && views > 0 && interactions !== null ? Math.round((interactions / views) * 1000) / 10 : null;
+
+    const prevViewsVal = viewsFrom === "kanaal" ? (pd?.v ?? null) : prevPosts.length ? sumOf(prevPosts, "views") : null;
+    const prevInteractions = interactionsFromDaily ? (pd?.e ?? null) : null;
+    const prevFollowers = pd && pd.days > 0 ? pd.f : null;
+
+    const hasAny = (views ?? 0) > 0 || (interactions ?? 0) > 0 || (followerGrowth ?? 0) !== 0 || posts.length > 0 || (reach ?? 0) > 0;
+    const state: PortalPlatformDetail["state"] = hasAny ? "data" : linked.has(plat) ? "stil" : "niet-gekoppeld";
+
+    return {
+      platform: plat,
+      state,
+      views,
+      viewsFrom,
+      reach,
+      likes,
+      comments,
+      shares,
+      interactions,
+      engagementRate,
+      followerGrowth,
+      videoCount: posts.length,
+      growth: {
+        // Groei alleen op dagcijfers met een volledige vorige periode; video-sommen
+        // zijn niet eerlijk te vergelijken (oudere video's hadden langer de tijd).
+        views: viewsFrom === "kanaal" && dailyComparable && views !== null ? pctOf(views, pd!.v) : null,
+        interactions: interactionsFromDaily && dailyComparable ? pctOf(d!.e, pd!.e) : null,
+        // Bij een heel kleine basis (bv. 4 → 196) zegt een percentage niets.
+        followerGrowth: dailyComparable && followerGrowth !== null && pd!.f >= 10 ? pctOf(followerGrowth, pd!.f) : null,
+      },
+      prev: { views: prevViewsVal, interactions: prevInteractions, followerGrowth: prevFollowers },
+    };
   });
-  const allVideos: PortalTopVideo[] = [...byDeliverable.values()]
-    .sort((a, b) => Number(b.views ?? 0) - Number(a.views ?? 0))
-    .map(toTopVideo);
+
+  // Weergaven van platforms zonder dagcijfers (bv. Facebook-reels) tellen mee via hun video's.
+  const videoBasedViews = platforms.filter((p) => p.viewsFrom === "video").reduce((a, p) => a + (p.views ?? 0), 0);
+  const prevVideoBasedViews = platforms.filter((p) => p.viewsFrom === "video").reduce((a, p) => a + (p.prev.views ?? 0), 0);
+  if (videoBasedViews > 0) {
+    const channelViews = metrics.views;
+    metrics.views = channelViews + videoBasedViews;
+    prev.views = prev.views + prevVideoBasedViews;
+    // Alleen een groeipercentage als het overgrote deel uit vergelijkbare dagcijfers komt.
+    deltas.views = videoBasedViews <= metrics.views * 0.25 ? pct(metrics.views, prev.views) : null;
+  }
+
+  // Interacties totaal: som van de (gecorrigeerde) platformcijfers.
+  metrics.engagements = platforms.reduce((a, p) => a + (p.interactions ?? 0), 0);
+  prev.engagements = platforms.reduce((a, p) => a + (p.prev.interactions ?? 0), 0);
+  deltas.engagements = pct(metrics.engagements, prev.engagements);
+
+  // Likes, reacties, shares en opgeslagen: per platform de beste beschikbare bron, opgeteld.
+  likes = platforms.reduce((a, p) => a + (p.likes ?? 0), 0);
+  comments = platforms.reduce((a, p) => a + (p.comments ?? 0), 0);
+  valuableInteractions =
+    platforms.reduce((a, p) => a + (p.shares ?? 0), 0) +
+    platforms.reduce((a, p) => {
+      const d = curDaily.get(p.platform);
+      return a + (d && d.sv > 0 ? d.sv : sumOf(postsOn(videos, p.platform), "saves"));
+    }, 0);
+
+  const byPlatform: PortalPlatformResult[] = platforms
+    .filter((p) => p.state === "data" && ((p.views ?? 0) > 0 || (p.reach ?? 0) > 0 || (p.interactions ?? 0) > 0))
+    .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
+    .map((p) => {
+      const best = videos
+        .flatMap((v) => v.platforms.filter((x) => x.platform === p.platform).map((x) => ({ v, x })))
+        .sort((a, b) => b.x.views - a.x.views)[0];
+      return {
+        platform: p.platform,
+        views: p.views ?? 0,
+        reach: p.reach ?? 0,
+        engagements: p.interactions ?? 0,
+        followerGrowth: p.followerGrowth ?? 0,
+        likes: p.likes ?? 0,
+        videoCount: p.videoCount,
+        bestVideo: best ? { title: best.v.title, views: best.x.views, url: best.x.url } : null,
+      };
+    });
+
+  const seriesMap = new Map<string, PortalSeriesPoint>();
+  const seriesByPlatform: Record<string, PortalSeriesPoint[]> = {};
+  for (const s of seriesRows) {
+    const date = String(s.d);
+    if (date < startIso) continue;
+    const pt = { views: Number(s.v ?? 0), reach: Number(s.r ?? 0), engagements: Number(s.e ?? 0), followers: Number(s.f ?? 0) };
+    const tot = seriesMap.get(date) ?? { date, views: 0, reach: 0, engagements: 0, followers: 0 };
+    tot.views += pt.views; tot.reach += pt.reach; tot.engagements += pt.engagements; tot.followers += pt.followers;
+    seriesMap.set(date, tot);
+    if (s.platform) (seriesByPlatform[String(s.platform)] ??= []).push({ date, ...pt });
+  }
+  const series: PortalSeriesPoint[] = [...seriesMap.values()].sort((a, b) => a.date.localeCompare(b.date));
+
+  if (!hasData && (videos.length > 0 || metrics.views > 0)) hasData = true;
+
+  // Eén regel per video (samengevoegd over platforms), van veel → weinig weergaven.
+  const toTopVideo = (v: PortalVideo): PortalTopVideo => ({
+    id: v.key,
+    title: v.title,
+    platform: v.platforms[0]?.platform ?? "instagram",
+    views: v.views,
+    likes: v.likes,
+    comments: v.comments,
+    shares: v.shares,
+    saves: v.saves,
+    reach: v.reach,
+    avgWatchSeconds: v.avgWatchSeconds,
+    publishedAt: v.publishedAt,
+    url: v.externalUrl,
+    thumbnailUrl: v.thumbUrl,
+  });
+  const allVideos: PortalTopVideo[] = videos.map(toTopVideo);
   const topVideos: PortalTopVideo[] = allVideos.slice(0, 3);
 
   const plannedRes = await db.execute(sql`
@@ -648,11 +784,13 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
   if (hasData) {
     if (deltas.reach !== null && Math.abs(deltas.reach) >= 5) {
       insights.push(`Jullie video's bereikten ${deltas.reach > 0 ? `${deltas.reach}% méér` : `${Math.abs(deltas.reach)}% minder`} mensen dan de vorige periode.`);
-    } else {
+    } else if (metrics.reach > 0) {
       insights.push(`Jullie content bereikte ${nf.format(metrics.reach)} mensen deze periode.`);
     }
     if (byPlatform.length >= 2) insights.push(`${PLATFORM_LABEL(byPlatform[0]!.platform)} is jullie grootste platform qua weergaven.`);
-    if (topVideos[0]) insights.push(`De best presterende video behaalde ${nf.format(topVideos[0].views)} weergaven.`);
+    if (videos[0] && videos[0].views > 0) {
+      insights.push(`De best presterende video behaalde ${nf.format(videos[0].views)} weergaven${videos[0].platforms.length > 1 ? ` op ${videos[0].platforms.length} platforms samen` : ""}.`);
+    }
     if (metrics.followerGrowth > 0) insights.push(`Jullie kregen ${nf.format(metrics.followerGrowth)} nieuwe volger${metrics.followerGrowth === 1 ? "" : "s"} deze periode.`);
   }
   const insight = insights.length ? insights.join(" ") : null;
@@ -666,9 +804,12 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
     prev,
     deltas,
     byPlatform,
+    platforms,
     series,
+    seriesByPlatform,
     topVideos,
     allVideos,
+    videos,
     likes,
     comments,
     valuableInteractions,

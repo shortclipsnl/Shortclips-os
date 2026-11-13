@@ -26,6 +26,8 @@ export type ReelPublication = {
   comments: number;
   shares: number;
   saves: number;
+  /** Gemiddelde kijktijd in seconden, als het platform die levert. */
+  avgWatchSeconds?: number | null;
 };
 
 export type ReelAsset = {
@@ -37,6 +39,21 @@ export type ReelAsset = {
   frameCreatedAt: Date | null;
 };
 
+/** De cijfers van één video op één platform (één publicatie). */
+export type ReelPlatformStats = {
+  platform: string;
+  url: string | null;
+  views: number;
+  /** Id van de publicatie op dit platform. */
+  publicationId?: string;
+  reach?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  saves?: number;
+  avgWatchSeconds?: number | null;
+};
+
 /** Eén video zoals die op meerdere platforms gepubliceerd is. */
 export type ReelVideo = {
   key: string;
@@ -44,7 +61,7 @@ export type ReelVideo = {
   publishedAt: Date;
   durationSeconds: number | null;
   caption: string;
-  platforms: { platform: string; url: string | null; views: number }[];
+  platforms: ReelPlatformStats[];
   views: number;
   reach: number;
   likes: number;
@@ -145,7 +162,20 @@ export function groupPublications(pubs: ReelPublication[]): ReelVideo[] {
       publishedAt: ps[0].publishedAt,
       durationSeconds: durs.length ? durs.sort((a, b) => a - b)[Math.floor(durs.length / 2)] : null,
       caption,
-      platforms: ps.map((p) => ({ platform: p.platform, url: p.externalUrl, views: p.views })).sort((a, b) => b.views - a.views),
+      platforms: ps
+        .map((p) => ({
+          platform: p.platform,
+          url: p.externalUrl,
+          views: p.views,
+          publicationId: p.id,
+          reach: p.reach,
+          likes: p.likes,
+          comments: p.comments,
+          shares: p.shares,
+          saves: p.saves,
+          avgWatchSeconds: p.avgWatchSeconds ?? null,
+        }))
+        .sort((a, b) => b.views - a.views),
       views: sum("views"),
       reach: sum("reach"),
       likes: sum("likes"),

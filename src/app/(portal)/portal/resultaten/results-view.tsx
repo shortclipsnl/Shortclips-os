@@ -5,8 +5,7 @@ import { PLATFORM } from "@/lib/statuses";
 import type { PortalResults } from "@/server/portal";
 import { ResultControls } from "./result-controls";
 import { TrendChart } from "./trend-chart";
-import { PlatformView } from "./platform-view";
-import { VideoResults } from "./video-results";
+import { ResultsExplorer } from "./results-explorer";
 
 /** Groei/daling t.o.v. de vorige periode; alleen als er echt vergelijkbare data is. */
 function Delta({ pct, compact = false }: { pct: number | null; compact?: boolean }) {
@@ -58,19 +57,20 @@ const PERIOD_LABEL: Record<string, string> = {
 
 /**
  * De resultatenweergave van het klantportaal, gedeeld met de interne
- * voorbeeldweergave. Volgorde: kerncijfers → resultaten per video → verloop →
- * per platform → vergelijking. Alleen echte cijfers uit de koppelingen.
+ * voorbeeldweergave. Volgorde: kerncijfers en mijlpaal → verloop → best
+ * presterende video's → per platform → per video → vergelijking. Alleen echte
+ * cijfers uit de koppelingen.
  */
-export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResults; basePath: string; reportHref: string }) {
+export function PortalResultsView({ r, basePath, reportHref, initialPlatform = "alle" }: { r: PortalResults; basePath: string; reportHref: string; initialPlatform?: string }) {
   const periodLabel =
     r.periodKey === "custom"
       ? `${formatDate(r.periodStart)} – ${formatDate(r.periodEnd)}`
       : `${PERIOD_LABEL[r.periodKey] ?? `Afgelopen ${r.days} dagen`}${r.periodKey === "maand" || r.periodKey === "vorigemaand" ? ` (${formatDate(r.periodStart)} – ${formatDate(r.periodEnd)})` : ""}`;
 
-  // Kanalen met cijfers vs. kanalen waarop we publiceren zonder (nog) gekoppelde cijfers.
-  const withData = new Set(r.byPlatform.map((p) => p.platform));
-  for (const v of r.allVideos) withData.add(v.platform);
-  const notLinked = r.plannedPlatforms.filter((p) => !withData.has(p));
+  // Per kanaal: levert cijfers, gekoppeld maar stil, of (nog) niet gekoppeld.
+  const withData = r.platforms.filter((p) => p.state === "data").map((p) => p.platform);
+  const notLinked = r.platforms.filter((p) => p.state === "niet-gekoppeld").map((p) => p.platform);
+  const quiet = r.platforms.filter((p) => p.state === "stil").map((p) => p.platform);
 
   const secondary = [
     { key: "likes", icon: <Heart className="size-4" />, label: "Likes", value: num(r.likes), has: r.likes > 0 },
@@ -93,16 +93,21 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
       </div>
 
       {/* Welke kanalen leveren cijfers, welke (nog) niet */}
-      {withData.size > 0 || notLinked.length > 0 ? (
+      {r.platforms.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
           <span className="text-[var(--color-ink-muted)]">Kanalen:</span>
-          {[...withData].map((p) => (
+          {withData.map((p) => (
             <span key={p} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--st-green-bg)] px-2.5 py-1 font-medium text-[var(--st-green)]">
               <span className="size-1.5 rounded-full bg-[var(--st-green)]" /> {PLATFORM[p]?.label ?? p}
             </span>
           ))}
+          {quiet.map((p) => (
+            <span key={p} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--st-grey-bg)] px-2.5 py-1 font-medium text-[var(--st-grey)]" title="Gekoppeld, maar in deze periode geen activiteit.">
+              <span className="size-1.5 rounded-full bg-[var(--st-grey)]" /> {PLATFORM[p]?.label ?? p} · geen activiteit
+            </span>
+          ))}
           {notLinked.map((p) => (
-            <span key={p} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--st-grey-bg)] px-2.5 py-1 font-medium text-[var(--st-grey)]" title="Op dit kanaal publiceren we, maar de cijfers zijn nog niet gekoppeld.">
+            <span key={p} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--st-grey-bg)] px-2.5 py-1 font-medium text-[var(--st-grey)]" title="De cijfers van dit kanaal zijn nog niet gekoppeld.">
               <span className="size-1.5 rounded-full bg-[var(--st-grey)]" /> {PLATFORM[p]?.label ?? p} · nog niet gekoppeld
             </span>
           ))}
@@ -146,24 +151,18 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
             <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-[var(--sc-line)] bg-[var(--st-green-bg)] px-4 py-3">
               <Trophy className="size-5 shrink-0 text-[var(--st-green)]" />
               <div className="text-[13.5px]">
-                <span className="font-semibold">Mijlpaal: {compact(r.milestone.reached)} weergaven in totaal.</span>
+                <span className="font-semibold">Mijlpaal: {compact(r.milestone.reached)} weergaven in totaal sinds de start.</span>
                 {r.milestone.next ? <span className="text-[var(--color-ink-muted)]"> Nog {compact(r.milestone.next - r.milestone.lifetimeViews)} tot {compact(r.milestone.next)}.</span> : null}
+                {r.metrics.views > 0 ? <span className="text-[var(--color-ink-muted)]"> In deze periode kwamen er {compact(r.metrics.views)} weergaven bij.</span> : null}
               </div>
             </div>
           ) : null}
 
-          {/* Resultaten per video (belangrijkste onderdeel) */}
-          {r.allVideos.length > 0 ? (
-            <VideoResults videos={r.allVideos} />
-          ) : (
-            <section className="sc-glass p-5 text-[13.5px] text-[var(--color-ink-muted)]">
-              <span className="font-semibold text-[var(--color-ink)]">Resultaten per video</span> · voor deze periode zijn (nog) geen cijfers per video beschikbaar via de gekoppelde kanalen. De totalen hierboven zijn wel compleet.
-            </section>
-          )}
-
+          {/* Verloop over de periode (algemeen) */}
           <TrendChart series={r.series} />
 
-          {r.byPlatform.length > 0 ? <PlatformView platforms={r.byPlatform} /> : null}
+          {/* Best presterende video's → per platform → per video, met één platformfilter */}
+          <ResultsExplorer videos={r.videos} platforms={r.platforms} initialPlatform={initialPlatform} />
 
           {r.insights.length > 0 ? (
             <section className="sc-glass p-5 sm:p-6">
@@ -211,7 +210,7 @@ export function PortalResultsView({ r, basePath, reportHref }: { r: PortalResult
           </section>
 
           <p className="flex items-center gap-1.5 text-xs text-[var(--color-ink-faint)]">
-            <Bookmark className="size-3.5" /> Cijfers komen automatisch uit je gekoppelde kanalen (via Metricool) en zijn gelijk aan wat je team intern ziet.
+            <Bookmark className="size-3.5" /> Cijfers komen automatisch uit je gekoppelde kanalen (via Metricool). Weergaven van kanalen zonder dagcijfers (zoals Facebook) tellen mee via de video&apos;s die in de periode zijn geplaatst.
           </p>
         </>
       )}
