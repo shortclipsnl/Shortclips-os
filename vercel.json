@@ -52,6 +52,7 @@
     { "path": "/api/jobs/run?job=drive.reconcile", "schedule": "17 * * * *" },
     { "path": "/api/jobs/run?job=drive.health", "schedule": "*/15 * * * *" },
     { "path": "/api/jobs/run?job=ops.control", "schedule": "*/15 5-17 * * 1-5" },
-    { "path": "/api/jobs/run?job=monitoring.watch", "schedule": "7,22,37,52 * * * *" }
+    { "path": "/api/jobs/run?job=monitoring.watch", "schedule": "7,22,37,52 * * * *" },
+    { "path": "/api/jobs/run?job=shoots.reconcile", "schedule": "20 5 * * *" }
   ]
 }
