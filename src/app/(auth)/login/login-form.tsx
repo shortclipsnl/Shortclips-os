@@ -15,7 +15,7 @@ function SubmitButton({ idle, busy }: { idle: string; busy: string }) {
   );
 }
 
-/** Tweede stap: de code uit de e-mail (alleen voor klanten waar dit aanstaat). */
+/** Tweede stap: de code uit de e-mail (interne accounts en klanten waar dit aanstaat). */
 function CodeForm({ maskedEmail }: { maskedEmail?: string }) {
   const [state, formAction] = useActionState<LoginState, FormData>(verifyLoginCodeAction, { step: "code" });
 

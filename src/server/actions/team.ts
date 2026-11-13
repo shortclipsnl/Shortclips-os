@@ -6,6 +6,7 @@ import { db } from "@/db/client";
 import { roles, teamMembers, userRoles, users } from "@/db/schema";
 import { ForbiddenError, isOwner, requirePermission } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
+import { notify } from "@/server/notifications";
 
 export type ActionResult = { ok: boolean; message?: string; id?: string };
 
@@ -50,6 +51,20 @@ async function roleIdForKey(key: string): Promise<string | null> {
 const PRIVILEGED_ROLES = ["owner", "admin"];
 function privilegedChangeBlocked(viewer: Parameters<typeof isOwner>[0], ...roles: Array<string | null | undefined>): boolean {
   return !isOwner(viewer) && roles.some((r) => !!r && PRIVILEGED_ROLES.includes(r));
+}
+
+/** Beveiligingsmelding aan de eigenaar bij een (nieuw) eigenaar- of beheerdersaccount. */
+async function alertPrivilegedRole(actorName: string, targetEmail: string, role: string): Promise<void> {
+  if (!PRIVILEGED_ROLES.includes(role)) return;
+  await notify({
+    roles: ["owner"],
+    level: "critical",
+    type: "security_privileged_role",
+    title: "Beveiliging: account met beheerrechten",
+    body: `${actorName} heeft ${targetEmail} de rol "${role}" gegeven. Klopt dit niet? Zet het account direct op inactief.`,
+    href: "/team",
+    dedupeKey: `privileged_role:${targetEmail}:${role}:${new Date().toISOString().slice(0, 13)}`,
+  }).catch(() => undefined);
 }
 
 /** Zorgt dat de gebruiker precies de rol-koppeling heeft die bij primaryRole hoort. */
@@ -103,6 +118,7 @@ export async function createTeamMember(input: TeamMemberInput): Promise<ActionRe
       entityId: userId,
       changes: { fullName, email, role: input.primaryRole },
     });
+    await alertPrivilegedRole(viewer.fullName, email, input.primaryRole);
 
     revalidatePath("/team");
     return { ok: true, id: userId };
@@ -174,6 +190,7 @@ export async function updateTeamMember(userId: string, input: TeamMemberInput): 
       entityId: userId,
       changes: { fullName, role: input.primaryRole },
     });
+    if (String(user.primaryRole) !== input.primaryRole) await alertPrivilegedRole(viewer.fullName, email, input.primaryRole);
 
     revalidatePath("/team");
     revalidatePath(`/team/${userId}/edit`);

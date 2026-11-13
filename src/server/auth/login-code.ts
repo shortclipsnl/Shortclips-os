@@ -23,9 +23,20 @@ const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const DEVICE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
-/** Moet deze gebruiker op dit apparaat een inlogcode invoeren? */
+/**
+ * Moet deze gebruiker op dit apparaat een inlogcode invoeren?
+ *
+ *  - Interne accounts (team, editors, videografen, eigenaar): altijd op een
+ *    nieuw apparaat, zodra e-mail is ingericht. Een gelekt wachtwoord alleen is
+ *    dan niet genoeg. Noodschakelaar: STAFF_LOGIN_CODE=off.
+ *  - Klanten: per klant aan te zetten (clients.portal_login_code_required).
+ */
 export async function loginCodeRequired(user: { id: string; primaryRole: string; clientId: string | null }): Promise<boolean> {
-  if (user.primaryRole !== "client" || !user.clientId) return false;
+  if (user.primaryRole !== "client") {
+    if (process.env.STAFF_LOGIN_CODE === "off" || !emailConfigured()) return false;
+    return !(await isTrustedDevice(user.id));
+  }
+  if (!user.clientId) return false;
   const [client] = await db
     .select({ required: clients.portalLoginCodeRequired })
     .from(clients)
