@@ -35,3 +35,4 @@ export * from "./feedback-rounds";
 export * from "./exit-interviews";
 export * from "./ops-control";
 export * from "./client-app";
+export * from "./editor-database";

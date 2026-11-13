@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Users } from "lucide-react";
 import { requireInternal, isOwner, canManageOperations } from "@/server/auth/context";
 import { assignMissingEditorsIfStale, mergeDuplicateShootsIfStale } from "@/server/jobs/calendar-sync";
 import { isCoreStaff } from "@/server/core-staff";
@@ -16,6 +16,7 @@ import { EditorBoardTable } from "./editor-board-table";
 import { AutofillEditorsButton } from "./autofill-editors";
 import { getWhatsappStandaarden } from "@/server/whatsapp-bericht";
 import { canUseWhatsappBericht } from "@/server/whatsapp-bericht-access";
+import { canUseEditorDatabase } from "@/server/editor-database-access";
 import { ClientStatusTabs } from "@/components/client-status-tabs";
 import { parseClientStatusFilter } from "@/lib/client-status";
 
@@ -136,6 +137,8 @@ export default async function VideosPage({
     ? (await listEditorBoard(viewer, { allEditors: true, withFeedbackRounds: showFeedbackRounds, withWhatsappBericht: showWhatsapp })).filter((v) =>
         klantenFilter === "alle" ? true : klantenFilter === "actief" ? v.clientActive : !v.clientActive)
     : [];
+  // Editor database (knop bovenaan): alleen eigenaar en vast kantoorteam.
+  const showEditorDatabase = canUseEditorDatabase(viewer);
   const whatsapp = showWhatsapp ? { standaarden: await getWhatsappStandaarden(), canManage: canManageOperations(viewer) } : null;
 
   return (
@@ -143,6 +146,17 @@ export default async function VideosPage({
       <PageHeader
         title="Editing"
         description={`${editingProjects.length} projecten · ${rows.length} video's in productie`}
+        actions={
+          showEditorDatabase ? (
+            // Editor database: back up en potentiële editors bij uitval of spoed. Alleen intern team.
+            <Link
+              href="/editor-database"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-4 text-sm font-semibold text-white shadow-[var(--shadow-card)] transition hover:bg-[var(--color-indigo-soft)]"
+            >
+              <Users className="size-4" strokeWidth={2} /> Editor database
+            </Link>
+          ) : undefined
+        }
       />
       <div className="mb-4">
         <ClientStatusTabs basePath="/videos" current={klantenFilter} params={{ filter: params.filter, status: params.status, klant: params.klant, editor: params.editor, weergave: params.weergave }} />
