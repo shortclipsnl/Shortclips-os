@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Building2, Camera, ClipboardList, Clock, FileText, Film, Globe, Handshake, Lock, Mail, MessageCircle, MessageSquareText, Phone, Radio, Scale, Users } from "lucide-react";
+import { AlertCircle, Building2, CalendarClock, Camera, CheckCircle2, ClipboardList, Clock, FileText, Film, Globe, Handshake, Lock, Mail, MessageCircle, MessageSquareText, Phone, Radio, Scale, Users } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalContact, getPortalProfile } from "@/server/portal";
 import { getPortalSettingsForClient } from "@/server/portal-settings";
@@ -32,14 +32,41 @@ function Field({ label, value, sub }: { label: string; value: React.ReactNode | 
   );
 }
 
-function Agreement({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+type Tone = "blue" | "orange" | "green" | "navy";
+const TONE: Record<Tone, { fg: string; bg: string; owner: string }> = {
+  blue: { fg: "var(--st-blue)", bg: "var(--st-blue-bg)", owner: "Shortclips regelt dit" },
+  orange: { fg: "var(--st-orange)", bg: "var(--st-orange-bg)", owner: "Jullie actie" },
+  green: { fg: "var(--st-green)", bg: "var(--st-green-bg)", owner: "Samen" },
+  navy: { fg: "var(--sc-accent)", bg: "var(--sc-fill-strong)", owner: "Afspraak" },
+};
+
+/** Eén werkafspraak: gekleurde rand en icoon per verantwoordelijke, met de belangrijkste termijn als label. */
+function Agreement({ icon, title, tone, keyTerm, children }: { icon: React.ReactNode; title: string; tone: Tone; keyTerm?: string | null; children: React.ReactNode }) {
+  const t = TONE[tone];
   return (
-    <div className="sc-glass flex gap-3.5 p-5">
-      <span className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-[var(--st-blue-bg)] text-[var(--st-blue)]">{icon}</span>
-      <div className="min-w-0">
-        <h3 className="text-[15px] font-semibold">{title}</h3>
-        <div className="mt-1 text-[13.5px] leading-relaxed text-[var(--color-ink-muted)]">{children}</div>
+    <div className="sw-card relative flex gap-3.5 overflow-hidden rounded-[16px] border p-5 pl-6" style={{ ["--tone" as string]: t.fg, ["--tone-bg" as string]: t.bg }}>
+      <span aria-hidden className="absolute inset-y-0 left-0 w-[4px]" style={{ background: t.fg }} />
+      <span className="grid size-11 shrink-0 place-items-center rounded-[12px]" style={{ background: t.bg, color: t.fg }}>{icon}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h3 className="text-[15px] font-semibold">{title}</h3>
+          <span className="rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide" style={{ background: t.bg, color: t.fg }}>{t.owner}</span>
+        </div>
+        {keyTerm ? <div className="mt-1.5 text-[18px] font-bold leading-tight tracking-tight" style={{ color: t.fg }}>{keyTerm}</div> : null}
+        <div className="mt-1.5 text-[13.5px] leading-relaxed text-[var(--color-ink-muted)] [&_strong]:font-semibold [&_strong]:text-[var(--color-ink)]">{children}</div>
       </div>
+    </div>
+  );
+}
+
+/** Grote termijn in de strook bovenaan de werkafspraken. */
+function Term({ icon, tone, value, label, sub }: { icon: React.ReactNode; tone: Tone; value: string; label: string; sub: string }) {
+  const t = TONE[tone];
+  return (
+    <div className="flex flex-col gap-1 rounded-[14px] border p-4" style={{ background: t.bg, borderColor: `color-mix(in srgb, ${t.fg} 22%, transparent)` }}>
+      <div className="flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: t.fg }}>{icon} {label}</div>
+      <div className="text-[24px] font-bold leading-tight tracking-tight text-[var(--color-ink)]">{value}</div>
+      <div className="text-[12px] text-[var(--color-ink-muted)]">{sub}</div>
     </div>
   );
 }
@@ -132,33 +159,57 @@ export default async function PortalSamenwerkingPage() {
       </section>
 
       {/* Werkafspraken */}
-      <section>
-        <h2 className="mb-1 flex items-center gap-2 text-[17px] font-semibold"><ClipboardList className="size-5 text-[var(--sc-accent)]" /> Werkafspraken</h2>
-        <p className="mb-4 text-[13px] text-[var(--color-ink-muted)]">Zo werken we samen. Afwijkende afspraken uit jullie offerte of overeenkomst gaan altijd voor.</p>
-        <div className="grid gap-3.5 md:grid-cols-2">
-          <Agreement icon={<Film className="size-5" />} title="Aanlevering video's">
-            Onze standaard leveringstermijn is <strong className="text-[var(--color-ink)]">{settings.deliveryWorkdays} werkdagen</strong> na de opnamedag, volgens de gemaakte afspraken.
+      <section className="sw-afspraken rounded-[20px] border border-[var(--sc-line)] p-5 shadow-[var(--shadow-card)] sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-[20px] font-bold tracking-tight"><ClipboardList className="size-5 text-[var(--sc-accent)]" /> Werkafspraken</h2>
+            <p className="mt-1 max-w-[62ch] text-[13.5px] text-[var(--color-ink-muted)]">Deze afspraken zorgen ervoor dat alles op schema blijft. Afwijkende afspraken uit jullie offerte of overeenkomst gaan altijd voor.</p>
+          </div>
+          <div className="flex flex-wrap gap-1.5 text-[11.5px] font-semibold">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--st-orange-bg)] px-2.5 py-1 text-[var(--st-orange)]"><span className="size-2 rounded-full bg-[var(--st-orange)]" /> Jullie actie</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--st-blue-bg)] px-2.5 py-1 text-[var(--st-blue)]"><span className="size-2 rounded-full bg-[var(--st-blue)]" /> Shortclips regelt dit</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--st-green-bg)] px-2.5 py-1 text-[var(--st-green)]"><span className="size-2 rounded-full bg-[var(--st-green)]" /> Samen</span>
+          </div>
+        </div>
+
+        {/* Belangrijkste termijnen */}
+        <div className="mt-5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+          <Term icon={<Film className="size-3.5" />} tone="blue" value={wd(settings.deliveryWorkdays)} label="Levering video's" sub="na de opnamedag" />
+          <Term icon={<MessageSquareText className="size-3.5" />} tone="orange" value={wd(settings.feedbackDaysVideos)} label="Feedback op video's" sub="na oplevering, één gebundelde ronde" />
+          <Term icon={<FileText className="size-3.5" />} tone="orange" value={wd(settings.feedbackDaysScripts)} label="Akkoord op scripts" sub="voor de opnamedag" />
+          <Term icon={<CalendarClock className="size-3.5" />} tone="green" value={wd(settings.cancelNoticeDays)} label="Opname verzetten" sub="vooraf kosteloos mogelijk" />
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <Agreement icon={<FileText className="size-5" />} title="Scripts" tone="orange" keyTerm={`Binnen ${wd(settings.feedbackDaysScripts)} akkoord of feedback`}>
+            Je ontvangt de scripts vóór de opname in dit portaal. Zo blijft de opnamedag op schema. <strong>Na akkoord zijn grote inhoudelijke wijzigingen niet inbegrepen.</strong>
           </Agreement>
-          <Agreement icon={<MessageSquareText className="size-5" />} title="Feedback">
-            Wij hanteren een feedbacktermijn van <strong className="text-[var(--color-ink)]">{wd(settings.feedbackDaysVideos)}</strong> na oplevering, tenzij anders afgesproken. Het weekend telt niet mee. Per video is één gebundelde feedbackronde inbegrepen; een extra ronde kost {settings.extraFeedbackFee}.
+          <Agreement icon={<MessageSquareText className="size-5" />} title="Feedback op video's" tone="orange" keyTerm={`Binnen ${wd(settings.feedbackDaysVideos)} na oplevering`}>
+            Het weekend telt niet mee, tenzij anders afgesproken. <strong>Per video is één gebundelde feedbackronde inbegrepen</strong>; een extra ronde kost {settings.extraFeedbackFee}.
           </Agreement>
-          <Agreement icon={<Camera className="size-5" />} title="Opnames">
-            We plannen de opnamedag samen in en bereiden hem voor met scripts en een checklist. {settings.shootDuration} Kosteloos verzetten kan tot {settings.cancelNoticeDays} werkdagen vooraf.
+          <Agreement icon={<Film className="size-5" />} title="Aanlevering video's" tone="blue" keyTerm={`${wd(settings.deliveryWorkdays)} na de opnamedag`}>
+            Dit is onze standaard leveringstermijn, volgens de gemaakte afspraken.
           </Agreement>
-          <Agreement icon={<FileText className="size-5" />} title="Scripts">
-            Je ontvangt de scripts vóór de opname in dit portaal. Graag binnen <strong className="text-[var(--color-ink)]">{wd(settings.feedbackDaysScripts)}</strong> akkoord of feedback, zodat de opnamedag op schema blijft. Na akkoord zijn grote inhoudelijke wijzigingen niet inbegrepen.
+          <Agreement icon={<Camera className="size-5" />} title="Opnames" tone="green" keyTerm={`Verzetten tot ${wd(settings.cancelNoticeDays)} vooraf`}>
+            We plannen de opnamedag samen in en bereiden hem voor met scripts en een checklist. {settings.shootDuration}
           </Agreement>
-          <Agreement icon={<Radio className="size-5" />} title="Publicatie">
+          <Agreement icon={<Radio className="size-5" />} title="Publicatie" tone={profile.weHandlePosting ? "blue" : "orange"} keyTerm="Volgens de contentplanning">
             {profile.weHandlePosting
               ? "Shortclips plaatst de video's op de afgesproken kanalen, volgens de contentplanning in dit portaal."
               : "Jullie plaatsen de video's zelf. Wij leveren ze kant-en-klaar aan, en de contentplanning in dit portaal laat zien wanneer welke video klaarstaat."}
           </Agreement>
-          <Agreement icon={<Handshake className="size-5" />} title="Pakket en samenwerking">
-            {profile.monthlyQuota > 0 ? <>{profile.monthlyQuota} video&apos;s per maand</> : <>Aantal video&apos;s volgens jullie offerte</>}
-            {focus ? <>, {focus.toLowerCase()}</> : null}
-            {looptijd ? <>, looptijd: {looptijd.toLowerCase()}</> : <>. {settings.contractTerm}</>}
+          <Agreement icon={<Handshake className="size-5" />} title="Pakket en samenwerking" tone="navy" keyTerm={profile.monthlyQuota > 0 ? `${profile.monthlyQuota} video's per maand` : null}>
+            {profile.monthlyQuota > 0 ? null : <>Aantal video&apos;s volgens jullie offerte. </>}
+            {focus ? <>{focus}. </> : null}
+            {looptijd ? <>Looptijd: {looptijd.toLowerCase()}.</> : <>{settings.contractTerm}</>}
           </Agreement>
         </div>
+
+        <div className="mt-4 flex items-start gap-2.5 rounded-[12px] border border-[color-mix(in_srgb,var(--st-orange)_25%,transparent)] bg-[var(--st-orange-bg)] px-4 py-3 text-[13px] leading-relaxed text-[var(--color-ink)]">
+          <AlertCircle className="mt-0.5 size-4 shrink-0 text-[var(--st-orange)]" />
+          <span><strong className="font-semibold">Waarom deze termijnen belangrijk zijn:</strong> als scripts en feedback op tijd binnen zijn, kunnen wij de opnames en oplevering volgens planning houden.</span>
+        </div>
+        <p className="mt-3 flex items-center gap-1.5 text-[12px] text-[var(--color-ink-faint)]"><CheckCircle2 className="size-3.5 text-[var(--st-green)]" /> Werkdagen zijn maandag tot en met vrijdag.</p>
       </section>
 
       {/* Wie doet wat */}
