@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Check, Copy, ExternalLink, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, ExternalLink, X } from "lucide-react";
 import { ClientLogo } from "@/components/ui";
 
 /* ------------------------------------------------------------------ *
@@ -130,7 +130,7 @@ export function CopyButton({ text, label = "Kopieer" }: { text: string; label?: 
 
 export type StripClient = { id: string; name: string; slug: string; logoUrl: string | null; color: string | null; n: number };
 
-export function MemoryClientStrip({ clients, activeSlug, weergave }: { clients: StripClient[]; activeSlug?: string; weergave: "intern" | "klant" }) {
+export function MemoryClientStrip({ clients, activeSlug, weergave, extraQuery = "" }: { clients: StripClient[]; activeSlug?: string; weergave: "intern" | "klant"; extraQuery?: string }) {
   const active = useRef<HTMLAnchorElement>(null);
   useEffect(() => {
     active.current?.scrollIntoView({ block: "nearest", inline: "center" });
@@ -145,7 +145,7 @@ export function MemoryClientStrip({ clients, activeSlug, weergave }: { clients: 
             <li key={c.id}>
               <Link
                 ref={on ? active : undefined}
-                href={`/contentgeheugen?klant=${c.slug}${weergave === "klant" ? "&weergave=klant" : ""}`}
+                href={`/contentgeheugen?klant=${c.slug}${weergave === "klant" ? "&weergave=klant" : ""}${extraQuery}`}
                 scroll={false}
                 aria-current={on ? "page" : undefined}
                 title={`${c.name} · ${c.n} posts`}
@@ -161,5 +161,45 @@ export function MemoryClientStrip({ clients, activeSlug, weergave }: { clients: 
         })}
       </ul>
     </nav>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Omslag met vangnet: lukt de afbeelding niet, dan een titelkaart in
+ * Shortclips-blauw met de openingszin. Nooit een leeg of zwart vlak.
+ * ------------------------------------------------------------------ */
+
+export function CoverImage({ src, title, big = false }: { src: string | null; title: string; big?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  if (src && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={title} loading="lazy" onError={() => setFailed(true)} className="absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+    );
+  }
+  return (
+    <span className="absolute inset-0 flex flex-col justify-center bg-gradient-to-br from-[#1a1a4c] via-[#00003b] to-[#000029] p-[12%] text-white">
+      <span className={`line-clamp-6 font-semibold leading-snug ${big ? "text-[15px]" : "text-[9px]"}`}>{title}</span>
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Horizontale slider met pijlen (Beste video's).
+ * ------------------------------------------------------------------ */
+
+export function Slider({ children, label }: { children: ReactNode; label: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const by = (dir: number) => ref.current?.scrollBy({ left: dir * Math.max(280, (ref.current?.clientWidth ?? 600) * 0.8), behavior: "smooth" });
+  return (
+    <div className="relative">
+      <div className="absolute -top-[52px] right-0 hidden gap-2 sm:flex">
+        <button type="button" onClick={() => by(-1)} aria-label="Naar links" className="grid size-9 place-items-center rounded-full border border-white/25 text-white/80 hover:bg-white/10 hover:text-white"><ChevronLeft className="size-4" /></button>
+        <button type="button" onClick={() => by(1)} aria-label="Naar rechts" className="grid size-9 place-items-center rounded-full border border-white/25 text-white/80 hover:bg-white/10 hover:text-white"><ChevronRight className="size-4" /></button>
+      </div>
+      <div ref={ref} role="list" aria-label={label} className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-3 [scrollbar-color:rgba(255,255,255,.3)_transparent] [scrollbar-width:thin]">
+        {children}
+      </div>
+    </div>
   );
 }

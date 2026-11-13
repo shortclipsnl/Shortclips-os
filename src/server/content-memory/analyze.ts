@@ -35,6 +35,10 @@ export type MemoryInput = {
   shares: number;
   saves: number;
   avgWatchSeconds: number | null;
+  /** Bereik (unieke kijkers), 0 = niet geleverd. */
+  reach?: number;
+  /** Aandeel dat de video uitkeek (0..1), zoals Metricool het levert. */
+  completionRate?: number | null;
   followerDelta: number;
   externalUrl: string | null;
   thumbnail: string | null;
@@ -78,6 +82,10 @@ export type MemoryVideo = {
   engagementRate: number;
   avgWatchSeconds: number | null;
   watchedShare: number | null;
+  /** Bereik; null als het platform het niet levert. */
+  reach: number | null;
+  /** Retentie: gemiddeld deel van de video bekeken (0..1), null als onbekend. */
+  retention: number | null;
   followerDelta: number;
   /** Views t.o.v. platformmediaan. */
   viewScore: number;
@@ -361,6 +369,10 @@ export function analyzeMemory(pubs: MemoryInput[], now: Date = new Date()): Cont
       engagementRate: er(p),
       avgWatchSeconds: p.avgWatchSeconds,
       watchedShare: p.avgWatchSeconds != null && p.durationSeconds ? Math.min(1, p.avgWatchSeconds / p.durationSeconds) : null,
+      reach: p.reach && p.reach > 0 ? p.reach : null,
+      retention: p.avgWatchSeconds != null && p.avgWatchSeconds > 0 && p.durationSeconds
+        ? Math.min(1, p.avgWatchSeconds / p.durationSeconds)
+        : null,
       followerDelta: p.followerDelta,
       viewScore: r2(viewScore),
       engScore: r2(engScore),

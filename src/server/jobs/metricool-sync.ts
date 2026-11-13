@@ -11,6 +11,7 @@ import {
   type MetricoolService,
 } from "@/server/integrations/metricool";
 import { runJob } from "./runner";
+import { downloadThumbnailData } from "@/server/content-memory/thumbnails";
 
 type Source = Pick<MetricoolService, "listBrands" | "timeline">;
 
@@ -19,25 +20,9 @@ type Source = Pick<MetricoolService, "listBrands" | "timeline">;
  * (180 px breed, JPEG) als data-URI van ~10-20 kB. Lukt verkleinen niet, dan
  * alleen het origineel als dat klein genoeg is. Anders null.
  */
+/** Omslag als kleine JPEG bewaren (360 px, scherp genoeg voor grote kaarten). */
 async function downloadThumbnail(url: string): Promise<string | null> {
-  if (!/^https:\/\//.test(url)) return null;
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return null;
-    const type = (res.headers.get("content-type") ?? "").split(";")[0]!.trim();
-    if (!/^image\/(jpeg|png|webp)$/.test(type)) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length === 0 || buf.length > 5_000_000) return null;
-    try {
-      const sharp = (await import("sharp")).default;
-      const small = await sharp(buf).resize({ width: 180, withoutEnlargement: true }).jpeg({ quality: 72 }).toBuffer();
-      return `data:image/jpeg;base64,${small.toString("base64")}`;
-    } catch {
-      return buf.length <= 150_000 ? `data:${type};base64,${buf.toString("base64")}` : null;
-    }
-  } catch {
-    return null;
-  }
+  return downloadThumbnailData(url);
 }
 
 /**
@@ -379,7 +364,7 @@ export async function pullMetricoolPosts(
               if (!pub) continue;
               // Miniatuur eenmalig als kleine kopie bewaren (de bron-URL verloopt),
               // alleen voor recente posts en met een plafond per run.
-              if (!pub.hasThumb && p.thumbnailUrl && thumbBudget.left > 0 && publishedAt && Date.now() - publishedAt.getTime() < 70 * 86400000) {
+              if (!pub.hasThumb && p.thumbnailUrl && thumbBudget.left > 0 && publishedAt && Date.now() - publishedAt.getTime() < 400 * 86400000) {
                 thumbBudget.left--;
                 const data = await downloadThumbnail(p.thumbnailUrl);
                 if (data) await db.update(publications).set({ thumbnailData: data }).where(eq(publications.id, pub.id));

@@ -4,6 +4,9 @@ import { db } from "@/db/client";
 import { aiOutputs, clients } from "@/db/schema";
 import { assertClientAccess, type Viewer } from "@/server/auth/context";
 import { aiConfigured, runPrompt } from "@/server/ai/client";
+import { backfillThumbnails } from "./thumbnails";
+import { generateHookAlternatives } from "./hook-alternatives";
+import { groupPublications, matchVideosToAssets, type ReelAsset, type ReelPublication } from "@/lib/screen-reel-match";
 import {
   analyzeMemory,
   captionKey,
@@ -55,8 +58,10 @@ type Row = {
   caption: string | null;
   duration_seconds: number | null;
   external_url: string | null;
-  thumb: string | null;
+  thumb_len: number | string | null;
   views: number | string | null;
+  reach: number | string | null;
+  completion_rate: number | string | null;
   likes: number | string | null;
   comments: number | string | null;
   shares: number | string | null;
@@ -96,11 +101,11 @@ async function loadInputs(clientId: string, labels: Record<string, string>): Pro
   const [pubRes, planRes, capRes] = await Promise.all([
     db.execute(sql`
       select p.id, p.platform, p.published_at, p.caption, p.duration_seconds, p.external_url,
-             coalesce(p.thumbnail_data, p.thumbnail_url) as thumb,
-             m.views, m.likes, m.comments, m.shares, m.saves, m.avg_watch_seconds, m.follower_delta
+             length(p.thumbnail_data) as thumb_len,
+             m.views, m.reach, m.likes, m.comments, m.shares, m.saves, m.avg_watch_seconds, m.completion_rate, m.follower_delta
       from publications p
       join lateral (
-        select views, likes, comments, shares, saves, avg_watch_seconds, follower_delta
+        select views, reach, likes, comments, shares, saves, avg_watch_seconds, completion_rate, follower_delta
         from social_metrics s where s.publication_id = p.id
         order by s.measured_on desc limit 1
       ) m on true
@@ -128,7 +133,10 @@ async function loadInputs(clientId: string, labels: Record<string, string>): Pro
     if (k.length >= 20 && r.hook && !caps.has(k)) caps.set(k, r.hook);
   }
 
-  return rowsOf<Row>(pubRes).map((r) => {
+  const rows = rowsOf<Row>(pubRes);
+  const thumbs = await resolveThumbnails(clientId, rows);
+
+  return rows.map((r) => {
     const k = captionKey(r.caption);
     const p = k.length >= 20 ? plan.get(k) : undefined;
     return {
@@ -138,14 +146,16 @@ async function loadInputs(clientId: string, labels: Record<string, string>): Pro
       caption: r.caption,
       durationSeconds: numOrNull(r.duration_seconds),
       views: num(r.views),
+      reach: num(r.reach),
       likes: num(r.likes),
       comments: num(r.comments),
       shares: num(r.shares),
       saves: num(r.saves),
       avgWatchSeconds: numOrNull(r.avg_watch_seconds),
+      completionRate: numOrNull(r.completion_rate),
       followerDelta: num(r.follower_delta),
       externalUrl: r.external_url,
-      thumbnail: r.thumb && r.thumb.length < 400_000 ? r.thumb : null,
+      thumbnail: thumbs.get(r.id) ?? null,
       spokenHook: k.length >= 20 ? caps.get(k) ?? null : null,
       planTitle: p?.title ?? null,
       planId: p?.id ?? null,
@@ -154,12 +164,92 @@ async function loadInputs(clientId: string, labels: Record<string, string>): Pro
   });
 }
 
+/** Opgeslagen omslag, als losse (cachebare) afbeelding. */
+export const thumbRoute = (publicationId: string, len: number | string) => `/api/contentgeheugen/thumb/${publicationId}?v=${len}`;
+
+/**
+ * Omslag per video, in volgorde van voorkeur:
+ *  1. de eigen opgeslagen omslag (Metricool, aangevuld door de nachtelijke job);
+ *  2. de omslag van dezelfde video op een ander platform (crosspost);
+ *  3. de omslag uit de videobibliotheek (Frame.io), via dezelfde koppellogica
+ *     als het kantoorscherm en Onze mijlpalen.
+ * Lukt geen van drieën, dan toont de pagina een titelkaart, nooit een leeg vlak.
+ */
+async function resolveThumbnails(clientId: string, rows: Row[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (const r of rows) if (r.thumb_len) out.set(r.id, thumbRoute(r.id, r.thumb_len));
+  if (out.size === rows.length) return out;
+
+  const toPub = (r: Row): ReelPublication => ({
+    id: r.id,
+    clientId,
+    platform: r.platform,
+    publishedAt: new Date(r.published_at!),
+    durationSeconds: numOrNull(r.duration_seconds),
+    caption: r.caption,
+    externalUrl: r.external_url,
+    views: num(r.views),
+    reach: num(r.reach),
+    likes: num(r.likes),
+    comments: num(r.comments),
+    shares: num(r.shares),
+    saves: num(r.saves),
+  });
+  const dated = rows.filter((r) => r.published_at);
+  const rowOf = (platform: string, url: string | null) => dated.find((x) => x.platform === platform && x.external_url === url);
+
+  // 2. Crosspost: dezelfde video op een ander platform heeft wel een omslag.
+  const groups = groupPublications(dated.map(toPub));
+  for (const g of groups) {
+    const members = g.platforms.map((pl) => rowOf(pl.platform, pl.url)).filter((r): r is Row => !!r);
+    const withThumb = members.find((m) => out.has(m.id));
+    if (!withThumb) continue;
+    for (const m of members) if (!out.has(m.id)) out.set(m.id, out.get(withThumb.id)!);
+  }
+  const missing = rows.filter((r) => !out.has(r.id));
+  if (!missing.length) return out;
+
+  // 3. Videobibliotheek (Frame.io).
+  try {
+    const libRes = await db.execute(sql`
+      select distinct on (fa.id) fa.id, fa.name, fa.subfolder_name, fa.duration_seconds, fa.frame_created_at
+      from deliverables d
+      join frame_assets fa on fa.frame_file_id::text = d.frame_asset_id::text
+        and fa.client_id = ${clientId} and fa.deleted_at is null
+      where d.client_id = ${clientId} and d.deleted_at is null
+      order by fa.id`);
+    const assets: ReelAsset[] = rowsOf<{ id: string; name: string; subfolder_name: string | null; duration_seconds: number | null; frame_created_at: string | Date | null }>(libRes).map((a) => ({
+      id: a.id,
+      clientId,
+      name: a.name,
+      subfolderName: a.subfolder_name,
+      durationSeconds: a.duration_seconds,
+      frameCreatedAt: a.frame_created_at ? new Date(a.frame_created_at) : null,
+    }));
+    if (!assets.length) return out;
+    for (const m of matchVideosToAssets(groupPublications(missing.filter((r) => r.published_at).map(toPub)), assets)) {
+      for (const pl of m.video.platforms) {
+        const r = rowOf(pl.platform, pl.url);
+        if (r && !out.has(r.id)) out.set(r.id, `/api/portal/frame/${m.asset.id}/thumb`);
+      }
+    }
+  } catch {
+    /* geen bibliotheek: titelkaart */
+  }
+  return out;
+}
+
 /** Korte cache per klant: de pagina en de Script Engine vragen dit vaak achter elkaar op. */
 const TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, { at: number; value: ClientMemory }>();
 
 export async function getContentMemory(viewer: Viewer, clientId: string): Promise<ClientMemory | null> {
   assertClientAccess(viewer, clientId);
+  return loadClientMemory(clientId);
+}
+
+/** Zonder kijkerscontrole: alleen voor achtergrondjobs. */
+export async function loadClientMemory(clientId: string): Promise<ClientMemory | null> {
   const hit = cache.get(clientId);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
   const [c] = await db.select({ id: clients.id, name: clients.name, slug: clients.slug }).from(clients).where(and(eq(clients.id, clientId), isNull(clients.deletedAt))).limit(1);
@@ -251,15 +341,24 @@ export async function refreshContentMemoryAi(clientId: string, opts: { force?: b
   return { ok: true, labeled };
 }
 
-/** Nachtelijke job: formats bijwerken voor klanten met nieuwe, nog niet gelabelde video's. */
-export async function runContentMemoryRefresh(): Promise<{ clients: number; labeled: number; skipped: number }> {
+/**
+ * Nachtelijke job (05:00-07:00, elke 20 min):
+ *  1. ontbrekende en te kleine omslagen aanvullen uit Metricool;
+ *  2. formats bijwerken voor klanten met nieuwe, nog niet gelabelde video's;
+ *  3. alternatieve hooks aanvullen voor actieve klanten waarvan de beste hooks veranderd zijn.
+ * Met tijdbudget; wat niet af is, volgt bij de volgende run.
+ */
+export async function runContentMemoryRefresh(): Promise<{ clients: number; labeled: number; skipped: number; thumbnails: number; hooks: number }> {
+  const started = Date.now();
+  const thumbs = await backfillThumbnails({ budgetMs: 70_000 }).catch(() => ({ updated: 0 }));
   const res = await db.execute(sql`
-    select distinct p.client_id from publications p
+    select distinct p.client_id, c.status::text status from publications p
+    join clients c on c.id = p.client_id and c.deleted_at is null
     where p.deleted_at is null and p.status = 'published'
   `);
-  let labeled = 0, done = 0, skipped = 0;
-  const started = Date.now();
-  for (const r of rowsOf<{ client_id: string }>(res)) {
+  const list = rowsOf<{ client_id: string; status: string }>(res);
+  let labeled = 0, done = 0, skipped = 0, hooks = 0;
+  for (const r of list) {
     // Tijdbudget per run (jobs mogen maximaal 300 sec): de rest volgt bij de volgende run.
     if (Date.now() - started > 200_000) { skipped++; continue; }
     try {
@@ -269,8 +368,20 @@ export async function runContentMemoryRefresh(): Promise<{ clients: number; labe
       skipped++;
     }
   }
-  return { clients: done, labeled, skipped };
+  for (const r of list.filter((x) => ACTIVE_STATUSES.includes(x.status))) {
+    if (Date.now() - started > 240_000) break;
+    try {
+      const cm = await loadClientMemory(r.client_id);
+      if (cm?.memory.videoCount) hooks += (await generateHookAlternatives(r.client_id, cm.memory)).generated;
+    } catch {
+      /* volgende run */
+    }
+  }
+  return { clients: done, labeled, skipped, thumbnails: thumbs.updated, hooks };
 }
+
+/** Klantstatussen die als "actief" gelden in de klantadministratie. */
+export const ACTIVE_STATUSES = ["active", "onboarding"];
 
 /* ------------------------------------------------------------------ *
  * Script Engine: het geheugen als briefing voor de schrijver
