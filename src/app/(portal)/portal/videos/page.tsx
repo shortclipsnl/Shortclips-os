@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CalendarDays, Check, ExternalLink, Film, FolderOpen, MessageSquareText } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, Film, FolderOpen } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalVideos } from "@/server/portal";
 import { getPortalFrameLibrary, type PortalFrameSession } from "@/server/portal-frame";
 import { getPortalSettingsForClient } from "@/server/portal-settings";
-import { FrameVideoGrid } from "@/components/portal/frame-video-grid";
+import { loadVideoReviews, type VideoReview } from "@/server/video-review";
+import { SessionReview } from "@/components/portal/session-review";
 import { StatusPill, portalBtn, type StatusTone } from "@/components/portal/status-pill";
 import { VideoProces } from "@/components/portal/video-proces";
 import { formatDateFull } from "@/lib/format";
 import { deadlineText } from "@/lib/portal-status";
-import { SessionApprove } from "./session-approve";
+import { reviewSummary } from "@/lib/video-review";
 
 export const metadata: Metadata = { title: "Video's" };
 export const dynamic = "force-dynamic";
@@ -40,8 +41,16 @@ function sessionSub(s: PortalFrameSession): string {
   return parts.join(" · ");
 }
 
-/** Sessiekaart in het overzicht: omslag (eerste video), titel, status, aantal. */
-function SessionCard({ s }: { s: PortalFrameSession }) {
+async function reviewsFor(clientId: string, s: PortalFrameSession): Promise<Map<string, VideoReview>> {
+  return loadVideoReviews(
+    clientId,
+    s.videos.map((v) => ({ id: v.id, mediaFileId: v.mediaFileId, versionCount: v.versionCount })),
+    { key: s.status?.key ?? null, deliverableStatus: s.deliverableStatus },
+  );
+}
+
+/** Sessiekaart in het overzicht: omslag (eerste video), titel, status, voortgang. */
+function SessionCard({ s, progress }: { s: PortalFrameSession; progress: string | null }) {
   const covers = s.videos.slice(0, 3);
   const attention = s.status?.key === "feedback";
   return (
@@ -65,6 +74,7 @@ function SessionCard({ s }: { s: PortalFrameSession }) {
           <ArrowRight className="mt-0.5 size-4 shrink-0 text-[var(--color-ink-faint)] transition-transform group-hover:translate-x-0.5" />
         </div>
         <p className="text-[12.5px] text-[var(--color-ink-muted)]">{sessionSub(s)}</p>
+        {progress ? <p className="text-[12.5px] text-[var(--color-ink-muted)]">{progress}</p> : null}
         <div className="mt-auto pt-1"><SessionStatus s={s} /></div>
       </div>
     </Link>
@@ -82,13 +92,16 @@ export default async function PortalVideosPage({ searchParams }: { searchParams:
 
   const waiting = lib.sessions.filter((s) => s.status?.key === "feedback");
   // Akkoordverzoeken van het team die (nog) niet aan een Frame-sessie hangen.
-  const linkedApprove = new Set(lib.sessions.map((s) => s.approveId).filter(Boolean));
+  const linkedApprove = new Set(lib.sessions.map((s) => s.deliverableId).filter(Boolean));
   const looseActions = legacy.actieNodig.filter((v) => !linkedApprove.has(v.id));
 
   const selected = sessie ? lib.sessions.find((s) => s.key === sessie) ?? null : null;
 
   /* ---------------- Detail: één opnamesessie ---------------- */
   if (selected) {
+    const reviews = await reviewsFor(viewer.clientId!, selected);
+    const videos = selected.videos.map((v) => ({ id: v.id, title: v.title, subfolder: v.subfolder, durationSeconds: v.durationSeconds, review: reviews.get(v.id) ?? null }));
+    const reviewable = videos.some((v) => v.review?.state.canReview);
     const dl = selected.status?.key === "feedback" ? deadlineText(selected.feedbackDeadline ? new Date(selected.feedbackDeadline) : null) : null;
     return (
       <div className="flex flex-col gap-6">
@@ -105,46 +118,44 @@ export default async function PortalVideosPage({ searchParams }: { searchParams:
           </div>
         </div>
 
-        {selected.status?.key === "feedback" ? (
+        {reviewable ? (
           <section className="sc-glass flex flex-wrap items-center justify-between gap-4 p-5" style={{ boxShadow: "inset 4px 0 0 var(--sc-act)" }}>
-            <div className="min-w-0 max-w-xl">
-              <p className="text-[15px] font-semibold">Deze video&apos;s wachten op jouw feedback</p>
+            <div className="min-w-0 max-w-2xl">
+              <p className="text-[15px] font-semibold">Zo beoordeel je de video&apos;s</p>
               <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">
-                Bekijk de video&apos;s hieronder. Alles goed? Keur ze in één keer goed. Wil je iets aangepast hebben, geef het dan gebundeld door{lib.reviewUrl ? " in Frame, met tijdcode bij de video" : " aan je contactpersoon"}.
+                Open een video en pauzeer op het moment waar je iets aan wilt veranderen. Typ je opmerking, die komt automatisch op dat tijdstip te staan. Klaar? Klik op <span className="font-semibold text-[var(--color-ink)]">Feedback versturen</span> en het team krijgt alles in één keer. Is een video goed, klik dan op <span className="font-semibold text-[var(--color-ink)]">Video goedkeuren</span>.
               </p>
               {dl ? <p className={`mt-1.5 text-[13px] font-semibold ${dl.urgent ? "text-[var(--st-orange)]" : "text-[var(--color-ink)]"}`}>{dl.text}</p> : null}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {selected.approveId ? <SessionApprove deliverableId={selected.approveId} /> : null}
-              {lib.reviewUrl ? (
-                <a href={lib.reviewUrl} target="_blank" rel="noreferrer" className={portalBtn.soft}>
-                  <MessageSquareText className="size-4" /> Feedback geven in Frame <ExternalLink className="size-3.5" />
-                </a>
-              ) : null}
             </div>
           </section>
         ) : null}
 
-        <FrameVideoGrid videos={selected.videos} reviewUrl={lib.reviewUrl} />
+        <SessionReview videos={videos} sessionKey={selected.key} canApproveAll={reviewable} />
       </div>
     );
   }
 
   /* ---------------- Overzicht: alle opnamesessies ---------------- */
+  const progressBySession = new Map<string, string | null>();
+  await Promise.all(
+    lib.sessions
+      .filter((s) => s.status && ["feedback", "verwerken"].includes(s.status.key))
+      .map(async (s) => {
+        const r = await reviewsFor(viewer.clientId!, s);
+        const parts = reviewSummary(s.videos.map((v) => r.get(v.id)?.label ?? null)).map((x) => x.label);
+        progressBySession.set(s.key, parts.length ? parts.join(" · ") : null);
+      }),
+  );
+
   return (
     <div className="flex flex-col gap-7">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[26px] font-bold tracking-tight">Video&apos;s</h1>
           <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            Al je video&apos;s per opnamesessie, rechtstreeks uit onze videobibliotheek. Klik op een sessie om de video&apos;s te bekijken.
+            Al je video&apos;s per opnamesessie. Bekijk ze, geef feedback op het juiste moment, keur ze goed en download ze, allemaal hier.
           </p>
         </div>
-        {lib.reviewUrl ? (
-          <a href={lib.reviewUrl} target="_blank" rel="noreferrer" className={portalBtn.soft}>
-            <ExternalLink className="size-4" /> Openen in Frame
-          </a>
-        ) : null}
       </div>
 
       {/* Wat er van de klant verwacht wordt, bovenaan */}
@@ -153,18 +164,21 @@ export default async function PortalVideosPage({ searchParams }: { searchParams:
           <div className="flex flex-wrap items-center gap-2.5">
             <StatusPill tone="orange">Actie nodig</StatusPill>
             <h2 className="text-[16px] font-semibold">
-              {waiting.length + looseActions.length === 1 ? "Er wacht 1 sessie op jouw feedback" : `Er wachten ${waiting.length + looseActions.length} sessies op jouw feedback`}
+              {waiting.length + looseActions.length === 1 ? "Er wacht 1 sessie op jouw beoordeling" : `Er wachten ${waiting.length + looseActions.length} sessies op jouw beoordeling`}
             </h2>
           </div>
           <div className="mt-3 flex flex-col gap-2">
             {waiting.map((s) => {
               const dl = deadlineText(s.feedbackDeadline ? new Date(s.feedbackDeadline) : null);
+              const progress = progressBySession.get(s.key);
               return (
                 <Link key={s.key} href={`/portal/videos?sessie=${encodeURIComponent(s.key)}`} className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] px-4 py-3 hover:bg-[var(--sc-fill-strong)]">
                   <FolderOpen className="size-4 shrink-0 text-[var(--st-orange)]" />
-                  <span className="min-w-0 flex-1 text-[14px] font-semibold">{s.title} <span className="font-normal text-[var(--color-ink-muted)]">· {s.videos.length} video&apos;s</span></span>
+                  <span className="min-w-0 flex-1 text-[14px] font-semibold">
+                    {s.title} <span className="font-normal text-[var(--color-ink-muted)]">· {progress ?? `${s.videos.length} video's`}</span>
+                  </span>
                   {dl ? <span className={`text-[12.5px] ${dl.urgent ? "font-semibold text-[var(--st-orange)]" : "text-[var(--color-ink-muted)]"}`}>{dl.text}</span> : null}
-                  <span className={portalBtn.act + " h-9"}>Bekijk &amp; beoordeel <ArrowRight className="size-4" /></span>
+                  <span className={portalBtn.act + " h-9"}>Bekijken en beoordelen <ArrowRight className="size-4" /></span>
                 </Link>
               );
             })}
@@ -180,7 +194,7 @@ export default async function PortalVideosPage({ searchParams }: { searchParams:
       ) : lib.sessions.length > 0 ? (
         <section className="sc-glass flex items-center gap-3 p-4 text-[14px]">
           <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--st-green-bg)] text-[var(--st-green)]"><Check className="size-4" /></span>
-          Er wacht nu niets op jouw feedback. Je kunt alle video&apos;s hieronder terugkijken.
+          Er wacht nu niets op jouw beoordeling. Je kunt alle video&apos;s hieronder terugkijken en downloaden.
         </section>
       ) : null}
 
@@ -199,7 +213,7 @@ export default async function PortalVideosPage({ searchParams }: { searchParams:
             <span className="text-[12.5px] text-[var(--color-ink-faint)]">{lib.sessions.length} sessies · {lib.totalVideos} video&apos;s</span>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {lib.sessions.map((s) => <SessionCard key={s.key} s={s} />)}
+            {lib.sessions.map((s) => <SessionCard key={s.key} s={s} progress={progressBySession.get(s.key) ?? null} />)}
           </div>
         </section>
       )}

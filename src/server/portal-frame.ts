@@ -22,6 +22,8 @@ export type PortalFrameVideo = {
   durationSeconds: number | null;
   createdAt: string | null;
   versionCount: number;
+  /** Het afspeelbare bestand (huidige versie) in Frame.io. */
+  mediaFileId: string;
 };
 
 export type PortalFrameSession = {
@@ -32,6 +34,10 @@ export type PortalFrameSession = {
   status: { key: SessionStatusKey; label: string } | null;
   /** Deliverable-id om in het portaal akkoord te geven (alleen bij status feedback). */
   approveId: string | null;
+  /** Opnamedag en editingproject van deze sessie (null = niet met zekerheid gekoppeld). */
+  dayId: string | null;
+  deliverableId: string | null;
+  deliverableStatus: string | null;
   feedbackDeadline: string | null;
   videos: PortalFrameVideo[];
 };
@@ -47,7 +53,8 @@ export type PortalFrameLibrary = {
 
 const PRODUCTIE = new Set(["recorded", "footage_upload", "awaiting_editor", "editing", "internal_review", "editor_revision"]);
 
-function sessionStatus(status: string | null, sessionCreatedAt: Date | null): PortalFrameSession["status"] {
+/** Sessiestatus voor de klant. `ignoreAge` = altijd de interne fase tonen (acties). */
+export function sessionStatusFor(status: string | null, sessionCreatedAt: Date | null, ignoreAge = false): PortalFrameSession["status"] {
   if (!status) return null;
   if (status === "client_review") return { key: "feedback", label: "Klaar voor jouw feedback" };
   if (status === "client_revision") return { key: "verwerken", label: "Feedback wordt verwerkt" };
@@ -55,7 +62,7 @@ function sessionStatus(status: string | null, sessionCreatedAt: Date | null): Po
   if (["published", "analysis_available"].includes(status)) return { key: "online", label: "Online" };
   // Interne fases alleen tonen voor recente sessies; bij oude sessies is de
   // interne status vaak niet bijgewerkt en zou "in productie" misleiden.
-  if (PRODUCTIE.has(status) && sessionCreatedAt && Date.now() - sessionCreatedAt.getTime() < 30 * 86_400_000) {
+  if (PRODUCTIE.has(status) && (ignoreAge || (sessionCreatedAt && Date.now() - sessionCreatedAt.getTime() < 30 * 86_400_000))) {
     return { key: "productie", label: "In productie" };
   }
   return null;
@@ -93,6 +100,7 @@ export async function getFrameLibraryForClient(clientId: string): Promise<Portal
       .select({
         id: frameAssets.id,
         name: frameAssets.name,
+        mediaFileId: frameAssets.mediaFileId,
         sessionFolderId: frameAssets.sessionFolderId,
         sessionName: frameAssets.sessionName,
         sessionCreatedAt: frameAssets.sessionCreatedAt,
@@ -133,7 +141,7 @@ export async function getFrameLibraryForClient(clientId: string): Promise<Portal
     let s = sessions.get(key);
     if (!s) {
       const del = r.dayId ? delByDay.get(r.dayId) ?? null : null;
-      const st = sessionStatus(del?.status ?? null, r.sessionCreatedAt);
+      const st = sessionStatusFor(del?.status ?? null, r.sessionCreatedAt);
       s = {
         key,
         title: prettySessionName(r.sessionName),
@@ -141,6 +149,9 @@ export async function getFrameLibraryForClient(clientId: string): Promise<Portal
         createdAt: r.sessionCreatedAt?.toISOString() ?? null,
         status: st,
         approveId: st?.key === "feedback" ? del!.id : null,
+        dayId: r.dayId ?? null,
+        deliverableId: del?.id ?? null,
+        deliverableStatus: del?.status ?? null,
         feedbackDeadline: st?.key === "feedback" ? reviewDeadline(del!.changed)?.toISOString() ?? null : null,
         videos: [],
       };
@@ -154,6 +165,7 @@ export async function getFrameLibraryForClient(clientId: string): Promise<Portal
       durationSeconds: r.durationSeconds,
       createdAt: r.createdAt?.toISOString() ?? null,
       versionCount: r.versionCount,
+      mediaFileId: r.mediaFileId,
     });
   }
 

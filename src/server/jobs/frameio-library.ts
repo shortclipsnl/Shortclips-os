@@ -25,6 +25,8 @@ export type FrameLibrarySource = {
   listProjects(): Promise<FrameProject[]>;
   listFolderChildrenAll(folderId: string, opts?: { metadata?: boolean }): Promise<FrameFile[]>;
   getFileThumbnail(fileId: string): Promise<string | null>;
+  /** Versies in een stack (nieuwste eerst); optioneel voor tests. */
+  listVersionStackChildren?(stackId: string): Promise<FrameFile[]>;
 };
 
 /** Thumbnails vooraf verversen (ze verlopen na ongeveer een dag), zodat de
@@ -124,6 +126,7 @@ function throttled(source: FrameLibrarySource): FrameLibrarySource {
     listProjects: () => call(() => source.listProjects()),
     listFolderChildrenAll: (id, opts) => call(() => source.listFolderChildrenAll(id, opts)),
     getFileThumbnail: (id) => call(() => source.getFileThumbnail(id)),
+    listVersionStackChildren: source.listVersionStackChildren ? (id) => call(() => source.listVersionStackChildren!(id)) : undefined,
   };
 }
 
@@ -342,6 +345,38 @@ export async function syncFrameLibrary(triggeredById?: string, rawSource: FrameL
                 .where(and(eq(frameAssets.frameProjectId, link.projectId), inArray(frameAssets.sessionFolderId, skippedSessions)))).map((r) => r.d).filter((d): d is string => !!d)
             : [];
           const shootBySession = await linkSessionsToShoots(link.clientId, [...sessions.values()], keptDays);
+
+          // Version stacks: exacte versieteller, en een video die net een stack is
+          // geworden (nieuw id in Frame) blijft dezelfde video in het portaal, zodat
+          // feedback en goedkeuringen van de klant eraan blijven hangen.
+          const stackItems = items.filter((it) => it.identity.type === "version_stack");
+          if (stackItems.length && source.listVersionStackChildren) {
+            const existing = await db
+              .select({ frameFileId: frameAssets.frameFileId, mediaFileId: frameAssets.mediaFileId, versionCount: frameAssets.versionCount })
+              .from(frameAssets)
+              .where(inArray(frameAssets.frameFileId, stackItems.map((it) => it.identity.id)));
+            const ex = new Map(existing.map((e) => [e.frameFileId, e]));
+            let budget = 40;
+            for (const it of stackItems) {
+              const prev = ex.get(it.identity.id);
+              if (prev && prev.mediaFileId === it.file.id) { it.versionCount = prev.versionCount; continue; }
+              if (budget-- <= 0) { it.versionCount = prev ? prev.versionCount + (prev.mediaFileId === it.file.id ? 0 : 1) : 2; continue; }
+              try {
+                const children = await source.listVersionStackChildren(it.identity.id);
+                it.versionCount = Math.max(1, children.length);
+                if (!prev && children.length) {
+                  const [match] = await db
+                    .select({ id: frameAssets.id })
+                    .from(frameAssets)
+                    .where(and(inArray(frameAssets.frameFileId, children.map((c) => c.id)), eq(frameAssets.clientId, link.clientId)))
+                    .limit(1);
+                  if (match) await db.update(frameAssets).set({ frameFileId: it.identity.id, updatedAt: new Date() }).where(eq(frameAssets.id, match.id));
+                }
+              } catch {
+                it.versionCount = prev ? prev.versionCount + 1 : 2;
+              }
+            }
+          }
 
           const allValues = items.map((it) => ({
             clientId: link.clientId,

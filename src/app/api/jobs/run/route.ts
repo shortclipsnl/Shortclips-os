@@ -73,6 +73,7 @@ import { runClientNotifications } from "@/server/jobs/notifications";
 import { flushPendingPush } from "@/server/push";
 import { pruneSessions } from "@/server/auth/session";
 import { pruneLoginChallenges } from "@/server/auth/login-code";
+import { runVideoReviewSync } from "@/server/video-review-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -122,6 +123,9 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "frameio.normalize_imported": normalizeImportedFrameDeliverables,
   "frameio.list_projects": listFrameProjects,
   "frameio.sync_library": syncFrameLibrary,
+  // Videobeoordeling klantportaal: mislukte opmerkingen opnieuw naar Frame.io en
+  // afgevinkte opmerkingen/reacties uit Frame.io terug (vangnet naast webhooks).
+  "video_review.sync": runVideoReviewSync,
   "frameio.library_coverage": frameLibraryCoverage,
   // Na de agenda-sync ook de scriptingtaken bijwerken: verplaatste of vervallen
   // opnames passen zo binnen het uur hun taak (deadline/afsluiten) aan.
