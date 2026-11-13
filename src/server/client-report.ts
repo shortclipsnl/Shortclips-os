@@ -3,7 +3,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db/client";
 import { clients } from "@/db/schema";
-import { requireInternal } from "@/server/auth/context";
+import { requireInternal, hasClientAccess } from "@/server/auth/context";
 
 const rows = <T,>(r: unknown): T[] => ((r as { rows?: T[] }).rows ?? (r as T[])) as T[];
 const dayOffset = (n: number) => {
@@ -35,7 +35,7 @@ export async function getClientReport(
 ) {
   // `trusted` alleen voor vertrouwde server-jobs (geen gebruikerssessie, bv. de
   // nachtelijke AI-verbeterlus). De normale UI-/actiepaden laten dit op false.
-  if (!trusted) await requireInternal();
+  const viewer = trusted ? null : await requireInternal();
 
   const [client] = await db
     .select({ id: clients.id, name: clients.name, logoUrl: clients.logoUrl, slug: clients.slug })
@@ -43,6 +43,10 @@ export async function getClientReport(
     .where(and(eq(clients.slug, slug), isNull(clients.deletedAt)))
     .limit(1);
   if (!client) notFound();
+  // Klantscope afdwingen: zonder dit kon elke interne gebruiker zonder
+  // "alle klanten"-recht (bv. een freelance videograaf) via /rapport/<slug>
+  // het rapport van élke klant openen.
+  if (viewer && !hasClientAccess(viewer, client.id)) notFound();
 
   // Met een expliciet venster (bv. een kalendermaand voor een maandrapport)
   // vergelijken we met de gelijk-lange periode er direct vóór. Zonder venster

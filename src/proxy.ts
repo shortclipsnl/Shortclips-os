@@ -30,12 +30,24 @@ const PUBLIC_PATHS = [
   "/api/editor/agenda",
   "/manifest.webmanifest",
   "/sw.js",
+  // Links met een eigen, onvoorspelbaar token (32 random bytes). Deze pagina's
+  // controleren het token zelf server-side; zonder deze uitzondering stuurde de
+  // proxy een uitgelogde ontvanger naar /login en werkten uitnodigingen,
+  // wachtwoordherstel, transfers en offertelinks niet.
+  "/account-instellen/",
+  "/wachtwoord-herstellen/",
+  "/d/",
+  "/api/d/",
+  "/offerte/",
 ];
+
+/** Publieke offerte-PDF via het deeltoken; /api/offertes/file en de rest blijven achter de sessie. */
+const PUBLIC_PATTERNS = [/^\/api\/offertes\/[A-Za-z0-9_-]{20,}\/pdf$/];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p)) || PUBLIC_PATTERNS.some((re) => re.test(pathname))) {
     return NextResponse.next();
   }
 

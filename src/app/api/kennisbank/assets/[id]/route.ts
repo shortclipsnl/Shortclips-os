@@ -26,10 +26,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (!(await canViewAsset(viewer, id))) return new Response("Niet toegestaan", { status: 403 });
 
   const size = asset.byteSize;
-  const download = new URL(req.url).searchParams.has("download");
+  // Alleen "veilige" bestandstypes inline tonen. HTML, SVG, XML e.d. altijd als
+  // download: anders zou een geüpload bestand als pagina op ons eigen domein
+  // draaien (stored XSS) met de rechten van wie het opent.
+  const inlineSafe = /^(application\/pdf|image\/(png|jpe?g|gif|webp|avif)|video\/|audio\/)/i.test(asset.contentType);
+  const download = new URL(req.url).searchParams.has("download") || !inlineSafe;
   const safeName = asset.fileName.replace(/[^\w.\- ()]+/g, "_");
   const headers: Record<string, string> = {
-    "Content-Type": asset.contentType,
+    "Content-Type": inlineSafe ? asset.contentType : "application/octet-stream",
     "Accept-Ranges": "bytes",
     "Cache-Control": "private, max-age=86400",
     "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(asset.fileName)}`,

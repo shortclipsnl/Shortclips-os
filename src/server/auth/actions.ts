@@ -211,7 +211,8 @@ export async function verifyLoginCodeAction(_prev: LoginState, formData: FormDat
   await createSession(result.userId, { ip, userAgent: h.get("user-agent") });
   await trustThisDevice(result.userId, h.get("user-agent"));
   await auditLog({ action: "auth.login_code_verified", entityType: "user", entityId: result.userId });
-  redirect("/portal");
+  const [who] = await db.select({ role: users.primaryRole }).from(users).where(eq(users.id, result.userId)).limit(1);
+  redirect(who?.role === "client" ? "/portal" : "/dashboard");
 }
 
 export async function logoutAction() {
