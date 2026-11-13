@@ -91,12 +91,12 @@ export type ChecklistItem = { key: string; label: string; auto?: boolean };
 export const WHATSAPP_CHECKLIST: Record<WhatsappOptie, ChecklistItem[]> = {
   videolink: [
     { key: "videolink", label: "Videolink toegevoegd", auto: true },
-    { key: "pdf", label: "Contentplanning PDF toegevoegd" },
+    { key: "pdf", label: "Contentplanning PDF toegevoegd aan dit bericht" },
     { key: "gecontroleerd", label: "Bericht gecontroleerd" },
   ],
   portaal: [
     { key: "portaal", label: "Video's staan klaar in het klantportaal" },
-    { key: "contentplanning", label: "Contentplanning is ingevuld en gecontroleerd" },
+    { key: "contentplanning", label: "Contentplanning is gecontroleerd en gedeeld met de klant" },
     { key: "gecontroleerd", label: "Bericht gecontroleerd" },
   ],
 };

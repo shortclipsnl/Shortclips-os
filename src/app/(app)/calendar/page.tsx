@@ -11,6 +11,7 @@ import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { listCalendar, monthGrid, type CalendarItem } from "@/server/calendar";
 import { listClients } from "@/server/clients";
 import { SharePlanningButton } from "./share-planning";
+import { ContactmomentNote } from "./contactmoment-note";
 import { StartDeadlineButton } from "./deadline-actions";
 import { activeDeadlineFor } from "@/server/planning-deadlines";
 import { ContentPlanningPdfButton } from "@/components/content-planning/pdf-button";
@@ -309,6 +310,9 @@ export default async function CalendarPage({
           </div>
         }
       />
+
+      {/* Werkafspraak: contentplanning en video's in één contactmoment naar de klant. */}
+      {canWrite ? <ContactmomentNote /> : null}
 
       {/* Compacte publicatiecheck — herinnering bij het inplannen/publiceren. */}
       <div className="mb-4">
