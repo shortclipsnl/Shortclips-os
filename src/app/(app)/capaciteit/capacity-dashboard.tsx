@@ -9,6 +9,7 @@ import CapEngine from "@/lib/capacity-engine";
 // De rekenmotor is pure JavaScript (gedeeld met het prototype); hier ongetypeerd.
 const E: any = CapEngine;
 import type { CapacityData } from "@/server/capacity-forecast";
+import { Avatar } from "@/components/ui";
 import "./capacity.css";
 
 type Drawer =
@@ -22,7 +23,6 @@ const SRC_LABEL: Record<string, string> = { bevestigd: "Bevestigd", voorspeld: "
 const STATUS_COLOR: Record<string, string> = { groen: "var(--color-good)", oranje: "var(--color-warn)", rood: "var(--color-bad)", grijs: "#9a98a6", vrij: "#9a98a6" };
 const N = (x: number) => (Math.round(x * 10) / 10).toString().replace(".", ",");
 const pillText = (c: any) => (c.key === "grijs" ? "?" : c.key === "vrij" ? "Vrij" : c.pct === null ? "!" : `${c.pct}%`);
-const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
 const SNOOZE_KEY = "cap-snoozed-v1";
 
 export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEdit: boolean }) {
@@ -159,9 +159,12 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
                 {cols.map((i) => {
                   const w = RR.weeks[i];
                   return (
-                    <th key={i} className={i === 0 ? "now" : ""}>
-                      {w.label}
-                      <small>{i === 0 ? "deze week" : i === 1 ? "volgende week" : w.monday.slice(0, 4) !== data.today.slice(0, 4) ? w.monday.slice(0, 4) : "\u00a0"}</small>
+                    <th key={i} className={`wkcol ${i === 0 ? "now" : ""}`}>
+                      <span className="cap-wh">
+                        <span className="cap-whn">Week {w.num ?? E.isoWeek(w.monday)}</span>
+                        <span className="cap-whd">{w.label}</span>
+                        <span className="cap-whs">{i === 0 ? "Deze week" : i === 1 ? "Volgende week" : w.monday.slice(0, 4) !== data.today.slice(0, 4) ? w.monday.slice(0, 4) : "\u00a0"}</span>
+                      </span>
                     </th>
                   );
                 })}
@@ -178,7 +181,7 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
                   <tr key={p.id}>
                     <td className="rl">
                       <button className="cap-who" onClick={() => setDrawer({ type: "person", pid: p.id })}>
-                        <span className={`cap-av ${fl ? "fl" : ""}`}>{initials(p.name)}</span>
+                        <span className={`cap-ph ${fl ? "fl" : ""}`}><Avatar name={p.name} src={p.avatarUrl} size={36} color="var(--color-indigo-ink)" /></span>
                         <span>
                           <span className="nm">{p.name}<span className={`cap-tag ${fl ? "fl" : ""}`}>{fl ? "Freelance" : "Vast"}</span></span>
                           <span className="sub">{p.capacityNote}</span>
@@ -190,7 +193,7 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
                       const exp = vg ? c.items.some((x: any) => x.source === "verwacht") : c.parts.some((x: any) => x.item.source === "verwacht");
                       const pk = peaks(kind, p.id, i);
                       return (
-                        <td key={i}>
+                        <td key={i} className={i === 0 ? "now" : ""}>
                           <button className={`cap-pill ${c.key}`} title={`${p.name} · ${c.wk.label}: ${N(c.load)} van ${c.cap ? N(c.cap.value) : "?"} ${unit}`}
                             onClick={() => setDrawer({ type: "cell", kind, pid: p.id, i, r })}>
                             {pillText(c)}
@@ -211,7 +214,7 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
                   const c = open[i];
                   const n = vg ? c.count : Math.round(c.load);
                   return (
-                    <td key={i}>
+                    <td key={i} className={i === 0 ? "now" : ""}>
                       {n ? (
                         <button className="cap-pill count" onClick={() => setDrawer({ type: "cell", kind: vg ? "vgopen" : "edopen", i, r })}>
                           {n} {vg ? (n === 1 ? "opname" : "opn.") : "video's"}
@@ -224,7 +227,7 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
               <tr>
                 <td className="rl"><div className="cap-who"><span className="cap-av team">∑</span><span className="nm" style={{ fontWeight: 500, color: "var(--color-ink-muted)" }}>Totaal {vg ? "videografie" : "editing"}</span></div></td>
                 {cols.map((i) => (
-                  <td key={i}>
+                  <td key={i} className={i === 0 ? "now" : ""}>
                     <button className={`cap-pill team ${team[i].key}`} onClick={() => setDrawer({ type: "cell", kind: vg ? "vgteam" : "edteam", i, r })}>{pillText(team[i])}</button>
                   </td>
                 ))}

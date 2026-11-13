@@ -1,4 +1,5 @@
 import "server-only";
+import { teamPhotoSrc } from "@/lib/team-photos";
 import { and, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import { capacityParams, capacityPeople, clients, deliverables, leaveRequests, productionDays, users } from "@/db/schema";
@@ -36,6 +37,8 @@ export type CapPerson = {
   pattern: number[] | null;
   leave: [string, string][];
   capacityNote?: string;
+  /** Profielfoto (opgeslagen avatarUrl of bekende teamfoto). */
+  avatarUrl?: string | null;
 };
 
 export type CapacityData = {
@@ -269,7 +272,7 @@ export async function loadCapacityData(): Promise<CapacityData> {
   const allIds = [...new Set([...vgIds, ...edIds])];
   const userRows = allIds.length
     ? await db
-        .select({ id: users.id, name: users.fullName, isStaff: users.isStaff, status: users.status, periods: users.availabilityPeriods })
+        .select({ id: users.id, name: users.fullName, isStaff: users.isStaff, status: users.status, periods: users.availabilityPeriods, avatarUrl: users.avatarUrl })
         .from(users)
         // Alleen actieve portaalaccounts; werk van niet-actieve mensen komt bij "nog geen".
         .where(and(inArray(users.id, allIds), isNull(users.deletedAt), eq(users.status, "active")))
@@ -339,6 +342,7 @@ export async function loadCapacityData(): Promise<CapacityData> {
         dayMax: 8, maxShootsPerDay: 2,
         pattern: hoursPerWeek ? [1, 2, 3, 4, 5] : null,
         leave, capacityNote: hoursPerWeek ? note : "Capaciteit niet vastgelegd",
+        avatarUrl: teamPhotoSrc(u.name, u.avatarUrl),
       });
     }
     if (edIds.has(u.id) && !(vgIds.has(u.id) && !capRows.some((c) => c.userId === u.id && c.unit === "shorts_4w"))) {
@@ -353,6 +357,7 @@ export async function loadCapacityData(): Promise<CapacityData> {
         id: u.id, name: first, role: "editor", employment: explicit ?? "freelance",
         shortsPerWeek: perWeek, pattern: [1, 2, 3, 4, 5], leave,
         capacityNote: `${String(perWeek).replace(".", ",")} video's per week (${src})`,
+        avatarUrl: teamPhotoSrc(u.name, u.avatarUrl),
       });
     }
   }
