@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ListChecks } from "lucide-react";
+import { ArrowLeft, Eye, ListChecks } from "lucide-react";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients, handoverNotes, tasks, users } from "@/db/schema";
-import { requireInternal, scopeToClients } from "@/server/auth/context";
+import { clients, handoverNotes, personalNotes, tasks, users } from "@/db/schema";
+import { isOwner, requireInternal, scopeToClients } from "@/server/auth/context";
 import { listAssignableUsers } from "@/server/clients";
 import { isCoreStaff, coreStaffRank } from "@/server/core-staff";
 import { Card, EmptyState, PageHeader, TeamAvatar } from "@/components/ui";
-import { ColleagueToggle, QuickTaskLines, TaskItem, type TaskItemData } from "./tasks-ui";
+import { QuickTaskLines, TaskItem, type TaskItemData } from "./tasks-ui";
+import { RecentNotes, TasksTopBar, type NoteItem } from "./notes-ui";
+import { canModifyTask } from "@/lib/task-permissions";
 import { HandoverBoard, type HandoverNote } from "./handover-board";
 import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
 import { syncClientMomentTasksIfStale } from "@/server/klantmomenten";
@@ -108,6 +110,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         entityType: tasks.entityType,
         entityId: tasks.entityId,
         dedupeKey: tasks.dedupeKey,
+        createdById: tasks.createdById,
       })
       .from(tasks)
       .leftJoin(clients, eq(clients.id, tasks.clientId))
@@ -117,8 +120,12 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       .limit(400);
     // Doorklikken naar waar de taak over gaat (bijv. de scriptsessie).
     // Feedbackherinnering en maandrapportage krijgen een compacte, opvallende weergave.
-    return rows.map(({ entityType, entityId, dedupeKey, ...t }) => ({
+    // Collega's mogen elkaars taken bekijken, maar alleen aanpassen wat van
+    // henzelf is (zelfde regel als in de server-acties).
+    const permViewer = { id: viewer.id, isOwner: isOwner(viewer) };
+    return rows.map(({ entityType, entityId, dedupeKey, createdById, ...t }) => ({
       ...t,
+      canEdit: canModifyTask(permViewer, { assigneeId: t.assigneeId, createdById }),
       href: taskHref({ entityType, entityId, dedupeKey }),
       signal: taskSignal({ title: t.title, description: t.description, dedupeKey, entityType, entityId, clientName: t.clientName, clientSlug: t.clientSlug }),
     }));
@@ -147,27 +154,44 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     gearchiveerd = (archived as TaskItemData[]).slice(0, 30);
   }
   const openTotal = openItems.length;
+  const isOwnView = persoon === viewer.id;
+
+  // Persoonlijke notities: altijd en uitsluitend die van de ingelogde
+  // medewerker, alleen getoond in de eigen weergave.
+  const notes: NoteItem[] = isOwnView
+    ? (
+        await db
+          .select({
+            id: personalNotes.id,
+            title: personalNotes.title,
+            body: personalNotes.body,
+            createdAt: personalNotes.createdAt,
+            updatedAt: personalNotes.updatedAt,
+            taskId: tasks.id,
+            taskStatus: tasks.status,
+          })
+          .from(personalNotes)
+          .leftJoin(tasks, and(eq(tasks.id, personalNotes.taskId), isNull(tasks.deletedAt)))
+          .where(and(eq(personalNotes.userId, viewer.id), isNull(personalNotes.deletedAt)))
+          .orderBy(desc(personalNotes.updatedAt))
+          .limit(50)
+      ).map((n) => ({
+        id: n.id,
+        title: n.title,
+        body: n.body,
+        createdAt: new Date(n.createdAt).toISOString(),
+        updatedAt: new Date(n.updatedAt).toISOString(),
+        taskId: n.taskId ?? null,
+        taskDone: n.taskStatus === "done",
+      }))
+    : [];
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-4">
-      {/* Primaire kop: de eigen taken van vandaag vallen meteen op. Een collega of
-          "Verdelen" toont die weergave; Overdracht krijgt een eigen titel. */}
-      {persoon === "overdracht" ? (
-        <PageHeader title="Overdracht" description="Punten die aan een collega worden overgedragen." />
-      ) : (
-        <div className="flex items-center gap-2.5 rounded-[var(--radius-md)] bg-gradient-to-r from-[var(--color-indigo-ink)] to-[var(--color-brand-600)] px-4 py-3.5 text-white">
-          <ListChecks className="size-6 shrink-0" />
-          <h1 className="text-lg font-semibold tracking-tight">
-            {persoon === viewer.id ? "Mijn taken voor vandaag" : persoon === "algemeen" ? "Nog te verdelen onder het team" : `Taken van ${selectedLabel}`}
-          </h1>
-          <span className="ml-auto rounded-full bg-white/20 px-3 py-0.5 text-sm font-bold tabular-nums">{openTotal}</span>
-        </div>
-      )}
-
-      {/* Collega's achter een knop — standaard dicht zodat de focus op de eigen
-          taken ligt. Bij het bekijken van een ander staat de rij open (om terug te
-          kunnen). */}
-      <ColleagueToggle defaultOpen={persoon !== viewer.id}>
+      {/* Drie knoppen bovenaan: Mijn taken, Bekijk taken van collega's, Maak
+          notitie. De collega's verschijnen pas na een klik; bij het bekijken
+          van een collega staat de rij open om snel te wisselen. */}
+      <TasksTopBar isOwnView={isOwnView} colleaguesOpen={!isOwnView}>
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
           {persons.map((u) => (
             <PersonCard key={u.id} id={u.id} name={u.fullName} count={openCountFor(u.id)} active={persoon === u.id} />
@@ -175,7 +199,34 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           <PersonCard id="algemeen" name="Verdelen onder team" count={algemeenCount} active={persoon === "algemeen"} generic chip="⇢" countLabel="te verdelen" />
           <PersonCard id="overdracht" name="Overdracht" count={handoverOpen} active={persoon === "overdracht"} generic chip="⇄" countLabel="open" accent="var(--color-violet)" />
         </div>
-      </ColleagueToggle>
+      </TasksTopBar>
+
+      {/* Primaire kop: de eigen taken van vandaag vallen meteen op. Bij een
+          collega staat duidelijk wiens taken het zijn, dat je alleen kijkt, en
+          een knop terug naar de eigen taken. */}
+      {persoon === "overdracht" ? (
+        <PageHeader title="Overdracht" description="Punten die aan een collega worden overgedragen." />
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 rounded-[var(--radius-md)] bg-gradient-to-r from-[var(--color-indigo-ink)] to-[var(--color-brand-600)] px-4 py-3.5 text-white">
+          {selected && !isOwnView ? <TeamAvatar name={selected.fullName} size={32} /> : <ListChecks className="size-6 shrink-0" />}
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold tracking-tight">
+              {isOwnView ? "Mijn taken voor vandaag" : persoon === "algemeen" ? "Nog te verdelen onder het team" : `Taken van ${selectedLabel}`}
+            </h1>
+            {selected && !isOwnView ? (
+              <p className="flex items-center gap-1.5 text-xs text-white/80">
+                <Eye className="size-3.5" /> Verantwoordelijk: {selected.fullName.split(" ")[0]} · je bekijkt deze taken
+              </p>
+            ) : null}
+          </div>
+          <span className="ml-auto rounded-full bg-white/20 px-3 py-0.5 text-sm font-bold tabular-nums">{openTotal}</span>
+          {!isOwnView ? (
+            <Link href="/tasks" className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-sm)] bg-white px-3 text-xs font-semibold text-[var(--color-indigo-ink)] hover:bg-white/90">
+              <ArrowLeft className="size-3.5" /> Terug naar mijn taken
+            </Link>
+          ) : null}
+        </div>
+      )}
 
       {persoon === "overdracht" ? (
         <HandoverBoard notes={handover} users={userOptions} canWrite={canWrite} />
@@ -196,9 +247,12 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
               compact
               key={`qt-${persoon ?? "none"}`}
               users={userOptions}
-              defaultAssignee={selected?.id ?? (persoon === "algemeen" ? undefined : persoon === viewer.id ? viewer.id : undefined)}
+              defaultAssignee={selected?.id ?? (persoon === "algemeen" ? undefined : isOwnView ? viewer.id : undefined)}
             />
           ) : null}
+
+          {/* Recente notities — alleen in de eigen weergave en alleen als er iets is. */}
+          {isOwnView ? <RecentNotes notes={notes} /> : null}
 
           {afgerond.length > 0 ? <TaskColumn title="Afgerond" accent="var(--color-good)" items={afgerond} users={userOptions} canWrite={canWrite} celebrateName="" /> : null}
           {gearchiveerd.length > 0 ? <TaskColumn title={`Gearchiveerd (${gearchiveerd.length})`} accent="var(--color-ink-faint)" items={gearchiveerd} users={userOptions} canWrite={canWrite} celebrateName="" /> : null}

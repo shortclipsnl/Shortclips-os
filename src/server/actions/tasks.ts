@@ -9,8 +9,10 @@ import { SCRIPTING_TASK_PREFIX } from "@/lib/scripting-task-plan";
 import {
   assertClientAccess,
   ForbiddenError,
+  isOwner,
   requirePermission,
 } from "@/server/auth/context";
+import { canModifyTask, TASK_READONLY_MESSAGE } from "@/lib/task-permissions";
 import { auditLog } from "@/server/audit";
 import { notify } from "@/server/notifications";
 
@@ -43,12 +45,13 @@ export async function setTaskStatus(taskId: string, status: string): Promise<Act
   try {
     const viewer = await requirePermission("tasks:write");
     const [task] = await db
-      .select({ id: tasks.id, clientId: tasks.clientId, status: tasks.status, title: tasks.title })
+      .select({ id: tasks.id, clientId: tasks.clientId, status: tasks.status, title: tasks.title, assigneeId: tasks.assigneeId, createdById: tasks.createdById })
       .from(tasks)
       .where(eq(tasks.id, taskId))
       .limit(1);
     if (!task) return { ok: false, message: "Taak niet gevonden." };
     if (task.clientId) assertClientAccess(viewer, task.clientId);
+    if (!canModifyTask({ id: viewer.id, isOwner: isOwner(viewer) }, task)) return { ok: false, message: TASK_READONLY_MESSAGE };
 
     await db
       .update(tasks)
@@ -220,12 +223,13 @@ export async function updateTask(
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
 
     const [task] = await db
-      .select({ id: tasks.id, clientId: tasks.clientId, assigneeId: tasks.assigneeId, title: tasks.title, entityType: tasks.entityType, entityId: tasks.entityId, dedupeKey: tasks.dedupeKey })
+      .select({ id: tasks.id, clientId: tasks.clientId, assigneeId: tasks.assigneeId, createdById: tasks.createdById, title: tasks.title, entityType: tasks.entityType, entityId: tasks.entityId, dedupeKey: tasks.dedupeKey })
       .from(tasks)
       .where(eq(tasks.id, taskId))
       .limit(1);
     if (!task) return { ok: false, message: "Taak niet gevonden." };
     if (task.clientId) assertClientAccess(viewer, task.clientId);
+    if (!canModifyTask({ id: viewer.id, isOwner: isOwner(viewer) }, task)) return { ok: false, message: TASK_READONLY_MESSAGE };
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (parsed.data.title !== undefined) patch.title = parsed.data.title;
@@ -282,12 +286,13 @@ export async function deleteTask(taskId: string): Promise<ActionResult> {
   try {
     const viewer = await requirePermission("tasks:write");
     const [task] = await db
-      .select({ id: tasks.id, clientId: tasks.clientId })
+      .select({ id: tasks.id, clientId: tasks.clientId, assigneeId: tasks.assigneeId, createdById: tasks.createdById })
       .from(tasks)
       .where(eq(tasks.id, taskId))
       .limit(1);
     if (!task) return { ok: false, message: "Taak niet gevonden." };
     if (task.clientId) assertClientAccess(viewer, task.clientId);
+    if (!canModifyTask({ id: viewer.id, isOwner: isOwner(viewer) }, task)) return { ok: false, message: TASK_READONLY_MESSAGE };
 
     await db.update(tasks).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(tasks.id, taskId));
 

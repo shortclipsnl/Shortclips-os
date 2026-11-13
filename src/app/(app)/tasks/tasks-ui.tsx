@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpRight, BarChart3, BellRing, Gift, Check, ChevronDown, Copy, Loader2, Pencil, Plus, Send, Trash2, Users, X } from "lucide-react";
+import { ArrowUpRight, BarChart3, BellRing, CalendarClock, Gift, Check, Copy, Loader2, Lock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { createTask, createTasksBulk, deleteTask, setTaskStatus, updateTask } from "@/server/actions/tasks";
 import { Button, ClientLogo, ErrorNote, LinkButton, TeamAvatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -63,7 +63,41 @@ export type TaskItemData = {
   href?: string | null;
   /** Automatische melding (feedbackherinnering, maandrapportage) → compacte weergave met actieknop. */
   signal?: TaskSignal | null;
+  /** Mag de kijker deze taak aanpassen? Taken van collega's zijn alleen-lezen. */
+  canEdit?: boolean;
 };
+
+/** Vandaag in Nederlandse tijd als YYYY-MM-DD. */
+function todayNL(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+}
+
+/** Compacte deadline: "Vandaag", "Morgen", "Verlopen · di 11 nov" of "do 20 nov". */
+function DueBadge({ dueOn, done }: { dueOn: string | null; done: boolean }) {
+  if (!dueOn) return null;
+  const today = todayNL();
+  const tomorrow = new Date(new Date(`${today}T12:00:00Z`).getTime() + 86_400_000).toISOString().slice(0, 10);
+  const label = new Date(`${dueOn}T12:00:00Z`).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+  let text = label;
+  let tone = "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]";
+  if (!done) {
+    if (dueOn < today) {
+      text = `Verlopen · ${label}`;
+      tone = "bg-[var(--color-bad-soft)] text-[var(--color-bad)]";
+    } else if (dueOn === today) {
+      text = "Vandaag";
+      tone = "bg-[var(--color-warn-soft)] text-[#8a5300]";
+    } else if (dueOn === tomorrow) {
+      text = "Morgen";
+    }
+  }
+  return (
+    <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold tabular-nums", tone)} title={`Deadline: ${label}`}>
+      <CalendarClock className="size-3" />
+      {text}
+    </span>
+  );
+}
 
 /** Kleur van de statusregel van een maandrapportagetaak (oranje = wacht op cijfers of aanpassing). */
 function rapportStatusTone(status: string): string {
@@ -95,29 +129,6 @@ const prioDot: Record<string, string> = {
   high: "var(--color-warn)",
   urgent: "var(--color-bad)",
 };
-
-/**
- * Collega's-schakelaar: standaard dicht, zodat de focus op de eigen taken ligt.
- * Eén klik op "Taken van collega's" toont de personenrij (als children).
- */
-export function ColleagueToggle({ defaultOpen = false, children }: { defaultOpen?: boolean; children: ReactNode }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-2 text-sm font-medium hover:bg-[var(--color-surface-2)]"
-      >
-        <Users className="size-4 text-[var(--color-ink-muted)]" />
-        {open ? "Verberg taken van collega's" : "Bekijk taken van collega's"}
-        <ChevronDown className={cn("size-4 text-[var(--color-ink-faint)] transition-transform", open && "rotate-180")} />
-      </button>
-      {open ? <div className="mt-3">{children}</div> : null}
-    </div>
-  );
-}
 
 /** Supersnelle invoer: typ taken, één per regel. Elke regel wordt een taak.
  *  `compact` maakt het vak kleiner, zodat de nadruk op de takenlijst blijft. */
@@ -291,6 +302,8 @@ export function TaskItem({
   const [eCategory, setECategory] = useState(normCategory(task.category));
   const router = useRouter();
   const done = task.status === "done" || optimisticDone;
+  // Taken van een collega: wel bekijken, niet afvinken, bewerken of verwijderen.
+  const editable = canWrite && task.canEdit !== false;
 
   function run(fn: () => Promise<unknown>) {
     start(async () => {
@@ -371,7 +384,7 @@ export function TaskItem({
     <>
       <button
         type="button"
-        disabled={!canWrite || pending}
+        disabled={!editable || pending}
         onClick={toggleDone}
         aria-pressed={done}
         aria-label={done ? `Taak heropenen: ${task.title}` : `Taak afronden: ${task.title}`}
@@ -391,7 +404,7 @@ export function TaskItem({
     <>
       {task.priority !== "normal" ? (
         <span
-          className="hidden shrink-0 items-center gap-1 text-2xs font-medium sm:inline-flex"
+          className="inline-flex shrink-0 items-center gap-1 text-2xs font-medium"
           style={{ color: prioDot[task.priority] }}
           title={`Prioriteit: ${PRIORITIES.find((p) => p.value === task.priority)?.label}`}
         >
@@ -414,7 +427,7 @@ export function TaskItem({
   );
   const actionsEl = (
     <>
-      {canWrite ? (
+      {editable ? (
         <>
           <button
             type="button"
@@ -437,6 +450,10 @@ export function TaskItem({
             {pending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
           </button>
         </>
+      ) : canWrite ? (
+        <span className="shrink-0 p-1.5 text-[var(--color-ink-faint)]" title="Taak van een collega: alleen bekijken" aria-label="Alleen bekijken">
+          <Lock className="size-3.5" />
+        </span>
       ) : null}
     </>
   );
@@ -485,13 +502,14 @@ export function TaskItem({
           </span>
         ) : null}
       </span>
+      <DueBadge dueOn={task.dueOn} done={done} />
       {prioBadge}
       {avatarEl}
       {!done && signal?.kind === "feedback" ? (
         reminderCopied ? (
           <span className="flex shrink-0 items-center gap-2">
             <span className="hidden text-2xs font-medium text-[var(--color-good)] sm:inline">Bericht gekopieerd</span>
-            {canWrite ? (
+            {editable ? (
               <Button size="sm" onClick={toggleDone} disabled={pending}>
                 <Check className="size-4" /> Verstuurd, afronden
               </Button>
@@ -540,6 +558,7 @@ export function TaskItem({
       </span>
 
       {/* Prioriteit als kleine stip — rustig in de regel, details in bewerken. */}
+      <DueBadge dueOn={task.dueOn} done={done} />
       {prioBadge}
       {avatarEl}
       {actionsEl}
@@ -562,7 +581,7 @@ export function TaskItem({
       ) : null}
 
       {/* Bewerkformulier — voorgevuld, wijzigt de bestaande taak direct. */}
-      {editing && canWrite ? (
+      {editing && editable ? (
         <div className="mt-2 ml-9 space-y-2 rounded-[var(--radius-md)] border border-[var(--color-line-strong)] bg-[var(--color-surface-2)] p-3">
           <div>
             <label className="mb-0.5 block text-2xs font-medium text-[var(--color-ink-faint)]">Titel</label>

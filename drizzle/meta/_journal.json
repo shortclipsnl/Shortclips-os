@@ -841,6 +841,13 @@
       "when": 1794510014934,
       "tag": "0119_klant_app",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1794566585592,
+      "tag": "0120_persoonlijke_notities",
+      "breakpoints": true
     }
   ]
 }

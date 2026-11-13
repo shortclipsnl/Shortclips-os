@@ -346,6 +346,29 @@ export const handoverNotes = pgTable(
   (t) => [index("handover_notes_open_idx").on(t.resolvedAt, t.createdAt)],
 );
 
+/**
+ * Persoonlijke notities: snel iets vastleggen tijdens de werkdag (knop "Maak
+ * notitie" op de takenpagina). Altijd van één medewerker en alleen voor die
+ * medewerker zichtbaar. Een notitie kan later worden omgezet naar een taak;
+ * dan verwijst `taskId` naar die taak.
+ */
+export const personalNotes = pgTable(
+  "personal_notes",
+  {
+    id: pk(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 160 }).notNull(),
+    body: text("body"),
+    /** Gezet wanneer de notitie is omgezet naar een taak. */
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    ...timestamps,
+    ...softDelete,
+  },
+  (t) => [index("personal_notes_user_idx").on(t.userId, t.updatedAt)],
+);
+
 export const taskDependencies = pgTable(
   "task_dependencies",
   {
