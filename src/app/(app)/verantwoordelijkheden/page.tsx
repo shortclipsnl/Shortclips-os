@@ -16,6 +16,12 @@ import { Weergave } from "./weergave";
 export const metadata: Metadata = { title: "Mijn verantwoordelijkheden" };
 export const dynamic = "force-dynamic";
 
+/** Persoonlijke missie bovenaan de pagina (13 nov 2026, Jarno). Leeg = geen tekst. */
+const MISSIE: Record<string, string> = {
+  "milou@shortclips.nl": "Mijn klanten worden bij mij volledig in de watten gelegd. Ze voelen zich altijd gehoord, ik ben ze altijd een stap voor en ik geef ze de beste short video ervaring die er is.",
+  "jiska@shortclips.nl": "Mijn klanten worden bij mij volledig in de watten gelegd. Ze voelen zich altijd gehoord, ik ben ze altijd een stap voor en ik geef ze de beste short video ervaring die er is.",
+};
+
 /** Voornaam uit het account waarmee is ingelogd; valt terug op de vaste naam. */
 function voornaam(fullName: string | null | undefined, terugval: string): string {
   const v = (fullName ?? "").trim().split(/\s+/)[0];
@@ -63,6 +69,12 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
           </LinkButton>
         ) : undefined}
       />
+
+      {MISSIE[medewerker.email] ? (
+        <p className="-mt-2 mb-7 max-w-3xl border-l-2 border-[var(--color-ink)] pl-4 text-[15px] font-medium leading-relaxed text-[var(--color-ink)]">
+          {MISSIE[medewerker.email]}
+        </p>
+      ) : null}
 
       {owner && (
         <div className="mb-6 flex flex-wrap items-center gap-2">
