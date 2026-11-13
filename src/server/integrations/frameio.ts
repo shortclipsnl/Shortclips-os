@@ -343,6 +343,82 @@ export class FrameService {
     return unwrap(result);
   }
 
+  /* ---------------- Beoordeling (klantportaal) ---------------- */
+
+  /**
+   * Opmerking plaatsen op een bestand. Let op: in V4 is `timestamp` een
+   * framestempel (beeldnummer), geen seconden. Gebruik `secondsToFramestamp`.
+   */
+  async createComment(fileId: string, input: { text: string; timestamp?: number | null }): Promise<FrameComment> {
+    const data: Record<string, unknown> = { text: input.text };
+    if (input.timestamp != null) data.timestamp = input.timestamp;
+    const res = await this.request<{ data?: FrameComment } | FrameComment>(
+      `/accounts/${this.requireAccount()}/files/${fileId}/comments`,
+      { method: "POST", body: { data }, retries: 0 },
+    );
+    return (res as { data?: FrameComment }).data ?? (res as FrameComment);
+  }
+
+  async getComment(commentId: string): Promise<FrameComment & { completed_at?: string | null; owner?: { id?: string; name?: string } }> {
+    const res = await this.request<{ data?: FrameComment } | FrameComment>(
+      `/accounts/${this.requireAccount()}/comments/${commentId}?include=owner`,
+    );
+    return ((res as { data?: FrameComment }).data ?? res) as FrameComment & { completed_at?: string | null };
+  }
+
+  /** Alle opmerkingen op een bestand, met de auteur (owner). */
+  async listCommentsDetailed(fileId: string): Promise<Array<FrameComment & { completed_at?: string | null; owner?: { id?: string; name?: string } }>> {
+    const result = await this.request<Page<FrameComment>>(
+      `/accounts/${this.requireAccount()}/files/${fileId}/comments?include=owner&page_size=100`,
+    );
+    return unwrap(result) as Array<FrameComment & { completed_at?: string | null; owner?: { id?: string; name?: string } }>;
+  }
+
+  /** Versies in een version stack, nieuwste eerst. */
+  async listVersionStackChildren(stackId: string): Promise<FrameFile[]> {
+    const result = await this.request<Page<FrameFile>>(
+      `/accounts/${this.requireAccount()}/version_stacks/${stackId}/children`,
+    );
+    return unwrap(result);
+  }
+
+  /** Metadata van een bestand (o.a. Frame Rate, Duration, Status). */
+  async getFileMetadata(fileId: string): Promise<Array<{ field_definition_id: string; field_definition_name: string; value: unknown; field_options?: Array<{ id: string; display_name: string }> }>> {
+    const res = await this.request<{ data?: { metadata?: unknown[] } }>(`/accounts/${this.requireAccount()}/files/${fileId}/metadata`);
+    return (res.data?.metadata ?? []) as Array<{ field_definition_id: string; field_definition_name: string; value: unknown }>;
+  }
+
+  async listFieldDefinitions(): Promise<Array<{ id: string; name: string; field_type: string; mutable?: boolean; field_configuration?: { options?: Array<{ id: string; display_name: string }> } }>> {
+    const result = await this.request<Page<{ id: string; name: string; field_type: string }>>(
+      `/accounts/${this.requireAccount()}/metadata/field_definitions?page_size=100`,
+    );
+    return unwrap(result);
+  }
+
+  /** Metadatawaarde zetten op een of meer bestanden in een project (bijv. Status). */
+  async setMetadataValues(projectId: string, fileIds: string[], values: Array<{ field_definition_id: string; value: unknown }>): Promise<void> {
+    await this.request(`/accounts/${this.requireAccount()}/projects/${projectId}/metadata/values`, {
+      method: "PATCH",
+      body: { data: { file_ids: fileIds, values } },
+    });
+  }
+
+  async listWorkspaceWebhooks(workspaceId: string): Promise<Array<{ id: string; url: string; events: string[]; active?: boolean }>> {
+    const result = await this.request<Page<{ id: string; url: string; events: string[] }>>(
+      `/accounts/${this.requireAccount()}/workspaces/${workspaceId}/webhooks`,
+    );
+    return unwrap(result);
+  }
+
+  /** V4: webhooks horen bij een workspace; het antwoord bevat eenmalig het secret. */
+  async createWorkspaceWebhook(workspaceId: string, input: { name: string; url: string; events: string[] }): Promise<{ id: string; secret?: string }> {
+    const res = await this.request<{ data?: { id: string; secret?: string } }>(
+      `/accounts/${this.requireAccount()}/workspaces/${workspaceId}/webhooks`,
+      { method: "POST", body: { data: input } },
+    );
+    return res.data ?? (res as unknown as { id: string; secret?: string });
+  }
+
   async listWebhooks(): Promise<Array<{ id: string; url: string; events: string[] }>> {
     const result = await this.request<Page<{ id: string; url: string; events: string[] }>>(
       `/accounts/${this.requireAccount()}/webhooks`,

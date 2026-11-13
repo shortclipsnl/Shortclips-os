@@ -1,16 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { syncFeedbackRounds } from "@/server/feedback-rounds";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { approvals, deliverables, reviewComments, reviewThreads, scripts } from "@/db/schema";
+import { scripts } from "@/db/schema";
 import { ForbiddenError, requirePortal } from "@/server/auth/context";
-import { auditLog, recordActivity } from "@/server/audit";
+import { recordActivity } from "@/server/audit";
 import { dispatch } from "@/server/automation";
-import { syncContentForDeliverable } from "@/server/content-sync";
-import { notifyXpEarned, recordAwardsSafe } from "@/server/awards/service";
+import { clientApproveDeliverable, clientRequestChangesDeliverable } from "@/server/portal-video-transitions";
 
 export type ActionResult = { ok: boolean; message?: string };
 
@@ -25,64 +23,7 @@ const feedbackSchema = z.object({
 export async function approveVideo(videoId: string): Promise<ActionResult> {
   try {
     const viewer = await requirePortal();
-
-    const [video] = await db
-      .select({ id: deliverables.id, clientId: deliverables.clientId, title: deliverables.title, status: deliverables.status, editorId: deliverables.editorId })
-      .from(deliverables)
-      .where(and(eq(deliverables.id, videoId), eq(deliverables.clientId, viewer.clientId!)))
-      .limit(1);
-
-    if (!video) return { ok: false, message: "Deze video is niet gevonden." };
-    if (!["client_review", "client_revision"].includes(video.status)) {
-      return { ok: false, message: "Deze video staat niet klaar voor goedkeuring." };
-    }
-
-    await db
-      .update(deliverables)
-      .set({ status: "approved", statusChangedAt: new Date(), approvedAt: new Date() })
-      .where(eq(deliverables.id, videoId));
-    // Klant heeft gereageerd: feedbackronde stopt, herinneringstaak vervalt.
-    await syncFeedbackRounds([videoId]).catch((e) => console.error("[feedback-rounds]", e));
-
-    // Showcase: awards van de editor bijwerken (nooit blokkerend).
-    await recordAwardsSafe(video.editorId);
-    await notifyXpEarned(video.editorId, videoId);
-
-    await db
-      .update(approvals)
-      .set({ status: "approved", decidedAt: new Date(), decidedByUserId: viewer.id })
-      .where(and(eq(approvals.entityId, videoId), eq(approvals.status, "pending")));
-
-    await auditLog({
-      viewer,
-      action: "portal.video_approved",
-      entityType: "deliverable",
-      entityId: videoId,
-      clientId: video.clientId,
-    });
-    await recordActivity({
-      clientId: video.clientId,
-      type: "video.approved_by_client",
-      title: `Video goedgekeurd door de klant: ${video.title}`,
-      entityType: "deliverable",
-      entityId: videoId,
-      actor: { id: viewer.id, fullName: viewer.fullName },
-      isClientVisible: true,
-    });
-    await dispatch({
-      trigger: "video.status_changed",
-      clientId: video.clientId,
-      entityType: "deliverable",
-      entityId: videoId,
-      data: { from: video.status, to: "approved", title: video.title },
-    });
-    // Direct als gekoppeld record in de contentplanning zetten.
-    await syncContentForDeliverable(videoId);
-
-    revalidatePath("/portal");
-    revalidatePath(`/portal/videos/${videoId}`);
-    revalidatePath("/calendar");
-    return { ok: true, message: "Bedankt. De video staat op goedgekeurd." };
+    return await clientApproveDeliverable(viewer, videoId);
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;
@@ -97,65 +38,7 @@ export async function requestChanges(
     const viewer = await requirePortal();
     const parsed = feedbackSchema.safeParse(input);
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
-
-    const [video] = await db
-      .select({ id: deliverables.id, clientId: deliverables.clientId, title: deliverables.title, clientRevisionRounds: deliverables.clientRevisionRounds })
-      .from(deliverables)
-      .where(and(eq(deliverables.id, videoId), eq(deliverables.clientId, viewer.clientId!)))
-      .limit(1);
-
-    if (!video) return { ok: false, message: "Deze video is niet gevonden." };
-
-    const [thread] = await db
-      .insert(reviewThreads)
-      .values({ deliverableId: videoId, visibility: "client" })
-      .returning({ id: reviewThreads.id });
-
-    await db.insert(reviewComments).values({
-      threadId: thread!.id,
-      body: parsed.data.body,
-      authorUserId: viewer.id,
-      authorName: viewer.fullName,
-      source: "portal",
-    });
-
-    await db
-      .update(deliverables)
-      .set({
-        status: "client_revision",
-        statusChangedAt: new Date(),
-        clientRevisionRounds: video.clientRevisionRounds + 1,
-      })
-      .where(eq(deliverables.id, videoId));
-    // Klant heeft feedback gegeven: feedbackronde stopt, herinneringstaak vervalt.
-    await syncFeedbackRounds([videoId]).catch((e) => console.error("[feedback-rounds]", e));
-
-    await db
-      .update(approvals)
-      .set({ status: "changes_requested", decidedAt: new Date(), decidedByUserId: viewer.id, comment: parsed.data.body })
-      .where(and(eq(approvals.entityId, videoId), eq(approvals.status, "pending")));
-
-    await recordActivity({
-      clientId: video.clientId,
-      type: "video.changes_requested",
-      title: `Klant vroeg om aanpassingen: ${video.title}`,
-      body: parsed.data.body,
-      entityType: "deliverable",
-      entityId: videoId,
-      actor: { id: viewer.id, fullName: viewer.fullName },
-      isClientVisible: true,
-    });
-    await dispatch({
-      trigger: "video.status_changed",
-      clientId: video.clientId,
-      entityType: "deliverable",
-      entityId: videoId,
-      data: { to: "client_revision", title: video.title, href: `/videos/${videoId}` },
-    });
-
-    revalidatePath("/portal");
-    revalidatePath(`/portal/videos/${videoId}`);
-    return { ok: true, message: "Je feedback is doorgestuurd naar het team." };
+    return await clientRequestChangesDeliverable(viewer, videoId, { summary: parsed.data.body });
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };
     throw error;

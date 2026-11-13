@@ -7,6 +7,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  real,
   text,
   timestamp,
   unique,
@@ -504,6 +505,8 @@ export const frameAssets = pgTable(
     durationSeconds: integer("duration_seconds"),
     commentCount: integer("comment_count"),
     versionCount: integer("version_count").notNull().default(1),
+    /** Beelden per seconde van de huidige versie (voor tijdcodes in Frame.io). */
+    frameRate: real("frame_rate"),
     /** Laatst opgehaalde (ondertekende, verlopende) thumbnail-URL. */
     thumbnailUrl: text("thumbnail_url"),
     frameCreatedAt: timestamp("frame_created_at", { withTimezone: true }),
