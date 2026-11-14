@@ -302,7 +302,7 @@ const fmtX = (x: number) => `${x.toFixed(1).replace(".", ",")}x`;
  * Analyse
  * ------------------------------------------------------------------ */
 
-function evidenceOf(n: number, hitRate: number, halvesAgree: boolean | null): Evidence {
+export function evidenceOf(n: number, hitRate: number, halvesAgree: boolean | null): Evidence {
   if (n <= 1) return "een_video";
   if (n <= 3) return "verkennend";
   const consistent = hitRate >= 0.65 || hitRate <= 0.35;

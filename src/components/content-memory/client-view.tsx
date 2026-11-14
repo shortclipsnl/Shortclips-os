@@ -1,4 +1,4 @@
-import { ArrowUpRight, Lightbulb, MessageSquareQuote, Megaphone, Sparkles, Trophy, Wand2 } from "lucide-react";
+import { ArrowUpRight, Camera, Clock, Lightbulb, MessageSquareQuote, Megaphone, Sparkles, Target, Trophy, Wand2 } from "lucide-react";
 import type { ClientMemory } from "@/server/content-memory";
 import { EVIDENCE_LABEL } from "@/server/content-memory/analyze";
 import { Thumb, nf, pct, plat, xf } from "./shared";
@@ -17,6 +17,8 @@ export function ClientMemoryView({ cm }: { cm: ClientMemory }) {
     ...(formats[0] ? [`Vaker inzetten: ${formats[0].label}`] : []),
     ...(m.topHooks[0] ? [`Nieuwe openingen in de stijl van "${m.topHooks[0].hook}"`] : []),
   ].slice(0, 4);
+  // Alleen onderdelen met een conclusie; de scriptopbouw is intern werkmateriaal.
+  const works = (cm.playbook?.items ?? []).filter((i) => i.key !== "script" && i.value && i.status !== "onvoldoende");
 
   return (
     <div className="flex flex-col gap-7">
@@ -37,6 +39,29 @@ export function ClientMemoryView({ cm }: { cm: ClientMemory }) {
           <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Vanaf ongeveer acht gepubliceerde video&apos;s zie je hier de eerste patronen. We trekken bewust geen conclusies uit een paar video&apos;s.</p>
           <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-[var(--sc-fill)]"><div className="h-full rounded-full bg-[var(--sc-cta)]" style={{ width: `${Math.min(100, (m.videoCount / 8) * 100)}%` }} /></div>
           <div className="mt-1.5 text-[12px] text-[var(--color-ink-muted)]">{m.videoCount} van 8 video&apos;s</div>
+        </section>
+      ) : null}
+
+      {works.length ? (
+        <section className="sc-glass p-6 sm:p-7">
+          <Head icon={Target} label="Wat werkt voor jou" title="Zo ziet jouw best presterende video eruit" />
+          <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">Berekend uit de echte resultaten van jouw video&apos;s. We bouwen hier bij elke nieuwe video op voort.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {works.map((i) => {
+              const Icon = WORK_ICON[i.key] ?? Sparkles;
+              return (
+                <div key={i.key} className="flex flex-col gap-2 rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"><Icon className="size-3.5" />{WORK_LABEL[i.key]}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${i.status === "bewezen" ? "bg-[var(--color-good-soft)] text-[#1d6b4c]" : "bg-[var(--color-warn-soft)] text-[#8a5a00]"}`}>{i.status === "bewezen" ? "Bewezen" : "Veelbelovend"}</span>
+                  </div>
+                  <div className="text-[17px] font-bold leading-snug">{i.value}</div>
+                  {i.quote ? <div className="text-[13px] italic text-[var(--color-ink-muted)]">“{i.quote}”</div> : null}
+                  <div className="mt-auto text-[12.5px] text-[var(--color-ink-muted)]">{i.perf != null ? `${xf(i.perf)} je normale niveau · ` : ""}{i.n} video&apos;s</div>
+                </div>
+              );
+            })}
+          </div>
         </section>
       ) : null}
 
@@ -145,6 +170,9 @@ export function ClientMemoryView({ cm }: { cm: ClientMemory }) {
     </div>
   );
 }
+
+const WORK_LABEL: Record<string, string> = { format: "Type video", hook: "Opening", lengte: "Videolengte", filmstijl: "Manier van filmen" };
+const WORK_ICON: Record<string, typeof Sparkles> = { format: Wand2, hook: MessageSquareQuote, lengte: Clock, filmstijl: Camera };
 
 function Head({ icon: Icon, label, title }: { icon: typeof Sparkles; label: string; title: string }) {
   return (

@@ -60,36 +60,43 @@ export function HookAltsPanel({ hookKey }: { hookKey: string }) {
   const data = items[hookKey];
   const busy = pending.has(hookKey);
   return (
-    <div className="flex h-full flex-col gap-3 rounded-[14px] border border-dashed border-[var(--color-line-strong)] bg-[var(--color-surface-sunken)] p-3.5">
-      <div className="flex items-center justify-between gap-2">
-        <h4 className="flex items-center gap-1.5 text-[13px] font-semibold"><Sparkles className="size-3.5 text-[var(--color-violet)]" />Alternatieven op basis van deze succesvolle hook</h4>
+    <div className="flex h-full flex-col gap-3 rounded-[16px] bg-[var(--color-indigo-ink)] p-4 text-white shadow-[0_10px_30px_rgba(0,0,59,.22)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wider text-[var(--color-indigo-ink)]">
+            <Sparkles className="size-3" /> Nieuwe hookvoorstellen
+          </span>
+          <h4 className="mt-2 text-[14.5px] font-semibold leading-snug">Alternatieven op basis van deze succesvolle hook</h4>
+          <p className="mt-0.5 text-[12px] text-white/65">Zelfde werkzame principe als de bewezen hook, nieuwe invalshoek. Nog te testen.</p>
+        </div>
         {data && !busy ? (
-          <button type="button" onClick={() => regenerate(hookKey)} className="inline-flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" title="Drie nieuwe alternatieven laten maken">
+          <button type="button" onClick={() => regenerate(hookKey)} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/20 px-2 py-1 text-[11.5px] font-medium text-white/80 hover:bg-white/10 hover:text-white" title="Drie nieuwe alternatieven laten maken">
             <RefreshCw className="size-3" /> Nieuwe
           </button>
         ) : null}
       </div>
       {busy ? (
         <ul className="flex flex-col gap-2" aria-busy="true">
-          {[0, 1, 2].map((i) => <li key={i} className="h-[58px] animate-pulse rounded-[10px] bg-[var(--color-surface-2)]" />)}
-          <li className="text-[11.5px] text-[var(--color-ink-muted)]">Alternatieven worden gemaakt op basis van deze hook en de klant...</li>
+          {[0, 1, 2].map((i) => <li key={i} className="h-[62px] animate-pulse rounded-[12px] bg-white/10" />)}
+          <li className="text-[11.5px] text-white/65">Alternatieven worden gemaakt op basis van deze hook en de klant...</li>
         </ul>
       ) : data ? (
-        <ul className="flex flex-col gap-2">
+        <ol className="flex flex-col gap-2">
           {data.alternatives.map((a, i) => (
-            <li key={i} className="flex items-start justify-between gap-3 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5">
-              <div className="min-w-0">
-                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--color-violet)]">{a.angle || `Alternatief ${i + 1}`}</div>
-                <p className="mt-0.5 text-[14px] font-medium leading-snug">{a.hook}</p>
+            <li key={i} className="flex items-start gap-3 rounded-[12px] bg-[var(--color-surface)] px-3 py-2.5 text-[var(--color-ink)]">
+              <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--color-indigo-ink)] text-[11.5px] font-bold text-white">{i + 1}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">{a.angle || `Alternatief ${i + 1}`}</div>
+                <p className="mt-0.5 text-[14.5px] font-semibold leading-snug">{a.hook}</p>
               </div>
               <CopyButton text={a.hook} />
             </li>
           ))}
-        </ul>
+        </ol>
       ) : (
-        <div className="flex flex-col items-start gap-2 text-[12.5px] text-[var(--color-ink-muted)]">
+        <div className="flex flex-col items-start gap-2 text-[12.5px] text-white/70">
           <span>{error ?? "Nog geen alternatieven."}</span>
-          <button type="button" onClick={() => regenerate(hookKey)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink)]"><RefreshCw className="size-3" />Maak alternatieven</button>
+          <button type="button" onClick={() => regenerate(hookKey)} className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-[var(--color-indigo-ink)]"><RefreshCw className="size-3" />Maak alternatieven</button>
         </div>
       )}
     </div>

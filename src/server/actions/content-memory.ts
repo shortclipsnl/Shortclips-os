@@ -13,10 +13,22 @@ export async function refreshContentMemoryAction(clientId: string): Promise<Memo
     assertClientAccess(viewer, clientId);
     const { backfillThumbnails } = await import("@/server/content-memory/thumbnails");
     await backfillThumbnails({ clientId, budgetMs: 40_000 }).catch(() => null);
+    const started = Date.now();
     const res = await refreshContentMemoryAi(clientId, { force: true });
+    // Daarna de strategie (filmstijl, formatvoorstellen, scriptopbouw), als er nog tijd is.
+    let strategyNote = "";
+    if (res.ok && Date.now() - started < 90_000) {
+      const { loadClientMemory, clearContentMemoryCache } = await import("@/server/content-memory");
+      const { generateStrategy } = await import("@/server/content-memory/strategy");
+      const cm = await loadClientMemory(clientId);
+      const st = cm ? await generateStrategy(clientId, cm.memory, { force: true }).catch(() => null) : null;
+      clearContentMemoryCache(clientId);
+      if (!st?.ok) strategyNote = " Strategie volgt automatisch.";
+    } else if (res.ok) strategyNote = " Strategie wordt morgenochtend bijgewerkt.";
     revalidatePath("/contentgeheugen");
+    revalidatePath("/portal/contentgeheugen");
     return res.ok
-      ? { ok: true, message: res.labeled ? `${res.labeled} video's van een format voorzien.` : "Bijgewerkt." }
+      ? { ok: true, message: (res.labeled ? `${res.labeled} video's van een format voorzien.` : "Bijgewerkt.") + strategyNote }
       : { ok: false, message: res.reason ?? "Bijwerken lukte niet." };
   } catch (e) {
     if (e instanceof ForbiddenError) return { ok: false, message: e.message };
@@ -69,5 +81,28 @@ export async function backfillThumbnailsAction(clientId: string): Promise<{ ok: 
     return { ok: true, updated: res.updated };
   } catch {
     return { ok: false, updated: 0 };
+  }
+}
+
+/**
+ * Strategie aanvullen als die nog ontbreekt (eerste keer, of een nieuw
+ * succesvol format zonder voorstellen). Normaal gebeurt dit 's ochtends.
+ */
+export async function strategyAction(clientId: string): Promise<MemoryActionResult> {
+  try {
+    const viewer = await requirePermission("analytics:read");
+    assertClientAccess(viewer, clientId);
+    const { getContentMemory, clearContentMemoryCache } = await import("@/server/content-memory");
+    const { generateStrategy } = await import("@/server/content-memory/strategy");
+    const cm = await getContentMemory(viewer, clientId);
+    if (!cm) return { ok: false, message: "Klant niet gevonden." };
+    const res = await generateStrategy(clientId, cm.memory);
+    clearContentMemoryCache(clientId);
+    if (!res.ok) return { ok: false, message: res.reason ?? "Analyse lukte niet." };
+    revalidatePath("/contentgeheugen");
+    return { ok: true, message: res.generated ? "Bijgewerkt." : "Al actueel." };
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    return { ok: false, message: "Analyse lukte niet." };
   }
 }

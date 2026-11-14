@@ -6,6 +6,8 @@ import { assertClientAccess, type Viewer } from "@/server/auth/context";
 import { aiConfigured, runPrompt } from "@/server/ai/client";
 import { backfillThumbnails } from "./thumbnails";
 import { generateHookAlternatives } from "./hook-alternatives";
+import { generateStrategy, loadStrategy, type MemoryStrategy } from "./strategy";
+import { buildPlaybook, playbookPromptText, type Playbook } from "./playbook";
 import { groupPublications, matchVideosToAssets, type ReelAsset, type ReelPublication } from "@/lib/screen-reel-match";
 import {
   analyzeMemory,
@@ -49,6 +51,10 @@ export type ClientMemory = {
   memory: ContentMemory;
   ai: MemoryAi;
   aiAvailable: boolean;
+  /** AI-laag: filmstijl per video, nieuwe formatvoorstellen, scriptopbouw. */
+  strategy: MemoryStrategy | null;
+  /** "Wat werkt voor deze klant", berekend uit de echte resultaten. */
+  playbook: Playbook;
 };
 
 type Row = {
@@ -254,9 +260,10 @@ export async function loadClientMemory(clientId: string): Promise<ClientMemory |
   if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
   const [c] = await db.select({ id: clients.id, name: clients.name, slug: clients.slug }).from(clients).where(and(eq(clients.id, clientId), isNull(clients.deletedAt))).limit(1);
   if (!c) return null;
-  const ai = await loadAi(clientId);
+  const [ai, strategy] = await Promise.all([loadAi(clientId), loadStrategy(clientId)]);
   const inputs = await loadInputs(clientId, ai.labels);
-  const value: ClientMemory = { clientId: c.id, clientName: c.name, clientSlug: c.slug, memory: analyzeMemory(inputs), ai, aiAvailable: aiConfigured() };
+  const memory = analyzeMemory(inputs);
+  const value: ClientMemory = { clientId: c.id, clientName: c.name, clientSlug: c.slug, memory, ai, aiAvailable: aiConfigured(), strategy, playbook: buildPlaybook(memory, strategy) };
   cache.set(clientId, { at: Date.now(), value });
   return value;
 }
@@ -380,6 +387,36 @@ export async function runContentMemoryRefresh(): Promise<{ clients: number; labe
   return { clients: done, labeled, skipped, thumbnails: thumbs.updated, hooks };
 }
 
+/**
+ * Ochtendjob (07:00-08:50, elke 10 min): de contentstrategie (filmstijl,
+ * nieuwe formatvoorstellen, scriptopbouw) bijwerken voor actieve klanten
+ * waarvan de resultaten veranderd zijn. Ongewijzigde klanten kosten niets.
+ */
+export async function runContentMemoryStrategy(): Promise<{ checked: number; generated: number; failed: number; remaining: number }> {
+  const started = Date.now();
+  const res = await db.execute(sql`
+    select distinct p.client_id from publications p
+    join clients c on c.id = p.client_id and c.deleted_at is null
+    where p.deleted_at is null and p.status = 'published' and c.status::text in ('active', 'onboarding')
+  `);
+  const list = rowsOf<{ client_id: string }>(res);
+  let checked = 0, generated = 0, failed = 0, remaining = 0;
+  for (const r of list) {
+    if (Date.now() - started > 170_000) { remaining++; continue; }
+    try {
+      const cm = await loadClientMemory(r.client_id);
+      checked++;
+      if (!cm || cm.memory.videoCount < 3) continue;
+      // Ongewijzigde handtekening: generateStrategy stopt direct, zonder AI-aanroep.
+      const out = await generateStrategy(r.client_id, cm.memory);
+      if (out.generated) { generated++; clearContentMemoryCache(r.client_id); } else if (!out.ok) failed++;
+    } catch {
+      failed++;
+    }
+  }
+  return { checked, generated, failed, remaining };
+}
+
 /** Klantstatussen die als "actief" gelden in de klantadministratie. */
 export const ACTIVE_STATUSES = ["active", "onboarding"];
 
@@ -410,6 +447,7 @@ export function contentMemoryPromptText(cm: ClientMemory, opts: { isAd?: boolean
     `Hooks die het best werkten (echte openingszinnen):\n${m.topHooks.slice(0, 6).map((v) => `- "${v.hook}" (${v.platform}, ${x(v.perf)} normaal)`).join("\n")}`,
     m.ctas.filter((g) => g.verdict === "beter" && solid(g)).length ? `CTA's die werken: ${m.ctas.filter((g) => g.verdict === "beter" && solid(g)).map((g) => `${g.label} (${x(g.medianPerf)})`).join(", ")}.` : "",
     worse.length ? `Werkt minder (vermijd of pas aan): ${worse.slice(0, 5).map((g) => `${g.label} (${x(g.medianPerf)}, ${g.n} video's)`).join("; ")}.` : "",
+    playbookPromptText(cm.playbook),
   ];
   return parts.filter(Boolean).join("\n\n");
 }

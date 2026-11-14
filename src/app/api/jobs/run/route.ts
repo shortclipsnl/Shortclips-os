@@ -39,7 +39,7 @@ import { runTransferCleanup } from "@/server/jobs/transfer-cleanup";
 import { runCaptionsAutoGenerate } from "@/server/jobs/captions-autogen";
 import { runCaptionDriveLink } from "@/server/jobs/caption-drive-link";
 import { runBriefingAutoGenerate } from "@/server/jobs/briefing-autogen";
-import { runContentMemoryRefresh } from "@/server/content-memory";
+import { runContentMemoryRefresh, runContentMemoryStrategy } from "@/server/content-memory";
 import { runContentResearchAdvance, runContentResearchWeekly } from "@/server/jobs/content-research-autogen";
 import { runContentResearchNotify } from "@/server/jobs/content-research-notify";
 import { runMonthlyReports, runReportQueue } from "@/server/jobs/report-monthly";
@@ -187,6 +187,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   // Overdag elke 5 min: handmatig gestarte rondes afmaken (licht als er niets loopt).
   "content_research.advance": runContentResearchAdvance,
   "content_memory.refresh": runContentMemoryRefresh,
+  "content_memory.strategy": runContentMemoryStrategy,
   "content_research.notify": runContentResearchNotify,
   "reports.generate_monthly": runMonthlyReports,
   "reports.review_reminders": runReportReviewReminders,
