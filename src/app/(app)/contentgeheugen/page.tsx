@@ -19,6 +19,8 @@ import { CopyButton, CoverImage, MemoryClientStrip, MemoryPlayerProvider, PlayTr
 import { HookAltsPanel, HookAltsProvider, HookPrinciple } from "@/components/content-memory/hook-alternatives";
 import { ThumbBackfill } from "@/components/content-memory/thumb-backfill";
 import { ContentDnaView } from "@/components/content-memory/dna-view";
+import { MemoryLessons } from "@/components/content-memory/lessons";
+import { lessonsForClient } from "@/server/result-alert-lessons";
 
 export const metadata: Metadata = { title: "Contentgeheugen" };
 export const dynamic = "force-dynamic";
@@ -45,6 +47,7 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
   const cm = selected ? await getContentMemory(viewer, selected.id) : null;
   const asClient = sp.weergave === "klant";
   const alts = cm && !asClient ? await getHookAlternatives(cm.clientId) : {};
+  const lessons = cm && !asClient ? await lessonsForClient(cm.clientId).catch(() => []) : [];
   const qs = (extra: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
     const merged = { klant: selected?.slug, weergave: asClient ? "klant" : undefined, alle: showAll ? "1" : undefined, ...extra };
@@ -96,6 +99,7 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
             <HookAltsProvider key={cm.clientId} clientId={cm.clientId} initial={alts} keys={shownHooks(cm.memory).map(hookKey)}>
               <InternalView cm={cm} />
             </HookAltsProvider>
+            <MemoryLessons lessons={lessons} />
           </MemoryPlayerProvider>
         )}
       </div>

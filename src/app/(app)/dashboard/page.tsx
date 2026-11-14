@@ -17,6 +17,8 @@ import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
 import { Dagstart } from "./dagstart";
 import { getContractAttention } from "@/server/contracts";
 import { ContractAttentionBlock } from "../contracten/attention-block";
+import { ResultAlertsBlock } from "./result-alerts-block";
+import { urgentAlertsForDashboard } from "@/server/result-alerts";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
@@ -47,6 +49,8 @@ export default async function DashboardPage() {
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
   // Contracten die aandacht nodig hebben: uitsluitend voor de eigenaar.
   const contractAttention = isOwner(viewer) ? await getContractAttention().catch(() => null) : null;
+  // Klanten die direct aandacht nodig hebben (rode alerts): eigen klanten, eigenaar ziet alles.
+  const urgentResults = await urgentAlertsForDashboard(viewer, { all: isOwner(viewer) }).catch(() => []);
   // Operationeel beheer (eigenaar + operationeel beheerder): snelkoppelingen +
   // aandachtspunt "klanten zonder portaallogin".
   const showOps = canManageOperations(viewer);
@@ -129,6 +133,9 @@ export default async function DashboardPage() {
           <span className="text-[var(--color-ink-muted)]">Maak de logins aan in Klantbeheer →</span>
         </Link>
       ) : null}
+
+      {/* Resultaten: klanten met een rode alert, tot die is afgehandeld. */}
+      <ResultAlertsBlock items={urgentResults} showOwner={isOwner(viewer)} />
 
       {/* Contracten & Verlengingen (alleen eigenaar): alleen wat nu een actie vraagt. */}
       {contractAttention ? <ContractAttentionBlock items={contractAttention.items} toVerify={contractAttention.toVerify} compact /> : null}

@@ -15,6 +15,8 @@ import { ScriptberichtButton, type ScriptberichtRow } from "./scriptbericht";
 import { getSavedScriptberichten, getScriptberichtTemplates, portalScriptLink } from "@/server/scriptbericht";
 import { EMPTY_SAVED } from "@/lib/scriptbericht";
 import { canManageDraaiboek, draaiboekStatusMap } from "@/server/draaiboek/service";
+import { ResultAdviceStrip } from "./result-advice";
+import { scriptingAdviceByClient } from "@/server/result-alerts";
 
 export const metadata: Metadata = { title: "Scripting" };
 export const dynamic = "force-dynamic";
@@ -34,6 +36,8 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
   const klantenFilter = parseClientStatusFilter((await searchParams).klanten);
   const { rows, clientOptions, writerOptions, clientResponsibles } = await listScripting(viewer, { klanten: klantenFilter });
   const scriptAppts = await upcomingScriptAppointments();
+  // Verbeteradvies uit de resultaten, om mee te nemen in nieuwe scripts.
+  const resultAdvice = await scriptingAdviceByClient(viewer).catch(() => []);
   // Scriptverantwoordelijke per klant (slug → naam/foto), om bij elke script
   // meeting automatisch te tonen wie die doet.
   const respBySlug = new Map((clientResponsibles ?? []).map((c) => [c.clientSlug, { name: c.responsibleName, avatar: c.responsibleAvatar }]));
@@ -88,6 +92,8 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
       <div className="mb-4">
         <ClientStatusTabs basePath="/scripting" current={klantenFilter} />
       </div>
+
+      <ResultAdviceStrip items={resultAdvice} />
 
       {/* Duidelijke melding als de Drive-koppeling (bron van de script-PDF's)
           niet beschikbaar is — zodat "geen scripts" niet voor verwarring zorgt. */}

@@ -35,6 +35,7 @@ import { runLeadImapSync } from "@/server/jobs/leads-imap-sync";
 import { runPandaDocSync } from "@/server/jobs/pandadoc-sync";
 import { runProfitabilitySignals } from "@/server/jobs/profitability-signals";
 import { runContentHealthSignals } from "@/server/jobs/content-health-signals";
+import { runResultAlertsJob } from "@/server/jobs/result-alerts-job";
 import { runScriptReviewReminders } from "@/server/jobs/script-review-reminders";
 import { runTransferCleanup } from "@/server/jobs/transfer-cleanup";
 import { runCaptionsAutoGenerate } from "@/server/jobs/captions-autogen";
@@ -193,6 +194,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "content_research.advance": runContentResearchAdvance,
   "content_memory.refresh": runContentMemoryRefresh,
   "content_memory.strategy": runContentMemoryStrategy,
+  // Klanten die aandacht nodig hebben: dagelijks na Metricool en het Contentgeheugen.
+  "result_alerts.detect": runResultAlertsJob,
   "content_research.notify": runContentResearchNotify,
   "reports.generate_monthly": runMonthlyReports,
   "reports.review_reminders": runReportReviewReminders,

@@ -8,6 +8,8 @@ import { amsterdamToday, deltaPct, parsePeriodKey, PERIODS, rankByCategory, reso
 import { loadResultsOverview, type ClientResult } from "@/server/resultaten-overzicht";
 import { TopVideos } from "./top-videos";
 import { AutoRefresh } from "./auto-refresh";
+import { AttentionAlerts } from "./attention-alerts";
+import { listResultAlerts } from "@/server/result-alerts";
 
 export const metadata: Metadata = { title: "Resultaten" };
 export const dynamic = "force-dynamic";
@@ -152,7 +154,7 @@ function ClientRow({ c, rank, prevLabel }: { c: ClientResult; rank: number; prev
 /* --------------------------------- Pagina -------------------------------- */
 
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<Search> }) {
-  await requirePermission("analytics:read");
+  const viewer = await requirePermission("analytics:read");
   const params = await searchParams;
   const periode = parsePeriodKey(params.periode);
   const period = resolvePeriod(periode, amsterdamToday());
@@ -160,7 +162,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     params.koppeling === "niet" ? "niet" : params.koppeling === "alle" ? "alle" : "gekoppeld";
   const cur = { periode, koppeling: linkFilter };
 
-  const data = await loadResultsOverview(period);
+  const [data, alerts] = await Promise.all([
+    loadResultsOverview(period),
+    listResultAlerts(viewer).catch(() => null),
+  ]);
   const { totals } = data;
   const linked = data.clients.filter((c) => c.linked);
   const toLink = data.clients.filter((c) => !c.linked);
@@ -219,6 +224,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           </a>
         </div>
       </div>
+
+      {/* 0. Klanten die aandacht nodig hebben (alerts met advies en acties) */}
+      {alerts ? <AttentionAlerts active={alerts.active} closed={alerts.closed} lastRun={alerts.lastRun} staff={alerts.staff} viewerId={viewer.id} /> : null}
 
       {/* 1. Totaalresultaten */}
       <section className="mb-5 rounded-[var(--radius-lg)] bg-[var(--color-indigo-ink)] p-4 text-white sm:p-5">

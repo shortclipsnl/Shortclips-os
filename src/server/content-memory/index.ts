@@ -484,5 +484,8 @@ export function contentMemoryPromptText(cm: ClientMemory, opts: { isAd?: boolean
 /** Contentgeheugen-tekst voor de Script Engine op basis van alleen een klant-id. */
 export async function contentMemoryTextForClient(viewer: Viewer, clientId: string, opts: { isAd?: boolean } = {}): Promise<string> {
   const cm = await getContentMemory(viewer, clientId).catch(() => null);
-  return cm ? contentMemoryPromptText(cm, opts) : "";
+  if (!cm) return "";
+  // Gemeten uitkomsten van eerdere verbeteracties (Klanten die aandacht nodig hebben).
+  const lessons = await import("@/server/result-alert-lessons").then((m) => m.lessonsPromptText(clientId)).catch(() => "");
+  return [contentMemoryPromptText(cm, opts), lessons].filter(Boolean).join("\n\n");
 }
