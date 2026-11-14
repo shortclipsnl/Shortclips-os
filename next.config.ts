@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
     // De HTML wordt uitgeserveerd door de embed-route (/dashboard/vermogen/embed),
     // dus het databestand moet mee in díe serverless functie.
     "/dashboard/vermogen/embed": ["./data/vermogen/vermogen_dashboard.html"],
+    // Interne prijslijst 2027: alleen uitgeleverd via de beveiligde embed-route.
+    "/prijslijst/embed": ["./data/prijslijst/prijslijst-2027.html"],
     "/vermogen/vermogen-db-shim.js": ["./data/vermogen/vermogen-db-shim.js"],
     // Shortclips-logo op de omslag van de editor-briefing (pagina en PDF).
     "/briefing/[id]": ["./public/shortclips-logo-ondark.png"],

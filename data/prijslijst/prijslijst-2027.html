@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<script>/*SC_OWNER*/</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interne Prijslijst 2027 · Shortclips</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --org:#1a55e8; --org-soft:#e8eefd;
+  --adv:#14309a; --adv-soft:#e7eaf6;
+  --comp:#06053a; --comp-soft:#e6e6ee;
+  --navy:#06053a;
+  --faq:#d97706; --faq-soft:#fef3e2;
+  --ok:#16a34a; --no:#dc2626; --warn:#b45309; --warn-soft:#fff7e6;
+  --bg:#f4f5f9; --card:#fff; --line:#e4e6ee; --text:#0e1030; --muted:#6b6f86;
+  --radius:14px; --shadow:0 1px 2px rgba(6,5,58,.05),0 4px 16px rgba(6,5,58,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:Poppins,system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:inherit}
+
+/* ---------- layout: één pagina binnen het dashboard ---------- */
+.pl-page{max-width:1240px;margin:0 auto;padding:28px 28px 60px}
+.pl-head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.pl-head h1{margin:0}
+.pl-head .meta{color:var(--muted);font-size:13px;margin-top:2px}
+.pl-head .tools{margin-left:auto;display:flex;gap:10px;align-items:center}
+.tabs-wrap{position:sticky;top:0;z-index:20;background:var(--bg);padding:8px 0 12px;margin-bottom:10px}
+.tabs{display:flex;gap:4px;overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:14px;padding:5px;box-shadow:var(--shadow);scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{border:0;background:transparent;border-radius:10px;padding:8px 11px;font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
+.tabs button:hover{color:var(--text);background:var(--bg)}
+.tabs button.on{background:var(--navy);color:#fff}
+.tabs .sep{width:1px;background:var(--line);margin:6px 6px;flex:none}
+.tabs .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.tabs button.on .dot{box-shadow:0 0 0 2px #fff}
+.ctrl-btn{border:1px solid #f3d29a;background:var(--warn-soft);color:#7a4a06;border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:500;display:inline-flex;gap:6px;align-items:center}
+.ctrl-btn .n{background:#f59e0b;color:#fff;border-radius:20px;padding:0 7px;font-size:11px;font-weight:600}
+.search{position:relative;width:min(340px,100%)}
+.search input{width:100%;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 12px 9px 36px;outline:none}
+.search input:focus{border-color:var(--org);box-shadow:0 0 0 3px var(--org-soft)}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.45}
+.results{position:absolute;top:calc(100% + 6px);right:0;width:min(440px,92vw);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(6,5,58,.14);max-height:420px;overflow:auto;display:none;padding:6px;z-index:40}
+.results.show{display:block}
+.res{display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:8px;cursor:pointer}
+.res:hover,.res.act{background:var(--bg)}
+.res .t{font-weight:500;font-size:13px}
+.res .s{font-size:11.5px;color:var(--muted)}
+.res .p{margin-left:auto;font-weight:600;font-size:13px;white-space:nowrap}
+.res .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.dot{width:9px;height:9px;border-radius:50%;flex:none}
+.intern{font-size:11px;font-weight:600;background:var(--navy);color:#fff;border-radius:20px;padding:3px 10px;white-space:nowrap}
+
+h1{font-size:28px;line-height:1.15;margin:0 0 6px;letter-spacing:-.4px}
+h2{font-size:18px;margin:0 0 12px;letter-spacing:-.2px}
+h3{font-size:15px;margin:0 0 6px}
+.lead{color:var(--muted);max-width:720px;margin:0 0 22px}
+.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:600;color:var(--muted);margin-bottom:6px}
+.section{margin-top:30px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.right{margin-left:auto}
+
+.btn{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:10px;padding:8px 14px;font-weight:500;font-size:13px;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.btn:hover{border-color:#c9ccda}
+.btn.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn.pri:hover{opacity:.9}
+.btn.ghost-w{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.25)}
+.btn.ghost-w:hover{background:rgba(255,255,255,.2)}
+
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:500;background:var(--bg);border:1px solid var(--line)}
+.chip.w{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:#fff}
+.tag-adv{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;border-radius:20px;padding:2px 9px;background:#fff;color:var(--navy)}
+
+/* segmented */
+.seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:transparent;border-radius:8px;padding:6px 13px;font-size:13px;font-weight:500;color:var(--muted)}
+.seg button.on{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(6,5,58,.12)}
+
+/* department hero cards */
+.dept{border-radius:18px;padding:24px;color:#fff;cursor:pointer;position:relative;overflow:hidden;transition:transform .15s,box-shadow .15s;display:flex;flex-direction:column;min-height:300px;text-decoration:none}
+.dept:hover{transform:translateY(-3px);box-shadow:0 14px 34px rgba(6,5,58,.22)}
+.dept .num{font-size:13px;opacity:.7;font-weight:500}
+.dept h2{font-size:24px;line-height:1.1;margin:6px 0 10px;color:#fff}
+.dept p{opacity:.85;margin:0 0 16px;font-size:13.5px}
+.dept .prices{margin-top:auto;border-top:1px solid rgba(255,255,255,.2);padding-top:12px}
+.dept .pr{display:flex;justify-content:space-between;padding:4px 0;font-size:14px}
+.dept .pr b{font-size:17px}
+.dept .foot{font-size:11.5px;opacity:.7;margin-top:6px}
+.bg-org{background:var(--org)} .bg-adv{background:var(--adv)} .bg-comp{background:var(--comp)}
+.c-org{color:var(--org)} .c-adv{color:var(--adv)} .c-comp{color:var(--comp)}
+
+.hero{background:var(--navy);color:#fff;border-radius:20px;padding:34px 34px 30px;position:relative;overflow:hidden}
+.hero h1{font-size:34px;color:#fff;max-width:640px}
+.hero p{opacity:.75;max-width:600px;margin:6px 0 0}
+.hero .tri{position:absolute;right:-40px;top:-40px;opacity:.08}
+
+/* package cards */
+.pkg{border-radius:16px;border:2px solid var(--line);background:#fff;padding:20px;position:relative;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.pkg:hover{box-shadow:var(--shadow)}
+.pkg.sel{border-color:var(--acc);box-shadow:0 0 0 4px var(--acc-soft)}
+.pkg .nm{font-weight:600;font-size:15px}
+.pkg .price{font-size:34px;font-weight:700;letter-spacing:-.8px;line-height:1.1;margin:8px 0 2px;color:var(--acc)}
+.pkg .per{font-size:12.5px;color:var(--muted)}
+.pkg .startbox{display:flex;justify-content:space-between;align-items:center;background:var(--bg);border-radius:10px;padding:10px 12px;margin:14px 0 12px;font-size:12.5px}
+.pkg .startbox b{font-size:15px}
+.pkg .advies{position:absolute;top:16px;right:16px;background:var(--acc);color:#fff;font-size:11px;font-weight:600;border-radius:20px;padding:3px 10px}
+.pkg .vol{display:flex;gap:6px;flex-wrap:wrap}
+.vol .chip{background:var(--acc-soft);border-color:transparent;color:var(--acc);font-weight:600}
+
+.diffbar{border-radius:12px;padding:12px 16px;background:var(--acc-soft);color:var(--acc);font-weight:500;display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.diffbar b{font-weight:700}
+
+/* tables */
+table{width:100%;border-collapse:collapse}
+.tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;text-align:left;color:var(--muted);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--line)}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl tr:last-child td{border-bottom:0}
+.tbl td.c,.tbl th.c{text-align:center}
+.tbl td.r,.tbl th.r{text-align:right;white-space:nowrap}
+.tbl .sub{background:var(--bg);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.tbl tr.diff td{background:#fffbea}
+.tbl tr.hl td{background:var(--acc-soft)}
+.ico{display:inline-flex;width:20px;height:20px;border-radius:50%;align-items:center;justify-content:center;flex:none}
+.ico.y{background:#dcfce7;color:var(--ok)} .ico.n{background:#fee2e2;color:var(--no)} .ico.q{background:#eef0f5;color:var(--muted);font-size:11px;font-weight:700}
+.li{display:flex;gap:10px;align-items:flex-start;padding:5px 0}
+.li .ico{margin-top:1px}
+
+/* info blocks */
+.info{border-radius:12px;background:var(--bg);padding:14px 16px}
+.info .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.info .v{font-weight:600;font-size:15px;margin:2px 0}
+.info .d{font-size:12.5px;color:var(--muted)}
+.check{border:1px solid #f3d29a;background:var(--warn-soft);color:#7a4a06;border-radius:10px;padding:8px 12px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start}
+.check b{color:#7a4a06}
+.check-ico{flex:none;width:18px;height:18px;border-radius:50%;background:#f59e0b;color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-top:1px}
+
+/* flow */
+.flow{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+.flow .st{flex:1;min-width:150px;border-radius:12px;padding:12px 14px;background:var(--bg)}
+.flow .st.on{background:var(--acc);color:#fff}
+.flow .st .k{font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+.flow .ar{display:flex;align-items:center;color:var(--muted);font-size:18px}
+
+/* formula */
+.formula{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.fbox{border-radius:14px;padding:14px 20px;text-align:center;min-width:120px;background:var(--acc-soft);color:var(--acc)}
+.fbox b{display:block;font-size:34px;line-height:1.1;font-weight:700}
+.fbox span{font-size:12px;font-weight:500}
+.fbox.res{background:var(--acc);color:#fff}
+.fop{font-size:26px;font-weight:600;color:var(--muted)}
+
+/* accordions */
+.acc{border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:8px;overflow:hidden}
+.acc>button{width:100%;text-align:left;border:0;background:transparent;padding:14px 16px;display:flex;gap:12px;align-items:center;font-weight:500}
+.acc>button .chev{margin-left:auto;transition:transform .2s;opacity:.5}
+.acc.open>button .chev{transform:rotate(180deg)}
+.acc .body{display:none;padding:0 16px 16px 16px;color:#33364f}
+.acc.open .body{display:block}
+.qmark{width:26px;height:26px;border-radius:8px;background:var(--faq-soft);color:var(--faq);font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.faq-q{color:var(--text)}
+.acc.faq.open{border-color:#f5c98a}
+
+/* extras */
+.xcat{border-top:4px solid var(--navy)}
+.xrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.xrow:last-child{border-bottom:0}
+.xrow .t{font-weight:500}
+.xrow .s{font-size:12px;color:var(--muted)}
+.xrow .p{margin-left:auto;font-weight:700;font-size:16px;white-space:nowrap}
+.xdetail{display:none;background:var(--bg);border-radius:10px;padding:12px 14px;margin:0 0 10px;font-size:13px}
+.xdetail.open{display:block}
+.xdetail dt{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;margin-top:6px}
+.xdetail dd{margin:0}
+
+/* calculator */
+.calc-lines .ln{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
+.calc-lines .ln span:last-child{white-space:nowrap;font-weight:500}
+.calc-lines .ln.tot{border-bottom:0;border-top:2px solid var(--text);margin-top:6px;padding-top:12px;font-size:16px;font-weight:700}
+.calc-lines .ln.tot span:last-child{font-weight:700}
+.calc-lines .ln.grp{border-bottom:0;padding:14px 0 2px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+.stepper button{border:0;background:var(--bg);width:28px;height:28px;font-weight:600}
+.stepper input{width:46px;border:0;text-align:center;height:28px;outline:none}
+.xsel{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.xsel:last-child{border-bottom:0}
+.xsel .t{font-size:13px;font-weight:500}
+.xsel .s{font-size:11.5px;color:var(--muted)}
+.xsel .rt{margin-left:auto;display:flex;align-items:center;gap:10px}
+.xsel .pr{font-size:12px;color:var(--muted);white-space:nowrap;min-width:70px;text-align:right}
+.big-total{font-size:38px;font-weight:700;letter-spacing:-1px;line-height:1.05}
+select,input[type=text],textarea{border:1px solid var(--line);border-radius:10px;background:#fff;padding:8px 11px;outline:none}
+select:focus,input[type=text]:focus,textarea:focus{border-color:var(--org)}
+label.fl{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;margin:0 0 6px}
+
+/* wizard */
+.qcard{border-radius:16px;background:#fff;border:1px solid var(--line);padding:24px;box-shadow:var(--shadow)}
+.qnum{width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:16px}
+.opt{border:2px solid var(--line);border-radius:12px;padding:14px;text-align:left;background:#fff}
+.opt:hover{border-color:#c9ccda}
+.opt.on{border-color:var(--navy);background:#f6f6fb}
+.opt b{display:block;margin-bottom:2px}
+.opt span{font-size:12.5px;color:var(--muted)}
+.prog{display:flex;gap:6px;margin-bottom:16px}
+.prog i{height:5px;flex:1;border-radius:4px;background:var(--line)}
+.prog i.on{background:var(--navy)}
+.result{border-radius:18px;overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--line);background:#fff}
+.result .head{padding:24px;color:#fff}
+.result .body{padding:22px 24px}
+
+/* situations */
+.sit{border-left:4px solid var(--acc);cursor:pointer}
+.sit:hover{box-shadow:0 8px 24px rgba(6,5,58,.1)}
+
+.copybox{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:13px;max-height:420px;overflow:auto}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--navy);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:all .2s;z-index:100;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.cmp-head{border-radius:12px;padding:14px;color:#fff}
+.cmp-head .p{font-size:26px;font-weight:700;letter-spacing:-.5px}
+.delta{font-weight:700}
+.delta.up{color:var(--no)} .delta.down{color:var(--ok)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
+
+@media (max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:900px){
+  .g2,.g3{grid-template-columns:1fr}
+  .pl-page{padding:18px 14px 40px}
+  .pl-head .tools{margin-left:0;width:100%}
+  .search{flex:1}
+  .hero h1{font-size:26px}
+}
+@media (max-width:560px){.g4{grid-template-columns:1fr}.intern{display:none}}
+.kern{font-size:15px;color:var(--muted);margin:0 0 16px}
+.kern b{color:var(--text);font-size:17px;display:block;margin-bottom:2px}
+.dept{min-height:250px}
+.dept .more{font-size:12.5px;font-weight:600;margin-top:12px;opacity:.85}
+.chip.mini{font-size:10.5px;padding:1px 7px}
+.tbl.clickable tbody tr{cursor:pointer}
+.tbl.clickable tbody tr:hover td{background:var(--bg)}
+.dhead{display:flex;gap:16px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-left:6px solid var(--acc);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow)}
+.dhead h1{font-size:26px;margin:2px 0 4px}
+.dhead .fit{margin-top:10px;font-size:13px;background:var(--acc-soft,#eef0f5);color:var(--acc);display:inline-block;border-radius:8px;padding:5px 10px}
+.dhead .fit b{font-weight:600}
+.pkg .price .per{font-size:13px;font-weight:400;letter-spacing:0}
+.pkg .vol .chip{background:var(--acc-soft);border-color:transparent;color:var(--acc);font-weight:600}
+.formula.small-f{margin-top:14px}
+.formula.small-f .fbox{padding:8px 14px;min-width:80px}
+.formula.small-f .fbox b{font-size:22px}
+.tabs button.prim{color:var(--navy);font-weight:600}
+.tabs button.prim.on{color:#fff}
+.adv-grid{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:start}
+.adv-out{position:sticky;top:78px}
+.step{display:flex;gap:14px;padding:16px 0;border-top:1px solid var(--line)}
+.step:first-of-type{border-top:0;padding-top:0}
+.sn{width:28px;height:28px;border-radius:50%;background:var(--bg);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex:none}
+.step.done .sn{background:var(--navy);color:#fff;border-color:var(--navy)}
+.st-t{font-weight:600;margin:3px 0 10px}
+.q{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:6px 0;flex-wrap:wrap}
+.q span{font-size:13.5px}
+.linkbtn{border:0;background:none;color:var(--muted);font-size:12.5px;text-decoration:underline;padding:6px 0 0;margin-top:4px}
+.bigopt{border:2px solid var(--line);border-radius:12px;background:#fff;padding:12px 14px;text-align:left;display:flex;flex-direction:column;gap:4px}
+.bigopt.on{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+.bigopt .pp{font-size:22px;font-weight:700;color:var(--acc);letter-spacing:-.4px}
+.chip.pick{cursor:pointer;background:#fff}
+.chip.pick:hover{border-color:var(--navy)}
+.empty{border-style:dashed;box-shadow:none}
+.cmp-head .p{font-size:26px;font-weight:700;letter-spacing:-.5px}
+@media (max-width:900px){.adv-grid{grid-template-columns:1fr}.adv-out{position:static}}
+/* afdelingskleuren op de losse pagina's */
+.pkg{padding:0;overflow:hidden;border-color:var(--acc)}
+.pkg .pkg-top{background:var(--acc);color:#fff;padding:18px 20px;position:relative}
+.pkg .pkg-top .nm{font-weight:600;font-size:15px;opacity:.9}
+.pkg .pkg-top .price{color:#fff;margin:6px 0 0}
+.pkg .pkg-top .per{color:rgba(255,255,255,.75)}
+.pkg .pkg-top .advies{background:#fff;color:var(--acc)}
+.pkg .pkg-body{padding:16px 20px 18px}
+.pkg:not(.sel){opacity:.92}
+.pkg:not(.sel) .pkg-top{filter:saturate(.85)}
+.pkg.sel{box-shadow:0 0 0 4px var(--acc-soft),0 10px 26px rgba(6,5,58,.14);opacity:1}
+.pkg .selmark{margin-top:10px;font-size:12px;font-weight:600;color:var(--acc)}
+.dhead.filled{background:var(--acc);color:#fff;border:0}
+.dhead.filled .eyebrow{color:rgba(255,255,255,.65)}
+.dhead.filled h1{color:#fff}
+.dhead.filled .muted{color:rgba(255,255,255,.8)}
+.dhead.filled .fit{background:rgba(255,255,255,.14);color:#fff}
+.diffbar{background:var(--acc);color:#fff}
+.diffbar b{color:#fff}
+.acc-card{border-top:5px solid var(--acc)}
+.acc-card h2{color:var(--acc)}
+.tinted .info{background:var(--acc-soft);border-left:4px solid var(--acc)}
+.tinted .info .k{color:var(--acc)}
+.drow td:first-child{border-left:4px solid var(--acc)}
+.drow .pc{color:var(--acc)}
+.step.done .sn{background:var(--acc);border-color:var(--acc)}
+/* extra kosten */
+.rule{background:var(--navy);color:#fff;border-radius:16px;padding:18px 22px;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.rule-t{font-weight:700;font-size:16px}
+.rule-steps{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.rule-steps span{font-size:13.5px;display:inline-flex;align-items:center;gap:8px}
+.rule-steps i{font-style:normal;width:22px;height:22px;border-radius:50%;background:#fff;color:var(--navy);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
+.rule-steps .ar{opacity:.5}
+.xh{font-size:18px;margin:30px 0 12px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.xh span{font-size:12.5px;font-weight:400;color:var(--muted)}
+.xgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.xgrid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.xtile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;box-shadow:var(--shadow);transition:transform .12s}
+.xtile:hover{transform:translateY(-2px)}
+.xtile .xt-p{font-size:28px;font-weight:700;letter-spacing:-.6px;line-height:1;color:var(--navy)}
+.xtile .xt-u{font-size:12px;color:var(--muted);margin:3px 0 10px}
+.xtile .xt-n{font-weight:600}
+.xtile .xt-s{font-size:12px;color:var(--muted)}
+.xtile .xt-more{display:none;font-size:12.5px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.xtile.open .xt-more{display:block}
+.xtile.hl{background:var(--navy);border-color:var(--navy);color:#fff}
+.xtile.hl .xt-p{color:#fff}.xtile.hl .xt-u,.xtile.hl .xt-s{color:rgba(255,255,255,.7)}
+.xtile.hl .xt-more{border-color:rgba(255,255,255,.2)}
+.tl{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:4px;border-radius:14px;overflow:hidden}
+.tl-seg{padding:16px 18px}
+.tl-seg.g{background:#dcfce7;color:#14532d}.tl-seg.o{background:#ffedd5;color:#7c2d12}.tl-seg.r{background:#fee2e2;color:#7f1d1d}
+.tl-when{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;opacity:.8}
+.tl-p{font-size:30px;font-weight:700;letter-spacing:-.6px;margin:4px 0 2px}
+.tl-d{font-size:12.5px;opacity:.85}
+.tl-axis{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:6px;padding:0 4px}
+.xlist{background:#fff;border:1px solid var(--line);border-radius:14px;padding:4px 16px}
+.xl-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+.xl-row:last-child{border-bottom:0}
+.xl-tag{margin-left:auto;background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:3px 11px;font-size:12px;font-weight:600;white-space:nowrap}
+.nope{margin-top:20px;border:1px solid #fecaca;background:#fef2f2;border-radius:14px;padding:14px 18px;font-size:13.5px;color:#7f1d1d}
+.nope-t{display:flex;gap:8px;align-items:center;font-weight:700;margin-bottom:4px}
+@media (max-width:1100px){.xgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:700px){.xgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.tl{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<!-- Pagina: Interne Prijslijst 2027. Bedoeld als één pagina binnen het Shortclips-dashboard (geen eigen navigatie of shell). -->
+<div class="pl-page" id="prijslijst">
+  <div class="pl-head">
+    <div>
+      <div class="eyebrow">Intern · alle bedragen excl. btw</div>
+      <h1>Prijslijst 2027</h1>
+      <div class="meta">Bron: Shortclips Prijslijst 2027 (PDF) · Organisch, Advertentie, Compleet, Partnerjaar en Creator Partner</div>
+    </div>
+    <div class="tools">
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="q" type="text" placeholder="Zoek pakket, tarief of vraag  ( / )" autocomplete="off">
+        <div class="results" id="results"></div>
+      </div>
+      <button class="ctrl-btn" id="ctrlBtn">Controlepunten <span class="n" id="ctrlN"></span></button>
+    </div>
+  </div>
+  <div class="tabs-wrap"><div class="tabs" id="tabs" role="tablist"></div></div>
+  <div id="view"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   1. CENTRALE DATA
+   Enige bron: Shortclips Prijslijst 2027 (PDF, 17 pagina's).
+   Bedragen wijzigen? Alleen hier aanpassen. Alle bedragen excl. btw.
+   ===================================================================== */
+const DEPTS = {
+  org:{ key:'org', nr:'01', naam:'Afdeling Organisch', kort:'Organisch', kleur:'#1a55e8', soft:'#e8eefd',
+    pitch:'Wekelijks zichtbaar op TikTok, Instagram Reels, YouTube Shorts en Facebook. Van strategie tot publiceren, door één vast team.',
+    kaart:'Voor bedrijven die structureel zichtbaar willen zijn met organische videocontent.',
+    doel:'Bereik en merkbekendheid opbouwen', ideaal:'Wekelijks zichtbaar wilt zijn en nog niet adverteert',
+    perMaand:'6 of 8 shorts', draaidagen:'1 per maand', publiceren:'Door ons', vanaf:2325,
+    pakketten:['org6','org8'] },
+  adv:{ key:'adv', nr:'02', naam:'Afdeling Advertentie', kort:'Advertentie', kleur:'#14309a', soft:'#e7eaf6',
+    pitch:'Advertentiecreatives met 3 hooks per video, klaar voor Meta en TikTok Ads. Wij maken de creatives, jouw mediabuyer zet ze live.',
+    kaart:'Voor bedrijven die sterke creatieve advertentiecontent willen ontwikkelen en testen.',
+    doel:'Advertenties testen en schalen', ideaal:'Adverteert en steeds nieuwe creatives nodig hebt',
+    perMaand:"6 of 8 video's x 3 hooks", draaidagen:'Per maand of per kwartaalronde', publiceren:'Via jouw mediabuyer', vanaf:2490,
+    pakketten:['adv6','adv8'] },
+  comp:{ key:'comp', nr:'03', naam:'Afdeling Compleet', kort:'Compleet', kleur:'#06053a', soft:'#e6e6ee',
+    pitch:'Organische content en advertentiecreatives uit één strategie, op twee vaste draaidagen per maand. Wat organisch werkt, wordt de basis voor nieuwe advertenties.',
+    kaart:'Voor bedrijven die organische videocontent en advertenties willen combineren.',
+    doel:'Bereik én conversie uit één strategie', ideaal:'Organisch zichtbaar wilt zijn én adverteert',
+    perMaand:'6 shorts + 3 ads, of 8 shorts + 6 ads', draaidagen:'2 per maand', publiceren:'Organisch door ons, ads via jouw mediabuyer', vanaf:3570,
+    pakketten:['comp6','comp8'], label:'Meest compleet' }
+};
+
+const PKG = {
+  org6:{ id:'org6', dept:'org', naam:'Organisch 6', prijs:2325, eenheid:'maand', shorts:6, ads:0, varianten:0,
+    ritme:'3x per 2 weken', draaidagen:'1 per maand, 4 tot 7 uur', start:6975, jaar:27900, jaarLevering:'72 shorts' },
+  org8:{ id:'org8', dept:'org', naam:'Organisch 8', prijs:2950, eenheid:'maand', shorts:8, ads:0, varianten:0, advies:true,
+    ritme:'2x per week', draaidagen:'1 per maand, 4 tot 7 uur', start:8850, jaar:35400, jaarLevering:'96 shorts' },
+  adv6:{ id:'adv6', dept:'adv', naam:'Advertentie 6', prijs:2490, eenheid:'maand of ronde', shorts:0, ads:6, hooks:3, varianten:18,
+    ritme:'Per maand of per kwartaal', draaidagen:'Draaidag en regie inbegrepen', start:null,
+    jaar:29880, jaarLevering:"72 video's · 216 varianten", jaarKw:9960, jaarLeveringKw:"4 rondes · 24 video's · 72 varianten" },
+  adv8:{ id:'adv8', dept:'adv', naam:'Advertentie 8', prijs:3320, eenheid:'maand of ronde', shorts:0, ads:8, hooks:3, varianten:24,
+    ritme:'Per maand of per kwartaal', draaidagen:'Draaidag en regie inbegrepen', start:null,
+    jaar:39840, jaarLevering:"96 video's · 288 varianten", jaarKw:13280, jaarLeveringKw:"4 rondes · 32 video's · 96 varianten" },
+  comp6:{ id:'comp6', dept:'comp', naam:'Compleet 6', prijs:3570, eenheid:'maand', shorts:6, ads:3, hooks:3, varianten:9,
+    ritme:'3x per 2 weken', draaidagen:'2 per maand, max 8 uur per dag', start:10710, jaar:42840, jaarLevering:'72 shorts · 36 ads · 108 varianten' },
+  comp8:{ id:'comp8', dept:'comp', naam:'Compleet 8', prijs:5440, eenheid:'maand', shorts:8, ads:6, hooks:3, varianten:18,
+    ritme:'2x per week', draaidagen:'2 per maand, max 8 uur per dag', start:16320, jaar:65280, jaarLevering:'96 shorts · 72 ads · 216 varianten' }
+};
+
+const INCL = {
+  org:{ in:['Strategie en onderwerpen','Hooks en scripts','Scriptmeeting 15 tot 30 min','1 draaidag per maand, 4 tot 7 uur','Regie op locatie','Montage, ondertiteling, kleur en geluid','1 feedbackronde per video','Captions en contentkalender','Publiceren op TikTok, Reels, Shorts en Facebook','Maandrapport en kwartaalanalyse','Vast aanspreekpunt en klantportaal'],
+        out:['LinkedIn als extra kanaal (zie aanvullende tarieven)','Communitymanagement','Advertenties (zie Advertentie of Compleet)',"Fotografie, thumbnails, bio's, raw footage, montagebestanden"] },
+  adv:{ in:['Creative strategie en invalshoeken','Scripts en 3 hooks per video','Draaidag en regie','Montage en ondertiteling','1 feedbackronde per creative','Export voor Meta en TikTok Ads','Videomateriaal doorsturen naar je mediabuyer'],
+        out:['Afstemming met de mediabuyer','Live zetten en advertentieaccount beheren','Campagnes beheren en optimaliseren','Analyse en rapportage van advertentieresultaten','Budgetten, targeting en mediabudget','Organische content en publiceren'] },
+  comp:{ in:['Eén strategie voor organisch en advertenties','Scripts en hooks, 3 hooks per advertentie','Montage, ondertiteling, kleur en geluid','Organisch publiceren, captions en contentkalender','Export voor Meta en TikTok Ads, naar je mediabuyer','Maandrapport organisch en kwartaalanalyse'],
+        out:['Afstemming met de mediabuyer en advertentieanalyse','Live zetten, campagnebeheer, budgetten en targeting','LinkedIn, communitymanagement, raw footage'] }
+};
+
+/* Genormaliseerde vergelijkingsmatrix. y = inbegrepen, n = niet inbegrepen, q = niet genoemd in PDF */
+const MATRIX = [
+  ['Strategie', {org:['y','Strategie en onderwerpen'],adv:['y','Creative strategie en invalshoeken'],comp:['y','Eén strategie voor organisch en ads']}],
+  ['Scripts en hooks', {org:['y','Hooks en scripts'],adv:['y','Scripts en 3 hooks per video'],comp:['y','3 hooks per advertentie']}],
+  ['Scriptmeeting', {org:['y','15 tot 30 min'],adv:['q','Niet genoemd'],comp:['q','Niet genoemd']}],
+  ['Draaidagen', {org:['y','1 per maand, 4 tot 7 uur'],adv:['y','Draaidag en regie'],comp:['y','2 per maand, max 8 uur']}],
+  ['Regie op locatie', {org:['y',''],adv:['y','Draaidag en regie'],comp:['q','Niet genoemd']}],
+  ['Montage en ondertiteling', {org:['y','Incl. kleur en geluid'],adv:['y',''],comp:['y','Incl. kleur en geluid']}],
+  ['Feedbackronde', {org:['y','1 per video'],adv:['y','1 per creative'],comp:['y','1 per video (algemene afspraak)']}],
+  ['Organisch publiceren', {org:['y','TikTok, Reels, Shorts, Facebook'],adv:['n',''],comp:['y','']}],
+  ['Captions en contentkalender', {org:['y',''],adv:['n',''],comp:['y','']}],
+  ['Export ads naar mediabuyer', {org:['n',''],adv:['y','Meta en TikTok Ads'],comp:['y','Meta en TikTok Ads']}],
+  ['Maandrapport en kwartaalanalyse', {org:['y',''],adv:['n','Analyse ads ligt bij mediabuyer'],comp:['y','Organisch']}],
+  ['Vast aanspreekpunt en klantportaal', {org:['y',''],adv:['q','Niet genoemd'],comp:['q','Niet genoemd']}],
+  ['Live zetten en campagnebeheer', {org:['n',''],adv:['n','Mediabuyer'],comp:['n','Mediabuyer']}],
+  ['LinkedIn', {org:['n','Aanvullend tarief'],adv:['n',''],comp:['n','Aanvullend tarief']}],
+  ['Communitymanagement', {org:['n',''],adv:['q','Niet genoemd'],comp:['n','']}],
+];
+
+const ALGEMEEN = [
+  {k:'Start', v:'3 maanden', d:'Daarna evaluatie en vervolg'},
+  {k:'Facturatie', v:'Vooraf', d:'Betaling binnen 14 dagen'},
+  {k:'Feedback', v:'1 ronde', d:'Per video inbegrepen'},
+  {k:'Mediabuying', v:'Bij de klant', d:'Live zetten en campagnebeheer'}
+];
+
+/* Aanvullende tarieven. calc: per eenheid rekenbaar ja/nee */
+const EXTRAS = [
+  {id:'fb', cat:'Feedback en wijzigingen', naam:'Extra feedbackronde', sub:'Per ronde, na de inbegrepen ronde', prijs:75, eenheid:'ronde', calc:true,
+    wat:'Een extra feedbackronde bovenop de ene inbegrepen ronde per video.', wanneer:'Als de klant na de inbegrepen ronde nog aanpassingen wil.', vw:'Alle punten in één keer sturen, dan worden ze samen verwerkt. Altijd vooraf afgestemd en per mail bevestigd.'},
+  {id:'reshoot', cat:'Feedback en wijzigingen', naam:'Opnieuw opnemen', sub:'Per video, bij wijziging van een goedgekeurd script', prijs:95, eenheid:'video', calc:true,
+    wat:'Een video opnieuw opnemen.', wanneer:'Wanneer een al goedgekeurd script daarna wordt gewijzigd.', vw:'Vooraf afgestemd en per mail bevestigd.'},
+  {id:'verzet0', cat:'Draaidag annuleren of verzetten', naam:'Tot 7 werkdagen vooraf', sub:'Kosteloos', prijs:0, eenheid:'draaidag', calc:true,
+    wat:'Draaidag annuleren of verzetten.', wanneer:'Melding uiterlijk 7 werkdagen voor de draaidag.', vw:'We zoeken samen direct een nieuwe datum.'},
+  {id:'verzet7', cat:'Draaidag annuleren of verzetten', naam:'Binnen 7 werkdagen', sub:'Per draaidag', prijs:395, eenheid:'draaidag', calc:true,
+    wat:'Draaidag annuleren of verzetten binnen 7 werkdagen.', wanneer:'Melding binnen 7 werkdagen voor de draaidag, omdat de dag al is ingepland.', vw:'We zoeken samen direct een nieuwe datum.'},
+  {id:'verzet24', cat:'Draaidag annuleren of verzetten', naam:'Binnen 24 uur of niet aanwezig', sub:'Van de draaidag', prijsTxt:'100%', calc:false,
+    wat:'Annulering binnen 24 uur of de klant is niet aanwezig.', wanneer:'Bij annulering binnen 24 uur voor de draaidag of afwezigheid.', vw:'100% van de draaidag wordt in rekening gebracht.', check:'De waarde van een draaidag staat niet in de PDF, dus dit bedrag is niet te berekenen.'},
+  {id:'content', cat:'Extra content en kanalen', naam:'Extra content', sub:'Op een geplande draaidag', prijsTxt:'In overleg', calc:false,
+    wat:'Extra video\'s bovenop de afdeling.', wanneer:'Als de klant meer content wil. Wordt meegenomen op een geplande draaidag.', vw:'Samen afstemmen en per mail bevestigen. Noem extern geen prijs per video.'},
+  {id:'hook', cat:'Extra content en kanalen', naam:'Extra hook', sub:'Per variant', prijs:45, eenheid:'variant', calc:true,
+    wat:'Een extra openingshook, dus een extra creatieve variant op een basisvideo.', wanneer:'Als de klant meer varianten wil dan de 3 hooks per video.', vw:'Vooraf afgestemd en per mail bevestigd.'},
+  {id:'spoed', cat:'Extra content en kanalen', naam:'Spoedlevering', sub:'Per video, binnen 3 werkdagen', prijs:95, eenheid:'video', calc:true,
+    wat:'Levering van een video binnen 3 werkdagen.', wanneer:'Als de klant een video sneller nodig heeft.', vw:'Deadline en bedrag worden per mail bevestigd.'},
+  {id:'linkedin', cat:'Extra content en kanalen', naam:'LinkedIn als extra kanaal', sub:'Vooraf afgestemd', prijsTxt:'Op aanvraag', calc:false,
+    wat:'Publiceren op LinkedIn naast de standaard kanalen.', wanneer:'Als de klant ook op LinkedIn zichtbaar wil zijn.', vw:'Mogelijkheden vooraf met de klant afstemmen.'},
+  {id:'km', cat:'Reizen en materiaal', naam:'Reiskosten', sub:'Per km', prijs:0.35, eenheid:'km', calc:true,
+    wat:'Vergoeding voor reiskilometers.', wanneer:'Bij reizen naar de opnamelocatie.', vw:'Tarief per km.', check:'De PDF zegt niet of dit enkele reis of retour is, en ook niet vanaf welke afstand het geldt.'},
+  {id:'reisuur', cat:'Reizen en materiaal', naam:'Extra reisuur', sub:'Boven 100 km enkele reis', prijs:50, eenheid:'uur', calc:true,
+    wat:'Vergoeding voor extra reistijd.', wanneer:'Als de opnamelocatie meer dan 100 km enkele reis is.', vw:'Per extra reisuur.'},
+  {id:'raw', cat:'Reizen en materiaal', naam:'Raw footage', sub:'Per draaidag, binnen 90 dagen', prijs:450, eenheid:'draaidag', calc:true,
+    wat:'Het ruwe beeldmateriaal van een draaidag.', wanneer:'Op verzoek, binnen 90 dagen na de draaidag.', vw:'Raw footage is standaard niet inbegrepen.'},
+  {id:'licentie', cat:'Reizen en materiaal', naam:'Licenties en beeldrechten', sub:'Muziek, locatie, merk', prijsTxt:'Kostprijs', calc:false,
+    wat:'Licenties voor muziek, locatie of merk.', wanneer:'Als een opname of video specifieke rechten nodig heeft.', vw:'Doorberekend tegen kostprijs.'},
+  {id:'montage', cat:'Reizen en materiaal', naam:'Montagebestanden', sub:'Niet standaard inbegrepen', prijsTxt:'Op aanvraag', calc:false,
+    wat:'De projectbestanden van de montage.', wanneer:'Als de klant de montagebestanden wil ontvangen.', vw:'Op aanvraag.'},
+];
+const EXTRA_CATS = ['Feedback en wijzigingen','Draaidag annuleren of verzetten','Extra content en kanalen','Reizen en materiaal'];
+
+const PARTNERJAAR = {
+  voordelen:[
+    {k:'Jaarstrategie', v:'Startsessie + jaarplan', d:'90 minuten. Advertentie: creative plan per kwartaal'},
+    {k:'Planning', v:'Voorrang', d:'Draaidagen 12 maanden vooruit vastgelegd'},
+    {k:'Prijs', v:'Vast, geen indexatie', d:'Bij een gewoon vervolg 1x per jaar CPI of tot 3%'},
+    {k:'Extra opnames', v:'2 per jaar', d:'Halve dag, bij Organisch en Compleet'}
+  ],
+  voorwaarden:[
+    {k:'Looptijd', v:'12 maanden', d:'Aansluitend op de startperiode, niet tussentijds opzegbaar'},
+    {k:'Facturatie', v:'Vooraf', d:'Per maand. Advertentie per kwartaal: per ronde'},
+    {k:'Evaluatie', v:'Elk kwartaal', d:'Kwartaalreviews plus een jaarreview'},
+    {k:'Zekerheid', v:'Per kwartaal opzegbaar', d:'Als wij aantoonbaar niet leveren wat is afgesproken'}
+  ]
+};
+
+const CREATOR = {
+  partner:{ naam:'Creator Partner', prijs:1950, opstart:1250, totaal6:12950, label:'Ons advies' },
+  academy:{ naam:'Creator Academy', prijs:295, minLooptijd:'6 maanden' },
+  wiedoetwat:[
+    ['Strategie en contentplan','Volledig, elke maand bijgestuurd op de cijfers','Levert input'],
+    ['Scripts','6 per maand','Schrijft de rest, wij geven feedback'],
+    ['Specialistische opnames','2 per traject, halve dag (maand 1 en 4), inclusief 2 shorts per keer','Draait mee en leert op de set'],
+    ['Dagelijkse opnames en montage','Nee','Volledig'],
+    ['Feedback',"Max 8 video's per maand, 1 gebundelde ronde met tijdcodes",'Verwerkt de feedback'],
+    ['Publiceren','Nee','Volledig'],
+    ['Analyse','Maandrapport en kwartaalreview','Geeft toegang tot de kanalen']
+  ]
+};
+
+const FAQ = [
+  {q:'Zijn er aanvullende kosten?', a:'Onze afdelingen zijn zo ingericht dat je vooraf precies weet wat je ontvangt en wat de investering is. Heb je aanvullende wensen, zoals extra video\'s, LinkedIn als extra kanaal of een spoedlevering? Dan bespreken we vooraf de mogelijkheden en eventuele meerkosten. Zo kom je nooit voor verrassingen te staan.', bron:'p. 15'},
+  {q:'Zijn er nog een paar aanpassingen mogelijk?', a:'Natuurlijk. Per video zit één feedbackronde inbegrepen, een extra ronde is € 75. Stuur je alle punten in één keer, dan verwerken we ze samen.', bron:'p. 15'},
+  {q:'Kunnen we de draaidag verzetten?', a:'Dat kan. Tot 7 werkdagen vooraf kosteloos, daarna € 395 omdat de dag al is ingepland. We zoeken samen direct een nieuwe datum.', bron:'p. 15'},
+  {q:'Kunnen we het sneller krijgen?', a:'Ja, met een spoedlevering binnen 3 werkdagen voor € 95 per video. We bevestigen de deadline en het bedrag per mail.', bron:'p. 15'},
+  {q:'Kunnen jullie ook op LinkedIn posten?', a:'Ja, LinkedIn kunnen we als extra kanaal toevoegen. We stemmen de mogelijkheden vooraf met je af.', bron:'p. 15'},
+  {q:'Zetten jullie de advertenties ook live?', a:'Daar kiezen we bewust niet voor. Wij maken de creatives en sturen ze klaar voor gebruik door naar je mediabuyer.', bron:'p. 15'},
+  {q:'Analyseren jullie de advertentieresultaten?', a:'Dat doet je mediabuyer. Die inzichten gebruiken we wel graag als input voor nieuwe scripts.', bron:'p. 15'},
+  {q:'We hebben geen mediabuyer.', a:'Geen probleem. We zoeken samen een geschikte partij die de campagnes live zet en beheert.', bron:'p. 15'},
+  {q:'Kunnen jullie extra video\'s maken?', a:'Ja, extra content nemen we mee op een geplande draaidag. We stemmen het samen af en bevestigen het per mail.', bron:'p. 15'},
+  {q:'Kunnen we maandelijks opzeggen?', a:'We starten altijd met 3 maanden en evalueren dan samen. Daarna kies je een vervolg van 3, 6 of 9 maanden, of het Partnerjaar.', bron:'p. 15'},
+  {q:'Krijgen we korting als we beide afnemen?', a:'We werken niet met kortingen, wel met meer gemak: met Afdeling Compleet heb je één team, één strategie en vaste draaidagen.', bron:'p. 15'},
+  {q:'Wat als de klant meer creatieve varianten wil?', a:'Elke advertentievideo krijgt 3 hooks. Extra varianten kunnen met een extra hook: € 45 per variant, vooraf afgestemd en per mail bevestigd.', bron:'Aanvullende tarieven, p. 14'},
+  {q:'Wat als een goedgekeurd script nog wordt gewijzigd?', a:'Dan nemen we de video opnieuw op voor € 95 per video. Dit stemmen we vooraf af.', bron:'Aanvullende tarieven, p. 14'},
+  {q:'Wat als een klant geplande video\'s niet gebruikt?', a:'Bij Organisch halen we niet gebruikte video\'s binnen 2 maanden in.', bron:'Afdeling Organisch, p. 4', check:'Alleen genoemd bij Organisch. Niet duidelijk of dit ook geldt voor Advertentie en Compleet.'},
+  {q:'Welke onderdelen zijn nooit inbegrepen?', a:'Mediabuying, campagnebeheer en advertentieanalyse bieden we niet aan; dat ligt bij de mediabuyer van de klant. Daarnaast vallen LinkedIn, communitymanagement, raw footage en montagebestanden buiten de afdelingen.', bron:'p. 4, 6, 8, 14'},
+  {q:'Hoe werkt meerwerk in het algemeen?', a:'Meerwerk bespreken we altijd vooraf en voeren we pas uit na akkoord per mail.', bron:'p. 14'},
+];
+
+const ARGS = {
+  org:['Geen losse video\'s, maar een complete contentafdeling: van strategie tot publiceren door één vast team.','Wekelijks zichtbaar op TikTok, Instagram Reels, YouTube Shorts en Facebook.','Organisch 8 is ons advies: een vast ritme van 2x per week.','We starten met 3 maanden en bespreken in maand 3 resultaten en koers.','Gaat de klant later adverteren? Dan stappen we bij de evaluatie over naar Compleet.'],
+  adv:['3 hooks per video: drie verschillende openingen op één basisvideo, dus 18 of 24 varianten om te testen.','Klaar voor Meta en TikTok Ads en direct doorgestuurd naar de mediabuyer.','Bewuste keuze: wij maken de creatives, de mediabuyer zet live, beheert en analyseert.','Maandelijks voor wie continu test, per kwartaal voor wie per campagne werkt.','Geen mediabuyer? Dan zoeken we samen een geschikte partij.'],
+  comp:['Organisch en advertenties uit hetzelfde verhaal en één strategie.','Wat organisch werkt, wordt de basis voor nieuwe advertenties.','Twee vaste draaidagen per maand, shorts en ads vast ingepland.','Geen korting, wel meer gemak: één team, één strategie en vaste draaidagen.']
+};
+const deptArgs = p => ARGS[p.dept].filter(a=>p.advies||!/ons advies/.test(a));
+const INTERN_REGEL = 'Op de vraag "wat kost één video?": we verkopen geen losse video\'s maar een afdeling. Noem extern nooit een prijs per video.';
+
+const SITUATIES = [
+  {titel:'Lokaal bedrijf, adverteert niet', tekst:'Wil vaker gezien worden in de regio en heeft geen plannen om te adverteren.', pkg:'org8', waarom:'Doel is bereik en merkbekendheid, er wordt niet geadverteerd. Organisch 8 is ons advies voor een ritme van 2x per week.'},
+  {titel:'Klein budget, wil starten met organisch', tekst:'Wil structureel zichtbaar worden, maar begint liever met een rustiger ritme.', pkg:'org6', waarom:'Organisch 6 geeft een ritme van 3x per 2 weken met dezelfde werkzaamheden als Organisch 8.'},
+  {titel:'Webshop met mediabuyer, test continu', tekst:'Adverteert al, de mediabuyer vraagt elke maand om nieuwe creatives.', pkg:'adv8', afname:'maand', waarom:'Adverteert en heeft steeds nieuwe creatives nodig. Maandelijkse afname past bij continu testen.'},
+  {titel:'Werkt met campagnes per seizoen', tekst:'Adverteert rond vaste momenten en heeft per campagne een nieuwe set nodig.', pkg:'adv6', afname:'kwartaal', waarom:'Per kwartaal: één ronde per kwartaal voor wie per campagne werkt.'},
+  {titel:'Adverteert en wil ook organisch zichtbaar zijn', tekst:'Heeft ads lopen en wil daarnaast wekelijks organisch posten.', pkg:'comp6', waarom:'Bereik én conversie uit één strategie. Wat organisch werkt, wordt input voor nieuwe ads.'},
+  {titel:'Na evaluatie tevreden, wil zekerheid', tekst:'Klant is na maand 3 positief en wil een vaste prijs en voorrang bij de planning.', route:'partner', waarom:'Partnerjaar: zelfde afdeling en maandbedrag, 12 maanden vast, geen indexatie, jaarstrategie en voorrang.'},
+  {titel:'Klant neemt een eigen creator aan', tekst:'Wil short video intern oppakken, maar strategisch sterk blijven.', route:'partner', waarom:'Creator Partner: Shortclips houdt strategie en regie, de creator doet het dagelijkse werk.'},
+];
+
+const CONTROLE = [
+  {t:'Draaidagen Advertentie', d:'Bij Advertentie staat "Draaidag en regie" inbegrepen, maar niet hoeveel draaidagen per maand of per kwartaalronde.'},
+  {t:'Startperiode Advertentie', d:'Bij Organisch en Compleet staat een startperiodebedrag (3 maanden). Bij Advertentie niet. De prijsopbouw rekent dit als 3 x maandbedrag (maandelijks) of 1 ronde (per kwartaal) en markeert het als afgeleid.'},
+  {t:'Reiskosten', d:'€ 0,35 per km: niet duidelijk of dit enkele reis of retour is, en vanaf welke afstand het geldt.'},
+  {t:'Annuleren binnen 24 uur', d:'"100% van de draaidag", maar de waarde van een draaidag staat niet in de PDF. Daarom niet berekend.'},
+  {t:'Creator Academy', d:'Niet duidelijk of de Academy los wordt verkocht, bij Creator Partner hoort of ernaast kan worden afgenomen.'},
+  {t:'Extra opnames Partnerjaar', d:'2 extra opnames per jaar (halve dag) bij Organisch en Compleet. Niet vermeld hoeveel video\'s die opleveren.'},
+  {t:'Niet gebruikte video\'s', d:'Inhalen binnen 2 maanden staat alleen bij Organisch. Onduidelijk of dit ook geldt voor Advertentie en Compleet.'},
+  {t:'Inbegrepen bij Compleet', d:'De Compleet-tabel noemt scriptmeeting, regie op locatie, feedbackronde en vast aanspreekpunt/klantportaal niet expliciet. De feedbackronde is aangehouden via de algemene afspraak op p. 2; de rest staat als "niet genoemd".'},
+];
+
+/* =====================================================================
+   2. HULPFUNCTIES
+   ===================================================================== */
+const $ = s => document.querySelector(s);
+const eur = n => '€ ' + Number(n).toLocaleString('nl-NL',{minimumFractionDigits:(n%1?2:0),maximumFractionDigits:2});
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const D = k => DEPTS[k];
+const P = id => PKG[id];
+const accVars = k => `--acc:${D(k).kleur};--acc-soft:${D(k).soft}`;
+const ICON = {
+  y:'<span class="ico y"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>',
+  n:'<span class="ico n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2"><path d="M6 6l12 12M18 6L6 18"/></svg></span>',
+  q:'<span class="ico q" title="Niet genoemd in de PDF">?</span>'
+};
+const chev = '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+const checkNote = t => `<div class="check"><span class="check-ico">!</span><div><b>Controlepunt:</b> ${t}</div></div>`;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
+function copy(text){
+  const done=()=>toast('Gekopieerd');
+  try{ navigator.clipboard.writeText(text).then(done,()=>fallbackCopy(text)); }catch(e){ fallbackCopy(text); }
+}
+function fallbackCopy(text){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Gekopieerd')}catch(e){toast('Kopiëren lukte niet, selecteer de tekst handmatig')}ta.remove()}
+
+/* gedeelde state tussen onderdelen */
+const S = {
+  deptPkg:{org:'org8',adv:'adv6',comp:'comp6'},
+  advAfname:'maand',
+  calc:{pkg:'org8', afname:'maand', vorm:'start', vervolg:3, qty:{}, creatorAcademy:0},
+  cmp:['org6','org8'],
+  wiz:{step:0, a:{}},
+  adv:{klant:'', doel:'', dept:'', pkg:'', afname:'maand', vorm:'start', mediabuyer:'', extras:{}}
+};
+
+/* =====================================================================
+   3. NAVIGATIE (tabbladen binnen deze ene pagina)
+   ===================================================================== */
+const TABS = [
+  {id:'overzicht', t:'Overzicht'},
+  {id:'organisch', t:'Organisch', dept:'org'},
+  {id:'advertentie', t:'Advertentie', dept:'adv'},
+  {id:'compleet', t:'Compleet', dept:'comp'},
+  {id:'partner', t:'Partnerjaar en Creator'},
+  {id:'extra', t:'Extra kosten en vragen', faq:true},
+  {sep:true},
+  {id:'adviseren', t:'Klant adviseren', primary:true},
+  {id:'vergelijken', t:'Vergelijken'},
+];
+let CUR='overzicht';
+function renderTabs(cur){
+  $('#tabs').innerHTML = TABS.map(r=>{
+    if(r.sep) return '<span class="sep"></span>';
+    const dot = r.dept ? `<span class="dot" style="background:${D(r.dept).kleur}"></span>` : r.faq ? '<span class="dot" style="background:var(--faq)"></span>' : '';
+    const onStyle = cur===r.id && r.dept ? `style="background:${D(r.dept).kleur}"` : '';
+    return `<button role="tab" data-tab="${r.id}" class="${cur===r.id?'on':''} ${r.primary?'prim':''}" ${onStyle}>${dot}${r.t}</button>`;
+  }).join('');
+  $('#tabs').querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>nav(b.dataset.tab));
+  $('#ctrlN').textContent=CONTROLE.length;
+}
+const VIEWS = {}, AFTER = {};
+function go(){
+  const v = VIEWS[CUR] ? CUR : 'overzicht';
+  renderTabs(v);
+  $('#view').innerHTML = VIEWS[v]();
+  if(AFTER[v]) AFTER[v]();
+  const top=$('#prijslijst').getBoundingClientRect().top+window.scrollY;
+  if(window.scrollY>top) window.scrollTo(0,top);
+  try{localStorage.setItem('sc-prijslijst-tab',v)}catch(e){}
+}
+function nav(id){ CUR=id; go(); }
+const DEPT_TAB = {org:'organisch',adv:'advertentie',comp:'compleet'};
+function toDept(k){nav(DEPT_TAB[k])}
+function toCompare(a,b){S.cmp=[a,b];nav('vergelijken')}
+function toAdvies(pkg,afname){ const p=P(pkg); const A=S.a;
+  A.creator=false; A.adv=p.dept==='org'?'nee':'ja'; A.org=p.dept==='comp'?'ja':(p.dept==='adv'?'nee':null);
+  A.pkg=pkg; if(afname) A.afname=afname; nav('adviseren'); }
+
+/* =====================================================================
+   4. COMPONENTEN
+   ===================================================================== */
+function volChips(p){
+  const v=[];
+  if(p.shorts) v.push(`${p.shorts} shorts`);
+  if(p.ads) v.push(`${p.ads} ${p.dept==='adv'?"video's":'ads'} x 3 hooks`);
+  if(p.varianten) v.push(`${p.varianten} varianten`);
+  return v;
+}
+function pkgCard(id, opts={}){
+  const p=P(id), kw=p.dept==='adv'&&S.advAfname==='kwartaal';
+  const per = p.dept==='adv' ? (kw?'per kwartaalronde':'per maand') : 'per maand';
+  const sub = p.dept==='org' ? `Ritme ${p.ritme} · 1 draaidag per maand` : p.dept==='comp' ? `Ritme ${p.ritme} · 2 draaidagen per maand` : (kw?'Eén ronde per kwartaal':'Elke maand een nieuwe set');
+  return `<div class="pkg ${opts.sel?'sel':''}" style="${accVars(p.dept)}" data-pkg="${id}">
+    <div class="pkg-top">
+      ${p.advies?'<span class="advies">Ons advies</span>':''}
+      <div class="nm">${p.naam}</div>
+      <div class="price">${eur(p.prijs)}<span class="per"> ${per}</span></div>
+    </div>
+    <div class="pkg-body">
+      <div class="vol">${volChips(p).map(v=>{const c=p.dept==='comp'?(/shorts/.test(v)?'org':'adv'):null;return `<span class="chip" ${c?`style="background:${D(c).soft};color:${D(c).kleur}"`:''}>${v}</span>`}).join('')}</div>
+      <div class="per" style="margin-top:8px">${sub}</div>
+      ${p.start?`<div class="startbox"><span>Start 3 maanden</span><b>${eur(p.start)}</b></div>`:''}
+      ${opts.sel?'<div class="selmark">✓ Geselecteerd</div>':''}
+    </div>
+  </div>`;
+}
+function inclList(dept){
+  const i=INCL[dept];
+  return `<div class="grid g2">
+    <div><div class="eyebrow" style="color:var(--ok)">Inbegrepen</div>${i.in.map(x=>`<div class="li">${ICON.y}<span>${x}</span></div>`).join('')}</div>
+    <div><div class="eyebrow" style="color:var(--no)">Niet inbegrepen</div>${i.out.map(x=>`<div class="li">${ICON.n}<span>${x}</span></div>`).join('')}</div>
+  </div>`;
+}
+function infoBlocks(list,cols='g4'){ return `<div class="grid ${cols}">${list.map(x=>`<div class="info"><div class="k">${x.k}</div><div class="v">${x.v}</div><div class="d">${x.d}</div></div>`).join('')}</div>`; }
+function argsBlock(dept){
+  return `<div class="acc"><button onclick="this.parentNode.classList.toggle('open')"><span class="qmark" style="background:${D(dept).soft};color:${D(dept).kleur}">★</span><span><b>Wat vertel je de klant?</b></span>${chev}</button>
+    <div class="body">${ARGS[dept].map(a=>`<div class="li">${ICON.y}<span>${a}</span></div>`).join('')}
+    <div class="li" style="margin-top:6px">${ICON.n}<span><b>Let op:</b> ${INTERN_REGEL}</span></div></div></div>`;
+}
+const checkLine = t => `<div class="small" style="color:#7a4a06;margin-top:8px"><span class="check-ico" style="width:15px;height:15px;font-size:10px;margin-right:6px">!</span>${t}</div>`;
+
+/* =====================================================================
+   5. VIEWS
+   ===================================================================== */
+VIEWS.overzicht = () => `
+  <div class="kern"><b>Je koopt geen losse video's. Je krijgt een complete creatieve afdeling.</b> Eerst kiezen we samen de afdeling, daarna de capaciteit.</div>
+  <div class="grid g3">
+    ${['org','adv','comp'].map(k=>{const d=D(k);return `<a class="dept bg-${k}" href="javascript:void(0)" onclick="toDept('${k}')">
+      <div class="row"><span class="num">${d.nr}</span>${d.label?`<span class="tag-adv right">${d.label}</span>`:''}</div>
+      <h2>${d.kort}</h2><p>${d.kaart}</p>
+      <div class="prices">${d.pakketten.map(id=>`<div class="pr"><span>${P(id).naam}${P(id).advies?' · advies':''}</span><b>${eur(P(id).prijs)}</b></div>`).join('')}
+      <div class="foot">${k==='adv'?'per maand of per kwartaalronde':'per maand'}</div></div>
+      <div class="more">Bekijk afdeling →</div>
+    </a>`}).join('')}
+  </div>
+
+  <div class="card section" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-left:4px solid var(--navy)">
+    <div><b style="font-size:15px">Klant in gesprek?</b><div class="muted small">Beantwoord twee vragen en je hebt direct de afdeling, het pakket, de prijs en een samenvatting om te kopiëren.</div></div>
+    <button class="btn pri right" onclick="nav('adviseren')">Klant adviseren →</button>
+  </div>
+
+  <div class="section">
+    <h2>Alle pakketten</h2>
+    <div class="card" style="padding:4px 6px;overflow:auto">
+      <table class="tbl clickable"><thead><tr><th>Pakket</th><th>Wat de klant krijgt</th><th>Draaidagen</th><th class="r">Investering</th><th class="r">Start 3 mnd</th></tr></thead><tbody>
+      ${Object.values(PKG).map(p=>`<tr style="--acc:${D(p.dept).kleur}" class="drow" onclick="S.deptPkg['${p.dept}']='${p.id}';toDept('${p.dept}')"><td><span class="dot" style="display:inline-block;background:${D(p.dept).kleur};margin-right:8px"></span><b>${p.naam}</b>${p.advies?' <span class="chip mini">advies</span>':''}</td>
+        <td>${volChips(p).join(' · ')}</td><td class="muted">${p.dept==='adv'?'Inbegrepen':p.dept==='org'?'1 per maand':'2 per maand'}</td>
+        <td class="r"><b class="pc">${eur(p.prijs)}</b> <span class="muted small">${p.dept==='adv'?'p/m of per ronde':'p/m'}</span></td><td class="r">${p.start?`<span class="pc">${eur(p.start)}</span>`:'<span class="muted">·</span>'}</td></tr>`).join('')}
+      <tr onclick="nav('partner')"><td><span class="dot" style="display:inline-block;background:#06053a;margin-right:8px"></span><b>Creator Partner</b></td><td>Strategie en regie, eigen creator doet het werk</td><td class="muted">2 per traject</td><td class="r"><b>${eur(CREATOR.partner.prijs)}</b> <span class="muted small">p/m</span></td><td class="r"><span class="muted small">+ ${eur(CREATOR.partner.opstart)} opstart</span></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="section"><h2>Geldt altijd</h2>${infoBlocks(ALGEMEEN)}</div>
+`;
+
+function deptView(dept){
+  const d=D(dept), sel=S.deptPkg[dept], [a,b]=d.pakketten.map(P), kw=S.advAfname==='kwartaal';
+  const diff = dept==='org' ? `<b>+2 shorts</b><span>ritme 3x per 2 weken → <b>2x per week</b></span><b>+${eur(b.prijs-a.prijs)} p/m</b>`
+    : dept==='adv' ? `<b>+2 video's</b><b>+6 varianten</b><b>+${eur(b.prijs-a.prijs)} per ${kw?'ronde':'maand'}</b>`
+    : `<b>+2 shorts</b><b>+3 ads (+9 varianten)</b><b>+${eur(b.prijs-a.prijs)} p/m</b><span>draaidagen gelijk</span>`;
+  const weten = {
+    org:[{k:'Kanalen',v:'TikTok, Reels, Shorts, Facebook',d:''},{k:"Niet gebruikte video's",v:'Inhalen binnen 2 maanden',d:''},{k:'Ook adverteren?',v:'Bij evaluatie naar Compleet',d:''}],
+    adv:[{k:'Mediabuyer',v:'Zet live, beheert, analyseert',d:''},{k:'Geen mediabuyer?',v:'We zoeken samen een partij',d:''},{k:'3 hooks',v:'3 openingen per basisvideo',d:''}],
+    comp:[{k:'Eén strategie',v:'Organisch en ads samen',d:''},{k:'Organisch test',v:'Welke hooks werken',d:''},{k:'Ads schalen',v:'Winnaars worden creatives',d:''}]
+  }[dept];
+  return `
+  <div class="dhead filled" style="${accVars(dept)}">
+    <div><div class="eyebrow">${d.nr} · Afdeling${d.label?' · '+d.label:''}</div><h1>${d.naam}</h1>
+      <div class="muted">${d.pitch}</div>
+      <div class="fit"><b>Past bij een klant die</b> ${d.ideaal.toLowerCase()}.</div></div>
+    <div class="row right" style="align-self:flex-start">
+      <button class="btn ghost-w" onclick="toCompare('${a.id}','${b.id}')">Vergelijken</button>
+      <button class="btn" onclick="toAdvies('${sel}','${S.advAfname}')">Klant adviseren</button></div>
+  </div>
+  <div class="section" style="${accVars(dept)};margin-top:18px">
+    ${dept==='adv'?`<div class="row" style="margin-bottom:10px"><span class="muted small">Afname</span><div class="seg" id="afnameSeg"><button data-v="maand" class="${!kw?'on':''}">Maandelijks · continu testen</button><button data-v="kwartaal" class="${kw?'on':''}">Per kwartaal · per campagne</button></div></div>`:''}
+    <div class="grid g2">${pkgCard(a.id,{sel:sel===a.id})}${pkgCard(b.id,{sel:sel===b.id})}</div>
+    <div class="diffbar"><span>Verschil ${a.naam} → ${b.naam.split(' ')[1]}:</span>${diff}</div>
+    ${dept==='adv'?`<div class="formula small-f"><div class="fbox"><b>${P(sel).ads}</b><span>video's</span></div><div class="fop">×</div><div class="fbox"><b>3</b><span>hooks</span></div><div class="fop">=</div><div class="fbox res"><b>${P(sel).varianten}</b><span>varianten</span></div><span class="muted small">Klik op een pakket om de berekening te wisselen</span></div>`:''}
+  </div>
+  <div class="card section acc-card" style="${accVars(dept)}"><h2 style="margin-bottom:8px">Wat zit erin?</h2><div class="muted small" style="margin-bottom:10px">Gelijk voor beide pakketten. Alleen het volume verschilt.</div>${inclList(dept)}
+    ${dept==='adv'?checkLine(CONTROLE[0].d):''}${dept==='comp'?checkLine('Scriptmeeting, regie op locatie en klantportaal worden bij Compleet niet expliciet genoemd. Zie controlepunten.'):''}</div>
+  <div class="section tinted" style="${accVars(dept)}">${infoBlocks(weten,'g3')}</div>
+  <div class="section">${argsBlock(dept)}</div>`;
+}
+VIEWS.organisch=()=>deptView('org'); VIEWS.advertentie=()=>deptView('adv'); VIEWS.compleet=()=>deptView('comp');
+function bindDept(dept){
+  document.querySelectorAll('.pkg[data-pkg]').forEach(el=>el.onclick=()=>{S.deptPkg[dept]=el.dataset.pkg;go()});
+  document.querySelectorAll('#afnameSeg button').forEach(b=>b.onclick=()=>{S.advAfname=b.dataset.v;go()});
+}
+AFTER.organisch=()=>bindDept('org'); AFTER.advertentie=()=>bindDept('adv'); AFTER.compleet=()=>bindDept('comp');
+
+/* ---------- Partnerjaar en Creator ---------- */
+VIEWS.partner = () => `
+  <div class="seg" id="pSeg" style="margin-bottom:18px"><button data-v="jaar" class="${S.pTab!=='creator'?'on':''}">Partnerjaar</button><button data-v="creator" class="${S.pTab==='creator'?'on':''}">Creator Partner</button></div>
+  ${S.pTab!=='creator' ? `
+  <div class="dhead" style="--acc:#06053a"><div><div class="eyebrow">Na de evaluatie in maand 3</div><h1>Partnerjaar</h1>
+    <div class="muted">Dezelfde afdeling en hetzelfde maandbedrag, 12 maanden vast.</div>
+    <div class="fit"><b>Past bij een klant die</b> na de startperiode tevreden is en zekerheid wil.</div></div></div>
+  <div class="section">${infoBlocks(PARTNERJAAR.voordelen)}</div>
+  <div class="section"><h2>Jaarbedragen</h2>
+    <div class="card" style="padding:4px 6px;overflow:auto"><table class="tbl"><thead><tr><th>Afdeling</th><th>Levering per jaar</th><th class="r">Per maand of ronde</th><th class="r">Per jaar</th></tr></thead><tbody>
+      ${Object.values(PKG).flatMap(p=>p.dept==='adv'
+        ? [[p.naam+' · maandelijks',p.jaarLevering,eur(p.prijs),p.jaar,p.dept],[p.naam+' · per kwartaal',p.jaarLeveringKw,eur(p.prijs)+' per ronde',p.jaarKw,p.dept]]
+        : [[p.naam,p.jaarLevering,eur(p.prijs),p.jaar,p.dept]]).map(r=>`<tr class="drow" style="--acc:${D(r[4]).kleur}"><td><span class="dot" style="display:inline-block;background:${D(r[4]).kleur};margin-right:8px"></span><b>${r[0]}</b></td><td class="muted">${r[1]}</td><td class="r pc">${r[2]}</td><td class="r"><b class="pc" style="font-size:15px">${eur(r[3])}</b></td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="small muted" style="margin-top:6px">Noem in een voorstel eerst het jaarbedrag, met het maandbedrag eronder.</div></div>
+  <div class="section"><h2>Partnerjaar of regulier vervolg?</h2>
+    <div class="grid g2">
+      <div class="card"><div class="eyebrow">Regulier vervolg</div><div class="li">${ICON.y}<span>3, 6 of 9 maanden</span></div><div class="li">${ICON.y}<span>Zelfde maandbedrag</span></div><div class="li">${ICON.n}<span>1x per jaar indexatie (CPI of tot 3%)</span></div></div>
+      <div class="card" style="border:2px solid var(--navy)"><div class="eyebrow">Partnerjaar</div><div class="li">${ICON.y}<span>12 maanden vast, zelfde maandbedrag</span></div><div class="li">${ICON.y}<span>Vaste prijs, geen indexatie</span></div><div class="li">${ICON.y}<span>Jaarstrategie en voorrang bij de planning</span></div><div class="li">${ICON.y}<span>2 extra opnames per jaar (Organisch en Compleet)</span></div></div>
+    </div></div>
+  <div class="section"><h2>Voorwaarden</h2>${infoBlocks(PARTNERJAAR.voorwaarden)}</div>`
+  : `
+  <div class="dhead" style="--acc:#06053a"><div><div class="eyebrow">Alleen als de klant het intern wil doen</div><h1>Creator Partner</h1>
+    <div class="muted">Shortclips houdt de strategie en de regie, de eigen creator van de klant doet het dagelijkse werk.</div>
+    <div class="fit"><b>Past bij een klant die</b> een eigen creator in dienst heeft of gaat aannemen.</div></div></div>
+  <div class="grid g2 section">
+    <div class="pkg sel" style="--acc:#06053a;--acc-soft:#e6e6ee;cursor:default"><span class="advies">Ons advies</span>
+      <div class="nm">Creator Partner</div><div class="price">${eur(CREATOR.partner.prijs)}<span class="per"> per maand</span></div>
+      <div class="startbox"><span>Opstart, eenmalig</span><b>${eur(CREATOR.partner.opstart)}</b></div>
+      <div class="startbox" style="margin-top:-6px"><span>Totaal traject 6 maanden</span><b>${eur(CREATOR.partner.totaal6)}</b></div></div>
+    <div class="pkg" style="--acc:#06053a;--acc-soft:#e6e6ee;cursor:default">
+      <div class="nm">Creator Academy</div><div class="price">${eur(CREATOR.academy.prijs)}<span class="per"> per maand, per creator</span></div>
+      <div class="startbox"><span>Online leeromgeving in ons portaal</span><b>inbegrepen</b></div>
+      <div class="startbox" style="margin-top:-6px"><span>Minimale looptijd</span><b>6 maanden</b></div></div>
+  </div>
+  ${checkLine(CONTROLE[4].d)}
+  <div class="section"><h2>Wie doet wat</h2><div class="card" style="padding:4px 6px;overflow:auto"><table class="tbl"><thead><tr><th>Onderdeel</th><th>Shortclips</th><th>Creator van de klant</th></tr></thead><tbody>
+    ${CREATOR.wiedoetwat.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]==='Nee'?ICON.n:r[1]}</td><td>${r[2]}</td></tr>`).join('')}
+  </tbody></table></div></div>
+  <div class="info section"><div class="v">Altijd een weg terug</div><div class="d">Wil de klant later dat Shortclips het weer volledig overneemt? Dan stapt hij over naar een afdeling, zonder opstartkosten.</div></div>`}`;
+AFTER.partner=()=>document.querySelectorAll('#pSeg button').forEach(b=>b.onclick=()=>{S.pTab=b.dataset.v;go()});
+
+/* ---------- Extra kosten en vragen ---------- */
+const X = id => EXTRAS.find(x=>x.id===id);
+function xTile(id, opts={}){ const x=X(id);
+  return `<div class="xtile ${opts.cls||''}" onclick="this.classList.toggle('open')">
+    <div class="xt-p">${x.prijsTxt||(x.prijs===0?'Gratis':eur(x.prijs))}</div>
+    <div class="xt-u">${x.prijs!=null&&x.prijs>0?'per '+x.eenheid:'&nbsp;'}</div>
+    <div class="xt-n">${x.naam}</div>
+    <div class="xt-s">${x.sub}</div>
+    <div class="xt-more"><b>Wanneer:</b> ${x.wanneer}<br><b>Afspraak:</b> ${x.vw}${x.check?checkLine(x.check):''}</div>
+  </div>`; }
+VIEWS.extra = () => `
+  <div class="rule">
+    <div class="rule-t">Gouden regel bij meerwerk</div>
+    <div class="rule-steps"><span><i>1</i> Vooraf afstemmen met de klant</span><span class="ar">→</span><span><i>2</i> Akkoord per mail</span><span class="ar">→</span><span><i>3</i> Pas dan uitvoeren</span></div>
+  </div>
+
+  <h2 class="xh">Vaste tarieven <span>Klik op een tarief voor uitleg</span></h2>
+  <div class="xgrid">
+    ${xTile('fb',{cls:'hl'})}${xTile('reshoot')}${xTile('spoed')}${xTile('hook')}${xTile('raw')}
+  </div>
+  <div class="small muted" style="margin-top:8px">Eén feedbackronde per video is altijd inbegrepen. De extra feedbackronde geldt pas vanaf de tweede ronde.</div>
+
+  <h2 class="xh">Draaidag verzetten of annuleren</h2>
+  <div class="tl">
+    <div class="tl-seg g"><div class="tl-when">Tot 7 werkdagen vooraf</div><div class="tl-p">Gratis</div><div class="tl-d">Kosteloos verzetten, samen direct een nieuwe datum</div></div>
+    <div class="tl-seg o"><div class="tl-when">Binnen 7 werkdagen</div><div class="tl-p">${eur(395)}</div><div class="tl-d">Per draaidag, de dag is al ingepland</div></div>
+    <div class="tl-seg r"><div class="tl-when">Binnen 24 uur of niet aanwezig</div><div class="tl-p">100%</div><div class="tl-d">Van de draaidag</div></div>
+  </div>
+  <div class="tl-axis"><span>Ruim van tevoren</span><span>Draaidag</span></div>
+  ${checkLine(CONTROLE[3].d)}
+
+  <div class="grid g2" style="margin-top:28px">
+    <div>
+      <h2 class="xh" style="margin-top:0">Reizen</h2>
+      <div class="xgrid two">${xTile('km')}${xTile('reisuur')}</div>
+    </div>
+    <div>
+      <h2 class="xh" style="margin-top:0">Geen vast bedrag <span>Altijd eerst afstemmen</span></h2>
+      <div class="xlist">
+        ${['content','linkedin','montage','licentie'].map(id=>{const x=X(id);return `<div class="xl-row"><div><b>${x.naam}</b><div class="small muted">${x.sub}</div></div><span class="xl-tag">${x.prijsTxt}</span></div>`}).join('')}
+      </div>
+      <div class="small" style="margin-top:8px;color:#7a4a06"><b>Let op:</b> noem bij extra content nooit een prijs per video.</div>
+    </div>
+  </div>
+
+  <div class="nope">
+    <div class="nope-t">${ICON.n} Bieden we niet aan</div>
+    <div>Mediabuying, live zetten van advertenties, campagnebeheer en advertentieanalyse. Dat ligt altijd bij de mediabuyer van de klant.</div>
+  </div>
+
+  <h2 class="xh" style="margin-top:40px">Vragen van klanten <span>Zo antwoordt iedereen hetzelfde</span></h2>
+  ${FAQ.map(f=>`<div class="acc faq"><button onclick="this.parentNode.classList.toggle('open')"><span class="qmark">?</span><span class="faq-q">${f.q}</span>${chev}</button>
+    <div class="body">${f.a}${f.check?checkLine(f.check):''}</div></div>`).join('')}`;
+
+/* ---------- Klant adviseren (keuzehulp + pakket + prijs + samenvatting) ---------- */
+function aDept(){ const A=S.a; if(A.creator) return 'creator'; if(A.adv==='nee') return 'org'; if(A.adv==='ja'&&A.org==='ja') return 'comp'; if(A.adv==='ja'&&A.org==='nee') return 'adv'; return null; }
+function yn(key,val,opts){ return `<div class="seg">${opts.map(o=>`<button data-k="${key}" data-v="${o[0]}" class="${val===o[0]?'on':''}">${o[1]}</button>`).join('')}</div>`; }
+function aCalc(){
+  const A=S.a, dept=aDept();
+  if(dept==='creator') return calcModel({pkg:'creator',creatorAcademy:0});
+  return calcModel({pkg:A.pkg, afname:A.afname, vorm:A.vorm, vervolg:A.vervolg});
+}
+function aSummary(){
+  const A=S.a, dept=aDept(), klant=A.klant||'[klant]';
+  if(dept==='creator') return `Advies voor ${klant}: Creator Partner\n\nShortclips houdt de strategie en de regie, de eigen creator doet het dagelijkse werk: strategie en contentplan, 6 scripts per maand, 2 specialistische opnames per traject, feedback op maximaal 8 video's per maand en een maandrapport.\n\nInvestering: ${eur(CREATOR.partner.prijs)} per maand, plus eenmalig ${eur(CREATOR.partner.opstart)} opstart. Traject van 6 maanden: ${eur(CREATOR.partner.totaal6)}. Alle bedragen exclusief btw.\n\nWil de klant later dat Shortclips het weer volledig overneemt? Dan stapt hij over naar een afdeling, zonder opstartkosten.`;
+  const p=P(A.pkg), d=D(p.dept), kw=p.dept==='adv'&&A.afname==='kwartaal';
+  const neemt = INCL[p.dept].in.map(x=>/^(TikTok|Meta|LinkedIn)/.test(x)?x:x[0].toLowerCase()+x.slice(1)).join('; ');
+  const cap = p.dept==='org' ? `Een vast ritme van ${p.ritme} een nieuwe short (${p.shorts} per maand), op TikTok, Instagram Reels, YouTube Shorts en Facebook.`
+    : p.dept==='adv' ? `${kw?'Per kwartaal één ronde':'Elke maand een nieuwe set'} van ${p.ads} advertentievideo's met elk 3 hooks: ${p.varianten} creatieve varianten om te testen, klaar voor Meta en TikTok Ads.`
+    : `Organisch een vast ritme van ${p.ritme} (${p.shorts} shorts per maand), plus ${p.ads} advertentievideo's met elk 3 hooks (${p.varianten} varianten), op twee vaste draaidagen per maand.`;
+  let inv;
+  if(A.vorm==='jaar') inv = `${eur(kw?p.jaarKw:p.jaar)} per jaar (${eur(p.prijs)} per ${kw?'kwartaalronde':'maand'}). Partnerjaar: 12 maanden vast, vaste prijs zonder indexatie, met jaarstrategie en voorrang bij de planning.`;
+  else if(A.vorm==='vervolg') inv = `${eur(p.prijs)} per ${kw?'kwartaalronde':'maand'}, vervolg van ${A.vervolg} maanden.`;
+  else inv = `${eur(p.prijs)} per ${kw?'kwartaalronde':'maand'}. We starten met 3 maanden${p.start?` (${eur(p.start)})`:''} en evalueren in maand 3 samen resultaten en koers.`;
+  const ex = EXTRAS.filter(x=>(+A.qty[x.id]||0)>0).map(x=>`· ${x.naam}: ${x.calc?(A.qty[x.id]+' x '+eur(x.prijs)+' per '+x.eenheid):x.prijsTxt}`);
+  const mb = p.dept==='org' ? '' : A.mb==='nee' ? '\n\nMediabuyer: nog niet aanwezig. We zoeken samen een geschikte partij die de campagnes live zet en beheert.' : A.mb==='ja' ? '\n\nMediabuyer: aanwezig. Wij sturen de creatives klaar voor gebruik door; de mediabuyer zet live en beheert.' : '';
+  return `Advies voor ${klant}: ${d.naam}, ${p.naam}${kw?' (per kwartaal)':''}\n\nDoel: ${d.doel}.\n\nWat Shortclips overneemt: ${neemt}.\n\nCapaciteit: ${cap}\n\nInvestering: ${inv} Alle bedragen exclusief btw.${mb}${ex.length?`\n\nAanvullend, vooraf afgestemd en per mail bevestigd:\n${ex.join('\n')}`:''}\n\nWaarom deze afdeling:\n${deptArgs(p).slice(0,3).map(x=>'· '+x).join('\n')}`;
+}
+VIEWS.adviseren = () => {
+  const A=S.a, dept=aDept();
+  const stepCol = dept && dept!=='creator' ? D(dept).kleur : '#06053a';
+  const step=(n,title,body,done)=>`<div class="step ${done?'done':''}" style="--acc:${stepCol}"><div class="sn">${done?'✓':n}</div><div style="flex:1;min-width:0"><div class="st-t">${title}</div>${body}</div></div>`;
+  let s2='', s3='', s4='';
+  if(dept && dept!=='creator'){
+    const d=D(dept);
+    if(!d.pakketten.includes(A.pkg)) A.pkg = d.pakketten.find(id=>P(id).advies)||d.pakketten[0];
+    s2 = step(2,'Welk pakket?',`
+      ${dept==='adv'?`<div style="margin-bottom:10px">${yn('afname',A.afname,[['maand','Maandelijks · test continu'],['kwartaal','Per kwartaal · werkt per campagne']])}</div>`:''}
+      <div class="grid g2" style="gap:10px">${d.pakketten.map(id=>{const p=P(id);return `<button class="bigopt ${A.pkg===id?'on':''}" data-pkg="${id}" style="${accVars(dept)}">
+        <span class="row"><b>${p.naam}</b>${p.advies?'<span class="chip mini right" style="background:var(--acc);color:#fff;border:0">advies</span>':''}</span>
+        <span class="pp">${eur(p.prijs)}<span class="muted small"> ${dept==='adv'?(A.afname==='kwartaal'?'per ronde':'p/m'):'p/m'}</span></span>
+        <span class="muted small">${volChips(p).join(' · ')}${p.shorts?' · '+p.ritme:''}</span></button>`}).join('')}</div>`, true);
+    s3 = step(3,'Welke samenwerking?',`${yn('vorm',A.vorm,[['start','Start 3 maanden'],['vervolg','Vervolg'],['jaar','Partnerjaar']])}
+      ${A.vorm==='vervolg'?`<span style="margin-left:6px">${yn('vervolg',String(A.vervolg),[['3','3 mnd'],['6','6 mnd'],['9','9 mnd']])}</span>`:''}
+      <div class="muted small" style="margin-top:6px">${A.vorm==='start'?'Iedere klant start met 3 maanden, daarna evaluatie.':A.vorm==='jaar'?'12 maanden vast na de evaluatie, vaste prijs, voorrang bij de planning.':'Na de evaluatie, zelfde maandbedrag.'}</div>`, true);
+    const n=EXTRAS.filter(x=>(+A.qty[x.id]||0)>0).length;
+    s4 = step(4,`Extra's <span class="muted small" style="font-weight:400">optioneel${n?' · '+n+' gekozen':''}</span>`,`
+      <div class="acc ${S.extraOpen?'open':''}" style="margin:0"><button id="exToggle"><span class="small">Extra feedback, spoed, extra hooks, reiskosten en meer</span>${chev}</button><div class="body" style="padding-top:0">
+      ${EXTRAS.filter(x=>!['verzet0','verzet24'].includes(x.id)).map(x=>`<div class="xsel"><div><div class="t">${x.naam}</div><div class="s">${x.sub}</div></div>
+        <div class="rt"><span class="pr">${x.prijsTxt||(eur(x.prijs)+' / '+x.eenheid)}</span>
+        ${x.calc?`<div class="stepper" data-id="${x.id}"><button data-d="-1">−</button><input value="${A.qty[x.id]||0}" inputmode="numeric"><button data-d="1">+</button></div>`
+          :`<label class="small"><input type="checkbox" data-chk="${x.id}" ${A.qty[x.id]?'checked':''}> mee</label>`}</div></div>`).join('')}
+      </div></div>`, n>0);
+  }
+  return `
+  <div class="row" style="margin-bottom:14px"><h1 style="font-size:24px;margin:0">Klant adviseren</h1>
+    <button class="btn right" id="aReset">Opnieuw beginnen</button></div>
+  <div class="row" style="margin-bottom:16px;gap:6px"><span class="muted small" style="margin-right:4px">Snel invullen:</span>${SITUATIES.map((s,i)=>`<button class="chip pick" data-sit="${i}">${s.titel}</button>`).join('')}</div>
+  <div class="grid adv-grid">
+    <div class="card" style="padding:22px">
+      <input type="text" id="aKlant" value="${esc(S.a.klant)}" placeholder="Naam klant of lead (optioneel)" style="width:100%;margin-bottom:18px">
+      ${step(1,'Wat is de situatie van de klant?',`
+        <div class="q"><span>Adverteert de klant al, of binnen 3 maanden?</span>${yn('adv',A.adv,[['nee','Nee'],['ja','Ja']])}</div>
+        ${A.adv==='ja'?`<div class="q"><span>Wil de klant ook organisch zichtbaar zijn?</span>${yn('org',A.org,[['nee','Nee'],['ja','Ja']])}</div>
+        <div class="q"><span>Is er een mediabuyer die de ads live zet?</span>${yn('mb',A.mb,[['ja','Ja'],['nee','Nee']])}</div>`:''}
+        <button class="linkbtn" id="aCreator">${A.creator?'✓ ':''}Klant wil het intern doen met een eigen creator</button>`, !!dept)}
+      ${dept==='creator'?'':s2+s3+s4}
+    </div>
+    <div id="aOut" class="adv-out"></div>
+  </div>`;
+};
+function renderAOut(){
+  const A=S.a, dept=aDept(), el=$('#aOut');
+  if(!dept){ el.innerHTML=`<div class="card empty"><div class="eyebrow">Advies</div><p class="muted" style="margin:0">Beantwoord de eerste vraag. Hier verschijnen dan de afdeling, het pakket, de prijs en een samenvatting om te kopiëren.</p></div>`; return; }
+  const m=aCalc(), x=extrasTotal(A.qty);
+  let head, kleur, why, wat;
+  if(dept==='creator'){ kleur='#06053a'; head=`Creator Partner`; why='De klant pakt short video intern op. Shortclips houdt strategie en regie.'; wat=['Strategie en contentplan','6 scripts per maand','2 specialistische opnames per traject','Feedback op max 8 video\'s per maand']; }
+  else { const p=P(A.pkg), d=D(p.dept); kleur=d.kleur; head=`${d.naam} · ${p.naam}`;
+    why = {org:'Adverteert niet, wil bereik en merkbekendheid opbouwen.',adv:'Adverteert en heeft steeds nieuwe creatives nodig, geen organische content.',comp:'Adverteert én wil organisch zichtbaar zijn: alles uit één strategie.'}[p.dept];
+    wat = [...volChips(p), p.dept==='adv'?(A.afname==='kwartaal'?'Eén ronde per kwartaal':'Elke maand een nieuwe set'):`Ritme ${p.ritme}`, p.dept==='org'?'1 draaidag per maand':p.dept==='comp'?'2 draaidagen per maand':'Draaidag en regie', p.dept==='adv'?'Export naar de mediabuyer':p.dept==='comp'?'Organisch publiceren door Shortclips':'Publiceren door Shortclips'];
+  }
+  const tot = m.contract + (dept==='creator'?0:x.t);
+  el.innerHTML = `<div class="result">
+    <div class="head" style="background:${kleur};padding:20px 22px">
+      <div class="eyebrow" style="color:rgba(255,255,255,.6)">${esc(A.klant)||'Advies'}</div>
+      <div style="font-size:20px;font-weight:700;line-height:1.2">${head}</div>
+      <div style="font-size:13px;opacity:.85;margin-top:4px">${why}</div>
+    </div>
+    <div class="body" style="padding:18px 22px">
+      <div class="row" style="gap:6px;margin-bottom:14px">${wat.map(w=>`<span class="chip">${w}</span>`).join('')}</div>
+      <div class="calc-lines">
+        ${m.lines.map(l=>`<div class="ln"><span>${l[0]}<div class="small muted">${l[1]}</div></span><span>${eur(l[2])}</span></div>`).join('')}
+        ${dept!=='creator'?x.l.map(l=>`<div class="ln"><span>${l[0]}<div class="small muted">${l[1]}</div></span><span>${eur(l[2])}</span></div>`).join('')+x.open.map(l=>`<div class="ln"><span>${l[0]}</span><span class="muted">${l[1]}</span></div>`).join(''):''}
+        <div class="ln tot"><span>${m.periodeLabel}</span><span style="color:${kleur}">${eur(tot)}</span></div>
+      </div>
+      <div class="small muted" style="margin-top:4px">Per ${m.eenheid||'maand'} ${eur(m.maand)} · ${m.freq} · excl. btw</div>
+      ${m.notes.filter(n=>n.startsWith('Bij Organisch')).map(n=>checkLine('Startbedrag Advertentie staat niet in de PDF, hier berekend.')).join('')}
+      <div class="row" style="margin-top:16px"><button class="btn pri" id="aCopy">Kopieer samenvatting</button><button class="btn" id="aShow">${S.showSum?'Verberg':'Bekijk'} tekst</button>
+        ${dept!=='creator'?`<button class="btn right" onclick="toDept('${P(A.pkg).dept}')">Pakketdetails</button>`:`<button class="btn right" onclick="S.pTab='creator';nav('partner')">Details</button>`}</div>
+      ${S.showSum?`<div class="copybox" style="margin-top:12px">${esc(aSummary())}</div>`:''}
+      <div class="small muted" style="margin-top:10px">${INTERN_REGEL}</div>
+    </div></div>`;
+  $('#aCopy').onclick=()=>copy(aSummary());
+  $('#aShow').onclick=()=>{S.showSum=!S.showSum;renderAOut()};
+}
+AFTER.adviseren = ()=>{
+  const A=S.a;
+  $('#aKlant').oninput=e=>{A.klant=e.target.value;renderAOut()};
+  document.querySelectorAll('.seg [data-k]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k, v=b.dataset.v;
+    if(k==='vervolg') A.vervolg=+v; else A[k]=v;
+    if(k==='adv'){A.creator=false; if(v==='nee'){A.org=null;A.mb='';}}
+    if(k==='org'||k==='adv') A.pkg='';
+    go();
+  });
+  $('#aCreator').onclick=()=>{A.creator=!A.creator; if(A.creator){A.adv=null;A.org=null;} go();};
+  document.querySelectorAll('.bigopt[data-pkg]').forEach(b=>b.onclick=()=>{A.pkg=b.dataset.pkg;go()});
+  const t=$('#exToggle'); if(t) t.onclick=()=>{S.extraOpen=!S.extraOpen;t.parentNode.classList.toggle('open')};
+  document.querySelectorAll('#view .stepper').forEach(st=>{
+    const id=st.dataset.id, inp=st.querySelector('input');
+    const set=v=>{v=Math.max(0,Math.floor(+v||0)); inp.value=v; A.qty[id]=v; renderAOut();};
+    st.querySelectorAll('button').forEach(b=>b.onclick=()=>set((+inp.value||0)+(+b.dataset.d)));
+    inp.oninput=()=>set(inp.value);
+  });
+  document.querySelectorAll('[data-chk]').forEach(ch=>ch.onchange=()=>{A.qty[ch.dataset.chk]=ch.checked?1:0;renderAOut()});
+  document.querySelectorAll('[data-sit]').forEach(b=>b.onclick=()=>{
+    const s=SITUATIES[+b.dataset.sit];
+    if(s.titel.includes('creator')){A.creator=true;A.adv=null;A.org=null;}
+    else if(s.route==='partner'){ A.vorm='jaar'; if(!aDept()){A.adv='nee';A.pkg='org8';} }
+    else { const p=P(s.pkg); A.creator=false; A.adv=p.dept==='org'?'nee':'ja'; A.org=p.dept==='comp'?'ja':(p.dept==='adv'?'nee':null); A.pkg=p.id; if(s.afname) A.afname=s.afname; }
+    go(); toast(s.titel);
+  });
+  $('#aReset').onclick=()=>{S.a=freshA();S.showSum=false;go()};
+  renderAOut();
+};
+function freshA(){return {klant:'',adv:null,org:null,mb:'',creator:false,pkg:'',afname:'maand',vorm:'start',vervolg:3,qty:{}}}
+S.a=freshA(); S.pTab='jaar';
+
+/* ---------- Rekenlogica (centraal) ---------- */
+function calcModel(c){
+  const lines=[], notes=[];
+  let contract=0, periodeLabel='', freq='';
+  if(c.pkg==='creator'){
+    lines.push(['Creator Partner',`${eur(CREATOR.partner.prijs)} x 6 maanden`, CREATOR.partner.prijs*6]);
+    lines.push(['Opstart, eenmalig','', CREATOR.partner.opstart]);
+    contract = CREATOR.partner.prijs*6 + CREATOR.partner.opstart;
+    return {lines,notes,contract,periodeLabel:'Traject 6 maanden',freq:'vooraf gefactureerd, betaling binnen 14 dagen',maand:CREATOR.partner.prijs};
+  }
+  const p=P(c.pkg), kw=p.dept==='adv'&&c.afname==='kwartaal';
+  if(c.vorm==='start'){
+    periodeLabel='Totaal start 3 maanden';
+    if(p.start){ lines.push([p.naam,`${eur(p.prijs)} x 3 maanden`,p.start]); contract=p.start; }
+    else if(kw){ lines.push([`${p.naam} · per kwartaal`,'1 ronde in de startperiode',p.prijs]); contract=p.prijs; notes.push('Bij Organisch en Compleet staat het startbedrag in de PDF, bij Advertentie niet.'); }
+    else { lines.push([`${p.naam} · maandelijks`,`${eur(p.prijs)} x 3 maanden`,p.prijs*3]); contract=p.prijs*3; notes.push('Bij Organisch en Compleet staat het startbedrag in de PDF, bij Advertentie niet.'); }
+  } else if(c.vorm==='vervolg'){
+    const n=c.vervolg; periodeLabel=`Totaal vervolg ${n} maanden`;
+    if(kw){ const r=n/3; lines.push([`${p.naam} · per kwartaal`,`${eur(p.prijs)} x ${r} ronde${r>1?'s':''}`,p.prijs*r]); contract=p.prijs*r; }
+    else { lines.push([p.naam,`${eur(p.prijs)} x ${n} maanden`,p.prijs*n]); contract=p.prijs*n; }
+  } else {
+    periodeLabel='Totaal Partnerjaar';
+    const j = kw?p.jaarKw:p.jaar;
+    lines.push([`${p.naam}${p.dept==='adv'?(kw?' · per kwartaal':' · maandelijks'):''}`, kw?`${eur(p.prijs)} x 4 rondes`:`${eur(p.prijs)} x 12 maanden`, j]);
+    contract=j;
+  }
+  freq = kw ? 'vooraf per ronde, betaling binnen 14 dagen' : 'vooraf per maand, betaling binnen 14 dagen';
+  return {lines,notes,contract,periodeLabel,freq,maand:p.prijs,eenheid:kw?'ronde':'maand'};
+}
+function extrasTotal(qty){
+  let t=0; const l=[];
+  EXTRAS.filter(x=>x.calc).forEach(x=>{const q=+qty[x.id]||0; if(q>0&&x.prijs>0){t+=q*x.prijs; l.push([x.naam,`${q} x ${eur(x.prijs)} per ${x.eenheid}`,q*x.prijs]);}});
+  const open = EXTRAS.filter(x=>!x.calc && qty[x.id]).map(x=>[x.naam, x.prijsTxt]);
+  return {t,l,open};
+}
+
+/* ---------- Vergelijken ---------- */
+function cmpRows(ids){
+  const ps=ids.map(P), r=(label,fn)=>({label,vals:ps.map(fn)});
+  return [
+    r('Investering',p=>eur(p.prijs)+(p.dept==='adv'?' p/m of ronde':' p/m')),
+    r('Start 3 maanden',p=>p.start?eur(p.start):'Niet vermeld'),
+    r('Organische shorts',p=>p.shorts?`${p.shorts} p/m · ${p.ritme}`:'Geen'),
+    r('Advertenties',p=>p.ads?`${p.ads} video's · ${p.varianten} varianten`:'Geen'),
+    r('Draaidagen',p=>p.dept==='org'?'1 per maand':p.dept==='comp'?'2 per maand':'Inbegrepen'),
+    r('Publiceren',p=>D(p.dept).publiceren),
+    r('Past bij een klant die',p=>D(p.dept).ideaal.toLowerCase()),
+  ];
+}
+VIEWS.vergelijken = () => {
+  const ids=S.cmp, ps=ids.map(P);
+  const sel=i=>`<select data-i="${i}">${Object.values(PKG).map(p=>`<option value="${p.id}" ${ids[i]===p.id?'selected':''}>${p.naam}</option>`).join('')}</select>`;
+  const [a,b]=ps, d=b.prijs-a.prijs;
+  const pts=[];
+  if(b.shorts!==a.shorts) pts.push(`${b.shorts>a.shorts?'+':''}${b.shorts-a.shorts} organische shorts per maand`);
+  if(b.ads!==a.ads) pts.push(`${b.ads>a.ads?'+':''}${b.ads-a.ads} advertentievideo's (${b.varianten>a.varianten?'+':''}${b.varianten-a.varianten} varianten)`);
+  if(a.dept!==b.dept) pts.push(`Publiceren: ${D(b.dept).publiceren.toLowerCase()}`);
+  return `<div class="row" style="margin-bottom:16px;gap:10px"><h1 style="font-size:24px;margin:0">Vergelijken</h1>
+    <div class="row right" style="gap:8px">${sel(0)}<span class="muted">met</span>${sel(1)}</div></div>
+  <div class="grid g2">${ps.map(p=>`<div class="cmp-head" style="background:${D(p.dept).kleur}"><div class="small" style="opacity:.75">${D(p.dept).naam}${p.advies?' · ons advies':''}</div><div style="font-weight:600;font-size:16px">${p.naam}</div><div class="p">${eur(p.prijs)}<span class="small" style="opacity:.7;font-weight:400"> ${p.dept==='adv'?'p/m of per ronde':'p/m'}</span></div></div>`).join('')}</div>
+  <div class="card" style="margin-top:12px;border-left:4px solid var(--navy)"><div class="eyebrow">Wat krijgt de klant extra bij ${b.naam}?</div>
+    ${pts.length?pts.map(p=>`<div class="li">${ICON.y}<span>${p}</span></div>`).join(''):'<div class="muted">Geen verschil in volume.</div>'}
+    <div class="li"><span class="ico q">€</span><span>Investering ${d>=0?'+':'−'}${eur(Math.abs(d))} per maand</span></div></div>
+  <div class="card section" style="padding:4px 6px;overflow:auto"><table class="tbl">
+    <tbody>${cmpRows(ids).map(r=>{const diff=new Set(r.vals.map(String)).size>1;return `<tr class="${diff?'diff':''}"><td class="muted" style="width:26%">${r.label}</td>${r.vals.map(v=>`<td style="width:37%"><b>${v}</b></td>`).join('')}</tr>`}).join('')}
+    <tr><td colspan="3" class="sub">Werkzaamheden</td></tr>
+    ${MATRIX.map(([label,m])=>{const vals=ps.map(p=>m[p.dept]);const diff=new Set(vals.map(v=>v[0])).size>1;return `<tr class="${diff?'diff':''}"><td class="muted">${label}</td>${vals.map(v=>`<td><div class="row" style="gap:8px;flex-wrap:nowrap">${ICON[v[0]]}<span class="small muted">${v[1]}</span></div></td>`).join('')}</tr>`}).join('')}
+    </tbody></table></div>
+  <div class="legend" style="margin-top:8px"><span><span style="display:inline-block;width:12px;height:12px;background:#fffbea;border:1px solid #f3e3a1;border-radius:3px;vertical-align:-2px"></span> Verschil</span><span>${ICON.q} Niet genoemd in de PDF</span></div>`;
+};
+AFTER.vergelijken = ()=>document.querySelectorAll('select[data-i]').forEach(s=>s.onchange=()=>{S.cmp[+s.dataset.i]=s.value;go()});
+
+/* ---------- Controlepunten ---------- */
+VIEWS.controle = () => `<button class="btn" onclick="nav('overzicht')" style="margin-bottom:14px">← Terug</button><h1 style="font-size:24px">Controlepunten</h1><p class="muted">Informatie die in de PDF ontbreekt of onduidelijk is. Niets hiervan is zelf ingevuld.</p>
+  <div class="grid g2">${CONTROLE.map((c,i)=>`<div class="card" style="border-left:4px solid #f59e0b"><div class="row"><span class="check-ico">${i+1}</span><b>${c.t}</b></div><p class="muted" style="margin:8px 0 0">${c.d}</p></div>`).join('')}</div>`;
+
+/* =====================================================================
+   6. ZOEKFUNCTIE
+   ===================================================================== */
+function searchIndex(){
+  const idx=[];
+  Object.values(PKG).forEach(p=>idx.push({t:p.naam, s:`${D(p.dept).naam} · ${volChips(p).join(' · ')}`, p:eur(p.prijs), c:D(p.dept).kleur, go:()=>{S.deptPkg[p.dept]=p.id;toDept(p.dept)}}));
+  Object.values(DEPTS).forEach(d=>idx.push({t:d.naam, s:d.doel, p:'vanaf '+eur(d.vanaf), c:d.kleur, go:()=>toDept(d.key)}));
+  EXTRAS.forEach(x=>idx.push({t:x.naam, s:'Extra kosten · '+x.sub, p:x.prijsTxt||eur(x.prijs), c:'#06053a', go:()=>{nav('extra');setTimeout(()=>{const e=document.getElementById('xd-'+x.id);if(e){e.classList.add('open');e.scrollIntoView({block:'center'})}},50)}}));
+  FAQ.forEach((f,i)=>idx.push({t:f.q, s:'Vraag van klant', p:'', c:'#d97706', go:()=>{nav('extra');setTimeout(()=>{const e=document.querySelectorAll('.acc.faq')[i];if(e){e.classList.add('open');e.scrollIntoView({block:'center'})}},50)}}));
+  idx.push({t:'Partnerjaar', s:'12 maanden vast, vaste prijs, voorrang', p:'', c:'#06053a', go:()=>{S.pTab='jaar';nav('partner')}});
+  idx.push({t:'Creator Partner', s:'Begeleiding eigen creator', p:eur(CREATOR.partner.prijs), c:'#06053a', go:()=>{S.pTab='creator';nav('partner')}});
+  idx.push({t:'Creator Academy', s:'Per creator, min. 6 maanden', p:eur(CREATOR.academy.prijs), c:'#06053a', go:()=>{S.pTab='creator';nav('partner')}});
+  idx.push({t:'Klant adviseren', s:'Afdeling, pakket, prijs en samenvatting', p:'', c:'#06053a', go:()=>nav('adviseren')});
+  return idx;
+}
+let IDX=null, resIdx=0, resList=[];
+function doSearch(q){
+  IDX = IDX||searchIndex();
+  const box=$('#results');
+  q=q.trim().toLowerCase();
+  if(!q){box.classList.remove('show');return}
+  const terms=q.split(/\s+/);
+  resList = IDX.filter(it=>{const h=(it.t+' '+it.s+' '+it.p).toLowerCase();return terms.every(t=>h.includes(t))}).slice(0,12);
+  resIdx=0;
+  box.innerHTML = resList.length ? resList.map((r,i)=>`<div class="res ${i===0?'act':''}" data-i="${i}"><span class="dot" style="background:${r.c}"></span><div><div class="t">${esc(r.t)}</div><div class="s">${esc(r.s)}</div></div><div class="p">${r.p}</div></div>`).join('')
+    : '<div class="res muted">Geen resultaten</div>';
+  box.classList.add('show');
+  box.querySelectorAll('.res[data-i]').forEach(el=>el.onmousedown=e=>{e.preventDefault();pick(+el.dataset.i)});
+}
+function pick(i){ const r=resList[i]; if(!r) return; $('#results').classList.remove('show'); $('#q').value=''; $('#q').blur(); r.go(); }
+$('#q').addEventListener('input',e=>doSearch(e.target.value));
+$('#q').addEventListener('blur',()=>setTimeout(()=>$('#results').classList.remove('show'),100));
+$('#q').addEventListener('keydown',e=>{
+  const els=[...document.querySelectorAll('.res[data-i]')];
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault(); if(!els.length) return; resIdx=(resIdx+(e.key==='ArrowDown'?1:-1)+els.length)%els.length; els.forEach((el,i)=>el.classList.toggle('act',i===resIdx));}
+  if(e.key==='Enter'){e.preventDefault();pick(resIdx)}
+  if(e.key==='Escape'){$('#results').classList.remove('show');e.target.blur()}
+});
+document.addEventListener('keydown',e=>{if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){e.preventDefault();$('#q').focus()}});
+$('#ctrlBtn').onclick=()=>nav('controle');
+if(!window.SC_OWNER){ $('#ctrlBtn').style.display='none'; }
+
+/* start */
+try{const r=localStorage.getItem('sc-prijslijst-tab'); if(r&&VIEWS[r]) CUR=r;}catch(e){}
+go();
+
+</script>
+</body>
+</html>
