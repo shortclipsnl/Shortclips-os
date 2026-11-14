@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { sql } from "drizzle-orm";
-import { Camera, CircleAlert, Clock, FlaskConical, Lightbulb, Megaphone, MessageSquareQuote, PenLine, Repeat, ScrollText, Sparkles, Target, Trophy, Wand2 } from "lucide-react";
+import { Camera, ChevronDown, CircleAlert, Clock, Dna, FlaskConical, Lightbulb, Megaphone, MessageSquareQuote, PenLine, Repeat, ScrollText, Sparkles, Trophy, Wand2 } from "lucide-react";
 import { db } from "@/db/client";
 import { requirePermission, hasClientAccess } from "@/server/auth/context";
 import { ACTIVE_STATUSES, getContentMemory, type ClientMemory } from "@/server/content-memory";
@@ -18,6 +18,7 @@ import { RefreshMemoryButton } from "@/components/content-memory/refresh-button"
 import { CopyButton, CoverImage, MemoryClientStrip, MemoryPlayerProvider, PlayTrigger, Slider, type PlayerVideo, type StripClient } from "@/components/content-memory/player";
 import { HookAltsPanel, HookAltsProvider, HookPrinciple } from "@/components/content-memory/hook-alternatives";
 import { ThumbBackfill } from "@/components/content-memory/thumb-backfill";
+import { ContentDnaView } from "@/components/content-memory/dna-view";
 
 export const metadata: Metadata = { title: "Contentgeheugen" };
 export const dynamic = "force-dynamic";
@@ -123,8 +124,9 @@ function InternalView({ cm }: { cm: ClientMemory }) {
         </div>
       ) : null}
 
-      {/* 1. Wat werkt voor deze klant: het recept voor de volgende video */}
-      <Band n={1} tone="plain" icon={Target} title="Wat werkt voor deze klant" sub="Automatisch berekend uit de echte resultaten van deze klant. Bewezen = consequent bij minstens vier video's; indicatie = wijst die kant op, nog bevestigen.">
+      {/* 1. Content DNA: wat werkt, waarom, en wat doen we bij de volgende opnames */}
+      <Band n={1} tone="plain" icon={Dna} title={`Content DNA · ${cm.clientName}`} sub="Automatisch berekend uit uitsluitend de resultaten van deze klant, per platform vergeleken. Bewezen = consequent bij minstens vier video's; voorlopig = wijst die kant op, nog bevestigen.">
+        <ContentDnaView dna={cm.dna} clientName={cm.clientName} />
         <PlaybookView p={cm.playbook} />
       </Band>
 
@@ -550,61 +552,47 @@ function StatusPill({ s }: { s: PlayStatus }) {
 }
 
 const PLAY_ICON: Record<PlayItem["key"], typeof Sparkles> = { format: Wand2, hook: MessageSquareQuote, lengte: Clock, filmstijl: Camera, script: ScrollText };
-const RECIPE_LABEL: Record<PlayItem["key"], string> = { format: "Format", hook: "Hook", lengte: "Lengte", filmstijl: "Filmen", script: "Script" };
 
 function PlaybookView({ p }: { p: Playbook }) {
-  const cards = p.items.filter((i) => i.key !== "script");
+  const style = p.items.find((i) => i.key === "filmstijl");
   const script = p.items.find((i) => i.key === "script");
+  if (!style && !script) return null;
   return (
-    <div className="flex flex-col gap-4">
-      {/* Het recept in één oogopslag */}
-      <div className="rounded-[16px] bg-[var(--color-indigo-ink)] p-4 text-white sm:p-5">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-white/60">Recept voor de volgende video</div>
-        {p.recipe.length ? (
-          <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            {p.recipe.map((r, i) => (
-              <span key={r.key} className="inline-flex items-center gap-2">
-                {i > 0 ? <span className="text-white/40">+</span> : null}
-                <span className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 ${r.status === "bewezen" ? "bg-white text-[var(--color-indigo-ink)]" : "border border-dashed border-white/40 text-white"}`}>
-                  <span className={`text-[10.5px] font-semibold uppercase tracking-wider ${r.status === "bewezen" ? "text-[var(--color-ink-muted)]" : "text-white/60"}`}>{RECIPE_LABEL[r.key]}</span>
-                  <span className="text-[14.5px] font-semibold">{r.text}</span>
-                </span>
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-2 text-[14px] text-white/75">Nog geen onderdelen met een betrouwbare conclusie. {p.sufficient ? "Er is nog geen duidelijk patroon in de resultaten." : `Vanaf 8 video's met resultaten verschijnen hier de eerste conclusies (nu ${p.videoCount}).`}</p>
-        )}
-        {p.recipe.some((r) => r.status !== "bewezen") ? <p className="mt-2.5 text-[11.5px] text-white/55">Wit = bewezen. Gestippeld = indicatie, nog bevestigen met nieuwe video&apos;s.</p> : null}
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {cards.map((i) => <PlayCard key={i.key} i={i} />)}
-      </div>
-
-      {script ? (
-        <article className="rounded-[18px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-sm sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <h3 className="flex items-center gap-2 text-[16px] font-semibold"><ScrollText className="size-4 text-[var(--color-ink-muted)]" />{script.title}</h3>
-              <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-muted)]">{script.detail}</p>
+    <details className="group mt-4 rounded-[16px] border border-[var(--color-line)] bg-[var(--color-surface-2)]">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px]">
+          <span className="font-semibold">Filmstijl en scriptopbouw</span>
+          {style ? <span className="inline-flex items-center gap-1.5 text-[var(--color-ink-muted)]"><Camera className="size-3.5" />{style.value ?? "Nog geen conclusie"}<StatusPill s={style.status} /></span> : null}
+          {script ? <span className="inline-flex items-center gap-1.5 text-[var(--color-ink-muted)]"><ScrollText className="size-3.5" />Scriptopbouw<StatusPill s={script.status} /></span> : null}
+        </span>
+        <ChevronDown className="size-4 text-[var(--color-ink-muted)] transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="flex flex-col gap-4 border-t border-[var(--color-line)] p-4">
+        {style ? <div className="max-w-[420px]"><PlayCard i={style} /></div> : null}
+        {script ? (
+          <article className="rounded-[18px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-sm sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="flex items-center gap-2 text-[16px] font-semibold"><ScrollText className="size-4 text-[var(--color-ink-muted)]" />{script.title}</h3>
+                <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-muted)]">{script.detail}</p>
+              </div>
+              <StatusPill s={script.status} />
             </div>
-            <StatusPill s={script.status} />
-          </div>
-          {p.script ? (
-            <ol className="mt-4 grid gap-2.5 md:grid-cols-5">
-              {([["Opening", p.script.opening], ["Informatie", p.script.informatie], ["Tempo", p.script.tempo], ["Spanning", p.script.spanning], ["Afsluiting", p.script.cta]] as const).map(([l, t], n) => (
-                <li key={l} className="flex flex-col gap-1.5 rounded-[12px] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-3">
-                  <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"><span className="grid size-5 place-items-center rounded-full bg-[var(--color-indigo-ink)] text-[10.5px] font-bold text-white">{n + 1}</span>{l}</span>
-                  <p className="text-[13px] leading-snug">{t || "Geen duidelijk patroon."}</p>
-                </li>
-              ))}
-            </ol>
-          ) : null}
-        </article>
-      ) : null}
-      {p.updatedAt ? <p className="text-[11.5px] text-[var(--color-ink-faint)]">Filmstijl, formatvoorstellen en scriptopbouw geanalyseerd op {dateNl(p.updatedAt)}; wordt automatisch bijgewerkt zodra er nieuwe resultaten zijn. Alle cijfers zijn verbanden, geen bewezen oorzaken.</p> : null}
-    </div>
+            {p.script ? (
+              <ol className="mt-4 grid gap-2.5 md:grid-cols-5">
+                {([["Opening", p.script.opening], ["Informatie", p.script.informatie], ["Tempo", p.script.tempo], ["Spanning", p.script.spanning], ["Afsluiting", p.script.cta]] as const).map(([l, t], n) => (
+                  <li key={l} className="flex flex-col gap-1.5 rounded-[12px] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-3">
+                    <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"><span className="grid size-5 place-items-center rounded-full bg-[var(--color-indigo-ink)] text-[10.5px] font-bold text-white">{n + 1}</span>{l}</span>
+                    <p className="text-[13px] leading-snug">{t || "Geen duidelijk patroon."}</p>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+          </article>
+        ) : null}
+        {p.updatedAt ? <p className="text-[11.5px] text-[var(--color-ink-faint)]">Filmstijl en scriptopbouw geanalyseerd op {dateNl(p.updatedAt)}; wordt automatisch bijgewerkt zodra er nieuwe resultaten zijn.</p> : null}
+      </div>
+    </details>
   );
 }
 

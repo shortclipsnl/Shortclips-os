@@ -8,6 +8,7 @@ import { backfillThumbnails } from "./thumbnails";
 import { generateHookAlternatives } from "./hook-alternatives";
 import { generateStrategy, loadStrategy, type MemoryStrategy } from "./strategy";
 import { buildPlaybook, playbookPromptText, type Playbook } from "./playbook";
+import { buildContentDna, dnaPromptText, type ContentDna } from "./dna";
 import { groupPublications, matchVideosToAssets, type ReelAsset, type ReelPublication } from "@/lib/screen-reel-match";
 import {
   analyzeMemory,
@@ -55,6 +56,8 @@ export type ClientMemory = {
   strategy: MemoryStrategy | null;
   /** "Wat werkt voor deze klant", berekend uit de echte resultaten. */
   playbook: Playbook;
+  /** Content DNA: vier kernonderdelen, strategische conclusie en aanbevelingen. */
+  dna: ContentDna;
 };
 
 type Row = {
@@ -74,6 +77,8 @@ type Row = {
   saves: number | string | null;
   avg_watch_seconds: number | string | null;
   follower_delta: number | string | null;
+  link_clicks: number | string | null;
+  conversions: number | string | null;
 };
 
 const rowsOf = <T,>(res: unknown): T[] => (((res as { rows?: unknown[] }).rows ?? res) as T[]);
@@ -108,10 +113,10 @@ async function loadInputs(clientId: string, labels: Record<string, string>): Pro
     db.execute(sql`
       select p.id, p.platform, p.published_at, p.caption, p.duration_seconds, p.external_url,
              length(p.thumbnail_data) as thumb_len,
-             m.views, m.reach, m.likes, m.comments, m.shares, m.saves, m.avg_watch_seconds, m.completion_rate, m.follower_delta
+             m.views, m.reach, m.likes, m.comments, m.shares, m.saves, m.avg_watch_seconds, m.completion_rate, m.follower_delta, m.link_clicks, m.conversions
       from publications p
       join lateral (
-        select views, reach, likes, comments, shares, saves, avg_watch_seconds, completion_rate, follower_delta
+        select views, reach, likes, comments, shares, saves, avg_watch_seconds, completion_rate, follower_delta, link_clicks, conversions
         from social_metrics s where s.publication_id = p.id
         order by s.measured_on desc limit 1
       ) m on true
@@ -159,6 +164,8 @@ async function loadInputs(clientId: string, labels: Record<string, string>): Pro
       saves: num(r.saves),
       avgWatchSeconds: numOrNull(r.avg_watch_seconds),
       completionRate: numOrNull(r.completion_rate),
+      linkClicks: numOrNull(r.link_clicks),
+      conversions: numOrNull(r.conversions),
       followerDelta: num(r.follower_delta),
       externalUrl: r.external_url,
       thumbnail: thumbs.get(r.id) ?? null,
@@ -260,12 +267,33 @@ export async function loadClientMemory(clientId: string): Promise<ClientMemory |
   if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
   const [c] = await db.select({ id: clients.id, name: clients.name, slug: clients.slug }).from(clients).where(and(eq(clients.id, clientId), isNull(clients.deletedAt))).limit(1);
   if (!c) return null;
-  const [ai, strategy] = await Promise.all([loadAi(clientId), loadStrategy(clientId)]);
+  const [ai, strategy, dataUpdatedAt] = await Promise.all([loadAi(clientId), loadStrategy(clientId), loadDataUpdatedAt(clientId)]);
   const inputs = await loadInputs(clientId, ai.labels);
   const memory = analyzeMemory(inputs);
-  const value: ClientMemory = { clientId: c.id, clientName: c.name, clientSlug: c.slug, memory, ai, aiAvailable: aiConfigured(), strategy, playbook: buildPlaybook(memory, strategy) };
+  const value: ClientMemory = {
+    clientId: c.id,
+    clientName: c.name,
+    clientSlug: c.slug,
+    memory,
+    ai,
+    aiAvailable: aiConfigured(),
+    strategy,
+    playbook: buildPlaybook(memory, strategy),
+    dna: buildContentDna(c.name, memory, strategy, dataUpdatedAt),
+  };
   cache.set(clientId, { at: Date.now(), value });
   return value;
+}
+
+/** Laatste moment waarop er nieuwe cijfers (Metricool-sync) voor deze klant binnenkwamen. */
+async function loadDataUpdatedAt(clientId: string): Promise<string | null> {
+  try {
+    const res = await db.execute(sql`select max(updated_at) as at from social_metrics where client_id = ${clientId}`);
+    const at = rowsOf<{ at: string | Date | null }>(res)[0]?.at;
+    return at ? new Date(at).toISOString() : null;
+  } catch {
+    return null;
+  }
 }
 
 export function clearContentMemoryCache(clientId?: string) {
@@ -431,7 +459,7 @@ export function contentMemoryPromptText(cm: ClientMemory, opts: { isAd?: boolean
   const m = cm.memory;
   if (!m.videoCount) return "";
   const head = `CONTENTGEHEUGEN VAN ${cm.clientName.toUpperCase()} (automatisch opgebouwd uit ${m.videoCount} gepubliceerde video's met echte Metricool-cijfers; prestatie = t.o.v. het normale niveau van deze klant op hetzelfde platform).`;
-  if (!m.sufficient) return `${head}\nNog te weinig video's voor patronen. Gebruik onderstaande voorbeelden alleen als inspiratie, niet als bewezen aanpak.\n${m.topHooks.slice(0, 3).map((v) => `- "${v.hook}" (${v.views} views)`).join("\n")}`;
+  if (!m.sufficient) return `${head}\nNog te weinig video's voor patronen. Gebruik onderstaande voorbeelden alleen als inspiratie, niet als bewezen aanpak.\n${m.topHooks.slice(0, 3).map((v) => `- "${v.hook}" (${v.views} views)`).join("\n")}\n\n${dnaPromptText(cm.dna)}`.trim();
   const solid = (g: MemoryGroup) => g.evidence === "aannemelijk" || g.evidence === "sterk";
   const fmtLines = m.formats.filter((g) => g.n >= 2).slice(0, 5).map((g) => {
     const info = formatInfo(cm, g.label);
@@ -448,6 +476,7 @@ export function contentMemoryPromptText(cm: ClientMemory, opts: { isAd?: boolean
     m.ctas.filter((g) => g.verdict === "beter" && solid(g)).length ? `CTA's die werken: ${m.ctas.filter((g) => g.verdict === "beter" && solid(g)).map((g) => `${g.label} (${x(g.medianPerf)})`).join(", ")}.` : "",
     worse.length ? `Werkt minder (vermijd of pas aan): ${worse.slice(0, 5).map((g) => `${g.label} (${x(g.medianPerf)}, ${g.n} video's)`).join("; ")}.` : "",
     playbookPromptText(cm.playbook),
+    dnaPromptText(cm.dna),
   ];
   return parts.filter(Boolean).join("\n\n");
 }

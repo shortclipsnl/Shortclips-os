@@ -39,6 +39,9 @@ export type MemoryInput = {
   reach?: number;
   /** Aandeel dat de video uitkeek (0..1), zoals Metricool het levert. */
   completionRate?: number | null;
+  /** Linkklikken en conversies, alleen als een koppeling ze levert (anders null). */
+  linkClicks?: number | null;
+  conversions?: number | null;
   followerDelta: number;
   externalUrl: string | null;
   thumbnail: string | null;
@@ -86,6 +89,9 @@ export type MemoryVideo = {
   reach: number | null;
   /** Retentie: gemiddeld deel van de video bekeken (0..1), null als onbekend. */
   retention: number | null;
+  /** Linkklikken / conversies; null = niet gemeten (Metricool levert dit meestal niet). */
+  linkClicks: number | null;
+  conversions: number | null;
   followerDelta: number;
   /** Views t.o.v. platformmediaan. */
   viewScore: number;
@@ -373,6 +379,8 @@ export function analyzeMemory(pubs: MemoryInput[], now: Date = new Date()): Cont
       retention: p.avgWatchSeconds != null && p.avgWatchSeconds > 0 && p.durationSeconds
         ? Math.min(1, p.avgWatchSeconds / p.durationSeconds)
         : null,
+      linkClicks: p.linkClicks ?? null,
+      conversions: p.conversions ?? null,
       followerDelta: p.followerDelta,
       viewScore: r2(viewScore),
       engScore: r2(engScore),

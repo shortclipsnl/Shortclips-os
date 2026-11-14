@@ -60,14 +60,14 @@ export const HOOK_PLAY: Record<string, string> = {
   Rondleiding: "Rondleiding aankondigen",
 };
 
-function statusOf(g: Pick<MemoryGroup, "n" | "medianPerf" | "evidence">): PlayStatus {
+export function statusOf(g: Pick<MemoryGroup, "n" | "medianPerf" | "evidence">): PlayStatus {
   if ((g.evidence === "aannemelijk" || g.evidence === "sterk") && g.medianPerf >= 1.2) return "bewezen";
   if (g.n >= 2 && g.medianPerf >= 1) return "indicatie";
   return "onvoldoende";
 }
 
 const RANK: Record<PlayStatus, number> = { bewezen: 2, indicatie: 1, onvoldoende: 0 };
-const pick = (gs: MemoryGroup[]) =>
+export const pickGroup = (gs: MemoryGroup[]) =>
   [...gs].sort((a, b) => RANK[statusOf(b)] - RANK[statusOf(a)] || b.medianPerf - a.medianPerf)[0] ?? null;
 
 /** Kijkcijfers van een groep video's, alleen wat het platform echt levert. */
@@ -141,12 +141,12 @@ export function buildPlaybook(m: ContentMemory, s: MemoryStrategy | null): Playb
   const short = m.sufficient ? "" : `Nog maar ${m.videoCount} van de minimaal ${MIN_VIDEOS} video's met resultaten.`;
 
   // 1. Format
-  const fmt = pick(m.formats.filter((g) => g.n >= 2));
+  const fmt = pickGroup(m.formats.filter((g) => g.n >= 2));
   const format = fromGroup("format", "Bestwerkend format", fmt, all, (v) => v.format === fmt?.label, (g) => g.label,
     short || (m.formatsLabeled ? "Nog geen format dat consequent boven het normale niveau scoort." : "Formats zijn nog niet herkend."));
 
   // 2. Hook: rangschikken op prestatie, onderbouwen met bereik en retentie.
-  const hg = pick(m.hooks.filter((g) => g.label !== "Stelling" && g.n >= 2));
+  const hg = pickGroup(m.hooks.filter((g) => g.label !== "Stelling" && g.n >= 2));
   const hook = fromGroup("hook", "Bestwerkende hook", hg, all, (v) => !!hg && v.hookTypes.includes(hg.label), (g) => HOOK_PLAY[g.label] ?? g.label,
     short || "Nog geen openingsstijl die consequent boven het normale niveau scoort.");
   if (hg) {
@@ -156,14 +156,14 @@ export function buildPlaybook(m: ContentMemory, s: MemoryStrategy | null): Playb
   }
 
   // 3. Lengte
-  const lg = pick(m.lengths.filter((g) => g.n >= 3));
+  const lg = pickGroup(m.lengths.filter((g) => g.n >= 3));
   const lengte = fromGroup("lengte", "Ideale videolengte", lg, all, (v) => !!lg && lengthLabel(v) === lg.label, (g) => g.label,
     short || "Nog geen lengte die duidelijk beter presteert dan de rest.");
 
   // 4. Filmstijl (herkend door de AI, beoordeeld op echte cijfers)
   const styles = s?.styles ?? {};
   const known = all.filter((v) => styles[v.id]).length;
-  const sg = pick(styleGroups(all, styles).filter((g) => g.n >= 2));
+  const sg = pickGroup(styleGroups(all, styles).filter((g) => g.n >= 2));
   const filmstijl = !s
     ? empty("filmstijl", "Beste manier van filmen", "De filmstijl per video wordt nog bepaald.")
     : fromGroup("filmstijl", "Beste manier van filmen", sg, all, (v) => !!sg && styles[v.id] === sg.label, (g) => g.label,
@@ -187,7 +187,9 @@ export function buildPlaybook(m: ContentMemory, s: MemoryStrategy | null): Playb
       }
     : empty("script", "Beste scriptopbouw", "De scriptopbouw wordt nog geanalyseerd.");
 
-  const items = [format, hook, lengte, filmstijl, script];
+  // Te weinig video's: geen conclusies, ook geen voorlopige (het Content DNA toont het voorlopige inzicht).
+  const items = [format, hook, lengte, filmstijl, script].map((i) =>
+    m.sufficient || i.status === "onvoldoende" ? i : { ...i, status: "onvoldoende" as const, value: i.key === "script" ? i.value : null });
   const recipe = items
     .filter((i) => i.value && i.status !== "onvoldoende" && i.key !== "script")
     .map((i) => ({ key: i.key, text: i.key === "lengte" ? (i.value as string).toLowerCase() : (i.value as string), status: i.status }));
