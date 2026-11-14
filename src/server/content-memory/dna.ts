@@ -178,7 +178,9 @@ function tile(
   const base: DnaTile = { key, title, value: null, status: "onvoldoende", n: 0, hits: 0, perf: null, evidence: null, detail: none, platformNote: null, quote: null, basis: null, basisNote: null, example: null };
   if (!g) return base;
   const vs = all.filter(ofGroup);
-  const status = statusOf(g);
+  // Rond het normale niveau (1,0x) is geen inzicht, ook geen voorlopig.
+  const raw = statusOf(g);
+  const status: PlayStatus = raw === "indicatie" && g.medianPerf < 1.1 ? "onvoldoende" : raw;
   const hits = Math.round(g.hitRate * g.n);
   return {
     ...base,
@@ -440,13 +442,14 @@ function conclusion(clientName: string, m: ContentMemory, t: ByKey, test: DnaAdv
   const lead = `${subject}${extras.length ? `, met ${list(extras)},` : ""} ${verb} ${clientName} de sterkste resultaten zien.`;
 
   const proof = known.find((x) => x.status === "bewezen") ?? known[0];
-  const proofLine = `${proof.title.replace(/^Sterkste |^Kansrijke /, "").replace(/^./, (c) => c.toUpperCase())}: ${proof.hits} van ${proof.n} video's boven normaal (gemiddeld ${fx(proof.perf ?? 1)}).`;
+  const PROOF_SUBJECT: Record<DnaKey, string> = { format: "Dit format", hook: "Deze opening", lengte: "Deze lengte", cta: "Deze afsluiting" };
+  const proofLine = `${PROOF_SUBJECT[proof.key]} scoorde bij ${proof.hits} van ${proof.n} video's boven normaal (gemiddeld ${fx(proof.perf ?? 1)}).`;
 
   const ctaLine = C && ctaLabel
     ? ` Als afsluiting werkt een CTA waarin ${CTA_CLAUSE[ctaLabel] ?? lc(C)} het best${t.cta.basis === "engagement" ? " (op basis van engagement; conversies zijn niet gemeten)" : t.cta.basis === "linkklikken" ? " (op basis van linkklikken)" : " (onderbouwd met conversiedata)"}.`
     : "";
   const provisional = known.filter((x) => x.status !== "bewezen").map((x) => lc(x.title.replace(/^Sterkste |^Kansrijke /, "")));
-  const provLine = provisional.length && !allProven ? ` Nog voorlopig: ${list(provisional)}.` : "";
+  const provLine = provisional.length && provisional.length < known.length ? ` Nog voorlopig: ${list(provisional)}.` : "";
   const sample = m.sufficient ? "" : `Voorlopig inzicht: gebaseerd op ${m.videoCount} geanalyseerde video's. `;
 
   const actions = [
@@ -455,8 +458,13 @@ function conclusion(clientName: string, m: ContentMemory, t: ByKey, test: DnaAdv
     L ? `houd de video's ${LENGTH_ADVICE[L] ?? lc(L)}` : null,
     C && ctaLabel ? `sluit af met ${CTA_ADVICE[ctaLabel] ?? lc(C)}` : null,
   ].filter(Boolean) as string[];
-  const testLine = test ? ` Test daarnaast bij één van die video's: ${lc(test.title)}${test.source === "voorstel" ? " (nieuw voorstel)" : ""}.` : "";
-  const advice = actions.length ? `Advies voor de volgende drie opnames: ${list(actions)}.${testLine}` : null;
+  const usedValues = new Set(known.map((x) => x.value));
+  const testLine = test && !usedValues.has(test.title) ? ` Test daarnaast bij één van die video's: ${lc(test.title)}${test.source === "voorstel" ? " (nieuw voorstel)" : ""}.` : "";
+  const advice = !actions.length
+    ? null
+    : allProven && m.sufficient
+      ? `Advies voor de volgende drie opnames: ${list(actions)}.${testLine}`
+      : `Advies voor de volgende drie opnames: ${list(actions)}, en kijk of het patroon standhoudt.${testLine}`;
 
   return {
     status: allProven && m.sufficient ? "bewezen" : "voorlopig",
