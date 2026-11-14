@@ -65,6 +65,8 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/dashboard", label: "Vandaag", icon: "LayoutDashboard" },
       { href: "/tasks", label: "Taken", icon: "CircleCheck", permissions: ["tasks:read"], match: "/tasks" },
       { href: "/kwaliteit", label: "Aandachtspunten", icon: "ShieldCheck", match: "/kwaliteit" },
+      // Persoonlijke businesscoach: ochtend- en avondcontrole en weekrapport. Alleen de eigenaar.
+      { href: "/coach", label: "Coach", icon: "Gauge", ownerOnly: true, match: "/coach" },
       // Persoonlijk: eigen verantwoordelijkheden, bevoegdheden en wanneer Jarno erbij moet.
       { href: "/verantwoordelijkheden", label: "Mijn verantwoordelijkheden", icon: "ListChecks", match: "/verantwoordelijkheden", verantwoordelijkhedenAccess: true },
     ],
