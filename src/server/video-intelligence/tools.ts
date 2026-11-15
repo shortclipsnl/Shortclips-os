@@ -112,7 +112,7 @@ async function venvHas(pkg: string, cacheKey: string): Promise<boolean> {
   const py = whisperPython();
   let ok = false;
   if (py) {
-    const res = await run(py, ["-c", `import ${pkg}`], { timeoutMs: 20000 });
+    const res = await run(py, ["-c", `import ${pkg}`], { timeoutMs: 60000 });
     ok = res.code === 0;
   }
   availability.set(cacheKey, ok);

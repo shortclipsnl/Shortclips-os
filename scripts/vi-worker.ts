@@ -103,6 +103,17 @@ async function processAll(): Promise<number> {
   return done;
 }
 
+/** Geanalyseerde video's koppelen aan hun publicatie (op basis van het transcript). */
+async function linkToPublications() {
+  try {
+    const { linkAnalyses } = await import("../src/server/video-intelligence/auto");
+    const l = await linkAnalyses();
+    log(`Koppeling met publicaties: ${l.linked} nieuw, ${l.changed} gecorrigeerd, ${l.unlinked} losgelaten, ${l.open} nog zonder publicatie.`);
+  } catch (e) {
+    log(`Koppelen aan publicaties mislukt: ${String(e)}`);
+  }
+}
+
 async function main() {
   // Zonder de zware tools heeft een worker geen zin — dan verwerkt hij niets zinnigs.
   if (!(await canRunHeavyPipeline())) {
@@ -119,7 +130,7 @@ async function main() {
     try {
       const { enqueueAutoAnalyses } = await import("../src/server/video-intelligence/auto");
       const q = await enqueueAutoAnalyses({ max: ENQUEUE });
-      log(`Wachtrij aangevuld: ${q.queued} video('s) bij ${q.clients} klant(en); ${q.unmatched} zonder gekoppeld videobestand.`);
+      log(`Wachtrij aangevuld: ${q.queued} video('s) bij ${q.clients} klant(en); ${q.waiting} wachten op een volgende ronde.`);
     } catch (e) {
       log(`Wachtrij aanvullen mislukt: ${String(e)}`);
     }
@@ -127,6 +138,7 @@ async function main() {
 
   if (ONCE) {
     const n = await processAll();
+    await linkToPublications();
     log(`Klaar — ${n} job(s) verwerkt.`);
     await closeDb();
     process.exit(0);
@@ -143,6 +155,7 @@ async function main() {
 
   while (!stopping) {
     const n = await processAll();
+    if (n > 0) await linkToPublications();
     if (n === 0 && !stopping) await new Promise((r) => setTimeout(r, INTERVAL_MS));
   }
 }

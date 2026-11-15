@@ -4,11 +4,11 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline as streamPipeline } from "node:stream/promises";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { videoAnalyses } from "@/db/schema";
-import { captionKey } from "@/server/content-memory/analyze";
-import { groupPublications, matchVideosToAssets, type ReelAsset, type ReelPublication } from "@/lib/screen-reel-match";
+import { assetTitleKey, groupPublications, type ReelPublication } from "@/lib/screen-reel-match";
+import { matchTranscripts } from "@/lib/transcript-match";
 import { ensureWorkDir } from "./paths";
 
 /**
@@ -20,10 +20,10 @@ import { ensureWorkDir } from "./paths";
  * Zo weet het Contentadvies per video hoe het middenstuk en de montage eruit
  * zien, in plaats van dat af te leiden uit de caption.
  *
- * Koppeling publicatie → videobestand, in volgorde van zekerheid:
- *  1. de contentplanning (het geplande bericht verwijst naar het videobestand);
- *  2. dezelfde koppellogica als het kantoorscherm (titel, duur en datum).
- * Geen koppeling = geen analyse; er wordt niets geraden.
+ * Volgorde: eerst het videobestand analyseren, daarna pas koppelen aan de
+ * publicatie. De koppeling gebruikt het transcript: wat er in de video gezegd
+ * wordt is een veel sterker kenmerk dan de bestandsnaam. Geen zekere koppeling
+ * = geen koppeling; er wordt niets geraden.
  */
 
 const FRAME_PREFIX = "frameio:";
@@ -34,114 +34,139 @@ export function isAutoAnalysis(a: { modelVersions?: unknown }): boolean {
   return !!(a.modelVersions as { auto?: boolean } | null)?.auto;
 }
 
-type PubRow = {
-  id: string; platform: string; published_at: string | Date | null; caption: string | null; duration_seconds: number | null; external_url: string | null;
-  views: unknown; reach: unknown; likes: unknown; comments: unknown; shares: unknown; saves: unknown;
-};
+type PubRow = { id: string; platform: string; published_at: string | Date; caption: string | null; duration_seconds: number | null; external_url: string | null; views: unknown };
 type AssetRow = { id: string; name: string; subfolder_name: string | null; duration_seconds: number | null; frame_created_at: string | Date | null; media_file_id: string | null; frame_file_id: string | null };
 
-/**
- * Zet nog niet geanalyseerde video's in de wachtrij. Per klant eerst de best en
- * slechtst presterende en de nieuwste video's, omdat die het advies het meest
- * sturen. Idempotent: een video die al een analyse heeft komt niet opnieuw.
- */
-export async function enqueueAutoAnalyses(opts: { max?: number; perClient?: number } = {}): Promise<{ queued: number; clients: number; unmatched: number }> {
-  const max = opts.max ?? 20;
-  const perClient = opts.perClient ?? 6;
-  const out = { queued: 0, clients: 0, unmatched: 0 };
-  const clients = rowsOf<{ id: string }>(await db.execute(sql`
-    select c.id from clients c
-    where c.deleted_at is null and c.status::text in ('active', 'onboarding')
-      and exists (select 1 from publications p where p.client_id = c.id and p.deleted_at is null and p.status = 'published')
-    order by c.name`));
+const ACTIVE_CLIENTS = sql`
+  select c.id from clients c
+  where c.deleted_at is null and c.status::text in ('active', 'onboarding')
+    and exists (select 1 from publications p where p.client_id = c.id and p.deleted_at is null and p.status = 'published')
+  order by c.name`;
 
-  for (const c of clients) {
-    if (out.queued >= max) break;
-    const [pubRes, assetRes, planRes, doneRes] = await Promise.all([
-      db.execute(sql`
-        select p.id, p.platform, p.published_at, p.caption, p.duration_seconds, p.external_url,
-               m.views, m.reach, m.likes, m.comments, m.shares, m.saves
-        from publications p
-        join lateral (select views, reach, likes, comments, shares, saves from social_metrics s where s.publication_id = p.id order by s.measured_on desc limit 1) m on true
-        where p.client_id = ${c.id} and p.deleted_at is null and p.status = 'published' and p.published_at is not null`),
+async function loadVideos(clientId: string) {
+  const pubs = rowsOf<PubRow>(await db.execute(sql`
+    select p.id, p.platform, p.published_at, p.caption, p.duration_seconds, p.external_url,
+           (select s.views from social_metrics s where s.publication_id = p.id order by s.measured_on desc limit 1) as views
+    from publications p
+    where p.client_id = ${clientId} and p.deleted_at is null and p.status = 'published' and p.published_at is not null`));
+  const toPub = (r: PubRow): ReelPublication => ({
+    id: r.id, clientId, platform: r.platform, publishedAt: new Date(r.published_at), durationSeconds: r.duration_seconds == null ? null : Number(r.duration_seconds),
+    caption: r.caption, externalUrl: r.external_url, views: num(r.views), reach: 0, likes: 0, comments: 0, shares: 0, saves: 0,
+  });
+  return groupPublications(pubs.map(toPub));
+}
+
+/**
+ * Zet nog niet geanalyseerde videobestanden uit de videobibliotheek in de
+ * wachtrij, nieuwste eerst. Van elke video alleen de laatste versie. De
+ * koppeling met de publicatie volgt ná de analyse, op basis van het transcript
+ * (linkAnalyses). Idempotent: een bestand dat al een analyse heeft komt niet
+ * opnieuw.
+ */
+export async function enqueueAutoAnalyses(opts: { max?: number; perClient?: number } = {}): Promise<{ queued: number; clients: number; waiting: number }> {
+  const max = opts.max ?? 20;
+  const perClient = opts.perClient ?? 8;
+  const out = { queued: 0, clients: 0, waiting: 0 };
+
+  for (const c of rowsOf<{ id: string }>(await db.execute(ACTIVE_CLIENTS))) {
+    const [assetRes, doneRes, firstRes] = await Promise.all([
       db.execute(sql`
         select id, name, subfolder_name, duration_seconds, frame_created_at, media_file_id, frame_file_id
-        from frame_assets where client_id = ${c.id} and deleted_at is null and coalesce(duration_seconds, 0) > 0`),
-      db.execute(sql`
-        select caption, frame_asset_id from content_calendar
-        where client_id = ${c.id} and deleted_at is null and frame_asset_id is not null and caption is not null and length(caption) > 20`).catch(() => [] as unknown),
+        from frame_assets where client_id = ${c.id} and deleted_at is null and coalesce(duration_seconds, 0) between 5 and 180
+          and frame_created_at is not null`),
       db.execute(sql`select source_url from video_analyses where client_id = ${c.id} and source_url like ${FRAME_PREFIX + "%"}`),
+      db.execute(sql`select min(published_at) as at, max(published_at) as last from publications where client_id = ${c.id} and deleted_at is null and status = 'published'`),
     ]);
-    const pubs = rowsOf<PubRow>(pubRes);
-    const assets = rowsOf<AssetRow>(assetRes);
-    if (!pubs.length || !assets.length) continue;
-    const assetById = new Map(assets.map((a) => [a.id, a]));
     const done = new Set(rowsOf<{ source_url: string }>(doneRes).map((r) => r.source_url));
+    const firstPub = rowsOf<{ at: string | Date | null }>(firstRes)[0]?.at;
+    const lastPub = rowsOf<{ last: string | Date | null }>(firstRes)[0]?.last;
+    const published = lastPub ? new Date(lastPub).getTime() : Date.now();
+    const from = firstPub ? new Date(firstPub).getTime() - 200 * 86_400_000 : 0;
 
-    const toPub = (r: PubRow): ReelPublication => ({
-      id: r.id, clientId: c.id, platform: r.platform, publishedAt: new Date(r.published_at!), durationSeconds: r.duration_seconds == null ? null : Number(r.duration_seconds),
-      caption: r.caption, externalUrl: r.external_url, views: num(r.views), reach: num(r.reach), likes: num(r.likes), comments: num(r.comments), shares: num(r.shares), saves: num(r.saves),
-    });
-    const videos = groupPublications(pubs.map(toPub));
-    const rowOf = (platform: string, url: string | null) => pubs.find((x) => x.platform === platform && x.external_url === url);
-
-    // 1. Via de contentplanning.
-    const planned = new Map<string, string>();
-    for (const r of rowsOf<{ caption: string; frame_asset_id: string }>(planRes)) {
-      const k = captionKey(r.caption);
-      if (k.length >= 20 && assetById.has(r.frame_asset_id)) planned.set(k, r.frame_asset_id);
-    }
-    // 2. Via titel, duur en datum.
-    const assetList: ReelAsset[] = assets.map((a) => ({ id: a.id, clientId: c.id, name: a.name, subfolderName: a.subfolder_name, durationSeconds: a.duration_seconds, frameCreatedAt: a.frame_created_at ? new Date(a.frame_created_at) : null }));
-    const matched = new Map(matchVideosToAssets(videos, assetList).map((m) => [m.video, m.asset.id]));
-
-    type Cand = { pub: PubRow; assetId: string; views: number; at: number };
-    const cands: Cand[] = [];
-    for (const v of videos) {
-      const members = v.platforms.map((pl) => rowOf(pl.platform, pl.url)).filter((r): r is PubRow => !!r);
-      const lead = [...members].sort((a, b) => num(b.views) - num(a.views))[0];
-      if (!lead) continue;
-      const assetId = planned.get(captionKey(lead.caption)) ?? matched.get(v);
-      if (!assetId) { out.unmatched++; continue; }
-      const a = assetById.get(assetId)!;
+    // Versies van dezelfde video (V2, V3) samennemen: de nieuwste telt. Ingekorte advertentieversies overslaan.
+    const latest = new Map<string, AssetRow>();
+    const analysedTitles = new Set<string>();
+    for (const a of rowsOf<AssetRow>(assetRes)) {
+      if (/verkort|\bad\b|ads?\s*-/i.test(a.subfolder_name ?? "")) continue;
+      if (new Date(a.frame_created_at!).getTime() < from) continue;
+      const title = assetTitleKey(a.name);
+      const key = title ? `${title}|${a.subfolder_name ?? ""}` : `id:${a.id}`;
       const fileId = a.media_file_id ?? a.frame_file_id;
-      if (!fileId || done.has(FRAME_PREFIX + fileId)) continue;
-      cands.push({ pub: lead, assetId, views: num(lead.views), at: new Date(lead.published_at!).getTime() });
+      if (fileId && done.has(FRAME_PREFIX + fileId)) analysedTitles.add(key);
+      const prev = latest.get(key);
+      if (!prev || new Date(prev.frame_created_at!).getTime() < new Date(a.frame_created_at!).getTime()) latest.set(key, a);
     }
-    if (!cands.length) continue;
-
-    // Volgorde: afwisselend best, zwakst en nieuwst.
-    const byViews = [...cands].sort((a, b) => b.views - a.views);
-    const byNew = [...cands].sort((a, b) => b.at - a.at);
-    const order: Cand[] = [];
-    for (let i = 0; order.length < cands.length && i < cands.length; i++) {
-      for (const x of [byViews[i], byViews[byViews.length - 1 - i], byNew[i]]) if (x && !order.includes(x)) order.push(x);
-    }
+    const todo = [...latest.entries()]
+      .filter(([key, a]) => !analysedTitles.has(key) && (a.media_file_id ?? a.frame_file_id))
+      .map(([, a]) => a)
+      // Eerst bestanden die al gepubliceerd kunnen zijn (nieuwste eerst): die sturen het advies. Nog niet gepubliceerd werk volgt daarna.
+      .sort((x, y) => {
+        const tx = new Date(x.frame_created_at!).getTime(), ty = new Date(y.frame_created_at!).getTime();
+        const px = tx <= published ? 0 : 1, py = ty <= published ? 0 : 1;
+        return px - py || ty - tx;
+      });
 
     let n = 0;
-    const seen = new Set<string>();
-    for (const cand of order) {
-      if (n >= perClient || out.queued >= max) break;
-      const a = assetById.get(cand.assetId)!;
-      const fileId = (a.media_file_id ?? a.frame_file_id)!;
-      if (seen.has(fileId)) continue;
-      seen.add(fileId);
-      const p = cand.pub;
+    for (const a of todo) {
+      if (n >= perClient || out.queued >= max) { out.waiting++; continue; }
       const res = await db.insert(videoAnalyses).values({
         clientId: c.id,
-        publicationId: p.id,
         title: a.name.slice(0, 240),
-        platform: p.platform as typeof videoAnalyses.$inferInsert.platform,
         sourceType: "frameio",
-        sourceUrl: FRAME_PREFIX + fileId,
-        caption: p.caption,
+        sourceUrl: FRAME_PREFIX + (a.media_file_id ?? a.frame_file_id),
         status: "queued",
         modelVersions: { auto: true },
-        metricsSnapshot: { views: num(p.views), likes: num(p.likes), comments: num(p.comments), shares: num(p.shares), saves: num(p.saves) },
       }).onConflictDoNothing().returning({ id: videoAnalyses.id });
       if (res.length) { n++; out.queued++; }
     }
     if (n) out.clients++;
+  }
+  return out;
+}
+
+/**
+ * Koppelt geanalyseerde videobestanden aan hun publicatie op basis van het
+ * transcript (en de duur). Draait na elke verwerkingsronde. Een bestaande
+ * koppeling wordt vervangen als het transcript duidelijk naar een andere video
+ * wijst, en losgelaten als niets haar meer draagt: liever geen koppeling dan
+ * een verkeerde.
+ */
+export async function linkAnalyses(): Promise<{ linked: number; changed: number; unlinked: number; open: number }> {
+  const out = { linked: 0, changed: 0, unlinked: 0, open: 0 };
+  for (const c of rowsOf<{ id: string }>(await db.execute(ACTIVE_CLIENTS))) {
+    const rows = rowsOf<{ id: string; publication_id: string | null; duration_ms: number | null; full_text: string | null; frame_created_at: string | Date | null }>(await db.execute(sql`
+      select a.id, a.publication_id, a.duration_ms, t.full_text,
+        (select f.frame_created_at from frame_assets f where f.client_id = a.client_id
+           and (f.media_file_id::text = substr(a.source_url, 9) or f.frame_file_id::text = substr(a.source_url, 9)) limit 1) as frame_created_at
+      from video_analyses a
+      join video_transcripts t on t.analysis_id = a.id
+      where a.client_id = ${c.id} and a.deleted_at is null and a.source_type = 'frameio'`));
+    if (!rows.length) continue;
+    const videos = await loadVideos(c.id);
+    const matches = new Map(matchTranscripts(
+      videos.map((v) => ({ key: v.key, caption: v.caption, publishedAt: v.publishedAt, durationSeconds: v.durationSeconds })),
+      rows.map((r) => ({ id: r.id, transcript: r.full_text ?? "", durationSeconds: r.duration_ms ? r.duration_ms / 1000 : null, createdAt: r.frame_created_at ? new Date(r.frame_created_at) : null })),
+    ).map((m) => [m.analysisId, m]));
+
+    for (const r of rows) {
+      const m = matches.get(r.id);
+      const v = m ? videos.find((x) => x.key === m.videoKey) : null;
+      if (v) {
+        const lead = v.platforms[0];
+        const same = v.platforms.some((p) => p.publicationId === r.publication_id);
+        if (same) continue;
+        await db.update(videoAnalyses).set({ publicationId: lead.publicationId, caption: v.caption, platform: lead.platform as typeof videoAnalyses.$inferInsert.platform, updatedAt: new Date() }).where(eq(videoAnalyses.id, r.id));
+        if (r.publication_id) out.changed++; else out.linked++;
+        continue;
+      }
+      if (!r.publication_id) { out.open++; continue; }
+      // Geen transcript-koppeling: een eerdere koppeling blijft alleen staan als de duur op de seconde klopt.
+      const old = videos.find((x) => x.platforms.some((p) => p.publicationId === r.publication_id));
+      const durOk = !!old?.durationSeconds && !!r.duration_ms && Math.abs(old.durationSeconds - r.duration_ms / 1000) <= 1;
+      if (durOk) continue;
+      await db.update(videoAnalyses).set({ publicationId: null, caption: null, updatedAt: new Date() }).where(eq(videoAnalyses.id, r.id));
+      out.unlinked++;
+    }
   }
   return out;
 }
