@@ -8,7 +8,7 @@ import {
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
-import { isOwner, isEditorRole, requireInternal } from "@/server/auth/context";
+import { isOwner, isEditorRole, isFreelanceVideographer, requireInternal } from "@/server/auth/context";
 import { getClientHub, type ClientHub } from "@/server/clients";
 import { listEditingProjects, type EditingProject } from "@/server/editing-board";
 import { ResultsToggle } from "./results-toggle";
@@ -68,6 +68,7 @@ import { todayAmsterdam } from "@/lib/planning-deadline";
 import { ClientDocsPanel } from "@/components/client-docs/docs-panel";
 import { getOnboardingView } from "@/server/onboarding";
 import { OnboardingTab } from "./onboarding-tab";
+import { ResearchTab } from "./research-tab";
 
 export const dynamic = "force-dynamic";
 
@@ -87,11 +88,11 @@ export default async function ClientPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; onderzoek?: string }>;
 }) {
   const viewer = await requireInternal();
   const { slug } = await params;
-  const { tab } = await searchParams;
+  const { tab, onderzoek } = await searchParams;
   const hub = await getClientHub(viewer, slug);
   const c = hub.client;
   // Editing-deadlines exact zoals op het editing-board — dezelfde bron
@@ -149,11 +150,15 @@ export default async function ClientPage({
     ? [{ key: "onboarding", label: onboardingOpen ? `Onboarding ${onboarding.done}/${onboarding.total}` : "Onboarding" }]
     : [];
 
+  const canSeeResearch = !isEditorRole(viewer) && !isFreelanceVideographer(viewer);
+
   const tabs: TabDef[] = [
     ...(onboardingOpen ? onboardingTab : []),
     { key: "overzicht", label: "Overzicht" },
     // Exitgesprek: alleen bij gestopte of gepauzeerde klanten, alleen voor het team.
     ...(!isEditorRole(viewer) && (EXIT_STATUSES as readonly string[]).includes(c.status) ? [{ key: "exitgesprek", label: "Exitgesprek" }] : []),
+    // Klantonderzoek: uitsluitend voor het interne team (geen editors, geen freelance videografen).
+    ...(canSeeResearch ? [{ key: "onderzoek", label: "Klantonderzoek" }] : []),
     { key: "videos", label: "Video's", count: activeVideos.length },
     { key: "scripts", label: "Scripts", count: hub.scripts.filter((s) => s.status !== "shot").length },
     ...(hub.shoots.length > 0 ? [{ key: "opnames", label: "Opnames" }] : []),
@@ -312,6 +317,15 @@ export default async function ClientPage({
             </details>
           ) : null}
         </div>
+      ) : null}
+      {active === "onderzoek" && canSeeResearch ? (
+        <ResearchTab
+          clientId={c.id}
+          slug={slug}
+          selectedId={onderzoek ?? null}
+          canStart={viewer.permissions.has("content_research:write") || viewer.permissions.has("clients:write")}
+          canManage={viewer.permissions.has("knowledge:write")}
+        />
       ) : null}
       {active === "videos" ? <VideosTab hub={hub} editingProjects={editingProjects} /> : null}
       {active === "scripts" ? <ScriptsTab hub={hub} canVI={viewer.permissions.has("video_intelligence:read")} /> : null}
@@ -700,7 +714,7 @@ function KnowledgeTab({ hub }: { hub: ClientHub }) {
                 <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">{k.body}</p>
                 {k.source !== "manual" ? (
                   <Badge tone="info" className="mt-1.5">
-                    afgeleid uit data
+                    {k.source === "klantonderzoek" ? "uit klantonderzoek" : k.source === "onboarding" ? "uit klantbriefing" : "afgeleid uit data"}
                   </Badge>
                 ) : null}
               </li>

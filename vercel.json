@@ -43,6 +43,7 @@
     { "path": "/api/jobs/run?job=transfers.cleanup", "schedule": "30 3 * * *" },
     { "path": "/api/jobs/run?job=content_research.weekly", "schedule": "*/5 0-9 * * 1" },
     { "path": "/api/jobs/run?job=content_research.advance", "schedule": "*/5 5-17 * * 1-5" },
+    { "path": "/api/jobs/run?job=client_research.advance", "schedule": "3-58/5 5-19 * * *" },
     { "path": "/api/jobs/run?job=content_research.notify", "schedule": "0 8 * * 1" },
     { "path": "/api/jobs/run?job=content_research.notify", "schedule": "0 9 * * 1" },
     { "path": "/api/jobs/run?job=reports.generate_monthly", "schedule": "0 6 * * *" },

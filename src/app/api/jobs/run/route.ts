@@ -44,6 +44,7 @@ import { runCaptionDriveLink } from "@/server/jobs/caption-drive-link";
 import { runBriefingAutoGenerate } from "@/server/jobs/briefing-autogen";
 import { runContentMemoryRefresh, runContentMemoryStrategy } from "@/server/content-memory";
 import { runContentResearchAdvance, runContentResearchWeekly } from "@/server/jobs/content-research-autogen";
+import { runClientResearchAdvance } from "@/server/jobs/client-research";
 import { runContentResearchNotify } from "@/server/jobs/content-research-notify";
 import { runMonthlyReports, runReportQueue } from "@/server/jobs/report-monthly";
 import { runReportTeamNotifications } from "@/server/reports/team";
@@ -194,6 +195,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "content_research.weekly": runContentResearchWeekly,
   // Overdag elke 5 min: handmatig gestarte rondes afmaken (licht als er niets loopt).
   "content_research.advance": runContentResearchAdvance,
+  // Klantonderzoek: lopende onderzoeken afmaken, nulmeting voor nieuwe klanten, hercontrole na 90 dagen.
+  "client_research.advance": runClientResearchAdvance,
   "content_memory.refresh": runContentMemoryRefresh,
   "content_memory.strategy": runContentMemoryStrategy,
   // Klanten die aandacht nodig hebben: dagelijks na Metricool en het Contentgeheugen.

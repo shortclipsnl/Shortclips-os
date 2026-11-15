@@ -19,6 +19,7 @@ import { CopyButton, CoverImage, MemoryClientStrip, MemoryPlayerProvider, PlayTr
 import { HookAltsPanel, HookAltsProvider, HookPrinciple } from "@/components/content-memory/hook-alternatives";
 import { ThumbBackfill } from "@/components/content-memory/thumb-backfill";
 import { ContentDnaView } from "@/components/content-memory/dna-view";
+import { ResearchStrip } from "@/components/content-memory/research-strip";
 import { MemoryLessons } from "@/components/content-memory/lessons";
 import { lessonsForClient } from "@/server/result-alert-lessons";
 
@@ -121,6 +122,7 @@ function InternalView({ cm }: { cm: ClientMemory }) {
 
   return (
     <div className="flex flex-col gap-5">
+      <ResearchStrip clientId={cm.clientId} clientSlug={cm.clientSlug} thin={!m.sufficient} />
       {!m.sufficient ? (
         <div className="flex gap-3 rounded-[var(--radius-md)] border border-[var(--color-warn)]/40 bg-[var(--color-warn-soft)] px-4 py-3 text-sm">
           <CircleAlert className="mt-0.5 size-4 shrink-0 text-[var(--color-warn)]" />
