@@ -22,6 +22,7 @@ import { ContentDnaView } from "@/components/content-memory/dna-view";
 import { MemoryLessons } from "@/components/content-memory/lessons";
 import { lessonsForClient } from "@/server/result-alert-lessons";
 import { getClientAdvice } from "@/server/content-memory/advice-store";
+import { clientInsightsFrom, loadInsightReviews } from "@/server/content-memory/client-insights-store";
 import { ContentAdviceView } from "@/components/content-memory/advice-view";
 
 export const metadata: Metadata = { title: "Contentgeheugen" };
@@ -49,7 +50,10 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
   const cm = selected ? await getContentMemory(viewer, selected.id) : null;
   const asClient = sp.weergave === "klant";
   const asAdvice = !asClient && sp.tab === "advies";
-  const adviceData = cm && asAdvice ? await getClientAdvice(viewer, cm) : null;
+  // Het advies voedt ook de klantweergave ("Wat werkt bij jouw bedrijf?"), dus ook daar laden.
+  const adviceData = cm && (asAdvice || asClient) ? await getClientAdvice(viewer, cm).catch(() => null) : null;
+  const reviews = cm && adviceData ? await loadInsightReviews(cm.clientId) : [];
+  const clientInsights = cm && asClient && adviceData ? clientInsightsFrom(cm, adviceData, reviews) : null;
   const alts = cm && !asClient && !asAdvice ? await getHookAlternatives(cm.clientId) : {};
   const lessons = cm && !asClient && !asAdvice ? await lessonsForClient(cm.clientId).catch(() => []) : [];
   const qs = (extra: Record<string, string | undefined>) => {
@@ -97,10 +101,10 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
         {!cm ? (
           <EmptyState title="Nog geen actieve klant met resultaten" description="Zodra Metricool publicaties en cijfers levert, verschijnt hier het geheugen." />
         ) : asClient ? (
-          <div className="portal-studio rounded-[20px] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-4 sm:p-6"><ClientMemoryView cm={cm} /></div>
+          <div className="portal-studio rounded-[20px] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-4 sm:p-6"><ClientMemoryView cm={cm} insights={clientInsights} /></div>
         ) : asAdvice && adviceData ? (
           <MemoryPlayerProvider>
-            <ContentAdviceView cm={cm} data={adviceData} />
+            <ContentAdviceView cm={cm} data={adviceData} reviews={reviews} />
           </MemoryPlayerProvider>
         ) : (
           <MemoryPlayerProvider>

@@ -121,3 +121,35 @@ export async function setAdviceStatusAction(id: string, status: string): Promise
     return { ok: false, message: "Opslaan lukte niet." };
   }
 }
+
+/**
+ * Klantinzichten: het team keurt een inzicht goed voor het klantportaal, past
+ * de tekst voor de klant aan of verbergt het. Zonder goedkeuring ziet de klant niets.
+ */
+export async function setInsightReviewAction(
+  clientId: string,
+  input: { key: string; decision: string; clientTitle?: string | null; clientText?: string | null },
+): Promise<MemoryActionResult> {
+  try {
+    const viewer = await requirePermission("analytics:read");
+    assertClientAccess(viewer, clientId);
+    // Een klant bepaalt nooit zelf wat er in het eigen portaal als inzicht staat.
+    if (viewer.isPortalUser) return { ok: false, message: "Geen toegang." };
+    if (input.decision !== "tonen" && input.decision !== "verbergen") return { ok: false, message: "Onbekende keuze." };
+    const { setInsightReview } = await import("@/server/content-memory/client-insights-store");
+    // Momentopname van het inzicht zoals het nu is, voor de geschiedenis.
+    const { loadClientMemory } = await import("@/server/content-memory");
+    const { loadClientAdvice } = await import("@/server/content-memory/advice-store");
+    const cm = await loadClientMemory(clientId);
+    const ca = cm ? await loadClientAdvice(cm, { sync: false }).catch(() => null) : null;
+    const s = ca?.advice.sections;
+    const item = s ? [...s.meer, ...s.blijven, ...s.minder, ...s.testen].find((i) => i.key === input.key) ?? null : null;
+    const res = await setInsightReview(viewer, clientId, { key: input.key, decision: input.decision, clientTitle: input.clientTitle, clientText: input.clientText, item });
+    revalidatePath("/contentgeheugen");
+    revalidatePath("/portal/contentgeheugen");
+    return res;
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    return { ok: false, message: "Opslaan lukte niet." };
+  }
+}

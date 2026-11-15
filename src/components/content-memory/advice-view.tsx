@@ -6,6 +6,10 @@ import type { AdviceRecord, ClientAdvice } from "@/server/content-memory/advice-
 import { CopyButton, CoverImage, PlayTrigger, type PlayerVideo } from "@/components/content-memory/player";
 import { AdviceStatusControl, AdviceStatusPill } from "@/components/content-memory/advice-status";
 import { plat, xf } from "@/components/content-memory/shared";
+import { ClientReviewControl } from "@/components/content-memory/client-review";
+import { defaultText, defaultTitle, insightTier, pendingReviews, type InsightReview } from "@/server/content-memory/client-insights";
+
+type ReviewCtx = { clientId: string; byKey: Map<string, InsightReview> };
 
 /**
  * Contentadvies: "Wat gaan we nu beter doen?"
@@ -63,7 +67,8 @@ function Evidence({ i, videos }: { i: AdviceItem; videos: Map<string, PlayerVide
   );
 }
 
-function AdviceCard({ i, record, videos }: { i: AdviceItem; record: AdviceRecord | undefined; videos: Map<string, PlayerVideo> }) {
+function AdviceCard({ i, record, videos, review }: { i: AdviceItem; record: AdviceRecord | undefined; videos: Map<string, PlayerVideo>; review?: ReviewCtx }) {
+  const rv = review?.byKey.get(i.key);
   const s = SECTION[i.section];
   return (
     <article className="relative overflow-hidden rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] pl-[5px]">
@@ -78,6 +83,19 @@ function AdviceCard({ i, record, videos }: { i: AdviceItem; record: AdviceRecord
         <p className="mt-1 text-[13.5px] font-medium leading-snug text-[var(--color-ink)]">{i.advice}</p>
         {record ? <div className="mt-2.5"><AdviceStatusControl key={`${record.id}-${record.status}`} id={record.id} status={record.status} manualVerdict={!i.target} /></div> : null}
         {record?.outcome ? <p className="mt-2 rounded-md bg-[var(--color-surface-sunken)] px-2.5 py-1.5 text-[12.5px] text-[var(--color-ink)]">{record.outcome.note}</p> : null}
+        {review ? (
+          <ClientReviewControl
+            key={`${i.key}-${rv?.decision ?? "open"}`}
+            clientId={review.clientId}
+            itemKey={i.key}
+            decision={rv?.decision ?? null}
+            tier={insightTier(i)}
+            defaultTitle={defaultTitle(i)}
+            defaultText={defaultText(i)}
+            clientTitle={rv?.clientTitle ?? null}
+            clientText={rv?.clientText ?? null}
+          />
+        ) : null}
         <details className="group mt-2.5">
           <summary className="cursor-pointer list-none text-[12.5px] font-medium text-[var(--color-ink-muted)] underline-offset-2 hover:text-[var(--color-ink)] hover:underline">Inzicht, toepassing, meten en bewijs</summary>
           <dl className="mt-2.5 grid gap-2.5 text-[13px] leading-snug">
@@ -92,7 +110,7 @@ function AdviceCard({ i, record, videos }: { i: AdviceItem; record: AdviceRecord
   );
 }
 
-function SectionBlock({ k, items, open, videos, empty }: { k: AdviceSection; items: AdviceItem[]; open: Record<string, AdviceRecord>; videos: Map<string, PlayerVideo>; empty: string }) {
+function SectionBlock({ k, items, open, videos, empty, review }: { k: AdviceSection; items: AdviceItem[]; open: Record<string, AdviceRecord>; videos: Map<string, PlayerVideo>; empty: string; review?: ReviewCtx }) {
   const s = SECTION[k];
   const Icon = s.icon;
   return (
@@ -104,7 +122,7 @@ function SectionBlock({ k, items, open, videos, empty }: { k: AdviceSection; ite
           <p className="text-[12.5px] text-[var(--color-ink-muted)]">{s.sub}</p>
         </div>
       </header>
-      {items.length ? items.map((i) => <AdviceCard key={i.key} i={i} record={open[i.key]} videos={videos} />) : <p className="rounded-[14px] border border-dashed border-[var(--color-line-strong)] px-4 py-5 text-[13px] text-[var(--color-ink-muted)]">{empty}</p>}
+      {items.length ? items.map((i) => <AdviceCard key={i.key} i={i} record={open[i.key]} videos={videos} review={review} />) : <p className="rounded-[14px] border border-dashed border-[var(--color-line-strong)] px-4 py-5 text-[13px] text-[var(--color-ink-muted)]">{empty}</p>}
     </section>
   );
 }
@@ -139,8 +157,11 @@ const SHOOT_TAG: Record<ShootLine["kind"], { label: string; cls: string }> = {
   testen: { label: "Testen", cls: "bg-[#fde6bd] text-[#6b4500]" },
 };
 
-export function ContentAdviceView({ cm, data }: { cm: ClientMemory; data: ClientAdvice }) {
+export function ContentAdviceView({ cm, data, reviews }: { cm: ClientMemory; data: ClientAdvice; reviews?: InsightReview[] }) {
   const a: ContentAdvice = data.advice;
+  // Beoordeling voor het klantportaal: alleen als de pagina de beoordelingen meegeeft.
+  const review: ReviewCtx | undefined = reviews ? { clientId: cm.clientId, byKey: new Map(reviews.map((r) => [r.key, r])) } : undefined;
+  const pending = reviews ? pendingReviews(a.sections, reviews) : 0;
   const videos = new Map<string, PlayerVideo>(cm.memory.all.map((v) => [v.id, { id: v.id, title: v.title, platform: v.platform, publishedOn: v.publishedOn, views: v.views, embedUrl: v.embedUrl ?? null, externalUrl: v.externalUrl }]));
   const total = a.sections.meer.length + a.sections.minder.length + a.sections.blijven.length + a.sections.testen.length;
   const shootText = [`Volgende opnamedag ${cm.clientName}`, ...a.nextShoot.map((l) => `${SHOOT_TAG[l.kind].label}: ${l.text}${l.proof === "hypothese" ? " (hypothese)" : ""}`)].join("\n");
@@ -218,12 +239,19 @@ export function ContentAdviceView({ cm, data }: { cm: ClientMemory; data: Client
       </div>
 
       {/* De vier onderdelen */}
+      {total && review ? (
+        <p className="rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3 text-[13px] leading-snug">
+          <b className="font-semibold">Klantportaal: </b>
+          {pending ? `${pending} ${pending === 1 ? "inzicht is" : "inzichten zijn"} nog niet beoordeeld. ` : "Alle inzichten zijn beoordeeld. "}
+          De klant ziet een inzicht pas in &quot;Wat werkt bij jouw bedrijf?&quot; nadat je het hieronder hebt goedgekeurd. Voor de klant geldt: bewezen vanaf acht video&apos;s, voorlopig vanaf vier, daaronder hypothese.
+        </p>
+      ) : null}
       {total ? (
         <div className="grid gap-x-5 gap-y-7 lg:grid-cols-2">
-          <SectionBlock k="meer" items={a.sections.meer} open={data.open} videos={videos} empty="Niets dat bewezen werkt en nog te weinig wordt ingezet." />
-          <SectionBlock k="minder" items={a.sections.minder} open={data.open} videos={videos} empty="Niets dat aantoonbaar onder normaal scoort of te vaak wordt herhaald." />
-          <SectionBlock k="blijven" items={a.sections.blijven} open={data.open} videos={videos} empty="Nog geen vast principe dat consequent boven normaal scoort." />
-          <SectionBlock k="testen" items={a.sections.testen} open={data.open} videos={videos} empty="Geen openstaande experimenten." />
+          <SectionBlock k="meer" items={a.sections.meer} open={data.open} videos={videos} review={review} empty="Niets dat bewezen werkt en nog te weinig wordt ingezet." />
+          <SectionBlock k="minder" items={a.sections.minder} open={data.open} videos={videos} review={review} empty="Niets dat aantoonbaar onder normaal scoort of te vaak wordt herhaald." />
+          <SectionBlock k="blijven" items={a.sections.blijven} open={data.open} videos={videos} review={review} empty="Nog geen vast principe dat consequent boven normaal scoort." />
+          <SectionBlock k="testen" items={a.sections.testen} open={data.open} videos={videos} review={review} empty="Geen openstaande experimenten." />
         </div>
       ) : null}
 

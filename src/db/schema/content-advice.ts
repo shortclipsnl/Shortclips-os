@@ -55,3 +55,36 @@ export const contentAdvice = pgTable(
     index("content_advice_client_idx").on(t.clientId, t.status),
   ],
 );
+
+/* ------------------------------------------------------------------ *
+ * Klantinzichten: wat de klant ziet in "Wat werkt bij jouw bedrijf?"
+ * ------------------------------------------------------------------ */
+
+/**
+ * Eén beoordeling per klant per inzicht (zelfde sleutel als het advies).
+ * Een inzicht staat pas in het klantportaal als het team het hier heeft
+ * goedgekeurd ("tonen"). Het team kan de titel en de toelichting voor de klant
+ * aanpassen; de cijfers en het bewijs komen altijd uit de actuele resultaten.
+ *
+ * Losse tabel en geen kolom op content_advice: een advies wordt afgesloten en
+ * komt later opnieuw terug als nieuwe regel, de keuze voor de klant blijft staan.
+ */
+export const contentInsightReviews = pgTable(
+  "content_insight_reviews",
+  {
+    id: pk(),
+    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    key: varchar("key", { length: 200 }).notNull(),
+    /** tonen | verbergen */
+    decision: varchar("decision", { length: 10 }).notNull(),
+    /** Eigen titel en toelichting voor de klant; leeg = de standaardtekst. */
+    clientTitle: varchar("client_title", { length: 200 }),
+    clientText: varchar("client_text", { length: 600 }),
+    /** Momentopname van het inzicht op het moment van beoordelen (voor de geschiedenis). */
+    item: jsonb("item").notNull().default(sql`'{}'::jsonb`),
+    reviewedById: uuid("reviewed_by_id").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("content_insight_reviews_unique").on(t.clientId, t.key)],
+);
