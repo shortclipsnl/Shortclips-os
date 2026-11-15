@@ -7,6 +7,8 @@ import { getClientVideoUpdate } from "@/server/video-updates";
 import { parsePortalPeriod, portalPeriodQuery } from "@/lib/portal-periods";
 import { PortalResultsView } from "./results-view";
 import { MonthlyVideoCard } from "./monthly-video";
+import { PeriodeToggle } from "./periode-toggle";
+import { getPortalQuarterlyReports } from "@/server/quarterly/service";
 
 export const metadata: Metadata = { title: "Resultaten" };
 export const dynamic = "force-dynamic";
@@ -28,16 +30,18 @@ export default async function PortalResultatenPage({
   const viewer = await requirePortal();
   const sp = await searchParams;
   const period = parsePortalPeriod(sp);
-  const [r, improvement, videoUpdate] = await Promise.all([
+  const [r, improvement, videoUpdate, kwartalen] = await Promise.all([
     getPortalResults(viewer, { days: period.days, from: period.from, to: period.to, periodKey: period.key }),
     getApprovedImprovementForClient(viewer),
     viewer.clientId ? getClientVideoUpdate(viewer.clientId) : Promise.resolve(null),
+    getPortalQuarterlyReports(viewer).catch(() => []),
   ]);
 
   const visible = improvement ? SECTIONS.filter((s) => improvement.content[s.k].length > 0) : [];
 
   return (
     <div className="flex flex-col gap-7">
+      <PeriodeToggle active="maand" nieuwKwartaal={kwartalen.some((k) => k.nieuw)} />
       <PortalResultsView r={r} basePath="/portal/resultaten" reportHref={`/resultatenrapport?${portalPeriodQuery(period)}`} initialPlatform={sp.platform ?? "alle"} />
 
       {videoUpdate ? <MonthlyVideoCard update={videoUpdate} /> : null}

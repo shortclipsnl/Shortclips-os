@@ -22,6 +22,8 @@ import { ContentDnaView } from "@/components/content-memory/dna-view";
 import { ResearchStrip } from "@/components/content-memory/research-strip";
 import { MemoryLessons } from "@/components/content-memory/lessons";
 import { lessonsForClient } from "@/server/result-alert-lessons";
+import { quarterLessonsForClient } from "@/server/quarterly/service";
+import { QuarterLessons } from "@/components/quarterly/quarter-lessons";
 
 export const metadata: Metadata = { title: "Contentgeheugen" };
 export const dynamic = "force-dynamic";
@@ -49,6 +51,7 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
   const asClient = sp.weergave === "klant";
   const alts = cm && !asClient ? await getHookAlternatives(cm.clientId) : {};
   const lessons = cm && !asClient ? await lessonsForClient(cm.clientId).catch(() => []) : [];
+  const kwartaalLessen = cm && !asClient ? await quarterLessonsForClient(cm.clientId).catch(() => []) : [];
   const qs = (extra: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
     const merged = { klant: selected?.slug, weergave: asClient ? "klant" : undefined, alle: showAll ? "1" : undefined, ...extra };
@@ -101,6 +104,7 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
               <InternalView cm={cm} />
             </HookAltsProvider>
             <MemoryLessons lessons={lessons} />
+            <QuarterLessons lessons={kwartaalLessen} />
           </MemoryPlayerProvider>
         )}
       </div>

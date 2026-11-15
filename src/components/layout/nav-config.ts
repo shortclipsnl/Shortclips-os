@@ -11,6 +11,8 @@ export type NavItem = {
   permissions?: PermissionKey[];
   /** Actief ook op onderliggende paden. */
   match?: string;
+  /** Extra paden waarop dit item ook actief is (bijv. een tweede tab van dezelfde omgeving). */
+  alsoMatch?: string[];
   /** Alleen zichtbaar voor de eigenaar (Janno). */
   ownerOnly?: boolean;
   /** Náást de eigenaar ook zichtbaar voor deze rollen (rolgebaseerd, geen e-mailuitzonderingen). */
@@ -99,7 +101,8 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/analytics", label: "Resultaten", icon: "TrendingUp", permissions: ["analytics:read"], match: "/analytics" },
       // Contentgeheugen: wat per klant aantoonbaar werkt (formats, hooks, CTA's, video's).
       { href: "/contentgeheugen", label: "Contentgeheugen", icon: "BrainCircuit", permissions: ["analytics:read"], match: "/contentgeheugen" },
-      { href: "/analytics/maandrapportages", label: "Maandrapportages", icon: "FileText", permissions: ["reports:read", "reports:team_read"], match: "/analytics/maandrapportages" },
+      // Rapportages: maandrapportages en kwartaalrapportages in één omgeving (tabs bovenaan).
+      { href: "/analytics/maandrapportages", label: "Rapportages", icon: "FileText", permissions: ["reports:read", "reports:team_read"], match: "/analytics/maandrapportages", alsoMatch: ["/analytics/kwartaalrapportages"] },
       { href: "/video-intelligence", label: "Video Intelligence", icon: "Sparkles", permissions: ["video_intelligence:read"], match: "/video-intelligence", section: "/analytics" },
     ],
   },
@@ -181,7 +184,7 @@ export function matchNavHref(items: NavItem[], pathname: string): string | null 
   for (const item of items) {
     const base = item.href.split("?")[0];
     const prefix = item.match ?? base;
-    const hit = pathname === base || pathname.startsWith(`${prefix}/`);
+    const hit = pathname === base || pathname.startsWith(`${prefix}/`) || (item.alsoMatch ?? []).some((p) => pathname === p || pathname.startsWith(`${p}/`));
     if (hit && (!best || base.length > best.length)) best = base;
   }
   return best;

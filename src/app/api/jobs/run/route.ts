@@ -48,6 +48,7 @@ import { runClientResearchAdvance } from "@/server/jobs/client-research";
 import { runContentResearchNotify } from "@/server/jobs/content-research-notify";
 import { runMonthlyReports, runReportQueue } from "@/server/jobs/report-monthly";
 import { runReportTeamNotifications } from "@/server/reports/team";
+import { runQuarterlyPlanner, runQuarterlyQueue, sendQuarterlyDigest } from "@/server/quarterly/workflow";
 import { runReportReviewReminders } from "@/server/jobs/report-review-reminders";
 import { runFeedbackReminders } from "@/server/feedback-rounds";
 import { runAttentionNotify } from "@/server/jobs/attention-notify";
@@ -206,6 +207,11 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "reports.review_reminders": runReportReviewReminders,
   "reports.process_queue": runReportQueue,
   "reports.team_notify": () => runReportTeamNotifications(),
+  // Kwartaalrapportages: dagelijks plannen (taken, statussen, één dagoverzicht per medewerker)
+  // en overdag de wachtrij met generaties verwerken.
+  "reports.quarterly_plan": () => runQuarterlyPlanner(),
+  "reports.quarterly_queue": runQuarterlyQueue,
+  "reports.quarterly_digest": async () => ({ sent: await sendQuarterlyDigest() }),
   "attention.notify": runAttentionNotify,
   // Operationele controle: elk kwartier op werkdagen; draait alleen om de ingestelde tijden (standaard 08:45, 13:30 stil en 15:30).
   "ops.control": () => runOpsControlScheduled(),

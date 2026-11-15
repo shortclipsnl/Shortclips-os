@@ -22,6 +22,8 @@ export function taskHref(t: { entityType: string | null; entityId: string | null
   if (t.entityType === "client_report" && t.entityId && (t.dedupeKey?.startsWith("report_action:") || t.dedupeKey?.startsWith(STAP_PREFIX))) {
     return `/analytics/maandrapportages/${t.entityId}`;
   }
+  // Processtap of verbeterpunt van een kwartaalrapportage → die rapportage.
+  if (t.entityType === "quarterly_report" && t.entityId) return `/analytics/kwartaalrapportages/${t.entityId}`;
   // Oude verzameltaak maandcontrole (één taak per maand) → pagina Maandrapportages.
   const batch = parseBatchKey(t.dedupeKey);
   if (t.entityType === "report_batch" && batch) return batchHref(batch.period);

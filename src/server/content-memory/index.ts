@@ -487,5 +487,7 @@ export async function contentMemoryTextForClient(viewer: Viewer, clientId: strin
   if (!cm) return "";
   // Gemeten uitkomsten van eerdere verbeteracties (Klanten die aandacht nodig hebben).
   const lessons = await import("@/server/result-alert-lessons").then((m) => m.lessonsPromptText(clientId)).catch(() => "");
-  return [contentMemoryPromptText(cm, opts), lessons].filter(Boolean).join("\n\n");
+  // Door het team goedgekeurde inzichten uit de kwartaalrapportage.
+  const kwartaal = await import("@/server/quarterly/service").then((m) => m.quarterLessonsPromptText(clientId)).catch(() => "");
+  return [contentMemoryPromptText(cm, opts), lessons, kwartaal].filter(Boolean).join("\n\n");
 }

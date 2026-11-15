@@ -51,6 +51,7 @@ export const PERMISSIONS = {
   "reports:read": "Rapportages bekijken",
   "reports:write": "Rapportages maken en publiceren",
   "reports:team_read": "Goedgekeurde maandrapportages lezen en als doorgenomen markeren",
+  "reports:approve": "Kwartaalrapportages definitief goedkeuren",
 
   // Finance — bewust strikt
   "finance:read": "Omzet, facturen en marges bekijken",

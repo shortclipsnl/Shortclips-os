@@ -890,6 +890,13 @@
       "when": 1794771000000,
       "tag": "0126_klantonderzoek",
       "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1794775000000,
+      "tag": "0127_kwartaalrapportages",
+      "breakpoints": true
     }
   ]
 }
