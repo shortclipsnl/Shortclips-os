@@ -45,6 +45,8 @@ export function ytdlpBin(): string {
 
 /** Python uit de transcriptie-venv (.venv-vi), of null als die er niet is. */
 export function whisperPython(): string | null {
+  // VI_PYTHON: expliciet pad, voor een worker waarvan de venv ergens anders staat.
+  if (process.env.VI_PYTHON && existsSync(process.env.VI_PYTHON)) return process.env.VI_PYTHON;
   const p = path.join(process.cwd(), ".venv-vi", "bin", "python");
   return existsSync(p) ? p : null;
 }

@@ -51,3 +51,6 @@ PILOT-LOGINS*
 
 # Video Intelligence transcriptie-venv
 .venv-vi/
+
+# Video Intelligence worker (Linux-venv en modelcache voor de automatische run)
+.vi-linux/

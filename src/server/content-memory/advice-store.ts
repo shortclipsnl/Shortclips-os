@@ -6,7 +6,9 @@ import { assertClientAccess, type Viewer } from "@/server/auth/context";
 import {
   advicePromptText,
   buildAdvice,
+  filmStyleOf,
   measureAdvice,
+  tempoOf,
   provenPatterns,
   type AdviceContext,
   type AdviceItem,
@@ -16,6 +18,7 @@ import {
   type CrossPattern,
 } from "./advice";
 import { shownFormats } from "./strategy";
+import { captionKey } from "./analyze";
 import type { ClientMemory } from "./index";
 
 /**
@@ -69,12 +72,49 @@ const CROSS_KEY = "content_advice.cross_patterns";
 const COOLDOWN_DAYS: Record<string, number> = { effectief: 60, niet_effectief: 90, vervallen: 90 };
 const iso = (d: Date | string | null) => (d ? new Date(d).toISOString() : null);
 
-export function adviceContext(cm: ClientMemory, cross: CrossPattern[] = []): AdviceContext {
+export type VideoSignals = { styles: Record<string, string>; tempo: Record<string, string> };
+
+/**
+ * Filmstijl en montagetempo per video uit de video-analyse (shots en transcript).
+ * Een analyse hoort bij alle publicaties van dezelfde video (zelfde caption op
+ * meerdere platforms).
+ */
+export async function loadVideoSignals(cm: ClientMemory): Promise<VideoSignals> {
+  const out: VideoSignals = { styles: {}, tempo: {} };
+  try {
+    const res = await db.execute(sql`
+      select a.caption, em.avg_shot_ms, coalesce(length(t.full_text), 0) > 40 as speech,
+        (select jsonb_agg(jsonb_build_object('t', s.shot_type, 'd', s.end_ms - s.start_ms)) from video_shots s where s.analysis_id = a.id and s.shot_type is not null) as shots
+      from video_analyses a
+      join video_editing_metrics em on em.analysis_id = a.id
+      left join video_transcripts t on t.analysis_id = a.id
+      where a.client_id = ${cm.clientId} and a.deleted_at is null and a.caption is not null`);
+    const rows = (((res as { rows?: unknown[] }).rows ?? res) as Array<{ caption: string; avg_shot_ms: number | null; speech: boolean; shots: Array<{ t: string; d: number }> | null }>);
+    const byKey = new Map<string, { style: string | null; tempo: string | null }>();
+    for (const r of rows) {
+      const k = captionKey(r.caption);
+      if (k.length < 20) continue;
+      byKey.set(k, { style: filmStyleOf({ avgShotMs: r.avg_shot_ms, speech: !!r.speech, shots: r.shots ?? [] }), tempo: tempoOf(r.avg_shot_ms == null ? null : Number(r.avg_shot_ms)) });
+    }
+    for (const v of cm.memory.all) {
+      const s = byKey.get(captionKey(v.caption));
+      if (s?.style) out.styles[v.id] = s.style;
+      if (s?.tempo) out.tempo[v.id] = s.tempo;
+    }
+  } catch {
+    /* geen video-analyse beschikbaar: advies zonder filmstijl en tempo */
+  }
+  return out;
+}
+
+export function adviceContext(cm: ClientMemory, cross: CrossPattern[] = [], video: VideoSignals = { styles: {}, tempo: {} }): AdviceContext {
   const formatIdeas = shownFormats(cm.memory).flatMap((g) => (cm.strategy?.formatIdeas[g.label]?.ideas ?? []).slice(0, 1).map((i) => ({ base: g.label, name: i.name, description: i.description, hook: i.hook })));
   return {
     clientId: cm.clientId,
     structures: cm.ai.structures,
-    styles: cm.strategy?.styles ?? {},
+    // Gemeten filmstijl (video-analyse) gaat voor het AI-label uit de strategie-analyse.
+    styles: { ...(cm.strategy?.styles ?? {}), ...video.styles },
+    tempo: video.tempo,
     formatIdeas,
     ideas: cm.ai.ideas,
     cross,
@@ -160,7 +200,7 @@ export async function syncClientAdvice(cm: ClientMemory, advice: ContentAdvice, 
 /** Het actuele advies van een klant, inclusief voortgang. Werkt de regels eerst bij. */
 export async function loadClientAdvice(cm: ClientMemory, opts: { sync?: boolean; now?: Date } = {}): Promise<ClientAdvice> {
   const nowMs = (opts.now ?? new Date()).getTime();
-  const ctx = adviceContext(cm, await loadCrossPatterns());
+  const ctx = adviceContext(cm, await loadCrossPatterns(), await loadVideoSignals(cm));
   const advice = buildAdvice(cm.memory, ctx);
   if (opts.sync !== false) await syncClientAdvice(cm, advice, ctx).catch((e) => console.error("[contentadvies] sync mislukt", e));
   const rows = (await db.select().from(contentAdvice).where(eq(contentAdvice.clientId, cm.clientId)).orderBy(desc(contentAdvice.statusChangedAt)).catch(() => [])).map(toRecord);
@@ -249,9 +289,11 @@ export async function runContentAdvice(): Promise<{ clients: number; created: nu
     if (cm?.memory.videoCount) memories.push(cm);
   }
 
+  const signals = new Map<string, VideoSignals>();
   const agg = new Map<string, CrossPattern & { perfs: number[] }>();
   for (const cm of memories) {
-    for (const p of provenPatterns(cm.memory, adviceContext(cm))) {
+    signals.set(cm.clientId, await loadVideoSignals(cm));
+    for (const p of provenPatterns(cm.memory, adviceContext(cm, [], signals.get(cm.clientId)))) {
       const k = `${p.dimension}:${p.label}`;
       const a = agg.get(k) ?? { dimension: p.dimension, label: p.label, clientIds: [], medianPerf: 0, perfs: [] };
       a.clientIds.push(cm.clientId);
@@ -270,7 +312,7 @@ export async function runContentAdvice(): Promise<{ clients: number; created: nu
   for (const cm of memories) {
     if (Date.now() - started > 240_000) break;
     try {
-      const ctx = adviceContext(cm, patterns);
+      const ctx = adviceContext(cm, patterns, signals.get(cm.clientId));
       const r = await syncClientAdvice(cm, buildAdvice(cm.memory, ctx), ctx, now);
       out.clients++; out.created += r.created; out.progressed += r.progressed; out.closed += r.closed;
     } catch (e) {

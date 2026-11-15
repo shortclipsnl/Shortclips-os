@@ -20,6 +20,14 @@ import { probe, detectSceneCuts, shotsFromCuts, grabFrame, editingMetrics, type 
 import { speechStats } from "./metrics";
 import { workDir, workFramesDir, ensureWorkDir, toStoreRelative } from "./paths";
 import { activeStore, fetchMediaToTemp, type MediaStore } from "./storage";
+import { downloadFrameSource, isAutoAnalysis } from "./auto";
+
+/** Kapt AI-tekst af op de kolomlengte, zodat een te lang label de analyse nooit laat mislukken. */
+const clip = (v: unknown, max: number): string | null => {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s ? Array.from(s).slice(0, max).join("") : null;
+};
 
 /** Leest een JPEG van schijf en geeft het terug als base64 (voor opslag in de DB). */
 async function fileToBase64(p: string): Promise<string | null> {
@@ -96,6 +104,17 @@ export async function runPipeline(analysisId: string): Promise<void> {
         fileSizeBytes: res.fileSizeBytes,
         updatedAt: new Date(),
       }).where(eq(videoAnalyses.id, analysisId));
+      await setStep(analysisId, "download", "done");
+    } else if (a.sourceType === "frameio") {
+      // Automatische analyse: het origineel komt uit de videobibliotheek (Frame.io).
+      const res = await downloadFrameSource(analysisId, a.sourceUrl ?? "");
+      if (!res.ok) {
+        await setStep(analysisId, "download", "failed", res.reason);
+        await db.update(videoAnalyses).set({ status: "failed", error: res.reason, updatedAt: new Date() }).where(eq(videoAnalyses.id, analysisId));
+        return;
+      }
+      mediaPath = res.mediaPath;
+      await db.update(videoAnalyses).set({ fileSizeBytes: res.fileSizeBytes, updatedAt: new Date() }).where(eq(videoAnalyses.id, analysisId));
       await setStep(analysisId, "download", "done");
     } else {
       // upload: het bestand staat al in de opslag (schijf of Supabase). Haal het
@@ -209,7 +228,10 @@ export async function runPipeline(analysisId: string): Promise<void> {
     }
 
     // 7) INSIGHTS (gated op ANTHROPIC_API_KEY)
-    if (!aiConfigured()) {
+    if (isAutoAnalysis(a)) {
+      // Automatische analyses voeden het Contentgeheugen; een los verbeterrapport per video is daar niet nodig.
+      await setStep(analysisId, "insights", "done", "Niet van toepassing bij automatische analyse.");
+    } else if (!aiConfigured()) {
       await setStep(analysisId, "insights", "skipped", "ANTHROPIC_API_KEY ontbreekt — AI-conclusies nog niet beschikbaar.");
     } else {
       await setStep(analysisId, "insights", "running");
@@ -347,9 +369,10 @@ async function visionAnalyse(analysisId: string): Promise<{ status: StepStatus; 
 
   // Shotbeschrijvingen terugschrijven.
   for (const vs of data.shots ?? []) {
+    if (!Number.isInteger(vs?.idx)) continue;
     await db.update(videoShots).set({
-      shotType: vs.shotType ?? null, description: vs.description ?? null,
-      motion: vs.motion ?? null, transition: vs.transition ?? null, textOnScreen: vs.textOnScreen ?? null,
+      shotType: clip(vs.shotType, 40), description: clip(vs.description, 2000),
+      motion: clip(vs.motion, 40), transition: clip(vs.transition, 40), textOnScreen: clip(vs.textOnScreen, 2000),
       updatedAt: new Date(),
     }).where(and(eq(videoShots.analysisId, analysisId), eq(videoShots.idx, vs.idx)));
   }

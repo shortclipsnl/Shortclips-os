@@ -28,7 +28,7 @@ import { captionKey, evidenceOf, lengthBucket, median, MIN_VIDEOS, type ContentM
 import { HOOK_PLAY, statusOf, type PlayStatus } from "./playbook";
 import { CTA_ADVICE, CTA_PLAY, HOOK_ADVICE, LENGTH_ADVICE } from "./dna";
 
-export type AdviceDim = "format" | "hook" | "cta" | "lengte" | "opbouw" | "filmstijl";
+export type AdviceDim = "format" | "hook" | "cta" | "lengte" | "opbouw" | "filmstijl" | "tempo";
 export type AdvicePhase = "format" | "hook" | "midden" | "cta";
 export type AdviceSection = "meer" | "minder" | "blijven" | "testen";
 export type AdviceProof = "bewezen" | "hypothese";
@@ -109,7 +109,7 @@ export type ContentAdvice = {
   nextShoot: ShootLine[];
   phases: PhaseSummary[];
   ctaGoals: CtaGoalView[];
-  coverage: { structure: number; filmStyle: number; retention: number; total: number };
+  coverage: { structure: number; filmStyle: number; tempo: number; retention: number; total: number };
   /** Wat het systeem (nog) niet kan zien, eerlijk benoemd. */
   gaps: string[];
 };
@@ -118,8 +118,10 @@ export type AdviceContext = {
   clientId?: string;
   /** AI-label per video: opbouw van het middenstuk. */
   structures?: Record<string, string>;
-  /** AI-label per video: filmstijl (uit de strategie-analyse). */
+  /** Filmstijl per video: gemeten in de video-analyse (shots), anders het AI-label uit de strategie-analyse. */
   styles?: Record<string, string>;
+  /** Montagetempo per video, gemeten in de video-analyse (gemiddelde shotlengte). */
+  tempo?: Record<string, string>;
   /** Nieuwe formatvoorstellen uit de strategie-analyse (nog niet getest). */
   formatIdeas?: Array<{ base: string; name: string; description: string; hook: string }>;
   /** Contentideeën uit de format-analyse (nog niet getest). */
@@ -149,7 +151,20 @@ const STRUCTURE_APPLY: Record<string, string> = {
   Sfeerimpressie: "Laat beelden het werk doen, met weinig tekst en een duidelijk tempo.",
 };
 
+export const TEMPO = {
+  rustig: "Rustige montage (shots van 4 sec of langer)",
+  midden: "Gemiddeld montagetempo (shots van 2 tot 4 sec)",
+  snel: "Snelle montage (shots korter dan 2 sec)",
+} as const;
+
+const TEMPO_APPLY: Record<string, string> = {
+  [TEMPO.rustig]: "Geef de editor mee: laat shots minstens vier seconden staan en knip alleen bij een nieuw onderwerp.",
+  [TEMPO.midden]: "Geef de editor mee: wissel elke twee tot vier seconden van beeld.",
+  [TEMPO.snel]: "Geef de editor mee: wissel binnen twee seconden van beeld en neem daarvoor genoeg tussenbeelden op.",
+};
+
 export function adviceTitle(dimension: AdviceDim, label: string): string {
+  if (dimension === "tempo") return label;
   if (dimension === "format") return `Format "${label}"`;
   if (dimension === "hook") return HOOK_PLAY[label] ?? (label === "Stelling" ? "Openen met een gewone stelling" : label);
   if (dimension === "cta") return label === "Geen duidelijke CTA" ? "Video's zonder duidelijke afsluiting" : CTA_PLAY[label] ?? label;
@@ -158,7 +173,7 @@ export function adviceTitle(dimension: AdviceDim, label: string): string {
   return `Filmstijl: ${lc(label)}`;
 }
 
-const PHASE: Record<AdviceDim, AdvicePhase> = { format: "format", hook: "hook", cta: "cta", lengte: "midden", opbouw: "midden", filmstijl: "midden" };
+const PHASE: Record<AdviceDim, AdvicePhase> = { format: "format", hook: "hook", cta: "cta", lengte: "midden", opbouw: "midden", filmstijl: "midden", tempo: "midden" };
 
 function applicationOf(dimension: AdviceDim, label: string, quote: string | null): string {
   const example = quote ? ` Voorbeeld dat werkte (niet letterlijk kopiëren): "${quote}"` : "";
@@ -167,13 +182,14 @@ function applicationOf(dimension: AdviceDim, label: string, quote: string | null
   if (dimension === "format") return "Plan dit format in op de volgende opnamedag en schrijf er minstens twee scripts voor.";
   if (dimension === "lengte") return `Schrijf de scripts zo dat de video ${LENGTH_ADVICE[label] ?? lc(label)} duurt.`;
   if (dimension === "opbouw") return STRUCTURE_APPLY[label] ?? `Bouw het middenstuk op als ${lc(label)}.`;
+  if (dimension === "tempo") return TEMPO_APPLY[label] ?? "Geef dit montagetempo door in de editorbriefing.";
   return `Neem de video op in de stijl ${lc(label)} en geef dit door in de editorbriefing.`;
 }
 
 function measureOf(dimension: AdviceDim, goalMetric?: string | null): string {
   if (dimension === "cta" && goalMetric) return `Vergelijk ${goalMetric} per 1.000 weergaven met video's met een andere afsluiting op hetzelfde platform.`;
   if (dimension === "hook") return "Vergelijk de prestatie t.o.v. normaal en het uitgekeken deel met video's met een andere opening op hetzelfde platform.";
-  if (dimension === "opbouw" || dimension === "filmstijl" || dimension === "lengte") return "Vergelijk het uitgekeken deel en de prestatie t.o.v. normaal met de andere video's op hetzelfde platform.";
+  if (dimension === "opbouw" || dimension === "filmstijl" || dimension === "lengte" || dimension === "tempo") return "Vergelijk het uitgekeken deel en de prestatie t.o.v. normaal met de andere video's op hetzelfde platform.";
   return "Vergelijk de prestatie t.o.v. normaal (weergaven en interactie) met de andere video's op hetzelfde platform.";
 }
 
@@ -198,6 +214,8 @@ type Group = {
   recentShare: number | null;
   recentCount: number;
   recentTotal: number;
+  /** Aantal unieke video's (dezelfde video op meerdere platforms telt één keer). */
+  unique: number;
   status: PlayStatus;
 };
 
@@ -258,7 +276,10 @@ function buildGroups(m: ContentMemory, ctx: AdviceContext): Group[] {
         }
       }
       const evidence = evidenceOf(vs.length, hitRate, halvesAgree);
-      const hs = vs.map((v) => hold.get(v.id)).filter((x): x is number => x != null);
+      // Dezelfde video op meerdere platforms is geen onafhankelijk bewijs: kijkgedrag en "bewezen" tellen per unieke video.
+      const unique = uniq(vs);
+      const hs = unique.map((v) => hold.get(v.id)).filter((x): x is number => x != null);
+      const raw = statusOf({ n: vs.length, medianPerf, evidence });
       const recentCount = recent.filter((v) => keyOf(v).includes(label)).length;
       return {
         dimension, label, vs, n: vs.length, medianPerf, hitRate: r2(hitRate), evidence, trend,
@@ -268,7 +289,8 @@ function buildGroups(m: ContentMemory, ctx: AdviceContext): Group[] {
         recentShare: recent.length >= 6 ? recentCount / recent.length : null,
         recentCount,
         recentTotal: recent.length,
-        status: statusOf({ n: vs.length, medianPerf, evidence }),
+        unique: unique.length,
+        status: raw === "bewezen" && unique.length < 4 ? "indicatie" : raw,
       };
     });
   };
@@ -280,6 +302,7 @@ function buildGroups(m: ContentMemory, ctx: AdviceContext): Group[] {
     ...make("lengte", (v) => { const b = lengthBucket(v.durationSeconds); return b ? [b] : []; }),
     ...make("opbouw", (v) => { const s = ctx.structures?.[v.id]; return s && s !== "Onbekend" ? [s] : []; }),
     ...make("filmstijl", (v) => { const s = ctx.styles?.[v.id]; return s && s !== "Onbekend" ? [s] : []; }),
+    ...make("tempo", (v) => { const s = ctx.tempo?.[v.id]; return s ? [s] : []; }),
   ];
 }
 
@@ -392,7 +415,9 @@ function item(section: AdviceSection, g: Group, parts: { insight: string; advice
     application: section === "minder" ? "" : applicationOf(g.dimension, g.label, quote),
     measure: measureOf(g.dimension, parts.goalMetric),
     proof: parts.proof,
-    proofNote: parts.proof === "bewezen" ? `Bewezen: ${hits} van ${g.n} video's boven normaal` : `Hypothese: ${g.n} ${g.n === 1 ? "video" : "video's"}, nog te weinig of te wisselend`,
+    proofNote: parts.proof === "bewezen"
+      ? `Bewezen: ${hits} van ${g.n} publicaties boven normaal (${g.unique} unieke video's)`
+      : `Hypothese: ${g.n} ${g.n === 1 ? "publicatie" : "publicaties"} van ${g.unique} ${g.unique === 1 ? "unieke video" : "unieke video's"}, nog te weinig of te wisselend`,
     source: "resultaten",
     n: g.n,
     hits,
@@ -411,6 +436,7 @@ const AMOUNT: Record<AdviceDim, string> = {
   lengte: "de volgende opnamedag",
   opbouw: "de volgende drie geschikte video's",
   filmstijl: "de volgende opnamedag",
+  tempo: "de volgende edits",
 };
 
 function alternative(groups: Group[], g: Group): Group | null {
@@ -488,7 +514,11 @@ export function buildAdvice(m: ContentMemory, ctx: AdviceContext = {}): ContentA
       if (!SKIP(g) && g.dimension !== "format" && g.hold != null && g.hold <= 0.85 && g.holdHit <= 0.35 && g.holdN >= 4) {
         sections.minder.push(item("minder", g, {
           insight: `Kijkers haken ${Math.round((1 - g.hold) * 100)}% eerder af dan normaal bij deze lengte (${g.holdN} video's met kijkdata).`,
-          advice: g.dimension === "hook" ? "Test een andere opening bij de volgende opnames: na deze opening haken kijkers eerder af." : g.dimension === "cta" ? "Kondig de afsluiting korter aan of test een andere afsluiting." : "Maak dit onderdeel korter of kies een andere aanpak bij de volgende opnames.",
+          advice: g.dimension === "hook" ? "Test een andere opening bij de volgende opnames: na deze opening haken kijkers eerder af."
+            : g.dimension === "cta" ? "Kondig de afsluiting korter aan of test een andere afsluiting."
+              : g.dimension === "tempo" ? "Test een ander montagetempo bij de volgende edits."
+                : g.dimension === "filmstijl" ? "Test een andere filmstijl op de volgende opnamedag."
+                  : "Maak dit onderdeel korter of kies een andere aanpak bij de volgende opnames.",
           proof: g.holdN >= 6 ? "bewezen" : "hypothese",
           impact: (1 - g.hold) * weight(g.holdN) * 0.8,
           worst: true,
@@ -620,6 +650,7 @@ export function buildAdvice(m: ContentMemory, ctx: AdviceContext = {}): ContentA
   const coverage = {
     structure: m.all.filter((v) => ctx.structures?.[v.id] && ctx.structures[v.id] !== "Onbekend").length,
     filmStyle: m.all.filter((v) => ctx.styles?.[v.id]).length,
+    tempo: m.all.filter((v) => ctx.tempo?.[v.id]).length,
     retention: m.all.filter((v) => v.retention != null).length,
     total: m.videoCount,
   };
@@ -655,7 +686,8 @@ export function buildAdvice(m: ContentMemory, ctx: AdviceContext = {}): ContentA
   if (!m.all.some((v) => (v.linkClicks ?? 0) > 0 || (v.conversions ?? 0) > 0)) gaps.push("Websiteklikken en aanvragen worden niet per video gemeten. Commerciële afsluitingen zijn daarom alleen op bereik en interactie beoordeeld.");
   if (coverage.total && coverage.structure < coverage.total * 0.5) gaps.push(`De opbouw van het middenstuk is bij ${coverage.structure} van ${coverage.total} video's herkend (afgeleid uit hook en caption, niet uit het beeld).`);
   else if (coverage.total) gaps.push("De opbouw van het middenstuk is afgeleid uit hook en caption, niet uit het beeld zelf.");
-  if (!coverage.filmStyle) gaps.push("Filmstijl, montagetempo en overgangen zijn nog niet per video vastgelegd. Daar doet dit advies geen uitspraak over.");
+  if (!coverage.filmStyle && !coverage.tempo) gaps.push("Filmstijl en montagetempo zijn nog niet per video gemeten. Daar doet dit advies geen uitspraak over.");
+  else if (coverage.total && coverage.tempo < coverage.total) gaps.push(`Filmstijl en montagetempo zijn gemeten bij ${coverage.tempo} van ${coverage.total} video's (video-analyse). De rest volgt automatisch.`);
   if (coverage.total && coverage.retention < coverage.total * 0.5) gaps.push(`Kijktijd is bekend bij ${coverage.retention} van ${coverage.total} video's.`);
 
   return { sufficient: m.sufficient, videoCount: m.videoCount, sections, priorities, nextShoot, phases, ctaGoals: goals, coverage, gaps };
@@ -706,6 +738,7 @@ export function matchesTarget(v: MemoryVideo, target: { dimension: AdviceDim; la
     case "lengte": return lengthBucket(v.durationSeconds) === target.label;
     case "opbouw": return ctx.structures?.[v.id] === target.label;
     case "filmstijl": return ctx.styles?.[v.id] === target.label;
+    case "tempo": return ctx.tempo?.[v.id] === target.label;
   }
 }
 
@@ -771,4 +804,36 @@ export function provenPatterns(m: ContentMemory, ctx: AdviceContext = {}): Array
   return buildGroups(m, ctx)
     .filter((g) => g.dimension !== "format" && g.dimension !== "lengte" && !SKIP(g) && g.status === "bewezen")
     .map((g) => ({ dimension: g.dimension, label: g.label, medianPerf: g.medianPerf }));
+}
+
+/* ------------------------------------------------------------------ *
+ * Video-analyse → filmstijl en montagetempo
+ * ------------------------------------------------------------------ */
+
+export type VideoSignalInput = {
+  /** Gemiddelde shotlengte in ms. */
+  avgShotMs: number | null;
+  /** Wordt er in de video gesproken? */
+  speech: boolean;
+  /** Geduide shots: type en duur in ms. */
+  shots: Array<{ t: string; d: number }>;
+};
+
+/** Montagetempo uit de gemeten gemiddelde shotlengte. */
+export function tempoOf(avgShotMs: number | null): string | null {
+  if (!avgShotMs || avgShotMs <= 0) return null;
+  return avgShotMs >= 4000 ? TEMPO.rustig : avgShotMs >= 2000 ? TEMPO.midden : TEMPO.snel;
+}
+
+/** Filmstijl uit het aandeel van de shottypes (naar duur). Te weinig geduide shots = geen uitspraak. */
+export function filmStyleOf(s: VideoSignalInput): string | null {
+  const total = s.shots.reduce((a, x) => a + Math.max(0, x.d), 0);
+  if (s.shots.length < 3 || total <= 0) return null;
+  const share = (...types: string[]) => s.shots.filter((x) => types.includes(x.t)).reduce((a, x) => a + Math.max(0, x.d), 0) / total;
+  if (share("interview") >= 0.4) return "Interview";
+  if (share("pov") >= 0.5) return "POV";
+  const presenter = share("talking_head");
+  if (presenter >= 0.5) return "Presentator in beeld";
+  if (presenter >= 0.15) return "Presentator met tussenbeelden";
+  return s.speech ? "Voiceover over beelden" : "Alleen beelden";
 }

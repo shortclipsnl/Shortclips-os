@@ -17,12 +17,25 @@
  *   ANTHROPIC_API_KEY, evt. FFMPEG_PATH/FFPROBE_PATH/YTDLP_PATH.
  * Zie docs/VIDEO-INTELLIGENCE-WORKER.md voor de volledige opzet.
  */
+import { rm } from "node:fs/promises";
 import { sql } from "drizzle-orm";
 import { db, rawClient } from "../src/db/client";
 import { runPipeline } from "../src/server/video-intelligence/pipeline";
 import { canRunHeavyPipeline } from "../src/server/video-intelligence/tools";
+import { workDir } from "../src/server/video-intelligence/paths";
 
 const ONCE = process.argv.includes("--once");
+const argNum = (name: string): number | null => {
+  const a = process.argv.find((x) => x.startsWith(`--${name}=`));
+  const n = a ? Number(a.split("=")[1]) : NaN;
+  return Number.isFinite(n) ? n : null;
+};
+/** --enqueue=N: eerst maximaal N nog niet geanalyseerde klantvideo's in de wachtrij zetten. */
+const ENQUEUE = argNum("enqueue");
+/** --max=N: hooguit N jobs per run. --budget-sec=N: geen nieuwe job starten na N seconden. */
+const MAX_JOBS = argNum("max");
+const BUDGET_SEC = argNum("budget-sec");
+const STARTED = Date.now();
 const INTERVAL_MS = Number(process.env.VI_WORKER_INTERVAL_MS ?? 5000);
 const STALE_MIN = Number(process.env.VI_WORKER_STALE_MIN ?? 30);
 
@@ -43,7 +56,7 @@ async function claimNext(): Promise<string | null> {
     where id = (
       select id from video_analyses
       where status = 'queued'
-         or (status = 'processing' and updated_at < now() - (${STALE_MIN} || ' minutes')::interval)
+         or (status = 'processing' and updated_at < now() - make_interval(mins => ${STALE_MIN}::int))
       order by created_at
       limit 1
       for update skip locked
@@ -64,11 +77,13 @@ async function closeDb() {
 async function processAll(): Promise<number> {
   let done = 0;
   while (!stopping) {
+    if (MAX_JOBS != null && done >= MAX_JOBS) break;
+    if (BUDGET_SEC != null && Date.now() - STARTED > BUDGET_SEC * 1000) break;
     let id: string | null = null;
     try {
       id = await claimNext();
     } catch (e) {
-      log(`Kon geen job claimen: ${String(e)}`);
+      log(`Kon geen job claimen: ${String(e)} ${String((e as { cause?: unknown })?.cause ?? "")}`);
       return done;
     }
     if (!id) break; // wachtrij leeg
@@ -81,6 +96,8 @@ async function processAll(): Promise<number> {
       // runPipeline schrijft fouten zelf naar video_analyses.error; hier alleen loggen.
       log(`Job ${id} fout: ${String(e)}`);
     }
+    // Werkbestanden (bronvideo, frames, audio) opruimen: alles wat bewaard moet blijven staat in de database.
+    await rm(workDir(id), { recursive: true, force: true }).catch(() => {});
     done++;
   }
   return done;
@@ -97,6 +114,16 @@ async function main() {
 
   const driver = process.env.DATABASE_URL ? "postgres (DATABASE_URL)" : "pglite (lokaal .data)";
   log(`Gestart. Database: ${driver}. Modus: ${ONCE ? "één keer" : `lus (elke ${INTERVAL_MS}ms)`}.`);
+
+  if (ENQUEUE) {
+    try {
+      const { enqueueAutoAnalyses } = await import("../src/server/video-intelligence/auto");
+      const q = await enqueueAutoAnalyses({ max: ENQUEUE });
+      log(`Wachtrij aangevuld: ${q.queued} video('s) bij ${q.clients} klant(en); ${q.unmatched} zonder gekoppeld videobestand.`);
+    } catch (e) {
+      log(`Wachtrij aanvullen mislukt: ${String(e)}`);
+    }
+  }
 
   if (ONCE) {
     const n = await processAll();

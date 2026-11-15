@@ -9,7 +9,7 @@ Schrijft JSON in hetzelfde formaat dat de pijplijn verwacht:
     "segments": [ { "start": float(s), "end": float(s), "text": str,
                     "words": [ { "word": str, "start": float(s), "end": float(s) } ] } ] }
 
-Het model ("base") wordt bij de eerste run gedownload en daarna gecachet.
+Het model (standaard "small") wordt bij de eerste run gedownload en daarna gecachet.
 Alleen gesproken tekst wordt getranscribeerd; er wordt niets verzonnen.
 """
 import json
@@ -38,7 +38,9 @@ def main() -> int:
     if channels > 1:
         audio = audio.reshape(-1, channels).mean(axis=1)
 
-    model = WhisperModel("base", device="cpu", compute_type="int8")
+    # "small" verstaat Nederlands duidelijk beter dan "base"; via VI_WHISPER_MODEL te wijzigen.
+    import os
+    model = WhisperModel(os.environ.get("VI_WHISPER_MODEL", "small"), device="cpu", compute_type="int8")
     segments, info = model.transcribe(
         audio,
         language=language,

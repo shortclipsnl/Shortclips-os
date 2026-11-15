@@ -147,3 +147,28 @@ describe("leerlus", () => {
     expect(measureAdvice("testen", null, "2026-01-01", m, {}, now)).toEqual({ executed: false, outcome: null });
   });
 });
+
+describe("video-analyse als bron voor het middenstuk", () => {
+  it("leidt filmstijl en montagetempo af uit gemeten shots", async () => {
+    const { filmStyleOf, tempoOf, TEMPO } = await import("@/server/content-memory/advice");
+    expect(tempoOf(1700)).toBe(TEMPO.snel);
+    expect(tempoOf(4200)).toBe(TEMPO.rustig);
+    expect(tempoOf(null)).toBeNull();
+    expect(filmStyleOf({ avgShotMs: 3000, speech: true, shots: [{ t: "talking_head", d: 9000 }, { t: "product", d: 2000 }, { t: "detail", d: 1000 }] })).toBe("Presentator in beeld");
+    expect(filmStyleOf({ avgShotMs: 1500, speech: true, shots: [{ t: "talking_head", d: 2000 }, { t: "product", d: 4000 }, { t: "detail", d: 3000 }] })).toBe("Presentator met tussenbeelden");
+    expect(filmStyleOf({ avgShotMs: 1500, speech: true, shots: [{ t: "product", d: 4000 }, { t: "detail", d: 3000 }, { t: "wide", d: 3000 }] })).toBe("Voiceover over beelden");
+    // Te weinig geduide shots: geen uitspraak.
+    expect(filmStyleOf({ avgShotMs: 1500, speech: true, shots: [{ t: "product", d: 4000 }] })).toBeNull();
+  });
+
+  it("neemt een bewezen montagetempo op in het advies voor het middenstuk", async () => {
+    const { TEMPO } = await import("@/server/content-memory/advice");
+    const tempo = Object.fromEntries([...strong.map((v) => [v.id, TEMPO.snel]), ...normal.map((v) => [v.id, TEMPO.rustig])]);
+    const a = buildAdvice(m, { tempo });
+    const fast = [...a.sections.meer, ...a.sections.blijven].find((i) => i.dimension === "tempo");
+    expect(fast?.label).toBe(TEMPO.snel);
+    expect(fast?.phase).toBe("midden");
+    expect(fast?.application).toMatch(/editor/);
+    expect(a.coverage.tempo).toBe(20);
+  });
+});
