@@ -91,6 +91,8 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/capaciteit", label: "Capaciteit", icon: "Gauge", permissions: ["productions:read", "team:read"], match: "/capaciteit" },
       // Persoonlijke klantenbibliotheek voor editors (eigen klanten + Editing Guide).
       { href: "/mijn-klanten", label: "Mijn klanten", icon: "BookOpen", match: "/mijn-klanten", editorsOnly: true },
+      // De algemene montagestandaard voor editors (scanblok, uitleg per onderdeel, eindcheck).
+      { href: "/edit-standaard", label: "Edit Standaard", icon: "ListChecks", match: "/edit-standaard", editorsOnly: true },
       { href: "/showcase", label: "Showcase", icon: "Trophy", permissions: ["videos:read"], match: "/showcase", editorsOnly: true },
       // Editors zien Editor Meetings hier, bij hun eigen werk (het team vindt het onder Team).
       { href: "/editor-meetings", label: "Editor Meetings", icon: "MessagesSquare", match: "/editor-meetings", editorsOnly: true },

@@ -32,7 +32,7 @@ export default async function AppLayout({
   // projecten) en Showcase (zijn awards). Onze klanten en Productieplanning niet.
   const editorOnly = isEditorRole(viewer);
   const freelanceVideographer = isFreelanceVideographer(viewer);
-  const EDITOR_NAV = new Set(["/dashboard", "/videos", "/showcase", "/mijn-klanten", "/editor-meetings"]);
+  const EDITOR_NAV = new Set(["/dashboard", "/videos", "/showcase", "/mijn-klanten", "/edit-standaard", "/editor-meetings"]);
   // Technische afdwinging (niet alleen het menu verbergen): een editor die een
   // andere URL intypt, komt terug op zijn eigen dashboard.
   if (editorOnly) {
