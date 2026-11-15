@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { ArrowUpRight, Check, Sparkles, Target, ThumbsUp, TrendingUp, Wand2 } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalResults } from "@/server/portal";
+import { getPortalBranding, getPortalResults } from "@/server/portal";
+import { getPeriodReview, summaryText } from "@/server/period-review";
 import { getApprovedImprovementForClient, type ImprovementContent } from "@/server/improvements";
 import { getClientVideoUpdate } from "@/server/video-updates";
-import { parsePortalPeriod, portalPeriodQuery } from "@/lib/portal-periods";
+import { parsePortalPeriod, periodResultOpts } from "@/lib/portal-periods";
 import { PortalResultsView } from "./results-view";
 import { MonthlyVideoCard } from "./monthly-video";
 
@@ -28,17 +29,30 @@ export default async function PortalResultatenPage({
   const viewer = await requirePortal();
   const sp = await searchParams;
   const period = parsePortalPeriod(sp);
-  const [r, improvement, videoUpdate] = await Promise.all([
-    getPortalResults(viewer, { days: period.days, from: period.from, to: period.to, periodKey: period.key }),
+  const [r, improvement, videoUpdate, brand] = await Promise.all([
+    getPortalResults(viewer, periodResultOpts(period)),
     getApprovedImprovementForClient(viewer),
     viewer.clientId ? getClientVideoUpdate(viewer.clientId) : Promise.resolve(null),
+    getPortalBranding(viewer),
   ]);
+  // Samenvatting, wat werkt, bedrijfsimpact en advies bij de gekozen periode.
+  const review = await getPeriodReview(viewer, r);
 
   const visible = improvement ? SECTIONS.filter((s) => improvement.content[s.k].length > 0) : [];
 
   return (
     <div className="flex flex-col gap-7">
-      <PortalResultsView r={r} basePath="/portal/resultaten" reportHref={`/resultatenrapport?${portalPeriodQuery(period)}`} initialPlatform={sp.platform ?? "alle"} />
+      <PortalResultsView
+        r={r}
+        review={review}
+        summaryText={review ? summaryText(brand.name, review) : ""}
+        basePath="/portal/resultaten"
+        pdfHref="/api/portal/periodrapport/pdf"
+        monthlyPdfHref={review?.monthlyReport ? `/api/portal/maandrapport/${review.monthlyReport.id}/pdf` : null}
+        shareHref="/resultatenrapport"
+        analysisHref={(id) => `/portal/analyses/${id}`}
+        initialPlatform={sp.platform ?? "alle"}
+      />
 
       {videoUpdate ? <MonthlyVideoCard update={videoUpdate} /> : null}
 

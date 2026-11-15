@@ -5,7 +5,7 @@ import { db } from "@/db/client";
 import { clients } from "@/db/schema";
 import { requirePermission } from "@/server/auth/context";
 import { getPortalResultsForClient } from "@/server/portal";
-import { parsePortalPeriod } from "@/lib/portal-periods";
+import { parsePortalPeriod, periodResultOpts } from "@/lib/portal-periods";
 import { ResultReport } from "@/components/portal/result-report";
 
 export const metadata: Metadata = { title: "Resultatenrapport" };
@@ -33,7 +33,7 @@ export default async function InternResultatenRapportPage({
     .limit(1);
   if (!client) notFound();
 
-  const r = await getPortalResultsForClient(viewer, client.id, { days: period.days, from: period.from, to: period.to, periodKey: period.key });
+  const r = await getPortalResultsForClient(viewer, client.id, periodResultOpts(period));
 
   return (
     <div style={{ minHeight: "100vh", background: "#f4f5f8" }}>

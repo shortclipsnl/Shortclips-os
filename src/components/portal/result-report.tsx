@@ -2,6 +2,7 @@ import { Logo } from "@/components/logo";
 import { PrintButton } from "@/components/portal/print-button";
 import { compact, formatDate, num } from "@/lib/format";
 import type { PortalResults } from "@/server/portal";
+import { capitalize, describePeriod } from "@/lib/portal-periods";
 
 const NAVY = "#00003b";
 const BLUE = "#2E90FA";
@@ -10,8 +11,8 @@ const PLATFORM_LABELS: Record<string, string> = { instagram: "Instagram", tiktok
 const platLabel = (p: string) => PLATFORM_LABELS[p] ?? p.charAt(0).toUpperCase() + p.slice(1);
 
 function periodLabelOf(r: PortalResults): string {
-  if (r.periodKey === "custom") return `${formatDate(r.periodStart)} – ${formatDate(r.periodEnd)}`;
-  return { "30": "Afgelopen 30 dagen", "90": "Afgelopen 3 maanden", "180": "Afgelopen 6 maanden", "365": "Afgelopen 12 maanden" }[r.periodKey] ?? `Afgelopen ${r.days} dagen`;
+  const p = describePeriod(r.periodKey, r.periodStart, r.periodEnd);
+  return p.mode === "vrij" ? p.label : `${capitalize(p.label)} (${formatDate(r.periodStart)} – ${formatDate(r.periodEnd)})`;
 }
 
 function deltaText(pct: number | null): { t: string; c: string } {
@@ -44,13 +45,13 @@ function Spark({ r }: { r: PortalResults }) {
   );
 }
 
-function Stat({ label, value, prefix = "", pct }: { label: string; value: number; prefix?: string; pct?: number | null }) {
+function Stat({ label, value, prefix = "", pct, versus = "vorige" }: { label: string; value: number; prefix?: string; pct?: number | null; versus?: string }) {
   const d = pct !== undefined ? deltaText(pct) : null;
   return (
     <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: "14px 16px", flex: "1 1 0", minWidth: 0 }}>
       <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: "#6b7280" }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 800, color: NAVY, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>{prefix}{num(value)}</div>
-      {d ? <div style={{ fontSize: 11.5, fontWeight: 600, color: d.c, marginTop: 2 }}>{d.t} <span style={{ color: "#9ca3af", fontWeight: 400 }}>vs. vorige</span></div> : null}
+      {d ? <div style={{ fontSize: 11.5, fontWeight: 600, color: d.c, marginTop: 2 }}>{d.t} <span style={{ color: "#9ca3af", fontWeight: 400 }}>vs. {versus}</span></div> : null}
     </div>
   );
 }
@@ -65,6 +66,7 @@ function H2({ children }: { children: React.ReactNode }) {
  */
 export function ResultReport({ r, clientName, clientLogoUrl }: { r: PortalResults; clientName: string; clientLogoUrl: string | null }) {
   const period = periodLabelOf(r);
+  const prevLabel = describePeriod(r.periodKey, r.periodStart, r.periodEnd).prevLabel ?? "de vorige periode";
   const compareRows: Array<{ k: "views" | "reach" | "followerGrowth" | "publishedVideos"; label: string }> = [
     { k: "views", label: "Weergaven" },
     { k: "reach", label: "Bereik" },
@@ -166,7 +168,7 @@ export function ResultReport({ r, clientName, clientLogoUrl }: { r: PortalResult
 
             {/* Vergelijking */}
             <div style={{ marginTop: 26 }}>
-              <H2>Vergeleken met de vorige periode</H2>
+              <H2>Vergeleken met {prevLabel}</H2>
               <table>
                 <thead>
                   <tr><th>Statistiek</th><th style={{ textAlign: "right" }}>Vorige periode</th><th style={{ textAlign: "right" }}>Deze periode</th><th style={{ textAlign: "right" }}>Verschil</th></tr>

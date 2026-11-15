@@ -420,6 +420,11 @@ export type PortalResults = {
   periodKey: string;
   periodStart: string;
   periodEnd: string;
+  /** De periode waarmee vergeleken wordt (vorige maand, vorig kwartaal of de even lange periode ervoor). */
+  prevStart: string;
+  prevEnd: string;
+  /** Eerste dag waarvan we cijfers hebben; bepaalt hoe ver de klant kan terugkijken. */
+  firstDataOn: string | null;
   metrics: PortalResultMetrics;
   prev: PortalResultMetrics;
   deltas: { views: number | null; reach: number | null; engagements: number | null; followerGrowth: number | null; publishedVideos: number | null };
@@ -447,7 +452,15 @@ export type PortalResults = {
   plannedPlatforms: string[];
 };
 
-export type PortalResultsOpts = { days?: number; from?: string; to?: string; periodKey?: string };
+export type PortalResultsOpts = {
+  days?: number;
+  from?: string;
+  to?: string;
+  periodKey?: string;
+  /** Vergelijkingsperiode (kalendermaand of kwartaal). Leeg = de even lange periode direct ervoor. */
+  prevFrom?: string;
+  prevTo?: string;
+};
 
 /**
  * Resultaten met inzicht (§Resultaten): kerncijfers over de gekozen periode,
@@ -493,8 +506,10 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
   const end = opts.to ? new Date(`${opts.to}T12:00:00Z`) : today;
   const start = opts.from ? new Date(`${opts.from}T12:00:00Z`) : new Date(end.getTime() - ((opts.days ?? 30) - 1) * 86_400_000);
   const lenDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1);
-  const prevEnd = new Date(start.getTime() - 86_400_000);
-  const prevStart = new Date(prevEnd.getTime() - (lenDays - 1) * 86_400_000);
+  const explicitPrev = !!opts.prevFrom && !!opts.prevTo && opts.prevFrom <= opts.prevTo && opts.prevTo < isoDay(start);
+  const prevEnd = explicitPrev ? new Date(`${opts.prevTo}T12:00:00Z`) : new Date(start.getTime() - 86_400_000);
+  const prevStart = explicitPrev ? new Date(`${opts.prevFrom}T12:00:00Z`) : new Date(prevEnd.getTime() - (lenDays - 1) * 86_400_000);
+  const prevLenDays = Math.max(1, Math.round((prevEnd.getTime() - prevStart.getTime()) / 86_400_000) + 1);
   const [startIso, endIso, prevStartIso, prevEndIso] = [isoDay(start), isoDay(end), isoDay(prevStart), isoDay(prevEnd)];
   const periodKey = opts.periodKey ?? (opts.from ? "custom" : String(opts.days ?? 30));
 
@@ -526,7 +541,7 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
              prev.v pv, prev.r pr, prev.e pe, prev.f pf, prev.pdays ppd, pubcur.c pubc, pubprev.c pubp
       from cur, prev, pubcur, pubprev
     `),
-    db.execute(sql`select coalesce(sum(views),0)::bigint lv, max(measured_on)::text lu from daily_metrics where client_id = ${clientId}`),
+    db.execute(sql`select coalesce(sum(views),0)::bigint lv, max(measured_on)::text lu, min(measured_on)::text fd from daily_metrics where client_id = ${clientId}`),
   ]);
 
   const row = rowsOf<Record<string, number>>(totalsRes)[0] ?? {};
@@ -543,7 +558,7 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
 
   // Alleen vergelijken als de vorige periode voldoende dagen data had — anders
   // geeft een bijna-lege basis onzinnige percentages (bv. +3000%).
-  const prevCovered = n("ppd") >= Math.ceil(lenDays * 0.8);
+  const prevCovered = n("ppd") >= Math.ceil(prevLenDays * 0.8);
   const pct = (c: number, p: number): number | null => (prevCovered && p > 0 ? Math.round(((c - p) / p) * 100) : null);
   const deltas = {
     views: pct(metrics.views, prev.views),
@@ -566,7 +581,8 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
              coalesce(sum(shares),0)::int sh, coalesce(sum(saves),0)::int sv,
              count(distinct measured_on)::int days
       from daily_metrics
-      where client_id = ${clientId} and platform is not null and measured_on between ${prevStartIso} and ${endIso}
+      where client_id = ${clientId} and platform is not null
+        and (measured_on between ${startIso} and ${endIso} or measured_on between ${prevStartIso} and ${prevEndIso})
       group by 1, 2
     `),
     db.execute(sql`
@@ -630,7 +646,7 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
     const posts = postsOn(videos, plat);
     const prevPosts = postsOn(prevVideos, plat);
     const postViews = sumOf(posts, "views");
-    const dailyComparable = !!d && !!pd && pd.days >= Math.ceil(lenDays * 0.8);
+    const dailyComparable = !!d && !!pd && pd.days >= Math.ceil(prevLenDays * 0.8);
 
     let views: number | null = null;
     let viewsFrom: PortalPlatformDetail["viewsFrom"] = null;
@@ -800,6 +816,9 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
     periodKey,
     periodStart: startIso,
     periodEnd: endIso,
+    prevStart: prevStartIso,
+    prevEnd: prevEndIso,
+    firstDataOn: life.fd ? String(life.fd) : null,
     metrics,
     prev,
     deltas,
