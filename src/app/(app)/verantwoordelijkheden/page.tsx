@@ -12,6 +12,7 @@ import { getWorkOverview } from "@/server/werkoverzicht";
 import { getVerantwoordelijkheden, telPerCategorie } from "@/server/verantwoordelijkheden";
 import { VERANTWOORDELIJKEN } from "@/lib/verantwoordelijkheden/data";
 import { Weergave } from "./weergave";
+import { getVisieVoor } from "@/server/visie";
 
 export const metadata: Metadata = { title: "Mijn verantwoordelijkheden" };
 export const dynamic = "force-dynamic";
@@ -41,6 +42,8 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
   if (!medewerker) notFound();
 
   const config = await getVerantwoordelijkheden();
+  // Onze visie (centrale bron): principe per onderdeel, Verder dan de taak en de meetpunten.
+  const visie = await getVisieVoor(viewer);
 
   // Live tellingen uit het bestaande werkoverzicht (zelfde bron als Vandaag).
   let subject = owner ? null : viewer;
@@ -104,7 +107,8 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
         </div>
       )}
 
-      <Weergave config={config} email={medewerker.email} markeer={owner} tellingen={tellingen} liveBeschikbaar={work !== null} />
+      <Weergave config={config} email={medewerker.email} markeer={owner} tellingen={tellingen} liveBeschikbaar={work !== null}
+        visie={visie} functie={medewerker.email === "rutger@shortclips.nl" ? "videograaf" : "content_creative"} />
     </div>
   );
 }

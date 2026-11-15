@@ -10,6 +10,18 @@ import {
   type Config, type Categorie, type Koppeling, type Niveau,
 } from "@/lib/verantwoordelijkheden/data";
 import type { Telling } from "@/server/verantwoordelijkheden";
+import { verderSleutel, type Functie, type Meetpunt, type Visie } from "@/lib/visie/data";
+import { PrincipeChip, VisieTekst } from "@/components/visie/markeer";
+
+/** KPI's die over het resultaat voor de klant gaan (de rest is operationeel: op tijd en foutloos). */
+const KPI_RESULTAAT = new Set(["Klanttevredenheid", "Procesverbeteringen"]);
+/** Welke meetpunten uit Onze visie bij welke functie horen: alleen wat je zelf kunt beïnvloeden. */
+const MEETPUNTEN_PER_FUNCTIE: Record<Functie, Meetpunt["key"][]> = {
+  content_creative: ["voorgedaan", "leerlus", "eenkeergoed", "ontzorgd", "waarde"],
+  videograaf: ["eenkeergoed"],
+  editor: ["eenkeergoed"],
+  directie: ["voorgedaan", "leerlus", "eenkeergoed", "ontzorgd", "waarde"],
+};
 
 /** Tekst tussen [[...]] is een voorstel: gemarkeerd voor Jarno, gewone tekst voor het team. */
 function T({ t, markeer }: { t: string; markeer: boolean }) {
@@ -118,14 +130,20 @@ function BeslisBlok({ nv, lijst, markeer }: { nv: Niveau; lijst: string[]; marke
   );
 }
 
-export function Weergave({ config, email, markeer, tellingen, liveBeschikbaar }: {
+export function Weergave({ config, email, markeer, tellingen, liveBeschikbaar, visie = null, functie = "content_creative" }: {
   config: Config; email: string; markeer: boolean; tellingen: Record<Categorie, Telling>; liveBeschikbaar: boolean;
+  /** Onze visie (centrale bron). Null = nog niet zichtbaar voor deze kijker: de pagina blijft dan zoals hij was. */
+  visie?: Visie | null; functie?: Functie;
 }) {
   const items = config.verantwoordelijkheden.filter((r) => r.persoon === email && r.actief);
   const beslissingen = config.beslissingen.filter((b) => b.persoon === email && b.actief);
   const afw = config.afwezigheid[email];
   const zelf = [...new Map(items.flatMap((r) => r.bevoegdheden).map((x) => [kaal(x).toLowerCase(), x])).values()];
   const kpis = config.profielen?.[email]?.kpis ?? [];
+  const fv = visie?.functies[functie] ?? null;
+  const kpisOperationeel = visie ? kpis.filter((k) => !KPI_RESULTAAT.has(k.titel)) : kpis;
+  const kpisResultaat = visie ? kpis.filter((k) => KPI_RESULTAAT.has(k.titel)) : [];
+  const meetpunten = visie ? visie.meetpunten.filter((m) => MEETPUNTEN_PER_FUNCTIE[functie].includes(m.key)) : [];
   const lijsten: Record<Niveau, string[]> = {
     zelf,
     overleg: beslissingen.filter((b) => b.niveau === "overleg").map((b) => b.situatie),
@@ -134,6 +152,25 @@ export function Weergave({ config, email, markeer, tellingen, liveBeschikbaar }:
 
   return (
     <div className="space-y-8">
+      {/* 0. Waarom mijn functie bestaat: uit Onze visie (centrale bron). */}
+      {fv ? (
+        <section className="sc-card grid gap-4 p-4 sm:grid-cols-3">
+          <div>
+            <div className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Waarom mijn functie bestaat</div>
+            <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-ink)]"><VisieTekst t={fv.betekenis} markeer={markeer} /></p>
+          </div>
+          <div>
+            <div className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Wanneer lever ik echt goed werk?</div>
+            <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-ink)]"><VisieTekst t={fv.standaard} markeer={markeer} /></p>
+          </div>
+          <div>
+            <div className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Zo voeg ik meer toe dan mijn taken</div>
+            <p className="mt-1 text-[13px] leading-relaxed text-[var(--color-ink)]"><VisieTekst t={fv.proactief} markeer={markeer} /></p>
+            <Link href="/visie#functie" className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-ink-muted)] hover:underline">Onze visie <ArrowUpRight className="size-3.5" /></Link>
+          </div>
+        </section>
+      ) : null}
+
       {/* 1. Verantwoordelijkheden: één regel per onderdeel, details op klik. */}
       <section>
         <Kop titel="Mijn verantwoordelijkheden" sub={items.length + " onderdelen · klik voor details"} />
@@ -145,6 +182,8 @@ export function Weergave({ config, email, markeer, tellingen, liveBeschikbaar }:
               const s = stijlVoor(r.koppeling);
               const Icon = s.icon;
               const cat = r.koppeling?.categorie && r.koppeling.categorie !== "alle" ? r.koppeling.categorie : null;
+              const verder = visie?.verderDanDeTaak[verderSleutel(r.id)] ?? null;
+              const principe = verder ? visie?.principes.find((x) => x.nr === verder.principe) : null;
               return (
                 <details key={r.id} className="group">
                   <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 transition hover:bg-[var(--color-neutral-soft)] [&::-webkit-details-marker]:hidden">
@@ -164,6 +203,15 @@ export function Weergave({ config, email, markeer, tellingen, liveBeschikbaar }:
                   </summary>
                   <div className="px-4 pb-4 pl-14">
                     <p className="text-[13px] leading-relaxed text-[var(--color-ink)]"><T t={r.wat} markeer={markeer} /></p>
+                    {verder ? (
+                      <div className="mt-2.5 rounded-[var(--radius-md)] bg-[var(--color-neutral-soft)] px-3 py-2 text-[13px] leading-relaxed text-[var(--color-ink)]">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <strong className="font-semibold">Verder dan de taak</strong>
+                          {principe ? <PrincipeChip nr={principe.nr} titel={principe.titel} /> : null}
+                        </div>
+                        <VisieTekst t={verder.tekst} markeer={markeer} />
+                      </div>
+                    ) : null}
                     <dl className="mt-2.5 space-y-1 text-[13px]">
                       {r.wanneer ? <Detail label="Wanneer"><T t={r.wanneer} markeer={markeer} /></Detail> : null}
                       {r.afgerond ? <Detail label="Klaar als"><T t={r.afgerond} markeer={markeer} /></Detail> : null}
@@ -186,12 +234,12 @@ export function Weergave({ config, email, markeer, tellingen, liveBeschikbaar }:
 
       {/* 2. KPI's: compacte tegels. */}
       <section>
-        <Kop titel="Mijn KPI's" sub="Hierop word je beoordeeld" />
+        <Kop titel="Mijn KPI's" sub={visie ? "Operationeel: leveren we het werk goed en op tijd?" : "Hierop word je beoordeeld"} />
         {kpis.length === 0 ? (
           <p className="text-sm text-[var(--color-ink-muted)]">Nog geen KPI&apos;s vastgelegd in de kennisbank.</p>
         ) : (
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-            {kpis.map((k) => {
+            {kpisOperationeel.map((k) => {
               const cat = KPI_LIVE[k.titel];
               const s = cat ? CAT[cat] : NEUTRAAL;
               const t = cat && liveBeschikbaar ? tellingen[cat] : null;
@@ -215,6 +263,35 @@ export function Weergave({ config, email, markeer, tellingen, liveBeschikbaar }:
           </div>
         )}
       </section>
+
+      {/* 2b. Resultaatgericht: voegen we waarde toe en wordt het werk steeds beter? Uit Onze visie. */}
+      {visie && (kpisResultaat.length > 0 || meetpunten.length > 0) ? (
+        <section>
+          <Kop titel="Voeg ik waarde toe?" sub="Resultaatgericht: een richting om op te sturen, geen afrekenpunt" />
+          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {kpisResultaat.map((k) => (
+              <div key={k.titel} className="sc-card relative overflow-hidden px-3.5 py-3 pl-4">
+                <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-[var(--color-good)]" />
+                <div className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">{k.titel}</div>
+                <div className="mt-0.5 text-sm font-semibold leading-snug text-[var(--color-ink)]"><T t={k.norm} markeer={markeer} /></div>
+              </div>
+            ))}
+            {meetpunten.map((m) => (
+              <div key={m.key} className="sc-card relative overflow-hidden px-3.5 py-3 pl-4">
+                <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-[var(--color-good)]" />
+                <div className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
+                  {m.titel}
+                  {m.status !== "bestaat" ? <span className="rounded-full bg-[var(--color-neutral-soft)] px-1.5 py-px normal-case tracking-normal text-[var(--color-ink-muted)]">meting volgt</span> : null}
+                </div>
+                <div className="mt-0.5 text-sm font-semibold leading-snug text-[var(--color-ink)]">{m.vraag}</div>
+                <div className="mt-1 text-xs leading-snug text-[var(--color-ink-muted)]">
+                  {m.meting}. Bron: <VisieTekst t={m.bron} markeer={markeer} />.{markeer ? <> Norm: <VisieTekst t={m.norm} markeer /></> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* 3. Beslissingen: drie kolommen naast elkaar. */}
       <section>

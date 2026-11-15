@@ -14,6 +14,7 @@ const EDITOR_PREFIXES = [
   "/notifications",
   "/account",
   "/transfer", // ruwe beelden en projectbestanden versturen
+  "/visie", // Onze visie, alleen-lezen en alleen de eigen functie (beheer is eigenaar-only)
 ];
 
 export function editorMayOpenPath(pathname: string): boolean {

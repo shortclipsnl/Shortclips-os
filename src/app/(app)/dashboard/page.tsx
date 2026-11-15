@@ -20,6 +20,9 @@ import { getContractAttention } from "@/server/contracts";
 import { ContractAttentionBlock } from "../contracten/attention-block";
 import { ResultAlertsBlock } from "./result-alerts-block";
 import { urgentAlertsForDashboard } from "@/server/result-alerts";
+import { getVisieVoor } from "@/server/visie";
+import { getScreenReel } from "@/server/screen-reel";
+import { VisieStrook, type VisieBewijs } from "@/components/visie/visie-strook";
 
 export const metadata: Metadata = { title: "Vandaag" };
 export const dynamic = "force-dynamic";
@@ -27,8 +30,18 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const viewer = await requireInternal();
 
+  // Onze visie: een voorstel ziet alleen de eigenaar, het team na vaststelling.
+  const visie = await getVisieVoor(viewer);
+
   // Editors krijgen een eigen, smaller dashboard met uitsluitend hun werk.
-  if (viewer.isEditorOnly) return <EditorDashboard viewer={viewer} />;
+  if (viewer.isEditorOnly) {
+    return (
+      <>
+        {visie ? <div className="mx-auto mb-4 max-w-[1400px]"><VisieStrook visie={visie} compact /></div> : null}
+        <EditorDashboard viewer={viewer} />
+      </>
+    );
+  }
 
   // Venster voor de weekplanning (dekt ook het weekend → kómende werkweek).
   const contentFrom = new Date().toISOString().slice(0, 10);
@@ -83,6 +96,15 @@ export default async function DashboardPage() {
     .filter((c) => c.scheduledOn === contentFrom && c.status !== "published")
     .map((c) => ({ id: c.id, title: c.title, clientName: c.clientName, at: c.scheduledAt }));
 
+  // Bewijs van de week: de best presterende recente klantvideo uit Resultaten
+  // (zelfde selectie als het Kantoorscherm). Geen invoer, geen verzonnen cijfers.
+  let bewijs: VisieBewijs | null = null;
+  if (visie) {
+    const reel = await getScreenReel(viewer).catch(() => null);
+    const top = reel?.items.filter((i) => i.views > 0).sort((a, b) => b.relative - a.relative || b.views - a.views)[0];
+    if (top) bewijs = { clientName: top.clientName, title: top.title, views: top.views, href: "/analytics" };
+  }
+
   const firstName = viewer.fullName.split(" ")[0];
   const hour = Number(new Date().toLocaleString("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: "Europe/Amsterdam" }));
   const greeting = hour < 6 ? "Goedenacht" : hour < 12 ? "Goedemorgen" : hour < 18 ? "Goedemiddag" : "Goedenavond";
@@ -113,6 +135,9 @@ export default async function DashboardPage() {
           </LinkButton>
         </div>
       </div>
+
+      {/* Onze visie: het principe van de week met één echt resultaat. Compact en klikbaar. */}
+      {visie ? <VisieStrook visie={visie} bewijs={bewijs} /> : null}
 
       {/* Blokkerend: actieve klanten zonder verantwoordelijke (alleen eigenaar). */}
       {missingCoord.count > 0 ? (
@@ -165,7 +190,7 @@ export default async function DashboardPage() {
 
       {/* Korte werkrichtlijn: zelfstandigheid, eigenaarschap en eerst zelf
           oplossen. Compact en standaard dicht — één klik open. */}
-      <GuidelineNote
+      {visie ? null : <GuidelineNote
         title="Zo werken we — zelfstandigheid & eigenaarschap"
         icon={<Compass className="size-4" />}
         tone="good"
@@ -176,7 +201,7 @@ export default async function DashboardPage() {
           <><strong className="font-semibold text-[var(--color-ink)]">Bewaak afspraken:</strong> deadlines, klantafspraken en kwaliteit houd je zelf in de gaten.</>,
         ]}
         footer="Vragen mag altijd — kom waar het kan met een voorstel erbij in plaats van alleen de vraag."
-      />
+      />}
 
       {/* Dagelijkse postherinnering (rechtsonder, met pingetje om 14:00). */}
       <PostingReminder posts={todaysPosts} />
