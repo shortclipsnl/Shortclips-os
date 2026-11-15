@@ -5,22 +5,17 @@ import { sql } from "drizzle-orm";
 import { Settings2 } from "lucide-react";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
-import { LinkButton, PageHeader } from "@/components/ui";
+import { LinkButton } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { requireInternal, isOwner, viewerForUser } from "@/server/auth/context";
-import { getWorkOverview } from "@/server/werkoverzicht";
-import { getVerantwoordelijkheden, telPerCategorie } from "@/server/verantwoordelijkheden";
+import { getVerantwoordelijkheden } from "@/server/verantwoordelijkheden";
+import { getLiveStand } from "@/server/verantwoordelijkheden-live";
 import { VERANTWOORDELIJKEN } from "@/lib/verantwoordelijkheden/data";
+import { rolVoor } from "@/lib/verantwoordelijkheden/rol";
 import { Weergave } from "./weergave";
 
 export const metadata: Metadata = { title: "Mijn verantwoordelijkheden" };
 export const dynamic = "force-dynamic";
-
-/** Persoonlijke missie bovenaan de pagina (13 nov 2026, Jarno). Leeg = geen tekst. */
-const MISSIE: Record<string, string> = {
-  "milou@shortclips.nl": "Mijn klanten worden bij mij volledig in de watten gelegd. Ze voelen zich altijd gehoord, ik ben ze altijd een stap voor en ik geef ze de beste short video ervaring die er is.",
-  "jiska@shortclips.nl": "Mijn klanten worden bij mij volledig in de watten gelegd. Ze voelen zich altijd gehoord, ik ben ze altijd een stap voor en ik geef ze de beste short video ervaring die er is.",
-};
 
 /** Voornaam uit het account waarmee is ingelogd; valt terug op de vaste naam. */
 function voornaam(fullName: string | null | undefined, terugval: string): string {
@@ -39,10 +34,12 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
   // ieder ander teamlid krijgt hem niet te zien (ook niet via de URL).
   const medewerker = owner ? (VERANTWOORDELIJKEN.find((m) => m.email === param) ?? VERANTWOORDELIJKEN[0]) : eigen;
   if (!medewerker) notFound();
+  const rol = rolVoor(medewerker.email);
+  if (!rol) notFound();
 
   const config = await getVerantwoordelijkheden();
 
-  // Live tellingen uit het bestaande werkoverzicht (zelfde bron als Vandaag).
+  // De persoon over wie de pagina gaat: de ingelogde medewerker, of (voor Jarno) de gekozen collega.
   let subject = owner ? null : viewer;
   let naam: string = owner ? medewerker.naam : voornaam(viewer.fullName, medewerker.naam);
   if (owner) {
@@ -54,30 +51,16 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
     subject = u ? await viewerForUser(u.id) : null;
     naam = voornaam(u?.fullName, medewerker.naam);
   }
-  const work = subject ? await getWorkOverview(subject, { trusted: owner }).catch(() => null) : null;
-  const tellingen = telPerCategorie(work);
+  if (!subject) notFound();
+
+  // Actuele stand: KPI's, eigen klanten of opnamedagen en signalen (allemaal bestaande portaaldata).
+  const live = await getLiveStand(subject, rol, { trusted: owner });
   const functie = config.profielen?.[medewerker.email]?.functie ?? medewerker.functie;
 
   return (
-    <div className="mx-auto max-w-[1100px] pb-10">
-      <PageHeader
-        title={`Ik, ${naam}, ben verantwoordelijk voor:`}
-        description={functie}
-        actions={owner ? (
-          <LinkButton href="/verantwoordelijkheden/beheer" variant="secondary">
-            <Settings2 className="size-4" /> Beheer
-          </LinkButton>
-        ) : undefined}
-      />
-
-      {MISSIE[medewerker.email] ? (
-        <p className="-mt-2 mb-7 max-w-3xl border-l-2 border-[var(--color-ink)] pl-4 text-[15px] font-medium leading-relaxed text-[var(--color-ink)]">
-          {MISSIE[medewerker.email]}
-        </p>
-      ) : null}
-
-      {owner && (
-        <div className="mb-6 flex flex-wrap items-center gap-2">
+    <div className="mx-auto max-w-[1180px] pb-10">
+      {owner ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Bekijk als</span>
           {VERANTWOORDELIJKEN.map((m) => (
             <Link
@@ -101,10 +84,13 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
           >
             {config.status === "goedgekeurd" ? "Goedgekeurd · zichtbaar voor het team" : "Concept · ook direct zichtbaar voor het team"}
           </span>
+          <LinkButton href="/verantwoordelijkheden/beheer" variant="secondary">
+            <Settings2 className="size-4" /> Beheer
+          </LinkButton>
         </div>
-      )}
+      ) : null}
 
-      <Weergave config={config} email={medewerker.email} markeer={owner} tellingen={tellingen} liveBeschikbaar={work !== null} />
+      <Weergave config={config} email={medewerker.email} naam={naam} functie={functie} rol={rol} live={live} markeer={owner} />
     </div>
   );
 }
