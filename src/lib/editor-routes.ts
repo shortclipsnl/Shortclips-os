@@ -9,6 +9,7 @@ const EDITOR_PREFIXES = [
   "/videos", // eigen editingprojecten (detail checkt of het project van hem is)
   "/showcase",
   "/mijn-klanten",
+  "/editor-meetings", // eigen maandelijkse meetings, verslagen en actiepunten
   "/scripts/", // alleen-lezen scriptpagina via het eigen project
   "/notifications",
   "/account",

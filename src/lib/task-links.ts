@@ -1,4 +1,5 @@
 import { STAP_PREFIX, batchHref, parseBatchKey } from "@/lib/maandcontrole";
+import { parsePlanTaskKey } from "@/lib/editor-meetings";
 import { dayIdFromKey, scriptingTaskHref, SCRIPTING_TASK_PREFIX } from "@/lib/scripting-task-plan";
 
 /**
@@ -24,6 +25,10 @@ export function taskHref(t: { entityType: string | null; entityId: string | null
   // Oude verzameltaak maandcontrole (één taak per maand) → pagina Maandrapportages.
   const batch = parseBatchKey(t.dedupeKey);
   if (t.entityType === "report_batch" && batch) return batchHref(batch.period);
+  // Plantaak editor meetings → het overzicht van die maand; actiepunt → de meeting.
+  const plan = parsePlanTaskKey(t.dedupeKey);
+  if (plan) return `/editor-meetings?maand=${plan.period}`;
+  if (t.entityType === "editor_meeting" && t.entityId) return `/editor-meetings/${t.entityId}`;
   // Taak uit de operationele controle → direct naar het onderdeel met het probleem.
   if (t.entityType === "ops_control_item" && t.entityId) return `/controle/${t.entityId}`;
   return null;

@@ -9,6 +9,8 @@ export type UpcomingMeeting = {
   title: string;
   scheduledAt: Date;
   location: string | null;
+  /** Afwijkende link (bijv. een editor meeting); standaard de teammeetings. */
+  href?: string;
 };
 
 /**

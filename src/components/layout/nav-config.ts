@@ -33,6 +33,9 @@ export type NavItem = {
    *  Milou en Jiska controleren en versturen draaiboeken vanuit Scripting en hebben
    *  deze pagina niet nodig. */
   videographerOnly?: boolean;
+  /** Editor Meetings: editors (eigen meetings) en wie ze voert of bewaakt
+   *  (Milou, Jiska, management). */
+  editorMeetingsAccess?: boolean;
   /** Afwijkend label in het editorportaal (het interne team houdt `label`). */
   editorLabel?: string;
   /** Externe/zelfstandige pagina: open als gewone link in een nieuw tabblad
@@ -89,6 +92,8 @@ export const NAVIGATION: NavGroup[] = [
       // Persoonlijke klantenbibliotheek voor editors (eigen klanten + Editing Guide).
       { href: "/mijn-klanten", label: "Mijn klanten", icon: "BookOpen", match: "/mijn-klanten", editorsOnly: true },
       { href: "/showcase", label: "Showcase", icon: "Trophy", permissions: ["videos:read"], match: "/showcase", editorsOnly: true },
+      // Editors zien Editor Meetings hier, bij hun eigen werk (het team vindt het onder Team).
+      { href: "/editor-meetings", label: "Editor Meetings", icon: "MessagesSquare", match: "/editor-meetings", editorsOnly: true },
       { href: "/analytics", label: "Resultaten", icon: "TrendingUp", permissions: ["analytics:read"], match: "/analytics" },
       // Contentgeheugen: wat per klant aantoonbaar werkt (formats, hooks, CTA's, video's).
       { href: "/contentgeheugen", label: "Contentgeheugen", icon: "BrainCircuit", permissions: ["analytics:read"], match: "/contentgeheugen" },
@@ -116,6 +121,8 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/doelen", label: "Doelen", icon: "Target", match: "/doelen", section: "/team" },
       { href: "/verlof", label: "Vakantie", icon: "Palmtree", match: "/verlof" },
       { href: "/meetings", label: "Teammeetings", icon: "Presentation", match: "/meetings" },
+      // Maandelijkse meeting per editor: plannen, voorbereiden, verslag en bewaking.
+      { href: "/editor-meetings", label: "Editor Meetings", icon: "MessagesSquare", match: "/editor-meetings", editorMeetingsAccess: true },
       // Interne kennisbank (vervanger van Skool): lezen voor iedereen intern,
       // beheren alleen voor de eigenaar (afgedwongen op de server).
       { href: "/kennisbank", label: "Kennisbank", icon: "GraduationCap", match: "/kennisbank" },

@@ -5,6 +5,7 @@ import { editorMayOpenPath } from "@/lib/editor-routes";
 import { videographerMayOpenPath } from "@/lib/videographer-routes";
 import { NAVIGATION } from "@/components/layout/nav-config";
 import { heeftVerantwoordelijkhedenPagina } from "@/lib/verantwoordelijkheden/data";
+import { canUseTeamView } from "@/server/editor-meetings";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SectionTabs } from "@/components/layout/section-tabs";
 import { Topbar } from "@/components/layout/topbar";
@@ -31,7 +32,7 @@ export default async function AppLayout({
   // projecten) en Showcase (zijn awards). Onze klanten en Productieplanning niet.
   const editorOnly = isEditorRole(viewer);
   const freelanceVideographer = isFreelanceVideographer(viewer);
-  const EDITOR_NAV = new Set(["/dashboard", "/videos", "/showcase", "/mijn-klanten"]);
+  const EDITOR_NAV = new Set(["/dashboard", "/videos", "/showcase", "/mijn-klanten", "/editor-meetings"]);
   // Technische afdwinging (niet alleen het menu verbergen): een editor die een
   // andere URL intypt, komt terug op zijn eigen dashboard.
   if (editorOnly) {
@@ -77,6 +78,10 @@ export default async function AppLayout({
       // Draaiboek: alleen voor de videograaf (Rutger, freelance videografen) en Jarno.
       // Milou en Jiska werken met draaiboeken vanuit Scripting (controle en versturen).
       if (item.videographerOnly && !owner && viewer.primaryRole !== "videographer" && (viewer.email ?? "").toLowerCase() !== "rutger@shortclips.nl") {
+        return false;
+      }
+      // Editor Meetings (teamweergave): Milou, Jiska en het management.
+      if (item.editorMeetingsAccess && !canUseTeamView(viewer)) {
         return false;
       }
       // Mijn verantwoordelijkheden: alleen Milou, Jiska en Rutger (en Jarno als beheerder).

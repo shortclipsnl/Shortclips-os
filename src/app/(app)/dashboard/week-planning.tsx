@@ -119,7 +119,7 @@ export function WeekPlanning({ shoots, meetings, uploads = [] }: { shoots: WeekS
                     {dayMeetings.map((m) => (
                       <Link
                         key={m.id}
-                        href="/meetings"
+                        href={m.href ?? "/meetings"}
                         className="flex items-start gap-1.5 rounded-[var(--radius-sm)] border-l-[3px] border-l-[var(--color-warn)] bg-[var(--color-warn-soft)] p-1.5 hover:brightness-[0.99]"
                       >
                         <Presentation className="mt-0.5 size-3.5 shrink-0 text-[var(--color-warn)]" strokeWidth={2} />

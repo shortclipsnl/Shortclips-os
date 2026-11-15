@@ -14,6 +14,7 @@ import { canModifyTask } from "@/lib/task-permissions";
 import { HandoverBoard, type HandoverNote } from "./handover-board";
 import { syncScriptingTasksIfStale } from "@/server/scripting-tasks";
 import { syncClientMomentTasksIfStale } from "@/server/klantmomenten";
+import { syncPlanTasksIfStale } from "@/server/editor-meetings";
 import { taskHref } from "@/lib/task-links";
 import { taskSignal } from "@/lib/task-signals";
 
@@ -37,6 +38,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   await syncScriptingTasksIfStale();
   // Vangnet: klantmomenten die binnen een week vallen als taak klaarzetten.
   await syncClientMomentTasksIfStale();
+  // Vangnet: de maandelijkse plantaak voor editor meetings bijwerken of afronden.
+  await syncPlanTasksIfStale();
 
   const [team, allOpen, handoverRows] = await Promise.all([
     listAssignableUsers(),

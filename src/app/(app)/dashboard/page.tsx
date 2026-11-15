@@ -4,6 +4,7 @@ import { requireInternal, isOwner, canManageOperations } from "@/server/auth/con
 import { portalAccessReport } from "@/server/jobs/portal-access";
 import { getDashboard } from "@/server/dashboard";
 import { listUpcomingMeetings } from "@/server/meetings";
+import { upcomingMeetingsForOwner } from "@/server/editor-meetings";
 import { listCalendar } from "@/server/calendar";
 import { activeClientsMissingCoordinator } from "@/server/clients";
 import { periodLabel } from "@/lib/format";
@@ -40,12 +41,15 @@ export default async function DashboardPage() {
   await syncScriptingTasksIfStale().catch(() => undefined);
 
   // Iedereen ziet uitsluitend de eigen dagstart — geen "bekijk als een ander".
-  const [data, meetings, contentItems, work] = await Promise.all([
+  const [data, teamMeetings, editorMeetings, contentItems, work] = await Promise.all([
     getDashboard(viewer),
     listUpcomingMeetings(7),
+    // Eigen editor meetings van deze week staan in dezelfde agenda.
+    upcomingMeetingsForOwner(viewer, 7).catch(() => []),
     listCalendar(viewer, { from: contentFrom, to: contentTo }),
     getWorkOverview(viewer),
   ]);
+  const meetings = [...teamMeetings, ...editorMeetings].sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime());
   const missingCoord = isOwner(viewer) ? await activeClientsMissingCoordinator() : { count: 0, names: [] };
   // Contracten die aandacht nodig hebben: uitsluitend voor de eigenaar.
   const contractAttention = isOwner(viewer) ? await getContractAttention().catch(() => null) : null;

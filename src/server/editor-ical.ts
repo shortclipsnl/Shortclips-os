@@ -7,6 +7,7 @@ import { clients, deliverables, productionDays, users } from "@/db/schema";
 import { env } from "@/lib/env";
 import { editorDeadline } from "@/lib/edit-deadline";
 import { nlHolidaySet } from "@/lib/holidays";
+import { upcomingMeetingsForEditor } from "@/server/editor-meetings";
 
 /* ------------------------------------------------------------------ *
  * Persoonlijke iCal-agendafeed per editor.
@@ -149,6 +150,31 @@ export async function buildEditorIcal(user: { id: string; fullName: string }): P
       "TRANSP:TRANSPARENT",
       "END:VEVENT",
     );
+  }
+
+  // Editor meetings: het maandelijkse gesprek met de content creator, op het
+  // geplande tijdstip. Stabiele UID per meeting, dus verplaatsen werkt de
+  // afspraak bij en annuleren haalt hem uit de agenda.
+  try {
+    for (const m of await upcomingMeetingsForEditor(user.id)) {
+      const start = new Date(m.scheduledAt!);
+      const end = new Date(start.getTime() + m.durationMinutes * 60_000);
+      const where = m.meetingUrl || m.location;
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:editor-meeting-${m.id}@shortclips.nl`,
+        `DTSTAMP:${now}`,
+        `LAST-MODIFIED:${stamp(m.updatedAt)}`,
+        `DTSTART:${stamp(start)}`,
+        `DTEND:${stamp(end)}`,
+        fold(`SUMMARY:Editor meeting${m.ownerName ? ` met ${esc(m.ownerName.split(" ")[0] ?? "")}` : ""}`),
+        ...(where ? [fold(`LOCATION:${esc(where)}`)] : []),
+        fold(`URL:${base}/editor-meetings`),
+        "END:VEVENT",
+      );
+    }
+  } catch {
+    /* de deadlines blijven leidend: een fout hier mag de feed niet breken */
   }
 
   lines.push("END:VCALENDAR");

@@ -23,6 +23,7 @@ import { runPublishingReconcile } from "@/server/jobs/publishing-reconcile";
 import { syncOpenOnboardings } from "@/server/onboarding";
 import { runScriptingTaskSync } from "@/server/scripting-tasks";
 import { runKlantmomentenSync } from "@/server/klantmomenten";
+import { runEditorMeetingsSync } from "@/server/editor-meetings";
 import { runScriptVersionSync } from "@/server/script-versions";
 import { runFrequentSync, runNightlyExternalSync, runNightlySync } from "@/server/jobs/orchestrator";
 import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
@@ -106,6 +107,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "feedback.reminders": runFeedbackReminders,
   // Klantmomenten: een week vooraf taak + melding voor de verantwoordelijke.
   "klantmomenten.sync": runKlantmomentenSync,
+  "editor_meetings.sync": runEditorMeetingsSync,
   "reminders.cleaning_friday": runCleaningFridayReminder,
   "goals.recompute": runGoalsRecompute,
   "goals.seed": runGoalsSeed,
