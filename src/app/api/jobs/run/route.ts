@@ -43,6 +43,7 @@ import { runCaptionsAutoGenerate } from "@/server/jobs/captions-autogen";
 import { runCaptionDriveLink } from "@/server/jobs/caption-drive-link";
 import { runBriefingAutoGenerate } from "@/server/jobs/briefing-autogen";
 import { runContentMemoryRefresh, runContentMemoryStrategy } from "@/server/content-memory";
+import { runContentAdvice } from "@/server/content-memory/advice-store";
 import { runContentResearchAdvance, runContentResearchWeekly } from "@/server/jobs/content-research-autogen";
 import { runContentResearchNotify } from "@/server/jobs/content-research-notify";
 import { runMonthlyReports, runReportQueue } from "@/server/jobs/report-monthly";
@@ -196,6 +197,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "content_research.advance": runContentResearchAdvance,
   "content_memory.refresh": runContentMemoryRefresh,
   "content_memory.strategy": runContentMemoryStrategy,
+  // Contentadvies: voortgang en effectmeting, dagelijks na het Contentgeheugen.
+  "content_memory.advice": runContentAdvice,
   // Klanten die aandacht nodig hebben: dagelijks na Metricool en het Contentgeheugen.
   "result_alerts.detect": runResultAlertsJob,
   "content_research.notify": runContentResearchNotify,

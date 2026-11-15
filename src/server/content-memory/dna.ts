@@ -108,7 +108,7 @@ const HOOK_CLAUSE: Record<string, string> = {
   Rondleiding: "direct een rondleiding wordt aangekondigd",
 };
 /** "open met ..." */
-const HOOK_ADVICE: Record<string, string> = {
+export const HOOK_ADVICE: Record<string, string> = {
   Vraag: "een directe vraag aan de kijker",
   Prijs: "de prijs in de eerste zin",
   Getal: "een concreet getal in de eerste zin",
@@ -118,7 +118,7 @@ const HOOK_ADVICE: Record<string, string> = {
   Stelling: "een gewone stelling",
 };
 /** "sluit af met ..." */
-const CTA_ADVICE: Record<string, string> = {
+export const CTA_ADVICE: Record<string, string> = {
   "Poll of keuze": "een keuze of poll",
   Raden: "een raadvraag",
   "Reactie vragen": "een vraag om te reageren",
@@ -140,7 +140,7 @@ const CTA_CLAUSE: Record<string, string> = {
   "Opslaan of delen": "de kijker wordt gevraagd de video op te slaan of te delen",
 };
 /** "houd de video's ..." */
-const LENGTH_ADVICE: Record<string, string> = {
+export const LENGTH_ADVICE: Record<string, string> = {
   "Korter dan 20 sec": "korter dan 20 seconden",
   "20 tot 35 sec": "tussen 20 en 35 seconden",
   "35 tot 50 sec": "tussen 35 en 50 seconden",

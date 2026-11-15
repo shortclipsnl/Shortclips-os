@@ -10,6 +10,7 @@ import { clientLearnedText } from "@/server/ai/knowledge";
 import { loadCompetitors, loadPriorScripts, loadToneOfVoice } from "@/server/content-research/sources";
 import { loadStoredStyle } from "@/server/content-research/style";
 import { readKeuring } from "@/server/content-research/quality";
+import { AdviceBrief } from "@/components/content-memory/advice-brief";
 import { styleToText } from "@/server/content-research/style-core";
 import { ScriptGeneratorChat } from "./scriptgenerator-ui";
 
@@ -105,6 +106,17 @@ export default async function ScriptGeneratorPage({ searchParams }: { searchPara
   // voorgeselecteerd (?client=<id>) en een idee worden doorgegeven (?idea=<id>).
   const fromIdea = idea ? await briefFromIdea(viewer, idea, Math.max(0, Math.min(4, Number(hook) || 0))) : undefined;
 
+  // Contentadvies van de voorgeselecteerde klant: wat doen, wat laten, wat testen.
+  const brief = client && hasClientAccess(viewer, client)
+    ? await (async () => {
+        const { loadClientMemory } = await import("@/server/content-memory");
+        const { loadClientAdvice } = await import("@/server/content-memory/advice-store");
+        const cm = await loadClientMemory(client);
+        if (!cm?.memory.videoCount) return null;
+        return { cm, advice: (await loadClientAdvice(cm, { sync: false })).advice };
+      })().catch(() => null)
+    : null;
+
   return (
     <div className="mx-auto max-w-[900px]">
       <PageHeader
@@ -122,6 +134,7 @@ export default async function ScriptGeneratorPage({ searchParams }: { searchPara
           </InfoNote>
         </div>
       ) : null}
+      {brief ? <AdviceBrief clientName={brief.cm.clientName} clientSlug={brief.cm.clientSlug} advice={brief.advice} /> : null}
       <ScriptGeneratorChat clients={clients} aiReady={aiConfigured()} initialClientId={client} initialBrief={fromIdea?.brief} initialIdeaId={fromIdea ? idea : undefined} />
     </div>
   );

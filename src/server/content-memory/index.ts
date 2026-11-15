@@ -9,6 +9,7 @@ import { generateHookAlternatives } from "./hook-alternatives";
 import { generateStrategy, loadStrategy, type MemoryStrategy } from "./strategy";
 import { buildPlaybook, playbookPromptText, type Playbook } from "./playbook";
 import { buildContentDna, dnaPromptText, type ContentDna } from "./dna";
+import { STRUCTURES } from "./advice";
 import { groupPublications, matchVideosToAssets, type ReelAsset, type ReelPublication } from "@/lib/screen-reel-match";
 import {
   analyzeMemory,
@@ -40,6 +41,8 @@ export type AiIdea = { title: string; format: string; hook: string; reason: stri
 export type MemoryAi = {
   formats: AiFormat[];
   labels: Record<string, string>;
+  /** Opbouw van het middenstuk per video (AI-label uit hook en caption; ontbreekt = onbekend). */
+  structures: Record<string, string>;
   ideas: AiIdea[];
   updatedAt: string | null;
   model: string | null;
@@ -88,7 +91,7 @@ const numOrNull = (v: unknown) => (v == null ? null : Number.isFinite(Number(v))
 /** Afkappen op hele tekens (geen losse emoji-helft, anders is de JSON naar de AI ongeldig). */
 const cut = (t: string, n: number) => Array.from(t).slice(0, n).join("");
 
-const EMPTY_AI: MemoryAi = { formats: [], labels: {}, ideas: [], updatedAt: null, model: null };
+const EMPTY_AI: MemoryAi = { formats: [], labels: {}, structures: {}, ideas: [], updatedAt: null, model: null };
 
 async function loadAi(clientId: string): Promise<MemoryAi> {
   const [row] = await db
@@ -102,6 +105,7 @@ async function loadAi(clientId: string): Promise<MemoryAi> {
   return {
     formats: Array.isArray(o.formats) ? o.formats : [],
     labels: o.labels && typeof o.labels === "object" ? o.labels : {},
+    structures: o.structures && typeof o.structures === "object" ? o.structures : {},
     ideas: Array.isArray(o.ideas) ? o.ideas : [],
     updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : null,
     model: o.model ?? null,
@@ -313,10 +317,10 @@ export function formatInfo(cm: ClientMemory, name: string): AiFormat | null {
 const SYSTEM = `Je bent contentanalist bij Shortclips, een bureau voor short video. Je krijgt de gepubliceerde video's van één klant (openingszin, caption, prestatie t.o.v. het normale niveau van die klant).
 Taak:
 1. Herken 3 tot 7 terugkerende contentformats bij DEZE klant (bijv. "Woningtour met prijsvraag", "Wijkportret", "Vacaturevideo"). Korte, herkenbare Nederlandse namen. Gebruik bestaande formatnamen opnieuw als ze passen.
-2. Geef elke video precies één format.
+2. Geef elke video precies één format en de opbouw van het middenstuk (hoe de video na de opening verloopt), precies één van: "Rondleiding", "Demonstratie", "Vergelijking", "Uitleg of tips", "Verhaal of case", "Vraag en antwoord", "Opsomming", "Sfeerimpressie", "Onbekend". Kies een opbouw alleen als opening en caption die echt laten zien; twijfel je, kies "Onbekend". Raad niet.
 3. Per format: description (1 zin: wat het is), why (1 zin: waarom het waarschijnlijk werkt of niet, gebaseerd op de cijfers; noem het een verklaring, geen bewijs), reuse (1 zin: hoe het team dit format concreet opnieuw inzet of aanpast).
 4. Drie nieuwe contentideeën die voortbouwen op de best presterende video's: title, format (één van jouw formatnamen), hook (een nieuwe openingszin in de stijl van wat werkte, geen kopie), reason (1 zin, verwijs naar welke video's dit onderbouwen).
-Verzin geen cijfers. Antwoord ALLEEN met geldige JSON: {"formats":[{"name","description","why","reuse"}],"labels":{"<id>":"<formatnaam>"},"ideas":[{"title","format","hook","reason"}]}`;
+Verzin geen cijfers. Antwoord ALLEEN met geldige JSON: {"formats":[{"name","description","why","reuse"}],"labels":{"<id>":["<formatnaam>","<opbouw>"]},"ideas":[{"title","format","hook","reason"}]}`;
 
 export async function refreshContentMemoryAi(clientId: string, opts: { force?: boolean } = {}): Promise<{ ok: boolean; labeled: number; reason?: string }> {
   if (!aiConfigured()) return { ok: false, labeled: 0, reason: "Geen AI-sleutel ingesteld" };
@@ -324,7 +328,8 @@ export async function refreshContentMemoryAi(clientId: string, opts: { force?: b
   const inputs = await loadInputs(clientId, prev.labels);
   const memory = analyzeMemory(inputs.map((v) => ({ ...v, format: null })));
   const scored = memory.all;
-  const unlabeled = scored.filter((v) => !prev.labels[v.id]);
+  // Ook video's zonder opbouw-label tellen als "nog te doen" (eenmalig voor bestaande video's).
+  const unlabeled = scored.filter((v) => !prev.labels[v.id] || prev.structures[v.id] === undefined);
   if (!opts.force && unlabeled.length === 0 && prev.updatedAt) return { ok: true, labeled: 0 };
   if (scored.length < 3) return { ok: false, labeled: 0, reason: "Te weinig video's" };
 
@@ -333,10 +338,10 @@ export async function refreshContentMemoryAi(clientId: string, opts: { force?: b
     .map((v) => `id=${v.id} | ${v.platform} | ${v.perf.toFixed(2)}x normaal | opening: "${cut(v.hook, 160)}" | caption: ${cut(v.caption.replace(/\s+/g, " "), 260)}`)
     .join("\n");
   const existing = prev.formats.length ? `Bestaande formatnamen (hergebruik waar het past): ${prev.formats.map((f) => f.name).join(", ")}\n\n` : "";
-  const res = await runPrompt({ system: SYSTEM, user: `${existing}Video's:\n${list}`, maxTokens: 8000, cacheSystem: true });
+  const res = await runPrompt({ system: SYSTEM, user: `${existing}Video's:\n${list}`, maxTokens: 12000, cacheSystem: true });
   if (!res.ok) return { ok: false, labeled: 0, reason: res.error ?? res.reason };
 
-  let parsed: Partial<MemoryAi>;
+  let parsed: Omit<Partial<MemoryAi>, "labels"> & { labels?: Record<string, unknown> };
   try {
     const json = res.text.slice(res.text.indexOf("{"), res.text.lastIndexOf("}") + 1);
     parsed = JSON.parse(json);
@@ -346,20 +351,31 @@ export async function refreshContentMemoryAi(clientId: string, opts: { force?: b
   const known = new Set(scored.map((v) => v.id));
   const labels: Record<string, string> = { ...prev.labels };
   let labeled = 0;
-  for (const [id, f] of Object.entries(parsed.labels ?? {})) {
-    if (known.has(id) && typeof f === "string" && f.trim()) {
+  const structures: Record<string, string> = { ...prev.structures };
+  for (const [id, raw] of Object.entries(parsed.labels ?? {})) {
+    if (!known.has(id)) continue;
+    // Nieuw: ["format", "opbouw"]; oud antwoord (alleen een formatnaam) blijft geldig.
+    const [f, st] = Array.isArray(raw) ? raw : [raw, null];
+    if (typeof f === "string" && f.trim()) {
       labels[id] = f.trim().slice(0, 60);
       labeled++;
     }
+    structures[id] = typeof st === "string" && (STRUCTURES as readonly string[]).includes(st.trim()) ? st.trim() : "Onbekend";
   }
+  // Niet teruggekomen in het antwoord: als onbekend vastleggen, zodat de klant niet elke nacht opnieuw wordt aangeboden.
+  for (const v of scored.slice(0, 150)) if (structures[v.id] === undefined) structures[v.id] = "Onbekend";
   // Zelfde caption op een ander platform krijgt hetzelfde format.
   const byKey = new Map<string, string>();
   for (const v of inputs) if (labels[v.id]) byKey.set(captionKey(v.caption), labels[v.id]);
   for (const v of inputs) if (!labels[v.id] && byKey.get(captionKey(v.caption))) labels[v.id] = byKey.get(captionKey(v.caption))!;
+  const stByKey = new Map<string, string>();
+  for (const v of inputs) if (structures[v.id] && structures[v.id] !== "Onbekend") stByKey.set(captionKey(v.caption), structures[v.id]);
+  for (const v of inputs) if ((!structures[v.id] || structures[v.id] === "Onbekend") && stByKey.get(captionKey(v.caption))) structures[v.id] = stByKey.get(captionKey(v.caption))!;
 
   const output: MemoryAi = {
     formats: (parsed.formats ?? []).filter((f) => f && f.name).slice(0, 8),
     labels,
+    structures,
     ideas: (parsed.ideas ?? []).filter((i) => i && i.title).slice(0, 5),
     updatedAt: new Date().toISOString(),
     model: res.model,
@@ -487,5 +503,7 @@ export async function contentMemoryTextForClient(viewer: Viewer, clientId: strin
   if (!cm) return "";
   // Gemeten uitkomsten van eerdere verbeteracties (Klanten die aandacht nodig hebben).
   const lessons = await import("@/server/result-alert-lessons").then((m) => m.lessonsPromptText(clientId)).catch(() => "");
-  return [contentMemoryPromptText(cm, opts), lessons].filter(Boolean).join("\n\n");
+  // Contentadvies: wat doen, wat laten, wat testen, plus de uitkomst van eerder advies.
+  const advice = await import("./advice-store").then((m) => m.adviceTextForClient(cm)).catch(() => "");
+  return [contentMemoryPromptText(cm, opts), advice, lessons].filter(Boolean).join("\n\n");
 }

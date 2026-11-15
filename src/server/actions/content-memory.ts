@@ -106,3 +106,18 @@ export async function strategyAction(clientId: string): Promise<MemoryActionResu
     return { ok: false, message: "Analyse lukte niet." };
   }
 }
+
+/** Contentadvies: het team zet een advies op ingepland, uitgevoerd of niet relevant. */
+export async function setAdviceStatusAction(id: string, status: string): Promise<MemoryActionResult> {
+  try {
+    const viewer = await requirePermission("analytics:read");
+    const { setAdviceStatus, STATUS_LABEL } = await import("@/server/content-memory/advice-store");
+    if (!(status in STATUS_LABEL)) return { ok: false, message: "Onbekende status." };
+    const res = await setAdviceStatus(viewer, id, status as keyof typeof STATUS_LABEL);
+    revalidatePath("/contentgeheugen");
+    return res;
+  } catch (e) {
+    if (e instanceof ForbiddenError) return { ok: false, message: e.message };
+    return { ok: false, message: "Opslaan lukte niet." };
+  }
+}
