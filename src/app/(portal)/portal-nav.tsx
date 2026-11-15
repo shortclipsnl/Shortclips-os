@@ -278,12 +278,14 @@ export function PortalSectionSwitch() {
   }
   const onResults = pathname === "/portal/resultaten";
   const onAnalyses = pathname === "/portal/analyses";
-  if (onResults || onAnalyses) {
+  const onKwartaal = pathname.startsWith("/portal/resultaten/kwartaal");
+  if (onResults || onAnalyses || onKwartaal) {
     return (
       <Segments
         items={[
           { href: "/portal/resultaten", label: "Cijfers", active: onResults },
           { href: "/portal/analyses", label: "Maandanalyses", active: onAnalyses },
+          { href: "/portal/resultaten/kwartaal", label: "Kwartaal", active: onKwartaal },
         ]}
       />
     );

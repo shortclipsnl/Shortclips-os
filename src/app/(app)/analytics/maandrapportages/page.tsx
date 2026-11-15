@@ -7,6 +7,7 @@ import { nlHolidaySet } from "@/lib/holidays";
 import { listMonthlyReports, requireReportsAccess } from "@/server/reports/service";
 import { PageHeader } from "@/components/ui";
 import { ReportList } from "./report-list";
+import { RapportageTabs } from "../rapportage-tabs";
 
 export const metadata: Metadata = { title: "Maandrapportages" };
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ export default async function MaandrapportagesPage({ searchParams }: { searchPar
 
   return (
     <div className="mx-auto max-w-[1400px]">
+      <RapportageTabs active="maand" />
       <PageHeader
         title="Maandrapportages"
         description={overview.teamOnly

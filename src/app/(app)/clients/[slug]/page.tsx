@@ -64,6 +64,8 @@ import { canManageClientDocs, getCurrentDocs, toSlots, visibleKinds } from "@/se
 import { ClientOverview } from "./client-overview";
 import { ClientMoments } from "./client-moments";
 import { getClientMomentsView } from "@/server/klantmomenten";
+import { clientQuarterSummary } from "@/server/quarterly/service";
+import { ClientQuarterBlock } from "@/components/quarterly/client-quarter-block";
 import { todayAmsterdam } from "@/lib/planning-deadline";
 import { ClientDocsPanel } from "@/components/client-docs/docs-panel";
 import { getOnboardingView } from "@/server/onboarding";
@@ -266,6 +268,10 @@ export default async function ClientPage({
             docSlots={docSlots.map((s) => ({ kind: s.kind, label: s.label, url: s.doc?.url ?? null }))}
             canEditClient={canEditClient}
           />
+          {/* Kwartaalrapportage: meest recente kwartaal, status en eerstvolgende deadline. */}
+          {viewer.permissions.has("reports:read") || viewer.permissions.has("reports:team_read") ? (
+            <ClientQuarterBlock summary={await clientQuarterSummary(c.id).catch(() => null)} />
+          ) : null}
           {/* Klantmomenten: samenwerkings- en bedrijfsjubilea. Een week vooraf krijgt
               de verantwoordelijke automatisch een taak en een melding. */}
           <ClientMoments

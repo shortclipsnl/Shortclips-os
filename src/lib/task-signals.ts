@@ -2,6 +2,7 @@ import { isFeedbackReminderKey } from "@/lib/ops-control/plan";
 import { batchHref, parseBatchKey, parseStapKey } from "@/lib/maandcontrole";
 import { periodLabel } from "@/lib/format";
 import { isKlantmomentKey } from "@/lib/klantmomenten";
+import { parseQuarterTaskKey } from "@/lib/kwartaal";
 
 /**
  * Automatische meldingen die op de takenpagina als compacte, opvallende regel
@@ -83,6 +84,18 @@ export function taskSignal(t: TaskLike): TaskSignal | null {
       meta: null,
       status: t.description?.split("\n")[0]?.trim() || null,
       actionHref: t.entityId ? `/analytics/maandrapportages/${t.entityId}` : "/analytics/maandrapportages",
+    };
+  }
+
+  // Kwartaalrapportage per klant en processtap: zelfde compacte weergave.
+  if (parseQuarterTaskKey(key)) {
+    return {
+      kind: "maandrapport",
+      title: t.clientName ?? "Klant",
+      text: t.title,
+      meta: null,
+      status: t.description?.split("\n")[0]?.trim() || null,
+      actionHref: t.entityId ? `/analytics/kwartaalrapportages/${t.entityId}` : "/analytics/kwartaalrapportages",
     };
   }
 
