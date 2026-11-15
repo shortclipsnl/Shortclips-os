@@ -11,6 +11,9 @@ import { IntegrationNotice } from "@/components/integration-notice";
 import { ScriptingBoard } from "./scripting-ui";
 import { ClientStatusTabs } from "@/components/client-status-tabs";
 import { parseClientStatusFilter } from "@/lib/client-status";
+import { deadlineLabel, feedbackDueDay, workdaysLabel } from "@/lib/feedback-deadline";
+import { nlHolidaySet } from "@/lib/holidays";
+import { scriptberichtTermijnen } from "@/server/feedback-overview";
 import { ScriptberichtButton, type ScriptberichtRow } from "./scriptbericht";
 import { getSavedScriptberichten, getScriptberichtTemplates, portalScriptLink } from "@/server/scriptbericht";
 import { EMPTY_SAVED } from "@/lib/scriptbericht";
@@ -56,6 +59,14 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
     getSavedScriptberichten(rows.map((r) => r.id)),
     draaiboekStatusMap(rows.map((r) => r.id)),
   ]);
+  // Feedbacktermijn per klant en de exacte deadline voor in het scriptbericht.
+  // Liggen de scripts al bij de klant in het portaal, dan geldt die deadline;
+  // anders de termijn van de klant gerekend vanaf vandaag (werkdagen, tot 17:00).
+  const sbTermijn = await scriptberichtTermijnen(rows.map((r) => ({ id: r.id, clientId: r.clientId, reviewId: r.reviewId }))).catch((e) => {
+    console.error("[scriptbericht] termijn", e);
+    return new Map<string, { termijn: string; deadline: string }>();
+  });
+  const sbTermijnStandaard = { termijn: workdaysLabel(3), deadline: deadlineLabel(feedbackDueDay(new Date(), 3, nlHolidaySet())) };
   const sbRows: ScriptberichtRow[] = rows.map((r) => ({
     id: r.id,
     clientId: r.clientId,
@@ -67,6 +78,7 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
     status: r.status,
     reviewId: r.reviewId,
     portalLink: portalScriptLink(r.reviewId),
+    termijn: sbTermijn.get(r.id) ?? sbTermijnStandaard,
     saved: sbSaved.get(r.id) ?? EMPTY_SAVED,
   }));
   const scriptbericht = (

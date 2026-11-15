@@ -398,7 +398,7 @@ function Row({ v, editors, canEdit, canAssign, canEditFiles, phaseColor, editorV
         ) : null}
         {/* WhatsApp-bericht eerste versies: twee opties, per opname. */}
         {whatsapp && v.whatsappBericht && WHATSAPP_PHASES.has(v.phase) ? (
-          <WhatsappBerichtKnoppen videoId={v.id} clientName={v.clientName} concept={v.whatsappBericht} standaarden={whatsapp.standaarden} canManage={whatsapp.canManage} />
+          <WhatsappBerichtKnoppen videoId={v.id} clientName={v.clientName} concept={v.whatsappBericht} standaarden={whatsapp.standaarden} canManage={whatsapp.canManage} feedbackDays={v.clientFeedbackDays} lopendeTermijn={v.feedbackTerm ? { termDays: v.feedbackTerm.state.termDays, dueOn: v.feedbackTerm.dueOn } : null} />
         ) : null}
       </div>
 

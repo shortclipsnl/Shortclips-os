@@ -6,7 +6,8 @@ import { nlHolidaySet } from "@/lib/holidays";
 import { amsterdamDay, clientFeedbackDue } from "@/lib/client-feedback";
 import { feedbackTermLabel, feedbackTermState, planRound, reminderDue, type FeedbackTermState } from "@/lib/feedback-term";
 import { isInactiveClientStatus } from "@/lib/client-status";
-import { getPortalSettingsForClient } from "@/server/portal-settings";
+import { getFeedbackDaysForClient } from "@/server/portal-settings";
+import { amsterdamTimeOn, feedbackDeadlineAt } from "@/lib/feedback-deadline";
 import { isCoreStaff } from "@/server/core-staff";
 import { clearByDedupe, notify } from "@/server/notifications";
 import { runJob } from "@/server/jobs/runner";
@@ -82,19 +83,20 @@ export async function syncFeedbackRounds(ids?: string[]): Promise<FeedbackSyncRe
   ]);
   const videoById = new Map(videos.map((v) => [v.id, v]));
   const holidays = nlHolidaySet();
-  const termCache = new Map<string, number>();
-  const termFor = async (clientId: string) => {
+  // Termijn per klant: eerste versie = feedbacktermijn video's, een
+  // correctieversie (video opnieuw bij de klant) = termijn correctieversie.
+  const termCache = new Map<string, { videos: number; correction: number }>();
+  const termFor = async (clientId: string, correction: boolean) => {
     let t = termCache.get(clientId);
     if (t === undefined) {
       try {
-        t = (await getPortalSettingsForClient(clientId)).feedbackDaysVideos;
+        t = await getFeedbackDaysForClient(clientId);
       } catch {
-        t = 3;
+        t = { videos: 3, correction: 3 };
       }
-      if (!Number.isFinite(t) || t < 1) t = 3;
       termCache.set(clientId, t);
     }
-    return t;
+    return correction ? t.correction : t.videos;
   };
 
   for (const id of scope) {
@@ -118,9 +120,9 @@ export async function syncFeedbackRounds(ids?: string[]): Promise<FeedbackSyncRe
     }
 
     if (plan.open && v) {
-      const termDays = await termFor(v.clientId);
       const startedAt = v.statusChangedAt instanceof Date ? v.statusChangedAt : new Date(v.statusChangedAt as unknown as string);
       const roundNumber = Math.max(0, ...mine.map((r) => r.roundNumber)) + 1;
+      const termDays = await termFor(v.clientId, roundNumber > 1 || v.clientRevisionRounds > 0);
       const inserted = await db.insert(clientFeedbackRounds).values({
         deliverableId: v.id,
         clientId: v.clientId,
@@ -244,7 +246,8 @@ export async function createDueFeedbackReminders(now = new Date()): Promise<Feed
       entityType: "deliverable",
       entityId: r.deliverableId,
       assigneeId: ownerId,
-      dueOn: today,
+      // Taakdatum = de laatste termijndag van de klant (voedt het herinneringsbericht).
+      dueOn: state.dueOn <= today ? state.dueOn : today,
       source: "automation",
       dedupeKey: dedupeFor(r.id),
     }).onConflictDoNothing().returning({ id: tasks.id });
@@ -326,4 +329,39 @@ export async function remindedDeliverables(ids: string[]): Promise<Set<string>> 
   const rows = await db.select({ id: clientFeedbackRounds.deliverableId }).from(clientFeedbackRounds)
     .where(and(isNull(clientFeedbackRounds.endedAt), sql`${clientFeedbackRounds.reminderAt} is not null`, inArray(clientFeedbackRounds.deliverableId, ids)));
   return new Set(rows.map((r) => r.id));
+}
+
+/**
+ * Het deadlinemoment (laatste termijndag, 17:00 Nederlandse tijd) voor video's
+ * die bij de klant liggen. Bron is de lopende feedbackronde, zodat klantportaal,
+ * Editing-pagina en WhatsApp-bericht exact dezelfde deadline tonen. Loopt er
+ * (nog) geen ronde, dan rekenen we met de termijn van de klant.
+ */
+export async function videoFeedbackDeadlines(
+  items: Array<{ deliverableId: string; clientId: string; statusChangedAt: Date | string; correction?: boolean }>,
+): Promise<Map<string, Date>> {
+  const out = new Map<string, Date>();
+  const ids = [...new Set(items.map((i) => i.deliverableId).filter(Boolean))];
+  if (!ids.length) return out;
+  const rounds = await db
+    .select({ deliverableId: clientFeedbackRounds.deliverableId, dueOn: clientFeedbackRounds.dueOn })
+    .from(clientFeedbackRounds)
+    .where(and(isNull(clientFeedbackRounds.endedAt), inArray(clientFeedbackRounds.deliverableId, ids)));
+  for (const r of rounds) out.set(r.deliverableId, amsterdamTimeOn(String(r.dueOn).slice(0, 10)));
+  const holidays = nlHolidaySet();
+  const cache = new Map<string, { videos: number; correction: number }>();
+  for (const i of items) {
+    if (out.has(i.deliverableId)) continue;
+    let t = cache.get(i.clientId);
+    if (!t) {
+      try {
+        t = await getFeedbackDaysForClient(i.clientId);
+      } catch {
+        t = { videos: 3, correction: 3 };
+      }
+      cache.set(i.clientId, t);
+    }
+    out.set(i.deliverableId, feedbackDeadlineAt(i.statusChangedAt, i.correction ? t.correction : t.videos, holidays));
+  }
+  return out;
 }

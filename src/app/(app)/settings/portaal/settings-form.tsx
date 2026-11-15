@@ -44,6 +44,12 @@ export function PortalSettingsForm({ initial }: { initial: PortalSettings }) {
       <div className="grid gap-4 sm:grid-cols-3">
         <Num label="Feedbacktermijn scripts (werkdagen)" k="feedbackDaysScripts" hint="Herinnering gaat zodra dit nadert" />
         <Num label="Feedbacktermijn video's (werkdagen)" k="feedbackDaysVideos" />
+        <Num label="Reactie op correctieversie (werkdagen)" k="feedbackDaysCorrection" hint="Video's die opnieuw naar de klant gaan" />
+      </div>
+      <p className="-mt-2 text-xs text-[var(--color-ink-muted)]">
+        Elke deadline loopt tot 17:00 Nederlandse tijd op de laatste werkdag. Weekenden en feestdagen tellen niet mee. Een afwijkende termijn per klant stel je in op de klantpagina bij Afspraken.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-3">
         <Num label="Annulering: kosteloos tot (werkdagen)" k="cancelNoticeDays" />
       </div>
       <div className="grid gap-4 sm:grid-cols-3">

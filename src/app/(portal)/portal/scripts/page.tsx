@@ -80,7 +80,7 @@ function SessionRow({ r, today }: { r: Row; today: string }) {
         {rev && rev.totalScripts > 0 && st.bucket !== "afgerond" ? <ScriptProgress approved={rev.approvedScripts} total={rev.totalScripts} /> : null}
         {actie && rev?.feedbackDeadline ? (
           <p className={`mt-1.5 inline-flex items-center gap-1.5 text-[13px] font-semibold ${st.tone === "red" ? "text-[var(--st-red)]" : "text-[var(--st-orange)]"}`}>
-            <Clock className="size-3.5" /> Graag uiterlijk {dayLabel(rev.feedbackDeadline).toLowerCase()}
+            <Clock className="size-3.5" /> Graag uiterlijk {dayLabel(rev.feedbackDeadline).toLowerCase()} om 17:00
           </p>
         ) : null}
       </div>
@@ -165,7 +165,7 @@ export default async function PortalScriptsPage() {
             </p>
             {firstAction?.shootOn ? <p className="text-[13.5px] font-medium text-[var(--color-ink)]">Scripts voor de opname van {dayLabel(firstAction.shootOn).toLowerCase()}</p> : null}
             <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">
-              {deadlines[0] ? <>Graag uiterlijk <strong className="text-[var(--color-ink)]">{dayLabel(deadlines[0]).toLowerCase()}</strong>. </> : null}
+              {deadlines[0] ? <>Graag uiterlijk <strong className="text-[var(--color-ink)]">{dayLabel(deadlines[0]).toLowerCase()} om 17:00</strong>. </> : null}
               Binnen {settings.feedbackDaysScripts} {settings.feedbackDaysScripts === 1 ? "werkdag" : "werkdagen"} reageren houdt de opnamedag op schema.
             </p>
           </div>

@@ -11,8 +11,9 @@ import { auditLog, recordActivity } from "@/server/audit";
 import { clearByDedupe, notify } from "@/server/notifications";
 import { portalEmailHtml, sendEmail } from "@/server/email";
 import { env } from "@/lib/env";
-import { getFeedbackDays } from "@/server/portal-settings";
-import { addWorkingDays } from "@/lib/workdays";
+import { getFeedbackDaysForClient } from "@/server/portal-settings";
+import { deadlineLabel, feedbackDeadlineAt } from "@/lib/feedback-deadline";
+import { nlHolidaySet } from "@/lib/holidays";
 import { assertReviewAccess, ensureVersionPages, getReviewApproval } from "@/server/script-review";
 import { carryOverPages } from "@/lib/script-approval";
 import { syncScriptingTasks } from "@/server/scripting-tasks";
@@ -20,12 +21,15 @@ import { createScriptUploadTarget } from "@/server/scripts/script-storage";
 import { ensureCaptionsForShoot } from "@/server/captions/run";
 import { ensureBriefingForShoot } from "@/server/briefing/run";
 
-/** Uiterste feedbackmoment: N werkdagen vanaf nu (eind van die dag). */
-async function scriptFeedbackDeadline(): Promise<Date> {
-  const { scripts } = await getFeedbackDays();
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
-  const day = addWorkingDays(today, Math.max(1, scripts));
-  return new Date(`${day}T17:00:00`);
+/**
+ * Uiterste feedbackmoment voor de scripts van deze klant: de feedbacktermijn van
+ * de klant (algemeen of afwijkend) in werkdagen vanaf nu, zonder weekenden en
+ * feestdagen, tot 17:00 Nederlandse tijd.
+ */
+async function scriptFeedbackDeadline(clientId: string): Promise<Date> {
+  // Een storing in de instellingen mag het versturen van scripts nooit blokkeren.
+  const { scripts } = await getFeedbackDaysForClient(clientId).catch(() => ({ scripts: 3 }));
+  return feedbackDeadlineAt(new Date(), scripts, nlHolidaySet());
 }
 
 export type ActionResult = { ok: boolean; message?: string; reviewId?: string; round?: "open" | "approved" | "feedback" };
@@ -206,7 +210,7 @@ export async function sendScriptForReview(input: z.infer<typeof sendSchema>): Pr
       .limit(1);
 
     const reviewTitle = title?.trim() || `Scripts opname ${fmtDate(day.scheduledOn)}`;
-    const feedbackDeadline = await scriptFeedbackDeadline();
+    const feedbackDeadline = await scriptFeedbackDeadline(clientId);
     let reviewId: string;
     let versionNumber: number;
     let herzien = false;
@@ -244,7 +248,7 @@ export async function sendScriptForReview(input: z.infer<typeof sendSchema>): Pr
     const staff = await clientStaff(clientId);
     const href = `/portal/scripts/${reviewId}`;
     const title2 = herzien ? "Aangepaste scripts staan klaar" : "Je scripts staan klaar om te bekijken";
-    const body = `De scripts voor je opname van ${fmtDate(day.scheduledOn)} staan klaar. Bekijk ze en geef eenvoudig je feedback of keur ze goed.`;
+    const body = `De scripts voor je opname van ${fmtDate(day.scheduledOn)} staan klaar. Bekijk ze en geef eenvoudig je feedback of keur ze goed. We ontvangen je reactie graag uiterlijk ${deadlineLabel(feedbackDeadline)}.`;
     if (ids.length > 0) {
       await notify({
         userIds: ids,
@@ -823,7 +827,8 @@ export async function uploadScriptReviewVersion(input: z.infer<typeof versionSch
     const versionNumber = review.currentVersion + 1;
 
     await db.insert(scriptReviewVersions).values({ reviewId, versionNumber, fileName: fileName.slice(0, 255), contentType: "application/pdf", sizeBytes, dataBase64: base64 ?? null, storagePath: storagePath ?? null, note: note ?? null, uploadedById: viewer.id });
-    await db.update(scriptReviews).set({ status: "opnieuw_controle", currentVersion: versionNumber, feedbackDeadline: await scriptFeedbackDeadline(), updatedAt: new Date() }).where(eq(scriptReviews.id, reviewId));
+    const feedbackDeadline = await scriptFeedbackDeadline(review.clientId);
+    await db.update(scriptReviews).set({ status: "opnieuw_controle", currentVersion: versionNumber, feedbackDeadline, updatedAt: new Date() }).where(eq(scriptReviews.id, reviewId));
 
     await carryOverApprovals(reviewId, versionNumber - 1, versionNumber);
     await syncDayScriptingStatus(review.productionDayId, "scripts_bij_klant");
@@ -836,9 +841,10 @@ export async function uploadScriptReviewVersion(input: z.infer<typeof versionSch
     const staff = await clientStaff(review.clientId);
     const href = `/portal/scripts/${reviewId}`;
     const heading = "Aangepaste scripts staan klaar";
-    const body = review.scheduledOn
+    const uiterlijk = ` We ontvangen je reactie graag uiterlijk ${deadlineLabel(feedbackDeadline)}.`;
+    const body = (review.scheduledOn
       ? `De aangepaste scripts voor je opname van ${fmtDate(review.scheduledOn)} staan klaar. Bekijk ze en geef je feedback of keur ze goed.`
-      : "De aangepaste scripts staan klaar om te bekijken.";
+      : "De aangepaste scripts staan klaar om te bekijken.") + uiterlijk;
     if (ids.length > 0) {
       await notify({ userIds: ids, clientId: review.clientId, level: "info", type: "script_review_ready", title: heading, body, href, entityType: "script_review", entityId: reviewId, dedupeKey: `script_review_ready:${reviewId}:v${versionNumber}` });
     }

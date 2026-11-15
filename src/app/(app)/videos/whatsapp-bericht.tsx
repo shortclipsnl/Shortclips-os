@@ -12,11 +12,15 @@ import {
   isValidVideoLink,
   kanKopieren,
   normalizeVideoLink,
+  haalTermijnEruit,
   standaardMetLink,
   whatsappOpmaak,
+  type TermijnContext,
   type WhatsappBerichtConcept,
   type WhatsappOptie,
 } from "@/lib/whatsapp-bericht";
+import { deadlineLabel, feedbackDueDay, workdaysLabel } from "@/lib/feedback-deadline";
+import { nlHolidaySet } from "@/lib/holidays";
 
 export type WhatsappStandaarden = Record<WhatsappOptie, string>;
 
@@ -63,14 +67,28 @@ export function WhatsappBerichtKnoppen({
   concept,
   standaarden,
   canManage,
+  feedbackDays,
+  lopendeTermijn,
 }: {
   videoId: string;
   clientName: string;
   concept: WhatsappBerichtConcept;
   standaarden: WhatsappStandaarden;
   canManage: boolean;
+  /** Feedbacktermijn van deze klant in werkdagen (algemeen of afwijkend). */
+  feedbackDays: number | null;
+  /** Loopt de feedbackronde al, dan geldt die deadline (niet opnieuw rekenen vanaf vandaag). */
+  lopendeTermijn: { termDays: number; dueOn: string } | null;
 }) {
   const [open, setOpen] = useState<WhatsappOptie | null>(null);
+  // Termijn en exacte deadline voor in het bericht: de lopende ronde, of anders
+  // de termijn van de klant gerekend vanaf vandaag (werkdagen, tot 17:00).
+  const termijn = useMemo<TermijnContext | null>(() => {
+    const days = lopendeTermijn?.termDays ?? feedbackDays;
+    if (!days) return null;
+    const dueDay = lopendeTermijn?.dueOn ?? feedbackDueDay(new Date(), days, nlHolidaySet());
+    return { termijn: workdaysLabel(days), deadline: deadlineLabel(dueDay) };
+  }, [feedbackDays, lopendeTermijn]);
   return (
     <div className="flex flex-wrap items-center gap-1" aria-label="WhatsApp-bericht eerste versies">
       {WHATSAPP_OPTIES.map((o) => {
@@ -110,6 +128,7 @@ export function WhatsappBerichtKnoppen({
           startOptie={open}
           initial={concept}
           standaarden={standaarden}
+          termijn={termijn}
           canManage={canManage}
           onClose={() => setOpen(null)}
         />
@@ -124,9 +143,11 @@ function WhatsappBerichtDialog({
   startOptie,
   initial,
   standaarden: initialStandaarden,
+  termijn,
   canManage,
   onClose,
 }: {
+  termijn: TermijnContext | null;
   videoId: string;
   clientName: string;
   startOptie: WhatsappOptie;
@@ -154,9 +175,9 @@ function WhatsappBerichtDialog({
   const optie = concept.optie ?? startOptie;
   const meta = WHATSAPP_OPTIE_META[optie];
   const standaard = standaarden[optie];
-  const tekst = concept.teksten[optie] ?? standaardMetLink(standaard, concept.videoLink);
+  const tekst = concept.teksten[optie] ?? standaardMetLink(standaard, concept.videoLink, termijn);
   const afgevinkt = concept.checks[optie] ?? [];
-  const aangepast = concept.teksten[optie] !== undefined && concept.teksten[optie] !== standaardMetLink(standaard, concept.videoLink);
+  const aangepast = concept.teksten[optie] !== undefined && concept.teksten[optie] !== standaardMetLink(standaard, concept.videoLink, termijn);
   const blokkade = kanKopieren(optie, tekst, concept.videoLink, afgevinkt);
   const linkOngeldig = Boolean(concept.videoLink) && !isValidVideoLink(concept.videoLink);
 
@@ -265,7 +286,7 @@ function WhatsappBerichtDialog({
   const saveStandaard = (reset: boolean) =>
     startBeheer(async () => {
       setBeheerMelding(null);
-      const r = await updateWhatsappStandaard(optie, reset ? "" : applyVideoLink(tekst, concept.videoLink, ""), { reset });
+      const r = await updateWhatsappStandaard(optie, reset ? "" : haalTermijnEruit(applyVideoLink(tekst, concept.videoLink, ""), termijn), { reset });
       if (r.ok) {
         setStandaarden((s) => ({ ...s, [optie]: r.text }));
         setBeheerMelding({ tone: "ok", text: reset ? "Standaardtekst hersteld voor iedereen." : "Opgeslagen als standaard voor iedereen." });

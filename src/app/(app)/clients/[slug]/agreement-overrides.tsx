@@ -14,6 +14,7 @@ const FIELDS: Array<{ k: Key; label: string; type: "num" | "text" }> = [
   { k: "shootDuration", label: "Duur opnamedag", type: "text" },
   { k: "feedbackDaysScripts", label: "Feedbacktermijn scripts (werkdagen)", type: "num" },
   { k: "feedbackDaysVideos", label: "Feedbacktermijn video's (werkdagen)", type: "num" },
+  { k: "feedbackDaysCorrection", label: "Reactie op correctieversie (werkdagen)", type: "num" },
   { k: "extraFeedbackFee", label: "Kosten extra feedbackronde", type: "text" },
   { k: "reviewDays", label: "Beoordelingstermijn (werkdagen)", type: "num" },
   { k: "reviewAutoApproveDays", label: "Akkoord bij geen reactie (werkdagen)", type: "num" },

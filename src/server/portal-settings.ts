@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientAgreementOverrides } from "@/db/schema";
 import { getNumberSetting, getStringSetting, setNumberSetting, setStringSetting } from "@/server/app-settings";
@@ -13,6 +13,8 @@ import { getNumberSetting, getStringSetting, setNumberSetting, setStringSetting 
 export type PortalSettings = {
   feedbackDaysScripts: number;
   feedbackDaysVideos: number;
+  /** Reactietermijn op een correctieversie (video's opnieuw bij de klant), in werkdagen. */
+  feedbackDaysCorrection: number;
   cancelNoticeDays: number;
   cancelFee: string;
   cancelLateNote: string;
@@ -35,6 +37,7 @@ export type PortalSettings = {
 export const PORTAL_SETTINGS_DEFAULTS: PortalSettings = {
   feedbackDaysScripts: 3,
   feedbackDaysVideos: 3,
+  feedbackDaysCorrection: 3,
   cancelNoticeDays: 7,
   cancelFee: "€ 395 excl. btw",
   cancelLateNote: "Bij annulering binnen 24 uur voor de opnamedag wordt 100% van de opnamedag in rekening gebracht.",
@@ -55,6 +58,7 @@ export const PORTAL_SETTINGS_DEFAULTS: PortalSettings = {
 const K = {
   feedbackDaysScripts: "portal.feedback_days_scripts",
   feedbackDaysVideos: "portal.feedback_days_videos",
+  feedbackDaysCorrection: "portal.feedback_days_correction",
   cancelNoticeDays: "portal.cancel_notice_days",
   cancelFee: "portal.cancel_fee",
   cancelLateNote: "portal.cancel_late_note",
@@ -76,7 +80,7 @@ export async function getPortalSettings(): Promise<PortalSettings> {
   const d = PORTAL_SETTINGS_DEFAULTS;
   const [
     feedbackDaysScripts, feedbackDaysVideos, cancelNoticeDays, cancelFee, cancelLateNote, reshootFee, extraFeedbackFee, travelCost, responseTime,
-    contractTerm, billingNote, shootDuration, reviewDays, reviewAutoApproveDays, extraContentNote, rawFootageFee, deliveryWorkdays,
+    contractTerm, billingNote, shootDuration, reviewDays, reviewAutoApproveDays, extraContentNote, rawFootageFee, deliveryWorkdays, feedbackDaysCorrection,
   ] = await Promise.all([
     getNumberSetting(K.feedbackDaysScripts, d.feedbackDaysScripts),
     getNumberSetting(K.feedbackDaysVideos, d.feedbackDaysVideos),
@@ -95,21 +99,22 @@ export async function getPortalSettings(): Promise<PortalSettings> {
     getStringSetting(K.extraContentNote, d.extraContentNote),
     getStringSetting(K.rawFootageFee, d.rawFootageFee),
     getNumberSetting(K.deliveryWorkdays, d.deliveryWorkdays),
+    getNumberSetting(K.feedbackDaysCorrection, d.feedbackDaysCorrection),
   ]);
   return {
     feedbackDaysScripts, feedbackDaysVideos, cancelNoticeDays, cancelFee, cancelLateNote, reshootFee, extraFeedbackFee, travelCost, responseTime,
-    contractTerm, billingNote, shootDuration, reviewDays, reviewAutoApproveDays, extraContentNote, rawFootageFee, deliveryWorkdays,
+    contractTerm, billingNote, shootDuration, reviewDays, reviewAutoApproveDays, extraContentNote, rawFootageFee, deliveryWorkdays, feedbackDaysCorrection,
   };
 }
 
 /** Welke afspraak-velden per klant mogen afwijken (informatieve weergave). */
 export const OVERRIDABLE_KEYS: Array<keyof PortalSettings> = [
-  "feedbackDaysScripts", "feedbackDaysVideos", "cancelNoticeDays", "cancelFee", "cancelLateNote",
+  "feedbackDaysScripts", "feedbackDaysVideos", "feedbackDaysCorrection", "cancelNoticeDays", "cancelFee", "cancelLateNote",
   "reshootFee", "extraFeedbackFee", "travelCost", "responseTime", "contractTerm", "billingNote",
   "shootDuration", "reviewDays", "reviewAutoApproveDays", "extraContentNote", "rawFootageFee", "deliveryWorkdays",
 ];
 
-const NUMBER_KEYS = new Set<keyof PortalSettings>(["feedbackDaysScripts", "feedbackDaysVideos", "cancelNoticeDays", "reviewDays", "reviewAutoApproveDays", "deliveryWorkdays"]);
+const NUMBER_KEYS = new Set<keyof PortalSettings>(["feedbackDaysScripts", "feedbackDaysVideos", "feedbackDaysCorrection", "cancelNoticeDays", "reviewDays", "reviewAutoApproveDays", "deliveryWorkdays"]);
 
 /** De afwijkende afspraak-velden voor één klant (leeg object = geen afwijkingen). */
 export async function getClientAgreementOverrides(clientId: string): Promise<Partial<PortalSettings>> {
@@ -143,12 +148,53 @@ export async function getFeedbackDays(): Promise<{ scripts: number; videos: numb
   return { scripts, videos };
 }
 
+/**
+ * De feedbacktermijnen zoals ze voor één klant gelden (algemeen, overschreven
+ * door een afwijkende klantafspraak). Altijd minimaal 1 werkdag.
+ */
+export async function getFeedbackDaysForClient(clientId: string): Promise<{ scripts: number; videos: number; correction: number }> {
+  const d = PORTAL_SETTINGS_DEFAULTS;
+  return (await getFeedbackDaysByClient([clientId])).get(clientId) ?? { scripts: d.feedbackDaysScripts, videos: d.feedbackDaysVideos, correction: d.feedbackDaysCorrection };
+}
+
+/** Zelfde als getFeedbackDaysForClient, in één keer voor meerdere klanten (voor lijsten). */
+export async function getFeedbackDaysByClient(clientIds: string[]): Promise<Map<string, { scripts: number; videos: number; correction: number }>> {
+  const ids = [...new Set(clientIds.filter(Boolean))];
+  const out = new Map<string, { scripts: number; videos: number; correction: number }>();
+  if (!ids.length) return out;
+  const [general, rows] = await Promise.all([
+    getPortalSettings(),
+    db.select({ clientId: clientAgreementOverrides.clientId, overrides: clientAgreementOverrides.overrides }).from(clientAgreementOverrides).where(inArray(clientAgreementOverrides.clientId, ids)),
+  ]);
+  const byClient = new Map(rows.map((r) => [r.clientId, (r.overrides ?? {}) as Record<string, unknown>]));
+  const pick = (raw: unknown, fallback: number) => {
+    const n = Number(raw);
+    return raw !== null && raw !== undefined && raw !== "" && Number.isFinite(n) && n >= 1 ? Math.round(n) : fallback;
+  };
+  const d = PORTAL_SETTINGS_DEFAULTS;
+  const gScripts = pick(general.feedbackDaysScripts, d.feedbackDaysScripts);
+  const gVideos = pick(general.feedbackDaysVideos, d.feedbackDaysVideos);
+  const gCorr = pick(general.feedbackDaysCorrection, gVideos);
+  for (const id of ids) {
+    const o = byClient.get(id) ?? {};
+    const videos = pick(o.feedbackDaysVideos, gVideos);
+    out.set(id, {
+      scripts: pick(o.feedbackDaysScripts, gScripts),
+      videos,
+      // Afwijkende videotermijn zonder eigen correctietermijn: de correctieversie volgt de videotermijn van de klant.
+      correction: pick(o.feedbackDaysCorrection, o.feedbackDaysVideos != null && o.feedbackDaysVideos !== "" ? videos : gCorr),
+    });
+  }
+  return out;
+}
+
 export async function savePortalSettings(input: PortalSettings, updatedById?: string): Promise<void> {
   const num = (k: string, v: number) => setNumberSetting(k, v, { category: "portal", updatedById });
   const str = (k: string, v: string) => setStringSetting(k, v, { category: "portal", updatedById });
   await Promise.all([
     num(K.feedbackDaysScripts, input.feedbackDaysScripts),
     num(K.feedbackDaysVideos, input.feedbackDaysVideos),
+    num(K.feedbackDaysCorrection, input.feedbackDaysCorrection),
     num(K.cancelNoticeDays, input.cancelNoticeDays),
     str(K.cancelFee, input.cancelFee),
     str(K.cancelLateNote, input.cancelLateNote),

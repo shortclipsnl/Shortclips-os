@@ -5,6 +5,7 @@ import { requirePortal } from "@/server/auth/context";
 import { getPortalVideo, getPortalFrameUrl } from "@/server/portal";
 import { Badge, buttonClass, Card, CardHeader } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { videoFeedbackDeadlines } from "@/server/feedback-rounds";
 import { clientStatusView, deadlineText, feedbackBeingProcessed, reviewDeadline, waitingOnClient } from "@/lib/portal-status";
 import { VideoDecision } from "../../actions-ui";
 
@@ -83,7 +84,9 @@ export default async function PortalVideoDetailPage({
   const view = clientStatusView(video.status);
   const needsDecision = waitingOnClient(video.status);
   const inFeedback = feedbackBeingProcessed(video.status);
-  const dl = needsDecision ? deadlineText(reviewDeadline(video.statusChangedAt)) : null;
+  const dl = needsDecision && viewer.clientId
+    ? deadlineText((await videoFeedbackDeadlines([{ deliverableId: video.id, clientId: viewer.clientId, statusChangedAt: video.statusChangedAt }])).get(video.id) ?? null)
+    : null;
   const expectedNewVersion = inFeedback ? reviewDeadline(video.statusChangedAt) : null;
   // Een goedgekeurde/ingeplande/online video hoort altijd terug te kijken te zijn.
   // Ontbreekt de directe Frame-link, val dan terug op de review-omgeving van de klant.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { taskSignal } from "@/lib/task-signals";
+import { feedbackReminderMessage, taskSignal } from "@/lib/task-signals";
 import { isFeedbackReminderKey } from "@/lib/ops-control/plan";
 
 describe("taskSignal", () => {
@@ -17,6 +17,11 @@ describe("taskSignal", () => {
     const s = taskSignal({ title: "Feedbackherinnering sturen: KKFH", description: "De feedbacktermijn van 3 werkdagen is verstreken. Er is nog geen feedback.", dedupeKey: "feedbackronde:1", entityType: "deliverable", clientName: null });
     expect(s?.title).toBe("Feedback herinneren | KKFH");
     expect(s?.meta).toBe("De feedbacktermijn van 3 werkdagen is verstreken");
+  });
+  it("herinneringsbericht noemt het exacte moment van de deadline", () => {
+    expect(feedbackReminderMessage("2026-11-19", "2026-11-19")).toContain("Vandaag is de laatste dag om feedback te geven. We ontvangen je reactie graag vóór 17:00.");
+    expect(feedbackReminderMessage("2026-11-19", "2026-11-20")).toContain("De feedbacktermijn liep tot donderdag 19 november om 17:00.");
+    expect(feedbackReminderMessage(null, "2026-11-20")).not.toContain("17:00");
   });
   it("maandcontrole wordt Maandrapportage | Maand", () => {
     const s = taskSignal({ title: "Maandrapportages controleren en afronden (oktober 2026)", description: "1 van 4 gecontroleerd, 3 nog te controleren.\nOpen: A", dedupeKey: "report_batch:2026-10:u1", entityType: "report_batch", clientName: null });

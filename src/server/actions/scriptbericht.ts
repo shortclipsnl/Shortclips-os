@@ -46,6 +46,8 @@ export async function saveScriptbericht(input: {
   /** Weglaten = alleen de link opslaan. */
   text?: string;
   copied?: boolean;
+  /** Termijn en deadline zoals in het venster getoond, om de standaardtekst exact te kunnen vergelijken. */
+  termijn?: { termijn: string; deadline: string };
 }): Promise<SaveScriptberichtResult> {
   try {
     const viewer = await requirePermission("scripts:write");
@@ -76,7 +78,10 @@ export async function saveScriptbericht(input: {
 
     if (typeof input.text === "string") {
       const { templates } = await getScriptberichtTemplates();
-      const standaard = renderTemplate(templates[input.methode], input.methode, link);
+      const termijn = input.termijn && typeof input.termijn.termijn === "string" && typeof input.termijn.deadline === "string"
+        ? { termijn: input.termijn.termijn.slice(0, 60), deadline: input.termijn.deadline.slice(0, 80) }
+        : null;
+      const standaard = renderTemplate(templates[input.methode], input.methode, link, termijn);
       const text = input.text.slice(0, 6000);
       if (text.trim() && text !== standaard) next.texts[input.methode] = text;
       else delete next.texts[input.methode];

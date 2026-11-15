@@ -16,6 +16,23 @@ export type WhatsappOptie = "videolink" | "portaal";
 export const WHATSAPP_OPTIES: WhatsappOptie[] = ["videolink", "portaal"];
 
 export const LINK_PLACEHOLDER = "[Voeg videolink toe]";
+/** Plekken in de standaardtekst die per opname automatisch worden ingevuld. */
+export const TERMIJN_TOKEN = "{{termijn}}";
+export const DEADLINE_TOKEN = "{{deadline}}";
+/** Feedbacktermijn van de klant voor deze opname: "3 werkdagen" en "donderdag 19 november om 17:00". */
+export type TermijnContext = { termijn: string; deadline: string };
+
+/** Termijn en deadline invullen in een standaardtekst. Teksten zonder deze plekken blijven ongewijzigd. */
+export function vulTermijnIn(text: string, ctx: TermijnContext | null | undefined): string {
+  if (!ctx) return text;
+  return text.split(TERMIJN_TOKEN).join(ctx.termijn).split(DEADLINE_TOKEN).join(ctx.deadline);
+}
+
+/** Omgekeerd: een ingevuld bericht terugzetten naar een standaardtekst met de plekken, zodat een datum nooit in de standaard belandt. */
+export function haalTermijnEruit(text: string, ctx: TermijnContext | null | undefined): string {
+  if (!ctx) return text;
+  return text.split(ctx.deadline).join(DEADLINE_TOKEN).split(ctx.termijn).join(TERMIJN_TOKEN);
+}
 export const WHATSAPP_BERICHT_MAX_LENGTH = 4000;
 export const VIDEO_LINK_MAX_LENGTH = 1000;
 
@@ -59,7 +76,7 @@ export const DEFAULT_WHATSAPP_BERICHT: Record<WhatsappOptie, string> = {
     "",
     "• *Correcties:* de video's zijn intern gecontroleerd. Eventuele feitelijke onjuistheden kun je als opmerkingen bij de video's via de link plaatsen. Eén correctieronde is inbegrepen.",
     "",
-    "• *3 werkdagen:* de videolink is 3 werkdagen geldig. Bekijk de video's daarom binnen deze termijn en geef eventuele opmerkingen direct door. Daarna gaan we verder volgens de contentplanning.",
+    `• *${TERMIJN_TOKEN}:* we ontvangen je feedback graag uiterlijk *${DEADLINE_TOKEN}*. De videolink is tot dat moment geldig. Geef eventuele opmerkingen daarom in één keer door. Daarna gaan we verder volgens de contentplanning.`,
     "",
     "Alvast bedankt! 😊",
   ].join("\n"),
@@ -80,7 +97,7 @@ export const DEFAULT_WHATSAPP_BERICHT: Record<WhatsappOptie, string> = {
     "",
     "• *Correcties:* de video's zijn intern gecontroleerd. Eventuele feitelijke onjuistheden kun je als opmerkingen direct bij de betreffende video in het portaal plaatsen. Eén correctieronde is inbegrepen.",
     "",
-    "• *3 werkdagen:* je hebt 3 werkdagen om de video's te beoordelen en eventuele opmerkingen door te geven. Daarna sluiten we de feedbackronde af en gaan we verder volgens de contentplanning.",
+    `• *${TERMIJN_TOKEN}:* we ontvangen je feedback graag uiterlijk *${DEADLINE_TOKEN}*. Daarna sluiten we de feedbackronde af en gaan we verder volgens de contentplanning.`,
     "",
     "Alvast bedankt! 😊",
   ].join("\n"),
@@ -157,8 +174,9 @@ export function applyVideoLink(text: string, previousLink: string, nextLink: str
 }
 
 /** Standaardtekst van een optie, met de videolink al ingevuld waar dat kan. */
-export function standaardMetLink(standaard: string, link: string): string {
-  return link ? applyVideoLink(standaard, "", link) : standaard;
+export function standaardMetLink(standaard: string, link: string, termijn?: TermijnContext | null): string {
+  const text = vulTermijnIn(standaard, termijn);
+  return link ? applyVideoLink(text, "", link) : text;
 }
 
 export type KopieerBlokkade = { kan: true } | { kan: false; reden: string };

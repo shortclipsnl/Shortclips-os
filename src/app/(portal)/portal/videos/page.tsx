@@ -25,7 +25,7 @@ const TONE: Record<NonNullable<PortalFrameSession["status"]>["key"], StatusTone>
 };
 
 function overdue(s: PortalFrameSession): boolean {
-  return !!s.feedbackDeadline && new Date(s.feedbackDeadline).getTime() < new Date().setHours(0, 0, 0, 0);
+  return !!s.feedbackDeadline && new Date(s.feedbackDeadline).getTime() < Date.now();
 }
 
 function SessionStatus({ s }: { s: PortalFrameSession }) {

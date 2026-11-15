@@ -388,7 +388,7 @@ export function deriveSession(s: SessionInput, c: ClientInput, issues: InternalI
       headline = n > 0 ? `Er ${n === 1 ? "staat" : "staan"} ${n} ${videosWord(n)} klaar voor jouw feedback` : "Je video's staan klaar voor jouw feedback";
       detail = state === "blocked"
         ? "De reactietermijn is voorbij. Geef je feedback zo snel mogelijk, dan ronden we je video's af."
-        : `We ontvangen je reactie graag vóór ${longDate(feedbackDeadline!)}.`;
+        : `We ontvangen je reactie graag uiterlijk ${longDate(feedbackDeadline!)} om 17:00.`;
       deadline = feedbackDeadline;
       action = { label: "Bekijk video's", href: videosHref };
       priority = state === "blocked" ? 100 : 90;

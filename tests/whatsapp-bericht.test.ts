@@ -12,6 +12,8 @@ import {
   sanitizeConcept,
   standaardMetLink,
   whatsappOpmaak,
+  haalTermijnEruit,
+  vulTermijnIn,
 } from "@/lib/whatsapp-bericht";
 import type { Viewer } from "@/server/auth/context";
 
@@ -61,7 +63,7 @@ describe("standaardteksten", () => {
     expect(lines[1]).toBe("");
     expect(t).toContain("🎥 *Bekijk de video's hier:*\n[Voeg videolink toe]");
     expect(t).toContain("📅 *Contentplanning*\nIn de bijgevoegde PDF vind je de contentplanning.");
-    expect(t).toContain("• *3 werkdagen:* de videolink is 3 werkdagen geldig.");
+    expect(t).toContain("• *{{termijn}}:* we ontvangen je feedback graag uiterlijk *{{deadline}}*. De videolink is tot dat moment geldig.");
     expect(lines.filter((l) => l.startsWith("• "))).toHaveLength(3);
     expect(lines.at(-1)).toBe("Alvast bedankt! 😊");
     expect(t).not.toContain("**");
@@ -75,6 +77,18 @@ describe("standaardteksten", () => {
     expect(t).toContain("Daarna sluiten we de feedbackronde af");
     expect(t).not.toContain(LINK_PLACEHOLDER);
     expect(t).not.toContain("**");
+  });
+
+  it("termijn en exacte deadline van de klant worden ingevuld en nooit in de standaard bewaard", () => {
+    const ctx = { termijn: "5 werkdagen", deadline: "maandag 23 november om 17:00" };
+    for (const o of ["videolink", "portaal"] as const) {
+      const filled = standaardMetLink(DEFAULT_WHATSAPP_BERICHT[o], "", ctx);
+      expect(filled).toContain("• *5 werkdagen:* we ontvangen je feedback graag uiterlijk *maandag 23 november om 17:00*.");
+      expect(filled).not.toContain("{{");
+      expect(haalTermijnEruit(filled, ctx)).toBe(DEFAULT_WHATSAPP_BERICHT[o]);
+    }
+    // Een eigen standaardtekst zonder deze plekken blijft ongewijzigd.
+    expect(vulTermijnIn("Hoi, de video's staan klaar.", ctx)).toBe("Hoi, de video's staan klaar.");
   });
 
   it("WhatsApp-opmaak: vet en cursief worden herkend", () => {

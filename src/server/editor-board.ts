@@ -1,4 +1,5 @@
 import "server-only";
+import { getFeedbackDaysByClient } from "@/server/portal-settings";
 import { sanitizeConcept, type WhatsappBerichtConcept } from "@/lib/whatsapp-bericht";
 import { isActiveClientStatus } from "@/lib/client-status";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
@@ -167,6 +168,10 @@ export type EditorBoardVideo = {
   /** Concept WhatsApp-bericht eerste versies. Alleen gevuld voor het
    *  kantoorteam (zie `canUseWhatsappBericht`); anders null. */
   whatsappBericht: WhatsappBerichtConcept | null;
+  /** Feedbacktermijn (werkdagen) die voor deze klant geldt bij deze video:
+   *  de videotermijn, of de correctietermijn als de video al eerder bij de klant
+   *  lag. Alleen gevuld samen met het WhatsApp-bericht. */
+  clientFeedbackDays: number | null;
 };
 
 const TOTAL_WORKDAYS = 14; // opname → klantoplevering
@@ -201,6 +206,8 @@ export async function listEditorBoard(
       currentVersion: deliverables.currentVersion,
       feedbackRounds: deliverables.feedbackRounds,
       whatsappBericht: deliverables.whatsappBericht,
+      clientId: deliverables.clientId,
+      clientRevisionRounds: deliverables.clientRevisionRounds,
       clientName: clients.name,
       clientSlug: clients.slug,
       clientColor: clients.color,
@@ -416,11 +423,24 @@ export async function listEditorBoard(
       feedbackRounds: opts.withFeedbackRounds ? Number(r.feedbackRounds ?? 0) : null,
       feedbackTerm: null,
       whatsappBericht: opts.withWhatsappBericht ? sanitizeConcept(r.whatsappBericht) : null,
+      clientFeedbackDays: null,
     };
   });
 
   // Voortgang uit de statuscheck: alleen in het overzicht voor Team Shortclips.
   // Een storing hierin mag het editingboard nooit laten vallen.
+  // Feedbacktermijn per klant, voor de deadline in het WhatsApp-bericht.
+  if (opts.withWhatsappBericht) {
+    try {
+      const days = await getFeedbackDaysByClient(rows.map((r) => r.clientId));
+      rows.forEach((r, i) => {
+        const d = days.get(r.clientId);
+        if (d && result[i]) result[i]!.clientFeedbackDays = Number(r.clientRevisionRounds ?? 0) > 0 ? d.correction : d.videos;
+      });
+    } catch (e) {
+      console.error("[feedbacktermijn] board", e);
+    }
+  }
   if (opts.allEditors) {
     try {
       const progress = await getEditorProgress(result.map((v) => ({ id: v.id, status: v.status, editorId: v.editorId, editorDueOn: v.editorDueOn })));

@@ -25,6 +25,13 @@ export const LINK_LABEL: Record<ScriptberichtMethode, string> = {
 /** Plek in het template waar de link komt. */
 export const LINK_TOKEN = "{{link}}";
 
+/** Plekken in het template die per opname automatisch worden ingevuld. */
+export const TERMIJN_TOKEN = "{{termijn}}";
+export const DEADLINE_TOKEN = "{{deadline}}";
+/** Feedbacktermijn van de klant voor deze scripts: "3 werkdagen" en "donderdag 19 november om 17:00". */
+export type TermijnContext = { termijn: string; deadline: string };
+const TERMIJN_ONBEKEND: TermijnContext = { termijn: "de afgesproken termijn", deadline: "de afgesproken datum" };
+
 /** Zichtbare plaatshouder zolang er nog geen link is ingevuld. */
 export const PLACEHOLDER: Record<ScriptberichtMethode, string> = {
   adobe: "[LINK NAAR SCRIPTS]",
@@ -43,6 +50,8 @@ export const DEFAULT_TEMPLATES: Templates = {
     "",
     "Alle feedback uit de scriptbespreking is hierin verwerkt.",
     "",
+    `⏰ We ontvangen je feedback graag binnen ${TERMIJN_TOKEN}, uiterlijk ${DEADLINE_TOKEN}. Zo kunnen we alles op tijd voorbereiden voor de opnamedag.`,
+    "",
     "Belangrijk om te weten:",
     "",
     "✅ Opmerkingen of aanpassingen? Plaats deze rechtstreeks als opmerking bij de betreffende pagina in het document. Graag niet via WhatsApp, zodat alle feedback overzichtelijk op één plek staat.",
@@ -60,6 +69,8 @@ export const DEFAULT_TEMPLATES: Templates = {
     LINK_TOKEN,
     "",
     "Alle feedback uit de scriptbespreking is hierin verwerkt.",
+    "",
+    `⏰ We ontvangen je feedback graag binnen ${TERMIJN_TOKEN}, uiterlijk ${DEADLINE_TOKEN}. Zo kunnen we alles op tijd voorbereiden voor de opnamedag.`,
     "",
     "Belangrijk om te weten:",
     "",
@@ -98,9 +109,13 @@ export function zonderOpmaak(text: string): string {
     .join("");
 }
 
-/** Template invullen met de link (of de plaatshouder als er nog geen link is). */
-export function renderTemplate(template: string, methode: ScriptberichtMethode, link: string): string {
-  return zonderOpmaak(template).split(LINK_TOKEN).join(insertedValue(methode, link));
+/** Template invullen met de link (of de plaatshouder als er nog geen link is) en met de feedbacktermijn en exacte deadline van deze klant. */
+export function renderTemplate(template: string, methode: ScriptberichtMethode, link: string, termijn?: TermijnContext | null): string {
+  const t = termijn ?? TERMIJN_ONBEKEND;
+  return zonderOpmaak(template)
+    .split(LINK_TOKEN).join(insertedValue(methode, link))
+    .split(TERMIJN_TOKEN).join(t.termijn)
+    .split(DEADLINE_TOKEN).join(t.deadline);
 }
 
 /**

@@ -22,6 +22,7 @@ import {
   type ScriptberichtMethode,
   type Templates,
   zonderOpmaak,
+  type TermijnContext,
 } from "@/lib/scriptbericht";
 import { resetScriptberichtTemplates, resetScriptberichtText, saveScriptbericht, saveScriptberichtTemplates } from "@/server/actions/scriptbericht";
 
@@ -39,6 +40,8 @@ export type ScriptberichtRow = {
   reviewId: string | null;
   /** Automatisch opgehaalde link naar de scripts in het klantportaal. */
   portalLink: string | null;
+  /** Feedbacktermijn en exacte deadline van deze klant, voor in het bericht. */
+  termijn: TermijnContext;
   saved: SavedScriptbericht;
 };
 
@@ -204,7 +207,7 @@ function initEditor(row: ScriptberichtRow, methode: ScriptberichtMethode, templa
     link,
     linkDraft: link,
     linkSource: auto ? "portaal" : savedLink ? "opgeslagen" : null,
-    text: useSaved ? zonderOpmaak(savedText!) : renderTemplate(templates[methode], methode, link),
+    text: useSaved ? zonderOpmaak(savedText!) : renderTemplate(templates[methode], methode, link, row.termijn),
     inserted: insertedValue(methode, link),
     fromSaved: useSaved,
   };
@@ -314,7 +317,7 @@ function ScriptberichtDialog({
   const persist = useCallback(
     async (patch: { link: string; text?: string; copied?: boolean }, methode: ScriptberichtMethode, forRow: ScriptberichtRow) => {
       if (!canWrite) return;
-      const res = await saveScriptbericht({ productionDayId: forRow.id, methode, ...patch });
+      const res = await saveScriptbericht({ productionDayId: forRow.id, methode, termijn: forRow.termijn, ...patch });
       if (!res.ok) {
         setSaveErr(res.message ?? "Opslaan mislukt.");
         return;
@@ -332,7 +335,7 @@ function ScriptberichtDialog({
         else delete links[methode];
         const texts = { ...cur.texts };
         if (typeof patch.text === "string") {
-          const standaard = renderTemplate(templates[methode], methode, patch.link);
+          const standaard = renderTemplate(templates[methode], methode, patch.link, forRow.termijn);
           if (patch.text.trim() && patch.text !== standaard) texts[methode] = patch.text;
           else delete texts[methode];
         }
@@ -367,7 +370,7 @@ function ScriptberichtDialog({
 
   function restoreStandard() {
     if (!editor || !row) return;
-    const text = renderTemplate(templates[editor.methode], editor.methode, editor.link);
+    const text = renderTemplate(templates[editor.methode], editor.methode, editor.link, row.termijn);
     setEditor({ ...editor, text, inserted: insertedValue(editor.methode, editor.link), fromSaved: false });
     setCopied(false);
     if (canWrite && savedById[row.id]?.texts[editor.methode]) {
@@ -385,7 +388,7 @@ function ScriptberichtDialog({
     ? checkMessage({ methode: editor.methode, link: editor.link, text: editor.text, clientId: row.clientId, ownReviewId: row.reviewId, foreign })
     : null;
   const linkPending = !!editor && editor.linkDraft.trim() !== editor.link;
-  const isPersonal = !!editor && editor.text !== renderTemplate(templates[editor.methode], editor.methode, editor.link);
+  const isPersonal = !!editor && editor.text !== renderTemplate(templates[editor.methode], editor.methode, editor.link, row?.termijn);
 
   async function onCopy() {
     if (!editor || !row || !check?.ok || linkPending) return;
@@ -432,7 +435,7 @@ function ScriptberichtDialog({
               onTemplatesSaved(t, isCustom);
               // Open bericht zonder persoonlijke aanpassing meteen bijwerken.
               if (editor && row && !isPersonal) {
-                setEditor({ ...editor, text: renderTemplate(t[editor.methode], editor.methode, editor.link), inserted: insertedValue(editor.methode, editor.link) });
+                setEditor({ ...editor, text: renderTemplate(t[editor.methode], editor.methode, editor.link, row.termijn), inserted: insertedValue(editor.methode, editor.link) });
               }
             }}
           />

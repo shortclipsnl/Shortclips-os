@@ -3,7 +3,8 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientIntegrations, deliverables, frameAssets, productionDays, scriptReviews } from "@/db/schema";
 import type { Viewer } from "@/server/auth/context";
-import { cleanVideoTitle, reviewDeadline } from "@/lib/portal-status";
+import { cleanVideoTitle } from "@/lib/portal-status";
+import { videoFeedbackDeadlines } from "@/server/feedback-rounds";
 
 /**
  * Videopagina van het klantportaal: de echte opnamesessies en video's uit het
@@ -135,6 +136,11 @@ export async function getFrameLibraryForClient(clientId: string): Promise<Portal
     if (!cur || RANK.indexOf(d.status) < RANK.indexOf(cur.status)) delByDay.set(d.dayId, { id: d.id, status: d.status, changed: d.changed });
   }
 
+  // Deadline per sessie die op feedback wacht: uit de lopende feedbackronde
+  // (termijn van deze klant, werkdagen en feestdagen, tot 17:00).
+  const waiting = [...delByDay.values()].filter((d) => d.status === "client_review");
+  const deadlineByDel = await videoFeedbackDeadlines(waiting.map((d) => ({ deliverableId: d.id, clientId, statusChangedAt: d.changed })));
+
   const sessions = new Map<string, PortalFrameSession>();
   for (const r of rows) {
     const key = r.sessionFolderId ?? "los";
@@ -152,7 +158,7 @@ export async function getFrameLibraryForClient(clientId: string): Promise<Portal
         dayId: r.dayId ?? null,
         deliverableId: del?.id ?? null,
         deliverableStatus: del?.status ?? null,
-        feedbackDeadline: st?.key === "feedback" ? reviewDeadline(del!.changed)?.toISOString() ?? null : null,
+        feedbackDeadline: st?.key === "feedback" ? deadlineByDel.get(del!.id)?.toISOString() ?? null : null,
         videos: [],
       };
       sessions.set(key, s);

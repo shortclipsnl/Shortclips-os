@@ -130,7 +130,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       ...t,
       canEdit: canModifyTask(permViewer, { assigneeId: t.assigneeId, createdById }),
       href: taskHref({ entityType, entityId, dedupeKey }),
-      signal: taskSignal({ title: t.title, description: t.description, dedupeKey, entityType, entityId, clientName: t.clientName, clientSlug: t.clientSlug }),
+      signal: taskSignal({ title: t.title, description: t.description, dedupeKey, entityType, entityId, clientName: t.clientName, clientSlug: t.clientSlug, dueOn: t.dueOn ? String(t.dueOn).slice(0, 10) : null }),
     }));
   }
 

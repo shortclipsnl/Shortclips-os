@@ -1,3 +1,5 @@
+import { DEADLINE_TIME_LABEL, amsterdamDay, deadlineLabel, timeLeftLabel, workdaysLeft } from "./feedback-deadline";
+import { nlHolidaySet } from "./holidays";
 import type { Tone } from "@/components/ui";
 
 /**
@@ -159,19 +161,20 @@ export function waitingText(since: Date | string | null | undefined): string {
   return n <= 0 ? "sinds vandaag bij jou" : n === 1 ? "wacht al 1 dag op jou" : `wacht al ${n} dagen op jou`;
 }
 
-const DATE_FMT = new Intl.DateTimeFormat("nl-NL", { day: "numeric", month: "short" });
 
-/** Korte deadline-tekst + of 't urgent is. */
-export function deadlineText(d: Date | null): { text: string; urgent: boolean } | null {
+/**
+ * Korte deadline-tekst voor de klant + of 't urgent is. Altijd met de exacte dag
+ * en 17:00, en de resterende tijd in werkdagen (weekenden en feestdagen tellen
+ * niet mee), zodat klant, team en WhatsApp-bericht dezelfde deadline noemen.
+ */
+export function deadlineText(d: Date | null, now: Date = new Date()): { text: string; urgent: boolean } | null {
   if (!d) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(d);
-  due.setHours(0, 0, 0, 0);
-  const days = Math.round((due.getTime() - today.getTime()) / 86_400_000);
-  const date = DATE_FMT.format(d);
-  if (days < 0) return { text: `Graag z.s.m. — termijn was ${date}`, urgent: true };
-  if (days === 0) return { text: "Beoordeel bij voorkeur vandaag", urgent: true };
-  if (days === 1) return { text: `Beoordeel vóór morgen (${date})`, urgent: true };
-  return { text: `Beoordeel vóór ${date} · nog ${days} dagen`, urgent: days <= 2 };
+  const holidays = nlHolidaySet();
+  const dueDay = amsterdamDay(d);
+  const today = amsterdamDay(now);
+  const left = workdaysLeft(dueDay, today, holidays);
+  const when = deadlineLabel(d);
+  if (left < 0) return { text: `Graag zo snel mogelijk. De termijn was ${when}.`, urgent: true };
+  if (left === 0) return { text: `Feedback graag vandaag vóór ${DEADLINE_TIME_LABEL}`, urgent: true };
+  return { text: `Feedback graag uiterlijk ${when} · ${timeLeftLabel(dueDay, today, holidays)}`, urgent: left <= 1 };
 }

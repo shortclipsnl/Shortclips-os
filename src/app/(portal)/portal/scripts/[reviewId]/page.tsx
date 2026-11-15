@@ -30,10 +30,10 @@ function deadlineLabel(iso: string | null): string | null {
   const day = d.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long", timeZone: TZ });
   const today = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
   const target = d.toLocaleDateString("en-CA", { timeZone: TZ });
-  if (target < today) return `De termijn was ${day}. Graag zo snel mogelijk.`;
+  if (target < today) return `De termijn was ${day} om 17:00. Graag zo snel mogelijk.`;
   const left = workingDaysUntil(today, target, nlHolidaySet());
   const rest = target === today ? "vandaag" : left <= 1 ? "nog 1 werkdag" : `nog ${left} werkdagen`;
-  return `Graag vóór ${day} · ${rest}`;
+  return `Graag uiterlijk ${day} om 17:00 · ${rest}`;
 }
 
 export default async function PortalScriptReviewPage({ params }: { params: Promise<{ reviewId: string }> }) {

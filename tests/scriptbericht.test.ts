@@ -33,6 +33,13 @@ describe("scriptbericht templates", () => {
   });
 
   it("vult de link in, of de plaatshouder zonder link", () => {
+    // Termijn en exacte deadline van de klant staan in beide standaardberichten.
+    const ctx = { termijn: "5 werkdagen", deadline: "maandag 23 november om 17:00" };
+    for (const m of ["adobe", "portal"] as const) {
+      const text = renderTemplate(DEFAULT_TEMPLATES[m], m, ADOBE, ctx);
+      expect(text).toContain("We ontvangen je feedback graag binnen 5 werkdagen, uiterlijk maandag 23 november om 17:00.");
+      expect(text).not.toContain("{{");
+    }
     expect(renderTemplate(DEFAULT_TEMPLATES.adobe, "adobe", ADOBE)).toContain(`📄 Scripts bekijken:\n${ADOBE}\n`);
     expect(renderTemplate(DEFAULT_TEMPLATES.adobe, "adobe", "")).toContain(PLACEHOLDER.adobe);
     expect(renderTemplate(DEFAULT_TEMPLATES.portal, "portal", "  ")).toContain(PLACEHOLDER.portal);

@@ -1,3 +1,4 @@
+import { DEADLINE_TIME_LABEL, amsterdamDay, deadlineLabel } from "@/lib/feedback-deadline";
 import { isFeedbackReminderKey } from "@/lib/ops-control/plan";
 import { batchHref, parseBatchKey, parseStapKey } from "@/lib/maandcontrole";
 import { periodLabel } from "@/lib/format";
@@ -22,15 +23,30 @@ type TaskLike = {
   entityId?: string | null;
   clientName: string | null;
   clientSlug?: string | null;
+  /** Deadline van de taak (YYYY-MM-DD). Bij een feedbackronde is dat de laatste termijndag. */
+  dueOn?: string | null;
 };
 
 const FEEDBACKRONDE_PREFIX = "feedbackronde:";
 
-/** Vast herinneringsbericht voor WhatsApp, netjes en vriendelijk. */
-export function feedbackReminderMessage(): string {
+/**
+ * Vast herinneringsbericht voor WhatsApp, netjes en vriendelijk. Met de
+ * deadline-dag van de feedbackronde noemt het bericht ook het exacte moment:
+ * op de laatste dag "vandaag vóór 17:00", daarna de datum die verstreken is.
+ */
+export function feedbackReminderMessage(dueDay?: string | null, today?: string): string {
+  const now = today ?? amsterdamDay(new Date());
+  const deadline = !dueDay
+    ? null
+    : dueDay === now
+      ? `Vandaag is de laatste dag om feedback te geven. We ontvangen je reactie graag vóór ${DEADLINE_TIME_LABEL}.`
+      : dueDay > now
+        ? `We ontvangen je reactie graag uiterlijk ${deadlineLabel(dueDay)}.`
+        : `De feedbacktermijn liep tot ${deadlineLabel(dueDay)}. We ontvangen je reactie graag zo snel mogelijk, zodat de planning op schema blijft.`;
   return [
     "Hoi! Bedankt weer voor de fijne samenwerking.",
     "Een korte herinnering: de nieuwe video's staan voor je klaar en we wachten nog op je feedback. Zou je ze willen bekijken en laten weten wat je ervan vindt? Dan kunnen wij ze verder afronden.",
+    ...(deadline ? [deadline] : []),
     "Alvast bedankt, en laat het gerust weten als je ergens vragen over hebt.",
     "Groet, Team Shortclips",
   ].join("\n\n");
@@ -69,7 +85,8 @@ export function taskSignal(t: TaskLike): TaskSignal | null {
       title: `Feedback herinneren | ${client}`,
       text: "Klant heeft nog geen feedback gegeven. Stuur een herinnering.",
       meta: meta || null,
-      message: feedbackReminderMessage(),
+      // Alleen bij een feedbackronde is de taakdatum de laatste termijndag van de klant.
+      message: feedbackReminderMessage(opsFeedback ? null : t.dueOn),
     };
   }
 

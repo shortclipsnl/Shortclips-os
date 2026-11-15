@@ -4,7 +4,8 @@ import { db } from "@/db/client";
 import { clients, productionDays, scriptReviewVersions, scriptReviews, users } from "@/db/schema";
 import { notify } from "@/server/notifications";
 import { portalEmailHtml, sendEmail } from "@/server/email";
-import { getFeedbackDays } from "@/server/portal-settings";
+import { getFeedbackDaysForClient } from "@/server/portal-settings";
+import { deadlineLabel } from "@/lib/feedback-deadline";
 import { amsterdamDay, isClientFeedbackOverdue } from "@/lib/client-feedback";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
@@ -41,7 +42,6 @@ export async function runScriptReviewReminders() {
     // Instelbare feedbacktermijn: herinner zodra de deadline nadert of al voorbij
     // is (±1 dag van tevoren), of — als er geen deadline staat — na de ingestelde
     // termijn aan stilte.
-    const { scripts: feedbackDays } = await getFeedbackDays();
     const candidates = await db
       .select({
         id: scriptReviews.id,
@@ -68,10 +68,16 @@ export async function runScriptReviewReminders() {
     const holidays = nlHolidaySet();
     const today = amsterdamDay(new Date());
     const tomorrow = addWorkingDays(today, 1, holidays);
+    // Zonder vastgelegde deadline geldt de termijn van déze klant (algemeen of afwijkend).
+    const termByClient = new Map<string, number>();
+    for (const r of candidates) {
+      if (r.feedbackDeadline || termByClient.has(r.clientId)) continue;
+      termByClient.set(r.clientId, (await getFeedbackDaysForClient(r.clientId).catch(() => ({ scripts: 3 }))).scripts);
+    }
     const rows = candidates.filter((r) =>
       r.feedbackDeadline
         ? amsterdamDay(r.feedbackDeadline as Date | string) <= tomorrow
-        : isClientFeedbackOverdue(r.updatedAt as Date | string, feedbackDays, today, holidays),
+        : isClientFeedbackOverdue(r.updatedAt as Date | string, termByClient.get(r.clientId) ?? 3, today, holidays),
     );
     ctx.counters.processed = rows.length;
 
@@ -109,7 +115,9 @@ export async function runScriptReviewReminders() {
         .where(and(eq(scriptReviewVersions.reviewId, r.id), eq(scriptReviewVersions.versionNumber, r.currentVersion))).limit(1);
       const { summary } = await getReviewApproval(r.id, r.currentVersion, v?.id ?? null);
       const progress = summary.total > 0 && summary.approved > 0 ? ` Je hebt er al ${summary.approved} van de ${summary.total} goedgekeurd.` : "";
-      const body = `Je scripts${r.shootOn ? ` voor de opname van ${fmtDate(r.shootOn)}` : ""} staan nog klaar om te bekijken.${progress} Goedkeuren kan per script met één klik.`;
+      const dueDay = r.feedbackDeadline ? amsterdamDay(r.feedbackDeadline as Date | string) : null;
+      const uiterlijk = dueDay && dueDay >= today ? ` We ontvangen je reactie graag uiterlijk ${deadlineLabel(r.feedbackDeadline as Date | string)}.` : "";
+      const body = `Je scripts${r.shootOn ? ` voor de opname van ${fmtDate(r.shootOn)}` : ""} staan nog klaar om te bekijken.${progress}${uiterlijk} Goedkeuren kan per script met één klik.`;
       const sent = await notify({
         userIds: portal.map((p) => p.id),
         clientId: r.clientId,

@@ -17,6 +17,7 @@ export async function updatePortalSettings(input: PortalSettings): Promise<Actio
     const clean: PortalSettings = {
       feedbackDaysScripts: clampDay(input.feedbackDaysScripts),
       feedbackDaysVideos: clampDay(input.feedbackDaysVideos),
+      feedbackDaysCorrection: clampDay(input.feedbackDaysCorrection) || 3,
       cancelNoticeDays: clampDay(input.cancelNoticeDays),
       cancelFee: str(input.cancelFee, 120),
       cancelLateNote: str(input.cancelLateNote, 400),
@@ -39,6 +40,7 @@ export async function updatePortalSettings(input: PortalSettings): Promise<Actio
     revalidatePath("/portal/samenwerking");
     revalidatePath("/portal/scripts");
     revalidatePath("/portal/planning");
+    revalidatePath("/portal/videos");
     return { ok: true };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, message: error.message };

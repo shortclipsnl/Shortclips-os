@@ -7,6 +7,9 @@ import { LinkButton, PageHeader } from "@/components/ui";
 import { ClientsBoard, type BoardClient } from "./clients-board";
 import { getRetentionOverview, retentionContext } from "@/server/client-retention";
 import { isEditorRole } from "@/server/auth/context";
+import { getFeedbackStatusOverview } from "@/server/feedback-overview";
+import { amsterdamDay } from "@/lib/feedback-deadline";
+import { FeedbackStatus } from "./feedback-status";
 
 export const metadata: Metadata = { title: "Klanten" };
 export const dynamic = "force-dynamic";
@@ -46,6 +49,13 @@ export default async function ClientsPage() {
     health: health.get(c.id) ? { status: health.get(c.id)!.health.status, reasons: health.get(c.id)!.health.reasons, commercial: health.get(c.id)!.commercial } : null,
   }));
 
+  // Feedbackstatus (scripts en video's bij de klant) voor het team, niet voor editors.
+  // Een storing hierin mag de klantenpagina nooit laten vallen.
+  const feedbackRows = isEditorRole(viewer) ? [] : await getFeedbackStatusOverview(viewer).catch((e) => {
+    console.error("[feedbackstatus] overzicht", e);
+    return [];
+  });
+
   const activeCount = clients.filter((c) => !STOPPED.has(c.status)).length;
   const inactiveCount = clients.filter((c) => STOPPED.has(c.status)).length;
   // Eigen pod = klanten waar jij verantwoordelijke bent. Heb je een pod, dan
@@ -72,6 +82,7 @@ export default async function ClientsPage() {
           alles vanaf het begin en hoeft er later niets te worden aangevuld.
         </p>
       ) : null}
+      <FeedbackStatus rows={feedbackRows} viewerId={viewer.id} today={amsterdamDay(new Date())} />
       <ClientsBoard clients={clients} viewerId={viewer.id} coveringIds={coveringIds} coveringNames={covering.map((c) => c.absentName)} defaultPod={myCount > 0 ? "mijn" : "alle"} />
     </div>
   );
