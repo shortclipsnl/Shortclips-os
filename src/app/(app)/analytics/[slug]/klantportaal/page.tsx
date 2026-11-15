@@ -7,8 +7,10 @@ import { db } from "@/db/client";
 import { clients } from "@/db/schema";
 import { requirePermission } from "@/server/auth/context";
 import { getPortalResultsForClient } from "@/server/portal";
-import { parsePortalPeriod, portalPeriodQuery } from "@/lib/portal-periods";
+import { parsePortalPeriod, periodResultOpts, portalPeriodQuery } from "@/lib/portal-periods";
+import { getPeriodReviewForClient, summaryText } from "@/server/period-review";
 import { Logo } from "@/components/logo";
+import { getDirectieBeschikbaarheid } from "@/server/reports/directie";
 import { PortalResultsView } from "@/app/(portal)/portal/resultaten/results-view";
 
 export const metadata: Metadata = { title: "Klantportaal — voorbeeld" };
@@ -39,11 +41,13 @@ export default async function KlantportaalVoorbeeldPage({
     .limit(1);
   if (!client) notFound();
 
-  const r = await getPortalResultsForClient(viewer, client.id, { days: period.days, from: period.from, to: period.to, periodKey: period.key });
+  const r = await getPortalResultsForClient(viewer, client.id, periodResultOpts(period));
+  const review = await getPeriodReviewForClient(viewer, client.id, r, "klant");
+  const directie = await getDirectieBeschikbaarheid(client.id, r, review);
 
   return (
     <div className="mx-auto max-w-[1100px]">
-      <Link href={`/analytics/${slug}`} className="inline-flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+      <Link href={`/analytics/${slug}?${portalPeriodQuery(period)}`} className="inline-flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
         <ArrowLeft className="size-4" /> Terug naar resultaten van {client.name}
       </Link>
 
@@ -62,7 +66,18 @@ export default async function KlantportaalVoorbeeldPage({
           <span className="text-sm text-white/70">{client.name}</span>
         </div>
         <div className="p-5 sm:p-7">
-          <PortalResultsView r={r} basePath={`/analytics/${slug}/klantportaal`} reportHref={`/resultatenrapport/${slug}?${portalPeriodQuery(period)}`} initialPlatform={sp.platform ?? "alle"} />
+          <PortalResultsView
+            r={r}
+            review={review}
+            summaryText={summaryText(client.name, review)}
+            basePath={`/analytics/${slug}/klantportaal`}
+            pdfHref={`/api/reports/period/${slug}/pdf`}
+            monthlyPdfHref={review.monthlyReport ? `/api/reports/monthly/${review.monthlyReport.id}/pdf?download=1` : null}
+            directie={directie.ok}
+            shareHref={`/resultatenrapport/${slug}`}
+            analysisHref={(id) => `/analytics/maandrapportages/${id}`}
+            initialPlatform={sp.platform ?? "alle"}
+          />
         </div>
       </div>
     </div>

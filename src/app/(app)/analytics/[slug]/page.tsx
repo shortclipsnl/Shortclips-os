@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Eye, FileText, Play } from "lucide-react";
+import { Download, Eye, FileText, Play } from "lucide-react";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clients } from "@/db/schema";
+import { clients, quarterlyReports } from "@/db/schema";
 import { requirePermission, assertClientAccess } from "@/server/auth/context";
 import { Card, CardHeader, ClientLogo, EmptyState, PageHeader, Stat, Table } from "@/components/ui";
 import { PlatformLogo } from "@/components/platform-logo";
@@ -18,6 +18,12 @@ import { currentPeriod, EMPTY_IMPROVEMENT, getImprovementPlan } from "@/server/i
 import { currentVideoPeriod, getClientVideoUpdate } from "@/server/video-updates";
 import { ImprovementEditor } from "./improvement-editor";
 import { VideoUpdateEditor } from "./video-update-editor";
+import { InternPeriodReview } from "./period-review";
+import { PeriodSwitch } from "@/components/period-switch";
+import { getPortalResultsForClient } from "@/server/portal";
+import { getPeriodReviewForClient } from "@/server/period-review";
+import { getDirectieBeschikbaarheid } from "@/server/reports/directie";
+import { capitalize, parsePortalPeriod, periodOptions, periodResultOpts, portalPeriodQuery } from "@/lib/portal-periods";
 
 // Vaste platformvolgorde voor de filterknoppen.
 const PLATFORM_ORDER = ["instagram", "tiktok", "facebook", "youtube", "linkedin"] as const;
@@ -32,12 +38,15 @@ export default async function ClientResultsPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ dagen?: string; platform?: string }>;
+  searchParams: Promise<{ periode?: string; van?: string; tot?: string; dagen?: string; platform?: string }>;
 }) {
   const viewer = await requirePermission("analytics:read");
   const { slug } = await params;
   const sp = await searchParams;
-  const days = Number(sp.dagen) || 30;
+  // Zelfde periodekeuze als het klantportaal: Maandelijks | Per kwartaal.
+  // Oude links met ?dagen= blijven werken.
+  const legacy = sp.dagen === "365" ? "365" : sp.dagen === "90" ? "90" : sp.dagen === "30" ? "30" : undefined;
+  const period = parsePortalPeriod(sp.periode ? sp : { periode: legacy });
   const platform = sp.platform && PLATFORM[sp.platform] ? sp.platform : null;
 
   const [client] = await db
@@ -48,12 +57,28 @@ export default async function ClientResultsPage({
   if (!client) notFound();
   assertClientAccess(viewer, client.id);
   const cid = client.id;
-  const dInt = `interval '${days} days'`;
-  const dPrev = `interval '${2 * days} days'`;
+  // De cijfers en vergelijking die de klant ook ziet (één bron), plus de interne analyse.
+  const r = await getPortalResultsForClient(viewer, cid, periodResultOpts(period));
+  const review = await getPeriodReviewForClient(viewer, cid, r, "intern");
+  // Directieversie van de maand: intern altijd te beoordelen; de klant ziet haar pas na afloop, controle en publicatie.
+  const directie = period.mode === "maand" ? await getDirectieBeschikbaarheid(cid, r, review) : null;
+  // Kwartaal: het rapport voor de directie is de kwartaalrapportage (eigen controle en goedkeuring).
+  const [kwartaalRapport] = period.mode === "kwartaal" && (viewer.permissions.has("reports:read") || viewer.permissions.has("reports:team_read"))
+    ? await db
+        .select({ id: quarterlyReports.id, published: quarterlyReports.publishedVersion })
+        .from(quarterlyReports)
+        .where(and(eq(quarterlyReports.clientId, cid), eq(quarterlyReports.periodKey, r.periodKey), isNull(quarterlyReports.deletedAt)))
+        .limit(1)
+    : [];
+  const days = r.days;
+  const pq = portalPeriodQuery(period);
+  const options = periodOptions(r.firstDataOn);
+  const versus = period.prevLabel ?? "vorige periode";
+  const inPeriod = sql`measured_on between ${r.periodStart} and ${r.periodEnd}`;
+  const inPrev = sql`measured_on between ${r.prevStart} and ${r.prevEnd}`;
   // Platformfilter voor de cijfers uit daily_metrics (leeg = alle platforms).
   const platCond = platform ? sql`and platform = ${platform}` : sql``;
-  const qp = (d: number) => `/analytics/${slug}?dagen=${d}${platform ? `&platform=${platform}` : ""}`;
-  const qpPlat = (p: string | null) => `/analytics/${slug}?dagen=${days}${p ? `&platform=${p}` : ""}`;
+  const qpPlat = (p: string | null) => `/analytics/${slug}?${pq}${p ? `&platform=${p}` : ""}`;
 
   const [totals, prevTotals, perMonth, perPlatform, videoRows, publishedRow, allClientsRaw] =
     await Promise.all([
@@ -63,19 +88,18 @@ export default async function ClientResultsPage({
                coalesce(sum(likes),0)::int likes, coalesce(sum(comments),0)::int comments,
                coalesce(sum(shares),0)::int shares, coalesce(sum(saves),0)::int saves,
                coalesce(sum(watch_seconds),0)::bigint watch_seconds, coalesce(sum(video_views),0)::bigint video_views
-        from daily_metrics where client_id = ${cid} and measured_on >= current_date - ${sql.raw(dInt)} ${platCond}`),
+        from daily_metrics where client_id = ${cid} and ${inPeriod} ${platCond}`),
       db.execute(sql`
         select coalesce(sum(views),0)::int views, coalesce(sum(reach),0)::int reach, coalesce(sum(engagements),0)::int engagements,
                coalesce(sum(follower_delta),0)::int follower_growth
-        from daily_metrics where client_id = ${cid}
-          and measured_on >= current_date - ${sql.raw(dPrev)} and measured_on < current_date - ${sql.raw(dInt)} ${platCond}`),
+        from daily_metrics where client_id = ${cid} and ${inPrev} ${platCond}`),
       db.execute(sql`
         select to_char(measured_on,'YYYY-MM') maand, coalesce(sum(views),0)::int views
         from daily_metrics where client_id = ${cid} and measured_on >= current_date - interval '12 months' ${platCond}
         group by 1 order by 1`),
       db.execute(sql`
         select platform, coalesce(sum(views),0)::int views, coalesce(sum(reach),0)::int reach, coalesce(sum(follower_delta),0)::int volgers
-        from daily_metrics where client_id = ${cid} and platform is not null and measured_on >= current_date - ${sql.raw(dInt)}
+        from daily_metrics where client_id = ${cid} and platform is not null and ${inPeriod}
         group by 1 order by 2 desc`),
       // Alle gepubliceerde video's van deze klant, met cijfers samengevoegd over platforms.
       db.execute(sql`
@@ -112,7 +136,9 @@ export default async function ClientResultsPage({
     slug: String(c.slug), name: String(c.name), color: c.color ? String(c.color) : null, status: String(c.status),
   })) as SelectorClient[];
 
-  const avgViews = publishedTotal > 0 ? Math.round(Number(t.views ?? 0) / publishedTotal) : 0;
+  // Gemiddelde over de video's die in de gekozen periode zijn geplaatst.
+  const periodVideos = r.videos.filter((v) => v.views > 0);
+  const avgViews = periodVideos.length > 0 ? Math.round(periodVideos.reduce((a, v) => a + v.views, 0) / periodVideos.length) : 0;
   const maxMonth = Math.max(1, ...months.map((m) => Number(m.views)));
 
   // Inzichten per maand, automatisch afgeleid uit de maandcijfers (geen AI nodig).
@@ -152,14 +178,25 @@ export default async function ClientResultsPage({
   const deltaPct = (cur: number, p: number): number | null => (p > 0 ? Math.round(((cur - p) / p) * 100) : null);
   const deltaHint = (cur: number, p: number): string | undefined => {
     const d = deltaPct(cur, p);
-    return d === null ? undefined : `${d >= 0 ? "+" : ""}${d}% vs vorige periode`;
+    return d === null ? undefined : `${d >= 0 ? "+" : ""}${d}% vs ${versus}`;
   };
   const deltaTone = (cur: number, p: number): "good" | "bad" | undefined => {
     const d = deltaPct(cur, p);
     return d === null ? undefined : d >= 0 ? "good" : "bad";
   };
 
-  const hasData = Number(t.views ?? 0) > 0 || months.length > 0 || videos.length > 0;
+  // Zonder platformfilter tonen we exact de cijfers van het klantportaal (inclusief
+  // weergaven van kanalen zonder dagcijfers), zodat team en klant hetzelfde zien.
+  const same = !platform;
+  const kViews = same ? r.metrics.views : Number(t.views ?? 0);
+  const kReach = same ? r.metrics.reach : Number(t.reach ?? 0);
+  const kFollowers = same ? r.metrics.followerGrowth : Number(t.follower_growth ?? 0);
+  const kLikes = same ? r.likes : Number(t.likes ?? 0);
+  const kComments = same ? r.comments : Number(t.comments ?? 0);
+  const hintOf = (pct: number | null, cur: number, p: number) => (same ? (pct === null ? undefined : `${pct >= 0 ? "+" : ""}${pct}% vs ${versus}`) : deltaHint(cur, p));
+  const toneOf = (pct: number | null, cur: number, p: number): "good" | "bad" | undefined => (same ? (pct === null ? undefined : pct >= 0 ? "good" : "bad") : deltaTone(cur, p));
+
+  const hasData = r.hasData || Number(t.views ?? 0) > 0 || months.length > 0 || videos.length > 0;
 
   // AI-inzichten & verbeterpunten (gated op de AI-sleutel). Laatste opgeslagen
   // analyse tonen; genereren/opnieuw kan via het paneel.
@@ -179,12 +216,12 @@ export default async function ClientResultsPage({
   // Bevindingen: concrete inzichten uit de cijfers (deterministisch, geen AI).
   const findings: string[] = [];
   {
-    const vD = deltaPct(Number(t.views ?? 0), Number(prev.views ?? 0));
-    if (vD !== null) findings.push(`Weergaven zijn met ${Math.abs(vD)}% ${vD >= 0 ? "gestegen" : "gedaald"} ten opzichte van de vorige periode.`);
-    const rD = deltaPct(Number(t.reach ?? 0), Number(prev.reach ?? 0));
-    if (rD !== null) findings.push(`Het bereik is met ${Math.abs(rD)}% ${rD >= 0 ? "gestegen" : "gedaald"} ten opzichte van de vorige periode.`);
+    const vD = same ? r.deltas.views : deltaPct(Number(t.views ?? 0), Number(prev.views ?? 0));
+    if (vD !== null) findings.push(`Weergaven zijn met ${Math.abs(vD)}% ${vD >= 0 ? "gestegen" : "gedaald"} ten opzichte van ${versus}.`);
+    const rD = same ? r.deltas.reach : deltaPct(Number(t.reach ?? 0), Number(prev.reach ?? 0));
+    if (rD !== null) findings.push(`Het bereik is met ${Math.abs(rD)}% ${rD >= 0 ? "gestegen" : "gedaald"} ten opzichte van ${versus}.`);
     if (publishedTotal > 0) findings.push(`Er staan in totaal ${num(publishedTotal)} video${publishedTotal === 1 ? "" : "'s"} van deze klant live.`);
-    const fg = Number(t.follower_growth ?? 0);
+    const fg = kFollowers;
     if (fg !== 0) findings.push(fg > 0 ? `Er kwamen ${num(fg)} nieuwe volgers bij in deze periode.` : `Het volgersaantal daalde met ${num(Math.abs(fg))}.`);
     if (!platform && platforms.length > 0) {
       const best = platforms[0]!;
@@ -193,7 +230,7 @@ export default async function ClientResultsPage({
     if (top.length > 0 && Number(top[0]!.views) > 0) {
       findings.push(`Best bekeken video: “${top[0]!.title}” met ${compact(Number(top[0]!.views))} weergaven.`);
     }
-    if (avgViews > 0) findings.push(`Gemiddeld haalt een video ${compact(avgViews)} weergaven.`);
+    if (avgViews > 0) findings.push(`Gemiddeld haalt een video uit deze periode ${compact(avgViews)} weergaven.`);
     if (avgWatch != null) findings.push(`De gemiddelde kijktijd is ${avgWatch.toFixed(1)} seconden per videoweergave.`);
   }
 
@@ -202,31 +239,92 @@ export default async function ClientResultsPage({
       <Link href="/analytics" className="text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">← Resultaten</Link>
       <PageHeader
         title={<span className="flex items-center gap-3"><ClientLogo name={client.name} logoUrl={client.logoUrl} color={client.color} size={40} />{client.name}</span>}
-        description={`Volledige resultaten · afgelopen ${days} dagen${platform ? ` · ${PLATFORM[platform]?.label}` : ""} · uit je eigen database (dagelijkse snapshots)`}
+        description={`${capitalize(period.label)} · ${formatDate(r.periodStart)} t/m ${formatDate(r.periodEnd)}${period.mode !== "vrij" && !period.complete ? " · loopt nog" : ""}${platform ? ` · ${PLATFORM[platform]?.label}` : ""} · zelfde cijfers als in het klantportaal`}
         actions={
           <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] p-0.5">
-              {[30, 90, 365].map((d) => (
-                <Link key={d} href={qp(d)} className={days === d ? "rounded-[4px] bg-[var(--color-indigo-ink)] px-3 py-1.5 text-xs font-medium text-white" : "px-3 py-1.5 text-xs font-medium text-[var(--color-ink-muted)]"}>
-                  {d === 365 ? "1 jaar" : `${d} dagen`}
-                </Link>
-              ))}
-            </div>
-            <Link href={`/analytics/${slug}/klantportaal?periode=${days === 90 ? 90 : 30}`}
+            <Link href={`/analytics/${slug}/klantportaal?${pq}`}
               className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] hover:border-[var(--color-brand-500)]"
               title="Bekijk hoe deze resultaten er in het klantportaal van de klant uitzien">
               <Eye className="size-4" /> In klantportaal
             </Link>
-            <a href={`/rapport/${slug}?dagen=${days}`} target="_blank" rel="noopener"
+            {/* De bestaande schermrapportage rekent met "afgelopen N dagen"; alleen tonen als dat de gekozen periode is. */}
+            {period.mode === "vrij" && period.key !== "custom" ? (
+              <a href={`/rapport/${slug}?dagen=${days}`} target="_blank" rel="noopener"
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] hover:border-[var(--color-brand-500)]"
+                title="Open de bestaande klantenrapportage op het scherm">
+                <FileText className="size-4" /> Rapportage
+              </a>
+            ) : null}
+            <a href={`/api/reports/period/${slug}/pdf?${pq}`}
               className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-brand-700)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
-              title="Genereer een klantenrapportage (PDF)">
-              <FileText className="size-4" /> Genereer rapportage
+              title="Dezelfde PDF die de klant uit het portaal downloadt">
+              <Download className="size-4" /> {period.mode === "kwartaal" ? "Download kwartaaloverzicht" : period.mode === "maand" ? "Download maandoverzicht" : "Download rapport"}
             </a>
           </div>
         }
       />
 
       <ClientSelector clients={selectorClients} currentSlug={slug} />
+
+      {/* Periodekeuze: dezelfde knoppen en logica als in het klantportaal. */}
+      <div className="mb-4">
+        <PeriodSwitch
+          basePath={`/analytics/${slug}`}
+          mode={period.mode}
+          periodKey={period.key}
+          months={options.months}
+          quarters={options.quarters}
+          from={period.key === "custom" ? period.from : undefined}
+          to={period.key === "custom" ? period.to : undefined}
+          variant="intern"
+        />
+      </div>
+
+      {/* Directieversie van deze maand: zelfde cijfers, geschreven voor de directie van de klant. */}
+      {directie ? (
+        <Card className="mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold">Directieversie van deze maand</h3>
+              <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
+                {directie.ok ? "Zichtbaar voor de klant in het klantportaal, bij Resultaten." : `Nog niet zichtbaar voor de klant. ${directie.reden ?? ""}`}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a href={`/api/reports/period/${slug}/pdf?${pq}&versie=directie`} target="_blank" rel="noopener"
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] hover:border-[var(--color-brand-500)]">
+                <Download className="size-4" /> Directieversie (PDF)
+              </a>
+              <a href={`/api/reports/period/${slug}/pdf?${pq}&versie=overzicht`} target="_blank" rel="noopener"
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] hover:border-[var(--color-brand-500)]">
+                <Download className="size-4" /> Directieoverzicht (1 pagina)
+              </a>
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
+      {/* Kwartaal: verwijzing naar de kwartaalrapportage, zodat er één rapport per kwartaal is. */}
+      {period.mode === "kwartaal" ? (
+        <Card className="mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold">Kwartaalrapportage</h3>
+              <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">
+                {kwartaalRapport
+                  ? kwartaalRapport.published !== null
+                    ? "Gepubliceerd. De klant ziet de rapportage en het directieoverzicht in het klantportaal."
+                    : "Nog niet gepubliceerd. De klant ziet hier alleen de cijfers tot de rapportage is goedgekeurd."
+                  : "Voor dit kwartaal is er nog geen kwartaalrapportage. Hieronder staat het cijferoverzicht."}
+              </p>
+            </div>
+            <Link href={kwartaalRapport ? `/analytics/kwartaalrapportages/${kwartaalRapport.id}` : "/analytics/kwartaalrapportages"}
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] hover:border-[var(--color-brand-500)]">
+              <FileText className="size-4" /> {kwartaalRapport ? "Open kwartaalrapportage" : "Naar kwartaalrapportages"}
+            </Link>
+          </div>
+        </Card>
+      ) : null}
 
       {/* Kort tekstje over de klant zelf, zodat meteen duidelijk is om wie het
           gaat. Komt uit de klantomschrijving; staat die er niet, dan tonen we
@@ -255,19 +353,22 @@ export default async function ClientResultsPage({
         <>
           <div className="mb-3 rounded-[var(--radius-md)] bg-[var(--color-indigo-ink)] px-4 py-2.5 text-sm font-bold tracking-tight text-white">Algemene prestaties</div>
           <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            <Stat label="Gepubliceerde video's" value={num(publishedTotal)} />
-            <Stat label="Weergaven" value={compact(Number(t.views ?? 0))} hint={deltaHint(Number(t.views ?? 0), Number(prev.views ?? 0))} tone={deltaTone(Number(t.views ?? 0), Number(prev.views ?? 0))} />
-            <Stat label="Bereik" value={compact(Number(t.reach ?? 0))} hint={deltaHint(Number(t.reach ?? 0), Number(prev.reach ?? 0))} tone={deltaTone(Number(t.reach ?? 0), Number(prev.reach ?? 0))} />
-            <Stat label="Gem. per video" value={compact(avgViews)} />
-            <Stat label="Nieuwe volgers" value={`${Number(t.follower_growth ?? 0) >= 0 ? "+" : ""}${num(Number(t.follower_growth ?? 0))}`} hint={deltaHint(Number(t.follower_growth ?? 0), Number(prev.follower_growth ?? 0))} tone={deltaTone(Number(t.follower_growth ?? 0), Number(prev.follower_growth ?? 0))} />
-            <Stat label="Likes" value={compact(Number(t.likes ?? 0))} />
-            <Stat label="Reacties" value={compact(Number(t.comments ?? 0))} />
+            <Stat label="Gepubliceerde video's" value={num(publishedTotal)} hint={`${num(r.metrics.publishedVideos)} in ${period.mode === "vrij" ? "deze periode" : period.label}`} />
+            <Stat label="Weergaven" value={compact(kViews)} hint={hintOf(r.deltas.views, kViews, Number(prev.views ?? 0))} tone={toneOf(r.deltas.views, kViews, Number(prev.views ?? 0))} />
+            <Stat label="Bereik" value={compact(kReach)} hint={hintOf(r.deltas.reach, kReach, Number(prev.reach ?? 0))} tone={toneOf(r.deltas.reach, kReach, Number(prev.reach ?? 0))} />
+            <Stat label="Gem. per video" value={avgViews > 0 ? compact(avgViews) : "—"} hint={avgViews > 0 ? `${periodVideos.length} video's uit deze periode` : "geen video's met cijfers in deze periode"} />
+            <Stat label="Nieuwe volgers" value={`${kFollowers >= 0 ? "+" : ""}${num(kFollowers)}`} hint={hintOf(r.deltas.followerGrowth, kFollowers, Number(prev.follower_growth ?? 0))} tone={toneOf(r.deltas.followerGrowth, kFollowers, Number(prev.follower_growth ?? 0))} />
+            <Stat label="Likes" value={compact(kLikes)} />
+            <Stat label="Reacties" value={compact(kComments)} />
             <Stat label="Shares" value={compact(Number(t.shares ?? 0))} />
             <Stat label="Saves" value={compact(Number(t.saves ?? 0))} />
             <Stat label="Gem. kijktijd" value={avgWatch != null ? `${avgWatch.toFixed(1)}s` : "—"} hint={avgWatch == null ? "geen reels-data" : undefined} />
             <Stat label="Profielbezoeken" value="—" hint="niet via Metricool" />
             <Stat label="Uitkijkpercentage" value={completionPct != null ? `${completionPct}%` : "—"} hint="niet via Metricool" />
           </div>
+
+          {/* Intern: vergelijking, trends, wat werkt en advies bij de gekozen periode. */}
+          {same ? <InternPeriodReview r={r} review={review} /> : null}
 
           {/* Bevindingen op basis van de resultaten. */}
           {findings.length > 0 ? (

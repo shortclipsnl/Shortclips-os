@@ -5,7 +5,6 @@ import { requirePortal } from "@/server/auth/context";
 import { getPortalQuarterDetail, getPortalQuarterlyReports } from "@/server/quarterly/service";
 import { PortalDownloadButton } from "@/components/portal/download-button";
 import { KlantReportView } from "@/components/quarterly/klant-report";
-import { PeriodeToggle } from "../periode-toggle";
 
 export const metadata: Metadata = { title: "Kwartaalresultaten" };
 export const dynamic = "force-dynamic";
@@ -29,7 +28,6 @@ export default async function PortalKwartaalPage({ searchParams }: { searchParam
 
   return (
     <div className="flex flex-col gap-6">
-      <PeriodeToggle active="kwartaal" nieuwKwartaal={lijst.some((r) => r.nieuw)} />
       <div>
         <h1 className="text-[25px] font-bold tracking-tight">Kwartaalresultaten</h1>
         <p className="mt-1 max-w-2xl text-sm text-[var(--color-ink-muted)]">Elk kwartaal zetten we op een rij wat de content heeft opgeleverd, wat we over jullie doelgroep hebben geleerd en wat we de komende drie maanden gaan doen.</p>
