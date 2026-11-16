@@ -176,7 +176,7 @@ export const STATUS_TONE: Record<DisplayStatus, "neutral" | "info" | "good" | "w
 /** Voor de editor: geen interne tussenstanden, alleen wat voor hem telt. */
 export function editorStatusLabel(status: DisplayStatus): string {
   if (status === "afgerond") return "Afgerond";
-  if (status === "gepland") return "Gepland";
+  if (status === "gepland") return "Ingepland";
   if (status === "verslag_nodig" || status === "verslag_concept") return "Geweest, verslag volgt";
   if (status === "niet_gehouden") return "Niet gehouden";
   return "Nog te plannen";
@@ -409,4 +409,79 @@ export function meetingMomentShort(at: Date | string): string {
   const d = new Date(at);
   const day = new Intl.DateTimeFormat("nl-NL", { timeZone: "Europe/Amsterdam", day: "numeric", month: "short" }).format(d).replace(".", "");
   return `${day} ${dateToAmsterdam(d).time}`;
+}
+
+/* ----------------------- maandoverzicht voor de editor ----------------------- */
+
+/** Zoveel maanden na de lopende maand staan altijd in het overzicht van de editor. */
+export const EDITOR_MONTHS_AHEAD = 4;
+
+/**
+ * De maanden in "Mijn meetings": van de eerste meeting (of de lopende maand)
+ * tot minimaal vier maanden vooruit. Schuift elke maand vanzelf door, dus er
+ * hoeft nooit handmatig een maand te worden toegevoegd.
+ */
+export function editorHistoryRange(current: string, firstMeeting: string | null, lastMeeting: string | null): string[] {
+  const from = firstMeeting && firstMeeting < current ? firstMeeting : current;
+  const ahead = addPeriods(current, EDITOR_MONTHS_AHEAD);
+  const to = lastMeeting && lastMeeting > ahead ? lastMeeting : ahead;
+  return periodRange(from, to);
+}
+
+/**
+ * Kleur per status voor de editor: oranje nog te plannen, blauw ingepland,
+ * paars geweest (verslag volgt), groen afgerond, grijs niet gehouden.
+ */
+export type EditorTone = "oranje" | "blauw" | "paars" | "groen" | "grijs";
+
+export function editorTone(status: DisplayStatus): EditorTone {
+  if (status === "afgerond") return "groen";
+  if (status === "gepland") return "blauw";
+  if (status === "verslag_nodig" || status === "verslag_concept") return "paars";
+  if (status === "niet_gehouden") return "grijs";
+  return "oranje";
+}
+
+/**
+ * Indeling van "Mijn meetings": de komende maanden (lopende maand eerst, de
+ * eerstvolgende meeting dus bovenaan) en daaronder de eerdere maanden, de
+ * recentste eerst.
+ */
+export function splitHistory<T extends { period: string }>(list: T[], current: string): { upcoming: T[]; earlier: T[] } {
+  const sorted = [...list].sort((a, b) => a.period.localeCompare(b.period));
+  return {
+    upcoming: sorted.filter((h) => h.period >= current),
+    earlier: sorted.filter((h) => h.period < current).reverse(),
+  };
+}
+
+/* ------------------------ eigen bespreekpunten editor ------------------------ */
+
+export const ITEM_OUTCOMES = ["besproken", "actiepunt", "verbeterpunt"] as const;
+export type ItemOutcome = (typeof ITEM_OUTCOMES)[number];
+
+export const ITEM_OUTCOME_LABEL: Record<ItemOutcome, string> = {
+  besproken: "Besproken",
+  actiepunt: "Omgezet naar actiepunt",
+  verbeterpunt: "Omgezet naar verbeterpunt",
+};
+
+/** Maximaal aantal open bespreekpunten per editor, zodat het overzichtelijk blijft. */
+export const MAX_OPEN_ITEMS = 15;
+export const MAX_ITEM_LENGTH = 500;
+
+export function isItemOutcome(v: unknown): v is ItemOutcome {
+  return typeof v === "string" && (ITEM_OUTCOMES as readonly string[]).includes(v);
+}
+
+/**
+ * Hoe de editor een bespreekpunt ziet:
+ *  - open: nog niet behandeld, aan te passen of te verwijderen;
+ *  - in_verslag: behandeld in een verslag dat nog in concept is (vergrendeld,
+ *    de uitkomst blijft intern tot het verslag is gepubliceerd);
+ *  - behandeld: het verslag is gepubliceerd, de uitkomst is zichtbaar.
+ */
+export function itemStateForEditor(status: string, meetingReportStatus: string | null): "open" | "in_verslag" | "behandeld" {
+  if (status !== "behandeld") return "open";
+  return meetingReportStatus === "gepubliceerd" ? "behandeld" : "in_verslag";
 }

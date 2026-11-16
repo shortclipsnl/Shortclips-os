@@ -3,8 +3,11 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, Check, Loader2, Plus, RotateCcw, Trash2, Wand2, X } from "lucide-react";
+import { CalendarPlus, Check, ListChecks, Loader2, MessageSquarePlus, Pencil, Plus, RotateCcw, Target, Trash2, Wand2, X } from "lucide-react";
 import {
+  addEditorMeetingItem,
+  deleteEditorMeetingItem,
+  updateEditorMeetingItem,
   cancelEditorMeeting,
   planEditorMeeting,
   saveEditorMeetingReport,
@@ -16,11 +19,14 @@ import {
 import { Badge, Button, ErrorNote, TeamAvatar } from "@/components/ui";
 import {
   EDITOR_THEMES,
+  ITEM_OUTCOME_LABEL,
+  MAX_ITEM_LENGTH,
   OWNER_TYPE_LABEL,
   SHORTCLIPS_THEMES,
   STATUS_LABEL,
   STATUS_TONE,
   type DisplayStatus,
+  type ItemOutcome,
   type OwnerType,
   type PointKind,
 } from "@/lib/editor-meetings";
@@ -126,6 +132,7 @@ export type OverviewRowData = {
   nextLabel: string | null;
   nextId: string | null;
   openActions: number;
+  openItems: number;
   defaults: PlanDefaults;
 };
 
@@ -255,7 +262,12 @@ export function OverviewTable({ rows, owners, viewerId, isManagement, defaultOwn
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
                   <div className="flex w-44 min-w-0 items-center gap-2.5">
                     <TeamAvatar name={r.editorName} avatarUrl={r.editorAvatar} size={30} />
-                    <span className="truncate text-sm font-semibold text-[var(--color-ink)]">{r.editorName}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-[var(--color-ink)]">{r.editorName}</span>
+                      {r.openItems > 0 ? (
+                        <span className="block text-2xs font-medium text-[var(--color-info)]">{r.openItems} {r.openItems === 1 ? "eigen bespreekpunt" : "eigen bespreekpunten"}</span>
+                      ) : null}
+                    </span>
                   </div>
                   <div className="w-72">
                     <div className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Verantwoordelijke</div>
@@ -439,6 +451,8 @@ export type ReportDefaults = {
   actions: { id: string; body: string; ownerType: OwnerType; assigneeId: string | null; dueOn: string | null }[];
   ownerId: string | null;
   nextPlanned: string | null;
+  /** Eigen bespreekpunten van de editor, met de uitkomst als die er al is. */
+  items: { id: string; body: string; outcome: ItemOutcome | null }[];
 };
 
 let seq = 0;
@@ -489,6 +503,7 @@ export function ReportForm({ defaults, editorName, assignees }: { defaults: Repo
   const [internalNotes, setInternalNotes] = useState(defaults.internalNotes);
   const [points, setPointsState] = useState<PointDraft[]>(() => defaults.points.map((p) => ({ key: p.id, id: p.id, kind: p.kind, theme: p.theme, body: p.body, example: p.example ?? "" })));
   const [actions, setActions] = useState<ActionDraft[]>(() => defaults.actions.map((a) => ({ key: a.id, id: a.id, body: a.body, ownerType: a.ownerType, assigneeId: a.assigneeId ?? "", dueOn: a.dueOn ?? "" })));
+  const [items, setItems] = useState(() => defaults.items.map((i) => ({ ...i, draftKey: null as string | null })));
   const [nextDate, setNextDate] = useState("");
   const [nextTime, setNextTime] = useState("10:00");
   const [nextTopics, setNextTopics] = useState("");
@@ -497,6 +512,33 @@ export function ReportForm({ defaults, editorName, assignees }: { defaults: Repo
   const router = useRouter();
   const setPoints = (fn: (p: PointDraft[]) => PointDraft[]) => { setPointsState(fn); setMsg(null); };
   const patchAction = (key: string, data: Partial<ActionDraft>) => { setActions((list) => list.map((a) => (a.key === key ? { ...a, ...data } : a))); setMsg(null); };
+
+  /**
+   * Uitkomst van een eigen bespreekpunt. Omzetten maakt meteen een actiepunt of
+   * verbeterpunt in dit verslag met dezelfde tekst; terugdraaien haalt dat punt
+   * weer weg. Zo hoeft niemand iets dubbel in te voeren.
+   */
+  function setOutcome(id: string, outcome: ItemOutcome | null) {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    if (item.draftKey) {
+      const k = item.draftKey;
+      setActions((list) => list.filter((a) => a.key !== k));
+      setPointsState((list) => list.filter((p) => p.key !== k));
+    }
+    let draftKey: string | null = null;
+    if (outcome === "actiepunt") {
+      draftKey = newKey();
+      const key = draftKey;
+      setActions((list) => [...list, { key, id: null, body: item.body, ownerType: "editor", assigneeId: "", dueOn: "" }]);
+    } else if (outcome === "verbeterpunt") {
+      draftKey = newKey();
+      const key = draftKey;
+      setPointsState((list) => [...list, { key, id: null, kind: "verbeterpunt", theme: "overig", body: item.body, example: "" }]);
+    }
+    setItems((list) => list.map((i) => (i.id === id ? { ...i, outcome, draftKey } : i)));
+    setMsg(null);
+  }
 
   function save(publish: boolean) {
     if (publish && !confirm(`Het verslag publiceren? ${editorName} ziet het direct in het portaal en krijgt een melding. Elk actiepunt wordt een taak.`)) return;
@@ -511,6 +553,7 @@ export function ReportForm({ defaults, editorName, assignees }: { defaults: Repo
           points: points.filter((p) => p.body.trim()).map((p) => ({ id: p.id, kind: p.kind, theme: p.theme, body: p.body, example: p.example || null })),
           actions: actions.filter((a) => a.body.trim()).map((a) => ({ id: a.id, body: a.body, ownerType: a.ownerType, assigneeId: a.assigneeId || null, dueOn: a.dueOn || null })),
           next: nextDate ? { date: nextDate, time: nextTime, topics: linesOf(nextTopics) } : null,
+          items: items.map((i) => ({ id: i.id, outcome: i.outcome })),
         },
         publish,
       );
@@ -524,6 +567,31 @@ export function ReportForm({ defaults, editorName, assignees }: { defaults: Repo
 
   return (
     <div>
+      {items.length ? (
+        <Section title={`Inbreng van ${editorName}`} hint={`Wat ${editorName} zelf wilde bespreken. Leg per punt vast wat ermee is gebeurd; omzetten maakt hieronder direct een actiepunt of verbeterpunt aan. Niet behandelde punten schuiven door naar de volgende meeting.`}>
+          <ul className="space-y-2">
+            {items.map((i) => (
+              <li key={i.id} className="flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line)] border-l-[3px] border-l-[var(--color-info)] bg-[var(--color-surface)] px-3 py-2.5">
+                <span className="min-w-56 flex-1 text-sm text-[var(--color-ink)]">{i.body}</span>
+                {i.outcome ? (
+                  <>
+                    <Badge tone={i.outcome === "besproken" ? "good" : "info"}>{ITEM_OUTCOME_LABEL[i.outcome]}</Badge>
+                    <button type="button" onClick={() => setOutcome(i.id, null)} className="inline-flex items-center gap-1 rounded px-2 py-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+                      <RotateCcw className="size-3.5" /> Terugdraaien
+                    </button>
+                  </>
+                ) : (
+                  <span className="flex flex-wrap gap-1.5">
+                    <OutcomeButton onClick={() => setOutcome(i.id, "besproken")} icon={<Check className="size-3.5" />} label="Besproken" />
+                    <OutcomeButton onClick={() => setOutcome(i.id, "actiepunt")} icon={<ListChecks className="size-3.5" />} label="Actiepunt" />
+                    <OutcomeButton onClick={() => setOutcome(i.id, "verbeterpunt")} icon={<Target className="size-3.5" />} label="Verbeterpunt" />
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
       <Section title="Wat ging goed?" hint="Positieve ontwikkelingen en sterke prestaties.">
         <PointList kind="sterk" points={points} setPoints={setPoints} placeholder="Bijv. sterke hooks bij de video's van november" addLabel="Sterk punt toevoegen" />
       </Section>
@@ -611,6 +679,142 @@ export function ReportForm({ defaults, editorName, assignees }: { defaults: Repo
           <span className="text-xs text-[var(--color-ink-faint)]">{defaults.published ? "Dit verslag is gepubliceerd; wijzigingen zijn direct zichtbaar voor de editor." : "Een concept is niet zichtbaar voor de editor."}</span>
         )}
       </div>
+    </div>
+  );
+}
+
+function OutcomeButton({ onClick, icon, label }: { onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-2 py-1 text-2xs font-medium text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+    >
+      {icon} {label}
+    </button>
+  );
+}
+
+/* ------------------- "Wat wil ik bespreken?" (editor) ------------------- */
+
+export type EditorItem = { id: string; body: string; state: "open" | "in_verslag" };
+
+/**
+ * De editor zet hier zelf bespreekpunten klaar voor de eerstvolgende meeting.
+ * Open punten zijn aan te passen en te verwijderen; een punt dat in een verslag
+ * wordt verwerkt is vergrendeld.
+ */
+export function ItemsEditor({ items, ownerFirst }: { items: EditorItem[]; ownerFirst: string | null }) {
+  const [adding, setAdding] = useState(false);
+  const [text, setText] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+
+  function add() {
+    if (!text.trim()) return;
+    setErr(null);
+    start(async () => {
+      const res = await addEditorMeetingItem(text);
+      if (!res.ok) return setErr(res.message ?? "Opslaan is niet gelukt.");
+      setText("");
+      router.refresh();
+    });
+  }
+  function saveEdit(id: string) {
+    setErr(null);
+    start(async () => {
+      const res = await updateEditorMeetingItem(id, editText);
+      if (!res.ok) return setErr(res.message ?? "Opslaan is niet gelukt.");
+      setEditing(null);
+      router.refresh();
+    });
+  }
+  function remove(id: string) {
+    if (!confirm("Dit bespreekpunt verwijderen?")) return;
+    setErr(null);
+    start(async () => {
+      const res = await deleteEditorMeetingItem(id);
+      if (!res.ok) return setErr(res.message ?? "Verwijderen is niet gelukt.");
+      router.refresh();
+    });
+  }
+
+  return (
+    <div>
+      {items.length ? (
+        <ul className="space-y-2">
+          {items.map((i, n) => (
+            <li key={i.id} className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2.5">
+              <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-info-soft)] text-2xs font-bold text-[var(--color-info)]">{n + 1}</span>
+              {editing === i.id ? (
+                <div className="min-w-0 flex-1">
+                  <textarea
+                    autoFocus
+                    className="sc-input resize-y"
+                    rows={2}
+                    maxLength={MAX_ITEM_LENGTH}
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEdit(i.id); } if (e.key === "Escape") setEditing(null); }}
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <Button size="sm" disabled={pending || !editText.trim()} onClick={() => saveEdit(i.id)}>{pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Opslaan</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Annuleren</Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 text-sm leading-relaxed text-[var(--color-ink)]">{i.body}</span>
+                  {i.state === "open" ? (
+                    <span className="flex shrink-0 items-center">
+                      <Badge tone="info">Open</Badge>
+                      <button type="button" onClick={() => { setEditing(i.id); setEditText(i.body); setErr(null); }} className="ml-1 rounded p-1.5 text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]" aria-label="Aanpassen"><Pencil className="size-3.5" /></button>
+                      <button type="button" disabled={pending} onClick={() => remove(i.id)} className="rounded p-1.5 text-[var(--color-ink-faint)] hover:text-[var(--color-bad)]" aria-label="Verwijderen"><Trash2 className="size-3.5" /></button>
+                    </span>
+                  ) : (
+                    <Badge tone="neutral">Besproken, verslag volgt</Badge>
+                  )}
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : !adding ? (
+        <p className="text-sm text-[var(--color-ink-muted)]">Nog niets klaargezet. Waar loop je tegenaan, wat wil je leren of wat kan Shortclips beter doen?</p>
+      ) : null}
+
+      {adding ? (
+        <div className="mt-3">
+          <textarea
+            autoFocus
+            className="sc-input resize-y"
+            rows={2}
+            maxLength={MAX_ITEM_LENGTH}
+            value={text}
+            placeholder="Bijv. ik wil meer variatie in mijn hooks leren"
+            onChange={(e) => { setText(e.target.value); setErr(null); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); add(); } if (e.key === "Escape") setAdding(false); }}
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button size="sm" disabled={pending || !text.trim()} onClick={add}>{pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Toevoegen</Button>
+            <Button size="sm" variant="ghost" onClick={() => { setAdding(false); setText(""); }}>Klaar</Button>
+            <span className="text-xs text-[var(--color-ink-faint)]">Enter om op te slaan, daarna direct het volgende punt.</span>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => { setAdding(true); setErr(null); }}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] border border-dashed border-[var(--color-info)] bg-[var(--color-info-soft)] px-4 py-3 text-sm font-semibold text-[var(--color-info)] hover:brightness-105"
+        >
+          <MessageSquarePlus className="size-4" /> Bespreekpunt toevoegen
+        </button>
+      )}
+      {err ? <div className="mt-2"><ErrorNote>{err}</ErrorNote></div> : null}
+      <p className="mt-3 text-xs text-[var(--color-ink-faint)]">{ownerFirst ? `${ownerFirst} ziet je punten vooraf.` : "Je content creative ziet je punten vooraf."} Wat besproken is, vind je terug in het verslag.</p>
     </div>
   );
 }

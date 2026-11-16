@@ -23,7 +23,7 @@ export default async function EditorMeetingsPage({ searchParams }: { searchParam
     return (
       <div className="space-y-2">
         <BackToEditing />
-        <EditorOwnView data={data} firstName={viewer.fullName.split(" ")[0] ?? ""} />
+        <EditorOwnView data={data} firstName={viewer.fullName.split(" ")[0] ?? ""} current={periodOf(todayAmsterdam())} />
       </div>
     );
   }
@@ -72,6 +72,7 @@ export default async function EditorMeetingsPage({ searchParams }: { searchParam
       nextLabel: r.nextMeeting ? meetingMomentShort(r.nextMeeting.at) : null,
       nextId: r.nextMeeting?.id ?? null,
       openActions: r.openActions,
+      openItems: r.openItems,
       defaults: { meetingId: r.meetingId, editorId: r.editor.id, date: at?.date ?? firstWorkday, time: at?.time ?? "10:00", location: "", meetingUrl: "", topics: [] },
     };
   });

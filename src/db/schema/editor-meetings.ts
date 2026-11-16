@@ -132,3 +132,38 @@ export const editorMeetingActions = pgTable(
     index("editor_meeting_actions_task_idx").on(t.taskId),
   ],
 );
+
+/**
+ * Bespreekpunten die de editor zelf inbrengt ("Wat wil ik bespreken?").
+ *
+ * Een open punt hoort automatisch bij de eerstvolgende meeting: het staat in
+ * beeld bij de editor, bij de verantwoordelijke content creator op de
+ * meetingpagina en in het verslagformulier, tot het is behandeld. Bij het
+ * verslag legt de content creator vast wat ermee is gebeurd; vanaf dat moment
+ * is het punt gekoppeld aan die meeting (`meetingId`) en bewaard in het verslag.
+ *
+ *  - status:  open | behandeld
+ *  - outcome: besproken | actiepunt | verbeterpunt (alleen bij behandeld).
+ *    Omzetten maakt in hetzelfde verslag een actiepunt of verbeterpunt aan,
+ *    zodat niemand iets dubbel hoeft in te voeren.
+ *  - Voor de editor telt een punt pas als behandeld zodra het verslag is
+ *    gepubliceerd; een conceptverslag blijft intern.
+ */
+export const editorMeetingItems = pgTable(
+  "editor_meeting_items",
+  {
+    id: pk(),
+    editorId: uuid("editor_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    status: varchar("status", { length: 16 }).notNull().default("open"),
+    outcome: varchar("outcome", { length: 16 }),
+    meetingId: uuid("meeting_id").references(() => editorMeetings.id, { onDelete: "set null" }),
+    handledAt: timestamp("handled_at", { withTimezone: true }),
+    handledById: uuid("handled_by_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [
+    index("editor_meeting_items_editor_idx").on(t.editorId, t.status),
+    index("editor_meeting_items_meeting_idx").on(t.meetingId),
+  ],
+);

@@ -1,10 +1,11 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, isNull, like, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, like, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clients,
   deliverables,
   editorMeetingActions,
+  editorMeetingItems,
   editorMeetingOwners,
   editorMeetingPoints,
   editorMeetings,
@@ -20,6 +21,8 @@ import { todayAmsterdam } from "@/lib/planning-deadline";
 import {
   ACTION_TASK_PREFIX,
   EDITOR_MEETING_OWNER_EMAILS,
+  MAX_ITEM_LENGTH,
+  MAX_OPEN_ITEMS,
   OWNER_TYPES,
   PLAN_TASK_PREFIX,
   POINT_KINDS,
@@ -29,6 +32,9 @@ import {
   cleanTheme,
   displayStatus,
   draftAgenda,
+  editorHistoryRange,
+  isItemOutcome,
+  itemStateForEditor,
   googleCalendarUrl,
   isMeetingOwnerEmail,
   isOverdue,
@@ -39,7 +45,6 @@ import {
   nextPeriod,
   parsePlanTaskKey,
   periodOf,
-  periodRange,
   planTaskDescription,
   planTaskKey,
   planTaskTitle,
@@ -50,6 +55,7 @@ import {
   sharedShortclipsThemes,
   themeLabel,
   type DisplayStatus,
+  type ItemOutcome,
   type OwnerType,
   type PlanLine,
   type PointKind,
@@ -307,6 +313,8 @@ export type OverviewRow = {
   lastMeeting: { id: string; at: Date } | null;
   nextMeeting: { id: string; at: Date } | null;
   openActions: number;
+  /** Open bespreekpunten die de editor zelf heeft klaargezet. */
+  openItems: number;
 };
 
 export type Overview = {
@@ -335,6 +343,14 @@ export async function getOverview(viewer: Viewer, period: string, now = new Date
         .groupBy(editorMeetingActions.editorId)
     : [];
   const openByEditor = new Map(openCounts.map((r) => [r.editorId, Number(r.n)]));
+  const itemCounts = ids.length
+    ? await db
+        .select({ editorId: editorMeetingItems.editorId, n: sql<number>`count(*)::int` })
+        .from(editorMeetingItems)
+        .where(and(inArray(editorMeetingItems.editorId, ids), eq(editorMeetingItems.status, "open")))
+        .groupBy(editorMeetingItems.editorId)
+    : [];
+  const itemsByEditor = new Map(itemCounts.map((r) => [r.editorId, Number(r.n)]));
 
   const list: OverviewRow[] = editors.map((editor) => {
     const info = ownerMap.get(editor.id)!;
@@ -359,6 +375,7 @@ export async function getOverview(viewer: Viewer, period: string, now = new Date
       lastMeeting: held ? { id: held.id, at: new Date(held.scheduledAt!) } : null,
       nextMeeting: upcoming ? { id: upcoming.id, at: new Date(upcoming.scheduledAt!) } : null,
       openActions: openByEditor.get(editor.id) ?? 0,
+      openItems: itemsByEditor.get(editor.id) ?? 0,
     };
   });
   return { period, rows: list, owners, isManagement: isMeetingManagement(viewer), viewerIsOwner: isMeetingOwner(viewer) };
@@ -547,6 +564,12 @@ export type MeetingDetail = {
   agendaDraft: string[];
   calendarUrl: string | null;
   assignees: { id: string; fullName: string }[];
+  /**
+   * Eigen bespreekpunten van de editor. Team: de open punten (zolang het
+   * verslag niet is gepubliceerd) en de punten die in deze meeting zijn
+   * behandeld. Editor: alleen de behandelde punten van een gepubliceerd verslag.
+   */
+  items: ItemView[];
 };
 
 function toView(m: MeetingRow, now: Date, forEditor: boolean): MeetingView {
@@ -663,18 +686,35 @@ export async function getMeetingDetail(viewer: Viewer, meetingId: string, now = 
     assignees = staff.filter((u) => isCoreStaff(u.email)).map((u) => ({ id: u.id, fullName: u.fullName }));
   }
 
-  return { mode: asEditor ? "editor" : "team", meeting: view, editor, owner, points, actions, earlierPoints, earlierActions, previous, recurring, preparation, agendaDraft, calendarUrl, assignees };
+  const items = asEditor
+    ? m.reportStatus === "gepubliceerd"
+      ? await loadItems(and(eq(editorMeetingItems.editorId, m.editorId), eq(editorMeetingItems.meetingId, m.id)))
+      : []
+    : await loadItems(
+        and(
+          eq(editorMeetingItems.editorId, m.editorId),
+          m.reportStatus === "gepubliceerd" ? eq(editorMeetingItems.meetingId, m.id) : or(eq(editorMeetingItems.status, "open"), eq(editorMeetingItems.meetingId, m.id)),
+        ),
+      );
+
+  return { mode: asEditor ? "editor" : "team", meeting: view, editor, owner, points, actions, earlierPoints, earlierActions, previous, recurring, preparation, agendaDraft, calendarUrl, assignees, items };
 }
 
 /* ------------------------------ editorportaal ------------------------------ */
 
 export type EditorPage = {
   owner: Person | null;
+  /** True als de verantwoordelijke vastligt; false als het een voorstel uit de klantprojecten is. */
+  ownerFixed: boolean;
   next: MeetingView | null;
+  /** De maand van de eerstvolgende meeting, ook als die nog niet is ingepland. */
+  target: { period: string; meetingId: string | null };
   nextCalendarUrl: string | null;
   openPoints: PointView[];
   openActions: ActionView[];
-  history: { period: string; status: DisplayStatus; meetingId: string | null; scheduledAt: Date | null; hasReport: boolean }[];
+  /** Eigen bespreekpunten: open (en in behandeling) en de recent besproken punten. */
+  items: { open: ItemView[]; handled: ItemView[] };
+  history: { period: string; status: DisplayStatus; meetingId: string | null; scheduledAt: Date | null; hasReport: boolean; ownerName: string | null }[];
   development: {
     achieved: PointView[];
     recurring: (RecurringTheme & { label: string })[];
@@ -691,39 +731,54 @@ export async function getEditorPage(viewer: Viewer, now = new Date()): Promise<E
   const today = todayAmsterdam(now);
   const current = periodOf(today);
   const published = eq(editorMeetings.reportStatus, "gepubliceerd");
-  const [meetings, points, actions, ownerInfo] = await Promise.all([
+  const [meetings, points, actions, owners, items] = await Promise.all([
     db.select().from(editorMeetings).where(eq(editorMeetings.editorId, editorId)).orderBy(asc(editorMeetings.period)),
     loadPoints(and(eq(editorMeetingPoints.editorId, editorId), published)),
     loadActions(and(eq(editorMeetingActions.editorId, editorId), published), viewer, () => false),
-    getOwnerMap([editorId]),
+    listMeetingOwners(),
+    loadItems(eq(editorMeetingItems.editorId, editorId)),
   ]);
+  const ownerInfo = await getOwnerMap([editorId], owners);
+  const currentOwnerId = ownerInfo.get(editorId)?.ownerId ?? null;
+  const ownerName = (id: string | null) => (id ? owners.find((o) => o.id === id)?.fullName ?? null : null);
 
   const upcoming = meetings
     .filter((m) => m.status === "gepland" && m.scheduledAt && new Date(m.scheduledAt).getTime() > now.getTime())
     .sort((a, b) => new Date(a.scheduledAt!).getTime() - new Date(b.scheduledAt!).getTime())[0];
-  const owner = await personById(upcoming?.ownerId ?? ownerInfo.get(editorId)?.ownerId ?? null);
+  const target = nextTarget(meetings, now);
+  const targetRow = target.meetingId ? meetings.find((x) => x.id === target.meetingId) : null;
+  // Eén bron: de verantwoordelijke van de geplande meeting, anders de vaste
+  // (of voorgestelde) verantwoordelijke van de editor.
+  const owner = await personById(upcoming?.ownerId ?? targetRow?.ownerId ?? currentOwnerId);
 
-  const first = meetings[0]?.period ?? current;
-  const last = [nextPeriod(current), meetings[meetings.length - 1]?.period ?? current].sort().pop()!;
-  const history = periodRange(first < current ? first : current, last)
+  const history = editorHistoryRange(current, meetings[0]?.period ?? null, meetings[meetings.length - 1]?.period ?? null)
     .reverse()
     .map((period) => {
       const m = meetings.find((x) => x.period === period) ?? null;
+      const status = displayStatus(m, period, now, today);
+      // Komende maanden tonen de huidige verantwoordelijke, zodat een wijziging direct doorwerkt.
+      const who = m?.ownerId ?? (period >= current ? currentOwnerId : null);
       return {
         period,
-        status: displayStatus(m, period, now, today),
+        status,
         meetingId: m?.id ?? null,
         scheduledAt: m?.status === "gepland" && m.scheduledAt ? new Date(m.scheduledAt) : null,
         hasReport: m?.reportStatus === "gepubliceerd",
+        ownerName: status === "niet_gehouden" ? null : ownerName(who),
       };
     });
 
   const mine = actions.filter((a) => a.assigneeId === editorId);
   const counted = mine.filter((a) => a.state === "open" || a.state === "afgerond");
   const next = upcoming ? toView(upcoming, now, true) : null;
+  const lastHandledMeeting = items
+    .filter((i) => i.editorState === "behandeld" && i.period)
+    .reduce<string | null>((acc, i) => (!acc || i.period! > acc ? i.period! : acc), null);
   return {
     owner,
+    ownerFixed: ownerInfo.get(editorId)?.source === "vast" || !!upcoming?.ownerId,
     next,
+    target: { period: target.period, meetingId: target.meetingId },
     nextCalendarUrl: next?.scheduledAt
       ? googleCalendarUrl({
           title: `Editor meeting met ${firstName(owner?.fullName ?? "Shortclips")}`,
@@ -735,6 +790,10 @@ export async function getEditorPage(viewer: Viewer, now = new Date()): Promise<E
       : null,
     openPoints: points.filter((p) => p.kind === "verbeterpunt" && p.status === "open").reverse(),
     openActions: mine.filter((a) => a.state === "open"),
+    items: {
+      open: items.filter((i) => i.editorState !== "behandeld"),
+      handled: items.filter((i) => i.editorState === "behandeld" && i.period === lastHandledMeeting),
+    },
     history,
     development: {
       achieved: points.filter((p) => (p.kind === "verbeterpunt" || p.kind === "vaardigheid") && p.status === "behaald").reverse(),
@@ -890,7 +949,7 @@ export async function planMeeting(viewer: Viewer, input: PlanInput, now = new Da
       type: "editor_meeting.planned",
       level: "info",
       title: wasPlanned ? `Je editor meeting is verplaatst naar ${moment.charAt(0).toLowerCase()}${moment.slice(1)}` : `Editor meeting gepland: ${moment.charAt(0).toLowerCase()}${moment.slice(1)}`,
-      body: `Met ${firstName(owner.fullName)}. De bespreekpunten staan op je pagina Editor Meetings.`,
+      body: `Met ${firstName(owner.fullName)}. Zet vooraf op je pagina Editor Meetings klaar wat jij wilt bespreken.`,
       href: "/editor-meetings",
       entityType: "editor_meeting",
       entityId: id,
@@ -960,6 +1019,8 @@ export type ReportInput = {
   points: { id?: string | null; kind: PointKind; theme: string; body: string; example?: string | null }[];
   actions: { id?: string | null; body: string; ownerType: OwnerType; assigneeId?: string | null; dueOn?: string | null }[];
   next?: { date: string; time: string; topics: string[] } | null;
+  /** Wat er met de eigen bespreekpunten van de editor is gebeurd. */
+  items?: { id: string; outcome: ItemOutcome | null }[];
 };
 
 function cleanDate(v: string | null | undefined): string | null {
@@ -1039,6 +1100,8 @@ export async function saveReport(viewer: Viewer, meetingId: string, input: Repor
     if (old.taskId) await db.update(tasks).set({ status: "cancelled", completedAt: new Date(), updatedAt: new Date() }).where(and(eq(tasks.id, old.taskId), inArray(tasks.status, [...OPEN_TASK])));
     await db.delete(editorMeetingActions).where(eq(editorMeetingActions.id, id));
   }
+
+  await applyItemOutcomes(viewer, m, input.items ?? [], now);
 
   if (willBePublished) {
     await ensureActionTasks(viewer, m, editor);
@@ -1151,6 +1214,161 @@ export async function setActionDone(viewer: Viewer, actionId: string, done: bool
     .update(tasks)
     .set({ status: done ? "done" : "todo", completedAt: done ? new Date() : null, updatedAt: new Date() })
     .where(and(eq(tasks.id, a.taskId), isNull(tasks.deletedAt), ne(tasks.status, "cancelled")));
+}
+
+/* ------------------------- eigen bespreekpunten editor ------------------------- */
+
+export type ItemView = {
+  id: string;
+  editorId: string;
+  body: string;
+  status: string;
+  outcome: ItemOutcome | null;
+  meetingId: string | null;
+  /** Maand van de meeting waarin het punt is behandeld. */
+  period: string | null;
+  createdAt: Date;
+  /** Hoe de editor het punt ziet (een conceptverslag blijft intern). */
+  editorState: "open" | "in_verslag" | "behandeld";
+};
+
+async function loadItems(where: ReturnType<typeof and>): Promise<ItemView[]> {
+  const list = await db
+    .select({
+      id: editorMeetingItems.id,
+      editorId: editorMeetingItems.editorId,
+      body: editorMeetingItems.body,
+      status: editorMeetingItems.status,
+      outcome: editorMeetingItems.outcome,
+      meetingId: editorMeetingItems.meetingId,
+      createdAt: editorMeetingItems.createdAt,
+      period: editorMeetings.period,
+      reportStatus: editorMeetings.reportStatus,
+    })
+    .from(editorMeetingItems)
+    .leftJoin(editorMeetings, eq(editorMeetings.id, editorMeetingItems.meetingId))
+    .where(where)
+    .orderBy(asc(editorMeetingItems.createdAt));
+  return list.map((r) => ({
+    id: r.id,
+    editorId: r.editorId,
+    body: r.body,
+    status: r.status,
+    outcome: isItemOutcome(r.outcome) ? r.outcome : null,
+    meetingId: r.meetingId,
+    period: r.period ?? null,
+    createdAt: new Date(r.createdAt),
+    editorState: itemStateForEditor(r.status, r.reportStatus ?? null),
+  }));
+}
+
+/**
+ * Voor welke meeting zijn nieuwe bespreekpunten bedoeld? De eerstvolgende
+ * geplande meeting; staat er niets gepland, dan de meeting van deze maand, of
+ * van volgende maand als die van deze maand al is geweest.
+ */
+function nextTarget(meetings: MeetingRow[], now: Date): { period: string; meetingId: string | null; ownerId: string | null } {
+  const current = periodOf(todayAmsterdam(now));
+  const upcoming = meetings
+    .filter((m) => m.status === "gepland" && m.scheduledAt && new Date(m.scheduledAt).getTime() > now.getTime())
+    .sort((a, b) => new Date(a.scheduledAt!).getTime() - new Date(b.scheduledAt!).getTime())[0];
+  if (upcoming) return { period: upcoming.period, meetingId: upcoming.id, ownerId: upcoming.ownerId };
+  const cur = meetings.find((m) => m.period === current);
+  const curDone = !!cur && (cur.reportStatus === "gepubliceerd" || (cur.status === "gepland" && !!cur.scheduledAt && new Date(cur.scheduledAt).getTime() <= now.getTime()));
+  const period = curDone ? nextPeriod(current) : current;
+  const m = meetings.find((x) => x.period === period) ?? null;
+  return { period, meetingId: m?.id ?? null, ownerId: m?.ownerId ?? null };
+}
+
+function cleanItem(body: string): string {
+  const text = body.replace(/\s+/g, " ").trim().slice(0, MAX_ITEM_LENGTH);
+  if (!text) throw new ForbiddenError("Vul een bespreekpunt in.");
+  return text;
+}
+
+async function requireOwnOpenItem(viewer: Viewer, itemId: string) {
+  if (!isEditorRole(viewer)) throw new ForbiddenError("Alleen de editor zelf kan dit bespreekpunt aanpassen.");
+  const [item] = await db.select().from(editorMeetingItems).where(eq(editorMeetingItems.id, itemId)).limit(1);
+  if (!item || item.editorId !== viewer.id) throw new ForbiddenError("Bespreekpunt niet gevonden.");
+  if (item.status !== "open") throw new ForbiddenError("Dit punt is al besproken en kan niet meer worden aangepast.");
+  return item;
+}
+
+/**
+ * Eén melding per meeting aan de verantwoordelijke content creator zodra de
+ * editor iets klaarzet. Meer punten voor dezelfde meeting geven geen nieuwe
+ * melding (vaste sleutel per editor per maand).
+ */
+async function notifyOwnerOfItems(viewer: Viewer, now: Date): Promise<void> {
+  const meetings = await db.select().from(editorMeetings).where(eq(editorMeetings.editorId, viewer.id));
+  const target = nextTarget(meetings, now);
+  const ownerId = target.ownerId ?? (await getOwnerMap([viewer.id])).get(viewer.id)?.ownerId ?? null;
+  if (!ownerId) return;
+  await notify({
+    userIds: [ownerId],
+    type: "editor_meeting.items",
+    level: "info",
+    title: `${firstName(viewer.fullName)} heeft bespreekpunten klaargezet`,
+    body: `Voor de editor meeting van ${monthLabel(target.period)}. Je ziet ze op de meetingpagina en in het verslag.`,
+    href: target.meetingId ? `/editor-meetings/${target.meetingId}` : "/editor-meetings",
+    entityType: "editor_meeting",
+    ...(target.meetingId ? { entityId: target.meetingId } : {}),
+    dedupeKey: `editormeeting:inbreng:${viewer.id}:${target.period}`,
+  });
+}
+
+/** Editor zet een eigen bespreekpunt klaar voor de eerstvolgende meeting. */
+export async function addItem(viewer: Viewer, body: string, now = new Date()): Promise<{ id: string }> {
+  if (!isEditorRole(viewer)) throw new ForbiddenError("Alleen editors zetten hier eigen bespreekpunten klaar.");
+  const text = cleanItem(body);
+  const [{ n } = { n: 0 }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(editorMeetingItems)
+    .where(and(eq(editorMeetingItems.editorId, viewer.id), eq(editorMeetingItems.status, "open")));
+  if (Number(n) >= MAX_OPEN_ITEMS) throw new ForbiddenError(`Je hebt al ${MAX_OPEN_ITEMS} open bespreekpunten. Rond eerst een paar punten af in je meeting.`);
+  const [row] = await db.insert(editorMeetingItems).values({ editorId: viewer.id, body: text, createdAt: now, updatedAt: now }).returning({ id: editorMeetingItems.id });
+  await notifyOwnerOfItems(viewer, now);
+  return { id: row!.id };
+}
+
+export async function updateItem(viewer: Viewer, itemId: string, body: string): Promise<void> {
+  await requireOwnOpenItem(viewer, itemId);
+  await db.update(editorMeetingItems).set({ body: cleanItem(body), updatedAt: new Date() }).where(eq(editorMeetingItems.id, itemId));
+}
+
+export async function deleteItem(viewer: Viewer, itemId: string): Promise<void> {
+  await requireOwnOpenItem(viewer, itemId);
+  await db.delete(editorMeetingItems).where(eq(editorMeetingItems.id, itemId));
+}
+
+/**
+ * Legt bij het verslag vast wat er met de bespreekpunten van de editor is
+ * gebeurd. Een behandeld punt wordt aan deze meeting gekoppeld en blijft daar
+ * bewaard. Een punt dat in een andere meeting is behandeld, blijft ongemoeid.
+ * Uitkomst weghalen zet het punt weer open voor de volgende meeting.
+ */
+async function applyItemOutcomes(viewer: Viewer, m: MeetingRow, list: { id: string; outcome: ItemOutcome | null }[], now: Date): Promise<void> {
+  if (list.length === 0) return;
+  const ids = [...new Set(list.map((i) => i.id))].slice(0, 60);
+  const existing = await db.select().from(editorMeetingItems).where(and(inArray(editorMeetingItems.id, ids), eq(editorMeetingItems.editorId, m.editorId)));
+  for (const it of list) {
+    const row = existing.find((r) => r.id === it.id);
+    if (!row) continue;
+    if (row.status === "behandeld" && row.meetingId && row.meetingId !== m.id) continue;
+    const outcome = isItemOutcome(it.outcome) ? it.outcome : null;
+    if (outcome) {
+      if (row.status === "behandeld" && row.meetingId === m.id && row.outcome === outcome) continue;
+      await db
+        .update(editorMeetingItems)
+        .set({ status: "behandeld", outcome, meetingId: m.id, handledAt: now, handledById: viewer.id, updatedAt: new Date() })
+        .where(eq(editorMeetingItems.id, row.id));
+    } else if (row.meetingId === m.id) {
+      await db
+        .update(editorMeetingItems)
+        .set({ status: "open", outcome: null, meetingId: null, handledAt: null, handledById: null, updatedAt: new Date() })
+        .where(eq(editorMeetingItems.id, row.id));
+    }
+  }
 }
 
 /* ----------------------- maandelijkse plantaak en meldingen ----------------------- */
