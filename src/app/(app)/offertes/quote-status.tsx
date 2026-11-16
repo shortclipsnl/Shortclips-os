@@ -4,7 +4,7 @@ import type { QuoteListRow } from "@/server/quotes";
 export const QUOTE_STATUS_META: Record<string, { label: string; color: string }> = {
   concept: { label: "Concept", color: "var(--color-ink-muted)" },
   verzonden: { label: "Verzonden", color: "var(--color-info)" },
-  bekeken: { label: "Bekeken door klant", color: "var(--color-violet)" },
+  bekeken: { label: "Bekeken", color: "var(--color-violet)" },
   geaccepteerd: { label: "Ondertekend", color: "var(--color-good)" },
   ondertekend: { label: "Ondertekend", color: "var(--color-good)" },
   afgewezen: { label: "Afgewezen", color: "var(--color-bad)" },

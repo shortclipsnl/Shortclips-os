@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ExternalLink, FileSignature } from "lucide-react";
-import { requireQuotesAccess } from "@/server/auth/context";
+import { isOwner, requireQuotesAccess } from "@/server/auth/context";
 import { getQuotesOverview } from "@/server/quotes";
 import { pandadocConfigured } from "@/server/quotes/pandadoc-client";
 import { lastPandaDocSync } from "@/server/quotes/pandadoc-sync";
@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Offertes" };
 export const dynamic = "force-dynamic";
 
 export default async function OffertesPage() {
-  await requireQuotesAccess();
+  const viewer = await requireQuotesAccess();
   const [{ rows, stats, owners }, last] = await Promise.all([getQuotesOverview(), lastPandaDocSync()]);
 
   const lastLog = Array.isArray(last?.log) ? (last!.log as { level?: string; message?: string }[]) : [];
@@ -21,6 +21,7 @@ export default async function OffertesPage() {
     at: last?.finishedAt ? new Date(last.finishedAt).toISOString() : null,
     ok: !last || last.status === "success" || last.status === "partial",
     message: lastError,
+    canManage: isOwner(viewer),
   };
 
   return (

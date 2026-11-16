@@ -121,8 +121,18 @@ export type ConvertForm = {
   defaultPmId: string | null;
   /** Interne teamleden om te betrekken (videograaf, andere projectmanager). */
   team: PmOption[];
-  /** Gekoppelde offerte uit PandaDoc (laatste), zonder bedrag. */
-  quote: { status: string; title: string; signedAt: string | null } | null;
+  /** Gekoppelde offerte uit PandaDoc (laatste). Bedrag en maandbedrag worden voor niet-eigenaren leeggemaakt. */
+  quote: {
+    id: string;
+    status: string;
+    title: string;
+    signedAt: string | null;
+    /** Afspraken die eenduidig uit de offerte zijn gelezen. */
+    terms: { focus: "organisch" | "advertentie" | null; shortsPerMonth: number | null; contractMonths: number | null; monthlyExclVat: number | null; monthlySource: "tekst" | "berekend" | null } | null;
+    /** Ondertekenaar uit PandaDoc, als aanvulling wanneer de lead die mist. */
+    contactName: string | null;
+    email: string | null;
+  } | null;
   /** Alleen de eigenaar ziet bedragen (wordt in de action gezet). */
   canSeeAmounts?: boolean;
 };
@@ -146,14 +156,22 @@ const LIVE_QUOTE = ["concept", "verzonden", "bekeken"];
 async function quoteForLead(leadId: string | null) {
   if (!leadId) return null;
   const rows = await db
-    .select({ status: quotes.status, title: quotes.title, acceptedAt: quotes.acceptedAt, updatedAt: quotes.updatedAt })
+    .select({ id: quotes.id, status: quotes.status, title: quotes.title, acceptedAt: quotes.acceptedAt, updatedAt: quotes.updatedAt, dealTerms: quotes.dealTerms, contactName: quotes.recipientContactName, email: quotes.recipientEmail })
     .from(quotes)
     .where(eq(quotes.leadId, leadId))
     .orderBy(desc(quotes.updatedAt));
   const signed = rows.find((r) => SIGNED.includes(r.status));
   const pick = signed ?? rows.find((r) => LIVE_QUOTE.includes(r.status)) ?? rows[0];
   if (!pick) return null;
-  return { status: pick.status as string, title: pick.title, signedAt: signed?.acceptedAt ? signed.acceptedAt.toISOString() : null };
+  return {
+    id: pick.id,
+    status: pick.status as string,
+    title: pick.title,
+    signedAt: signed?.acceptedAt ? signed.acceptedAt.toISOString() : null,
+    terms: (pick.dealTerms as NonNullable<ConvertForm["quote"]>["terms"]) ?? null,
+    contactName: (signed ?? pick).contactName ?? null,
+    email: (signed ?? pick).email ?? null,
+  };
 }
 
 export async function getConvertForm(leadId: string): Promise<ConvertForm | null> {
@@ -184,8 +202,8 @@ export async function getConvertForm(leadId: string): Promise<ConvertForm | null
     lead: {
       id: lead.id,
       company: lead.company,
-      contactName: lead.contactName,
-      email: lead.email,
+      contactName: lead.contactName ?? quote?.contactName ?? null,
+      email: lead.email ?? quote?.email ?? null,
       phone: lead.phone,
       website: lead.website,
       expectedMonthly: Number(lead.expectedMonthly) > 0 ? String(lead.expectedMonthly) : null,
@@ -358,6 +376,12 @@ export async function convertLead(viewer: { id: string; email: string }, input: 
       .update(salesLeads)
       .set({ status: "gewonnen", convertedClientId: clientId, updatedAt: new Date() })
       .where(eq(salesLeads.id, lead.id));
+
+    // Getekende offerte(s) van deze lead in het klantdossier: zelfde record, geen kopie.
+    await tx
+      .update(quotes)
+      .set({ clientId, updatedAt: new Date() })
+      .where(and(eq(quotes.leadId, lead.id), isNull(quotes.clientId)));
 
     return { ok: true as const, slug, clientId, existing: Boolean(input.linkToClientId) };
   });

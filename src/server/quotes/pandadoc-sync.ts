@@ -7,6 +7,7 @@ import { notify } from "@/server/notifications";
 import { nextQuoteNumber } from "@/server/quotes/number";
 import { putQuotePdf } from "@/server/quotes/storage";
 import { pdfPlainText } from "@/server/briefing/guide-highlights";
+import { isSimilarCompany } from "@/lib/onboarding-plan";
 import {
   PandaDocError,
   downloadDocumentPdf,
@@ -20,7 +21,9 @@ import {
 import {
   AUDIT_ACTION,
   GENERIC_EMAIL_DOMAINS,
+  canCreateLeadFrom,
   companyFromTitle,
+  extractDealTerms,
   emailDomain,
   extractTotalFromText,
   isInternalEmail,
@@ -148,6 +151,8 @@ export async function syncPandaDocDocument(documentId: string, opts: { forcePdf?
     amountSource,
     currency: details.grand_total?.currency ?? existing?.currency ?? "EUR",
     serviceType: serviceTypeFrom(title, pdfText) ?? existing?.serviceType ?? null,
+    // Afspraken alleen opnieuw lezen als er een verse PDF-tekst is.
+    ...(pdfText ? { dealTerms: extractDealTerms(pdfText, title, amount ? Number(amount) : null) } : {}),
     sentAt: toDate(details.date_sent) ?? existing?.sentAt ?? null,
     acceptedAt: status === "ondertekend" ? completedAt ?? existing?.acceptedAt ?? null : null,
     acceptedByName: status === "ondertekend" ? contactName : null,
@@ -196,7 +201,10 @@ export async function syncPandaDocDocument(documentId: string, opts: { forcePdf?
   const [fresh] = await db.select().from(quotes).where(eq(quotes.id, quoteId)).limit(1);
   if (fresh) {
     await linkQuoteToLead(fresh);
-    if (statusChanged || created) await applyQuoteEffects(fresh, prevStatus, !!existing?.firstOpenedAt);
+    if (statusChanged || created) {
+      const [linked] = await db.select().from(quotes).where(eq(quotes.id, quoteId)).limit(1);
+      await applyQuoteEffects(linked ?? fresh, prevStatus, !!existing?.firstOpenedAt);
+    }
   }
 
   return { quoteId, created, statusChanged, warnings };
@@ -275,13 +283,68 @@ export async function linkQuoteToLead(q: QuoteRow): Promise<void> {
   }
 
   if (!match) {
-    if (clientId !== q.clientId) await db.update(quotes).set({ clientId }).where(eq(quotes.id, q.id));
+    // Bestaande klant (verlenging): geen nieuwe lead, alleen aan de klant koppelen.
+    if (clientId) {
+      if (clientId !== q.clientId || q.leadMatch) await db.update(quotes).set({ clientId, leadMatch: null }).where(eq(quotes.id, q.id));
+      return;
+    }
+    // Twijfel: lijkt op één of meer bestaande leads, maar niet zeker genoeg. Een
+    // medewerker kiest de lead op de offerte (geen automatische koppeling).
+    const similar = company.length >= 3 ? leads.filter((l) => isSimilarCompany(l.company, q.recipientCompany ?? "")) : [];
+    if (similar.length) {
+      if (q.leadMatch !== "controleren" || q.leadId) await db.update(quotes).set({ leadId: null, leadMatch: "controleren" }).where(eq(quotes.id, q.id));
+      return;
+    }
+    // Geen lead en geen twijfel: bij een nieuwe, verzonden offerte met zekere
+    // gegevens een lead aanmaken. Historische offertes maken nooit leads aan.
+    if (isNewQuote(q) && canCreateLeadFrom(q)) {
+      const leadId = await createLeadFromQuote(q);
+      if (leadId) await db.update(quotes).set({ leadId, leadMatch: "aangemaakt" }).where(eq(quotes.id, q.id));
+    }
     return;
   }
-  if (match.lead.id === q.leadId && match.how === q.leadMatch && clientId === q.clientId) return;
+  if (match.lead.id === q.leadId && (match.how === q.leadMatch || q.leadMatch === "aangemaakt") && clientId === q.clientId) return;
   await db.update(quotes).set({ leadId: match.lead.id, leadMatch: match.how, clientId }).where(eq(quotes.id, q.id));
   // Lead zonder e-mail: aanvullen met het adres uit PandaDoc (feitelijk gegeven).
   if (!match.lead.email && email) await db.update(salesLeads).set({ email, updatedAt: new Date() }).where(eq(salesLeads.id, match.lead.id));
+}
+
+/** Nieuw = verzonden (niet meer concept) en aangemaakt in de laatste 30 dagen. */
+function isNewQuote(q: QuoteRow): boolean {
+  if (q.status === "concept") return false;
+  const at = (q.sentAt ?? q.createdAt)?.getTime() ?? 0;
+  return Date.now() - at <= RECENT_MS;
+}
+
+/**
+ * Lead aanmaken uit PandaDoc-gegevens (feitelijk: bedrijf uit de titel, contact
+ * en e-mail van de ondertekenaar). Uniek per document via externalId, dus een
+ * herhaalde synchronisatie of gelijktijdige webhook maakt nooit een tweede lead.
+ */
+export async function createLeadFromQuote(q: QuoteRow): Promise<string | null> {
+  const externalId = `pandadoc:${q.externalId ?? q.id}`;
+  const [existing] = await db.select({ id: salesLeads.id }).from(salesLeads).where(eq(salesLeads.externalId, externalId)).limit(1);
+  if (existing) return existing.id;
+  const company = (q.recipientCompany ?? "").trim() || q.recipientEmail || "Onbekend bedrijf";
+  const firstContact = (q.sentAt ?? q.createdAt ?? new Date()).toISOString().slice(0, 10);
+  const inserted = await db
+    .insert(salesLeads)
+    .values({
+      company: company.slice(0, 200),
+      contactName: q.recipientContactName,
+      email: q.recipientEmail,
+      status: "offerte",
+      source: "PandaDoc",
+      firstContactOn: firstContact,
+      ownerId: q.createdById ?? null,
+      note: `Automatisch aangemaakt vanuit PandaDoc-offerte "${q.title}".`,
+      externalId,
+    })
+    .onConflictDoNothing()
+    .returning({ id: salesLeads.id });
+  if (inserted[0]) return inserted[0].id;
+  const [row] = await db.select({ id: salesLeads.id }).from(salesLeads).where(eq(salesLeads.externalId, externalId)).limit(1);
+  return row?.id ?? null;
 }
 
 /** Bij meerdere leads met hetzelfde adres: de open lead, anders de nieuwste. */

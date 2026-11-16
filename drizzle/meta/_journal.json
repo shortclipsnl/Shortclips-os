@@ -911,6 +911,13 @@
       "when": 1794777000000,
       "tag": "0129_contentgeheugen_klantinzichten",
       "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "7",
+      "when": 1794830000000,
+      "tag": "0130_offerte_afspraken",
+      "breakpoints": true
     }
   ]
 }

@@ -43,6 +43,10 @@ export type QuoteListRow = {
   ownerName: string | null;
   syncError: string | null;
   link: string | null;
+  /** Laatste gebeurtenis (verzonden, geopend, getekend…) uit de tijdlijn. */
+  lastActivityAt: Date | null;
+  /** Lead of offerte hoort al bij een klant (omgezet of verlenging). */
+  isClient: boolean;
 };
 
 export type QuotesStats = {
@@ -57,6 +61,11 @@ export type QuotesStats = {
 };
 
 const OPEN_STATUSES = new Set(["verzonden", "bekeken"]);
+
+function latest(...ds: (Date | null)[]): Date | null {
+  const t = ds.filter((d): d is Date => !!d).map((d) => new Date(d).getTime());
+  return t.length ? new Date(Math.max(...t)) : null;
+}
 const SIGNED_STATUSES = new Set(["ondertekend", "geaccepteerd"]);
 
 export async function getQuotesOverview(): Promise<{ rows: QuoteListRow[]; stats: QuotesStats; owners: string[] }> {
@@ -91,6 +100,8 @@ export async function getQuotesOverview(): Promise<{ rows: QuoteListRow[]; stats
       ownerName: users.fullName,
       syncError: quotes.syncError,
       publicToken: quotes.publicToken,
+      leadClientId: salesLeads.convertedClientId,
+      lastEventAt: sql<string | null>`(select max(e.occurred_at) from quote_events e where e.quote_id = ${quotes.id})`,
     })
     .from(quotes)
     .leftJoin(clients, eq(clients.id, quotes.clientId))
@@ -129,6 +140,8 @@ export async function getQuotesOverview(): Promise<{ rows: QuoteListRow[]; stats
       ownerName: r.ownerName ?? r.senderName,
       syncError: r.syncError,
       link: r.publicToken ? publicQuoteLink(r.publicToken) : null,
+      lastActivityAt: latest(r.lastEventAt ? new Date(r.lastEventAt) : null, r.lastOpenedAt, r.acceptedAt, r.sentAt),
+      isClient: !!(r.clientSlug || r.leadClientId),
     };
   });
 
@@ -173,6 +186,8 @@ export async function getQuotesByLead(): Promise<Map<string, LeadQuoteSummary>> 
     .where(and(isNull(quotes.deletedAt), sql`${quotes.leadId} is not null`))
     .orderBy(sql`coalesce(${quotes.sentAt}, ${quotes.createdAt}) desc`);
   const map = new Map<string, LeadQuoteSummary>();
+  // Getekende offerte gaat voor: die moet bij de lead direct zichtbaar zijn.
+  rows.sort((a, b) => Number(SIGNED_STATUSES.has(b.status)) - Number(SIGNED_STATUSES.has(a.status)));
   for (const r of rows) {
     const prev = map.get(r.leadId!);
     if (prev) { prev.count++; continue; }
@@ -199,7 +214,7 @@ export async function getQuoteDetail(id: string) {
     db.select().from(quoteLines).where(eq(quoteLines.quoteId, id)).orderBy(quoteLines.sortOrder),
     db.select().from(quoteEvents).where(eq(quoteEvents.quoteId, id)).orderBy(desc(quoteEvents.occurredAt)),
     q.clientId ? db.select({ id: clients.id, name: clients.name, slug: clients.slug }).from(clients).where(eq(clients.id, q.clientId)).limit(1) : Promise.resolve([]),
-    q.leadId ? db.select({ id: salesLeads.id, company: salesLeads.company, status: salesLeads.status, contactName: salesLeads.contactName, email: salesLeads.email, phone: salesLeads.phone }).from(salesLeads).where(eq(salesLeads.id, q.leadId)).limit(1) : Promise.resolve([]),
+    q.leadId ? db.select({ id: salesLeads.id, company: salesLeads.company, status: salesLeads.status, contactName: salesLeads.contactName, email: salesLeads.email, phone: salesLeads.phone, convertedClientId: salesLeads.convertedClientId }).from(salesLeads).where(eq(salesLeads.id, q.leadId)).limit(1) : Promise.resolve([]),
   ]);
   return { quote: q, lines, events, client: client[0] ?? null, lead: lead[0] ?? null };
 }
