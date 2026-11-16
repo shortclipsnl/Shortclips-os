@@ -10,7 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --org:#1a55e8; --org-soft:#e8eefd;
+  --org:#145a6b; --org-soft:#e5eff1;
   --adv:#14309a; --adv-soft:#e7eaf6;
   --comp:#06053a; --comp-soft:#e6e6ee;
   --navy:#06053a;
@@ -45,7 +45,7 @@ a{color:inherit}
 .ctrl-btn .n{background:#f59e0b;color:#fff;border-radius:20px;padding:0 7px;font-size:11px;font-weight:600}
 .search{position:relative;width:min(340px,100%)}
 .search input{width:100%;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 12px 9px 36px;outline:none}
-.search input:focus{border-color:var(--org);box-shadow:0 0 0 3px var(--org-soft)}
+.search input:focus{border-color:var(--navy);box-shadow:0 0 0 3px #e6e6ee}
 .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.45}
 .results{position:absolute;top:calc(100% + 6px);right:0;width:min(440px,92vw);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(6,5,58,.14);max-height:420px;overflow:auto;display:none;padding:6px;z-index:40}
 .results.show{display:block}
@@ -59,14 +59,14 @@ a{color:inherit}
 .intern{font-size:11px;font-weight:600;background:var(--navy);color:#fff;border-radius:20px;padding:3px 10px;white-space:nowrap}
 
 h1{font-size:28px;line-height:1.15;margin:0 0 6px;letter-spacing:-.4px}
-h2{font-size:18px;margin:0 0 12px;letter-spacing:-.2px}
+h2{font-size:19px;margin:0 0 16px;letter-spacing:-.2px}
 h3{font-size:15px;margin:0 0 6px}
 .lead{color:var(--muted);max-width:720px;margin:0 0 22px}
 .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:600;color:var(--muted);margin-bottom:6px}
-.section{margin-top:30px}
+.section{margin-top:44px}
 
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px}
-.grid{display:grid;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px}
+.grid{display:grid;gap:20px}
 .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -127,18 +127,18 @@ h3{font-size:15px;margin:0 0 6px}
 
 /* tables */
 table{width:100%;border-collapse:collapse}
-.tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;text-align:left;color:var(--muted);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--line)}
-.tbl td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;text-align:left;color:var(--muted);font-weight:600;padding:12px 14px;border-bottom:1px solid var(--line)}
+.tbl td{padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:top}
 .tbl tr:last-child td{border-bottom:0}
 .tbl td.c,.tbl th.c{text-align:center}
 .tbl td.r,.tbl th.r{text-align:right;white-space:nowrap}
 .tbl .sub{background:var(--bg);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 .tbl tr.diff td{background:#fffbea}
 .tbl tr.hl td{background:var(--acc-soft)}
-.ico{display:inline-flex;width:20px;height:20px;border-radius:50%;align-items:center;justify-content:center;flex:none}
-.ico.y{background:#dcfce7;color:var(--ok)} .ico.n{background:#fee2e2;color:var(--no)} .ico.q{background:#eef0f5;color:var(--muted);font-size:11px;font-weight:700}
-.li{display:flex;gap:10px;align-items:flex-start;padding:5px 0}
-.li .ico{margin-top:1px}
+.ico{display:inline-flex;width:22px;height:22px;border-radius:6px;align-items:center;justify-content:center;flex:none;color:#fff}
+.ico.y{background:var(--ok)} .ico.n{background:var(--no)} .ico.q{background:#9aa0b4;font-size:12px;font-weight:700;line-height:1;text-align:center}
+.li{display:flex;gap:12px;align-items:flex-start;padding:7px 0;line-height:1.45}
+.li .ico{margin-top:0}
 
 /* info blocks */
 .info{border-radius:12px;background:var(--bg);padding:14px 16px}
@@ -204,7 +204,7 @@ table{width:100%;border-collapse:collapse}
 .xsel .pr{font-size:12px;color:var(--muted);white-space:nowrap;min-width:70px;text-align:right}
 .big-total{font-size:38px;font-weight:700;letter-spacing:-1px;line-height:1.05}
 select,input[type=text],textarea{border:1px solid var(--line);border-radius:10px;background:#fff;padding:8px 11px;outline:none}
-select:focus,input[type=text]:focus,textarea:focus{border-color:var(--org)}
+select:focus,input[type=text]:focus,textarea:focus{border-color:var(--navy)}
 label.fl{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;margin:0 0 6px}
 
 /* wizard */
@@ -345,6 +345,119 @@ label.fl{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.0
 .nope-t{display:flex;gap:8px;align-items:center;font-weight:700;margin-bottom:4px}
 @media (max-width:1100px){.xgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:700px){.xgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.tl{grid-template-columns:1fr}}
+
+/* ===== v3 (16 nov 2026): rust, uitlijning en vaste posities ===== */
+body{line-height:1.55}
+.num-t{font-variant-numeric:tabular-nums}
+.kern{margin:4px 0 24px}
+.dept{padding:26px;gap:2px}
+.dept .pr{padding:7px 0;align-items:baseline}
+.dept .pr .u{font-size:11.5px;opacity:.7;font-weight:400;margin-left:4px}
+.dept .prices{padding-top:14px}
+
+/* pakketkaart */
+.pkg .pkg-top{padding:22px 24px}
+.pkg .pkg-body{padding:20px 24px 22px}
+.pkg .price{font-size:36px;font-variant-numeric:tabular-nums}
+.pkg .ptag{font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:600;opacity:.75;margin-top:10px}
+.pkg .psub{font-size:13px;color:rgba(255,255,255,.78);margin-top:4px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 14px}
+.fact{background:var(--acc-soft);border-radius:10px;padding:10px 12px}
+.fact b{display:block;font-size:20px;line-height:1.15;color:var(--acc);font-variant-numeric:tabular-nums}
+.fact span{font-size:11.5px;color:var(--muted)}
+.pkg .meta-l{font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.pkg .meta-l b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* blokjes */
+.blk{display:inline-flex;align-items:center;justify-content:center;border-radius:7px;padding:4px 10px;font-size:12.5px;font-weight:600;color:#fff;background:var(--acc);white-space:nowrap;line-height:1.3}
+.blk.lg{font-size:15px;padding:5px 11px;font-variant-numeric:tabular-nums}
+.blk.soft{background:var(--acc-soft);color:var(--acc)}
+
+/* alle pakketten: vaste kolommen */
+.ptab{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.ptab .pr-h,.ptab .pr-r{display:grid;grid-template-columns:170px minmax(0,1.5fr) minmax(0,1fr) 190px 150px;gap:16px;align-items:center;padding:0 22px}
+.ptab .pr-h{background:var(--bg);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;padding-top:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.ptab .pr-r{padding-top:16px;padding-bottom:16px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
+.ptab .pr-r:hover{background:#fafbfd}
+.ptab .pr-r:last-child{border-bottom:0}
+.ptab .grp{padding:12px 22px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:var(--acc);background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.ptab .grp i{width:9px;height:9px;border-radius:3px;background:var(--acc);display:inline-block}
+.ptab .c-r{text-align:right}
+.ptab .vol-l{font-weight:500}
+.ptab .vol-s,.ptab .sm{font-size:12px;color:var(--muted)}
+.ptab .inv{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.ptab .inv .u{font-size:11.5px;color:var(--muted)}
+.ptab .alt{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ptab .alt b{color:var(--text);font-weight:600}
+.ptab .lbl{display:none}
+.ptab-note{font-size:12px;color:var(--muted);margin-top:10px}
+
+/* ja/nee labels */
+.yn{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600}
+.yn.y{color:#15803d}.yn.n{color:#b91c1c}.yn.q{color:var(--muted)}
+.yn small{font-weight:400;color:var(--muted);font-size:12px}
+.inc-h{display:flex;align-items:center;gap:8px;font-size:12px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:8px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.inc-h.y{color:#15803d}.inc-h.n{color:#b91c1c}
+
+/* vergelijken */
+.cmp-head{padding:18px 20px}
+.cmp-head .p{font-variant-numeric:tabular-nums;margin-top:4px}
+.cmp-head .p2{font-size:12.5px;opacity:.8}
+.tbl.cmp td{vertical-align:middle}
+.tbl.cmp td.lab{color:var(--muted);font-weight:500;width:24%}
+
+/* partnerjaar en creator */
+.pcmp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(7,auto);gap:0 20px}
+.pcol{display:grid;grid-template-rows:subgrid;grid-row:span 7;background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.pcol>div{padding:13px 20px;border-top:1px solid var(--line);font-size:13px}
+.pcol .ph{color:#fff;background:var(--acc);border-top:0;padding:18px 20px}
+.pcol .ph .t{font-weight:700;font-size:17px;line-height:1.2}
+.pcol .ph .s{font-size:12px;opacity:.78;margin-top:3px}
+.pcol .rk{display:flex;align-items:center;gap:7px;font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;font-weight:700;color:var(--acc);margin-bottom:4px}
+.pcol b.big{font-size:22px;letter-spacing:-.4px;font-variant-numeric:tabular-nums;display:block;line-height:1.2;color:var(--acc)}
+.pcol .act{background:var(--bg)}
+.pblocks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.pblock{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px 24px;border-top:4px solid var(--acc)}
+.pblock.wide{grid-column:1/-1}
+.pblock .ph2{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.pblock .ph2 h3{margin:0;font-size:15.5px}
+.pblock .ph2 .sub{font-size:12px;color:var(--muted)}
+.pico{width:36px;height:36px;border-radius:10px;background:var(--acc-soft);color:var(--acc);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.kv{display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-top:1px solid var(--line);font-size:13.5px}
+.kv:first-of-type{border-top:0}
+.kv span{color:var(--muted)}
+.kv b{text-align:right;font-variant-numeric:tabular-nums}
+.inv-big{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.inv-big b{font-size:32px;letter-spacing:-.6px;color:var(--acc);font-variant-numeric:tabular-nums;line-height:1.1}
+
+/* jaartabel */
+.ptab.jt .pr-h,.ptab.jt .pr-r{grid-template-columns:220px minmax(0,1.4fr) 170px 140px}
+@media (max-width:1100px){
+  .ptab.jt .pr-h,.ptab.jt .pr-r{grid-template-columns:190px minmax(0,1.2fr) 150px 130px}
+  .ptab .pr-h,.ptab .pr-r{grid-template-columns:150px minmax(0,1.4fr) minmax(0,1fr) 170px 130px}
+}
+@media (max-width:900px){
+  .ptab .pr-h{display:none}
+  .ptab .pr-r,.ptab.jt .pr-r{grid-template-columns:1fr auto;gap:8px 14px;padding:16px 18px}
+  .ptab .pr-r .c-name{grid-column:1/-1}
+  .ptab .pr-r .c-vol{grid-column:1/-1}
+  .ptab .pr-r .c-dd{grid-column:1/2;grid-row:3}
+  .ptab .pr-r .c-inv{grid-column:2/3;grid-row:3/5;align-self:center}
+  .ptab .pr-r .c-alt{grid-column:1/2;grid-row:4;text-align:left}
+  .ptab .lbl{display:inline;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-right:6px}
+  .pcmp{grid-template-columns:1fr;grid-template-rows:none;gap:20px}
+  .pcol{grid-row:auto;grid-template-rows:none}
+  .pblocks{grid-template-columns:1fr}
+  .facts{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .section{margin-top:34px}
+}
+@media (max-width:560px){.facts{gap:8px}.fact{padding:9px 10px}.fact b{font-size:17px}.fact span{font-size:10.5px;line-height:1.3;display:block}.pkg .price{font-size:30px}}
+.search input[type=text]{padding:9px 12px 9px 36px}
+.info{background:#fff;border:1px solid var(--line)}
+.tinted .info{border-top:0;border-right:0;border-bottom:0}
+.pblock .tbl.cmp td.lab{width:46%}
+.blk.lg{min-width:92px}
+.dhead+.section{margin-top:24px}
 </style>
 </head>
 <body>
@@ -377,7 +490,7 @@ label.fl{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.0
    Bedragen wijzigen? Alleen hier aanpassen. Alle bedragen excl. btw.
    ===================================================================== */
 const DEPTS = {
-  org:{ key:'org', nr:'01', naam:'Afdeling Organisch', kort:'Organisch', kleur:'#1a55e8', soft:'#e8eefd',
+  org:{ key:'org', nr:'01', naam:'Afdeling Organisch', kort:'Organisch', kleur:'#145a6b', soft:'#e5eff1',
     pitch:'Wekelijks zichtbaar op TikTok, Instagram Reels, YouTube Shorts en Facebook. Van strategie tot publiceren, door één vast team.',
     kaart:'Voor bedrijven die structureel zichtbaar willen zijn met organische videocontent.',
     doel:'Bereik en merkbekendheid opbouwen', ideaal:'Wekelijks zichtbaar wilt zijn en nog niet adverteert',
@@ -568,9 +681,28 @@ const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const D = k => DEPTS[k];
 const P = id => PKG[id];
 const accVars = k => `--acc:${D(k).kleur};--acc-soft:${D(k).soft}`;
+/* Prijspresentatie, centraal. Organisch: de investering voor het traject van 3 maanden
+   (minimale samenwerking) is leidend, het maandbedrag staat er subtiel onder. */
+const isTraject = p => p.dept==='org';
+const tot3 = p => p.start || p.prijs*3;
+const vid3 = p => p.shorts*3;
+function hoofdPrijs(p, kw){
+  if(isTraject(p)) return {v:tot3(p), u:'voor 3 maanden', alt:`${eur(p.prijs)} per maand`};
+  if(p.dept==='adv') return {v:p.prijs, u:kw===undefined?'per maand of per ronde':(kw?'per kwartaalronde':'per maand'), alt:kw?'Eén ronde per kwartaal':'Maandelijks of per kwartaal'};
+  return {v:p.prijs, u:'per maand', alt:`Start 3 maanden ${eur(p.start)}`};
+}
+const SVG = {
+  wie:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14.5c2.4.2 4.1 1.8 4.5 4.5"/></svg>',
+  krijgt:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 12h18M12 8v13M12 8S10.5 3 7.5 3.8C5 4.5 7 8 12 8zm0 0s1.5-5 4.5-4.2C19 4.5 17 8 12 8z"/></svg>',
+  tijd:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>',
+  geld:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 6.5A7 7 0 1 0 17.5 17.5"/><path d="M4 10.5h9M4 13.5h9"/></svg>',
+  plus:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg>',
+  taak:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/></svg>'
+};
+const ynLabel = (k, extra='') => `<span class="yn ${k}">${ICON[k]}${{y:'Ja',n:'Nee',q:'Niet genoemd'}[k]}${extra?` <small>${extra}</small>`:''}</span>`;
 const ICON = {
-  y:'<span class="ico y"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>',
-  n:'<span class="ico n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2"><path d="M6 6l12 12M18 6L6 18"/></svg></span>',
+  y:'<span class="ico y" aria-label="Inbegrepen"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>',
+  n:'<span class="ico n" aria-label="Niet inbegrepen"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2"><path d="M6 6l12 12M18 6L6 18"/></svg></span>',
   q:'<span class="ico q" title="Niet genoemd in de PDF">?</span>'
 };
 const chev = '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
@@ -581,6 +713,21 @@ function copy(text){
   try{ navigator.clipboard.writeText(text).then(done,()=>fallbackCopy(text)); }catch(e){ fallbackCopy(text); }
 }
 function fallbackCopy(text){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('Gekopieerd')}catch(e){toast('Kopiëren lukte niet, selecteer de tekst handmatig')}ta.remove()}
+
+/* Rekencontrole op de centrale data: afgeleide bedragen moeten kloppen met de maandbedragen. */
+function controleerBedragen(){
+  const f=[];
+  Object.values(PKG).forEach(p=>{
+    if(p.start && p.start!==p.prijs*3) f.push(`${p.naam}: start ${p.start} ≠ 3 x ${p.prijs}`);
+    if(p.jaar!==p.prijs*12) f.push(`${p.naam}: jaar ${p.jaar} ≠ 12 x ${p.prijs}`);
+    if(p.jaarKw && p.jaarKw!==p.prijs*4) f.push(`${p.naam}: kwartaal-jaar ${p.jaarKw} ≠ 4 x ${p.prijs}`);
+    if(p.ads && p.varianten!==p.ads*3) f.push(`${p.naam}: varianten ${p.varianten} ≠ ${p.ads} x 3`);
+  });
+  if(CREATOR.partner.totaal6!==CREATOR.partner.prijs*6+CREATOR.partner.opstart) f.push('Creator Partner: traject 6 maanden klopt niet');
+  if(f.length) console.error('[prijslijst] rekencontrole', f);
+  return f;
+}
+window.SC_REKENCONTROLE = controleerBedragen();
 
 /* gedeelde state tussen onderdelen */
 const S = {
@@ -625,7 +772,6 @@ function go(){
   if(AFTER[v]) AFTER[v]();
   const top=$('#prijslijst').getBoundingClientRect().top+window.scrollY;
   if(window.scrollY>top) window.scrollTo(0,top);
-  try{localStorage.setItem('sc-prijslijst-tab',v)}catch(e){}
 }
 function nav(id){ CUR=id; go(); }
 const DEPT_TAB = {org:'organisch',adv:'advertentie',comp:'compleet'};
@@ -646,19 +792,24 @@ function volChips(p){
   return v;
 }
 function pkgCard(id, opts={}){
-  const p=P(id), kw=p.dept==='adv'&&S.advAfname==='kwartaal';
-  const per = p.dept==='adv' ? (kw?'per kwartaalronde':'per maand') : 'per maand';
-  const sub = p.dept==='org' ? `Ritme ${p.ritme} · 1 draaidag per maand` : p.dept==='comp' ? `Ritme ${p.ritme} · 2 draaidagen per maand` : (kw?'Eén ronde per kwartaal':'Elke maand een nieuwe set');
+  const p=P(id), kw=p.dept==='adv'&&S.advAfname==='kwartaal', m=hoofdPrijs(p,kw);
+  const facts = p.dept==='org' ? [[p.shorts,"video's per maand"],[vid3(p),"video's in 3 maanden"],[1,'draaidag per maand']]
+    : p.dept==='adv' ? [[p.ads,`video's per ${kw?'ronde':'maand'}`],[3,'hooks per video'],[p.varianten,'varianten']]
+    : [[p.shorts,'shorts per maand'],[p.ads,'ads per maand'],[p.varianten,'ad-varianten']];
+  const meta = p.dept==='org' ? [['Ritme',p.ritme],['Draaidag','1 per maand, 4 tot 7 uur'],['Per maand',eur(p.prijs)]]
+    : p.dept==='adv' ? [['Afname',kw?'Eén ronde per kwartaal':'Elke maand een nieuwe set'],['Draaidag','Draaidag en regie inbegrepen']]
+    : [['Ritme organisch',p.ritme],['Draaidagen','2 per maand, max 8 uur'],['Start 3 maanden',eur(p.start)]];
   return `<div class="pkg ${opts.sel?'sel':''}" style="${accVars(p.dept)}" data-pkg="${id}">
     <div class="pkg-top">
       ${p.advies?'<span class="advies">Ons advies</span>':''}
       <div class="nm">${p.naam}</div>
-      <div class="price">${eur(p.prijs)}<span class="per"> ${per}</span></div>
+      <div class="ptag">${isTraject(p)?'Investering voor 3 maanden':'Investering '+m.u}</div>
+      <div class="price">${eur(m.v)}</div>
+      ${isTraject(p)?`<div class="psub">${m.alt} · minimale samenwerking 3 maanden</div>`:''}
     </div>
     <div class="pkg-body">
-      <div class="vol">${volChips(p).map(v=>{const c=p.dept==='comp'?(/shorts/.test(v)?'org':'adv'):null;return `<span class="chip" ${c?`style="background:${D(c).soft};color:${D(c).kleur}"`:''}>${v}</span>`}).join('')}</div>
-      <div class="per" style="margin-top:8px">${sub}</div>
-      ${p.start?`<div class="startbox"><span>Start 3 maanden</span><b>${eur(p.start)}</b></div>`:''}
+      <div class="facts">${facts.map(f=>`<div class="fact"><b>${f[0]}</b><span>${f[1]}</span></div>`).join('')}</div>
+      ${meta.map(x=>`<div class="meta-l"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('')}
       ${opts.sel?'<div class="selmark">✓ Geselecteerd</div>':''}
     </div>
   </div>`;
@@ -666,8 +817,8 @@ function pkgCard(id, opts={}){
 function inclList(dept){
   const i=INCL[dept];
   return `<div class="grid g2">
-    <div><div class="eyebrow" style="color:var(--ok)">Inbegrepen</div>${i.in.map(x=>`<div class="li">${ICON.y}<span>${x}</span></div>`).join('')}</div>
-    <div><div class="eyebrow" style="color:var(--no)">Niet inbegrepen</div>${i.out.map(x=>`<div class="li">${ICON.n}<span>${x}</span></div>`).join('')}</div>
+    <div><div class="inc-h y">${ICON.y} Inbegrepen</div>${i.in.map(x=>`<div class="li">${ICON.y}<span>${x}</span></div>`).join('')}</div>
+    <div><div class="inc-h n">${ICON.n} Niet inbegrepen</div>${i.out.map(x=>`<div class="li">${ICON.n}<span>${x}</span></div>`).join('')}</div>
   </div>`;
 }
 function infoBlocks(list,cols='g4'){ return `<div class="grid ${cols}">${list.map(x=>`<div class="info"><div class="k">${x.k}</div><div class="v">${x.v}</div><div class="d">${x.d}</div></div>`).join('')}</div>`; }
@@ -681,14 +832,38 @@ const checkLine = t => `<div class="small" style="color:#7a4a06;margin-top:8px">
 /* =====================================================================
    5. VIEWS
    ===================================================================== */
+function pakketTabel(){
+  const groep=(k,label)=>`<div class="grp" style="--acc:${k}"><i></i>${label}</div>`;
+  const rij=(acc,o)=>`<div class="pr-r" style="--acc:${acc};--acc-soft:${o.soft||'#e6e6ee'}" onclick="${o.go}">
+      <div class="c-name"><span class="blk">${o.naam}</span>${o.advies?' <span class="blk soft" style="margin-left:4px;font-size:11px;padding:3px 8px">advies</span>':''}</div>
+      <div class="c-vol"><div class="vol-l">${o.vol}</div><div class="vol-s">${o.volS}</div></div>
+      <div class="c-dd"><span class="lbl">Draaidagen</span><span>${o.dd}</span><div class="sm">${o.ddS}</div></div>
+      <div class="c-inv c-r"><div class="inv"><span class="blk lg">${eur(o.inv)}</span><span class="u">${o.invU}</span></div></div>
+      <div class="c-alt c-r alt">${o.alt}</div>
+    </div>`;
+  const pk = p => { const m=hoofdPrijs(p), d=D(p.dept);
+    const vol = p.dept==='org' ? [`${p.shorts} video's per maand`, `Totaal ${vid3(p)} video's in 3 maanden · ${p.ritme}`]
+      : p.dept==='adv' ? [`${p.ads} video's x 3 hooks`, `${p.varianten} varianten · per maand of per kwartaal`]
+      : [`${p.shorts} shorts + ${p.ads} ads per maand`, `${p.varianten} ad-varianten · ${p.ritme}`];
+    const dd = p.dept==='org' ? ['1 per maand','4 tot 7 uur'] : p.dept==='adv' ? ['Inbegrepen','Draaidag en regie'] : ['2 per maand','Max 8 uur per dag'];
+    const alt = p.dept==='org' ? `<b>${eur(p.prijs)}</b> per maand` : p.dept==='comp' ? `3 mnd: <b>${eur(p.start)}</b>` : 'Maand of kwartaal';
+    return rij(d.kleur,{soft:d.soft,naam:p.naam,advies:p.advies,vol:vol[0],volS:vol[1],dd:dd[0],ddS:dd[1],inv:m.v,invU:m.u,alt,go:`S.deptPkg['${p.dept}']='${p.id}';toDept('${p.dept}')`}); };
+  return `<div class="ptab">
+    <div class="pr-h"><div>Pakket</div><div>Wat de klant krijgt</div><div>Draaidagen</div><div class="c-r">Investering</div><div class="c-r">Aanvullend</div></div>
+    ${['org','adv','comp'].map(k=>groep(D(k).kleur,`${D(k).nr} · ${D(k).kort}${k==='org'?' · investering voor 3 maanden':''}`)+D(k).pakketten.map(id=>pk(P(id))).join('')).join('')}
+    ${groep('#3d3a7a','Creator Partner · begeleiding eigen creator')}
+    ${rij('#3d3a7a',{soft:'#ecebf5',naam:'Creator Partner',vol:'Strategie en regie door Shortclips',volS:'Eigen creator doet het dagelijkse werk',dd:'2 per traject',ddS:'Halve dag, maand 1 en 4',inv:CREATOR.partner.prijs,invU:'per maand',alt:`+ <b>${eur(CREATOR.partner.opstart)}</b> opstart`,go:"S.pTab='creator';nav('partner')"})}
+  </div>
+  <div class="ptab-note">Alle bedragen excl. btw. Klik op een regel voor de details van het pakket.</div>`;
+}
 VIEWS.overzicht = () => `
   <div class="kern"><b>Je koopt geen losse video's. Je krijgt een complete creatieve afdeling.</b> Eerst kiezen we samen de afdeling, daarna de capaciteit.</div>
   <div class="grid g3">
     ${['org','adv','comp'].map(k=>{const d=D(k);return `<a class="dept bg-${k}" href="javascript:void(0)" onclick="toDept('${k}')">
       <div class="row"><span class="num">${d.nr}</span>${d.label?`<span class="tag-adv right">${d.label}</span>`:''}</div>
       <h2>${d.kort}</h2><p>${d.kaart}</p>
-      <div class="prices">${d.pakketten.map(id=>`<div class="pr"><span>${P(id).naam}${P(id).advies?' · advies':''}</span><b>${eur(P(id).prijs)}</b></div>`).join('')}
-      <div class="foot">${k==='adv'?'per maand of per kwartaalronde':'per maand'}</div></div>
+      <div class="prices">${d.pakketten.map(id=>{const p=P(id),m=hoofdPrijs(p);return `<div class="pr"><span>${p.naam}${p.advies?' · advies':''}</span><b class="num-t">${eur(m.v)}</b></div>`}).join('')}
+      <div class="foot">${k==='org'?'Investering voor 3 maanden · minimale samenwerking':k==='adv'?'Per maand of per kwartaalronde':'Per maand'}</div></div>
       <div class="more">Bekijk afdeling →</div>
     </a>`}).join('')}
   </div>
@@ -700,14 +875,7 @@ VIEWS.overzicht = () => `
 
   <div class="section">
     <h2>Alle pakketten</h2>
-    <div class="card" style="padding:4px 6px;overflow:auto">
-      <table class="tbl clickable"><thead><tr><th>Pakket</th><th>Wat de klant krijgt</th><th>Draaidagen</th><th class="r">Investering</th><th class="r">Start 3 mnd</th></tr></thead><tbody>
-      ${Object.values(PKG).map(p=>`<tr style="--acc:${D(p.dept).kleur}" class="drow" onclick="S.deptPkg['${p.dept}']='${p.id}';toDept('${p.dept}')"><td><span class="dot" style="display:inline-block;background:${D(p.dept).kleur};margin-right:8px"></span><b>${p.naam}</b>${p.advies?' <span class="chip mini">advies</span>':''}</td>
-        <td>${volChips(p).join(' · ')}</td><td class="muted">${p.dept==='adv'?'Inbegrepen':p.dept==='org'?'1 per maand':'2 per maand'}</td>
-        <td class="r"><b class="pc">${eur(p.prijs)}</b> <span class="muted small">${p.dept==='adv'?'p/m of per ronde':'p/m'}</span></td><td class="r">${p.start?`<span class="pc">${eur(p.start)}</span>`:'<span class="muted">·</span>'}</td></tr>`).join('')}
-      <tr onclick="nav('partner')"><td><span class="dot" style="display:inline-block;background:#06053a;margin-right:8px"></span><b>Creator Partner</b></td><td>Strategie en regie, eigen creator doet het werk</td><td class="muted">2 per traject</td><td class="r"><b>${eur(CREATOR.partner.prijs)}</b> <span class="muted small">p/m</span></td><td class="r"><span class="muted small">+ ${eur(CREATOR.partner.opstart)} opstart</span></td></tr>
-      </tbody></table>
-    </div>
+    ${pakketTabel()}
   </div>
 
   <div class="section"><h2>Geldt altijd</h2>${infoBlocks(ALGEMEEN)}</div>
@@ -715,11 +883,11 @@ VIEWS.overzicht = () => `
 
 function deptView(dept){
   const d=D(dept), sel=S.deptPkg[dept], [a,b]=d.pakketten.map(P), kw=S.advAfname==='kwartaal';
-  const diff = dept==='org' ? `<b>+2 shorts</b><span>ritme 3x per 2 weken → <b>2x per week</b></span><b>+${eur(b.prijs-a.prijs)} p/m</b>`
+  const diff = dept==='org' ? `<b>+${b.shorts-a.shorts} video's per maand</b><span>+${vid3(b)-vid3(a)} in 3 maanden · ritme ${a.ritme} → <b>${b.ritme}</b></span><b>+${eur(tot3(b)-tot3(a))} voor 3 maanden</b>`
     : dept==='adv' ? `<b>+2 video's</b><b>+6 varianten</b><b>+${eur(b.prijs-a.prijs)} per ${kw?'ronde':'maand'}</b>`
     : `<b>+2 shorts</b><b>+3 ads (+9 varianten)</b><b>+${eur(b.prijs-a.prijs)} p/m</b><span>draaidagen gelijk</span>`;
   const weten = {
-    org:[{k:'Kanalen',v:'TikTok, Reels, Shorts, Facebook',d:''},{k:"Niet gebruikte video's",v:'Inhalen binnen 2 maanden',d:''},{k:'Ook adverteren?',v:'Bij evaluatie naar Compleet',d:''}],
+    org:[{k:'Minimale samenwerking',v:'3 maanden, daarna evaluatie',d:''},{k:'Kanalen',v:'TikTok, Reels, Shorts, Facebook',d:''},{k:"Niet gebruikte video's",v:'Inhalen binnen 2 maanden',d:''},{k:'Ook adverteren?',v:'Bij evaluatie naar Compleet',d:''}],
     adv:[{k:'Mediabuyer',v:'Zet live, beheert, analyseert',d:''},{k:'Geen mediabuyer?',v:'We zoeken samen een partij',d:''},{k:'3 hooks',v:'3 openingen per basisvideo',d:''}],
     comp:[{k:'Eén strategie',v:'Organisch en ads samen',d:''},{k:'Organisch test',v:'Welke hooks werken',d:''},{k:'Ads schalen',v:'Winnaars worden creatives',d:''}]
   }[dept];
@@ -738,9 +906,9 @@ function deptView(dept){
     <div class="diffbar"><span>Verschil ${a.naam} → ${b.naam.split(' ')[1]}:</span>${diff}</div>
     ${dept==='adv'?`<div class="formula small-f"><div class="fbox"><b>${P(sel).ads}</b><span>video's</span></div><div class="fop">×</div><div class="fbox"><b>3</b><span>hooks</span></div><div class="fop">=</div><div class="fbox res"><b>${P(sel).varianten}</b><span>varianten</span></div><span class="muted small">Klik op een pakket om de berekening te wisselen</span></div>`:''}
   </div>
-  <div class="card section acc-card" style="${accVars(dept)}"><h2 style="margin-bottom:8px">Wat zit erin?</h2><div class="muted small" style="margin-bottom:10px">Gelijk voor beide pakketten. Alleen het volume verschilt.</div>${inclList(dept)}
+  <div class="card section acc-card" style="${accVars(dept)}"><h2 style="margin-bottom:6px">Wat zit erin?</h2><div class="muted small" style="margin-bottom:18px">Gelijk voor beide pakketten. Alleen het volume verschilt.</div>${inclList(dept)}
     ${dept==='adv'?checkLine(CONTROLE[0].d):''}${dept==='comp'?checkLine('Scriptmeeting, regie op locatie en klantportaal worden bij Compleet niet expliciet genoemd. Zie controlepunten.'):''}</div>
-  <div class="section tinted" style="${accVars(dept)}">${infoBlocks(weten,'g3')}</div>
+  <div class="section tinted" style="${accVars(dept)}">${infoBlocks(weten,weten.length>3?'g4':'g3')}</div>
   <div class="section">${argsBlock(dept)}</div>`;
 }
 VIEWS.organisch=()=>deptView('org'); VIEWS.advertentie=()=>deptView('adv'); VIEWS.compleet=()=>deptView('comp');
@@ -751,45 +919,83 @@ function bindDept(dept){
 AFTER.organisch=()=>bindDept('org'); AFTER.advertentie=()=>bindDept('adv'); AFTER.compleet=()=>bindDept('comp');
 
 /* ---------- Partnerjaar en Creator ---------- */
+const PCOL = {
+  jaar:{acc:'#06053a',soft:'#e6e6ee'}, creator:{acc:'#3d3a7a',soft:'#ecebf5'}, academy:{acc:'#5b6178',soft:'#eef0f4'}
+};
+const pAcc = k => `--acc:${PCOL[k].acc};--acc-soft:${PCOL[k].soft}`;
+function pBlock(icon,titel,sub,body,cls=''){
+  return `<div class="pblock ${cls}"><div class="ph2"><span class="pico">${SVG[icon]}</span><div><h3>${titel}</h3>${sub?`<div class="sub">${sub}</div>`:''}</div></div>${body}</div>`;
+}
+const kvs = list => list.map(x=>`<div class="kv"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');
+const lis = list => list.map(x=>`<div class="li">${ICON.y}<span>${x}</span></div>`).join('');
+function partnerVergelijk(){
+  const o8=P('org8');
+  const col=(k,kop,sub,cells,btn)=>`<div class="pcol" style="${pAcc(k)}">
+    <div class="ph"><div class="t">${kop}</div><div class="s">${sub}</div></div>
+    ${cells.map(c=>`<div><div class="rk">${SVG[c[0]].replace('width="18" height="18"','width="13" height="13"')}${c[1]}</div>${c[2]}</div>`).join('')}
+    <div class="act">${btn}</div></div>`;
+  return `<div class="pcmp">
+    ${col('jaar','Partnerjaar','Na de evaluatie in maand 3',[
+      ['wie','Voor wie','Klant die na de startperiode tevreden is en zekerheid wil.'],
+      ['krijgt','Wat ontvangt de klant','Dezelfde afdeling, plus jaarstrategie, voorrang bij de planning en 2 extra opnames.'],
+      ['tijd','Looptijd','12 maanden vast, aansluitend op de startperiode.'],
+      ['geld','Investering',`<b class="big">12 x maandbedrag</b><span class="muted small">Vaste prijs, geen indexatie. Bijv. ${o8.naam}: ${eur(o8.jaar)} per jaar.</span>`],
+      ['plus','Extra','Kwartaalreviews en een jaarreview.']],
+      `<button class="btn" onclick="S.pTab='jaar';go()">Details Partnerjaar →</button>`)}
+    ${col('creator','Creator Partner','Alleen als de klant het intern wil doen',[
+      ['wie','Voor wie','Klant met een eigen creator in dienst, of die er een aanneemt.'],
+      ['krijgt','Wat ontvangt de klant','Strategie en regie, 6 scripts per maand, 2 specialistische opnames en feedback.'],
+      ['tijd','Looptijd','Traject van 6 maanden.'],
+      ['geld','Investering',`<b class="big">${eur(CREATOR.partner.prijs)} <span class="small muted" style="font-weight:400">per maand</span></b><span class="muted small">+ ${eur(CREATOR.partner.opstart)} opstart · traject ${eur(CREATOR.partner.totaal6)}</span>`],
+      ['plus','Extra','Altijd terug naar een afdeling, zonder opstartkosten.']],
+      `<button class="btn" onclick="S.pTab='creator';go()">Details Creator Partner →</button>`)}
+    ${col('academy','Creator Academy','Online leeromgeving in ons portaal',[
+      ['wie','Voor wie','Creators van de klant die zelfstandig willen leren.'],
+      ['krijgt','Wat ontvangt de klant','Toegang tot de online leeromgeving in het Shortclips portaal.'],
+      ['tijd','Looptijd',`Minimaal ${CREATOR.academy.minLooptijd}.`],
+      ['geld','Investering',`<b class="big">${eur(CREATOR.academy.prijs)} <span class="small muted" style="font-weight:400">per maand</span></b><span class="muted small">Per creator</span>`],
+      ['plus','Let op','<span style="color:#7a4a06">Nog niet vastgelegd of de Academy los of bij Creator Partner wordt verkocht.</span>']],
+      `<button class="btn" onclick="S.pTab='creator';go()">Bekijk bij Creator Partner →</button>`)}
+  </div>`;
+}
+function jaarTabel(){
+  const rows = Object.values(PKG).flatMap(p=>p.dept==='adv'
+    ? [[p.naam,'maandelijks',p.jaarLevering,`${eur(p.prijs)} per maand`,p.jaar,p.dept],[p.naam,'per kwartaal',p.jaarLeveringKw,`${eur(p.prijs)} per ronde`,p.jaarKw,p.dept]]
+    : [[p.naam,'',p.jaarLevering,`${eur(p.prijs)} per maand`,p.jaar,p.dept]]);
+  return `<div class="ptab jt" style="box-shadow:none">
+    <div class="pr-h"><div>Pakket</div><div>Levering per jaar</div><div class="c-r">Per maand of ronde</div><div class="c-r">Per jaar</div></div>
+    ${rows.map(r=>`<div class="pr-r" style="cursor:default;${accVars(r[5])}">
+      <div class="c-name"><span class="blk">${r[0]}</span>${r[1]?` <span class="sm">${r[1]}</span>`:''}</div>
+      <div class="c-vol sm" style="color:var(--text)">${r[2]}</div>
+      <div class="c-alt c-r alt">${r[3]}</div>
+      <div class="c-inv c-r"><span class="blk lg">${eur(r[4])}</span></div></div>`).join('')}
+  </div>`;
+}
 VIEWS.partner = () => `
-  <div class="seg" id="pSeg" style="margin-bottom:18px"><button data-v="jaar" class="${S.pTab!=='creator'?'on':''}">Partnerjaar</button><button data-v="creator" class="${S.pTab==='creator'?'on':''}">Creator Partner</button></div>
-  ${S.pTab!=='creator' ? `
-  <div class="dhead" style="--acc:#06053a"><div><div class="eyebrow">Na de evaluatie in maand 3</div><h1>Partnerjaar</h1>
-    <div class="muted">Dezelfde afdeling en hetzelfde maandbedrag, 12 maanden vast.</div>
-    <div class="fit"><b>Past bij een klant die</b> na de startperiode tevreden is en zekerheid wil.</div></div></div>
-  <div class="section">${infoBlocks(PARTNERJAAR.voordelen)}</div>
-  <div class="section"><h2>Jaarbedragen</h2>
-    <div class="card" style="padding:4px 6px;overflow:auto"><table class="tbl"><thead><tr><th>Afdeling</th><th>Levering per jaar</th><th class="r">Per maand of ronde</th><th class="r">Per jaar</th></tr></thead><tbody>
-      ${Object.values(PKG).flatMap(p=>p.dept==='adv'
-        ? [[p.naam+' · maandelijks',p.jaarLevering,eur(p.prijs),p.jaar,p.dept],[p.naam+' · per kwartaal',p.jaarLeveringKw,eur(p.prijs)+' per ronde',p.jaarKw,p.dept]]
-        : [[p.naam,p.jaarLevering,eur(p.prijs),p.jaar,p.dept]]).map(r=>`<tr class="drow" style="--acc:${D(r[4]).kleur}"><td><span class="dot" style="display:inline-block;background:${D(r[4]).kleur};margin-right:8px"></span><b>${r[0]}</b></td><td class="muted">${r[1]}</td><td class="r pc">${r[2]}</td><td class="r"><b class="pc" style="font-size:15px">${eur(r[3])}</b></td></tr>`).join('')}
-    </tbody></table></div>
-    <div class="small muted" style="margin-top:6px">Noem in een voorstel eerst het jaarbedrag, met het maandbedrag eronder.</div></div>
-  <div class="section"><h2>Partnerjaar of regulier vervolg?</h2>
-    <div class="grid g2">
-      <div class="card"><div class="eyebrow">Regulier vervolg</div><div class="li">${ICON.y}<span>3, 6 of 9 maanden</span></div><div class="li">${ICON.y}<span>Zelfde maandbedrag</span></div><div class="li">${ICON.n}<span>1x per jaar indexatie (CPI of tot 3%)</span></div></div>
-      <div class="card" style="border:2px solid var(--navy)"><div class="eyebrow">Partnerjaar</div><div class="li">${ICON.y}<span>12 maanden vast, zelfde maandbedrag</span></div><div class="li">${ICON.y}<span>Vaste prijs, geen indexatie</span></div><div class="li">${ICON.y}<span>Jaarstrategie en voorrang bij de planning</span></div><div class="li">${ICON.y}<span>2 extra opnames per jaar (Organisch en Compleet)</span></div></div>
-    </div></div>
-  <div class="section"><h2>Voorwaarden</h2>${infoBlocks(PARTNERJAAR.voorwaarden)}</div>`
-  : `
-  <div class="dhead" style="--acc:#06053a"><div><div class="eyebrow">Alleen als de klant het intern wil doen</div><h1>Creator Partner</h1>
-    <div class="muted">Shortclips houdt de strategie en de regie, de eigen creator van de klant doet het dagelijkse werk.</div>
-    <div class="fit"><b>Past bij een klant die</b> een eigen creator in dienst heeft of gaat aannemen.</div></div></div>
-  <div class="grid g2 section">
-    <div class="pkg sel" style="--acc:#06053a;--acc-soft:#e6e6ee;cursor:default"><span class="advies">Ons advies</span>
-      <div class="nm">Creator Partner</div><div class="price">${eur(CREATOR.partner.prijs)}<span class="per"> per maand</span></div>
-      <div class="startbox"><span>Opstart, eenmalig</span><b>${eur(CREATOR.partner.opstart)}</b></div>
-      <div class="startbox" style="margin-top:-6px"><span>Totaal traject 6 maanden</span><b>${eur(CREATOR.partner.totaal6)}</b></div></div>
-    <div class="pkg" style="--acc:#06053a;--acc-soft:#e6e6ee;cursor:default">
-      <div class="nm">Creator Academy</div><div class="price">${eur(CREATOR.academy.prijs)}<span class="per"> per maand, per creator</span></div>
-      <div class="startbox"><span>Online leeromgeving in ons portaal</span><b>inbegrepen</b></div>
-      <div class="startbox" style="margin-top:-6px"><span>Minimale looptijd</span><b>6 maanden</b></div></div>
+  <div class="kern"><b>Langer samenwerken: drie vormen naast elkaar.</b> Vergelijk ze hieronder op dezelfde punten en open daarna de details.</div>
+  ${partnerVergelijk()}
+  <div class="section" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px">
+    <h2 style="margin:0">Details</h2>
+    <div class="seg" id="pSeg"><button data-v="jaar" class="${S.pTab!=='creator'?'on':''}">Partnerjaar</button><button data-v="creator" class="${S.pTab==='creator'?'on':''}">Creator Partner en Academy</button></div>
   </div>
-  ${checkLine(CONTROLE[4].d)}
-  <div class="section"><h2>Wie doet wat</h2><div class="card" style="padding:4px 6px;overflow:auto"><table class="tbl"><thead><tr><th>Onderdeel</th><th>Shortclips</th><th>Creator van de klant</th></tr></thead><tbody>
-    ${CREATOR.wiedoetwat.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]==='Nee'?ICON.n:r[1]}</td><td>${r[2]}</td></tr>`).join('')}
-  </tbody></table></div></div>
-  <div class="info section"><div class="v">Altijd een weg terug</div><div class="d">Wil de klant later dat Shortclips het weer volledig overneemt? Dan stapt hij over naar een afdeling, zonder opstartkosten.</div></div>`}`;
+  ${S.pTab!=='creator' ? `<div class="pblocks" style="${pAcc('jaar')}">
+    ${pBlock('wie','Voor wie','Moment: de evaluatie in maand 3',`<p style="margin:0">Een klant die na de startperiode van 3 maanden tevreden is en zekerheid wil over prijs en planning.</p>`)}
+    ${pBlock('krijgt','Wat de klant ontvangt','',lis(['Dezelfde afdeling en hetzelfde maandbedrag','Jaarstrategie: startsessie van 90 minuten en een jaarplan (Advertentie: creative plan per kwartaal)','Voorrang: draaidagen 12 maanden vooruit vastgelegd','2 extra opnames per jaar, halve dag (Organisch en Compleet)','Kwartaalreviews plus een jaarreview']))}
+    ${pBlock('tijd','Looptijd en samenwerking','',kvs([['Looptijd','12 maanden'],['Start','Aansluitend op de startperiode'],['Tussentijds opzeggen','Nee'],['Facturatie','Vooraf per maand'],['Advertentie per kwartaal','Vooraf per ronde'],['Zekerheid','Per kwartaal opzegbaar als wij aantoonbaar niet leveren']]))}
+    ${pBlock('plus','Voordelen ten opzichte van regulier vervolg','Regulier vervolg: 3, 6 of 9 maanden',`
+      <table class="tbl cmp"><thead><tr><th></th><th>Regulier</th><th>Partnerjaar</th></tr></thead><tbody>
+      ${[['Zelfde maandbedrag','y','y'],['Vaste prijs, geen indexatie','n','y'],['Jaarstrategie en voorrang','n','y'],['2 extra opnames per jaar','n','y']].map(r=>`<tr><td class="lab">${r[0]}</td><td>${ynLabel(r[1])}</td><td>${ynLabel(r[2])}</td></tr>`).join('')}
+      </tbody></table><div class="small muted" style="margin-top:8px">Regulier vervolg: 1x per jaar indexatie (CPI of tot 3%).</div>`)}
+    ${pBlock('geld','Investering','Noem in een voorstel eerst het jaarbedrag, met het maandbedrag eronder',jaarTabel(),'wide')}
+  </div>` : `<div class="pblocks" style="${pAcc('creator')}">
+    ${pBlock('wie','Voor wie','Niet actief verkopen',`<p style="margin:0">Een klant die short video intern wil oppakken met een eigen creator, maar strategisch sterk wil blijven. Shortclips houdt de strategie en de regie.</p>`)}
+    ${pBlock('krijgt','Wat de klant ontvangt','',lis(['Strategie en contentplan, elke maand bijgestuurd op de cijfers','6 scripts per maand','2 specialistische opnames per traject, halve dag, inclusief 2 shorts per keer',"Feedback op max 8 video's per maand, 1 gebundelde ronde met tijdcodes",'Maandrapport en kwartaalreview']))}
+    ${pBlock('tijd','Looptijd en samenwerking','',kvs([['Traject','6 maanden'],['Specialistische opnames','Maand 1 en 4'],['Dagelijkse opnames en montage','Door de creator'],['Publiceren','Door de creator'],['Weg terug','Naar een afdeling, zonder opstartkosten']]))}
+    ${pBlock('geld','Investering','',`<div class="inv-big"><b>${eur(CREATOR.partner.prijs)}</b><span class="muted">per maand</span></div>${kvs([['Opstart, eenmalig',eur(CREATOR.partner.opstart)],['Totaal traject 6 maanden',eur(CREATOR.partner.totaal6)],['Creator Academy, per creator',`${eur(CREATOR.academy.prijs)} per maand`],['Academy minimale looptijd',CREATOR.academy.minLooptijd]])}${checkLine(CONTROLE[4].d)}`)}
+    ${pBlock('taak','Wie doet wat','',`<table class="tbl cmp"><thead><tr><th>Onderdeel</th><th>Shortclips</th><th>Creator van de klant</th></tr></thead><tbody>
+      ${CREATOR.wiedoetwat.map(r=>`<tr><td class="lab"><b style="color:var(--text)">${r[0]}</b></td><td>${r[1]==='Nee'?ynLabel('n'):r[1]}</td><td>${r[2]}</td></tr>`).join('')}
+      </tbody></table>`,'wide')}
+  </div>`}`;
 AFTER.partner=()=>document.querySelectorAll('#pSeg button').forEach(b=>b.onclick=()=>{S.pTab=b.dataset.v;go()});
 
 /* ---------- Extra kosten en vragen ---------- */
@@ -865,6 +1071,7 @@ function aSummary(){
   let inv;
   if(A.vorm==='jaar') inv = `${eur(kw?p.jaarKw:p.jaar)} per jaar (${eur(p.prijs)} per ${kw?'kwartaalronde':'maand'}). Partnerjaar: 12 maanden vast, vaste prijs zonder indexatie, met jaarstrategie en voorrang bij de planning.`;
   else if(A.vorm==='vervolg') inv = `${eur(p.prijs)} per ${kw?'kwartaalronde':'maand'}, vervolg van ${A.vervolg} maanden.`;
+  else if(isTraject(p)) inv = `${eur(tot3(p))} voor de eerste 3 maanden (${vid3(p)} video's in totaal, ${eur(p.prijs)} per maand). Daarna evalueren we samen resultaten en koers.`;
   else inv = `${eur(p.prijs)} per ${kw?'kwartaalronde':'maand'}. We starten met 3 maanden${p.start?` (${eur(p.start)})`:''} en evalueren in maand 3 samen resultaten en koers.`;
   const ex = EXTRAS.filter(x=>(+A.qty[x.id]||0)>0).map(x=>`· ${x.naam}: ${x.calc?(A.qty[x.id]+' x '+eur(x.prijs)+' per '+x.eenheid):x.prijsTxt}`);
   const mb = p.dept==='org' ? '' : A.mb==='nee' ? '\n\nMediabuyer: nog niet aanwezig. We zoeken samen een geschikte partij die de campagnes live zet en beheert.' : A.mb==='ja' ? '\n\nMediabuyer: aanwezig. Wij sturen de creatives klaar voor gebruik door; de mediabuyer zet live en beheert.' : '';
@@ -882,8 +1089,10 @@ VIEWS.adviseren = () => {
       ${dept==='adv'?`<div style="margin-bottom:10px">${yn('afname',A.afname,[['maand','Maandelijks · test continu'],['kwartaal','Per kwartaal · werkt per campagne']])}</div>`:''}
       <div class="grid g2" style="gap:10px">${d.pakketten.map(id=>{const p=P(id);return `<button class="bigopt ${A.pkg===id?'on':''}" data-pkg="${id}" style="${accVars(dept)}">
         <span class="row"><b>${p.naam}</b>${p.advies?'<span class="chip mini right" style="background:var(--acc);color:#fff;border:0">advies</span>':''}</span>
-        <span class="pp">${eur(p.prijs)}<span class="muted small"> ${dept==='adv'?(A.afname==='kwartaal'?'per ronde':'p/m'):'p/m'}</span></span>
-        <span class="muted small">${volChips(p).join(' · ')}${p.shorts?' · '+p.ritme:''}</span></button>`}).join('')}</div>`, true);
+        ${isTraject(p)?`<span class="pp">${eur(tot3(p))}<span class="muted small"> voor 3 maanden</span></span>
+        <span class="muted small">${eur(p.prijs)} per maand · ${p.shorts} video's per maand · ${vid3(p)} in 3 maanden</span>`
+        :`<span class="pp">${eur(p.prijs)}<span class="muted small"> ${dept==='adv'?(A.afname==='kwartaal'?'per ronde':'per maand'):'per maand'}</span></span>
+        <span class="muted small">${volChips(p).join(' · ')}${p.shorts?' · '+p.ritme:''}</span>`}</button>`}).join('')}</div>`, true);
     s3 = step(3,'Welke samenwerking?',`${yn('vorm',A.vorm,[['start','Start 3 maanden'],['vervolg','Vervolg'],['jaar','Partnerjaar']])}
       ${A.vorm==='vervolg'?`<span style="margin-left:6px">${yn('vervolg',String(A.vervolg),[['3','3 mnd'],['6','6 mnd'],['9','9 mnd']])}</span>`:''}
       <div class="muted small" style="margin-top:6px">${A.vorm==='start'?'Iedere klant start met 3 maanden, daarna evaluatie.':A.vorm==='jaar'?'12 maanden vast na de evaluatie, vaste prijs, voorrang bij de planning.':'Na de evaluatie, zelfde maandbedrag.'}</div>`, true);
@@ -921,7 +1130,7 @@ function renderAOut(){
   if(dept==='creator'){ kleur='#06053a'; head=`Creator Partner`; why='De klant pakt short video intern op. Shortclips houdt strategie en regie.'; wat=['Strategie en contentplan','6 scripts per maand','2 specialistische opnames per traject','Feedback op max 8 video\'s per maand']; }
   else { const p=P(A.pkg), d=D(p.dept); kleur=d.kleur; head=`${d.naam} · ${p.naam}`;
     why = {org:'Adverteert niet, wil bereik en merkbekendheid opbouwen.',adv:'Adverteert en heeft steeds nieuwe creatives nodig, geen organische content.',comp:'Adverteert én wil organisch zichtbaar zijn: alles uit één strategie.'}[p.dept];
-    wat = [...volChips(p), p.dept==='adv'?(A.afname==='kwartaal'?'Eén ronde per kwartaal':'Elke maand een nieuwe set'):`Ritme ${p.ritme}`, p.dept==='org'?'1 draaidag per maand':p.dept==='comp'?'2 draaidagen per maand':'Draaidag en regie', p.dept==='adv'?'Export naar de mediabuyer':p.dept==='comp'?'Organisch publiceren door Shortclips':'Publiceren door Shortclips'];
+    wat = [...(isTraject(p)?[`${p.shorts} video's per maand`,`${vid3(p)} video's in 3 maanden`]:volChips(p)), p.dept==='adv'?(A.afname==='kwartaal'?'Eén ronde per kwartaal':'Elke maand een nieuwe set'):`Ritme ${p.ritme}`, p.dept==='org'?'1 draaidag per maand':p.dept==='comp'?'2 draaidagen per maand':'Draaidag en regie', p.dept==='adv'?'Export naar de mediabuyer':p.dept==='comp'?'Organisch publiceren door Shortclips':'Publiceren door Shortclips'];
   }
   const tot = m.contract + (dept==='creator'?0:x.t);
   el.innerHTML = `<div class="result">
@@ -992,7 +1201,7 @@ function calcModel(c){
   }
   const p=P(c.pkg), kw=p.dept==='adv'&&c.afname==='kwartaal';
   if(c.vorm==='start'){
-    periodeLabel='Totaal start 3 maanden';
+    periodeLabel=isTraject(p)?'Investering voor 3 maanden':'Totaal start 3 maanden';
     if(p.start){ lines.push([p.naam,`${eur(p.prijs)} x 3 maanden`,p.start]); contract=p.start; }
     else if(kw){ lines.push([`${p.naam} · per kwartaal`,'1 ronde in de startperiode',p.prijs]); contract=p.prijs; notes.push('Bij Organisch en Compleet staat het startbedrag in de PDF, bij Advertentie niet.'); }
     else { lines.push([`${p.naam} · maandelijks`,`${eur(p.prijs)} x 3 maanden`,p.prijs*3]); contract=p.prijs*3; notes.push('Bij Organisch en Compleet staat het startbedrag in de PDF, bij Advertentie niet.'); }
@@ -1020,10 +1229,11 @@ function extrasTotal(qty){
 function cmpRows(ids){
   const ps=ids.map(P), r=(label,fn)=>({label,vals:ps.map(fn)});
   return [
-    r('Investering',p=>eur(p.prijs)+(p.dept==='adv'?' p/m of ronde':' p/m')),
-    r('Start 3 maanden',p=>p.start?eur(p.start):'Niet vermeld'),
-    r('Organische shorts',p=>p.shorts?`${p.shorts} p/m · ${p.ritme}`:'Geen'),
-    r('Advertenties',p=>p.ads?`${p.ads} video's · ${p.varianten} varianten`:'Geen'),
+    r('Investering 3 maanden',p=>p.start?`${eur(p.start)}${isTraject(p)?` <span class="blk soft" style="${accVars('org')};font-size:10.5px;padding:2px 7px;margin-left:4px">leidend</span>`:''}`:`${eur(p.prijs*3)} <span class="small muted" style="font-weight:400">bij 3 x maand</span>`),
+    r('Per maand',p=>eur(p.prijs)+(p.dept==='adv'?' <span class="small muted" style="font-weight:400">of per kwartaalronde</span>':'')),
+    r("Organische video's",p=>p.shorts?`${p.shorts} per maand · ${vid3(p)} in 3 maanden`:'Geen'),
+    r('Advertenties',p=>p.ads?`${p.ads} video's · ${p.varianten} varianten per ${p.dept==='adv'?'maand of ronde':'maand'}`:'Geen'),
+    r('Ritme organisch',p=>p.shorts?p.ritme:'Niet van toepassing'),
     r('Draaidagen',p=>p.dept==='org'?'1 per maand':p.dept==='comp'?'2 per maand':'Inbegrepen'),
     r('Publiceren',p=>D(p.dept).publiceren),
     r('Past bij een klant die',p=>D(p.dept).ideaal.toLowerCase()),
@@ -1032,23 +1242,25 @@ function cmpRows(ids){
 VIEWS.vergelijken = () => {
   const ids=S.cmp, ps=ids.map(P);
   const sel=i=>`<select data-i="${i}">${Object.values(PKG).map(p=>`<option value="${p.id}" ${ids[i]===p.id?'selected':''}>${p.naam}</option>`).join('')}</select>`;
-  const [a,b]=ps, d=b.prijs-a.prijs;
+  const [a,b]=ps, d=b.prijs-a.prijs, sg=n=>(n>=0?'+':'−')+eur(Math.abs(n));
   const pts=[];
-  if(b.shorts!==a.shorts) pts.push(`${b.shorts>a.shorts?'+':''}${b.shorts-a.shorts} organische shorts per maand`);
+  if(b.shorts!==a.shorts) pts.push(`${b.shorts>a.shorts?'+':''}${b.shorts-a.shorts} organische video's per maand (${b.shorts>a.shorts?'+':''}${vid3(b)-vid3(a)} in 3 maanden)`);
   if(b.ads!==a.ads) pts.push(`${b.ads>a.ads?'+':''}${b.ads-a.ads} advertentievideo's (${b.varianten>a.varianten?'+':''}${b.varianten-a.varianten} varianten)`);
   if(a.dept!==b.dept) pts.push(`Publiceren: ${D(b.dept).publiceren.toLowerCase()}`);
-  return `<div class="row" style="margin-bottom:16px;gap:10px"><h1 style="font-size:24px;margin:0">Vergelijken</h1>
+  const head=p=>{const m=hoofdPrijs(p);return `<div class="cmp-head" style="background:${D(p.dept).kleur}"><div class="small" style="opacity:.75">${D(p.dept).naam}${p.advies?' · ons advies':''}</div><div style="font-weight:600;font-size:16px">${p.naam}</div><div class="p">${eur(m.v)}<span class="small" style="opacity:.75;font-weight:400"> ${m.u}</span></div><div class="p2">${isTraject(p)?m.alt+` · ${vid3(p)} video's`:p.dept==='comp'?m.alt:'Maandelijks of per kwartaal'}</div></div>`};
+  return `<div class="row" style="margin-bottom:18px;gap:10px"><h1 style="font-size:24px;margin:0">Vergelijken</h1>
     <div class="row right" style="gap:8px">${sel(0)}<span class="muted">met</span>${sel(1)}</div></div>
-  <div class="grid g2">${ps.map(p=>`<div class="cmp-head" style="background:${D(p.dept).kleur}"><div class="small" style="opacity:.75">${D(p.dept).naam}${p.advies?' · ons advies':''}</div><div style="font-weight:600;font-size:16px">${p.naam}</div><div class="p">${eur(p.prijs)}<span class="small" style="opacity:.7;font-weight:400"> ${p.dept==='adv'?'p/m of per ronde':'p/m'}</span></div></div>`).join('')}</div>
-  <div class="card" style="margin-top:12px;border-left:4px solid var(--navy)"><div class="eyebrow">Wat krijgt de klant extra bij ${b.naam}?</div>
+  <div class="grid g2">${ps.map(head).join('')}</div>
+  <div class="card" style="margin-top:16px;border-left:4px solid var(--navy)"><div class="eyebrow">Wat krijgt de klant extra bij ${b.naam}?</div>
     ${pts.length?pts.map(p=>`<div class="li">${ICON.y}<span>${p}</span></div>`).join(''):'<div class="muted">Geen verschil in volume.</div>'}
-    <div class="li"><span class="ico q">€</span><span>Investering ${d>=0?'+':'−'}${eur(Math.abs(d))} per maand</span></div></div>
-  <div class="card section" style="padding:4px 6px;overflow:auto"><table class="tbl">
-    <tbody>${cmpRows(ids).map(r=>{const diff=new Set(r.vals.map(String)).size>1;return `<tr class="${diff?'diff':''}"><td class="muted" style="width:26%">${r.label}</td>${r.vals.map(v=>`<td style="width:37%"><b>${v}</b></td>`).join('')}</tr>`}).join('')}
+    <div class="li"><span class="ico q">€</span><span>Investering ${sg(d*3)} over 3 maanden (${sg(d)} per maand)</span></div></div>
+  <div class="card section" style="padding:4px 8px;overflow:auto"><table class="tbl cmp">
+    <thead><tr><th></th>${ps.map(p=>`<th><span class="blk" style="--acc:${D(p.dept).kleur}">${p.naam}</span></th>`).join('')}</tr></thead>
+    <tbody>${cmpRows(ids).map(r=>{const diff=new Set(r.vals.map(String)).size>1;return `<tr class="${diff?'diff':''}"><td class="lab">${r.label}</td>${r.vals.map(v=>`<td style="width:38%"><b>${v}</b></td>`).join('')}</tr>`}).join('')}
     <tr><td colspan="3" class="sub">Werkzaamheden</td></tr>
-    ${MATRIX.map(([label,m])=>{const vals=ps.map(p=>m[p.dept]);const diff=new Set(vals.map(v=>v[0])).size>1;return `<tr class="${diff?'diff':''}"><td class="muted">${label}</td>${vals.map(v=>`<td><div class="row" style="gap:8px;flex-wrap:nowrap">${ICON[v[0]]}<span class="small muted">${v[1]}</span></div></td>`).join('')}</tr>`}).join('')}
+    ${MATRIX.map(([label,m])=>{const vals=ps.map(p=>m[p.dept]);const diff=new Set(vals.map(v=>v[0])).size>1;return `<tr class="${diff?'diff':''}"><td class="lab">${label}</td>${vals.map(v=>`<td>${ynLabel(v[0], v[0]==='q'?'':v[1])}</td>`).join('')}</tr>`}).join('')}
     </tbody></table></div>
-  <div class="legend" style="margin-top:8px"><span><span style="display:inline-block;width:12px;height:12px;background:#fffbea;border:1px solid #f3e3a1;border-radius:3px;vertical-align:-2px"></span> Verschil</span><span>${ICON.q} Niet genoemd in de PDF</span></div>`;
+  <div class="legend" style="margin-top:10px">${ynLabel('y','inbegrepen')}${ynLabel('n','niet inbegrepen')}${ynLabel('q','in de PDF')}<span><span style="display:inline-block;width:12px;height:12px;background:#fffbea;border:1px solid #f3e3a1;border-radius:3px;vertical-align:-2px"></span> Verschil tussen de pakketten</span></div>`;
 };
 AFTER.vergelijken = ()=>document.querySelectorAll('select[data-i]').forEach(s=>s.onchange=()=>{S.cmp[+s.dataset.i]=s.value;go()});
 
@@ -1061,8 +1273,8 @@ VIEWS.controle = () => `<button class="btn" onclick="nav('overzicht')" style="ma
    ===================================================================== */
 function searchIndex(){
   const idx=[];
-  Object.values(PKG).forEach(p=>idx.push({t:p.naam, s:`${D(p.dept).naam} · ${volChips(p).join(' · ')}`, p:eur(p.prijs), c:D(p.dept).kleur, go:()=>{S.deptPkg[p.dept]=p.id;toDept(p.dept)}}));
-  Object.values(DEPTS).forEach(d=>idx.push({t:d.naam, s:d.doel, p:'vanaf '+eur(d.vanaf), c:d.kleur, go:()=>toDept(d.key)}));
+  Object.values(PKG).forEach(p=>idx.push({t:p.naam, s:`${D(p.dept).naam} · ${volChips(p).join(' · ')}`, p:isTraject(p)?eur(tot3(p))+' / 3 mnd':eur(p.prijs), c:D(p.dept).kleur, go:()=>{S.deptPkg[p.dept]=p.id;toDept(p.dept)}}));
+  Object.values(DEPTS).forEach(d=>idx.push({t:d.naam, s:d.doel, p:d.key==='org'?'vanaf '+eur(tot3(P(d.pakketten[0])))+' / 3 mnd':'vanaf '+eur(d.vanaf), c:d.kleur, go:()=>toDept(d.key)}));
   EXTRAS.forEach(x=>idx.push({t:x.naam, s:'Extra kosten · '+x.sub, p:x.prijsTxt||eur(x.prijs), c:'#06053a', go:()=>{nav('extra');setTimeout(()=>{const e=document.getElementById('xd-'+x.id);if(e){e.classList.add('open');e.scrollIntoView({block:'center'})}},50)}}));
   FAQ.forEach((f,i)=>idx.push({t:f.q, s:'Vraag van klant', p:'', c:'#d97706', go:()=>{nav('extra');setTimeout(()=>{const e=document.querySelectorAll('.acc.faq')[i];if(e){e.classList.add('open');e.scrollIntoView({block:'center'})}},50)}}));
   idx.push({t:'Partnerjaar', s:'12 maanden vast, vaste prijs, voorrang', p:'', c:'#06053a', go:()=>{S.pTab='jaar';nav('partner')}});
@@ -1099,7 +1311,9 @@ $('#ctrlBtn').onclick=()=>nav('controle');
 if(!window.SC_OWNER){ $('#ctrlBtn').style.display='none'; }
 
 /* start */
-try{const r=localStorage.getItem('sc-prijslijst-tab'); if(r&&VIEWS[r]) CUR=r;}catch(e){}
+/* Altijd openen op Overzicht, ook bij opnieuw bezoeken of via het zijmenu. */
+try{localStorage.removeItem('sc-prijslijst-tab')}catch(e){}
+CUR='overzicht';
 go();
 
 </script>
