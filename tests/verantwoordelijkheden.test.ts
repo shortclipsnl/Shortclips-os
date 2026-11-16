@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MEDEWERKERS, kaal, normaliseer, standaardConfig } from "@/lib/verantwoordelijkheden/data";
+import { rolVoor } from "@/lib/verantwoordelijkheden/rol";
 
 describe("Mijn verantwoordelijkheden: standaardverdeling uit de kennisbank", () => {
   const config = standaardConfig();
@@ -46,5 +47,26 @@ describe("Mijn verantwoordelijkheden: standaardverdeling uit de kennisbank", () 
   it("bevat geen gedachtestreepjes in teksten voor het team", () => {
     const alles = JSON.stringify(config);
     expect(kaal(alles)).not.toMatch(/[—–]/);
+  });
+});
+
+describe("Mijn verantwoordelijkheden: directierol (16 nov 2026)", () => {
+
+  it("geeft Jarno de directierol met precies vijf KPI's", () => {
+    const rol = rolVoor("jarno@shortclips.nl");
+    expect(rol?.key).toBe("directie");
+    expect(rol?.kpis.map((k) => k.id)).toEqual(["omzet", "sales", "behoud", "capaciteit", "operatie"]);
+  });
+
+  it("laat de rollen van Milou, Jiska en Rutger ongewijzigd", () => {
+    expect(rolVoor("milou@shortclips.nl")?.key).toBe("cc");
+    expect(rolVoor("jiska@shortclips.nl")?.key).toBe("cc");
+    expect(rolVoor("rutger@shortclips.nl")?.key).toBe("videograaf");
+    expect(rolVoor("milou@shortclips.nl")?.niveaus).toBeUndefined();
+    expect(rolVoor("rutger@shortclips.nl")?.functie).toBeUndefined();
+  });
+
+  it("bevat geen gedachtestreepjes in de directietekst", () => {
+    expect(JSON.stringify(rolVoor("jarno@shortclips.nl"))).not.toMatch(/[—–]/);
   });
 });

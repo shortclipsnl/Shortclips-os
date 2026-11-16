@@ -10,7 +10,7 @@
  * de eigenaar ziet het label "Voorstel".
  */
 
-export type RolKey = "cc" | "videograaf";
+export type RolKey = "cc" | "videograaf" | "directie";
 
 export type Scenario = {
   situatie: string;
@@ -49,6 +49,12 @@ export type Rol = {
   kpis: KpiDef[];
   /** Kop boven het linkerblok. */
   lijstTitel: string;
+  /** Functienaam bovenin het missieblok; leeg = de functie uit Beheer/kennisbank. */
+  functie?: string;
+  /** Andere titels voor de vier niveaus (alleen de directierol gebruikt dit). */
+  niveaus?: Partial<Record<NiveauKey, { titel: string; uitleg: string }>>;
+  /** Toelichting naast "Wat beslis ik zelf?". */
+  beslisUitleg?: string;
 };
 
 const CC: Rol = {
@@ -304,10 +310,158 @@ const VIDEOGRAAF: Rol = {
   lijstTitel: "Mijn opnamedagen",
 };
 
+
+/**
+ * Directierol (Jarno), toegevoegd 16 nov 2026. De detailverantwoordelijkheden,
+ * bevoegdheden en vaste controles komen uit de bestaande verdeling (data.ts,
+ * Team Shortclips 1.3 en 1.14). De dagelijkse stand komt volledig uit het portaal.
+ * Taken, signalen en scenario's hieronder zijn door Claude uitgewerkt op basis
+ * van zijn opdracht: de scenario's staan als voorstel gemarkeerd.
+ */
+const DIRECTIE: Rol = {
+  key: "directie",
+  functie: "Directeur",
+  verantwoordelijkVoor: "de koers, groei en gezondheid van Shortclips: sales, klantbehoud, financiën, team en de standaard",
+  missie: "Shortclips groeit winstgevend en draait zelfstandig, omdat ik stuur op de grote lijnen en alleen ingrijp waar het team mij echt nodig heeft.",
+  kerntaak: "Ik werk aan het bedrijf, niet in het bedrijf. Ik breng nieuwe klanten binnen, bewaak omzet, marge en klantbehoud, en zorg dat team, capaciteit en systemen de groei aankunnen. De dagelijkse uitvoering ligt bij het team.",
+  resultaat: "Groeiende terugkerende omzet, klanten die blijven en een team dat zonder mij de standaard haalt.",
+  klaarAls: [
+    "Nieuwe leads zijn binnen afzienbare tijd opgevolgd en offertes worden actief nagebeld.",
+    "De terugkerende maandomzet groeit richting het maanddoel.",
+    "Contracten die aflopen zijn op tijd besproken en verlengd.",
+    "Klanten met dalende resultaten of ontevredenheid hebben een eigenaar en een plan.",
+    "Er zijn geen capaciteitsknelpunten zonder oplossing.",
+    "Niveau 4-vragen van het team zijn binnen een week beslist.",
+    "De kwartaaldoelen lopen op koers of er is bijgestuurd.",
+  ],
+  taken: [
+    {
+      titel: "Iedere dag",
+      punten: [
+        "Deze pagina doornemen: wat is groen, wat is oranje, wat is rood.",
+        "Nieuwe leads en opvolgingen van vandaag oppakken.",
+        "Rode signalen beoordelen en zo nodig ingrijpen.",
+      ],
+    },
+    {
+      titel: "Iedere week",
+      punten: [
+        "Niveau 4-aanvragen van het team beslissen.",
+        "Openstaande offertes opvolgen.",
+        "Contracten en verlengingen nalopen.",
+        "Capaciteit van de komende weken controleren.",
+      ],
+    },
+    {
+      titel: "Iedere maand",
+      punten: [
+        "Omzet, marge en winstgevendheid per klant beoordelen.",
+        "Steekproef op de facturatie.",
+        "Voortgang van de kwartaaldoelen bijsturen.",
+        "SOP's verbeteren waar vragen terugkomen.",
+      ],
+    },
+  ],
+  signaleren: [
+    "Er komen minder nieuwe leads binnen dan normaal.",
+    "Offertes blijven langer dan een week onbeantwoord.",
+    "Een grote klant loopt binnen zestig dagen af zonder verlengingsgesprek.",
+    "Meerdere klanten van één teamlid vragen tegelijk aandacht.",
+    "Het team loopt structureel achter op deadlines.",
+    "Editors of videografen zitten weken vooruit vol.",
+    "De marge per klant zakt onder de afgesproken grens.",
+    "Een teamlid komt steeds bij jou met vragen die het zelf kan beslissen.",
+  ],
+  scenarios: [
+    {
+      situatie: "De terugkerende omzet zakt onder het maanddoel",
+      eigenaar: "Jarno",
+      actie: "Pipeline en openstaande offertes nalopen, verlengingen versnellen en bepalen welke salesacties deze maand nodig zijn.",
+      voorkomen: "Iedere week offertes en verlengingen nalopen, niet pas aan het eind van de maand.",
+      niveau: "Zelf beslissen.",
+      voorstel: true,
+    },
+    {
+      situatie: "Een belangrijke klant wil stoppen",
+      eigenaar: "Jarno, met de Content Creative van de klant",
+      actie: "Het voorstel van de Content Creative bekijken, het opzeggesprek voeren en vastleggen wat er geleerd is.",
+      voorkomen: "Klantbehoudsignalen in Aandachtspunten laten oppakken door de eigenaar van de klant.",
+      niveau: "Zelf beslissen. Het opzeggesprek voert altijd Jarno.",
+      voorstel: true,
+    },
+    {
+      situatie: "Het team loopt structureel achter op deadlines",
+      eigenaar: "Jarno",
+      actie: "Oorzaak bepalen (capaciteit, planning of werkwijze) en samen met het team een oplossing kiezen, bijvoorbeeld een extra editor via de Editor database.",
+      voorkomen: "Wekelijks de capaciteit en de opleveringen op tijd controleren.",
+      niveau: "Zelf beslissen. Oplossen doet het team.",
+      voorstel: true,
+    },
+    {
+      situatie: "Capaciteit raakt vol bij een nieuwe klant",
+      eigenaar: "Jarno",
+      actie: "Proefplannen op Capaciteit, en pas tekenen als editors en videografen het aankunnen of er extra capaciteit is geregeld.",
+      voorkomen: "Capaciteit 4 tot 8 weken vooruit bekijken.",
+      niveau: "Zelf beslissen.",
+      voorstel: true,
+    },
+    {
+      situatie: "Een teamlid escaleert iets wat het zelf kan beslissen",
+      eigenaar: "Jarno",
+      actie: "Terugleggen met de vraag om een eigen voorstel, en kijken of de verdeling op deze pagina duidelijk genoeg is.",
+      voorkomen: "Verantwoordelijkheden en beslisniveaus actueel houden in Beheer.",
+      niveau: "Zelf beslissen.",
+      voorstel: true,
+    },
+  ],
+  kpis: [
+    {
+      id: "omzet",
+      titel: "Terugkerende maandomzet",
+      norm: "Groeit richting het maanddoel",
+      grenzen: "Groen: maandomzet op of boven het maanddoel. Oranje: 90 tot 100%. Rood: onder 90%. Zonder ingesteld maanddoel geen kleur.",
+      registratie: "Het maanddoel komt uit Financiën (doel per maand). Staat het niet ingevuld, dan toont de tegel alleen het bedrag.",
+    },
+    {
+      id: "sales",
+      titel: "Open leads en offertes",
+      norm: "Iedere lead op tijd opgevolgd",
+      grenzen: "Groen: geen verlopen opvolgdatums. Oranje: 1 of 2. Rood: 3 of meer.",
+    },
+    {
+      id: "behoud",
+      titel: "Klanten die aandacht vragen",
+      norm: "Iedere klant met een signaal heeft een plan",
+      grenzen: "Groen: geen. Oranje: 1 of 2 klanten. Rood: 3 of meer, of een contract in de kritieke fase.",
+    },
+    {
+      id: "capaciteit",
+      titel: "Capaciteitsknelpunten",
+      norm: "Geen knelpunten zonder oplossing, 3 maanden vooruit",
+      grenzen: "Groen: geen. Oranje: 1 of 2. Rood: 3 of meer.",
+    },
+    {
+      id: "operatie",
+      titel: "Opleveringen op tijd",
+      norm: "Eerste versie uiterlijk 14 werkdagen na de opnamedag",
+      grenzen: "Groen: 95% of meer op tijd. Oranje: 85 tot 95%. Rood: onder 85%. Gemeten over alle klanten, laatste 30 dagen.",
+    },
+  ],
+  lijstTitel: "Doelen dit kwartaal",
+  niveaus: {
+    zelf: { titel: "Ik beslis zelf", uitleg: "Dit beslis je als directeur, zonder overleg vooraf." },
+    vastleggen: { titel: "Beslissen en vastleggen", uitleg: "Je beslist en legt het besluit vast, zodat het team weet waar het staat." },
+    overleg: { titel: "Samen met het team", uitleg: "Hier beslist het team na intern overleg. Jij kijkt alleen mee als het vastloopt." },
+    jarno: { titel: "Komt bij mij terecht", uitleg: "Niveau 4 van het team: hier verwacht het team jouw besluit, met hun voorstel erbij." },
+  },
+  beslisUitleg: "Alles wat niet bij Komt bij mij terecht staat, lost het team zelf op.",
+};
+
 const PER_EMAIL: Record<string, Rol> = {
   "milou@shortclips.nl": CC,
   "jiska@shortclips.nl": CC,
   "rutger@shortclips.nl": VIDEOGRAAF,
+  "jarno@shortclips.nl": DIRECTIE,
 };
 
 export function rolVoor(email: string | null | undefined): Rol | null {

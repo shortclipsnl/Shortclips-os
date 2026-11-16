@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 import { requireInternal, isOwner, viewerForUser } from "@/server/auth/context";
 import { getVerantwoordelijkheden } from "@/server/verantwoordelijkheden";
 import { getLiveStand } from "@/server/verantwoordelijkheden-live";
-import { VERANTWOORDELIJKEN } from "@/lib/verantwoordelijkheden/data";
+import { MEDEWERKERS, VERANTWOORDELIJKEN } from "@/lib/verantwoordelijkheden/data";
 import { rolVoor } from "@/lib/verantwoordelijkheden/rol";
 import { Weergave } from "./weergave";
 import { getVisieVoor } from "@/server/visie";
@@ -31,9 +31,12 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
   const owner = isOwner(viewer);
   const param = (await searchParams).persoon?.toLowerCase();
   const eigen = VERANTWOORDELIJKEN.find((m) => m.email === viewer.email.toLowerCase());
-  // Alleen Milou, Jiska en Rutger hebben deze pagina. Jarno bekijkt hun pagina als beheerder;
-  // ieder ander teamlid krijgt hem niet te zien (ook niet via de URL).
-  const medewerker = owner ? (VERANTWOORDELIJKEN.find((m) => m.email === param) ?? VERANTWOORDELIJKEN[0]) : eigen;
+  // Milou, Jiska en Rutger zien alleen hun eigen pagina. Jarno heeft sinds 16 nov ook een eigen
+  // directiepagina (standaard bij openen) en bekijkt de pagina's van het team als beheerder.
+  // Teamleden kunnen de directiepagina niet openen, ook niet via de URL.
+  const jarno = MEDEWERKERS.find((m) => m.email === "jarno@shortclips.nl")!;
+  const keuzes = owner ? [jarno, ...VERANTWOORDELIJKEN] : [];
+  const medewerker = owner ? (keuzes.find((m) => m.email === param) ?? jarno) : eigen;
   if (!medewerker) notFound();
   const rol = rolVoor(medewerker.email);
   if (!rol) notFound();
@@ -45,7 +48,11 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
   // De persoon over wie de pagina gaat: de ingelogde medewerker, of (voor Jarno) de gekozen collega.
   let subject = owner ? null : viewer;
   let naam: string = owner ? medewerker.naam : voornaam(viewer.fullName, medewerker.naam);
-  if (owner) {
+  if (owner && medewerker.email === jarno.email) {
+    // De directiepagina gaat over de ingelogde eigenaar zelf.
+    subject = viewer;
+    naam = voornaam(viewer.fullName, jarno.naam);
+  } else if (owner) {
     const [u] = await db
       .select({ id: users.id, fullName: users.fullName })
       .from(users)
@@ -58,14 +65,14 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
 
   // Actuele stand: KPI's, eigen klanten of opnamedagen en signalen (allemaal bestaande portaaldata).
   const live = await getLiveStand(subject, rol, { trusted: owner });
-  const functie = config.profielen?.[medewerker.email]?.functie ?? medewerker.functie;
+  const functie = rol.functie ?? config.profielen?.[medewerker.email]?.functie ?? medewerker.functie;
 
   return (
     <div className="mx-auto max-w-[1180px] pb-10">
       {owner ? (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Bekijk als</span>
-          {VERANTWOORDELIJKEN.map((m) => (
+          {keuzes.map((m) => (
             <Link
               key={m.email}
               href={`/verantwoordelijkheden?persoon=${encodeURIComponent(m.email)}`}
