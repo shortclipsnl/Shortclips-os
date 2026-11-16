@@ -155,3 +155,49 @@ table.cap-radar { border-collapse: separate; border-spacing: 0; width: 100%; min
 /* Profielfoto's in de radar */
 .cap-ph { flex: none; display: inline-flex; border-radius: 50%; padding: 2px; box-shadow: 0 0 0 1.5px var(--color-line-strong); }
 .cap-ph img, .cap-ph > span { display: block; }
+
+/* Ruimte tussen de weken (16 nov): bredere kolommen, afwisselende kolomtint,
+ * duidelijke scheidingslijnen en de huidige week als omlijnde kolom.
+ * Alleen opmaak; berekeningen en klikgedrag blijven gelijk. */
+.cap-radar { --cap-col-line: var(--color-line); --cap-col-tint: color-mix(in srgb, var(--color-ink) 2.5%, transparent); --cap-now-line: color-mix(in srgb, var(--color-indigo-ink) 45%, transparent); --cap-now-tint: color-mix(in srgb, var(--color-indigo-ink) 6%, transparent); }
+.cap-radar th, .cap-radar td { padding: 9px 14px; }
+.cap-radar th.rl, .cap-radar td.rl { width: 240px; padding-left: 16px; padding-right: 14px; box-shadow: inset -1px 0 0 var(--color-line); }
+.cap-scroll { position: relative; }
+.cap-scroll.is-scrolled .cap-radar th.rl, .cap-scroll.is-scrolled .cap-radar td.rl { box-shadow: inset -1px 0 0 var(--color-line), 6px 0 10px -6px rgba(0, 0, 59, .16); }
+.cap-radar thead th.rl { z-index: 2; }
+
+/* Kolommen: duidelijke scheidingslijn en om-en-om een lichte tint */
+.cap-radar thead th.wkcol + th.wkcol, .cap-radar tbody td + td:not(.rl) { border-left: 1px solid var(--cap-col-line); }
+.cap-radar thead th.wkcol:nth-child(odd), .cap-radar tbody td:not(.rl):nth-child(odd) { background-color: var(--cap-col-tint); }
+
+/* Weekkop: weeknummer en datum goed leesbaar */
+.cap-radar thead th.wkcol { padding: 10px 10px 12px; border-bottom: 1px solid var(--color-line); }
+.cap-wh { padding: 7px 6px; min-width: 84px; margin: 0 auto; }
+.cap-whn { font-size: 14px; }
+.cap-whd { font-size: 12px; }
+
+/* Huidige week: tint plus omlijning over de hele kolom */
+.cap-radar thead th.now, .cap-radar tbody td.now { background-color: var(--cap-now-tint); box-shadow: inset 1.5px 0 0 var(--cap-now-line), inset -1.5px 0 0 var(--cap-now-line); }
+.cap-radar tbody tr:last-child td.now { box-shadow: inset 1.5px 0 0 var(--cap-now-line), inset -1.5px 0 0 var(--cap-now-line), inset 0 -1.5px 0 var(--cap-now-line); }
+.cap-radar thead th.now { box-shadow: inset 1.5px 0 0 var(--cap-now-line), inset -1.5px 0 0 var(--cap-now-line), inset 0 1.5px 0 var(--cap-now-line); }
+.cap-radar thead th.now + th.wkcol, .cap-radar tbody td.now + td { border-left-color: transparent; }
+
+/* Rijen: rustige scheiding, vaste hoogte */
+.cap-radar tbody td { border-bottom: 1px solid color-mix(in srgb, var(--color-line) 55%, transparent); height: 50px; }
+.cap-radar tbody tr:last-child td { border-bottom: 0; }
+.cap-radar tbody tr:nth-last-child(2) td { border-top: 1px solid var(--color-line); }
+.cap-radar tbody tr:hover td:not(.rl) { background-color: color-mix(in srgb, var(--color-ink) 5%, transparent); }
+.cap-radar tbody tr:hover td.now { background-color: color-mix(in srgb, var(--color-indigo-ink) 10%, transparent); }
+
+/* Percentages: vaste breedte en gelijke cijferbreedte, zodat weken goed te vergelijken zijn */
+.cap-radar .cap-pill { width: 76px; max-width: none; height: 32px; font-variant-numeric: tabular-nums; }
+.cap-radar .cap-pill.team { width: 76px; height: 26px; }
+.cap-radar .cap-pill.count { width: auto; min-width: 76px; padding: 0 10px; font-size: 12px; }
+.cap-radar .cap-none { display: inline-block; width: 76px; }
+
+@media (max-width: 640px) {
+  .cap-radar th.rl, .cap-radar td.rl { width: 148px; padding-left: 10px; padding-right: 8px; }
+  .cap-radar td.rl .sub { display: none; }
+  .cap-radar th, .cap-radar td { padding: 8px 10px; }
+  .cap-radar .cap-pill, .cap-radar .cap-pill.team { width: 68px; }
+}

@@ -151,8 +151,8 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
           </div>
           <div className="cap-rfree"><span className={`cap-dot ${tk}`} /><b>{tp === null ? "?" : `${tp}%`} bezet</b> · {Math.round(free)} {unit} vrij komende 4 weken</div>
         </div>
-        <div className="cap-scroll">
-          <table className="cap-radar" style={{ minWidth: 220 + cols.length * 86 }}>
+        <div className="cap-scroll" onScroll={(e) => e.currentTarget.classList.toggle("is-scrolled", e.currentTarget.scrollLeft > 2)}>
+          <table className="cap-radar" style={{ minWidth: 240 + cols.length * 112 }}>
             <thead>
               <tr>
                 <th className="rl" />
