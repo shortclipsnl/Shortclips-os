@@ -150,7 +150,7 @@ export function Weergave({ config, email, naam, functie, rol, live, markeer, vis
   /** Onze visie (centrale bron). Null = nog niet zichtbaar voor deze kijker: de pagina blijft dan zoals hij was. */
   visie?: Visie | null;
 }) {
-  const visieFunctie: Functie = rol.key === "cc" ? "content_creative" : "videograaf";
+  const visieFunctie: Functie = rol.key === "cc" ? "content_creative" : rol.key === "directie" ? "directie" : "videograaf";
   const fv = visie?.functies[visieFunctie] ?? null;
   const meetpunten = visie ? visie.meetpunten.filter((m) => MEETPUNTEN_PER_FUNCTIE[visieFunctie].includes(m.key)) : [];
   const items = config.verantwoordelijkheden.filter((r) => r.persoon === email && r.actief);
@@ -164,7 +164,15 @@ export function Weergave({ config, email, naam, functie, rol, live, markeer, vis
     overleg: beslissingen.filter((b) => b.niveau === "overleg").map((b) => b.situatie),
     jarno: beslissingen.filter((b) => b.niveau === "escaleren").map((b) => b.situatie),
   };
-  const cc = rol.key === "cc";
+  const directie = rol.key === "directie";
+  if (directie) {
+    // Voor de directeur: wat het team volgens de verdeling bij hem neerlegt (niveau 4).
+    lijsten.jarno = [...new Map(
+      config.beslissingen.filter((b) => b.persoon !== email && b.actief && b.niveau === "escaleren").map((b) => [kaal(b.situatie).toLowerCase(), b.situatie]),
+    ).values()];
+  }
+  const niveaus = VIER_NIVEAUS.map((nv) => ({ ...nv, ...(rol.niveaus?.[nv.key] ?? {}) }));
+  const cc = rol.key === "cc" || directie;
   const aantal = cc ? live.klanten.length : live.opnames.length;
 
   return (
@@ -183,7 +191,7 @@ export function Weergave({ config, email, naam, functie, rol, live, markeer, vis
           </div>
           <div className="rounded-xl bg-white/10 px-4 py-3">
             <div className="text-2xs font-semibold uppercase tracking-wide text-white/60">
-              {cc ? "Mijn klanten" : "Mijn opnamedagen, komende 3 weken"}
+              {directie ? "Actieve klanten" : cc ? "Mijn klanten" : "Mijn opnamedagen, komende 3 weken"}
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold">{aantal}</span>
@@ -223,6 +231,45 @@ export function Weergave({ config, email, naam, functie, rol, live, markeer, vis
 
       {/* 3. Links mijn klanten of opnamedagen, rechts wat ik zelf moet signaleren. */}
       <div className="grid items-start gap-4 lg:grid-cols-2">
+        {directie ? (
+          <Blok
+            icon={Target}
+            titel={rol.lijstTitel}
+            sub={live.doelen ? `week ${live.doelen.week} van ${live.doelen.weken}` : undefined}
+            actie={<Link href="/doelen" className="text-xs font-semibold text-[var(--color-ink-muted)] hover:underline">Alle doelen</Link>}
+          >
+            {!live.doelen ? (
+              <p className="px-4 py-4 text-[13px] text-[var(--color-ink-muted)]">De doelen konden nu niet geladen worden. Kijk op Doelen.</p>
+            ) : live.doelen.pijlers.every((p) => p.totaal === 0) ? (
+              <p className="px-4 py-4 text-[13px] text-[var(--color-ink-muted)]">Er zijn nog geen doelen voor dit kwartaal vastgelegd.</p>
+            ) : (
+              <ul className="divide-y divide-[var(--color-line)]">
+                {live.doelen.pijlers.map((p) => {
+                  const kleur: Kleur | null = p.achter > 0 ? "rood" : p.risico > 0 ? "oranje" : p.totaal > 0 ? "groen" : null;
+                  return (
+                    <li key={p.key}>
+                      <Link href="/doelen" className="flex items-center gap-3 px-4 py-2.5 transition hover:bg-[var(--color-neutral-soft)]">
+                        <span aria-hidden className={cn("size-2.5 shrink-0 rounded-full", kleur ? KLEUR[kleur].balk : "bg-[var(--color-line-strong)]")} />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold text-[var(--color-ink)]">{p.label}</div>
+                          <div className="text-xs text-[var(--color-ink-muted)]">
+                            {p.totaal === 0 ? "Geen doelen" : `${p.totaal} ${p.totaal === 1 ? "doel" : "doelen"}${p.gehaald ? ` · ${p.gehaald} gehaald` : ""}`}
+                          </div>
+                        </div>
+                        <span className="flex shrink-0 gap-1">
+                          {p.opKoers ? <span className="rounded-full bg-[var(--color-good-soft)] px-2 py-0.5 text-2xs font-bold text-[#1d6b4c]">{p.opKoers} op koers</span> : null}
+                          {p.risico ? <span className="rounded-full bg-[var(--color-warn-soft)] px-2 py-0.5 text-2xs font-bold text-[#8a5300]">{p.risico} risico</span> : null}
+                          {p.achter ? <span className="rounded-full bg-[var(--color-bad-soft)] px-2 py-0.5 text-2xs font-bold text-[#a3271c]">{p.achter} achter</span> : null}
+                        </span>
+                        <ArrowUpRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Blok>
+        ) : (
         <Blok icon={cc ? Users : CalendarDays} titel={rol.lijstTitel} sub={cc ? `${aantal} actief` : "komende 3 weken"}>
           {cc ? (
             live.klanten.length === 0 ? (
@@ -275,6 +322,7 @@ export function Weergave({ config, email, naam, functie, rol, live, markeer, vis
             </ul>
           )}
         </Blok>
+        )}
 
         <Blok
           icon={Radar}
@@ -294,13 +342,13 @@ export function Weergave({ config, email, naam, functie, rol, live, markeer, vis
                 const rij = (
                   <>
                     {s.klant ? <ClientLogo name={s.klant} logoUrl={s.logoUrl} color={s.color} size={30} /> : (
-                      <span className="grid size-[30px] shrink-0 place-items-center rounded-lg bg-[var(--color-neutral-soft)] text-[var(--color-ink-faint)]"><Target className="size-4" /></span>
+                      <span className="grid size-[30px] shrink-0 place-items-center rounded-lg bg-[var(--color-neutral-soft)] text-[var(--color-ink-faint)]">{directie ? <Radar className="size-4" /> : <Target className="size-4" />}</span>
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold leading-snug text-[var(--color-ink)]">
                         {s.klant ? <>{s.klant}: </> : null}{s.actie}
                       </div>
-                      <div className="text-xs leading-snug text-[var(--color-ink-muted)]">{s.wat} · Eigenaar: {naam}</div>
+                      <div className="text-xs leading-snug text-[var(--color-ink-muted)]">{s.wat} · Eigenaar: {s.eigenaar ?? naam}</div>
                     </div>
                     <span className={cn(
                       "shrink-0 rounded-full px-2 py-0.5 text-2xs font-bold",
@@ -341,10 +389,10 @@ export function Weergave({ config, email, naam, functie, rol, live, markeer, vis
       <section>
         <div className="mb-2.5 flex items-baseline gap-2">
           <h2 className="text-base font-semibold text-[var(--color-ink)]">Wat beslis ik zelf?</h2>
-          <span className="text-xs text-[var(--color-ink-faint)]">Staat iets niet bij Naar Jarno, dan los je het zelf of samen op.</span>
+          <span className="text-xs text-[var(--color-ink-faint)]">{rol.beslisUitleg ?? "Staat iets niet bij Naar Jarno, dan los je het zelf of samen op."}</span>
         </div>
         <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {VIER_NIVEAUS.map((nv) => <NiveauBlok key={nv.key} nv={nv} lijst={lijsten[nv.key]} markeer={markeer} />)}
+          {niveaus.map((nv) => <NiveauBlok key={nv.key} nv={nv} lijst={lijsten[nv.key]} markeer={markeer} />)}
         </div>
         <p className="mt-2.5 text-xs text-[var(--color-ink-faint)]">
           Twijfel je over het niveau van een situatie? Zoek hem op in de{" "}
