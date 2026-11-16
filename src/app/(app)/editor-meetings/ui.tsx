@@ -180,9 +180,10 @@ function OwnerPicker({ row, owners, canSet }: { row: OverviewRowData; owners: Ow
   );
 }
 
-export function OverviewTable({ rows, owners, viewerId, isManagement, defaultOwner, monthName }: { rows: OverviewRowData[]; owners: OwnerOption[]; viewerId: string; isManagement: boolean; defaultOwner: string; monthName: string }) {
-  const [owner, setOwner] = useState(defaultOwner);
-  const [editor, setEditor] = useState("");
+export function OverviewTable({ rows, owners, viewerId, isManagement, defaultOwner, initialEditor = "", monthName }: { rows: OverviewRowData[]; owners: OwnerOption[]; viewerId: string; isManagement: boolean; defaultOwner: string; initialEditor?: string; monthName: string }) {
+  // Doorgeklikt vanaf een editor op Editing: toon die editor, ongeacht de verantwoordelijke.
+  const [owner, setOwner] = useState(initialEditor ? "" : defaultOwner);
+  const [editor, setEditor] = useState(initialEditor);
   const [status, setStatus] = useState("");
   const [planning, setPlanning] = useState<string | null>(null);
 

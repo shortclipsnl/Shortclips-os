@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, Users } from "lucide-react";
+import { AlertTriangle, MessagesSquare, Users } from "lucide-react";
 import { requireInternal, isOwner, canManageOperations } from "@/server/auth/context";
 import { assignMissingEditorsIfStale, mergeDuplicateShootsIfStale } from "@/server/jobs/calendar-sync";
 import { isCoreStaff } from "@/server/core-staff";
@@ -19,6 +19,9 @@ import { canUseWhatsappBericht } from "@/server/whatsapp-bericht-access";
 import { canUseEditorDatabase } from "@/server/editor-database-access";
 import { ClientStatusTabs } from "@/components/client-status-tabs";
 import { parseClientStatusFilter } from "@/lib/client-status";
+import { canUseTeamView, getOverview } from "@/server/editor-meetings";
+import { FIRST_MEETING_PERIOD, periodOf } from "@/lib/editor-meetings";
+import { todayAmsterdam } from "@/lib/planning-deadline";
 
 export const metadata: Metadata = { title: "Editing" };
 export const dynamic = "force-dynamic";
@@ -140,6 +143,11 @@ export default async function VideosPage({
   // Editor database (knop bovenaan): alleen eigenaar en vast kantoorteam.
   const showEditorDatabase = canUseEditorDatabase(viewer);
   const whatsapp = showWhatsapp ? { standaarden: await getWhatsappStandaarden(), canManage: canManageOperations(viewer) } : null;
+  // Editor Meetings (knop bovenaan): Milou, Jiska en het management. Het getal
+  // komt live uit het meetingoverzicht van deze maand, zodat de knop vanzelf
+  // laat zien of er iets te plannen, te verslaan of te laat is.
+  const showEditorMeetings = canUseTeamView(viewer);
+  const meetingAttention = showEditorMeetings ? await editorMeetingAttention(viewer) : 0;
 
   return (
     <div className="mx-auto max-w-[1500px]">
@@ -147,14 +155,31 @@ export default async function VideosPage({
         title="Editing"
         description={`${editingProjects.length} projecten · ${rows.length} video's in productie`}
         actions={
-          showEditorDatabase ? (
-            // Editor database: back up en potentiële editors bij uitval of spoed. Alleen intern team.
-            <Link
-              href="/editor-database"
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-4 text-sm font-semibold text-white shadow-[var(--shadow-card)] transition hover:bg-[var(--color-indigo-soft)]"
-            >
-              <Users className="size-4" strokeWidth={2} /> Editor database
-            </Link>
+          showEditorMeetings || showEditorDatabase ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {showEditorMeetings ? (
+                // Editor Meetings: maandelijks gesprek per editor (plannen, verslag, actiepunten).
+                <Link
+                  href="/editor-meetings"
+                  title={meetingAttention > 0 ? `${meetingAttention} editor meeting${meetingAttention === 1 ? "" : "s"} vraagt aandacht` : "Alle editor meetings op schema"}
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-4 text-sm font-semibold text-white shadow-[var(--shadow-card)] transition hover:bg-[var(--color-indigo-soft)]"
+                >
+                  <MessagesSquare className="size-4" strokeWidth={2} /> Editor Meetings
+                  {meetingAttention > 0 ? (
+                    <span className="ml-0.5 inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--color-warn)] px-1.5 text-2xs font-bold tabular-nums text-white">{meetingAttention}</span>
+                  ) : null}
+                </Link>
+              ) : null}
+              {showEditorDatabase ? (
+                // Editor database: back up en potentiële editors bij uitval of spoed. Alleen intern team.
+                <Link
+                  href="/editor-database"
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-4 text-sm font-semibold text-white shadow-[var(--shadow-card)] transition hover:bg-[var(--color-indigo-soft)]"
+                >
+                  <Users className="size-4" strokeWidth={2} /> Editor database
+                </Link>
+              ) : null}
+            </div>
           ) : undefined
         }
       />
@@ -238,6 +263,30 @@ export default async function VideosPage({
       )}
     </div>
   );
+}
+
+/**
+ * Aantal editor meetings dat deze maand aandacht vraagt, met dezelfde regels als
+ * het meetingoverzicht (zelfde tellers als daar): nog te plannen en verslag
+ * ontbreekt voor de eigen editors, over tijd voor iedereen. Een storing hier mag de
+ * Editing-pagina nooit blokkeren.
+ */
+async function editorMeetingAttention(viewer: Awaited<ReturnType<typeof requireInternal>>): Promise<number> {
+  try {
+    const period = periodOf(todayAmsterdam());
+    const overview = await getOverview(viewer, period);
+    const mine = overview.viewerIsOwner ? overview.rows.filter((r) => r.owner?.id === viewer.id) : overview.rows;
+    const canPlan = period >= FIRST_MEETING_PERIOD;
+    const ids = new Set<string>();
+    for (const r of mine) {
+      if (canPlan && (r.status === "te_plannen" || r.status === "opnieuw_plannen")) ids.add(r.editor.id);
+      if (r.status === "verslag_nodig" || r.status === "verslag_concept") ids.add(r.editor.id);
+    }
+    for (const r of overview.rows) if (r.overdue) ids.add(r.editor.id);
+    return ids.size;
+  } catch {
+    return 0;
+  }
 }
 
 function DrillCard({

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, Repeat2, Sparkles, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CalendarClock, ChevronLeft, ChevronRight, Repeat2, Sparkles, Users } from "lucide-react";
 import { isEditorRole, requireInternal } from "@/server/auth/context";
 import { canUseEditorMeetings, getEditorPage, getInsights, getOverview, syncPlanTasksIfStale } from "@/server/editor-meetings";
 import { Badge, Card, CardHeader, PageHeader, Stat } from "@/components/ui";
@@ -13,14 +13,19 @@ import { OverviewTable, type OverviewRowData } from "./ui";
 export const metadata: Metadata = { title: "Editor Meetings" };
 export const dynamic = "force-dynamic";
 
-export default async function EditorMeetingsPage({ searchParams }: { searchParams: Promise<{ maand?: string }> }) {
+export default async function EditorMeetingsPage({ searchParams }: { searchParams: Promise<{ maand?: string; editor?: string }> }) {
   const viewer = await requireInternal();
   if (!canUseEditorMeetings(viewer)) redirect("/dashboard");
 
   // Editors: uitsluitend de eigen meetings, verslagen en actiepunten.
   if (isEditorRole(viewer)) {
     const data = await getEditorPage(viewer);
-    return <EditorOwnView data={data} firstName={viewer.fullName.split(" ")[0] ?? ""} />;
+    return (
+      <div className="space-y-2">
+        <BackToEditing />
+        <EditorOwnView data={data} firstName={viewer.fullName.split(" ")[0] ?? ""} />
+      </div>
+    );
   }
 
   // Vangnet naast de dagelijkse job: plantaken en herinneringen bijwerken.
@@ -29,7 +34,8 @@ export default async function EditorMeetingsPage({ searchParams }: { searchParam
   const today = todayAmsterdam();
   const current = periodOf(today);
   const planFor = planningPeriods(today).create;
-  const sp = (await searchParams).maand;
+  const params = await searchParams;
+  const sp = params.maand;
   const period = isPeriod(sp) ? sp : current;
   const [overview, insights] = await Promise.all([getOverview(viewer, period), getInsights(viewer)]);
 
@@ -71,9 +77,12 @@ export default async function EditorMeetingsPage({ searchParams }: { searchParam
   });
 
   const canPlanPast = period >= current && period >= FIRST_MEETING_PERIOD;
+  // Vanaf Editing doorgeklikt op een editor: die editor staat direct gefilterd.
+  const initialEditor = params.editor && overview.rows.some((r) => r.editor.id === params.editor) ? params.editor : "";
   return (
     <div className="mx-auto max-w-[1180px] space-y-6">
       <PageHeader
+        breadcrumb={<BackToEditing />}
         title="Editor Meetings"
         description="Iedere editor heeft elke maand een persoonlijk gesprek met de verantwoordelijke content creator, bij voorkeur in de eerste week."
         actions={
@@ -109,7 +118,7 @@ export default async function EditorMeetingsPage({ searchParams }: { searchParam
         {overview.rows.length === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-[var(--color-ink-muted)]">Er zijn nog geen actieve editors met een portaalaccount.</p>
         ) : (
-          <OverviewTable rows={rows} owners={overview.owners.map((o) => ({ id: o.id, fullName: o.fullName }))} viewerId={viewer.id} isManagement={overview.isManagement} defaultOwner={overview.viewerIsOwner ? viewer.id : ""} monthName={monthLabel(period)} />
+          <OverviewTable rows={rows} owners={overview.owners.map((o) => ({ id: o.id, fullName: o.fullName }))} viewerId={viewer.id} isManagement={overview.isManagement} defaultOwner={overview.viewerIsOwner ? viewer.id : ""} initialEditor={initialEditor} monthName={monthLabel(period)} />
         )}
       </Card>
 
@@ -171,5 +180,14 @@ export default async function EditorMeetingsPage({ searchParams }: { searchParam
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Editor Meetings is onderdeel van Editing: altijd één klik terug. */
+function BackToEditing() {
+  return (
+    <Link href="/videos" className="inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+      <ArrowLeft className="size-4" /> Terug naar Editing
+    </Link>
   );
 }

@@ -1,4 +1,7 @@
+import Link from "next/link";
+import { MessagesSquare } from "lucide-react";
 import { getEditingDashboard, listEditorsWithRates } from "@/server/editing";
+import { canUseTeamView } from "@/server/editor-meetings";
 import { editorCapacityMap } from "@/server/metrics";
 import { editorLoad, LOAD_LABEL } from "@/lib/metrics";
 import type { Viewer } from "@/server/auth/context";
@@ -23,6 +26,8 @@ const LEVEL_COLOR: Record<string, string> = {
 export async function WorkloadSection({ viewer }: { viewer: Viewer }) {
   const canSeeCosts = viewer.permissions.has("finance:read_costs");
   const canManage = viewer.permissions.has("team:write");
+  // Vanuit de werkvoorraad direct naar de meetings van die editor (zelfde editor-id).
+  const showMeetings = canUseTeamView(viewer);
   const [data, editors, capMap] = await Promise.all([
     getEditingDashboard(viewer),
     canManage ? listEditorsWithRates() : Promise.resolve([]),
@@ -84,6 +89,11 @@ export async function WorkloadSection({ viewer }: { viewer: Viewer }) {
                   {e.next_due ? <span>eerstvolgende deadline {formatDate(e.next_due)}</span> : null}
                   {canSeeCosts ? <span className="font-semibold text-[var(--color-ink)]">editkosten lopend: {euro(Number(e.cost_active))}</span> : null}
                   {canSeeCosts && rate > 0 ? <span>{euro(rate)}/video</span> : null}
+                  {showMeetings ? (
+                    <Link href={`/editor-meetings?editor=${e.editor_id}`} className="ml-auto inline-flex items-center gap-1 font-semibold text-[var(--color-indigo-ink)] hover:underline">
+                      <MessagesSquare className="size-3" /> Editor meeting
+                    </Link>
+                  ) : null}
                 </div>
               </div>
             );
