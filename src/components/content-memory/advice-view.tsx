@@ -157,7 +157,7 @@ const SHOOT_TAG: Record<ShootLine["kind"], { label: string; cls: string }> = {
   testen: { label: "Testen", cls: "bg-[#fde6bd] text-[#6b4500]" },
 };
 
-export function ContentAdviceView({ cm, data, reviews }: { cm: ClientMemory; data: ClientAdvice; reviews?: InsightReview[] }) {
+export function ContentAdviceView({ cm, data, reviews, embedded = false }: { cm: ClientMemory; data: ClientAdvice; reviews?: InsightReview[]; embedded?: boolean }) {
   const a: ContentAdvice = data.advice;
   // Beoordeling voor het klantportaal: alleen als de pagina de beoordelingen meegeeft.
   const review: ReviewCtx | undefined = reviews ? { clientId: cm.clientId, byKey: new Map(reviews.map((r) => [r.key, r])) } : undefined;
@@ -172,7 +172,7 @@ export function ContentAdviceView({ cm, data, reviews }: { cm: ClientMemory; dat
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[22px] font-semibold tracking-tight">Contentadvies: wat gaan we nu beter doen?</h2>
+          {embedded ? null : <h2 className="text-[22px] font-semibold tracking-tight">Contentadvies: wat gaan we nu beter doen?</h2>}
           <p className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">{cm.clientName} · berekend uit {a.videoCount} video&apos;s van deze klant. Bewezen = minstens vier video&apos;s met een consequent beeld. Al het andere is een hypothese of experiment.</p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-[12px]">

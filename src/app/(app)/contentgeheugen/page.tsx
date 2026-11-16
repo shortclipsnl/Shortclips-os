@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 import { sql } from "drizzle-orm";
-import { Camera, ChevronDown, CircleAlert, Clock, Dna, FlaskConical, Lightbulb, Megaphone, MessageSquareQuote, PenLine, Repeat, ScrollText, Sparkles, Trophy, Wand2 } from "lucide-react";
+import { Camera, ChevronDown, CircleAlert, ClipboardCheck, Clock, Dna, FlaskConical, Lightbulb, Megaphone, MessageSquareQuote, PenLine, Repeat, ScrollText, Sparkles, Trophy, Wand2 } from "lucide-react";
 import { db } from "@/db/client";
 import { requirePermission, hasClientAccess } from "@/server/auth/context";
 import { ACTIVE_STATUSES, getContentMemory, type ClientMemory } from "@/server/content-memory";
@@ -27,6 +28,10 @@ import { QuarterLessons } from "@/components/quarterly/quarter-lessons";
 import { getClientAdvice } from "@/server/content-memory/advice-store";
 import { clientInsightsFrom, loadInsightReviews } from "@/server/content-memory/client-insights-store";
 import { ContentAdviceView } from "@/components/content-memory/advice-view";
+import { SectionNav } from "@/components/content-memory/section-nav";
+import type { ClientAdvice } from "@/server/content-memory/advice-store";
+import type { InsightReview } from "@/server/content-memory/client-insights";
+import type { DnaTile } from "@/server/content-memory/dna";
 
 export const metadata: Metadata = { title: "Contentgeheugen" };
 export const dynamic = "force-dynamic";
@@ -39,6 +44,12 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
   const viewer = await requirePermission("analytics:read");
   const sp = await searchParams;
   const showAll = sp.alle === "1";
+  if (sp.tab === "advies" && sp.weergave !== "klant") {
+    const p = new URLSearchParams();
+    if (sp.klant) p.set("klant", sp.klant);
+    if (showAll) p.set("alle", "1");
+    redirect(`/contentgeheugen?${p.toString()}#contentadvies`);
+  }
   const res = await db.execute(sql`
     select c.id, c.name, c.slug, c.logo_url, c.color, c.status::text status, count(p.id)::int as n
     from clients c join publications p on p.client_id = c.id and p.deleted_at is null and p.status = 'published'
@@ -52,17 +63,17 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
   const selected = options.find((c) => c.slug === sp.klant) ?? options[0];
   const cm = selected ? await getContentMemory(viewer, selected.id) : null;
   const asClient = sp.weergave === "klant";
-  const asAdvice = !asClient && sp.tab === "advies";
-  // Het advies voedt ook de klantweergave ("Wat werkt bij jouw bedrijf?"), dus ook daar laden.
-  const adviceData = cm && (asAdvice || asClient) ? await getClientAdvice(viewer, cm).catch(() => null) : null;
+  // Eén bron voor het advies: dezelfde gegevens voeden sectie 07 in Geheugen
+  // en de klantweergave ("Wat werkt bij jouw bedrijf?").
+  const adviceData = cm ? await getClientAdvice(viewer, cm).catch(() => null) : null;
   const reviews = cm && adviceData ? await loadInsightReviews(cm.clientId) : [];
   const clientInsights = cm && asClient && adviceData ? clientInsightsFrom(cm, adviceData, reviews) : null;
-  const alts = cm && !asClient && !asAdvice ? await getHookAlternatives(cm.clientId) : {};
-  const lessons = cm && !asClient && !asAdvice ? await lessonsForClient(cm.clientId).catch(() => []) : [];
-  const kwartaalLessen = cm && !asClient && !asAdvice ? await quarterLessonsForClient(cm.clientId).catch(() => []) : [];
+  const alts = cm && !asClient ? await getHookAlternatives(cm.clientId) : {};
+  const lessons = cm && !asClient ? await lessonsForClient(cm.clientId).catch(() => []) : [];
+  const kwartaalLessen = cm && !asClient ? await quarterLessonsForClient(cm.clientId).catch(() => []) : [];
   const qs = (extra: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
-    const merged = { klant: selected?.slug, weergave: asClient ? "klant" : undefined, tab: asAdvice ? "advies" : undefined, alle: showAll ? "1" : undefined, ...extra };
+    const merged = { klant: selected?.slug, weergave: asClient ? "klant" : undefined, alle: showAll ? "1" : undefined, ...extra };
     for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
     return `/contentgeheugen?${p.toString()}`;
   };
@@ -82,7 +93,7 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
 
       {/* Klantselectie */}
       <div className="flex flex-col gap-3">
-        <MemoryClientStrip clients={options} activeSlug={selected?.slug} weergave={asClient ? "klant" : "intern"} extraQuery={`${showAll ? "&alle=1" : ""}${asAdvice ? "&tab=advies" : ""}`} />
+        <MemoryClientStrip clients={options} activeSlug={selected?.slug} weergave={asClient ? "klant" : "intern"} extraQuery={showAll ? "&alle=1" : ""} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           {cm ? <DataLine cm={cm} /> : <span />}
           <div className="flex flex-wrap items-center gap-3">
@@ -92,9 +103,8 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
               </Link>
             ) : null}
             <div className="inline-flex rounded-lg bg-[var(--color-surface-sunken)] p-1 text-sm">
-              <Link href={qs({ weergave: "", tab: "" })} scroll={false} className={`rounded-md px-3 py-1.5 ${!asClient && !asAdvice ? "bg-[var(--color-surface)] font-semibold shadow-sm" : "text-[var(--color-ink-muted)]"}`}>Geheugen</Link>
-              <Link href={qs({ weergave: "", tab: "advies" })} scroll={false} className={`rounded-md px-3 py-1.5 ${asAdvice ? "bg-[var(--color-indigo-ink)] font-semibold text-white shadow-sm" : "font-medium text-[var(--color-ink)]"}`}>Contentadvies</Link>
-              <Link href={qs({ weergave: "klant", tab: "" })} scroll={false} className={`rounded-md px-3 py-1.5 ${asClient ? "bg-[var(--color-surface)] font-semibold shadow-sm" : "text-[var(--color-ink-muted)]"}`}>Zo ziet de klant het</Link>
+              <Link href={qs({ weergave: "" })} scroll={false} className={`rounded-md px-3 py-1.5 ${!asClient ? "bg-[var(--color-surface)] font-semibold shadow-sm" : "text-[var(--color-ink-muted)]"}`}>Geheugen</Link>
+              <Link href={qs({ weergave: "klant" })} scroll={false} className={`rounded-md px-3 py-1.5 ${asClient ? "bg-[var(--color-surface)] font-semibold shadow-sm" : "text-[var(--color-ink-muted)]"}`}>Zo ziet de klant het</Link>
             </div>
           </div>
         </div>
@@ -106,15 +116,11 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
           <EmptyState title="Nog geen actieve klant met resultaten" description="Zodra Metricool publicaties en cijfers levert, verschijnt hier het geheugen." />
         ) : asClient ? (
           <div className="portal-studio rounded-[20px] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-4 sm:p-6"><ClientMemoryView cm={cm} insights={clientInsights} /></div>
-        ) : asAdvice && adviceData ? (
-          <MemoryPlayerProvider>
-            <ContentAdviceView cm={cm} data={adviceData} reviews={reviews} />
-          </MemoryPlayerProvider>
         ) : (
           <MemoryPlayerProvider>
             <StrategyAutoFill key={`s-${cm.clientId}`} clientId={cm.clientId} needed={strategyMissing(cm.memory, cm.strategy)} />
             <HookAltsProvider key={cm.clientId} clientId={cm.clientId} initial={alts} keys={shownHooks(cm.memory).map(hookKey)}>
-              <InternalView cm={cm} />
+              <InternalView cm={cm} advice={adviceData} reviews={reviews} />
             </HookAltsProvider>
             <MemoryLessons lessons={lessons} />
             <QuarterLessons lessons={kwartaalLessen} />
@@ -126,10 +132,24 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
 }
 
 /* ------------------------------------------------------------------ *
- * Interne weergave: vijf banen, elk met een eigen achtergrondvlak
+ * Interne weergave: zeven onderdelen, elk met een vaste accentkleur
  * ------------------------------------------------------------------ */
 
-function InternalView({ cm }: { cm: ClientMemory }) {
+type SectionKey = "dna" | "best" | "success" | "format" | "hook" | "cta" | "advice";
+
+/** Vaste volgorde, kleur en icoon per onderdeel: voor iedere klant hetzelfde. */
+const SECTIONS: Record<SectionKey, { n: number; id: string; label: string; color: string; icon: typeof Sparkles }> = {
+  dna: { n: 1, id: "content-dna", label: "Content DNA", color: "var(--cg-dna)", icon: Dna },
+  best: { n: 2, id: "beste-videos", label: "Beste video's", color: "var(--cg-best)", icon: Trophy },
+  success: { n: 3, id: "terugkerende-successen", label: "Terugkerende successen", color: "var(--cg-success)", icon: Repeat },
+  format: { n: 4, id: "formats", label: "Formats", color: "var(--cg-format)", icon: Wand2 },
+  hook: { n: 5, id: "hooks", label: "Hooks", color: "var(--cg-hook)", icon: MessageSquareQuote },
+  cta: { n: 6, id: "call-to-actions", label: "Call to actions", color: "var(--cg-cta)", icon: Megaphone },
+  advice: { n: 7, id: "contentadvies", label: "Contentadvies", color: "var(--cg-advice)", icon: ClipboardCheck },
+};
+const NAV = (Object.keys(SECTIONS) as SectionKey[]).map((k) => ({ id: SECTIONS[k].id, n: SECTIONS[k].n, label: SECTIONS[k].label, color: SECTIONS[k].color }));
+
+function InternalView({ cm, advice, reviews }: { cm: ClientMemory; advice: ClientAdvice | null; reviews: InsightReview[] }) {
   const m = cm.memory;
   const successes = m.successes ?? [];
   const formats = shownFormats(m);
@@ -138,69 +158,131 @@ function InternalView({ cm }: { cm: ClientMemory }) {
   const best = m.topVideos.slice(0, 10);
 
   return (
-    <div className="flex flex-col gap-5">
-      <ResearchStrip clientId={cm.clientId} clientSlug={cm.clientSlug} thin={!m.sufficient} />
-      {!m.sufficient ? (
-        <div className="flex gap-3 rounded-[var(--radius-md)] border border-[var(--color-warn)]/40 bg-[var(--color-warn-soft)] px-4 py-3 text-sm">
-          <CircleAlert className="mt-0.5 size-4 shrink-0 text-[var(--color-warn)]" />
-          <span>Nog maar {m.videoCount} video&apos;s met cijfers. Vanaf 8 video&apos;s worden successen en patronen getoond. Wat hieronder staat zijn losse voorbeelden, geen bewezen aanpak.</span>
+    <div className="flex flex-col">
+      <SectionNav items={NAV} />
+      <div className="mt-3 flex flex-col gap-4">
+        <ResearchStrip clientId={cm.clientId} clientSlug={cm.clientSlug} thin={!m.sufficient} />
+        {!m.sufficient ? (
+          <div className="flex gap-3 rounded-[var(--radius-md)] border border-[var(--color-warn)]/40 bg-[var(--color-warn-soft)] px-4 py-3 text-sm">
+            <CircleAlert className="mt-0.5 size-4 shrink-0 text-[var(--color-warn)]" />
+            <span>Nog maar {m.videoCount} video&apos;s met cijfers. Vanaf 8 video&apos;s worden successen en patronen getoond. Wat hieronder staat zijn losse voorbeelden, geen bewezen aanpak.</span>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-8 flex flex-col gap-10 sm:gap-12">
+        {/* 1. Content DNA: wat werkt, waarom, en wat doen we bij de volgende opnames */}
+        <Band s="dna" tone="plain" title={`Content DNA · ${cm.clientName}`} sub="Automatisch berekend uit uitsluitend de resultaten van deze klant, per platform vergeleken. Bewezen = consequent bij minstens vier video's; voorlopig = wijst die kant op, nog bevestigen.">
+          <ContentDnaView dna={cm.dna} clientName={cm.clientName} />
+          <PlaybookView p={cm.playbook} />
+        </Band>
+
+        {/* 2. Beste video's: de blikvanger */}
+        <Band s="best" tone="hero" title="Beste video's" sub="Gerangschikt op prestatie t.o.v. het eigen platform (60% weergaven, 40% interactie). Klik om af te spelen.">
+          {best.length ? (
+            <Slider label="Beste video's">
+              {best.map((v, i) => <BestVideoCard key={v.id} v={v} rank={i + 1} clientSlug={cm.clientSlug} />)}
+            </Slider>
+          ) : <Empty dark>Nog geen video&apos;s met cijfers.</Empty>}
+        </Band>
+
+        {/* 3. Terugkerende successen */}
+        <Band s="success" tone="plain" title="Terugkerende successen" sub="Patronen die door meerdere video's gedragen worden. Eén video is nooit een patroon.">
+          {successes.length ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {successes.map((x, i) => <SuccessCard key={i} s={x} top={i === 0} />)}
+            </div>
+          ) : (
+            <Empty>{m.sufficient ? "Nog geen succes dat door minstens vier video's consequent gedragen wordt. Zodra er een duidelijk patroon is, verschijnt het hier vanzelf." : "Te weinig video's om successen te bepalen."}</Empty>
+          )}
+        </Band>
+
+        {/* 4. Best werkende formats + nieuwe formatvoorstellen */}
+        <Band s="format" tone="tint" title="Best werkende formats" sub="Door AI herkend uit de captions, beoordeeld op echte prestaties. Onder elk succesvol format staan nieuwe formats om te testen.">
+          {formats.length ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {formats.map((g) => <FormatCard key={g.label} cm={cm} g={g} />)}
+            </div>
+          ) : (
+            <Empty>{m.formatsLabeled ? "Nog geen format dat bij minstens twee video's boven het normale niveau scoort." : "Nog geen formats herkend. Klik op \"Formats bijwerken\" of wacht op de nachtelijke analyse."}</Empty>
+          )}
+        </Band>
+
+        {/* 5. Best werkende hooks + drie alternatieven */}
+        <Band s="hook" tone="plain" title="Best werkende hooks" sub="De echte openingszin van de best presterende video's, met drie nieuwe hooks op hetzelfde principe voor de volgende scripts.">
+          {hooks.length ? (
+            <div className="flex flex-col gap-4">
+              {hooks.map((v) => <HookCard key={v.id} v={v} />)}
+            </div>
+          ) : <Empty>Nog geen hooks die boven het normale niveau scoren.</Empty>}
+        </Band>
+
+        {/* 6. Best werkende call to actions */}
+        <Band s="cta" tone="tint" title="Best werkende call to actions" sub="Exacte afsluiters uit de captions. Conversies zijn alleen bekend als de klant formulier- of UTM-data koppelt.">
+          {ctas.length ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {ctas.map((g) => <CtaCard key={g.label} g={g} />)}
+            </div>
+          ) : <Empty>Nog geen call to action die bij minstens twee video&apos;s boven het normale niveau scoort.</Empty>}
+        </Band>
+
+        {/* 7. Contentadvies: wat gaan we nu beter doen? Zelfde gegevens als overal in het portaal. */}
+        <Band
+          s="advice"
+          tone="plain"
+          title="Contentadvies: wat gaan we nu beter doen?"
+          sub="Vertaalt het Content DNA en de onderdelen hierboven naar concrete acties voor scripts, opnames en de editorbriefing."
+          actions={<Link href={`/ai/scriptgenerator?client=${cm.clientId}`} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-[12.5px] font-medium hover:border-[var(--color-ink-muted)]"><PenLine className="size-3.5" />Naar de Script Engine</Link>}
+        >
+          <AdviceFromDna cm={cm} advice={advice} />
+          {advice ? (
+            <div className="mt-6"><ContentAdviceView cm={cm} data={advice} reviews={reviews} embedded /></div>
+          ) : (
+            <Empty>Het contentadvies kon nu niet geladen worden. Ververs de pagina; lukt het daarna nog niet, dan wordt het bij de ochtendanalyse opnieuw opgebouwd.</Empty>
+          )}
+        </Band>
+      </div>
+    </div>
+  );
+}
+
+/** Kansrijk voor het volgende script: format, hook en CTA uit het Content DNA, plus de opnamedag als kopieerbare briefing. */
+function AdviceFromDna({ cm, advice }: { cm: ClientMemory; advice: ClientAdvice | null }) {
+  const pick = (k: DnaTile["key"]) => cm.dna.tiles.find((t) => t.key === k);
+  const tiles = (["format", "hook", "cta"] as const).map(pick).filter((t): t is DnaTile => !!t);
+  const avoid = advice?.advice.sections.minder.slice(0, 2) ?? [];
+  const brief = [
+    `Scriptbriefing ${cm.clientName}`,
+    cm.dna.conclusion.text,
+    ...tiles.filter((t) => t.value).map((t) => `${t.title}: ${t.value}${t.status === "bewezen" ? "" : " (voorlopig, nog testen)"}${t.quote ? ` - bijv. "${t.quote}"` : ""}`),
+    ...(advice?.advice.nextShoot ?? []).map((l) => `${l.kind === "basis" ? "Basis" : l.kind === "doen" ? "Doen" : l.kind === "laten" ? "Laten" : "Testen"}: ${l.text}${l.proof === "hypothese" ? " (hypothese)" : ""}`),
+  ].filter(Boolean).join("\n");
+  const tone = { bewezen: "bg-[var(--color-good-soft)] text-[#1d6b4c]", indicatie: "bg-[var(--color-warn-soft)] text-[#8a5a00]", onvoldoende: "bg-[var(--color-neutral-soft)] text-[var(--color-ink-muted)]" } as const;
+  const label = { bewezen: "Bewezen", indicatie: "Voorlopig", onvoldoende: "Te weinig data" } as const;
+  return (
+    <div className="rounded-[16px] border p-4 sm:p-5" style={{ borderColor: "color-mix(in srgb, var(--acc) 30%, var(--color-line))", background: "color-mix(in srgb, var(--acc) 6%, var(--color-surface))" }}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-[15px] font-semibold">Kansrijk voor de volgende scripts</h3>
+          <p className="mt-0.5 text-[12.5px] text-[var(--color-ink-muted)]">Rechtstreeks uit het Content DNA van {cm.clientName}. Kopieer de briefing en plak hem in het script of de Script Engine.</p>
         </div>
+        <CopyButton text={brief} label="Kopieer scriptbriefing" />
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {tiles.map((t) => (
+          <div key={t.key} className="flex min-w-0 flex-col gap-1.5 rounded-[12px] border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">{t.title}</span>
+              <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${tone[t.status]}`}>{label[t.status]}</span>
+            </div>
+            <p className={`text-[14.5px] font-semibold leading-snug ${t.value ? "" : "text-[var(--color-ink-muted)]"}`}>{t.value ?? "Nog geen conclusie"}</p>
+            {t.quote && t.value ? <p className="line-clamp-2 text-[12.5px] italic leading-snug text-[var(--color-ink-muted)]">&ldquo;{t.quote}&rdquo;</p> : null}
+          </div>
+        ))}
+      </div>
+      {avoid.length ? (
+        <p className="mt-3 text-[12.5px] leading-snug"><span className="mr-1.5 inline-flex rounded bg-[var(--color-bad-soft)] px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[#a3271c]">Vermijden</span>{avoid.map((i) => i.title).join(" · ")}</p>
       ) : null}
-
-      {/* 1. Content DNA: wat werkt, waarom, en wat doen we bij de volgende opnames */}
-      <Band n={1} tone="plain" icon={Dna} title={`Content DNA · ${cm.clientName}`} sub="Automatisch berekend uit uitsluitend de resultaten van deze klant, per platform vergeleken. Bewezen = consequent bij minstens vier video's; voorlopig = wijst die kant op, nog bevestigen.">
-        <ContentDnaView dna={cm.dna} clientName={cm.clientName} />
-        <PlaybookView p={cm.playbook} />
-      </Band>
-
-      {/* 2. Beste video's: de blikvanger */}
-      <Band n={2} tone="hero" icon={Trophy} title="Beste video's" sub="Gerangschikt op prestatie t.o.v. het eigen platform (60% weergaven, 40% interactie). Klik om af te spelen.">
-        {best.length ? (
-          <Slider label="Beste video's">
-            {best.map((v, i) => <BestVideoCard key={v.id} v={v} rank={i + 1} clientSlug={cm.clientSlug} />)}
-          </Slider>
-        ) : <Empty dark>Nog geen video&apos;s met cijfers.</Empty>}
-      </Band>
-
-      {/* 3. Terugkerende successen */}
-      <Band n={3} tone="plain" icon={Repeat} title="Terugkerende successen" sub="Patronen die door meerdere video's gedragen worden. Eén video is nooit een patroon.">
-        {successes.length ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {successes.map((s, i) => <SuccessCard key={i} s={s} top={i === 0} />)}
-          </div>
-        ) : (
-          <Empty>{m.sufficient ? "Nog geen succes dat door minstens vier video's consequent gedragen wordt. Zodra er een duidelijk patroon is, verschijnt het hier vanzelf." : "Te weinig video's om successen te bepalen."}</Empty>
-        )}
-      </Band>
-
-      {/* 4. Best werkende formats + nieuwe formatvoorstellen */}
-      <Band n={4} tone="tint" icon={Wand2} title="Best werkende formats" sub="Door AI herkend uit de captions, beoordeeld op echte prestaties. Onder elk succesvol format staan nieuwe formats om te testen.">
-        {formats.length ? (
-          <div className="grid gap-4 lg:grid-cols-2">
-            {formats.map((g) => <FormatCard key={g.label} cm={cm} g={g} />)}
-          </div>
-        ) : (
-          <Empty>{m.formatsLabeled ? "Nog geen format dat bij minstens twee video's boven het normale niveau scoort." : "Nog geen formats herkend. Klik op \"Formats bijwerken\" of wacht op de nachtelijke analyse."}</Empty>
-        )}
-      </Band>
-
-      {/* 5. Best werkende hooks + drie alternatieven */}
-      <Band n={5} tone="plain" icon={MessageSquareQuote} title="Best werkende hooks" sub="De echte openingszin van de best presterende video's, met drie nieuwe hooks op hetzelfde principe voor de volgende scripts.">
-        {hooks.length ? (
-          <div className="flex flex-col gap-4">
-            {hooks.map((v) => <HookCard key={v.id} v={v} />)}
-          </div>
-        ) : <Empty>Nog geen hooks die boven het normale niveau scoren.</Empty>}
-      </Band>
-
-      {/* 6. Best werkende call to actions */}
-      <Band n={6} tone="tint" icon={Megaphone} title="Best werkende call to actions" sub="Exacte afsluiters uit de captions. Conversies zijn alleen bekend als de klant formulier- of UTM-data koppelt.">
-        {ctas.length ? (
-          <div className="grid gap-4 lg:grid-cols-2">
-            {ctas.map((g) => <CtaCard key={g.label} g={g} />)}
-          </div>
-        ) : <Empty>Nog geen call to action die bij minstens twee video&apos;s boven het normale niveau scoort.</Empty>}
-      </Band>
     </div>
   );
 }
@@ -227,17 +309,33 @@ const BAND: Record<"hero" | "plain" | "tint", string> = {
   tint: "bg-[var(--color-surface-2)] border-[var(--color-line)]",
 };
 
-function Band({ n, tone, icon: Icon, title, sub, children }: { n: number; tone: keyof typeof BAND; icon: typeof Sparkles; title: string; sub?: string; children: ReactNode }) {
+/** Eén sectie met vaste opbouw: accentlijn, gekleurd icoon, nummer, titel en uitleg. */
+function Band({ s: key, tone, title, sub, actions, children }: { s: SectionKey; tone: keyof typeof BAND; title: string; sub?: string; actions?: ReactNode; children: ReactNode }) {
+  const sec = SECTIONS[key];
+  const Icon = sec.icon;
   const hero = tone === "hero";
+  const style = { "--acc": sec.color } as CSSProperties;
   return (
-    <section className={`scroll-mt-20 rounded-[22px] border px-4 py-6 sm:px-7 sm:py-8 ${BAND[tone]}`} aria-labelledby={`cg-sec-${n}`}>
-      <div className="mb-5 flex items-start gap-3 pr-0 sm:pr-24">
-        <span className={`grid size-9 shrink-0 place-items-center rounded-xl text-[13px] font-bold tabular-nums ${hero ? "bg-white/12 text-white" : "bg-[var(--color-indigo-ink)] text-white"}`}>{String(n).padStart(2, "0")}</span>
-        <div className="min-w-0">
-          <h2 id={`cg-sec-${n}`} className="flex items-center gap-2 text-[19px] font-semibold tracking-tight"><Icon className={`size-[18px] ${hero ? "text-white/70" : "text-[var(--color-ink-muted)]"}`} />{title}</h2>
-          {sub ? <p className={`mt-0.5 text-[13px] ${hero ? "text-white/65" : "text-[var(--color-ink-muted)]"}`}>{sub}</p> : null}
+    <section id={sec.id} style={style} className={`relative scroll-mt-36 overflow-hidden rounded-[22px] border px-4 pb-6 pt-7 sm:px-7 sm:pb-8 sm:pt-8 ${BAND[tone]}`} aria-labelledby={`cg-sec-${sec.n}`}>
+      <span className="absolute inset-x-0 top-0 h-[5px]" style={{ background: "var(--acc)" }} aria-hidden />
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b pb-5" style={{ borderColor: hero ? "rgba(255,255,255,.14)" : "color-mix(in srgb, var(--acc) 22%, var(--color-line))" }}>
+        <div className="flex min-w-0 items-start gap-3.5 sm:pr-24">
+          <span
+            className="grid size-11 shrink-0 place-items-center rounded-[13px] sm:size-12"
+            style={{ background: hero ? "color-mix(in srgb, var(--acc) 26%, transparent)" : "color-mix(in srgb, var(--acc) 15%, var(--color-surface))", color: "var(--acc)" }}
+          >
+            <Icon className="size-[22px]" strokeWidth={2.2} />
+          </span>
+          <div className="min-w-0">
+            <div className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: hero ? "var(--acc)" : "color-mix(in srgb, var(--acc) 78%, var(--color-ink))" }}>
+              {String(sec.n).padStart(2, "0")} · {sec.label}
+            </div>
+            <h2 id={`cg-sec-${sec.n}`} className="mt-0.5 text-[21px] font-bold leading-tight tracking-tight sm:text-[24px]">{title}</h2>
+            {sub ? <p className={`mt-1 max-w-[760px] text-[13px] leading-snug ${hero ? "text-white/65" : "text-[var(--color-ink-muted)]"}`}>{sub}</p> : null}
+          </div>
         </div>
-      </div>
+        {actions ? <div className="shrink-0">{actions}</div> : null}
+      </header>
       {children}
     </section>
   );
@@ -315,9 +413,9 @@ function BestVideoCard({ v, rank, clientSlug }: { v: MemoryVideo; rank: number; 
 }
 
 const KIND: Record<MemorySuccess["kind"], { label: string; color: string; icon: typeof Sparkles }> = {
-  format: { label: "Format", color: "var(--color-violet)", icon: Wand2 },
-  hook: { label: "Hook", color: "var(--color-brand-700)", icon: MessageSquareQuote },
-  cta: { label: "Call to action", color: "var(--color-good)", icon: Megaphone },
+  format: { label: "Format", color: "var(--cg-format)", icon: Wand2 },
+  hook: { label: "Hook", color: "var(--cg-hook)", icon: MessageSquareQuote },
+  cta: { label: "Call to action", color: "var(--cg-cta)", icon: Megaphone },
   formule: { label: "Succesformule", color: "var(--color-warn)", icon: Lightbulb },
   lengte: { label: "Lengte", color: "var(--color-lime)", icon: Clock },
   kijktijd: { label: "Kijktijd", color: "var(--color-lime)", icon: Clock },
@@ -402,13 +500,13 @@ function FormatCard({ cm, g }: { cm: ClientMemory; g: MemoryGroup }) {
       <div className="flex min-w-0 flex-1 flex-col gap-2.5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--color-violet)]">Format</div>
+            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-[var(--cg-format)]">Format</div>
             <h3 className="text-[17px] font-semibold leading-snug">{g.label}</h3>
           </div>
           <EvidenceBadge e={g.evidence} />
         </div>
         <div className="flex items-baseline gap-2">
-          <b className="text-[22px] font-bold leading-none tabular-nums text-[var(--color-violet)]">{xf(g.medianPerf)}</b>
+          <b className="text-[22px] font-bold leading-none tabular-nums text-[var(--cg-format)]">{xf(g.medianPerf)}</b>
           <span className="text-[12px] text-[var(--color-ink-muted)]">normaal · {Math.round(g.hitRate * g.n)} van {g.n} boven normaal · {nf(g.medianViews)} views mediaan</span>
         </div>
         <p className="text-[13px] leading-snug"><span className="font-semibold">Waarom het werkt:</span> {info?.why ?? "Uitleg volgt na de eerstvolgende formatanalyse."}</p>
@@ -417,8 +515,8 @@ function FormatCard({ cm, g }: { cm: ClientMemory; g: MemoryGroup }) {
             {traits.map((t) => <span key={t} className="rounded-full border border-[var(--color-line)] bg-[var(--color-surface-sunken)] px-2 py-0.5 text-[11.5px] font-medium">{t}</span>)}
           </div>
         ) : null}
-        <div className="mt-auto rounded-[10px] bg-[var(--color-violet-soft)] px-3 py-2 text-[13px] leading-snug">
-          <span className="font-semibold text-[var(--color-violet)]">Advies:</span> {info?.reuse ?? "Plan dit format opnieuw in en varieer het onderwerp."}
+        <div className="mt-auto rounded-[10px] px-3 py-2 text-[13px] leading-snug" style={{ background: "color-mix(in srgb, var(--cg-format) 10%, var(--color-surface))" }}>
+          <span className="font-semibold text-[var(--cg-format)]">Advies:</span> {info?.reuse ?? "Plan dit format opnieuw in en varieer het onderwerp."}
         </div>
       </div>
     </div>
