@@ -31,7 +31,7 @@ export const STATE_LABEL: Record<ChecklistState, string> = {
 };
 
 /** Video-statussen waarin de montage klaar en goedgekeurd is. */
-const VIDEO_READY = new Set(["approved", "ready_to_publish", "scheduled", "published", "analysis_available"]);
+export const VIDEO_READY = new Set(["approved", "ready_to_publish", "scheduled", "published", "analysis_available"]);
 
 export type ChecklistPost = {
   status: string; // to_prepare | ready | scheduled | published | failed

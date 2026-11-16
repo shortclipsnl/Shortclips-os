@@ -16,6 +16,64 @@ export const PUBLICATION_CHECKLIST: string[] = [
   "Caption gecontroleerd op spelfouten",
 ];
 
+/**
+ * Handmatige punten van de publicatiecheck VÓÓR publicatie (Contentplanning).
+ * Alleen wat het systeem niet zelf kan zien; goedkeuring, gekoppelde video,
+ * platform en publicatiemoment leest de pagina automatisch uit de data.
+ * De caption-check is bewust hetzelfde punt als in de checklist na publicatie
+ * ("Caption gecontroleerd op spelfouten"): één keer afvinken telt voor beide.
+ */
+export const PRE_PUBLICATION_CHECKS = {
+  subtitles: "Ondertiteling en teksten gecontroleerd",
+  caption: "Caption gecontroleerd op spelfouten",
+} as const;
+
+export type PrePublicationCheck = { id: string; done: boolean; doneByName: string | null };
+
+/**
+ * Handmatige vooraf-checks per video (ondertiteling, caption). Maakt de rijen
+ * lui aan (idempotent via de unieke index), zelfde tabel als de checklist na
+ * publicatie; de voortgangsteller daarvan telt alleen zijn eigen labels.
+ */
+export async function getPrePublicationChecks(
+  deliverableIds: string[],
+): Promise<Map<string, { subtitles: PrePublicationCheck; caption: PrePublicationCheck }>> {
+  const ids = [...new Set(deliverableIds.filter(Boolean))];
+  const out = new Map<string, { subtitles: PrePublicationCheck; caption: PrePublicationCheck }>();
+  if (ids.length === 0) return out;
+
+  await db
+    .insert(publicationChecks)
+    .values(
+      ids.flatMap((deliverableId) => [
+        { deliverableId, label: PRE_PUBLICATION_CHECKS.subtitles, sortOrder: 100 },
+        { deliverableId, label: PRE_PUBLICATION_CHECKS.caption, sortOrder: PUBLICATION_CHECKLIST.indexOf(PRE_PUBLICATION_CHECKS.caption) },
+      ]),
+    )
+    .onConflictDoNothing();
+
+  const rows = await db
+    .select({
+      id: publicationChecks.id,
+      deliverableId: publicationChecks.deliverableId,
+      label: publicationChecks.label,
+      done: publicationChecks.done,
+      doneByName: users.fullName,
+    })
+    .from(publicationChecks)
+    .leftJoin(users, eq(users.id, publicationChecks.doneById))
+    .where(inArray(publicationChecks.deliverableId, ids));
+
+  for (const id of ids) {
+    const find = (label: string): PrePublicationCheck => {
+      const r = rows.find((x) => x.deliverableId === id && x.label === label);
+      return { id: r?.id ?? "", done: r?.done ?? false, doneByName: r?.doneByName ?? null };
+    };
+    out.set(id, { subtitles: find(PRE_PUBLICATION_CHECKS.subtitles), caption: find(PRE_PUBLICATION_CHECKS.caption) });
+  }
+  return out;
+}
+
 export type PublicationCheck = {
   id: string;
   label: string;

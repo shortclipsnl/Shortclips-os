@@ -33,3 +33,18 @@ export function coreStaffRank(email: string | null | undefined): number {
   const i = (CORE_STAFF_EMAILS as readonly string[]).indexOf(email.toLowerCase());
   return i === -1 ? CORE_STAFF_EMAILS.length : i;
 }
+
+/**
+ * Wie de publicatiecheck op de Contentplanning automatisch opengeklapt krijgt
+ * tijdens het dagelijkse publicatiemoment (werkdagen 14:00-17:00): de mensen
+ * die publiceren. Rutger (videograaf) bewust niet.
+ */
+export const PUBLICATION_CHECK_AUTO_OPEN_EMAILS = [
+  "jarno@shortclips.nl",
+  "milou@shortclips.nl",
+  "jiska@shortclips.nl",
+] as const;
+
+export function autoOpensPublicationCheck(email: string | null | undefined): boolean {
+  return !!email && (PUBLICATION_CHECK_AUTO_OPEN_EMAILS as readonly string[]).includes(email.toLowerCase());
+}
