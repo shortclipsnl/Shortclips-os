@@ -411,6 +411,17 @@ export async function syncAllPandaDoc(opts: { full?: boolean; budgetMs?: number;
     items.push(...batch);
     if (batch.length < 100) break;
   }
+  // Openstaande offertes (laatste 60 dagen) altijd meenemen: een opening door de
+  // klant hoeft de wijzigingsdatum in PandaDoc niet te veranderen.
+  if (!opts.full) {
+    const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    const open = await db
+      .select({ externalId: quotes.externalId, title: quotes.title, status: quotes.pandadocStatus })
+      .from(quotes)
+      .where(and(eq(quotes.source, "pandadoc"), inArray(quotes.status, ["verzonden", "bekeken"]), isNull(quotes.deletedAt), sql`coalesce(${quotes.sentAt}, ${quotes.createdAt}) >= ${since}`));
+    const listed = new Set(items.map((i) => i.id));
+    for (const o of open) if (o.externalId && !listed.has(o.externalId)) items.push({ id: o.externalId, name: o.title, status: undefined });
+  }
   report.seen = items.length;
 
   const known = items.length

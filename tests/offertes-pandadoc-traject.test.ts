@@ -37,7 +37,10 @@ vi.mock("@/server/quotes/pandadoc-client", () => {
     },
     getAuditTrail: async (id: string) => get(id).audit,
     downloadDocumentPdf: async (id: string) => new TextEncoder().encode(get(id).text),
-    listDocuments: async () => [...docs.values()].map(({ id, name, status, date_modified }) => ({ id, name, status, date_modified })),
+    listDocuments: async (o: { modifiedFrom?: Date } = {}) =>
+      [...docs.values()]
+        .filter((d) => !o.modifiedFrom || new Date(d.date_modified) >= o.modifiedFrom)
+        .map(({ id, name, status, date_modified }) => ({ id, name, status, date_modified })),
     changeDocumentStatus: async () => { throw new Error("niet gebruiken in tests"); },
     verifyWebhookSignature: () => true,
   };
@@ -236,5 +239,19 @@ describe("Afgewezen, verlopen, ontbrekende bedragen en storingen", () => {
     await sync.syncAllPandaDoc({ full: true });
     expect((await db.select().from(S.quotes)).length).toBe(before);
     expect((await db.select().from(S.salesLeads)).length).toBe(leadsBefore);
+  });
+});
+
+describe("Periodieke synchronisatie zonder webhook", () => {
+  it("haalt openstaande offertes elke ronde opnieuw op, zodat een opening niet gemist wordt", async () => {
+    const d = docs.get("doc-aquasel")!;
+    d.status = "document.viewed";
+    d.audit.push({ id: "aq-open", action: 8, date_created: iso(0.01), user: { email: "marketing@aquasel.nl" } });
+    // Wijzigingsdatum blijft bewust oud: alleen de status verandert.
+    await db.insert(S.syncJobs).values({ provider: "system", jobType: "pandadoc.sync", status: "success", startedAt: new Date(), finishedAt: new Date() });
+    await sync.syncAllPandaDoc({ full: false });
+    const q = await quoteOf("doc-aquasel");
+    expect(q.status).toBe("bekeken");
+    expect(q.openCount).toBe(1);
   });
 });
