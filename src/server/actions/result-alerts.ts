@@ -189,3 +189,68 @@ export async function rerunResultAlerts(): Promise<ActionResult> {
     throw error;
   }
 }
+
+const pickUpSchema = z.object({
+  clientId: z.string().uuid(),
+  assigneeId: z.string().uuid({ message: "Kies een verantwoordelijke." }),
+  dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Kies een deadline."),
+  headline: z.string().trim().min(3).max(200),
+  action: z.string().trim().min(3).max(240),
+  title: z.string().trim().min(3).max(240),
+  urgent: z.boolean(),
+  note: z.string().trim().max(600),
+});
+
+/**
+ * "Oppakken" vanuit het groei/daling-overzicht. Gebruikt altijd de bestaande
+ * alert van de klant (één status, één taak). Is er nog geen lopende alert
+ * omdat de dagelijkse analyse het signaal (nog) niet zag, dan wordt die hier
+ * aangemaakt, zodat opvolgen, afhandelen en de takenpagina gelijk lopen.
+ */
+export async function pickUpDecline(input: z.input<typeof pickUpSchema>): Promise<ActionResult> {
+  try {
+    const viewer = await requirePermission("tasks:write");
+    const parsed = pickUpSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
+    const d = parsed.data;
+    assertClientAccess(viewer, d.clientId);
+
+    const findActive = async () => {
+      const [a] = await db
+        .select({ id: resultAlerts.id })
+        .from(resultAlerts)
+        .where(and(eq(resultAlerts.clientId, d.clientId), eq(resultAlerts.kind, "negatief"), sql`${resultAlerts.status} in ('open','actie')`))
+        .limit(1);
+      return a?.id ?? null;
+    };
+    let alertId = await findActive();
+    if (!alertId) {
+      const inserted = await db
+        .insert(resultAlerts)
+        .values({
+          clientId: d.clientId,
+          kind: "negatief",
+          level: d.urgent ? "rood" : "oranje",
+          status: "open",
+          headline: d.headline,
+          analysis: { findings: [], causes: [], advice: d.action, adviceShort: d.action, actions: [d.action], memory: [] },
+          assigneeId: d.assigneeId,
+        })
+        .onConflictDoNothing()
+        .returning({ id: resultAlerts.id });
+      alertId = inserted[0]?.id ?? (await findActive());
+      if (!alertId) return { ok: false, message: "Oppakken lukte niet. Probeer het opnieuw." };
+    }
+
+    return createResultAlertTask({
+      alertId,
+      assigneeId: d.assigneeId,
+      dueOn: d.dueOn,
+      title: d.title,
+      description: `${d.headline}\n\n${d.note}\n\n(Opgepakt vanuit Klanten met daling op de Resultatenpagina.)`,
+    });
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
