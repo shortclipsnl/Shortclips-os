@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarClock, CheckCircle2, ChevronDown, Clock, FileText, MapPin } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { AlertCircle, ArrowRight, CalendarClock, CheckCircle2, ChevronDown, Clock, FileText, MapPin } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalData } from "@/server/portal";
 import { getPortalSettingsForClient } from "@/server/portal-settings";
@@ -31,6 +32,20 @@ type Row = {
 
 type Bucket = "actie" | "bezig" | "goedgekeurd" | "afgerond";
 
+/**
+ * Vaste kleur per status, gelijk aan de statuslabels:
+ * blauw = wij zijn bezig (informatie), groen = goedgekeurd, oranje/rood = actie van de klant.
+ * `solid` is een volle kleur waar witte tekst goed op leesbaar is (licht en donker thema);
+ * `ink` is de themavolgende tekstkleur voor accenten.
+ */
+const TONE_COLOR: Record<StatusTone, { solid: string; ink: string }> = {
+  blue: { solid: "#1b5fe0", ink: "var(--st-blue)" },
+  green: { solid: "#17784c", ink: "var(--st-green)" },
+  orange: { solid: "#c2410c", ink: "var(--st-orange)" },
+  red: { solid: "#b42318", ink: "var(--st-red)" },
+  grey: { solid: "#5b5b74", ink: "var(--st-grey)" },
+};
+
 /** Status per opname, met de vaste portaalkleuren. */
 function statusOf(r: Row, today: string): { bucket: Bucket; tone: StatusTone; label: string } {
   const rev = r.review;
@@ -45,47 +60,97 @@ function statusOf(r: Row, today: string): { bucket: Bucket; tone: StatusTone; la
   return past ? { bucket: "afgerond", tone: "grey", label: "Afgerond · opgenomen" } : { bucket: "goedgekeurd", tone: "green", label: "Goedgekeurd" };
 }
 
-function ShootDate({ iso }: { iso: string | null }) {
-  if (!iso) return <span className="grid size-12 shrink-0 place-items-center rounded-[12px] bg-[var(--sc-fill-strong)] text-[var(--color-ink-faint)]"><FileText className="size-5" /></span>;
+/** Groot datumvak: weekdag, dagnummer en maand op een volle statuskleur. */
+function ShootDate({ iso, tone, muted }: { iso: string | null; tone: StatusTone; muted: boolean }) {
+  if (!iso) {
+    return (
+      <span className="grid h-[84px] w-[76px] shrink-0 place-items-center rounded-[14px] bg-[var(--sc-fill-strong)] text-[var(--color-ink-faint)]">
+        <FileText className="size-6" />
+      </span>
+    );
+  }
   const d = new Date(`${iso}T12:00:00`);
+  const weekday = d.toLocaleDateString("nl-NL", { weekday: "short", timeZone: TZ }).replace(".", "");
+  const month = d.toLocaleDateString("nl-NL", { month: "short", timeZone: TZ }).replace(".", "");
+  if (muted) {
+    return (
+      <span className="flex h-[84px] w-[76px] shrink-0 flex-col items-center justify-center rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] text-[var(--color-ink-muted)]">
+        <span className="text-[11px] font-semibold uppercase tracking-wider">{weekday}</span>
+        <span className="text-[26px] font-bold leading-none tabular-nums">{d.getDate()}</span>
+        <span className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider">{month}</span>
+      </span>
+    );
+  }
   return (
-    <span className="flex size-12 shrink-0 flex-col items-center justify-center rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)]">
-      <span className="text-[17px] font-bold leading-none tabular-nums">{d.getDate()}</span>
-      <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">{d.toLocaleDateString("nl-NL", { month: "short", timeZone: TZ })}</span>
+    <span
+      className="flex h-[84px] w-[76px] shrink-0 flex-col items-center justify-center rounded-[14px] text-white"
+      style={{ background: TONE_COLOR[tone].solid, boxShadow: `0 8px 20px -10px ${TONE_COLOR[tone].solid}` }}
+    >
+      <span className="text-[11px] font-semibold uppercase tracking-wider opacity-85">{weekday}</span>
+      <span className="text-[28px] font-extrabold leading-none tabular-nums">{d.getDate()}</span>
+      <span className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider opacity-85">{month}</span>
     </span>
   );
 }
 
-function SessionRow({ r, today }: { r: Row; today: string }) {
+function SessionRow({ r, today, isNext = false }: { r: Row; today: string; isNext?: boolean }) {
   const st = statusOf(r, today);
   const rev = r.review;
   const actie = st.bucket === "actie";
+  const done = st.bucket === "afgerond";
+  const color = TONE_COLOR[st.tone];
   return (
     <div
-      className="sc-glass flex flex-wrap items-center gap-4 p-4 sm:p-5"
-      style={actie ? { boxShadow: `inset 4px 0 0 ${st.tone === "red" ? "var(--st-red)" : "var(--sc-act)"}` } : undefined}
+      className="flex flex-col gap-4 rounded-[var(--radius-lg)] border p-4 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:gap-5 sm:p-5"
+      style={
+        done
+          ? { background: "var(--color-surface)", borderColor: "var(--color-line)" }
+          : {
+              background: `color-mix(in srgb, ${color.solid} 6%, var(--color-surface))`,
+              borderColor: `color-mix(in srgb, ${color.solid} 30%, var(--color-line))`,
+              boxShadow: `inset 4px 0 0 ${color.solid}, var(--shadow-card)`,
+            }
+      }
     >
-      <ShootDate iso={r.shootOn} />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <h3 className="text-[15.5px] font-semibold">{r.shootOn ? `Opnamesessie ${dayLabel(r.shootOn).toLowerCase()}` : rev?.title ?? "Scripts"}</h3>
-          <StatusPill tone={st.tone}>{st.label}</StatusPill>
+      <div className="flex min-w-0 flex-1 items-start gap-4 sm:items-center">
+        <ShootDate iso={r.shootOn} tone={st.tone} muted={done} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: done ? "var(--color-ink-faint)" : color.ink }}>
+              Opnamesessie
+            </span>
+            {isNext ? (
+              <span className="rounded-full bg-[var(--sc-cta)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--sc-cta-ink)]">Eerstvolgende opname</span>
+            ) : null}
+          </div>
+          <h3 className={`mt-0.5 font-bold tracking-tight ${done ? "text-[16px]" : "text-[19px] sm:text-[20px]"}`}>
+            {r.shootOn ? dayLabel(r.shootOn) : rev?.title ?? "Scripts"}
+          </h3>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px] text-[var(--color-ink-muted)]">
+            {r.shootOn ? (
+              <span className="inline-flex items-center gap-1.5 font-medium text-[var(--color-ink)]">
+                <Clock className="size-4" style={{ color: done ? undefined : color.ink }} />
+                {r.shootTime ? `Vanaf ${r.shootTime.slice(0, 5)}` : "Tijd volgt"}
+                <span className="font-normal text-[var(--color-ink-muted)]">· {relativeDays(r.shootOn)}</span>
+              </span>
+            ) : null}
+            {r.location ? <span className="inline-flex items-center gap-1"><MapPin className="size-3.5" /> {r.location}</span> : null}
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <StatusPill tone={st.tone} className="px-3 py-1.5 text-[12.5px]">{st.label}</StatusPill>
+            {rev ? <span className="inline-flex items-center gap-1 text-[13px] text-[var(--color-ink-muted)]"><FileText className="size-3.5" /> {rev.title}</span> : null}
+            {rev && rev.openComments > 0 ? <span className="text-[13px] text-[var(--color-ink-muted)]">{rev.openComments} opmerking{rev.openComments === 1 ? "" : "en"}</span> : null}
+          </div>
+          {rev && rev.totalScripts > 0 && !done ? <ScriptProgress approved={rev.approvedScripts} total={rev.totalScripts} /> : null}
+          {actie && rev?.feedbackDeadline ? (
+            <p className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: color.ink }}>
+              <Clock className="size-3.5" /> Graag uiterlijk {dayLabel(rev.feedbackDeadline).toLowerCase()} om 17:00
+            </p>
+          ) : null}
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] text-[var(--color-ink-muted)]">
-          {r.shootOn ? <span>{relativeDays(r.shootOn)}{r.shootTime ? ` · vanaf ${r.shootTime.slice(0, 5)}` : ""}</span> : null}
-          {r.location ? <span className="inline-flex items-center gap-1"><MapPin className="size-3.5" /> {r.location}</span> : null}
-          {rev ? <span className="inline-flex items-center gap-1"><FileText className="size-3.5" /> {rev.title}</span> : null}
-          {rev && rev.openComments > 0 ? <span>{rev.openComments} opmerking{rev.openComments === 1 ? "" : "en"}</span> : null}
-        </div>
-        {rev && rev.totalScripts > 0 && st.bucket !== "afgerond" ? <ScriptProgress approved={rev.approvedScripts} total={rev.totalScripts} /> : null}
-        {actie && rev?.feedbackDeadline ? (
-          <p className={`mt-1.5 inline-flex items-center gap-1.5 text-[13px] font-semibold ${st.tone === "red" ? "text-[var(--st-red)]" : "text-[var(--st-orange)]"}`}>
-            <Clock className="size-3.5" /> Graag uiterlijk {dayLabel(rev.feedbackDeadline).toLowerCase()} om 17:00
-          </p>
-        ) : null}
       </div>
       {rev ? (
-        <Link href={`/portal/scripts/${rev.id}`} className={`${actie ? portalBtn.act : portalBtn.soft} shrink-0`}>
+        <Link href={`/portal/scripts/${rev.id}`} className={`${actie ? portalBtn.act : portalBtn.soft} w-full shrink-0 sm:w-auto`}>
           {actie ? (rev.approvedScripts > 0 ? "Verder beoordelen" : "Scripts beoordelen") : "Bekijk scripts"} <ArrowRight className="size-4" />
         </Link>
       ) : null}
@@ -97,8 +162,8 @@ function SessionRow({ r, today }: { r: Row; today: string }) {
 function ScriptProgress({ approved, total }: { approved: number; total: number }) {
   const pct = Math.round((approved / total) * 100);
   return (
-    <div className="mt-2 flex max-w-[360px] items-center gap-2.5">
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--sc-fill-strong)]" aria-hidden>
+    <div className="mt-2.5 flex max-w-[380px] items-center gap-2.5">
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--sc-fill-strong)]" aria-hidden>
         <div className="h-full rounded-full bg-[var(--st-green)]" style={{ width: `${pct}%` }} />
       </div>
       <span className="shrink-0 text-[12.5px] font-semibold text-[var(--color-ink-muted)] tabular-nums">
@@ -108,16 +173,44 @@ function ScriptProgress({ approved, total }: { approved: number; total: number }
   );
 }
 
-function Section({ title, hint, rows, today }: { title: string; hint?: string; rows: Row[]; today: string }) {
+function Section({
+  title,
+  hint,
+  rows,
+  today,
+  tone,
+  icon: Icon,
+  nextKey,
+}: {
+  title: string;
+  hint?: string;
+  rows: Row[];
+  today: string;
+  tone: StatusTone;
+  icon: LucideIcon;
+  nextKey: string | null;
+}) {
   if (rows.length === 0) return null;
+  const color = TONE_COLOR[tone];
   return (
     <section>
-      <div className="mb-3 flex items-baseline gap-2">
-        <h2 className="text-[17px] font-semibold">{title}</h2>
-        <span className="text-[13px] text-[var(--color-ink-faint)]">{rows.length}</span>
+      <div className="mb-4 flex items-center gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-[10px] text-white" style={{ background: color.solid }}>
+          <Icon className="size-[18px]" />
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-[19px] font-bold tracking-tight">{title}</h2>
+            <span className="rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums" style={{ color: color.ink, background: `var(--st-${tone}-bg)` }}>
+              {rows.length}
+            </span>
+          </div>
+          {hint ? <p className="text-[13px] text-[var(--color-ink-muted)]">{hint}</p> : null}
+        </div>
       </div>
-      {hint ? <p className="-mt-2 mb-3 text-[13px] text-[var(--color-ink-muted)]">{hint}</p> : null}
-      <div className="flex flex-col gap-3">{rows.map((r) => <SessionRow key={r.key} r={r} today={today} />)}</div>
+      <div className="flex flex-col gap-4">
+        {rows.map((r) => <SessionRow key={r.key} r={r} today={today} isNext={r.key === nextKey} />)}
+      </div>
     </section>
   );
 }
@@ -143,11 +236,15 @@ export default async function PortalScriptsPage() {
   groups.goedgekeurd.sort(asc);
   groups.afgerond.sort((a, b) => (b.shootOn ?? "").localeCompare(a.shootOn ?? ""));
 
+  // Eerstvolgende opname (vandaag of later), ongeacht de status van het script.
+  const nextShoot = rows.filter((r) => !!r.shootOn && r.shootOn >= today).sort(asc)[0] ?? null;
+  const nextKey = nextShoot?.key ?? null;
+
   const firstAction = groups.actie[0]?.review ?? null;
   const deadlines = groups.actie.map((r) => r.review?.feedbackDeadline).filter((d): d is string => !!d).sort();
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="flex flex-col gap-10">
       <div>
         <h1 className="text-[26px] font-bold tracking-tight">Scripts</h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Per opnamesessie zie je het script, de status en of er iets van je verwacht wordt.</p>
@@ -170,7 +267,7 @@ export default async function PortalScriptsPage() {
             </p>
           </div>
           {firstAction ? (
-            <Link href={`/portal/scripts/${firstAction.id}`} className={portalBtn.act}>{firstAction.approvedScripts > 0 ? "Verder beoordelen" : "Start met beoordelen"} <ArrowRight className="size-4" /></Link>
+            <Link href={`/portal/scripts/${firstAction.id}`} className={`${portalBtn.act} w-full sm:w-auto`}>{firstAction.approvedScripts > 0 ? "Verder beoordelen" : "Start met beoordelen"} <ArrowRight className="size-4" /></Link>
           ) : null}
         </section>
       ) : (
@@ -185,9 +282,9 @@ export default async function PortalScriptsPage() {
         </section>
       )}
 
-      <Section title="Wacht op jouw akkoord" rows={groups.actie} today={today} />
-      <Section title="In voorbereiding" hint="Hier zijn wij mee bezig. Je hoeft nog niets te doen." rows={groups.bezig} today={today} />
-      <Section title="Goedgekeurd" hint="Klaar voor de opnamedag." rows={groups.goedgekeurd} today={today} />
+      <Section title="Wacht op jouw akkoord" rows={groups.actie} today={today} tone="orange" icon={AlertCircle} nextKey={nextKey} />
+      <Section title="In voorbereiding" hint="Hier zijn wij mee bezig. Je hoeft nog niets te doen." rows={groups.bezig} today={today} tone="blue" icon={CalendarClock} nextKey={nextKey} />
+      <Section title="Goedgekeurd" hint="Klaar voor de opnamedag." rows={groups.goedgekeurd} today={today} tone="green" icon={CheckCircle2} nextKey={nextKey} />
 
       {rows.length === 0 ? (
         <section className="sc-glass flex items-center gap-3 p-5 text-[14px] text-[var(--color-ink-muted)]">
