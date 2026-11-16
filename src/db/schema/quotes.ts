@@ -142,8 +142,10 @@ export const quotes = pgTable(
     /** Verzender in PandaDoc (verantwoordelijke), als e-mail + naam. */
     senderEmail: varchar("sender_email", { length: 320 }),
     senderName: varchar("sender_name", { length: 160 }),
-    /** Hoe de lead gekoppeld is: email | domein | naam | handmatig. Handmatig wordt nooit overschreven. */
+    /** Hoe de lead gekoppeld is: email | domein | naam | aangemaakt | controleren | handmatig. Handmatig wordt nooit overschreven. */
     leadMatch: varchar("lead_match", { length: 20 }),
+    /** Afspraken uit de offertetekst (pakket, video's, looptijd, maandbedrag); alleen eenduidige waarden. */
+    dealTerms: jsonb("deal_terms"),
     syncedAt: timestamp("synced_at", { withTimezone: true }),
     syncError: text("sync_error"),
 

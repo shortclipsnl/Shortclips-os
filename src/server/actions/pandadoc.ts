@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { quotes, salesLeads } from "@/db/schema";
+import { clients, quotes, salesLeads } from "@/db/schema";
 import { ForbiddenError, requireQuotesAccess } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { runPandaDocSync } from "@/server/jobs/pandadoc-sync";
 import { PandaDocError, changeDocumentStatus, pandadocConfigured } from "@/server/quotes/pandadoc-client";
-import { syncPandaDocDocument } from "@/server/quotes/pandadoc-sync";
+import { createLeadFromQuote, syncPandaDocDocument } from "@/server/quotes/pandadoc-sync";
 import { PANDADOC_SETTABLE, allowedManualStatuses, mapPandaDocStatus, type SettableStatus } from "@/lib/pandadoc";
 
 export type PdActionResult = { ok: boolean; message?: string };
@@ -103,5 +103,50 @@ export async function setQuoteLead(input: z.infer<typeof linkSchema>): Promise<P
     return { ok: true, message: p.data.leadId ? "Gekoppeld aan de lead." : "Koppeling verwijderd." };
   } catch (e) {
     return fail(e);
+  }
+}
+
+/**
+ * Voorbereiding voor "Omzetten naar klant" vanaf een ondertekende offerte.
+ * Geeft de lead terug waarop het bestaande omzetvenster (met controle en
+ * onboarding) draait. Is er nog geen lead, dan wordt die aangemaakt uit de
+ * PandaDoc-gegevens; staat de offerte al bij een klant, dan het klantdossier.
+ * Er wordt hier nog niets omgezet: dat gebeurt pas na bevestigen.
+ */
+export async function prepareQuoteConversion(
+  quoteId: string,
+): Promise<{ ok: true; leadId: string } | { ok: true; clientSlug: string; clientName: string } | { ok: false; message: string }> {
+  try {
+    const viewer = await requireQuotesAccess();
+    if (!z.string().uuid().safeParse(quoteId).success) return { ok: false, message: "Ongeldige offerte." };
+    const [q] = await db.select().from(quotes).where(and(eq(quotes.id, quoteId), isNull(quotes.deletedAt))).limit(1);
+    if (!q) return { ok: false, message: "Offerte niet gevonden." };
+    if (!["ondertekend", "geaccepteerd"].includes(q.status)) return { ok: false, message: "Alleen een ondertekende offerte kan worden omgezet." };
+
+    if (q.leadId) {
+      const [lead] = await db.select({ id: salesLeads.id, client: salesLeads.convertedClientId }).from(salesLeads).where(eq(salesLeads.id, q.leadId)).limit(1);
+      if (lead?.client) {
+        const [c] = await db.select({ slug: clients.slug, name: clients.name }).from(clients).where(eq(clients.id, lead.client)).limit(1);
+        if (c) return { ok: true, clientSlug: c.slug, clientName: c.name };
+      }
+      if (lead) return { ok: true, leadId: lead.id };
+    }
+    // Verlenging: offerte hoort al bij een bestaande klant, geen tweede klant.
+    if (q.clientId) {
+      const [c] = await db.select({ slug: clients.slug, name: clients.name }).from(clients).where(and(eq(clients.id, q.clientId), isNull(clients.deletedAt))).limit(1);
+      if (c) return { ok: true, clientSlug: c.slug, clientName: c.name };
+    }
+    if (q.leadMatch === "controleren") {
+      return { ok: false, message: "Deze offerte lijkt op een bestaande lead. Kies eerst de juiste lead bij Gekoppelde lead, dan kun je omzetten." };
+    }
+    const leadId = await createLeadFromQuote(q);
+    if (!leadId) return { ok: false, message: "Er kon geen lead worden aangemaakt uit deze offerte." };
+    await db.update(quotes).set({ leadId, leadMatch: "aangemaakt", updatedAt: new Date() }).where(eq(quotes.id, q.id));
+    await db.update(salesLeads).set({ status: "gewonnen", updatedAt: new Date() }).where(eq(salesLeads.id, leadId));
+    await auditLog({ viewer, action: "quote.lead_created", entityType: "quote", entityId: q.id, changes: { leadId } }).catch(() => {});
+    revalidate(q.id);
+    return { ok: true, leadId };
+  } catch (e) {
+    return { ok: false, message: fail(e).message ?? "Er ging iets mis." };
   }
 }

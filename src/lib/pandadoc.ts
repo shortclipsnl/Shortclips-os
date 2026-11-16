@@ -157,3 +157,142 @@ export function conversionRate(counts: { ondertekend: number; afgewezen: number;
   const done = counts.ondertekend + counts.afgewezen + counts.verlopen;
   return done === 0 ? null : counts.ondertekend / done;
 }
+
+/* ------------------------------------------------------------------ *
+ * Afspraken uit de offerte (voor "Omzetten naar klant")
+ * ------------------------------------------------------------------ */
+
+export type DealTerms = {
+  focus: "organisch" | "advertentie" | null;
+  shortsPerMonth: number | null;
+  contractMonths: number | null;
+  monthlyExclVat: number | null;
+  /** "tekst" = letterlijk in de offerte gevonden; "berekend" = totaal ÷ looptijd. */
+  monthlySource: "tekst" | "berekend" | null;
+};
+
+const uniq = <T,>(xs: T[]) => [...new Set(xs)];
+
+/**
+ * Leest pakket, aantal video's, looptijd en maandbedrag uit de offertetekst.
+ * Alleen als het eenduidig is: bij twee verschillende waarden blijft het veld
+ * leeg (dan vult een medewerker het in het controlevenster in).
+ */
+export function extractDealTerms(text: string | null | undefined, title: string, totalExclVat: number | null): DealTerms {
+  const t = (text ?? "").replace(/\s+/g, " ");
+  const service = serviceTypeFrom(title, text);
+  const focus = service === "Advertentiecreatives" ? "advertentie" : service === "Organische short video" ? "organisch" : null;
+
+  const shorts = uniq(
+    [...t.matchAll(/(\d{1,2})\s*(?:short[\s-]?(?:video'?s|form video'?s)|shorts|video'?s|creatives)\s*(?:per|p\/|\/)\s*maand/gi)].map((m) => Number(m[1])),
+  ).filter((n) => n > 0 && n <= 40);
+
+  const months = uniq(
+    [...t.matchAll(/(?:looptijd|contractduur|periode|minimaal|samenwerking van|voor)\D{0,30}?(\d{1,2})\s*maanden/gi)].map((m) => Number(m[1])),
+  ).filter((n) => [3, 6, 9, 12, 24].includes(n));
+
+  const monthlyRe = /€\s*([\d.,]+\d)\s*(?:,-)?\s*(?:excl\.?\s*btw\s*)?(?:per maand|p\/m|\/\s*maand|per mnd)/gi;
+  const monthly = uniq([...t.matchAll(monthlyRe)].map((m) => parseEuro(m[1]!)).filter((n): n is number => n != null && n >= 250));
+
+  let monthlyExclVat: number | null = null;
+  let monthlySource: DealTerms["monthlySource"] = null;
+  if (monthly.length === 1) {
+    monthlyExclVat = monthly[0]!;
+    monthlySource = "tekst";
+  } else if (monthly.length === 0 && totalExclVat && months.length === 1) {
+    const per = totalExclVat / months[0]!;
+    // Alleen als het een rond bedrag is (anders klopt de aanname niet).
+    if (Math.abs(per - Math.round(per)) < 0.005) { monthlyExclVat = Math.round(per); monthlySource = "berekend"; }
+  }
+
+  return {
+    focus,
+    shortsPerMonth: shorts.length === 1 ? shorts[0]! : null,
+    contractMonths: months.length === 1 ? months[0]! : null,
+    monthlyExclVat,
+    monthlySource,
+  };
+}
+
+/** Pakketkeuze in het omzetvenster, alleen bij een exacte match. */
+export function pakketFromTerms(terms: Pick<DealTerms, "focus" | "shortsPerMonth"> | null | undefined): "org6" | "org8" | "ads6" | "ads8" | null {
+  if (!terms?.focus || !terms.shortsPerMonth) return null;
+  if (terms.shortsPerMonth !== 6 && terms.shortsPerMonth !== 8) return null;
+  return `${terms.focus === "organisch" ? "org" : "ads"}${terms.shortsPerMonth}` as "org6" | "org8" | "ads6" | "ads8";
+}
+
+/* ------------------------------------------------------------------ *
+ * Commerciële opvolging
+ * ------------------------------------------------------------------ */
+
+export type AttentionInput = {
+  id: string;
+  status: string;
+  sentAt: Date | string | null;
+  firstOpenedAt: Date | string | null;
+  lastOpenedAt: Date | string | null;
+  expiresOn: Date | string | null;
+};
+export type AttentionKind = "recent_bekeken" | "verloopt" | "niet_geopend" | "lang_open";
+export type AttentionSignal = { id: string; kind: AttentionKind; label: string; days: number; rank: number };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const ms = (d: Date | string | null) => (d ? new Date(d).getTime() : null);
+
+/**
+ * Eén signaal per openstaande offerte (het belangrijkste), gesorteerd op
+ * urgentie. Concept, ondertekend, afgewezen en verlopen tellen nooit mee.
+ */
+export function attentionSignals(rows: AttentionInput[], now = Date.now()): AttentionSignal[] {
+  const out: AttentionSignal[] = [];
+  for (const r of rows) {
+    if (r.status !== "verzonden" && r.status !== "bekeken") continue;
+    const sent = ms(r.sentAt);
+    const opened = ms(r.lastOpenedAt);
+    const expires = ms(r.expiresOn);
+    const daysOpen = sent ? Math.floor((now - sent) / DAY_MS) : 0;
+
+    if (expires && expires > now && expires - now <= 7 * DAY_MS) {
+      const d = Math.max(0, Math.ceil((expires - now) / DAY_MS));
+      out.push({ id: r.id, kind: "verloopt", label: d <= 1 ? "Verloopt morgen" : `Verloopt over ${d} dagen`, days: d, rank: 0 });
+    } else if (r.status === "bekeken" && opened && now - opened <= 7 * DAY_MS) {
+      const d = Math.floor((now - opened) / DAY_MS);
+      out.push({ id: r.id, kind: "recent_bekeken", label: d === 0 ? "Vandaag bekeken, nog niet getekend" : `${d} ${d === 1 ? "dag" : "dagen"} geleden bekeken, nog niet getekend`, days: d, rank: 1 });
+    } else if (r.status === "verzonden" && sent && now - sent > 3 * DAY_MS) {
+      out.push({ id: r.id, kind: "niet_geopend", label: `${daysOpen} dagen verzonden, nog niet geopend`, days: daysOpen, rank: 2 });
+    } else if (sent && now - sent > 14 * DAY_MS) {
+      out.push({ id: r.id, kind: "lang_open", label: `Staat al ${daysOpen} dagen open`, days: daysOpen, rank: 3 });
+    }
+  }
+  return out.sort((a, b) => a.rank - b.rank || (a.kind === "verloopt" ? a.days - b.days : a.kind === "recent_bekeken" ? a.days - b.days : b.days - a.days));
+}
+
+/** Maandvergelijking: ondertekend en verzonden in deze vs. vorige kalendermaand (Amsterdamse tijd). */
+export function monthComparison(
+  rows: { status: string; sentAt: Date | string | null; signedAt: Date | string | null }[],
+  now = new Date(),
+): { signedThis: number; signedPrev: number; sentThis: number; sentPrev: number } {
+  const key = (d: Date) => new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", timeZone: "Europe/Amsterdam" }).format(d);
+  const thisKey = key(now);
+  const prevDate = new Date(now);
+  prevDate.setUTCDate(1);
+  prevDate.setUTCMonth(prevDate.getUTCMonth() - 1);
+  const prevKey = key(new Date(Date.UTC(prevDate.getUTCFullYear(), prevDate.getUTCMonth(), 15)));
+  let signedThis = 0, signedPrev = 0, sentThis = 0, sentPrev = 0;
+  for (const r of rows) {
+    if (r.signedAt && (r.status === "ondertekend" || r.status === "geaccepteerd")) {
+      const k = key(new Date(r.signedAt));
+      if (k === thisKey) signedThis++; else if (k === prevKey) signedPrev++;
+    }
+    if (r.sentAt) {
+      const k = key(new Date(r.sentAt));
+      if (k === thisKey) sentThis++; else if (k === prevKey) sentPrev++;
+    }
+  }
+  return { signedThis, signedPrev, sentThis, sentPrev };
+}
+
+/** Genoeg zekere gegevens om automatisch een lead aan te maken. */
+export function canCreateLeadFrom(q: { recipientCompany: string | null; recipientEmail: string | null }): boolean {
+  return normalizeCompany(q.recipientCompany).length >= 3 && !!q.recipientEmail && !isInternalEmail(q.recipientEmail);
+}

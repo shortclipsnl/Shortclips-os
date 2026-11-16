@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowRightCircle, Check, Loader2, X } from "lucide-react
 import { convertLeadWithOnboarding, loadConvertForm } from "@/server/actions/onboarding";
 import type { ConvertForm } from "@/server/onboarding";
 import { PAKKETTEN } from "@/lib/onboarding-plan";
+import { pakketFromTerms } from "@/lib/pandadoc";
 import { Button } from "@/components/ui";
 
 type Pakket = (typeof PAKKETTEN)[number]["value"];
@@ -28,7 +29,7 @@ export function ConvertButton({ leadId, label = "Naar klant" }: { leadId: string
   );
 }
 
-function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: () => void }) {
+export function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: () => void }) {
   const router = useRouter();
   const [form, setForm] = useState<ConvertForm | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -50,6 +51,7 @@ function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: ()
   const [publisher, setPublisher] = useState<"shortclips" | "klant">("shortclips");
   const [notes, setNotes] = useState("");
   const [team, setTeam] = useState<string[]>([]);
+  const [fromQuote, setFromQuote] = useState<string[]>([]);
 
   // Na omzetten pas bij sluiten de lijst verversen (anders verdwijnt dit venster).
   const onClose = () => {
@@ -71,6 +73,19 @@ function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: ()
       setMonthly(f.lead.expectedMonthly ? String(Math.round(Number(f.lead.expectedMonthly))) : "");
       setStartOn(f.lead.startOn ?? "");
       setPmId(f.defaultPmId ?? "");
+      // Afspraken uit de (getekende) offerte overnemen, alleen eenduidige waarden.
+      const t = f.quote?.terms;
+      if (t) {
+        const taken: string[] = [];
+        const pk = pakketFromTerms(t);
+        if (pk) { setPakket(pk); taken.push("pakket"); }
+        if (t.contractMonths && [3, 6, 12].includes(t.contractMonths)) { setMonths(String(t.contractMonths)); taken.push("looptijd"); }
+        if (t.monthlyExclVat && !(Number(f.lead.expectedMonthly) > 0)) {
+          setMonthly(String(Math.round(t.monthlyExclVat)));
+          taken.push(t.monthlySource === "berekend" ? "maandbedrag (berekend uit totaal ÷ looptijd)" : "maandbedrag");
+        }
+        setFromQuote(taken);
+      }
     });
     return () => {
       alive = false;
@@ -270,6 +285,11 @@ function ConvertDialog({ leadId, onClose: close }: { leadId: string; onClose: ()
               ) : (
                 <p className="flex items-start gap-1.5 text-[var(--color-warn)]"><AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> Geen PandaDoc-offerte gekoppeld aan deze lead.</p>
               )}
+              {fromQuote.length ? (
+                <p className="flex items-start gap-1.5 text-[var(--color-good)]"><Check className="mt-0.5 size-3.5 shrink-0" /> Uit de offerte overgenomen: {fromQuote.join(", ")}. Controleer dit even.</p>
+              ) : form.quote ? (
+                <p className="flex items-start gap-1.5 text-[var(--color-ink-muted)]"><AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> Pakket en looptijd niet eenduidig uit de offerte te lezen; kies ze hierboven.</p>
+              ) : null}
               <p className="flex items-center gap-1.5 text-[var(--color-good)]"><Check className="size-3.5" /> Lead is nog niet eerder omgezet</p>
               {form.similarClients.length === 0 ? (
                 <p className="flex items-center gap-1.5 text-[var(--color-good)]"><Check className="size-3.5" /> Geen bestaande klant met een gelijkende naam</p>

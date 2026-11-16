@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ChevronLeft, Download, ExternalLink, FileText } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronLeft, Download, ExternalLink, FileText } from "lucide-react";
 import { PageHeader } from "@/components/ui";
 import { euro } from "@/lib/quotes";
 import { allowedManualStatuses, mapPandaDocStatus, pandadocDocumentUrl } from "@/lib/pandadoc";
 import { StatusPill, followUpHint } from "../quote-status";
 import { LeadPicker, RefreshButton, StatusActions } from "./pandadoc-actions";
+import { QuoteConvertButton } from "./quote-convert";
 
 type Quote = {
   id: string; number: string; title: string; status: string; externalId: string | null; pandadocStatus: string | null;
@@ -43,7 +44,7 @@ function compactTimeline(events: Event[]) {
   return out.reverse();
 }
 
-export function PandaDocQuoteDetail({ quote, events, lead, client, leads }: { quote: Quote; events: Event[]; lead: Lead; client: Client; leads: { id: string; company: string; status: string }[] }) {
+export function PandaDocQuoteDetail({ quote, events, lead, client, leads, candidates = [], autoConvert = false }: { quote: Quote; events: Event[]; lead: Lead; client: Client; leads: { id: string; company: string; status: string }[]; candidates?: { id: string; company: string; status: string }[]; autoConvert?: boolean }) {
   const status = quote.status === "geaccepteerd" ? "ondertekend" : quote.status;
   const amount = quote.amountSource ? Number(quote.amount) : null;
   const manual = allowedManualStatuses(mapPandaDocStatus(quote.pandadocStatus));
@@ -83,6 +84,23 @@ export function PandaDocQuoteDetail({ quote, events, lead, client, leads }: { qu
         </div>
 
         <aside className="order-1 space-y-4 lg:order-2">
+          {/* Ondertekend: door naar klant */}
+          {status === "ondertekend" ? (
+            <div className="sc-card border-[color-mix(in_srgb,var(--color-good)_40%,transparent)] p-4">
+              <div className="mb-2 flex items-center gap-1.5 text-sm font-bold text-[var(--color-good)]"><CheckCircle2 className="size-4" /> Ondertekend{quote.acceptedAt ? ` op ${dt(quote.acceptedAt)}` : ""}</div>
+              {client ? (
+                <Link href={`/clients/${client.slug}?tab=onboarding`} className="inline-flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-line-strong)] px-3.5 py-2.5 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]">
+                  {client.name} is klant <ArrowRight className="size-4" />
+                </Link>
+              ) : (
+                <>
+                  <QuoteConvertButton quoteId={quote.id} autoOpen={autoConvert} />
+                  <p className="mt-2 text-2xs text-[var(--color-ink-faint)]">Je ziet eerst een controlescherm. Pas na bevestigen worden klant, Drive-map, taken en onboarding aangemaakt. Er gaat niets naar de klant.</p>
+                </>
+              )}
+            </div>
+          ) : null}
+
           {/* Kerncijfers */}
           <div className="sc-card p-4">
             <div className="text-2xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Totaalbedrag</div>
@@ -121,7 +139,13 @@ export function PandaDocQuoteDetail({ quote, events, lead, client, leads }: { qu
               </div>
               <LeadPicker quoteId={quote.id} current={lead?.id ?? null} leads={leads} />
               <p className="mt-1 text-2xs text-[var(--color-ink-faint)]">
-                {lead ? (quote.leadMatch === "handmatig" ? "Handmatig gekoppeld." : `Automatisch gekoppeld op ${quote.leadMatch === "email" ? "e-mailadres" : quote.leadMatch === "domein" ? "e-maildomein" : "bedrijfsnaam"}.`) : "Geen zekere match gevonden. Kies de lead hierboven."}
+                {lead
+                  ? quote.leadMatch === "handmatig" ? "Handmatig gekoppeld."
+                  : quote.leadMatch === "aangemaakt" ? "Nieuwe lead, automatisch aangemaakt uit deze offerte."
+                  : `Automatisch gekoppeld op ${quote.leadMatch === "email" ? "e-mailadres" : quote.leadMatch === "domein" ? "e-maildomein" : "bedrijfsnaam"}.`
+                  : quote.leadMatch === "controleren"
+                  ? `Controleren: lijkt op ${candidates.map((c) => c.company).join(", ") || "een bestaande lead"}. Kies de juiste lead hierboven.`
+                  : "Geen zekere match gevonden. Kies de lead hierboven."}
               </p>
             </div>
           </div>

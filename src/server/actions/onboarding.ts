@@ -33,7 +33,10 @@ export async function loadConvertForm(leadId: string): Promise<{ ok: true; form:
     const form = await getConvertForm(leadId);
     if (!form) return { ok: false, message: "Lead niet gevonden." };
     // Bedragen alleen voor de eigenaar.
-    if (!isOwner(viewer)) form.lead.expectedMonthly = null;
+    if (!isOwner(viewer)) {
+      form.lead.expectedMonthly = null;
+      if (form.quote?.terms) form.quote.terms = { ...form.quote.terms, monthlyExclVat: null, monthlySource: null };
+    }
     // Zet een projectmanager zelf om, dan staat die standaard als projectmanager.
     const self = form.pms.find((p) => p.id === viewer.id);
     if (self) form.defaultPmId = self.id;

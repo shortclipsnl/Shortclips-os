@@ -24,6 +24,7 @@ export default async function OffertesPage() {
     at: last?.finishedAt ? new Date(last.finishedAt).toISOString() : null,
     ok: !last || last.status === "success" || last.status === "partial",
     message: errorForViewer(owner, lastError),
+    canManage: owner,
   };
 
   return (

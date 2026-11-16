@@ -12,9 +12,10 @@ import { PageHeader } from "@/components/ui";
 import { QuoteDocument, QUOTE_DOCUMENT_CSS, type QuoteDocData } from "@/components/quotes/quote-document";
 import { QuoteEditor } from "./quote-editor";
 import { PandaDocQuoteDetail } from "./pandadoc-detail";
-import { and, asc, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { salesLeads } from "@/db/schema";
+import { clients, salesLeads } from "@/db/schema";
+import { isSimilarCompany } from "@/lib/onboarding-plan";
 import type { QuoteContent } from "@/lib/quotes";
 
 export const metadata: Metadata = { title: "Offerte" };
@@ -39,9 +40,10 @@ function dt(d: Date) {
   return new Date(d).toLocaleString("nl-NL", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function QuoteDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ omzetten?: string }> }) {
   const viewer = await requireQuotesAccess();
   const { id } = await params;
+  const { omzetten } = await searchParams;
   const detail = await getQuoteDetail(id);
   if (!detail) notFound();
   const { quote, lines, events } = detail;
@@ -53,7 +55,26 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
       .from(salesLeads)
       .where(and(isNull(salesLeads.deletedAt)))
       .orderBy(asc(salesLeads.company));
-    return <PandaDocQuoteDetail quote={{ ...quote, syncError: errorForViewer(isOwner(viewer), quote.syncError) }} events={events} lead={detail.lead} client={detail.client} leads={leads} />;
+    // Twijfel bij de automatische koppeling: toon de leads die erop lijken.
+    const candidates = quote.leadMatch === "controleren" && quote.recipientCompany
+      ? leads.filter((l) => isSimilarCompany(l.company, quote.recipientCompany!)).slice(0, 4)
+      : [];
+    let convertedClient: { slug: string; name: string } | null = null;
+    if (detail.lead?.convertedClientId) {
+      const [c] = await db.select({ slug: clients.slug, name: clients.name }).from(clients).where(eq(clients.id, detail.lead.convertedClientId)).limit(1);
+      convertedClient = c ?? null;
+    }
+    return (
+      <PandaDocQuoteDetail
+        quote={{ ...quote, syncError: errorForViewer(isOwner(viewer), quote.syncError) }}
+        events={events}
+        lead={detail.lead}
+        client={detail.client ?? (convertedClient ? { id: detail.lead!.convertedClientId!, ...convertedClient } : null)}
+        leads={leads}
+        candidates={candidates}
+        autoConvert={omzetten === "1"}
+      />
+    );
   }
   const link = quote.publicToken ? publicQuoteLink(quote.publicToken) : null;
   const company = await getCompanyInfo();
