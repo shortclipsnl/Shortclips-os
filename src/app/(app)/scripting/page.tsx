@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { requireInternal, isOwner } from "@/server/auth/context";
+import { getVisieVoor } from "@/server/visie";
 import { listScripting } from "@/server/scripting";
 import { upcomingScriptAppointments } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
@@ -28,6 +29,8 @@ export const maxDuration = 300;
 
 export default async function ScriptingPage({ searchParams }: { searchParams: Promise<{ filter?: string; status?: string; sessie?: string; klanten?: string }> }) {
   const viewer = await requireInternal();
+  // Onze visie (centrale bron): de drie inhoudelijke vragen bovenaan de kwaliteitscheck.
+  const visie = await getVisieVoor(viewer);
   // Scripting leest dezelfde opnames (production_days) als de opnameplanning, dus
   // ook hier de Google Agenda op de achtergrond verversen als 'ie >20 min oud is.
   await syncCalendarIfStale();
@@ -125,6 +128,9 @@ export default async function ScriptingPage({ searchParams }: { searchParams: Pr
           icon={<ShieldCheck className="size-4" />}
           tone="violet"
           items={[
+            ...(visie?.kwaliteitsvragen.scripting ?? []).map((q, i) => (
+              <strong key={`visie-${i}`} className="font-semibold text-[var(--color-ink)]">{q}</strong>
+            )),
             <><strong className="font-semibold text-[var(--color-ink)]">Hook direct duidelijk:</strong> in de eerste zinnen is het onderwerp herkenbaar — geen algemene opening.</>,
             <><strong className="font-semibold text-[var(--color-ink)]">Nieuwsgierigheid:</strong> geef het antwoord niet te vroeg weg, tenzij het format (demo/snelle uitleg) daarom vraagt.</>,
             <><strong className="font-semibold text-[var(--color-ink)]">Middenstuk:</strong> elke zin voegt iets toe, hoog tempo, geen herhaling of omslachtige uitleg.</>,

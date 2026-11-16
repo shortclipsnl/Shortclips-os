@@ -9,6 +9,9 @@ import { listAssignableUsers } from "@/server/clients";
 import { ensureWeeklyMeeting } from "@/server/meetings";
 import { Avatar, Badge, Card, PageHeader } from "@/components/ui";
 import { AddItemForm, NewMeetingForm } from "./meetings-ui";
+import { getVisieVoor } from "@/server/visie";
+import { getScreenReel } from "@/server/screen-reel";
+import { KlantVanDeWeek, type KlantVanDeWeekData } from "@/components/visie/klant-van-de-week";
 
 export const metadata: Metadata = { title: "Teammeetings" };
 export const dynamic = "force-dynamic";
@@ -26,7 +29,15 @@ function dateTime(d: Date): string {
 }
 
 export default async function MeetingsPage() {
-  await requireInternal();
+  const viewer = await requireInternal();
+  // Klant van de week: vragen uit Onze visie, klant automatisch uit Resultaten.
+  const visie = await getVisieVoor(viewer);
+  let klantVanDeWeek: KlantVanDeWeekData = null;
+  if (visie) {
+    const reel = await getScreenReel(viewer).catch(() => null);
+    const top = reel?.items.filter((i) => i.views > 0).sort((a, b) => b.relative - a.relative || b.views - a.views)[0];
+    if (top) klantVanDeWeek = { clientName: top.clientName, title: top.title, views: top.views };
+  }
   // Zorg dat de vaste woensdag-16:00-meeting bestaat (start met een lege lijst).
   const weeklyId = await ensureWeeklyMeeting();
   const [members, meetings, weekly, weeklyItems] = await Promise.all([
@@ -66,6 +77,7 @@ export default async function MeetingsPage() {
         </Link>
 
         <div className="space-y-6 p-6">
+          {visie ? <KlantVanDeWeek visie={visie} data={klantVanDeWeek} /> : null}
           {/* Bespreekpunten die al genoteerd zijn — met wie ze toevoegde. Zo zie je
               in één oogopslag waar de meeting over gaat, zonder door te klikken. */}
           <section>
@@ -104,6 +116,7 @@ export default async function MeetingsPage() {
             </div>
             <p className="mt-2 text-sm leading-relaxed text-[var(--color-ink-muted)]">
               Heb je iets te bespreken? Voeg het de hele week door toe — dan behandelen we het samen tijdens de vaste teammeeting.
+              {visie ? " Zag je een collega iets doen voor een klant waar niemand om vroeg? Zet het erbij, dan delen we het voorbeeld." : ""}
             </p>
             <div className="mt-4">
               <AddItemForm meetingId={weeklyId} kind="agenda" members={members} bare />

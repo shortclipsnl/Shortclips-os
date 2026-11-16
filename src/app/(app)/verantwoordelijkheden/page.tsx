@@ -13,6 +13,7 @@ import { getLiveStand } from "@/server/verantwoordelijkheden-live";
 import { VERANTWOORDELIJKEN } from "@/lib/verantwoordelijkheden/data";
 import { rolVoor } from "@/lib/verantwoordelijkheden/rol";
 import { Weergave } from "./weergave";
+import { getVisieVoor } from "@/server/visie";
 
 export const metadata: Metadata = { title: "Mijn verantwoordelijkheden" };
 export const dynamic = "force-dynamic";
@@ -38,6 +39,8 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
   if (!rol) notFound();
 
   const config = await getVerantwoordelijkheden();
+  // Onze visie (centrale bron): principe per onderdeel, Verder dan de taak en de meetpunten.
+  const visie = await getVisieVoor(viewer);
 
   // De persoon over wie de pagina gaat: de ingelogde medewerker, of (voor Jarno) de gekozen collega.
   let subject = owner ? null : viewer;
@@ -90,7 +93,7 @@ export default async function VerantwoordelijkhedenPage({ searchParams }: { sear
         </div>
       ) : null}
 
-      <Weergave config={config} email={medewerker.email} naam={naam} functie={functie} rol={rol} live={live} markeer={owner} />
+      <Weergave config={config} email={medewerker.email} naam={naam} functie={functie} rol={rol} live={live} markeer={owner} visie={visie} />
     </div>
   );
 }

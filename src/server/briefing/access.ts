@@ -1,4 +1,5 @@
 import "server-only";
+import { getVastgesteldeVisie } from "@/server/visie";
 import { and, eq, isNull } from "drizzle-orm";
 import fs from "node:fs";
 import path from "node:path";
@@ -42,5 +43,7 @@ function logoDataUri(): string | null {
 
 export async function briefingHtml(doc: BriefingDoc, mode: "screen" | "pdf"): Promise<string> {
   const cover = await coverImageDataUri(doc);
-  return renderBriefingHtml(doc, { coverDataUri: cover, logoDataUri: logoDataUri(), mode, appUrl: process.env.APP_URL });
+  // Kwaliteitsvragen voor de editor komen uit Onze visie; alleen een vastgestelde visie gaat mee naar freelancers.
+  const visie = await getVastgesteldeVisie().catch(() => null);
+  return renderBriefingHtml(doc, { coverDataUri: cover, logoDataUri: logoDataUri(), mode, appUrl: process.env.APP_URL, exportChecks: visie?.kwaliteitsvragen.editing ?? [] });
 }

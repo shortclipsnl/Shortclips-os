@@ -9,6 +9,16 @@ import { cn } from "@/lib/cn";
 import { KENNISBANK_TEAM, kaal, naamVan, type Config } from "@/lib/verantwoordelijkheden/data";
 import { VIER_NIVEAUS, moetVastleggen, zonderVastleggen, type NiveauKey, type Rol } from "@/lib/verantwoordelijkheden/rol";
 import type { Kleur, KpiStand, LiveStand } from "@/server/verantwoordelijkheden-live";
+import { verderSleutel, type Functie, type Meetpunt, type Visie } from "@/lib/visie/data";
+import { PrincipeChip, VisieTekst } from "@/components/visie/markeer";
+
+/** Welke meetpunten uit Onze visie bij welke functie horen: alleen wat je zelf kunt beïnvloeden. */
+const MEETPUNTEN_PER_FUNCTIE: Record<Functie, Meetpunt["key"][]> = {
+  content_creative: ["voorgedaan", "leerlus", "eenkeergoed", "ontzorgd", "waarde"],
+  videograaf: ["eenkeergoed"],
+  editor: ["eenkeergoed"],
+  directie: ["voorgedaan", "leerlus", "eenkeergoed", "ontzorgd", "waarde"],
+};
 
 /** Tekst tussen [[...]] is een voorstel: gemarkeerd voor Jarno, gewone tekst voor het team. */
 function T({ t, markeer }: { t: string; markeer: boolean }) {
@@ -135,9 +145,14 @@ function NiveauBlok({ nv, lijst, markeer }: { nv: (typeof VIER_NIVEAUS)[number];
   );
 }
 
-export function Weergave({ config, email, naam, functie, rol, live, markeer }: {
+export function Weergave({ config, email, naam, functie, rol, live, markeer, visie = null }: {
   config: Config; email: string; naam: string; functie: string; rol: Rol; live: LiveStand; markeer: boolean;
+  /** Onze visie (centrale bron). Null = nog niet zichtbaar voor deze kijker: de pagina blijft dan zoals hij was. */
+  visie?: Visie | null;
 }) {
+  const visieFunctie: Functie = rol.key === "cc" ? "content_creative" : "videograaf";
+  const fv = visie?.functies[visieFunctie] ?? null;
+  const meetpunten = visie ? visie.meetpunten.filter((m) => MEETPUNTEN_PER_FUNCTIE[visieFunctie].includes(m.key)) : [];
   const items = config.verantwoordelijkheden.filter((r) => r.persoon === email && r.actief);
   const beslissingen = config.beslissingen.filter((b) => b.persoon === email && b.actief);
   const afw = config.afwezigheid[email];
@@ -339,6 +354,39 @@ export function Weergave({ config, email, naam, functie, rol, live, markeer }: {
 
       {/* 5. Verdieping: ingeklapt. */}
       <section className="space-y-2.5">
+        {visie && fv ? (
+          <Uitklap icon={Target} titel="Hoe voeg ik meer waarde toe dan mijn taken?" sub="Uit Onze visie">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Waarom mijn functie bestaat</div>
+                <p className="leading-relaxed text-[var(--color-ink)]"><VisieTekst t={fv.betekenis} markeer={markeer} /></p>
+              </div>
+              <div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Wanneer lever ik echt goed werk?</div>
+                <p className="leading-relaxed text-[var(--color-ink)]"><VisieTekst t={fv.standaard} markeer={markeer} /></p>
+              </div>
+              <div>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Proactief</div>
+                <p className="leading-relaxed text-[var(--color-ink)]"><VisieTekst t={fv.proactief} markeer={markeer} /></p>
+              </div>
+            </div>
+            {meetpunten.length > 0 ? (
+              <div className="mt-4 border-t border-[var(--color-line)] pt-3">
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">Voeg ik waarde toe? Een richting, geen afrekenpunt</div>
+                <ul className="grid gap-x-8 gap-y-1.5 md:grid-cols-2">
+                  {meetpunten.map((m) => (
+                    <li key={m.key} className="leading-snug text-[var(--color-ink)]">
+                      <span className="font-semibold">{m.titel}:</span> {m.vraag}{" "}
+                      <span className="text-[var(--color-ink-muted)]">{m.meting}.{markeer ? <> Norm: <VisieTekst t={m.norm} markeer /></> : null}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <Link href="/visie#functie" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-ink-muted)] hover:underline">Naar Onze visie <ArrowUpRight className="size-3.5" /></Link>
+          </Uitklap>
+        ) : null}
+
         <Uitklap icon={CircleCheck} titel="Wanneer is mijn werk klaar?">
           <ul className="space-y-1.5">
             {rol.klaarAls.map((x) => (
@@ -372,7 +420,10 @@ export function Weergave({ config, email, naam, functie, rol, live, markeer }: {
             <p className="text-[var(--color-ink-muted)]">Nog geen verantwoordelijkheden vastgelegd.</p>
           ) : (
             <div className="-mx-4 -my-4 divide-y divide-[var(--color-line)]">
-              {items.map((r) => (
+              {items.map((r) => {
+                const verder = visie?.verderDanDeTaak[verderSleutel(r.id)] ?? null;
+                const principe = verder ? visie?.principes.find((x) => x.nr === verder.principe) : null;
+                return (
                 <details key={r.id} className="group/item">
                   <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-2.5 hover:bg-[var(--color-neutral-soft)] [&::-webkit-details-marker]:hidden">
                     <div className="min-w-0 flex-1">
@@ -385,6 +436,15 @@ export function Weergave({ config, email, naam, functie, rol, live, markeer }: {
                   </summary>
                   <div className="px-4 pb-4">
                     <p className="leading-relaxed text-[var(--color-ink)]"><T t={r.wat} markeer={markeer} /></p>
+                    {verder ? (
+                      <div className="mt-2.5 rounded-lg bg-[var(--color-neutral-soft)] px-3 py-2 leading-relaxed text-[var(--color-ink)]">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <strong className="font-semibold">Verder dan de taak</strong>
+                          {principe ? <PrincipeChip nr={principe.nr} titel={principe.titel} /> : null}
+                        </div>
+                        <VisieTekst t={verder.tekst} markeer={markeer} />
+                      </div>
+                    ) : null}
                     <dl className="mt-2.5 space-y-1">
                       {r.wanneer ? <Detail label="Wanneer"><T t={r.wanneer} markeer={markeer} /></Detail> : null}
                       {r.afgerond ? <Detail label="Klaar als"><T t={r.afgerond} markeer={markeer} /></Detail> : null}
@@ -399,7 +459,8 @@ export function Weergave({ config, email, naam, functie, rol, live, markeer }: {
                     ) : null}
                   </div>
                 </details>
-              ))}
+                );
+              })}
             </div>
           )}
         </Uitklap>

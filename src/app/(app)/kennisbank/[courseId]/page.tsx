@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getVisieVoor } from "@/server/visie";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight, Download, FileText, Info, Link2, Pencil, Video } from "lucide-react";
@@ -12,6 +13,13 @@ import { CompleteButton } from "./complete-button";
 import { LessonEditorLoader } from "./editor-loader";
 import { getChapterClientDocs } from "@/server/client-documents";
 import { ClientDocButtons } from "@/components/client-docs/doc-buttons";
+
+/** Welke lessen in "Over Shortclips" gaan over missie, waarden of het inwerktraject. */
+function visieVerwijzingVoor(titel: string): { tekst: string; href: string } | null {
+  if (/^0\.[34]\b/.test(titel)) return { tekst: "De vragen voor je gesprek na 30, 60 en 90 dagen staan bij Onze visie.", href: "/visie#inwerken" };
+  if (/^(1\.4|1\.5|1\.7|2\.1|2\.2|2\.3)\b/.test(titel)) return { tekst: "De actuele versie van onze missie, visie en de vijf kernprincipes staat op één plek.", href: "/visie" };
+  return null;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +54,10 @@ export default async function CoursePage({
   // Klantenbibliotheek: lessen in een klanthoofdstuk tonen bovenaan de twee
   // vaste guides van die klant (centrale bron, altijd de nieuwste versie).
   const clientDocs = lesson ? await getChapterClientDocs(viewer, lesson.chapterId) : null;
+  // Lessen over missie, waarden en verwachtingen verwijzen naar de centrale bron (Onze visie),
+  // zodat er niet meerdere versies naast elkaar leven. De les zelf blijft staan.
+  const visie = await getVisieVoor(viewer);
+  const visieVerwijzing = visie && lesson && /over shortclips/i.test(detail.course.title) ? visieVerwijzingVoor(lesson.title) : null;
 
   const outline = (
     <>
@@ -100,6 +112,12 @@ export default async function CoursePage({
             />
           ) : (
             <article className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5 sm:p-7">
+              {visieVerwijzing ? (
+                <Link href={visieVerwijzing.href} className="mb-4 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-line-strong)] bg-[var(--color-neutral-soft)] px-3.5 py-2.5 text-sm text-[var(--color-ink)] hover:border-[var(--color-ink)]">
+                  <span className="min-w-0 flex-1">{visieVerwijzing.tekst}</span>
+                  <span className="shrink-0 font-semibold">Onze visie →</span>
+                </Link>
+              ) : null}
               <header className="flex flex-wrap items-start justify-between gap-3">
                 <h2 className="min-w-0 text-xl font-bold tracking-tight text-[var(--color-ink)] sm:text-2xl">{lesson.title}</h2>
                 <div className="flex items-center gap-2">

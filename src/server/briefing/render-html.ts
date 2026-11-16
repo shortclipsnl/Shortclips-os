@@ -57,7 +57,7 @@ function linkText(l: { key: string; href: string | null; note?: string }): strin
   }
 }
 
-export function renderBriefingHtml(doc: BriefingDoc, opts: { coverDataUri?: string | null; logoDataUri?: string | null; mode: "screen" | "pdf"; appUrl?: string }): string {
+export function renderBriefingHtml(doc: BriefingDoc, opts: { coverDataUri?: string | null; logoDataUri?: string | null; mode: "screen" | "pdf"; appUrl?: string; exportChecks?: string[] }): string {
   const abs = (href: string) => (href.startsWith("/") && opts.appUrl ? opts.appUrl.replace(/\/$/, "") + href : href);
   const metaItems: Array<[string, string, boolean]> = [
     ["Opnamedatum", fmtDate(doc.session.date, true), false],
@@ -143,6 +143,12 @@ export function renderBriefingHtml(doc: BriefingDoc, opts: { coverDataUri?: stri
   ${doc.imagePages.length ? `<p class="small">De script-PDF bevat ook ${doc.imagePages.length} beeldpagina's (moodboard of referenties). Die staan in het origineel; hieronder staan alleen de scriptpagina's.</p>` : ""}
 </section>`;
 
+  // "Voordat je oplevert": de kwaliteitsvragen uit Onze visie (centrale bron). Alleen als die is vastgesteld.
+  const checks = (opts.exportChecks ?? []).filter(Boolean);
+  const exportBlock = checks.length
+    ? `<section class="block"><h2><span>✓</span> Voordat je oplevert</h2><ul class="hl">${checks.map((c) => `<li><span class="txt">${esc(c)}</span></li>`).join("")}</ul><p class="small">Je monteert geen script, je maakt een video waar iemand niet van wegscrollt. Voelt de opening zwak? Lever een alternatieve opening mee of meld het.</p></section>`
+    : "";
+
   const footer = `<footer class="foot">Automatisch samengesteld uit ${doc.sourceFileName ? `de script-PDF "${esc(doc.sourceFileName)}"` : "de script-PDF"}, de Editing Guide en de projectgegevens in het portaal.${doc.updatedAt ? ` Laatst bijgewerkt ${esc(fmtStamp(doc.updatedAt))}.` : ""} De scripts volgen hierna precies zoals in de script-PDF.</footer>`;
 
   const css = `
@@ -203,7 +209,7 @@ export function renderBriefingHtml(doc: BriefingDoc, opts: { coverDataUri?: stri
   @media print { .sc-brief a { text-decoration: none; } }
   `;
 
-  const body = `<div class="sc-brief">${cover}${alertBlock}${note}${overview}${highlights}${material}${footer}</div>`;
+  const body = `<div class="sc-brief">${cover}${alertBlock}${note}${overview}${highlights}${exportBlock}${material}${footer}</div>`;
   if (opts.mode === "screen") return `<style>${scopeCss(css, ".sc-brief-root")}</style><div class="sc-brief-root">${body}</div>`;
   return `<!doctype html><html lang="nl"><head><meta charset="utf-8" /><title>Editor briefing ${esc(doc.client.name)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">

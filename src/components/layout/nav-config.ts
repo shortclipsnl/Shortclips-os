@@ -31,6 +31,8 @@ export type NavItem = {
   editorsOnly?: boolean;
   /** Alleen voor de eigenaar en de medewerkers met klantverantwoordelijkheid (Milou, Jiska, Rutger). */
   verantwoordelijkhedenAccess?: boolean;
+  /** Onze visie: voor de eigenaar altijd, voor het team zodra de visie is vastgesteld. */
+  visieAccess?: boolean;
   /** Alleen voor videografen (Rutger en freelance videografen) en de eigenaar.
    *  Milou en Jiska controleren en versturen draaiboeken vanuit Scripting en hebben
    *  deze pagina niet nodig. */
@@ -131,6 +133,8 @@ export const NAVIGATION: NavGroup[] = [
       // Interne kennisbank (vervanger van Skool): lezen voor iedereen intern,
       // beheren alleen voor de eigenaar (afgedwongen op de server).
       { href: "/kennisbank", label: "Kennisbank", icon: "GraduationCap", match: "/kennisbank" },
+      // Missie, visie, positionering en de vijf kernprincipes: één centrale bron.
+      { href: "/visie", label: "Onze visie", icon: "Flag", match: "/visie", section: "/kennisbank", visieAccess: true },
       { href: "/beslissingshulp", label: "Beslissingshulp", icon: "Compass", match: "/beslissingshulp", section: "/kennisbank" },
       { href: "/noodprocedure", label: "Noodprocedure", icon: "LifeBuoy", manageClients: true, match: "/noodprocedure", section: "/kennisbank" },
       { href: "/ai/kennisbank", label: "AI-kennisbank", icon: "BookOpen", permissions: ["ai:read"], match: "/ai/kennisbank", section: "/kennisbank" },

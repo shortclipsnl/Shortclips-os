@@ -6,6 +6,7 @@ import { videographerMayOpenPath } from "@/lib/videographer-routes";
 import { NAVIGATION } from "@/components/layout/nav-config";
 import { heeftVerantwoordelijkhedenPagina } from "@/lib/verantwoordelijkheden/data";
 import { canUseTeamView } from "@/server/editor-meetings";
+import { getVisieVoor } from "@/server/visie";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SectionTabs } from "@/components/layout/section-tabs";
 import { Topbar } from "@/components/layout/topbar";
@@ -41,6 +42,8 @@ export default async function AppLayout({
   }
   // Vieringskaart bij binnenkomst (alleen editors kunnen awards hebben).
   const celebration = editorOnly ? await getCelebrationContext(viewer.id) : null;
+  // Onze visie: een voorstel ziet alleen de eigenaar; het team na vaststelling.
+  const visieZichtbaar = (await getVisieVoor(viewer)) !== null;
   const groups = NAVIGATION.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
@@ -84,6 +87,7 @@ export default async function AppLayout({
       if (item.editorMeetingsAccess && !canUseTeamView(viewer)) {
         return false;
       }
+      if (item.visieAccess && !visieZichtbaar) return false;
       // Mijn verantwoordelijkheden: alleen Milou, Jiska en Rutger (en Jarno als beheerder).
       if (item.verantwoordelijkhedenAccess && !owner && !heeftVerantwoordelijkhedenPagina(viewer.email)) {
         return false;

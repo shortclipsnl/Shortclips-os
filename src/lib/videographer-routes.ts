@@ -9,7 +9,7 @@
  * Geldt niet voor het kernteam (Rutger is videograaf maar kernteam) en niet voor
  * accounts met het recht "alle klanten zien". Uitbreiden = een pad toevoegen.
  */
-const EXACT = ["/dashboard", "/draaiboek", "/productions", "/notifications", "/account", "/transfer", "/mijn-klanten"];
+const EXACT = ["/dashboard", "/draaiboek", "/productions", "/notifications", "/account", "/transfer", "/mijn-klanten", "/visie"];
 const PREFIXES = [
   "/draaiboek/", // eigen draaiboek (detail controleert klanttoegang)
   "/productions/", // eigen opname (detail controleert klanttoegang)
