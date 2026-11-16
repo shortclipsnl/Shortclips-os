@@ -633,6 +633,17 @@ body {
   animation: zwwShine 2.4s ease-in-out infinite;
   animation-delay: inherit;
 }
+/* Zo werken wij: groen = Shortclips regelt dit, blauw = actie van de klant. */
+.portal-studio {
+  --zww-green-ink: #0e5a37;
+  --zww-blue-ink: #0f3488;
+  --zww-blue-on: #ffffff;
+}
+:root[data-portal-theme="dark"] .portal-studio {
+  --zww-green-ink: #8ee6bb;
+  --zww-blue-ink: #c3d6ff;
+  --zww-blue-on: #0a0b16;
+}
 @keyframes zwwPulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--st-green) 55%, transparent); }
   50% { box-shadow: 0 0 0 6px transparent, 0 0 12px 2px color-mix(in srgb, var(--st-green) 45%, transparent); }

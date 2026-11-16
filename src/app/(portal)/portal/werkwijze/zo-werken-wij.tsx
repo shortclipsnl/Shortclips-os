@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, Check, Clock, Repeat } from "lucide-react";
+import {
+  ArrowRight, CalendarCheck, ChartColumn, Check, Clock, Hand, Lightbulb, MessageSquareText,
+  MessagesSquare, Megaphone, PenLine, RefreshCw, Repeat, Scissors, Search, ShieldCheck, Target, Video,
+  type LucideIcon,
+} from "lucide-react";
 
 export type Pakket = "organisch" | "zelf-publiceren" | "advertentie";
 type View = "alles" | "wij" | "jij";
@@ -18,8 +22,23 @@ const PHASES = [
 ];
 /** Aantal stappen per fase (samen 12). */
 const PHASE_SIZES = [4, 4, 2, 2];
-/** Eigen kleur per fase, zodat de cyclus in één oogopslag te volgen is. */
-const PHASE_COLOR = ["var(--sc-accent)", "var(--st-green)", "var(--st-orange)", "var(--st-blue)"];
+/** Icoon per stap, op titel. Onbekende titels vallen terug op een vinkje. */
+const STEP_ICON: Record<string, LucideIcon> = {
+  "Strategie & doelstellingen": Target,
+  "Contentonderzoek": Search,
+  "Onderwerpen, hooks & scripts": PenLine,
+  "Scriptmeeting & voorbereiding": MessagesSquare,
+  "Opnamedag op locatie": Video,
+  "Montage & afwerking": Scissors,
+  "Kwaliteitscontrole": ShieldCheck,
+  "Jouw beoordeling": MessageSquareText,
+  "Aanlevering voor campagnes": Megaphone,
+  "Contentkalender & aanlevering": CalendarCheck,
+  "Contentkalender & publicatie": CalendarCheck,
+  "Statistieken & maandrapport": ChartColumn,
+  "Evaluatie & aanbeveling": Lightbulb,
+  "De volgende cyclus": RefreshCw,
+};
 
 function steps(pakket: Pakket): Step[] {
   const stap9: Step =
@@ -163,8 +182,11 @@ export function ZoWerkenWij({ pakket }: { pakket: Pakket }) {
                   <h3 className="text-[15px] font-semibold">{item.title}</h3>
                   <p className="mt-0.5 text-[13.5px] text-[var(--color-ink-muted)]">{item.line}</p>
                 </div>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--sc-fill-strong)] px-3 py-1.5 text-[12.5px] font-semibold">
-                  <Clock className="size-3.5" /> {item.time}
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full border bg-[var(--st-green-bg)] px-3 py-1.5 text-[13px] font-bold text-[var(--zww-green-ink)]"
+                  style={{ borderColor: "color-mix(in srgb, var(--st-green) 35%, transparent)" }}
+                >
+                  <Clock className="size-4 text-[var(--st-green)]" strokeWidth={2.4} aria-hidden /> {item.time}
                 </span>
               </li>
             ))}
@@ -191,51 +213,80 @@ export function ZoWerkenWij({ pakket }: { pakket: Pakket }) {
         <div>
           <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">De werkwijze</span>
           <h2 className="mt-1 text-[22px] font-bold tracking-tight">De cyclus die elke maand terugkomt</h2>
-          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-[13px] font-medium">
-            <span className="inline-flex items-center gap-2"><GreenCheck glow={false} delay={0} /> {wijCount} stappen regelt Shortclips volledig</span>
-            <span className="inline-flex items-center gap-2"><span aria-hidden className="size-5 rounded-md border-2 border-[var(--sc-accent)] bg-[var(--st-blue-bg)]" /> {jijCount} stappen waarbij jij nodig bent</span>
+          <div className="mt-3 flex flex-wrap gap-2 text-[13px] font-semibold" aria-label="Legenda">
+            <span className="inline-flex items-center gap-2 rounded-full bg-[var(--st-green-bg)] py-1.5 pl-1.5 pr-3 text-[var(--zww-green-ink)]">
+              <GreenCheck glow={false} delay={0} /> Groen = Shortclips regelt dit
+              <span className="font-medium opacity-80">({wijCount} stappen)</span>
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full bg-[var(--st-blue-bg)] py-1.5 pl-1.5 pr-3 text-[var(--zww-blue-ink)]">
+              <span aria-hidden className="grid size-5 place-items-center rounded-full bg-[var(--st-blue)] text-[var(--zww-blue-on)]">
+                <Hand className="size-3" strokeWidth={2.6} />
+              </span>
+              Blauw = actie van jou als klant
+              <span className="font-medium opacity-80">({jijCount} stappen)</span>
+            </span>
           </div>
         </div>
 
         <div className="flex flex-col">
-          {grouped.map((phase, pi) => {
-            const col = PHASE_COLOR[pi] ?? "var(--sc-accent)";
-            return (
+          {grouped.map((phase) => (
             <div key={phase.label}>
-              <p className="mb-2 mt-5 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: col }}>
-                <span className="size-2 rounded-full" style={{ background: col }} aria-hidden /> {phase.label}
-              </p>
-              <ol className="flex flex-col gap-1.5">
-                {phase.steps.map((s) => {
+              <p className="mb-3 mt-6 text-[11px] font-bold uppercase tracking-wider text-[var(--color-ink-muted)]">{phase.label}</p>
+              <ol className="flex flex-col gap-3">
+                {phase.steps.map((s, si) => {
                   const ours = s.who === "shortclips";
                   const dim = (view === "jij" && ours) || (view === "wij" && !ours);
+                  const Icon = STEP_ICON[s.title] ?? (ours ? Check : Hand);
+                  const last = si === phase.steps.length - 1;
                   return (
-                    <li
-                      key={s.n}
-                      className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-[14px] px-4 py-3.5 sm:px-5 ${fade} ${dim ? "opacity-30" : ""} ${ours ? "bg-[var(--sc-fill)]" : view === "jij" ? "shadow-[var(--shadow-raised)]" : ""}`}
-                      style={ours ? { borderLeft: `3px solid ${col}` } : { border: `2px solid ${col}`, background: "color-mix(in srgb, " + col + " 10%, transparent)" }}
-                    >
-                      <span className="grid size-7 shrink-0 place-items-center rounded-full text-[13px] font-bold tabular-nums text-white" style={{ background: col }}>{String(s.n).padStart(2, "0")}</span>
-                      <div className="min-w-0 flex-[1_1_240px]">
-                        <h3 className="text-[15px] font-semibold leading-snug">{s.title}</h3>
-                        <p className="mt-0.5 text-[13.5px] text-[var(--color-ink-muted)]">{s.line}</p>
+                    <li key={s.n} className={`flex gap-3 sm:gap-4 ${fade} ${dim ? "opacity-30" : ""}`}>
+                      {/* Tijdlijn: nummer met verbindingslijn naar de volgende stap */}
+                      <div className="flex w-8 shrink-0 flex-col items-center" aria-hidden>
+                        <span
+                          className={`mt-3.5 grid size-8 place-items-center rounded-full text-[13px] font-bold tabular-nums ${ours ? "bg-[var(--st-green)] text-white" : "bg-[var(--st-blue)] text-[var(--zww-blue-on)]"}`}
+                        >
+                          {String(s.n).padStart(2, "0")}
+                        </span>
+                        {!last && <span className="-mb-3 mt-1.5 w-0.5 flex-1 rounded-full bg-[var(--sc-line)]" />}
                       </div>
-                      {ours ? (
-                        <span className="ml-11 inline-flex items-center gap-2 text-[12.5px] font-semibold text-[var(--st-green)] sm:ml-0">
-                          <GreenCheck glow={glow} delay={s.n * 0.18} size={22} /> Shortclips regelt dit
+
+                      <div
+                        className={`flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2.5 rounded-[14px] px-4 py-3.5 sm:px-5 ${ours ? "border" : "border-2"} ${!ours && view === "jij" ? "shadow-[var(--shadow-raised)]" : ""}`}
+                        style={
+                          ours
+                            ? { background: "var(--st-green-bg)", borderColor: "color-mix(in srgb, var(--st-green) 30%, transparent)" }
+                            : { background: "var(--st-blue-bg)", borderColor: "var(--st-blue)" }
+                        }
+                      >
+                        <span
+                          aria-hidden
+                          className={`grid size-9 shrink-0 place-items-center rounded-xl ${ours ? "bg-[var(--st-green)] text-white" : "bg-[var(--st-blue)] text-[var(--zww-blue-on)]"}`}
+                        >
+                          <Icon className="size-[18px]" strokeWidth={2.2} />
                         </span>
-                      ) : (
-                        <span className="ml-11 rounded-full bg-[var(--sc-cta)] px-3 py-1.5 text-[12.5px] font-bold text-[var(--sc-cta-ink)] sm:ml-0">
-                          {s.who === "klant" ? "Jouw actie" : "Samen met jou"}
-                        </span>
-                      )}
+                        <div className="min-w-0 flex-[1_1_200px]">
+                          <h3 className={`text-[15px] font-semibold leading-snug ${ours ? "text-[var(--zww-green-ink)]" : "text-[var(--zww-blue-ink)]"}`}>
+                            <span className="sr-only">Stap {s.n}: </span>{s.title}
+                          </h3>
+                          <p className="mt-0.5 text-[13.5px] text-[var(--color-ink-muted)]">{s.line}</p>
+                        </div>
+                        {ours ? (
+                          <span className="inline-flex items-center gap-2 text-[12.5px] font-semibold text-[var(--zww-green-ink)]">
+                            <GreenCheck glow={glow} delay={s.n * 0.18} size={22} /> Shortclips regelt dit
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--st-blue)] px-3 py-1.5 text-[12.5px] font-bold text-[var(--zww-blue-on)]">
+                            <Hand className="size-3.5" strokeWidth={2.4} aria-hidden />
+                            {s.who === "klant" ? "Jouw actie" : "Samen met jou"}
+                          </span>
+                        )}
+                      </div>
                     </li>
                   );
                 })}
               </ol>
             </div>
-            );
-          })}
+          ))}
           <div className="mt-4 flex items-center gap-4 rounded-[14px] border-2 border-dashed border-[var(--sc-line)] px-4 py-3.5 sm:px-5">
             <Repeat className="size-5 shrink-0 text-[var(--sc-accent)]" />
             <p className="text-[13.5px]">
