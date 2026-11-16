@@ -285,7 +285,7 @@ export function PortalSectionSwitch() {
         items={[
           { href: "/portal/resultaten", label: "Cijfers", active: onResults },
           { href: "/portal/analyses", label: "Maandanalyses", active: onAnalyses },
-          { href: "/portal/resultaten/kwartaal", label: "Kwartaal", active: onKwartaal },
+          { href: "/portal/resultaten/kwartaal", label: "Kwartaalrapportages", active: onKwartaal },
         ]}
       />
     );

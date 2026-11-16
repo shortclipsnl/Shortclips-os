@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import { ArrowUpRight, Check, Sparkles, Target, ThumbsUp, TrendingUp, Wand2 } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalResults } from "@/server/portal";
+import { getPortalBranding, getPortalResults } from "@/server/portal";
+import { getPeriodReview, summaryText } from "@/server/period-review";
 import { getApprovedImprovementForClient, type ImprovementContent } from "@/server/improvements";
 import { getClientVideoUpdate } from "@/server/video-updates";
-import { parsePortalPeriod, portalPeriodQuery } from "@/lib/portal-periods";
+import { parsePortalPeriod, periodResultOpts } from "@/lib/portal-periods";
+import { getDirectieBeschikbaarheid } from "@/server/reports/directie";
+import { getPortalQuarterlyReports } from "@/server/quarterly/service";
 import { PortalResultsView } from "./results-view";
 import { MonthlyVideoCard } from "./monthly-video";
-import { PeriodeToggle } from "./periode-toggle";
-import { getPortalQuarterlyReports } from "@/server/quarterly/service";
 
 export const metadata: Metadata = { title: "Resultaten" };
 export const dynamic = "force-dynamic";
@@ -30,19 +31,38 @@ export default async function PortalResultatenPage({
   const viewer = await requirePortal();
   const sp = await searchParams;
   const period = parsePortalPeriod(sp);
-  const [r, improvement, videoUpdate, kwartalen] = await Promise.all([
-    getPortalResults(viewer, { days: period.days, from: period.from, to: period.to, periodKey: period.key }),
+  const [r, improvement, videoUpdate, brand] = await Promise.all([
+    getPortalResults(viewer, periodResultOpts(period)),
     getApprovedImprovementForClient(viewer),
     viewer.clientId ? getClientVideoUpdate(viewer.clientId) : Promise.resolve(null),
-    getPortalQuarterlyReports(viewer).catch(() => []),
+    getPortalBranding(viewer),
   ]);
+  // Samenvatting, wat werkt, bedrijfsimpact en advies bij de gekozen periode.
+  const review = await getPeriodReview(viewer, r);
+  // Directieversie: alleen voor een afgeronde maand waarvan de maandrapportage is gepubliceerd.
+  const directie = review && viewer.clientId ? await getDirectieBeschikbaarheid(viewer.clientId, r, review) : null;
+  // Bij een kwartaal: de gepubliceerde kwartaalrapportage van datzelfde kwartaal (als die er is).
+  const kwartaalRapport = period.mode === "kwartaal"
+    ? ((await getPortalQuarterlyReports(viewer).catch(() => [])).find((k) => k.periodKey === r.periodKey) ?? null)
+    : undefined;
 
   const visible = improvement ? SECTIONS.filter((s) => improvement.content[s.k].length > 0) : [];
 
   return (
     <div className="flex flex-col gap-7">
-      <PeriodeToggle active="maand" nieuwKwartaal={kwartalen.some((k) => k.nieuw)} />
-      <PortalResultsView r={r} basePath="/portal/resultaten" reportHref={`/resultatenrapport?${portalPeriodQuery(period)}`} initialPlatform={sp.platform ?? "alle"} />
+      <PortalResultsView
+        r={r}
+        review={review}
+        summaryText={review ? summaryText(brand.name, review) : ""}
+        basePath="/portal/resultaten"
+        pdfHref="/api/portal/periodrapport/pdf"
+        monthlyPdfHref={review?.monthlyReport ? `/api/portal/maandrapport/${review.monthlyReport.id}/pdf` : null}
+        directie={directie?.ok ?? false}
+        kwartaalRapport={kwartaalRapport ? { id: kwartaalRapport.id, periodKey: kwartaalRapport.periodKey, nieuw: kwartaalRapport.nieuw } : kwartaalRapport}
+        shareHref="/resultatenrapport"
+        analysisHref={(id) => `/portal/analyses/${id}`}
+        initialPlatform={sp.platform ?? "alle"}
+      />
 
       {videoUpdate ? <MonthlyVideoCard update={videoUpdate} /> : null}
 

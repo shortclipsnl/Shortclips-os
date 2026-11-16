@@ -4,7 +4,7 @@ import { db } from "@/db/client";
 import { clients } from "@/db/schema";
 import { requirePortal } from "@/server/auth/context";
 import { getPortalResults } from "@/server/portal";
-import { parsePortalPeriod } from "@/lib/portal-periods";
+import { parsePortalPeriod, periodResultOpts } from "@/lib/portal-periods";
 import { ResultReport } from "@/components/portal/result-report";
 
 export const metadata: Metadata = { title: "Resultatenrapport" };
@@ -19,7 +19,7 @@ export default async function ResultatenRapportPage({
   const viewer = await requirePortal();
   const period = parsePortalPeriod(await searchParams);
   const [r, [client]] = await Promise.all([
-    getPortalResults(viewer, { days: period.days, from: period.from, to: period.to, periodKey: period.key }),
+    getPortalResults(viewer, periodResultOpts(period)),
     db.select({ name: clients.name, logoUrl: clients.logoUrl }).from(clients).where(and(eq(clients.id, viewer.clientId ?? ""), isNull(clients.deletedAt))).limit(1),
   ]);
 

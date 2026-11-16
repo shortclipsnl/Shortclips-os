@@ -6,3 +6,12 @@
  * Op true zetten = menu-item verschijnt voor alle klanten.
  */
 export const PORTAL_CONTENTGEHEUGEN_LIVE = true;
+
+/**
+ * Directieversie van het maandoverzicht in het klantportaal (Resultaten).
+ * Aan = de klant ziet bij een afgeronde maand waarvan de maandrapportage is
+ * goedgekeurd en gepubliceerd het blok "Voor je directie". Zonder gepubliceerde
+ * maandrapportage verschijnt er niets; de bestaande maandcontrole is dus ook de
+ * goedkeuring van de directieversie. Intern is ze altijd te beoordelen.
+ */
+export const PORTAL_DIRECTIEVERSIE_LIVE = true;
