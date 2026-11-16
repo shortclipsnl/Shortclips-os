@@ -119,7 +119,29 @@ export async function getContentItemForVideo(itemId: string): Promise<ContentIte
 
 /** De video die bij dit bericht hoort, of null. */
 export async function resolveContentVideo(item: ContentItemForVideo): Promise<ContentVideo | null> {
-  const all = await clientVideos(item.clientId);
+  return resolveFrom(item, await clientVideos(item.clientId));
+}
+
+/**
+ * Zelfde koppeling als `resolveContentVideo`, maar voor meerdere berichten van
+ * één klant tegelijk (de Frame-bibliotheek wordt één keer geladen). Gebruikt
+ * door de klantagenda in het portaal; resultaat per bericht-id.
+ */
+export async function resolveContentVideosForClient(items: ContentItemForVideo[]): Promise<Map<string, ContentVideo>> {
+  const out = new Map<string, ContentVideo>();
+  const byClient = new Map<string, ContentItemForVideo[]>();
+  for (const it of items) byClient.set(it.clientId, [...(byClient.get(it.clientId) ?? []), it]);
+  for (const [clientId, list] of byClient) {
+    const all = await clientVideos(clientId);
+    for (const it of list) {
+      const v = resolveFrom(it, all);
+      if (v) out.set(it.id, v);
+    }
+  }
+  return out;
+}
+
+function resolveFrom(item: ContentItemForVideo, all: Row[]): ContentVideo | null {
   if (!all.length) return null;
 
   if (item.frameAssetId) {
