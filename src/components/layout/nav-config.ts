@@ -90,7 +90,9 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },
       { href: "/productions", label: "Opnames", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
       { href: "/draaiboek", label: "Draaiboek", icon: "ClipboardList", permissions: ["productions:read"], match: "/draaiboek", videographerOnly: true },
-      { href: "/videos", label: "Editing", editorLabel: "Editing Planning", icon: "Scissors", permissions: ["videos:read"], match: "/videos" },
+      // Editor Meetings hoort bij Editing: het team opent het via de knop bovenaan
+      // de Editing-pagina, dus Editing blijft in het menu actief op /editor-meetings.
+      { href: "/videos", label: "Editing", editorLabel: "Editing Planning", icon: "Scissors", permissions: ["videos:read"], match: "/videos", alsoMatch: ["/editor-meetings"] },
       // Wie zit vol, wie heeft ruimte en welke opnames komen eraan (niet voor editors).
       { href: "/capaciteit", label: "Capaciteit", icon: "Gauge", permissions: ["productions:read", "team:read"], match: "/capaciteit" },
       // Persoonlijke klantenbibliotheek voor editors (eigen klanten + Editing Guide).
@@ -98,7 +100,7 @@ export const NAVIGATION: NavGroup[] = [
       // De algemene montagestandaard voor editors (scanblok, uitleg per onderdeel, eindcheck).
       { href: "/edit-standaard", label: "Edit Standaard", icon: "ListChecks", match: "/edit-standaard", editorsOnly: true },
       { href: "/showcase", label: "Showcase", icon: "Trophy", permissions: ["videos:read"], match: "/showcase", editorsOnly: true },
-      // Editors zien Editor Meetings hier, bij hun eigen werk (het team vindt het onder Team).
+      // Editors zien Editor Meetings hier, bij hun eigen werk (het team opent het via de Editing-pagina).
       { href: "/editor-meetings", label: "Editor Meetings", icon: "MessagesSquare", match: "/editor-meetings", editorsOnly: true },
       { href: "/analytics", label: "Resultaten", icon: "TrendingUp", permissions: ["analytics:read"], match: "/analytics" },
       // Contentgeheugen: wat per klant aantoonbaar werkt (formats, hooks, CTA's, video's).
@@ -128,8 +130,6 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/doelen", label: "Doelen", icon: "Target", match: "/doelen", section: "/team" },
       { href: "/verlof", label: "Vakantie", icon: "Palmtree", match: "/verlof" },
       { href: "/meetings", label: "Teammeetings", icon: "Presentation", match: "/meetings" },
-      // Maandelijkse meeting per editor: plannen, voorbereiden, verslag en bewaking.
-      { href: "/editor-meetings", label: "Editor Meetings", icon: "MessagesSquare", match: "/editor-meetings", editorMeetingsAccess: true },
       // Interne kennisbank (vervanger van Skool): lezen voor iedereen intern,
       // beheren alleen voor de eigenaar (afgedwongen op de server).
       { href: "/kennisbank", label: "Kennisbank", icon: "GraduationCap", match: "/kennisbank" },
