@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { importCandidates } from "@/db/schema";
-import { ForbiddenError, requireOwner, requireOperationalManager } from "@/server/auth/context";
+import { ForbiddenError, requireOwner } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
 import { recordTest, specFor } from "@/server/integrations/registry";
 import type { Provider } from "@/server/integrations/types";
@@ -22,7 +22,7 @@ export type ActionResult<T = unknown> = { ok: boolean; message?: string; data?: 
 
 export async function testIntegration(provider: string): Promise<ActionResult> {
   try {
-    const viewer = await requireOperationalManager();
+    const viewer = await requireOwner();
     const spec = specFor(provider as Provider);
     if (!spec) return { ok: false, message: "Onbekende koppeling." };
 
@@ -54,7 +54,7 @@ const JOBS: Record<string, () => Promise<{ ok: boolean; error?: string }>> = {
 
 export async function runSyncJob(job: string): Promise<ActionResult> {
   try {
-    const viewer = await requireOperationalManager();
+    const viewer = await requireOwner();
     const runner = JOBS[job];
     if (!runner) return { ok: false, message: "Onbekende taak." };
 
@@ -82,7 +82,7 @@ export async function syncDriveForClient(
   folderId: string,
 ): Promise<ActionResult> {
   try {
-    const viewer = await requireOperationalManager();
+    const viewer = await requireOwner();
     const result = await syncClientDriveFolder(clientId, folderId, viewer.id);
     revalidatePath("/settings/integrations");
     return { ok: result.ok, message: result.ok ? "Map gesynchroniseerd." : result.error };
@@ -148,7 +148,7 @@ export async function confirmImport(runId: string): Promise<ActionResult> {
  */
 export async function syncDriveNow(): Promise<ActionResult> {
   try {
-    const viewer = await requireOperationalManager();
+    const viewer = await requireOwner();
     const { processDriveChanges } = await import("@/server/jobs/drive-sync");
     const r = await processDriveChanges({ trigger: "handmatig", triggeredById: viewer.id, budgetMs: 45_000 });
     revalidatePath("/settings/integrations");

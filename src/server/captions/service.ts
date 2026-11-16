@@ -2,8 +2,9 @@ import "server-only";
 import { and, asc, eq, gte, isNull, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { captionItems, captionSets, clients, files, productionDays, shootScriptSources, users } from "@/db/schema";
-import { assertClientAccess, scopeToClients, type Viewer } from "@/server/auth/context";
+import { assertClientAccess, isOwner, scopeToClients, type Viewer } from "@/server/auth/context";
 import { shootHasReviewPdf } from "@/server/captions/generate";
+import { errorForViewer } from "@/lib/team-error";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -245,7 +246,7 @@ export async function getShootCaptions(viewer: Viewer, productionDayId: string):
           id: set.id,
           status: set.status as CaptionListStatus,
           generatedAt: set.generatedAt ? set.generatedAt.toISOString() : null,
-          errorMessage: set.errorMessage ?? null,
+          errorMessage: errorForViewer(isOwner(viewer), set.errorMessage),
           checkedByName: set.checkedByName ?? null,
           checkedAt: set.checkedAt ? set.checkedAt.toISOString() : null,
         }

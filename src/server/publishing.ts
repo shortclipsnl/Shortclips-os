@@ -17,6 +17,7 @@ import { metricool } from "@/server/integrations/metricool";
 import { findOwn, metricoolScheduler, type MetricoolScheduler } from "@/server/integrations/metricool-scheduler";
 import { frameio } from "@/server/integrations/frameio";
 import { getContentItemForVideo, resolveContentVideo } from "@/server/content-video";
+import { logError } from "@/server/audit";
 
 /**
  * Publiceren vanuit de contentplanning: per bericht "Handmatig" (standaard, het
@@ -370,6 +371,7 @@ export async function planViaMetricool(
       done.push(label(network));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      void logError({ category: "integration", source: "metricool:publiceren", error: e, context: { publicationId: row.id } });
       await db
         .update(publications)
         .set({ syncStatus: "mislukt", lastError: msg.slice(0, 500), attempts: sql`${publications.attempts} + 1`, updatedAt: new Date() })

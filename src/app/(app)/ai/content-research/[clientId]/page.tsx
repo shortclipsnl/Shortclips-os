@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requirePermission } from "@/server/auth/context";
+import { isOwner, requirePermission } from "@/server/auth/context";
 import { aiConfigured } from "@/server/ai/client";
 import { getClientContentResearch, listContentResearchOverview } from "@/server/content-research/service";
 import { EmptyState, InfoNote, PageHeader } from "@/components/ui";
@@ -18,6 +18,7 @@ import { ResearchPanel, type RunView } from "../research-panel";
 import { DnaForm } from "../dna-form";
 import { StylePanel } from "../style-panel";
 import { ContentChat } from "../content-chat";
+import { errorForViewer } from "@/lib/team-error";
 
 export const metadata: Metadata = { title: "AI Content Research" };
 export const dynamic = "force-dynamic";
@@ -85,7 +86,7 @@ export default async function ContentResearchClientPage({
     sources: Array.isArray(r.sources) ? (r.sources as { label: string; url: string }[]) : [],
     ideasCount: r.ideasCount,
     newCount: r.newCount,
-    errorMessage: r.errorMessage,
+    errorMessage: errorForViewer(isOwner(viewer), r.errorMessage),
     dataBasis: (r.dataBasis ?? {}) as RunView["dataBasis"],
     keuring: candidatesView(r.kandidaten),
     finishedAt: r.finishedAt ? r.finishedAt.toISOString() : null,

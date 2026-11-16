@@ -21,6 +21,7 @@ import { speechStats } from "./metrics";
 import { workDir, workFramesDir, ensureWorkDir, toStoreRelative } from "./paths";
 import { activeStore, fetchMediaToTemp, type MediaStore } from "./storage";
 import { downloadFrameSource, isAutoAnalysis } from "./auto";
+import { logError } from "@/server/audit";
 
 /** Kapt AI-tekst af op de kolomlengte, zodat een te lang label de analyse nooit laat mislukken. */
 const clip = (v: unknown, max: number): string | null => {
@@ -241,6 +242,7 @@ export async function runPipeline(analysisId: string): Promise<void> {
 
     await finalizeStatus(analysisId);
   } catch (err) {
+    void logError({ category: "job", source: "taak:video_analyse", error: err, context: { analysisId } });
     await db.update(videoAnalyses).set({ status: "failed", error: String(err), updatedAt: new Date() }).where(eq(videoAnalyses.id, analysisId)).catch(() => {});
   }
 }

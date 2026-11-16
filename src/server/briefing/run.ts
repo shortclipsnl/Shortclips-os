@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { briefingSets, clientDocuments, clients, deliverables, kbAssetParts, kbAssets, productionDays } from "@/db/schema";
-import { recordActivity } from "@/server/audit";
+import { recordActivity, logError } from "@/server/audit";
 import { notify } from "@/server/notifications";
 import { shootReviewPdf } from "@/server/captions/generate";
 import { runJsonPrompt } from "@/server/ai/client";
@@ -116,6 +116,7 @@ export async function ensureBriefingForShoot(productionDayId: string, opts: { fo
   const setId = set!.id;
 
   const fail = async (message: string): Promise<EnsureBriefingResult> => {
+    void logError({ category: "job", source: "taak:editorbriefing", error: new Error(message), context: { productionDayId } });
     await db
       .update(briefingSets)
       .set({ status: "mislukt", errorMessage: message.slice(0, 500), startedAt: null, updatedAt: new Date() })

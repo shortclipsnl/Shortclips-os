@@ -10,6 +10,7 @@ import {
   quarterSchedule, quarterTaskKey, quarterTaskTitle, type QuarterMode, type QuarterStap, type QuarterStatus,
 } from "@/lib/kwartaal";
 import { amsterdamToday, ensureQuarterRow, generateQuarterReport, holidaysAround, logQuarterEvent } from "./run";
+import { errorForViewer } from "@/lib/team-error";
 
 /**
  * Automatische kwartaalplanning.
@@ -312,7 +313,7 @@ export async function sendQuarterlyDigest(now = new Date()): Promise<number> {
     if (ev.has("concept_gegenereerd")) add(controller, { soort: "Voorlopig concept klaar voor controle", tekst: naam });
     if (ev.has("definitief_gegenereerd")) add(controller, { soort: "Definitieve rapportage beschikbaar", tekst: naam });
     if (ev.has("wachten_op_data")) add(controller, { soort: "Ontbrekende gegevens", tekst: `${naam}: ${r.wachtReden ?? "nog niet alle cijfers binnen"}` });
-    if (ev.has("generatie_mislukt")) add(controller, { soort: "Genereren mislukt", tekst: `${naam}: ${r.errorMessage ?? "probeer het opnieuw"}` });
+    if (ev.has("generatie_mislukt")) add(controller, { soort: "Genereren mislukt", tekst: `${naam}: ${errorForViewer(false, r.errorMessage) ?? "probeer het opnieuw"}` });
     if (ev.has("controle_afgerond") && people.approver !== controller) add(people.approver, { soort: "Wacht op goedkeuring", tekst: naam });
     if (ev.has("aanpassingen_gevraagd")) add(controller, { soort: "Aanpassingen gevraagd", tekst: naam });
     if (ev.has("goedgekeurd")) add(controller, { soort: "Goedgekeurd, nog publiceren", tekst: naam });

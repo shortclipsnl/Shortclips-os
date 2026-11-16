@@ -4,7 +4,8 @@ import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-o
 import { db } from "@/db/client";
 import { clients, driveMappings, files, integrationConnections } from "@/db/schema";
 import { drive, DriveService, type DriveFile } from "@/server/integrations/drive";
-import { ensureConnectionRow } from "@/server/integrations/google-connection";
+import { ensureConnectionRow, readGoogleConnection } from "@/server/integrations/google-connection";
+import { googleAuth, GoogleReauthRequiredError } from "@/server/integrations/google-auth";
 import { matchScore, normalizeName } from "@/server/import";
 import { aliasesForSlug } from "@/server/integrations/client-aliases";
 import { runJob, type JobContext } from "./runner";
@@ -654,6 +655,20 @@ export async function reconcileDriveFolders(
 ) {
   const budgetMs = options.budgetMs ?? 200_000;
   if (!drive.isConfigured) return { ok: false, skipped: "not_configured" as const };
+
+  // Vraagt Google opnieuw toestemming, dan faalt elke klantmap op hetzelfde
+  // token. Eén controle vooraf voorkomt honderden identieke foutregels per dag;
+  // de koppelingsbewaking meldt het al (één keer) aan de eigenaar. Na opnieuw
+  // verbinden slaagt deze controle weer en draait alles gewoon door.
+  const conn = await readGoogleConnection().catch(() => null);
+  if (conn?.tokenMeta.authState === "reauth_required") {
+    try {
+      await googleAuth.getAccessToken("google_drive");
+    } catch (error) {
+      if (error instanceof GoogleReauthRequiredError) return { ok: false, skipped: "reauth_required" as const };
+      throw error;
+    }
+  }
 
   const mappings = await db
     .select()

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { desc, sql } from "drizzle-orm";
 import { db, activeDriver } from "@/db/client";
 import { errorLogs } from "@/db/schema";
-import { requirePermission } from "@/server/auth/context";
+import { isOwner, requireInternal } from "@/server/auth/context";
+import { NoAccess } from "@/components/no-access";
 import { Badge, Card, CardHeader, EmptyState, Stat, Table } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 import { env } from "@/lib/env";
@@ -27,7 +28,7 @@ async function measureDatabaseLatency(): Promise<number> {
 }
 
 export default async function HealthPage() {
-  await requirePermission("settings:read");
+  if (!isOwner(await requireInternal())) return <NoAccess what="Systeemstatus" />;
 
   const latency = await measureDatabaseLatency();
 

@@ -5,7 +5,7 @@ import { clientResearchRuns, clients } from "@/db/schema";
 import { env } from "@/lib/env";
 import { aiConfigured, aiModelStrong, runJsonPrompt, runResearch, runStructured } from "@/server/ai/client";
 import { notify } from "@/server/notifications";
-import { recordActivity } from "@/server/audit";
+import { recordActivity, logError } from "@/server/audit";
 import { todayAmsterdam } from "@/lib/planning-deadline";
 import {
   BASELINE_METRICS,
@@ -314,6 +314,7 @@ async function finish(run: Run) {
 }
 
 async function fail(runId: string, message: string) {
+  void logError({ category: "job", source: "taak:klantonderzoek", error: new Error(message), context: { runId } });
   const [run] = await db
     .update(clientResearchRuns)
     .set({ status: "mislukt", errorMessage: message.slice(0, 600), finishedAt: new Date(), updatedAt: new Date() })

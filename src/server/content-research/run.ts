@@ -8,7 +8,7 @@ import { aiModel } from "@/server/ai/client";
 import { clientLearnedText } from "@/server/ai/knowledge";
 import { gatherFeedbackContext } from "@/server/script-control";
 import { notify } from "@/server/notifications";
-import { recordActivity } from "@/server/audit";
+import { recordActivity, logError } from "@/server/audit";
 import { ideateFromBriefing, runResearchBriefing, type IdeaDraft, type ResearchOutput } from "./generate";
 import { judgeCandidates, pickRevisable, reviseCandidates, type JudgedCandidate } from "./judge";
 import { nearDuplicate, pickShown, rankByQuality } from "./quality";
@@ -248,6 +248,7 @@ export async function runContentResearchJob(runId: string, opts: { budgetMs?: nu
 
   const fail = async (message: string): Promise<JobResult> => {
     const credit = isCreditError(message);
+    void logError({ category: "job", source: "taak:content_research", error: new Error(message), context: { runId } });
     await db
       .update(contentResearchRuns)
       .set({

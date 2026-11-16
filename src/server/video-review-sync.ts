@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { clients, frameAssets, portalVideoApprovals, portalVideoComments } from "@/db/schema";
 import { frameio } from "@/server/integrations/frameio";
 import { framestampToMs, frameCommentText, isPortalFrameText, matchReplyParent, secondsToFramestamp } from "@/lib/video-review";
+import { logError } from "@/server/audit";
 
 /**
  * Synchronisatie tussen de videobeoordeling in het portaal en Frame.io (V4).
@@ -137,6 +138,7 @@ async function markSynced(id: string, frameCommentId: string) {
 }
 
 async function markFailed(id: string, attempts: number, error: string) {
+  void logError({ category: "integration", source: "frameio:videofeedback", error: new Error(error), context: { commentId: id } });
   await db
     .update(portalVideoComments)
     .set({ syncStatus: "failed", syncAttempts: attempts + 1, syncError: error, updatedAt: new Date() })

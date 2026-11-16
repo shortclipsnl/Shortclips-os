@@ -81,13 +81,13 @@ export async function collectFindings(today: string, holidays?: Set<string>): Pr
     const bad = (p: string) => health.some((h) => h.spec.provider === p && h.configured && ["error", "stale", "never_synced"].includes(h.status));
     if (bad("google_calendar")) {
       unavailable.add("opname");
-      partial.set("scripting", "Google Agenda synchroniseert niet: opnamedata kunnen verouderd zijn.");
+      partial.set("scripting", "Opnamedata kunnen tijdelijk niet actueel zijn. Jarno is automatisch op de hoogte.");
     }
     if (bad("frameio")) {
-      partial.set("editing", "Frame.io synchroniseert niet: nieuwe versies kunnen ontbreken.");
-      partial.set("klantfeedback", "Frame.io synchroniseert niet: nieuwe klantfeedback kan ontbreken.");
+      partial.set("editing", "Nieuwe videoversies kunnen tijdelijk later verschijnen. Jarno is automatisch op de hoogte.");
+      partial.set("klantfeedback", "Nieuwe klantfeedback kan tijdelijk later verschijnen. Jarno is automatisch op de hoogte.");
     }
-    if (bad("google_drive")) partial.set("scripting", "Google Drive synchroniseert niet: nieuwe script-PDF's kunnen ontbreken.");
+    if (bad("google_drive")) partial.set("scripting", "Nieuwe script-PDF's kunnen tijdelijk later verschijnen. Jarno is automatisch op de hoogte.");
   } catch (e) {
     errors.push(`Koppelingsstatus niet te lezen: ${e instanceof Error ? e.message : String(e)}`);
   }
