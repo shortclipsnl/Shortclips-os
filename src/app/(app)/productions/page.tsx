@@ -5,7 +5,16 @@ import { asc, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients as clientsTable } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
-import { getDefaultVideographer, getMonthShootStats, getShootOverview, nextShootPerClient, shootsInRange } from "@/server/productions";
+import { getDefaultVideographer, getShootOverview, nextShootPerClient, shootsInRange } from "@/server/productions";
+import {
+  getCalendarFreshness,
+  getShootAvailability,
+  pastShootsToConfirm,
+  planningCandidates,
+  reconcileShootCompletion,
+  shootCounts,
+} from "@/server/shoot-planning";
+import { todayAmsterdam } from "@/lib/shoot-status";
 import { listAssignableUsers } from "@/server/clients";
 import { missingShootAppointments } from "@/server/appointments";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
@@ -14,17 +23,28 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { SCRIPTING_STATUS } from "@/lib/statuses";
 import { ShootAgenda, type AgendaShoot } from "./shoot-agenda";
 import { VideographerCell, type PersonOption } from "./prod-cells";
+import { AvailableDaysOverview, ConfirmPastShoots, PlanningCandidates, SyncBanner, dayHref } from "./planning-panels";
 import { AppointmentReview, type ReviewRow } from "@/app/(app)/settings/integrations/appointment-review";
 
 export const metadata: Metadata = { title: "Opnameplanning" };
 export const dynamic = "force-dynamic";
 
-export default async function ProductionsPage({ searchParams }: { searchParams: Promise<{ videograaf?: string; inplannen?: string }> }) {
+const fmtShort = (iso: string) =>
+  new Date(`${iso.slice(0, 10)}T12:00:00Z`).toLocaleDateString("nl-NL", { day: "numeric", month: "short", timeZone: "UTC" });
+const fmtLong = (iso: string) => {
+  const s = new Date(`${iso.slice(0, 10)}T12:00:00Z`).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
+export default async function ProductionsPage({ searchParams }: { searchParams: Promise<{ videograaf?: string; inplannen?: string; dag?: string }> }) {
   const viewer = await requireInternal();
   const sp = await searchParams;
   const vgFilter = sp.videograaf?.trim() || null;
-  // Google Agenda op de achtergrond verversen als de laatste sync >1u geleden is.
+  const focusDay = sp.dag && /^\d{4}-\d{2}-\d{2}$/.test(sp.dag) ? sp.dag : null;
+  // Google Agenda op de achtergrond verversen als de laatste sync >5 min geleden is.
   await syncCalendarIfStale();
+  // Afgeronde opnames bijwerken (alleen met bewijs: beelden in montage of verder).
+  await reconcileShootCompletion().catch(() => 0);
 
   // Ruim venster voor de agenda: 2 maanden terug t/m ~6 maanden vooruit.
   const s = new Date();
@@ -33,17 +53,22 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
   e.setMonth(e.getMonth() + 6, 1);
   const startIso = s.toLocaleDateString("en-CA");
   const endIso = e.toLocaleDateString("en-CA");
-  const todayIso = new Date().toLocaleDateString("en-CA");
+  const todayIso = todayAmsterdam();
 
   const canAssign = viewer.permissions.has("productions:write");
-  const [shoots, monthStats, nextPerClient, overview, assignable, defaultVg] = await Promise.all([
+  const [shoots, counts, nextPerClient, overview, assignable, defaultVg, availability, freshness, toConfirm] = await Promise.all([
     shootsInRange(viewer, startIso, endIso),
-    getMonthShootStats(viewer),
+    shootCounts(viewer),
     nextShootPerClient(viewer),
     getShootOverview(viewer),
     canAssign ? listAssignableUsers() : Promise.resolve([]),
     getDefaultVideographer(),
+    getShootAvailability(),
+    getCalendarFreshness(),
+    pastShootsToConfirm(viewer),
   ]);
+  const candidates = await planningCandidates(viewer, availability);
+  const unconfirmed = freshness.stale;
 
   // Ontbrekende opnames uit Google Agenda (herkend maar geen klant, of mogelijk
   // gemist) — zodat ze zichtbaar zijn en in één klik te koppelen. Alleen voor wie
@@ -88,48 +113,82 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
     scriptId: x.scriptId ?? null,
   }));
 
-  const next = shoots.find((x) => x.scheduledOn >= todayIso) ?? null;
+  // Eerstvolgende opname: geannuleerde en al afgeronde opnames tellen niet mee.
+  const next = shoots.find((x) => x.scheduledOn >= todayIso && x.status !== "cancelled" && x.status !== "completed") ?? null;
+  const nextVg = next ? (next.videographerName ?? defaultVg?.fullName ?? null) : null;
 
   // Filter op videograaf (klik op een pill): toon alleen zijn/haar opnames.
   const matchesVg = (name: string | null) => !vgFilter || (name ?? defaultVg?.fullName ?? null) === vgFilter;
   const shownNext = nextPerClient.filter((n) => matchesVg(n.videographerName));
   const shownAgenda = agendaShoots.filter((a) => matchesVg(a.videographerName));
 
-  // Beschikbare dagen om in te plannen: werkdagen (ma–vr) in de komende 7 dagen
-  // waarop nog geen opname staat — zo zie je in één oogopslag welke dagen nog
-  // vrij zijn om te vullen. De "nog niet ingepland"-klantenlijst staat voortaan
-  // standaard onder de blokken (geen klik meer nodig).
-  const bookedDays = new Set(shoots.map((x) => x.scheduledOn));
-  let availableDays = 0;
-  for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    const dow = d.getDay(); // 0 = zondag, 6 = zaterdag
-    if (dow >= 1 && dow <= 5 && !bookedDays.has(d.toLocaleDateString("en-CA"))) availableDays++;
+  // Beschikbaarheid uit één centrale berekening (zelfde bron als het overzicht
+  // onder de kalender): werkdagen deze week waarop minstens één videograaf ruimte heeft.
+  const weekFree = availability.days.filter((d) => d.date <= availability.weekEnd && d.available);
+  const availableByDate: Record<string, string[]> = {};
+  for (const d of availability.days) {
+    const names = d.perVg.filter((v) => v.state === "beschikbaar").map((v) => v.name);
+    if (names.length > 0) availableByDate[d.date] = names;
   }
+  const toConfirmThisMonth = toConfirm.filter((r) => String(r.scheduledOn).slice(0, 7) === todayIso.slice(0, 7)).length;
 
   return (
     <div className="mx-auto max-w-[1200px]">
       <PageHeader title="Opnameplanning" description="Agenda — gesynchroniseerd vanuit Google Agenda" />
 
-      {/* Gekleurde statusblokken. */}
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Deze week" value={overview.thisWeek} hint="komende 7 dagen" tone="info" />
-        <Stat label="Afgerond deze maand" value={monthStats.completed} tone={monthStats.completed > 0 ? "good" : "neutral"} />
+      {/* Statusblokken: alle cijfers uit dezelfde centrale opnamegegevens. */}
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat
-          label="Eerstvolgende opname"
-          value={next ? new Date(next.scheduledOn).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }) : "—"}
-          hint={next ? next.clientName : "niets gepland"}
-          tone={next ? "warn" : "neutral"}
+          label="Deze week"
+          value={counts.week}
+          hint={`${fmtShort(counts.weekStart)} - ${fmtShort(counts.weekEnd)} · ${counts.weekLeft} nog te gaan`}
+          tone="info"
         />
         <Stat
-          label="Beschikbare dagen"
-          value={availableDays}
-          hint={availableDays === 0 ? "komende week vol ingepland" : `werkdag${availableDays === 1 ? "" : "en"} komende week nog vrij`}
-          tone={availableDays > 0 ? "info" : "good"}
+          label="Afgerond deze maand"
+          value={counts.completed}
+          hint={
+            toConfirmThisMonth > 0 ? (
+              <span className="font-semibold text-[#8a5300]">{toConfirmThisMonth} nog te bevestigen</span>
+            ) : (
+              `${counts.plannedMonth} nog gepland deze maand`
+            )
+          }
+          tone={counts.completed > 0 ? "good" : "neutral"}
+        />
+        <Stat
+          label="Eerstvolgende opname"
+          value={next ? fmtShort(next.scheduledOn) : "-"}
+          hint={next ? `${next.clientName}${nextVg ? ` · ${nextVg.split(" ")[0]}` : ""}` : "niets gepland"}
+          tone={next ? "info" : "neutral"}
+        />
+        <Stat
+          label="Beschikbare dagen deze week"
+          value={weekFree.length}
+          hint={
+            weekFree.length === 0 ? (
+              "geen werkdag meer vrij deze week"
+            ) : (
+              <span className="flex flex-col gap-0.5">
+                <span>{weekFree.length} werkdag{weekFree.length === 1 ? "" : "en"} beschikbaar{unconfirmed ? " (onbevestigd)" : ""}</span>
+                {weekFree.map((d) => (
+                  <Link key={d.date} href={dayHref(d.date)} className="font-semibold text-[var(--color-ink)] underline-offset-2 hover:underline">
+                    {fmtLong(d.date)}
+                  </Link>
+                ))}
+              </span>
+            )
+          }
+          tone={unconfirmed ? "warn" : weekFree.length > 0 ? "good" : "neutral"}
           icon={<CalendarCheck />}
         />
       </div>
+
+      {unconfirmed ? (
+        <SyncBanner lastSuccessAt={freshness.lastSuccessAt} lastError={freshness.lastError} canFix={viewer.permissions.has("clients:write")} />
+      ) : null}
+
+      <ConfirmPastShoots rows={toConfirm.map((r) => ({ ...r, scheduledOn: String(r.scheduledOn).slice(0, 10) }))} canWrite={canAssign} />
 
       {/* Mogelijk ontbrekende opnames uit Google Agenda: herkend maar nog niet
           gekoppeld, of mogelijk gemist. In één klik aan een klant koppelen →
@@ -180,9 +239,42 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
 
       {/* De agenda zelf: per week (ma–zo dag-indeling) of per maand, doorbladerbaar.
           Start op de week van de eerstvolgende opname, niet op een lege "deze week". */}
-      <div className="mb-6">
-        <ShootAgenda shoots={shownAgenda} initialDate={next?.scheduledOn} />
+      <div id="agenda" className="mb-6 scroll-mt-4">
+        <ShootAgenda
+          key={focusDay ?? "start"}
+          shoots={shownAgenda}
+          initialDate={focusDay ?? next?.scheduledOn}
+          focusDate={focusDay}
+          availableByDate={availableByDate}
+          availabilityUnconfirmed={unconfirmed}
+        />
       </div>
+
+      {/* Alle beschikbare opnamedagen van deze maand, per videograaf. */}
+      <AvailableDaysOverview
+        days={availability.days}
+        videographers={availability.videographers}
+        monthEnd={availability.monthEnd}
+        unconfirmed={unconfirmed}
+      />
+
+      {/* Klanten zonder volgende opname: wie benaderen om lege dagen te vullen. */}
+      <PlanningCandidates
+        rows={candidates.map((c) => ({
+          clientId: c.clientId,
+          clientName: c.clientName,
+          clientSlug: c.clientSlug,
+          clientColor: c.clientColor,
+          clientLogo: c.clientLogo,
+          lastShootOn: c.lastShootOn,
+          windowFrom: c.windowFrom,
+          windowTo: c.windowTo,
+          priority: c.priority,
+          coordinatorName: c.coordinatorName,
+          videographerName: c.videographerName,
+          suggestedDate: c.suggestedDate,
+        }))}
+      />
 
       {shownNext.length > 0 ? (
         <Card className="mb-5 overflow-hidden" padded={false}>

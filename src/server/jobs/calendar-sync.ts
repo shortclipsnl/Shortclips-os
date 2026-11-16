@@ -17,6 +17,7 @@ import {
 } from "@/db/schema";
 import { addWorkingDays } from "@/lib/workdays";
 import { nlHolidaySet } from "@/lib/holidays";
+import { syncedShootStatus, todayAmsterdam } from "@/lib/shoot-status";
 import { firstNameKey } from "@/lib/editors";
 import { notify } from "@/server/notifications";
 import { getNumberSetting, setNumberSetting } from "@/server/app-settings";
@@ -561,7 +562,6 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
           scheduledOn,
           ...(startTime ? { startTime } : {}),
           ...(ev.location ? { locationName: ev.location.slice(0, 200) } : {}),
-          status: "planned" as const,
           updatedAt: new Date(),
         };
 
@@ -592,12 +592,18 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         if (targetPdId) {
           // Oude waarden vóór de update, om een verplaatsing te herkennen.
           const [before] = await db
-            .select({ scheduledOn: productionDays.scheduledOn, startTime: productionDays.startTime, videographerId: productionDays.videographerId, coordinatorId: clients.coordinatorId })
+            .select({ scheduledOn: productionDays.scheduledOn, startTime: productionDays.startTime, videographerId: productionDays.videographerId, coordinatorId: clients.coordinatorId, status: productionDays.status })
             .from(productionDays)
             .innerJoin(clients, eq(clients.id, productionDays.clientId))
             .where(eq(productionDays.id, targetPdId))
             .limit(1);
-          await db.update(productionDays).set(base).where(eq(productionDays.id, targetPdId));
+          // Status niet blind op "gepland" zetten: dat wiste eerder elke run een
+          // afgeronde opname weer uit (waardoor "Afgerond deze maand" op 0 bleef).
+          // Zie syncedShootStatus voor de regels.
+          await db
+            .update(productionDays)
+            .set({ ...base, status: syncedShootStatus(before?.status ?? null, scheduledOn, todayAmsterdam()) })
+            .where(eq(productionDays.id, targetPdId));
 
           // Verplaatsing herkend (datum of starttijd gewijzigd) → betrokken
           // medewerkers melden én de auto-deadlines van gekoppelde video's
@@ -643,7 +649,7 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         } else {
           const [created] = await db
             .insert(productionDays)
-            .values({ ...base, editorId: editorByClient.get(ev.clientId) ?? null })
+            .values({ ...base, status: "planned", editorId: editorByClient.get(ev.clientId) ?? null })
             .returning({ id: productionDays.id });
           targetPdId = created!.id;
         }
@@ -730,6 +736,14 @@ export async function runCalendarSync(options: CalendarSyncOptions = {}) {
         const r = await mergeDuplicateDeliverables();
         if (mergedDays || r.merged || r.aligned) ctx.log(`Opgeschoond: ${mergedDays} dubbele opnamedagen, ${r.merged} dubbele editing-projecten, ${r.aligned} editor-correcties.`);
       } catch { /* opschonen mag de sync nooit breken */ }
+
+      // Afgeronde opnames bijwerken: alleen bij bewijs dat er gefilmd is (video in
+      // montage of verder), nooit puur omdat de datum voorbij is.
+      try {
+        const { reconcileShootCompletion } = await import("@/server/shoot-planning");
+        const done = await reconcileShootCompletion();
+        if (done) ctx.log(`${done} opname(s) op Afgerond gezet (beelden in montage of verder).`);
+      } catch { /* mag de sync nooit breken */ }
 
       // Publicatie-afspraken (agenda "Klant Content uploaden") → contentplanning.
       // De titel is de post, de omschrijving bevat de caption. Alleen met een

@@ -112,3 +112,40 @@ export async function setProductionVideographer(dayId: string, userId: string | 
     throw error;
   }
 }
+
+/**
+ * Opname uit het verleden bevestigen als Afgerond of Geannuleerd (vanuit het
+ * blok "Bevestig deze opnames" op de Opnameplanning). Alleen voor opnames op of
+ * vóór vandaag: toekomstige opnames annuleer je in Google Agenda (leidend).
+ */
+export async function confirmShootOutcome(dayId: string, outcome: "completed" | "cancelled"): Promise<ActionResult> {
+  try {
+    if (outcome !== "completed" && outcome !== "cancelled") return { ok: false, message: "Onbekende status." };
+    const viewer = await requirePermission("productions:write");
+    const [day] = await db
+      .select({ id: productionDays.id, clientId: productionDays.clientId, status: productionDays.status, scheduledOn: productionDays.scheduledOn })
+      .from(productionDays)
+      .where(eq(productionDays.id, dayId))
+      .limit(1);
+    if (!day) return { ok: false, message: "Opnamedag niet gevonden." };
+    assertClientAccess(viewer, day.clientId);
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+    if (String(day.scheduledOn).slice(0, 10) > today) {
+      return { ok: false, message: "Deze opname ligt nog in de toekomst. Verplaats of annuleer hem in Google Agenda." };
+    }
+    await db.update(productionDays).set({ status: outcome, updatedAt: new Date() }).where(eq(productionDays.id, dayId));
+    await auditLog({
+      viewer,
+      action: "production.status_changed",
+      entityType: "production_day",
+      entityId: dayId,
+      clientId: day.clientId,
+      changes: { van: day.status, naar: outcome, via: "opnameplanning_bevestiging" },
+    });
+    revalidatePath("/productions");
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, message: error.message };
+    throw error;
+  }
+}
