@@ -13,7 +13,7 @@ import { StrategyAutoFill } from "@/components/content-memory/strategy-autofill"
 import type { MemoryGroup, MemorySuccess, MemoryVideo } from "@/server/content-memory/analyze";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
 import { EvidenceBadge, PerfChip, dateNl, nf, pct, plat, xf } from "@/components/content-memory/shared";
-import { ClientMemoryView } from "@/components/content-memory/client-view";
+import { ClientYearMemoryPage } from "@/components/content-memory/client-year-page";
 import { RefreshMemoryButton } from "@/components/content-memory/refresh-button";
 import { CopyButton, CoverImage, MemoryClientStrip, MemoryPlayerProvider, PlayTrigger, Slider, type PlayerVideo, type StripClient } from "@/components/content-memory/player";
 import { HookAltsPanel, HookAltsProvider, HookPrinciple } from "@/components/content-memory/hook-alternatives";
@@ -25,7 +25,7 @@ import { lessonsForClient } from "@/server/result-alert-lessons";
 import { quarterLessonsForClient } from "@/server/quarterly/service";
 import { QuarterLessons } from "@/components/quarterly/quarter-lessons";
 import { getClientAdvice } from "@/server/content-memory/advice-store";
-import { clientInsightsFrom, loadInsightReviews } from "@/server/content-memory/client-insights-store";
+import { loadInsightReviews } from "@/server/content-memory/client-insights-store";
 import { ContentAdviceView } from "@/components/content-memory/advice-view";
 
 export const metadata: Metadata = { title: "Contentgeheugen" };
@@ -56,7 +56,6 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
   // Het advies voedt ook de klantweergave ("Wat werkt bij jouw bedrijf?"), dus ook daar laden.
   const adviceData = cm && (asAdvice || asClient) ? await getClientAdvice(viewer, cm).catch(() => null) : null;
   const reviews = cm && adviceData ? await loadInsightReviews(cm.clientId) : [];
-  const clientInsights = cm && asClient && adviceData ? clientInsightsFrom(cm, adviceData, reviews) : null;
   const alts = cm && !asClient && !asAdvice ? await getHookAlternatives(cm.clientId) : {};
   const lessons = cm && !asClient && !asAdvice ? await lessonsForClient(cm.clientId).catch(() => []) : [];
   const kwartaalLessen = cm && !asClient && !asAdvice ? await quarterLessonsForClient(cm.clientId).catch(() => []) : [];
@@ -105,7 +104,7 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
         {!cm ? (
           <EmptyState title="Nog geen actieve klant met resultaten" description="Zodra Metricool publicaties en cijfers levert, verschijnt hier het geheugen." />
         ) : asClient ? (
-          <div className="portal-studio rounded-[20px] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-4 sm:p-6"><ClientMemoryView cm={cm} insights={clientInsights} /></div>
+          <div className="portal-studio rounded-[20px] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-4 sm:p-6"><ClientYearMemoryPage viewer={viewer} clientId={cm.clientId} /></div>
         ) : asAdvice && adviceData ? (
           <MemoryPlayerProvider>
             <ContentAdviceView cm={cm} data={adviceData} reviews={reviews} />

@@ -289,6 +289,38 @@ export async function loadClientMemory(clientId: string): Promise<ClientMemory |
   return value;
 }
 
+/**
+ * Hetzelfde geheugen, maar alleen over video's gepubliceerd vanaf `from`
+ * (YYYY-MM-DD, Amsterdamse datum). Voor de klantweergave, die per
+ * kalenderjaar analyseert. Het interne geheugen en de Script Engine blijven
+ * het volledige geheugen gebruiken.
+ */
+const periodCache = new Map<string, { at: number; value: ClientMemory }>();
+export async function loadClientMemoryForPeriod(clientId: string, from: string): Promise<ClientMemory | null> {
+  const ck = `${clientId}|${from}`;
+  const hit = periodCache.get(ck);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
+  const [c] = await db.select({ id: clients.id, name: clients.name, slug: clients.slug }).from(clients).where(and(eq(clients.id, clientId), isNull(clients.deletedAt))).limit(1);
+  if (!c) return null;
+  const [ai, strategy, dataUpdatedAt] = await Promise.all([loadAi(clientId), loadStrategy(clientId), loadDataUpdatedAt(clientId)]);
+  const amsDay = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
+  const inputs = (await loadInputs(clientId, ai.labels)).filter((v) => v.publishedAt && amsDay(v.publishedAt) >= from);
+  const memory = analyzeMemory(inputs);
+  const value: ClientMemory = {
+    clientId: c.id,
+    clientName: c.name,
+    clientSlug: c.slug,
+    memory,
+    ai,
+    aiAvailable: aiConfigured(),
+    strategy,
+    playbook: buildPlaybook(memory, strategy),
+    dna: buildContentDna(c.name, memory, strategy, dataUpdatedAt),
+  };
+  periodCache.set(ck, { at: Date.now(), value });
+  return value;
+}
+
 /** Laatste moment waarop er nieuwe cijfers (Metricool-sync) voor deze klant binnenkwamen. */
 async function loadDataUpdatedAt(clientId: string): Promise<string | null> {
   try {
@@ -301,8 +333,13 @@ async function loadDataUpdatedAt(clientId: string): Promise<string | null> {
 }
 
 export function clearContentMemoryCache(clientId?: string) {
-  if (clientId) cache.delete(clientId);
-  else cache.clear();
+  if (clientId) {
+    cache.delete(clientId);
+    for (const k of periodCache.keys()) if (k.startsWith(`${clientId}|`)) periodCache.delete(k);
+  } else {
+    cache.clear();
+    periodCache.clear();
+  }
 }
 
 /** Formatbeschrijving uit de AI-analyse bij een formatgroep. */
