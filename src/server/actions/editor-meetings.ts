@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { ForbiddenError, requireInternal } from "@/server/auth/context";
 import { auditLog } from "@/server/audit";
-import { cancelMeeting, planMeeting, saveReport, saveTopics, setActionDone, setEditorOwner, setPointStatus } from "@/server/editor-meetings";
-import { OWNER_TYPES, POINT_KINDS } from "@/lib/editor-meetings";
+import { addItem, cancelMeeting, deleteItem, planMeeting, saveReport, saveTopics, setActionDone, setEditorOwner, setPointStatus, updateItem } from "@/server/editor-meetings";
+import { ITEM_OUTCOMES, MAX_ITEM_LENGTH, OWNER_TYPES, POINT_KINDS } from "@/lib/editor-meetings";
 
 export type ActionResult = { ok: boolean; message?: string; id?: string };
 
@@ -74,6 +74,7 @@ const reportSchema = z.object({
     .array(z.object({ id: z.string().uuid().nullish(), body: z.string().max(1000), ownerType: z.enum(OWNER_TYPES), assigneeId: z.string().uuid().nullish(), dueOn: z.string().nullish() }))
     .max(40),
   next: z.object({ date: z.string(), time: z.string(), topics: z.array(z.string().max(300)).max(20) }).nullish(),
+  items: z.array(z.object({ id: z.string().uuid(), outcome: z.enum(ITEM_OUTCOMES).nullable() })).max(60).optional(),
 });
 
 export async function saveEditorMeetingReport(meetingId: string, input: z.input<typeof reportSchema>, publish: boolean): Promise<ActionResult & { published?: boolean }> {
@@ -110,5 +111,36 @@ export async function setEditorMeetingOwner(editorId: string, ownerId: string): 
     const viewer = await requireInternal();
     await setEditorOwner(viewer, parsed.data.editorId, parsed.data.ownerId);
     await auditLog({ viewer, action: "editor_meeting.owner_set", entityType: "user", entityId: parsed.data.editorId, changes: { verantwoordelijke: parsed.data.ownerId } });
+  });
+}
+
+/* ------------------- eigen bespreekpunten van de editor ------------------- */
+
+const itemText = z.string().trim().min(1, "Vul een bespreekpunt in.").max(MAX_ITEM_LENGTH, `Houd het kort: maximaal ${MAX_ITEM_LENGTH} tekens.`);
+
+export async function addEditorMeetingItem(body: string): Promise<ActionResult> {
+  const parsed = itemText.safeParse(body);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
+  return run(async () => {
+    const viewer = await requireInternal();
+    return await addItem(viewer, parsed.data);
+  });
+}
+
+export async function updateEditorMeetingItem(itemId: string, body: string): Promise<ActionResult> {
+  const parsed = itemText.safeParse(body);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message };
+  if (!z.string().uuid().safeParse(itemId).success) return { ok: false, message: "Bespreekpunt niet gevonden." };
+  return run(async () => {
+    const viewer = await requireInternal();
+    await updateItem(viewer, itemId, parsed.data);
+  });
+}
+
+export async function deleteEditorMeetingItem(itemId: string): Promise<ActionResult> {
+  if (!z.string().uuid().safeParse(itemId).success) return { ok: false, message: "Bespreekpunt niet gevonden." };
+  return run(async () => {
+    const viewer = await requireInternal();
+    await deleteItem(viewer, itemId);
   });
 }

@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CalendarPlus, ClipboardList, History, Lock, MapPin, Repeat2, Video } from "lucide-react";
+import { ArrowLeft, CalendarPlus, ClipboardList, History, Lock, MapPin, MessageSquarePlus, Repeat2, Video } from "lucide-react";
 import { ForbiddenError, requireInternal } from "@/server/auth/context";
 import { canUseEditorMeetings, getMeetingDetail, type MeetingDetail } from "@/server/editor-meetings";
 import { Badge, Card, CardHeader, InfoNote, PageHeader, Stat, TeamAvatar } from "@/components/ui";
 import { formatDateFull } from "@/lib/format";
 import { EDIT_PHASE_LABEL_FALLBACK } from "./labels";
-import { OWNER_TYPE_LABEL, STATUS_LABEL, STATUS_TONE, dateToAmsterdam, editorStatusLabel, meetingMoment, meetingMomentShort, monthLabel, monthTitle, prevPeriod } from "@/lib/editor-meetings";
-import { ActionLine, PointLine } from "../editor-view";
+import { ITEM_OUTCOME_LABEL, OWNER_TYPE_LABEL, STATUS_LABEL, STATUS_TONE, dateToAmsterdam, editorStatusLabel, meetingMoment, meetingMomentShort, monthLabel, monthTitle, prevPeriod } from "@/lib/editor-meetings";
+import { ActionLine, HandledItemLine, PointLine } from "../editor-view";
 import { MeetingControls, PointToggle, ReportForm, TopicsEditor } from "../ui";
 
 export const metadata: Metadata = { title: "Editor meeting" };
@@ -121,6 +121,11 @@ function EditorDetail({ d }: { d: MeetingDetail }) {
               <ul className="divide-y divide-[var(--color-line)]">{by("vaardigheid").map((p) => <PointLine key={p.id} point={p} />)}</ul>
             </ReportBlock>
           ) : null}
+          {d.items.length ? (
+            <ReportBlock title="Wat jij wilde bespreken">
+              <ul className="divide-y divide-[var(--color-line)]">{d.items.map((i) => <HandledItemLine key={i.id} item={i} />)}</ul>
+            </ReportBlock>
+          ) : null}
           <ReportBlock title="Jouw feedback aan Shortclips">
             {by("shortclips").length ? <ul className="divide-y divide-[var(--color-line)]">{by("shortclips").map((p) => <PointLine key={p.id} point={p} />)}</ul> : <p className="text-sm text-[var(--color-ink-muted)]">Niets vastgelegd.</p>}
           </ReportBlock>
@@ -182,6 +187,25 @@ function TeamDetail({ d }: { d: MeetingDetail }) {
           <span className="text-sm font-semibold text-[#8a5300]">Terugkerend verbeterpunt:</span>
           {d.recurring.map((r) => <Badge key={r.theme} tone="warn">{r.label} · {r.months} maanden</Badge>)}
         </div>
+      ) : null}
+
+      {d.items.length && !published ? (
+        <Card padded={false} className="overflow-hidden">
+          <div className="border-t-[3px] border-t-[var(--color-info)] p-5">
+            <CardHeader
+              title={<span className="flex items-center gap-2"><MessageSquarePlus className="size-4 text-[var(--color-info)]" /> Inbreng van {editorFirst}</span>}
+              subtitle={`Wat ${editorFirst} zelf wil bespreken. Leg in het verslag per punt vast wat ermee is gebeurd.`}
+            />
+            <ul className="mt-3 space-y-1.5">
+              {d.items.map((i) => (
+                <li key={i.id} className="flex items-start justify-between gap-3 text-sm text-[var(--color-ink)]">
+                  <span className="flex gap-2"><span className="mt-2 size-1.5 shrink-0 rounded-full bg-[var(--color-info)]" />{i.body}</span>
+                  {i.outcome ? <Badge tone={i.outcome === "besproken" ? "good" : "info"}>{ITEM_OUTCOME_LABEL[i.outcome]}</Badge> : <Badge>Open</Badge>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Card>
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -324,6 +348,7 @@ function TeamDetail({ d }: { d: MeetingDetail }) {
                 actions: d.actions.map((a) => ({ id: a.id, body: a.body, ownerType: a.ownerType, assigneeId: a.assigneeId, dueOn: a.dueOn })),
                 ownerId: d.owner?.id ?? null,
                 nextPlanned: null,
+                items: d.items.map((i) => ({ id: i.id, body: i.body, outcome: i.outcome })),
               }}
             />
           </>

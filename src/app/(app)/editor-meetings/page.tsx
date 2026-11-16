@@ -20,7 +20,7 @@ export default async function EditorMeetingsPage({ searchParams }: { searchParam
   // Editors: uitsluitend de eigen meetings, verslagen en actiepunten.
   if (isEditorRole(viewer)) {
     const data = await getEditorPage(viewer);
-    return <EditorOwnView data={data} firstName={viewer.fullName.split(" ")[0] ?? ""} />;
+    return <EditorOwnView data={data} firstName={viewer.fullName.split(" ")[0] ?? ""} current={periodOf(todayAmsterdam())} />;
   }
 
   // Vangnet naast de dagelijkse job: plantaken en herinneringen bijwerken.
@@ -66,6 +66,7 @@ export default async function EditorMeetingsPage({ searchParams }: { searchParam
       nextLabel: r.nextMeeting ? meetingMomentShort(r.nextMeeting.at) : null,
       nextId: r.nextMeeting?.id ?? null,
       openActions: r.openActions,
+      openItems: r.openItems,
       defaults: { meetingId: r.meetingId, editorId: r.editor.id, date: at?.date ?? firstWorkday, time: at?.time ?? "10:00", location: "", meetingUrl: "", topics: [] },
     };
   });
