@@ -4,8 +4,11 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { contentCalendar } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
-import { isCoreStaff } from "@/server/core-staff";
-import { getPublicationCheckSummaries } from "@/server/publication-checks";
+import { autoOpensPublicationCheck } from "@/server/core-staff";
+import { getPrePublicationChecks, getPublicationCheckSummaries } from "@/server/publication-checks";
+import { amsterdamClock, isInPublicationWindow } from "@/lib/publication-window";
+import { VIDEO_READY } from "@/lib/content-planning-status";
+import { PublicationCheckPanel, type AutoState, type PubCheckRow } from "./publication-check-panel";
 import { getPublishingSummaries } from "@/server/publishing";
 import { syncCalendarIfStale } from "@/server/jobs/calendar-sync";
 import { listCalendar, monthGrid, type CalendarItem } from "@/server/calendar";
@@ -15,10 +18,9 @@ import { ContactmomentNote } from "./contactmoment-note";
 import { StartDeadlineButton } from "./deadline-actions";
 import { activeDeadlineFor } from "@/server/planning-deadlines";
 import { ContentPlanningPdfButton } from "@/components/content-planning/pdf-button";
-import { Badge, Card, ClientLogo, EmptyState, GuidelineNote, PageHeader } from "@/components/ui";
-import { ListChecks } from "lucide-react";
+import { Badge, Card, ClientLogo, EmptyState, PageHeader } from "@/components/ui";
 import { formatDateFull, periodLabel } from "@/lib/format";
-import { PLATFORM, PUBLICATION_STATUS } from "@/lib/statuses";
+import { PLATFORM, PUBLICATION_STATUS, VIDEO_STATUS } from "@/lib/statuses";
 import { cn } from "@/lib/cn";
 import { Planner } from "./planner";
 import { CalDateCell, CalStatusCell } from "./calendar-cells";
@@ -56,26 +58,11 @@ export default async function CalendarPage({
   await syncCalendarIfStale();
   const canWriteCal = viewer.permissions.has("calendar:write");
 
-  // Publicatiecheck extra benadrukken tijdens het postmoment: voor het kernteam
-  // (Jarno, Milou, Jiska, Rutger) staat de check op werkdagen tussen 14:30 en
-  // 17:00 (Amsterdam) automatisch volledig open met een groene omlijning, zodat
-  // ze 'm op het moment van publiceren sowieso zien.
-  const amsParts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Amsterdam",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date());
-  const amsHour = Number(amsParts.find((p) => p.type === "hour")?.value ?? "0");
-  const amsMinute = Number(amsParts.find((p) => p.type === "minute")?.value ?? "0");
-  const amsWeekday = amsParts.find((p) => p.type === "weekday")?.value ?? "";
-  const amsMinutesOfDay = amsHour * 60 + amsMinute;
-  const inPostingWindow =
-    ["Mon", "Tue", "Wed", "Thu", "Fri"].includes(amsWeekday) &&
-    amsMinutesOfDay >= 14 * 60 + 30 &&
-    amsMinutesOfDay < 17 * 60;
-  const todayAms = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Amsterdam" });
+  // Publicatiecheck: klapt op werkdagen van 14:00 tot 17:00 (Amsterdam)
+  // automatisch open voor Jarno, Milou en Jiska. De browser houdt dit daarna
+  // live bij (ook als de pagina al openstaat), zie PublicationCheckPanel.
+  const autoOpenPubCheck = autoOpensPublicationCheck(viewer.email);
+  const todayAms = amsterdamClock().date;
 
   const params = await searchParams;
 
@@ -134,13 +121,6 @@ export default async function CalendarPage({
     .sort((a, b) => a.name.localeCompare(b.name));
   const weekItems = rawWeekItems.filter((i) => inMode(i));
 
-  // Publicatiecheck automatisch openen zodra er vandaag een publicatie verschuldigd
-  // is: de geplande publicatietijd is bereikt en de video staat nog niet online.
-  const minOf = (t: string | null) => (t ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : 0);
-  const publicatieVerschuldigd = [...items, ...weekItems].some(
-    (i) => i.scheduledOn === todayAms && i.videoStatus !== "published" && minOf(i.scheduledAt) <= amsMinutesOfDay,
-  );
-  const emphasizePublicatiecheck = isCoreStaff(viewer.email) && (publicatieVerschuldigd || inPostingWindow);
   const weekByDay = new Map<string, CalendarItem[]>();
   for (const item of weekItems) {
     const list = weekByDay.get(item.scheduledOn) ?? [];
@@ -234,6 +214,53 @@ export default async function CalendarPage({
   const pubCheckFor = (i: CalendarItem) =>
     i.videoStatus === "published" && i.deliverableId ? pubCheckSummaries.get(i.deliverableId) ?? null : null;
 
+  // Publicatiecheck vóór publicatie: alle berichten van vandaag in onze
+  // planning (respecteert het klantfilter). Goedkeuring, gekoppelde video,
+  // platform en moment komen automatisch uit de data; ondertiteling en caption
+  // vinkt het team af (opgeslagen per video, zie PRE_PUBLICATION_CHECKS).
+  const todayItems = (
+    await listCalendar(viewer, { from: todayAms, to: todayAms, clientSlug: params.klant })
+  ).filter((i) => postsContent(i));
+  const preChecks = await getPrePublicationChecks(
+    todayItems.filter((i) => i.deliverableId).map((i) => i.deliverableId as string),
+  );
+  const pubCheckRows: PubCheckRow[] = todayItems.map((i) => {
+    const platforms = (i.platforms as string[]) ?? [];
+    const approved: AutoState = !i.deliverableId
+      ? { state: "missing", note: "Nog geen video gekoppeld" }
+      : VIDEO_READY.has(i.videoStatus ?? "")
+        ? { state: "ok", note: "Goedgekeurd door de klant" }
+        : { state: "open", note: `Status video: ${VIDEO_STATUS[i.videoStatus as keyof typeof VIDEO_STATUS]?.label ?? "onbekend"}` };
+    const linked: AutoState = i.deliverableId
+      ? { state: "ok", note: "Video gekoppeld aan dit bericht" }
+      : { state: "missing", note: "Koppel de juiste video aan dit bericht" };
+    const planned: AutoState =
+      platforms.length > 0 && i.scheduledAt
+        ? { state: "ok", note: `${platforms.map((p) => PLATFORM[p]?.label ?? p).join(", ")} om ${i.scheduledAt.slice(0, 5)}` }
+        : { state: "open", note: platforms.length === 0 ? "Nog geen platform gekozen" : "Nog geen publicatietijd ingesteld" };
+    const pre = i.deliverableId ? preChecks.get(i.deliverableId) : undefined;
+    return {
+      id: i.id,
+      title: i.title,
+      clientName: i.clientName,
+      clientLogo: i.clientLogo,
+      clientColor: i.clientColor,
+      time: i.scheduledAt,
+      platforms,
+      videoHref: i.deliverableId ? `/videos/${i.deliverableId}` : null,
+      published: i.status === "published" || i.videoStatus === "published" || i.videoStatus === "analysis_available",
+      approved,
+      linked,
+      subtitles: pre?.subtitles.id ? pre.subtitles : null,
+      caption: pre?.caption.id ? pre.caption : null,
+      hasCaption: !!(i.caption && i.caption.trim().length > 0),
+      planned,
+    };
+  });
+  const pubCheckScope = selectedClient ? `vandaag · ${selectedClient.name}` : "vandaag";
+  const PUBCHECK_ROLES = ["owner", "admin", "operational_manager", "project_coordinator", "content_creator"];
+  const canTogglePubCheck = PUBCHECK_ROLES.includes(viewer.primaryRole);
+
   // CalendarItem → het lichte item dat ContentChip verwacht.
   const toChipItem = (i: CalendarItem) => ({
     id: i.id,
@@ -314,29 +341,14 @@ export default async function CalendarPage({
       {/* Werkafspraak: contentplanning en video's in één contactmoment naar de klant. */}
       {canWrite ? <ContactmomentNote /> : null}
 
-      {/* Compacte publicatiecheck — herinnering bij het inplannen/publiceren. */}
+      {/* Publicatiecheck vóór publicatie: live statussen per bericht van vandaag. */}
       <div className="mb-4">
-        <GuidelineNote
-          title="Publicatiecheck — controleer dit vóór je publiceert"
-          icon={<ListChecks className="size-4" />}
-          tone="info"
-          defaultOpen={emphasizePublicatiecheck}
-          highlight={emphasizePublicatiecheck}
-          items={[
-            <>
-              <strong className="font-semibold text-[var(--color-ink)]">Video gecontroleerd</strong>
-              <span className="mt-1 block space-y-0.5">
-                <span className="flex gap-1.5"><span aria-hidden>✓</span><span>De definitieve video is goedgekeurd door de klant.</span></span>
-                <span className="flex gap-1.5"><span aria-hidden>✓</span><span>De ondertiteling is volledig gecontroleerd en bevat geen spel- of typefouten.</span></span>
-              </span>
-            </>,
-            <><strong className="font-semibold text-[var(--color-ink)]">Caption:</strong> klopt, zonder typefouten, met de juiste toon en hashtags.</>,
-            <><strong className="font-semibold text-[var(--color-ink)]">Cover:</strong> de juiste thumbnail/cover staat ingesteld.</>,
-            <><strong className="font-semibold text-[var(--color-ink)]">Ondertiteling:</strong> aanwezig, leesbaar en synchroon.</>,
-            <><strong className="font-semibold text-[var(--color-ink)]">Klantafspraken:</strong> merkregels, vermijd-woorden en terugkerende correcties nageleefd.</>,
-            <><strong className="font-semibold text-[var(--color-ink)]">Publicatiemoment:</strong> juiste datum, tijd en platform(en) — afgestemd op de klant.</>,
-          ]}
-          footer="Controleer dit zelf per item voordat je op publiceren zet. Een fout is achteraf lastig terug te draaien."
+        <PublicationCheckPanel
+          autoOpen={autoOpenPubCheck}
+          initialOpen={autoOpenPubCheck && isInPublicationWindow()}
+          canToggle={canTogglePubCheck}
+          rows={pubCheckRows}
+          scopeLabel={pubCheckScope}
         />
       </div>
 
