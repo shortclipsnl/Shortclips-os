@@ -897,6 +897,20 @@
       "when": 1794775000000,
       "tag": "0127_kwartaalrapportages",
       "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1794776000000,
+      "tag": "0128_contentadvies",
+      "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "7",
+      "when": 1794777000000,
+      "tag": "0129_contentgeheugen_klantinzichten",
+      "breakpoints": true
     }
   ]
 }

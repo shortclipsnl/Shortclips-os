@@ -1,14 +1,16 @@
 import { ArrowUpRight, Camera, Clock, Lightbulb, MessageSquareQuote, Megaphone, Sparkles, Target, Trophy, Wand2 } from "lucide-react";
 import type { ClientMemory } from "@/server/content-memory";
 import { EVIDENCE_LABEL } from "@/server/content-memory/analyze";
+import type { ClientInsights } from "@/server/content-memory/client-insights";
 import { Thumb, nf, pct, plat, xf } from "./shared";
+import { WhatWorks } from "./what-works";
 
 /**
  * Klantversie van het Contentgeheugen. Zelfde inzichten als intern, maar
  * visueel en opbouwend: tegenvallers staan hier niet prominent in.
  * Wordt gebruikt in het klantportaal én als voorbeeld in het interne portaal.
  */
-export function ClientMemoryView({ cm }: { cm: ClientMemory }) {
+export function ClientMemoryView({ cm, insights = null }: { cm: ClientMemory; insights?: ClientInsights | null }) {
   const m = cm.memory;
   const formats = m.formats.filter((g) => g.n >= 2 && g.medianPerf >= 1).slice(0, 3);
   const ctas = m.ctas.filter((g) => g.label !== "Geen duidelijke CTA" && g.n >= 2 && g.medianPerf >= 1).slice(0, 3);
@@ -24,7 +26,7 @@ export function ClientMemoryView({ cm }: { cm: ClientMemory }) {
     <div className="flex flex-col gap-7">
       <section className="overflow-hidden rounded-[20px] bg-[#00003b] p-6 text-white sm:p-8">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-white/60">Contentgeheugen</div>
-        <h1 className="mt-1 text-[26px] font-bold leading-tight tracking-tight">Wat we over jouw content hebben geleerd</h1>
+        <h1 className="mt-1 text-[26px] font-bold leading-tight tracking-tight">{insights?.shown ? "Wat werkt bij jouw bedrijf?" : "Wat we over jouw content hebben geleerd"}</h1>
         <p className="mt-2 max-w-2xl text-[14px] text-white/70">Elke video die we samen maken, maakt de volgende beter. Dit geheugen bouwt zich automatisch op uit de echte resultaten van je video&apos;s.</p>
         <div className="mt-6 grid grid-cols-3 gap-3 sm:max-w-xl">
           {[[m.videoCount.toLocaleString("nl-NL"), "video's geanalyseerd"], [nf(m.totalViews), "weergaven"], [nf(m.totalInteractions), "interacties"]].map(([v, l]) => (
@@ -42,6 +44,8 @@ export function ClientMemoryView({ cm }: { cm: ClientMemory }) {
         </section>
       ) : null}
 
+      {insights ? <WhatWorks insights={insights} /> : null}
+
       {works.length ? (
         <section className="sc-glass p-6 sm:p-7">
           <Head icon={Target} label="Wat werkt voor jou" title="Zo ziet jouw best presterende video eruit" />
@@ -53,7 +57,7 @@ export function ClientMemoryView({ cm }: { cm: ClientMemory }) {
                 <div key={i.key} className="flex flex-col gap-2 rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4">
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]"><Icon className="size-3.5" />{WORK_LABEL[i.key]}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${i.status === "bewezen" ? "bg-[var(--color-good-soft)] text-[#1d6b4c]" : "bg-[var(--color-warn-soft)] text-[#8a5a00]"}`}>{i.status === "bewezen" ? "Bewezen" : "Veelbelovend"}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${proven(i) ? "bg-[var(--color-good-soft)] text-[#1d6b4c]" : "bg-[var(--color-warn-soft)] text-[#8a5a00]"}`}>{proven(i) ? "Bewezen" : "Voorlopig"}</span>
                   </div>
                   <div className="text-[17px] font-bold leading-snug">{i.value}</div>
                   {i.quote ? <div className="text-[13px] italic text-[var(--color-ink-muted)]">“{i.quote}”</div> : null}
@@ -84,14 +88,12 @@ export function ClientMemoryView({ cm }: { cm: ClientMemory }) {
           <Head icon={Wand2} label="Formats" title="Deze soorten video's werken het best" />
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             {formats.map((g, i) => {
-              const info = cm.ai.formats.find((f) => f.name === g.label);
               const best = g.examples[0];
               return (
                 <div key={g.label} className="flex flex-col gap-3 rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">#{i + 1} · {g.n} video&apos;s</div>
                   <div className="text-[17px] font-bold leading-snug">{g.label}</div>
                   <div className="flex gap-4 text-[13px]"><span><b className="text-[18px] tabular-nums">{xf(g.medianPerf)}</b> je normale niveau</span><span><b className="text-[18px] tabular-nums">{Math.round(g.hitRate * 100)}%</b> boven gemiddeld</span></div>
-                  {info?.why ? <p className="text-[13px] text-[var(--color-ink-muted)]">{info.why}</p> : null}
                   {best ? <div className="mt-auto flex items-center gap-3"><Thumb v={best} size="sm" /><div className="min-w-0 text-[12.5px]"><div className="line-clamp-2 font-semibold">{best.title}</div><div className="text-[var(--color-ink-muted)]">{nf(best.views)} weergaven · {plat(best.platform)}</div></div></div> : null}
                 </div>
               );
@@ -122,7 +124,7 @@ export function ClientMemoryView({ cm }: { cm: ClientMemory }) {
           <Head icon={Megaphone} label="Call to actions" title="Afsluiters die werken" />
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             {ctas.map((g) => {
-              const ex = g.examples.find((e) => e.ctaText) ?? g.examples[0];
+              const ex = g.examples.find((e) => e.ctaText && !isUrlOnly(e.ctaText));
               return (
                 <div key={g.label} className="rounded-[14px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-4">
                   <div className="text-[15px] font-bold">{g.label}</div>
@@ -170,6 +172,10 @@ export function ClientMemoryView({ cm }: { cm: ClientMemory }) {
     </div>
   );
 }
+
+/** Voor de klant heet iets pas "bewezen" bij minstens acht video's met een consequent resultaat. */
+const proven = (i: { status: string; n: number }) => i.status === "bewezen" && i.n >= 8;
+const isUrlOnly = (t: string) => /^(https?:\/\/|www\.)\S+$/i.test(t.trim());
 
 const WORK_LABEL: Record<string, string> = { format: "Type video", hook: "Opening", lengte: "Videolengte", filmstijl: "Manier van filmen" };
 const WORK_ICON: Record<string, typeof Sparkles> = { format: Wand2, hook: MessageSquareQuote, lengte: Clock, filmstijl: Camera };

@@ -18,6 +18,7 @@
     { "path": "/api/jobs/run?job=content_memory.refresh", "schedule": "*/20 5-6 * * *" },
     { "path": "/api/jobs/run?job=content_memory.strategy", "schedule": "*/10 7-8 * * *" },
     { "path": "/api/jobs/run?job=result_alerts.detect", "schedule": "5 7 * * *" },
+    { "path": "/api/jobs/run?job=content_memory.advice", "schedule": "25 7 * * *" },
     { "path": "/api/jobs/run?job=reminders.next_day_todo&slot=zomer", "schedule": "45 14 * * 1-5" },
     { "path": "/api/jobs/run?job=reminders.next_day_todo&slot=winter", "schedule": "45 15 * * 1-5" },
     { "path": "/api/jobs/run?job=vrijdagcheck.notify", "schedule": "0 7 * * 5" },

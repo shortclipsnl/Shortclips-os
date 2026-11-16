@@ -24,6 +24,9 @@ import { MemoryLessons } from "@/components/content-memory/lessons";
 import { lessonsForClient } from "@/server/result-alert-lessons";
 import { quarterLessonsForClient } from "@/server/quarterly/service";
 import { QuarterLessons } from "@/components/quarterly/quarter-lessons";
+import { getClientAdvice } from "@/server/content-memory/advice-store";
+import { clientInsightsFrom, loadInsightReviews } from "@/server/content-memory/client-insights-store";
+import { ContentAdviceView } from "@/components/content-memory/advice-view";
 
 export const metadata: Metadata = { title: "Contentgeheugen" };
 export const dynamic = "force-dynamic";
@@ -32,7 +35,7 @@ export const maxDuration = 180;
 
 type ClientRow = { id: string; name: string; slug: string; logo_url: string | null; color: string | null; status: string; n: number };
 
-export default async function ContentMemoryPage({ searchParams }: { searchParams: Promise<{ klant?: string; weergave?: string; alle?: string }> }) {
+export default async function ContentMemoryPage({ searchParams }: { searchParams: Promise<{ klant?: string; weergave?: string; alle?: string; tab?: string }> }) {
   const viewer = await requirePermission("analytics:read");
   const sp = await searchParams;
   const showAll = sp.alle === "1";
@@ -49,12 +52,17 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
   const selected = options.find((c) => c.slug === sp.klant) ?? options[0];
   const cm = selected ? await getContentMemory(viewer, selected.id) : null;
   const asClient = sp.weergave === "klant";
-  const alts = cm && !asClient ? await getHookAlternatives(cm.clientId) : {};
-  const lessons = cm && !asClient ? await lessonsForClient(cm.clientId).catch(() => []) : [];
-  const kwartaalLessen = cm && !asClient ? await quarterLessonsForClient(cm.clientId).catch(() => []) : [];
+  const asAdvice = !asClient && sp.tab === "advies";
+  // Het advies voedt ook de klantweergave ("Wat werkt bij jouw bedrijf?"), dus ook daar laden.
+  const adviceData = cm && (asAdvice || asClient) ? await getClientAdvice(viewer, cm).catch(() => null) : null;
+  const reviews = cm && adviceData ? await loadInsightReviews(cm.clientId) : [];
+  const clientInsights = cm && asClient && adviceData ? clientInsightsFrom(cm, adviceData, reviews) : null;
+  const alts = cm && !asClient && !asAdvice ? await getHookAlternatives(cm.clientId) : {};
+  const lessons = cm && !asClient && !asAdvice ? await lessonsForClient(cm.clientId).catch(() => []) : [];
+  const kwartaalLessen = cm && !asClient && !asAdvice ? await quarterLessonsForClient(cm.clientId).catch(() => []) : [];
   const qs = (extra: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
-    const merged = { klant: selected?.slug, weergave: asClient ? "klant" : undefined, alle: showAll ? "1" : undefined, ...extra };
+    const merged = { klant: selected?.slug, weergave: asClient ? "klant" : undefined, tab: asAdvice ? "advies" : undefined, alle: showAll ? "1" : undefined, ...extra };
     for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
     return `/contentgeheugen?${p.toString()}`;
   };
@@ -74,7 +82,7 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
 
       {/* Klantselectie */}
       <div className="flex flex-col gap-3">
-        <MemoryClientStrip clients={options} activeSlug={selected?.slug} weergave={asClient ? "klant" : "intern"} extraQuery={showAll ? "&alle=1" : ""} />
+        <MemoryClientStrip clients={options} activeSlug={selected?.slug} weergave={asClient ? "klant" : "intern"} extraQuery={`${showAll ? "&alle=1" : ""}${asAdvice ? "&tab=advies" : ""}`} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           {cm ? <DataLine cm={cm} /> : <span />}
           <div className="flex flex-wrap items-center gap-3">
@@ -84,8 +92,9 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
               </Link>
             ) : null}
             <div className="inline-flex rounded-lg bg-[var(--color-surface-sunken)] p-1 text-sm">
-              <Link href={qs({ weergave: "" })} scroll={false} className={`rounded-md px-3 py-1.5 ${!asClient ? "bg-[var(--color-surface)] font-semibold shadow-sm" : "text-[var(--color-ink-muted)]"}`}>Intern</Link>
-              <Link href={qs({ weergave: "klant" })} scroll={false} className={`rounded-md px-3 py-1.5 ${asClient ? "bg-[var(--color-surface)] font-semibold shadow-sm" : "text-[var(--color-ink-muted)]"}`}>Zo ziet de klant het</Link>
+              <Link href={qs({ weergave: "", tab: "" })} scroll={false} className={`rounded-md px-3 py-1.5 ${!asClient && !asAdvice ? "bg-[var(--color-surface)] font-semibold shadow-sm" : "text-[var(--color-ink-muted)]"}`}>Geheugen</Link>
+              <Link href={qs({ weergave: "", tab: "advies" })} scroll={false} className={`rounded-md px-3 py-1.5 ${asAdvice ? "bg-[var(--color-indigo-ink)] font-semibold text-white shadow-sm" : "font-medium text-[var(--color-ink)]"}`}>Contentadvies</Link>
+              <Link href={qs({ weergave: "klant", tab: "" })} scroll={false} className={`rounded-md px-3 py-1.5 ${asClient ? "bg-[var(--color-surface)] font-semibold shadow-sm" : "text-[var(--color-ink-muted)]"}`}>Zo ziet de klant het</Link>
             </div>
           </div>
         </div>
@@ -96,7 +105,11 @@ export default async function ContentMemoryPage({ searchParams }: { searchParams
         {!cm ? (
           <EmptyState title="Nog geen actieve klant met resultaten" description="Zodra Metricool publicaties en cijfers levert, verschijnt hier het geheugen." />
         ) : asClient ? (
-          <div className="portal-studio rounded-[20px] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-4 sm:p-6"><ClientMemoryView cm={cm} /></div>
+          <div className="portal-studio rounded-[20px] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-4 sm:p-6"><ClientMemoryView cm={cm} insights={clientInsights} /></div>
+        ) : asAdvice && adviceData ? (
+          <MemoryPlayerProvider>
+            <ContentAdviceView cm={cm} data={adviceData} reviews={reviews} />
+          </MemoryPlayerProvider>
         ) : (
           <MemoryPlayerProvider>
             <StrategyAutoFill key={`s-${cm.clientId}`} clientId={cm.clientId} needed={strategyMissing(cm.memory, cm.strategy)} />

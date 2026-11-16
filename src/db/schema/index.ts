@@ -42,3 +42,4 @@ export * from "./result-alerts";
 export * from "./editor-meetings";
 export * from "./client-research";
 export * from "./quarterly";
+export * from "./content-advice";
