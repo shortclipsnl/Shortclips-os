@@ -86,6 +86,7 @@ const CATEGORY: Record<AdviceDim, string> = {
   lengte: "Videolengte",
   opbouw: "Opbouw",
   filmstijl: "Manier van filmen",
+  tempo: "Montagetempo",
 };
 const GROUP: Record<AdviceSection, InsightGroup> = { meer: "goed", blijven: "goed", minder: "minder", testen: "testen" };
 const LIMIT: Record<InsightGroup, number> = { goed: 6, minder: 4, testen: 4 };
