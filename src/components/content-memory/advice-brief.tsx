@@ -25,7 +25,7 @@ export function AdviceBrief({ clientName, clientSlug, advice }: { clientName: st
     <section aria-label="Contentadvies" className="mb-4 rounded-[14px] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[14px] font-semibold">Contentadvies {clientName}: neem dit mee in de scripts</h2>
-        <Link href={`/contentgeheugen?klant=${clientSlug}&tab=advies`} className="inline-flex items-center gap-1 text-[12.5px] font-medium text-[var(--color-ink-muted)] underline-offset-2 hover:text-[var(--color-ink)] hover:underline">Volledig advies<ArrowRight className="size-3.5" /></Link>
+        <Link href={`/contentgeheugen?klant=${clientSlug}#contentadvies`} className="inline-flex items-center gap-1 text-[12.5px] font-medium text-[var(--color-ink-muted)] underline-offset-2 hover:text-[var(--color-ink)] hover:underline">Volledig advies<ArrowRight className="size-3.5" /></Link>
       </div>
       <div className="mt-3 grid gap-4 sm:grid-cols-3">
         {col("Doen", "bg-[var(--color-good-soft)] text-[#1d6b4c]", doen)}

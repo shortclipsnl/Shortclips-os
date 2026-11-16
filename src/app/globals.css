@@ -795,3 +795,22 @@ body {
   border-color: var(--sc-line);
   box-shadow: inset 4px 0 0 #ffffff;
 }
+/* Contentgeheugen: vaste accentkleur per onderdeel (licht en donker). */
+:root {
+  --cg-dna: #7c5cff;
+  --cg-best: #c4900f;
+  --cg-success: #2e9a6e;
+  --cg-format: #1b5fe0;
+  --cg-hook: #d13f78;
+  --cg-cta: #e0662f;
+  --cg-advice: #6f9800;
+}
+:root[data-theme="dark"] {
+  --cg-dna: #9d86ff;
+  --cg-best: #e3b445;
+  --cg-success: #4cc394;
+  --cg-format: #6a95f5;
+  --cg-hook: #ec6fa0;
+  --cg-cta: #f08a5a;
+  --cg-advice: #a6cf2e;
+}
