@@ -186,7 +186,7 @@ export async function runChecks(now = new Date()): Promise<{ integrations: Integ
     if (needsHuman && (row?.errs_since_ok ?? 0) > 0) level = "down";
     const skipped = calLog.filter((l) => /overgeslagen \(niet bereikbaar\)/.test(l.message));
     let summary = level === "ok" ? "Opnames en afspraken worden elk uur bijgewerkt." : `Laatste geslaagde synchronisatie ${ago(lastOk, now)}.`;
-    let action: string | null = needsHuman ? "Verbind Google opnieuw via Instellingen > Koppelingen (log in met teamshortclips@gmail.com)." : null;
+    let action: string | null = needsHuman ? "Zelfde Google-toestemming als Google Drive: volg de actie bij Google Drive (app in Google Cloud op In production zetten, daarna opnieuw verbinden met teamshortclips@gmail.com)." : null;
     if (level === "ok" && skipped.length > 0) {
       level = "warn";
       const names = skipped.map((l) => l.message.match(/Agenda "([^"]+)"/)?.[1] ?? "onbekend").map(shortCalendarName);

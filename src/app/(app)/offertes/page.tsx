@@ -1,26 +1,29 @@
 import type { Metadata } from "next";
 import { ExternalLink, FileSignature } from "lucide-react";
-import { requireQuotesAccess } from "@/server/auth/context";
+import { isOwner, requireQuotesAccess } from "@/server/auth/context";
 import { getQuotesOverview } from "@/server/quotes";
 import { pandadocConfigured } from "@/server/quotes/pandadoc-client";
 import { lastPandaDocSync } from "@/server/quotes/pandadoc-sync";
 import { PageHeader } from "@/components/ui";
 import { OffertesBoard } from "./offertes-board";
+import { errorForViewer } from "@/lib/team-error";
 
 export const metadata: Metadata = { title: "Offertes" };
 export const dynamic = "force-dynamic";
 
 export default async function OffertesPage() {
-  await requireQuotesAccess();
-  const [{ rows, stats, owners }, last] = await Promise.all([getQuotesOverview(), lastPandaDocSync()]);
+  const viewer = await requireQuotesAccess();
+  const owner = isOwner(viewer);
+  const [{ rows: rawRows, stats, owners }, last] = await Promise.all([getQuotesOverview(), lastPandaDocSync()]);
 
+  const rows = rawRows.map((r) => ({ ...r, syncError: errorForViewer(owner, r.syncError) }));
   const lastLog = Array.isArray(last?.log) ? (last!.log as { level?: string; message?: string }[]) : [];
   const lastError = last?.error ?? lastLog.filter((l) => l.level === "error").at(-1)?.message ?? null;
   const sync = {
     configured: pandadocConfigured(),
     at: last?.finishedAt ? new Date(last.finishedAt).toISOString() : null,
     ok: !last || last.status === "success" || last.status === "partial",
-    message: lastError,
+    message: errorForViewer(owner, lastError),
   };
 
   return (

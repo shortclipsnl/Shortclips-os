@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireOwner } from "@/server/auth/context";
+import { isOwner, requireInternal } from "@/server/auth/context";
+import { NoAccess } from "@/components/no-access";
 import { monitorOverview } from "@/server/monitoring/watch";
 import { mailChannel } from "@/server/monitoring/mailer";
 import { Badge, Card, CardHeader, EmptyState, Table } from "@/components/ui";
 import { LEVEL_LABEL, type Incident, type MonitorLevel } from "@/lib/monitoring-rules";
 import { env } from "@/lib/env";
 import { MonitorActions } from "./monitor-actions";
+import { technicalIssues } from "@/server/monitoring/technical-issues";
 
 export const metadata: Metadata = { title: "Koppelingsbewaking" };
 export const dynamic = "force-dynamic";
@@ -46,8 +48,14 @@ function StatusPill({ level }: { level: MonitorLevel }) {
 }
 
 export default async function KoppelingsbewakingPage() {
-  await requireOwner();
-  const [{ integrations, processes, state, level }, mail] = await Promise.all([monitorOverview(), mailChannel()]);
+  if (!isOwner(await requireInternal())) return <NoAccess what="Koppelingsbewaking" />;
+  const [{ integrations, processes, state, level }, mail, issues] = await Promise.all([
+    monitorOverview(),
+    mailChannel(),
+    technicalIssues().catch(() => []),
+  ]);
+  const activeIssues = issues.filter((i) => i.active);
+  const shownIssues = issues.slice(0, 15);
 
   const actionNeeded = integrations.filter((c) => (c.level === "down" || c.level === "warn") && c.action);
   const problems = integrations.filter((c) => c.level === "down" || c.level === "warn");
@@ -123,6 +131,60 @@ export default async function KoppelingsbewakingPage() {
           </Card>
         ))}
       </div>
+
+      {/* Technische meldingen: alle geregistreerde fouten, alleen voor de beheerder */}
+      <Card padded={false}>
+        <div className="p-5 pb-3">
+          <CardHeader
+            title="Technische meldingen"
+            subtitle={`Alle technische fouten uit het portaal en de koppelingen van de afgelopen 14 dagen, samengevoegd per melding. ${
+              activeIssues.length ? `${activeIssues.length} nog actief.` : "Niets actief in de afgelopen 24 uur."
+            } Medewerkers, editors en klanten zien deze meldingen niet.`}
+          />
+        </div>
+        {shownIssues.length === 0 ? (
+          <EmptyState title="Geen technische fouten in de afgelopen 14 dagen" />
+        ) : (
+          <Table
+            head={
+              <>
+                <th className="sc-th">Koppeling</th>
+                <th className="sc-th">Foutmelding</th>
+                <th className="sc-th">Ontstaan</th>
+                <th className="sc-th">Laatst</th>
+                <th className="sc-th text-right">Aantal</th>
+                <th className="sc-th">Actie nodig</th>
+              </>
+            }
+          >
+            {shownIssues.map((i) => (
+              <tr key={i.key} className={i.active ? "" : "opacity-60"}>
+                <td className="sc-td whitespace-nowrap font-medium">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="size-2 rounded-full" style={{ background: i.active ? (i.needsOwner ? DOT.down : DOT.warn) : DOT.off }} aria-hidden />
+                    {i.system}
+                  </span>
+                </td>
+                <td className="sc-td max-w-[340px] text-xs text-[var(--color-ink-muted)]">
+                  <span className="line-clamp-2" title={i.message}>{i.message}</span>
+                  {i.reference || i.path ? (
+                    <span className="mt-0.5 block text-2xs text-[var(--color-ink-faint)]">
+                      {i.path ? `Pagina ${i.path}` : ""}{i.path && i.reference ? " · " : ""}{i.reference ? `Referentie ${i.reference}` : ""}
+                    </span>
+                  ) : null}
+                </td>
+                <td className="sc-td whitespace-nowrap text-xs text-[var(--color-ink-muted)]">{when(i.firstAt)}</td>
+                <td className="sc-td whitespace-nowrap text-xs text-[var(--color-ink-muted)]">{i.active ? when(i.lastAt) : `${when(i.lastAt)} (niet meer gezien)`}</td>
+                <td className="sc-td text-right tabular-nums">{i.count}</td>
+                <td className="sc-td max-w-[360px] text-xs">
+                  {i.needsOwner && i.active ? <Badge tone="bad">Jij</Badge> : <Badge tone="neutral">Geen</Badge>}
+                  <span className="mt-1 block text-[var(--color-ink)]">{i.action}</span>
+                </td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </Card>
 
       {/* Werkprocessen: werkt de koppeling, én is de data per proces actueel? */}
       <Card padded={false}>

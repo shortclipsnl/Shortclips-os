@@ -16,6 +16,7 @@ import { thumbnailsFor } from "@/server/reports/metrics";
 import type { Doel, QuarterMetrics } from "./metrics";
 import { amsterdamToday, holidaysAround, type VersionContent } from "./run";
 import { quarterController, quarterPeople } from "./workflow";
+import { errorForViewer } from "@/lib/team-error";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: string) => UUID.test(v);
@@ -133,7 +134,7 @@ export async function listQuarterlyReports(viewer: Viewer): Promise<QuarterOverv
       achterstallig: isAchterstallig({ status }, q, today, holidays),
       afgelopen: today > q.to,
       ontbrekend: Array.isArray(r.ontbrekend) ? (r.ontbrekend as unknown[]).length : 0,
-      wachtReden: r.wachtReden, errorMessage: r.errorMessage,
+      wachtReden: r.wachtReden, errorMessage: errorForViewer(isOwner(viewer), r.errorMessage),
       versie: r.versionNumber, publishedVersion: r.publishedVersion,
       portaalLooptAchter: r.publishedVersion !== null && status !== "gepubliceerd",
       gecontroleerd: Boolean(r.reviewedAt),
@@ -264,7 +265,7 @@ export async function getQuarterlyReport(viewer: Viewer, id: string): Promise<Qu
     title: r.title, quarter: q, schedule: quarterSchedule(q, holidays),
     status, voorlopig: r.voorlopig, bezig, inWachtrij: Boolean(r.queued),
     pakketType: (r.pakketType as PakketType) ?? "onbekend",
-    metrics, klant, intern, ontbrekend, wachtReden: r.wachtReden, errorMessage: r.errorMessage, openFeedback, checks,
+    metrics, klant, intern, ontbrekend, wachtReden: r.wachtReden, errorMessage: errorForViewer(isOwner(viewer), r.errorMessage), openFeedback, checks,
     approveBlocker: blocker,
     health: healthOf(metrics, ontbrekend.length),
     versie: r.versionNumber, publishedVersion: r.publishedVersion, approvedVersion: r.approvedVersion,

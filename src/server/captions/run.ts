@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { captionItems, captionSets, clients, productionDays } from "@/db/schema";
-import { recordActivity } from "@/server/audit";
+import { recordActivity, logError } from "@/server/audit";
 import { notify } from "@/server/notifications";
 import { generateCaptionsForPdf, shootReviewPdf } from "@/server/captions/generate";
 
@@ -93,6 +93,7 @@ export async function ensureCaptionsForShoot(
   // Genereren (kan tientallen seconden duren).
   const res = await generateCaptionsForPdf({ clientId: day.clientId, pdfBase64: pdf.pdfBase64 });
   if (!res.ok) {
+    void logError({ category: "job", source: "taak:captions", error: new Error(res.error), context: { productionDayId } });
     await db
       .update(captionSets)
       .set({ status: "mislukt", errorMessage: res.error.slice(0, 500), startedAt: null, updatedAt: new Date() })

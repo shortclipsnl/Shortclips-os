@@ -16,6 +16,7 @@ export type ReportStatus =
 /** Klantstatussen die als "actief" tellen: één centrale definitie (zie @/lib/client-status). */
 export { ACTIVE_CLIENT_STATUSES, isActiveClientStatus } from "@/lib/client-status";
 import { isActiveClientStatus } from "@/lib/client-status";
+import { errorForViewer } from "@/lib/team-error";
 
 /** Statussen waarin een rapport intern is goedgekeurd (en dus door het team gelezen mag worden). */
 export const APPROVED_STATUSES: ReportStatus[] = ["goedgekeurd", "gepubliceerd"];
@@ -220,7 +221,7 @@ export async function listMonthlyReports(viewer: Viewer): Promise<ReportOverview
       openActies: acts.get(r.id)?.open ?? 0,
       actiesTotaal: acts.get(r.id)?.total ?? 0,
       approvedByName: r.approvedByName ?? null,
-      errorMessage: r.errorMessage ?? null,
+      errorMessage: errorForViewer(isOwnerViewer(viewer), r.errorMessage),
       startedAt: r.startedAt ? r.startedAt.toISOString() : null,
       stale: r.status === "analyse_bezig" && (!r.startedAt || Date.now() - r.startedAt.getTime() > 20 * 60000),
       hasAnalysis: Boolean(r.analysis && Object.keys(r.analysis as object).length),
@@ -449,7 +450,7 @@ export async function getMonthlyReport(viewer: Viewer, id: string): Promise<Repo
     approvedAt: r.approvedAt ? r.approvedAt.toISOString() : null,
     approvedByName: r.approvedByName ?? null,
     publishedAt: r.publishedAt ? r.publishedAt.toISOString() : null,
-    errorMessage: r.errorMessage,
+    errorMessage: errorForViewer(isOwnerViewer(viewer), r.errorMessage),
     startedAt: r.startedAt ? r.startedAt.toISOString() : null,
     stale: r.status === "analyse_bezig" && (!r.startedAt || Date.now() - r.startedAt.getTime() > 20 * 60000),
     feedback: feedback.map((f) => ({ ...f, createdAt: f.createdAt.toISOString() })),

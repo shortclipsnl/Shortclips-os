@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Download, FileCheck2 } from "lucide-react";
-import { requireQuotesAccess } from "@/server/auth/context";
+import { isOwner, requireQuotesAccess } from "@/server/auth/context";
+import { errorForViewer } from "@/lib/team-error";
 import { getQuoteDetail } from "@/server/quotes";
 import { publicQuoteLink } from "@/server/quotes/token";
 import { getCompanyInfo } from "@/server/quotes/company";
@@ -39,7 +40,7 @@ function dt(d: Date) {
 }
 
 export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireQuotesAccess();
+  const viewer = await requireQuotesAccess();
   const { id } = await params;
   const detail = await getQuoteDetail(id);
   if (!detail) notFound();
@@ -52,7 +53,7 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
       .from(salesLeads)
       .where(and(isNull(salesLeads.deletedAt)))
       .orderBy(asc(salesLeads.company));
-    return <PandaDocQuoteDetail quote={quote} events={events} lead={detail.lead} client={detail.client} leads={leads} />;
+    return <PandaDocQuoteDetail quote={{ ...quote, syncError: errorForViewer(isOwner(viewer), quote.syncError) }} events={events} lead={detail.lead} client={detail.client} leads={leads} />;
   }
   const link = quote.publicToken ? publicQuoteLink(quote.publicToken) : null;
   const company = await getCompanyInfo();

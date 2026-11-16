@@ -8,7 +8,7 @@ import {
 } from "@/lib/kwartaal";
 import { normalizeIntern, type QuarterIntern, type QuarterKlant } from "@/lib/kwartaal-inhoud";
 import { loadStrategyProfile, strategyToText } from "@/server/reports/strategy";
-import { recordActivity } from "@/server/audit";
+import { recordActivity, logError } from "@/server/audit";
 import { generateQuarterAnalysis, KWARTAAL_ANALYSE_VERSIE } from "./analysis";
 import { buildQuarterMetrics, type Doel, type QuarterMetrics } from "./metrics";
 
@@ -135,6 +135,7 @@ export async function generateQuarterReport(
   await db.update(quarterlyReports).set({ startedAt: now, errorMessage: null, updatedAt: now }).where(eq(quarterlyReports.id, reportId));
 
   const fail = async (reason: "no_provider" | "error", message: string): Promise<GenerateResult> => {
+    void logError({ category: "job", source: "taak:kwartaalrapportage", error: new Error(message), context: { reportId } });
     await db.update(quarterlyReports).set({ startedAt: null, errorMessage: message.slice(0, 500), attempts: sql`${quarterlyReports.attempts} + 1`, updatedAt: new Date() }).where(eq(quarterlyReports.id, reportId));
     await logQuarterEvent({ reportId, clientId: r.clientId, type: "generatie_mislukt", byId: opts.byId, note: message });
     return { ok: false, reason, message };

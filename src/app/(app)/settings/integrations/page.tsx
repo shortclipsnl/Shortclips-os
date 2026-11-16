@@ -7,7 +7,8 @@ import {
 } from "lucide-react";
 import { db } from "@/db/client";
 import { clients, syncJobs, integrationEvents } from "@/db/schema";
-import { isOwner, requireOperationalManager } from "@/server/auth/context";
+import { canManageOperations, isOwner, requireInternal } from "@/server/auth/context";
+import { NoAccess } from "@/components/no-access";
 import { integrationHealth } from "@/server/integrations/registry";
 import { appointmentReviewStats, unmatchedAppointments } from "@/server/appointments";
 import { calendarColorMap } from "@/server/calendar-couplings";
@@ -43,7 +44,8 @@ export default async function IntegrationsPage({
 }: {
   searchParams: Promise<{ google?: string; frameio?: string; melding?: string }>;
 }) {
-  const viewer = await requireOperationalManager();
+  const viewer = await requireInternal();
+  if (!canManageOperations(viewer)) return <NoAccess what="Koppelingen" />;
   const sp = await searchParams;
   const googleNotice =
     sp.google === "verbonden"
@@ -57,6 +59,53 @@ export default async function IntegrationsPage({
       : sp.frameio === "fout"
         ? { ok: false, text: sp.melding ?? "Frame.io opnieuw verbinden is niet gelukt." }
         : undefined;
+  const owner = isOwner(viewer);
+
+  const [agendaReview, agendaStats, agendaColors, clientOptions] = await Promise.all([
+    unmatchedAppointments(50),
+    appointmentReviewStats(),
+    calendarColorMap(),
+    db.select({ id: clients.id, name: clients.name }).from(clients).where(isNull(clients.deletedAt)).orderBy(asc(clients.name)),
+  ]);
+
+  const reviewRows: ReviewRow[] = agendaReview.map((a) => ({
+    id: a.id,
+    title: a.title,
+    when: formatDateTime(a.startsAt),
+    calendarName: a.calendarName ?? null,
+    color: agendaColors.get(a.calendarId) ?? "var(--color-ink-faint)",
+    matchConfidence: a.matchConfidence,
+  }));
+
+  const agendaCard = (
+    <Card>
+      <CardHeader title="Afspraken zonder klant — controleren" />
+      <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+        {agendaStats.total === 0
+          ? "Er is nog niets uit Google Agenda gesynchroniseerd."
+          : `${agendaStats.matched} van ${agendaStats.total} afspraken gekoppeld · ${agendaStats.needsReview} te controleren${
+              agendaStats.ambiguous ? ` (waarvan ${agendaStats.ambiguous} met meerdere mogelijke klanten)` : ""
+            }${agendaStats.internal ? ` · ${agendaStats.internal} intern herkend (geen klant nodig)` : ""}.`}
+      </p>
+      <AppointmentReview rows={reviewRows} clients={clientOptions} />
+    </Card>
+  );
+
+  // Technische status, foutmeldingen, sync-logboek en webhooks zijn uitsluitend
+  // voor de eigenaar. De operationeel beheerder houdt hier alleen het
+  // operationele deel: agenda-afspraken aan de juiste klant koppelen.
+  if (!owner) {
+    return (
+      <div className="mx-auto max-w-[1200px]">
+        <PageHeader
+          title="Agenda-afspraken controleren"
+          description="Afspraken uit Google Agenda die nog niet zeker aan een klant gekoppeld zijn. De technische koppelingen beheert Jarno."
+        />
+        {agendaCard}
+      </div>
+    );
+  }
+
   const health = await integrationHealth();
   const canWrite = viewer.permissions.has("integrations:write");
 
@@ -77,22 +126,6 @@ export default async function IntegrationsPage({
     }).from(integrationEvents).orderBy(desc(integrationEvents.receivedAt)).limit(15),
   ]);
 
-  const [agendaReview, agendaStats, agendaColors, clientOptions] = await Promise.all([
-    unmatchedAppointments(50),
-    appointmentReviewStats(),
-    calendarColorMap(),
-    db.select({ id: clients.id, name: clients.name }).from(clients).where(isNull(clients.deletedAt)).orderBy(asc(clients.name)),
-  ]);
-
-  const reviewRows: ReviewRow[] = agendaReview.map((a) => ({
-    id: a.id,
-    title: a.title,
-    when: formatDateTime(a.startsAt),
-    calendarName: a.calendarName ?? null,
-    color: agendaColors.get(a.calendarId) ?? "var(--color-ink-faint)",
-    matchConfidence: a.matchConfidence,
-  }));
-
   return (
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
@@ -101,7 +134,7 @@ export default async function IntegrationsPage({
       />
 
       <div className="space-y-5">
-        <DriveStatusCard isOwner={isOwner(viewer)} notice={googleNotice} />
+        <DriveStatusCard isOwner={owner} notice={googleNotice} />
         {frameioNotice ? (
           <p className={`mt-3 text-sm ${frameioNotice.ok ? "text-[var(--color-good)]" : "text-[var(--color-bad)]"}`}>{frameioNotice.text}</p>
         ) : null}
@@ -217,7 +250,7 @@ export default async function IntegrationsPage({
             subtitle="Normaal draaien deze taken automatisch. Hier kun je ze direct uitvoeren."
           />
           <div className="mt-4 flex flex-wrap gap-3">
-            {isOwner(viewer) ? (
+            {owner ? (
               <a href="/api/integrations/frameio/connect" className="inline-flex items-center rounded-[var(--radius-sm)] bg-[var(--color-brand-500)] px-3 py-1.5 text-sm font-medium text-white">
                 Frame.io opnieuw verbinden
               </a>
@@ -327,17 +360,7 @@ export default async function IntegrationsPage({
       </Card>
 
       {/* Google Agenda: afspraken die (nog) geen zekere klant hebben */}
-      <Card>
-        <CardHeader title="Afspraken zonder klant — controleren" />
-        <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          {agendaStats.total === 0
-            ? "Er is nog niets uit Google Agenda gesynchroniseerd."
-            : `${agendaStats.matched} van ${agendaStats.total} afspraken gekoppeld · ${agendaStats.needsReview} te controleren${
-                agendaStats.ambiguous ? ` (waarvan ${agendaStats.ambiguous} met meerdere mogelijke klanten)` : ""
-              }${agendaStats.internal ? ` · ${agendaStats.internal} intern herkend (geen klant nodig)` : ""}.`}
-        </p>
-        <AppointmentReview rows={reviewRows} clients={clientOptions} />
-      </Card>
+      <div className="mt-5">{agendaCard}</div>
     </div>
   );
 }

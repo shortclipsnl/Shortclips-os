@@ -11,7 +11,7 @@ import {
 import { STALE_MIN } from "./run";
 import { rankWithVariety } from "./opportunity";
 import { toIdeaView, type IdeaView } from "./idea-view";
-import { assertClientAccess, scopeToClients, type Viewer } from "@/server/auth/context";
+import { assertClientAccess, scopeToClients, type Viewer, isOwner } from "@/server/auth/context";
 import { listClientsForScripts, clientLearnedText } from "@/server/ai/knowledge";
 import { gatherFeedbackContext } from "@/server/script-control";
 import { getClientWinningPatterns } from "@/server/scripts/winning-patterns";
@@ -19,6 +19,7 @@ import { loadDna, dnaToText, type ContentDna } from "./content-dna";
 import { buildPerformanceContext } from "./performance";
 import { loadStoredStyle, type StoredStyle } from "./style";
 import { styleToText } from "./style-core";
+import { errorForViewer } from "@/lib/team-error";
 
 export type OverviewClient = {
   id: string;
@@ -83,7 +84,7 @@ export async function listContentResearchOverview(viewer: Viewer): Promise<Overv
       seenLatest.add(r.clientId);
       const beat = (r.heartbeatAt ?? r.createdAt).getTime();
       if (r.status === "bezig" && (Date.now() - beat) / 60000 < STALE_MIN) running.add(r.clientId);
-      lastError.set(r.clientId, r.status === "mislukt" ? r.errorMessage : null);
+      lastError.set(r.clientId, r.status === "mislukt" ? errorForViewer(isOwner(viewer), r.errorMessage) : null);
     }
     if (r.status === "klaar" && r.finishedAt && !lastAt.has(r.clientId)) {
       lastAt.set(r.clientId, r.finishedAt.toISOString());

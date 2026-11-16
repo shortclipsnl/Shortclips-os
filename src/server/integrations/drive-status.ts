@@ -99,7 +99,10 @@ export async function getDriveStatus(options: { peekPending?: boolean } = {}): P
   } else if (authState === "reauth_required") {
     connection = "verbroken";
     reason = "Google heeft de toestemming ingetrokken of laten verlopen.";
-    action = "Klik op 'Opnieuw verbinden' en log in met het zakelijke Google-account.";
+    action =
+      "Zet eerst in Google Cloud (APIs & Services > OAuth consent screen > Audience) de app op 'In production'. " +
+      "Staat die op 'Testing', dan laat Google de toegang na 7 dagen vervallen en valt Drive en Agenda telkens opnieuw weg. " +
+      "Klik daarna op 'Opnieuw verbinden' en log in met teamshortclips@gmail.com.";
     canReconnect = true;
   } else if (authState === "config_error") {
     connection = "verbroken";

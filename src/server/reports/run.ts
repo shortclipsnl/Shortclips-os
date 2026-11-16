@@ -2,7 +2,7 @@ import "server-only";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientReports, clients, monthlyReportFeedback, monthlyReportVersions } from "@/db/schema";
-import { recordActivity } from "@/server/audit";
+import { recordActivity, logError } from "@/server/audit";
 import { syncReportBatches } from "./batch";
 import { generateMonthlyAnalysis, periodLabel, previousMonthPeriod, type MonthlyAnalysis } from "./analysis";
 
@@ -84,6 +84,7 @@ export async function ensureMonthlyReport(
   const res = await generateMonthlyAnalysis(clientId, period, { trusted: true, priorSummary: prior, feedback: openFeedback.map((f) => f.body) });
   if (!res.ok) {
     const message = res.reason === "no_provider" ? "Er is nog geen AI-sleutel ingesteld." : res.reason === "no_data" ? "Geen resultaten in deze maand om te analyseren." : res.message ?? "Analyse mislukt.";
+    if (res.reason !== "no_data") void logError({ category: "job", source: "taak:maandrapportage", error: new Error(message), context: { reportId } });
     await db.update(clientReports).set({ status: "mislukt", errorMessage: message.slice(0, 500), startedAt: null, updatedAt: new Date() }).where(eq(clientReports.id, reportId));
     return { ok: false, reason: res.reason === "no_data" ? "no_data" : res.reason === "no_provider" ? "no_provider" : "error", message, reportId };
   }

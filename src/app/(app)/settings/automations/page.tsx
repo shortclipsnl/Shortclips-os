@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { automationRules, automationRuns } from "@/db/schema";
-import { requirePermission } from "@/server/auth/context";
+import { isOwner, requirePermission } from "@/server/auth/context";
+import { errorForViewer } from "@/lib/team-error";
 import { Badge, Card, CardHeader, EmptyState, Table } from "@/components/ui";
 import { formatDateTime, relativeDays } from "@/lib/format";
 
@@ -19,7 +20,7 @@ const TRIGGER_LABELS: Record<string, string> = {
 };
 
 export default async function AutomationsPage() {
-  await requirePermission("automations:read");
+  const owner = isOwner(await requirePermission("automations:read"));
 
   const [rules, runs] = await Promise.all([
     db.select().from(automationRules).orderBy(desc(automationRules.isEnabled), automationRules.name),
@@ -106,7 +107,7 @@ export default async function AutomationsPage() {
                     {r.status === "success" ? "gelukt" : r.status === "error" ? "fout" : r.status}
                   </Badge>
                   {r.error ? (
-                    <span className="ml-2 text-xs text-[var(--color-ink-muted)]">{r.error}</span>
+                    <span className="ml-2 text-xs text-[var(--color-ink-muted)]">{errorForViewer(owner, r.error)}</span>
                   ) : null}
                 </td>
                 <td className="sc-td text-[var(--color-ink-muted)]">{formatDateTime(r.createdAt)}</td>

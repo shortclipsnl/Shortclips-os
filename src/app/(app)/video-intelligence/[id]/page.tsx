@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { requirePermission } from "@/server/auth/context";
+import { isOwner, requirePermission } from "@/server/auth/context";
+import { errorForViewer } from "@/lib/team-error";
 import { getAnalysis } from "@/server/video-intelligence/queries";
 import { getVideoBenchmarks, BENCHMARK_MIN_SAMPLE } from "@/server/video-intelligence/intelligence";
 import { Avatar, Badge } from "@/components/ui";
@@ -36,7 +37,7 @@ export default async function AnalysisPage({ params }: { params: Promise<{ id: s
     width: a.width,
     height: a.height,
     aspectRatio: a.aspectRatio,
-    error: a.error,
+    error: errorForViewer(isOwner(viewer), a.error),
     hasMedia: Boolean(a.mediaPath),
     hasThumb: Boolean(a.thumbnailData),
     clientName: detail.client?.name ?? "Onbekend",
