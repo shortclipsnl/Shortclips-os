@@ -1,200 +1,156 @@
 import type { Metadata } from "next";
-import { CalendarDays, Clock, Radio } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { requirePortal } from "@/server/auth/context";
-import { getPortalContentPlanning, type PortalContentPost } from "@/server/portal-content";
-import { StatusPill, type StatusTone } from "@/components/portal/status-pill";
-import { PLATFORM } from "@/lib/statuses";
-import { loadContentPlanningOverview } from "@/server/content-planning/overview";
-import { PlanningChecklist } from "@/components/portal/planning-checklist";
+import { countClientAgendaByWeek, getClientAgenda } from "@/server/portal-content";
+import { ContentAgenda } from "@/components/portal/content-agenda";
 import { ContentPlanningPdfButton } from "@/components/content-planning/pdf-button";
-import { loadClientDeadline } from "@/server/planning-deadlines";
-import { DeadlineCountdown } from "@/components/portal/deadline-countdown";
+import { addDays, isIsoDate, isIsoMonth, isoWeekNumber, mondayOf, monthDays, shiftMonth } from "@/lib/client-content-planning";
 
 export const metadata: Metadata = { title: "Contentplanning" };
 export const dynamic = "force-dynamic";
 
 const TZ = "Europe/Amsterdam";
 
-function mondayOf(iso: string): string {
-  const d = new Date(`${iso}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
-  return d.toISOString().slice(0, 10);
-}
-function addDays(iso: string, n: number): string {
-  const d = new Date(`${iso}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-/** ISO-weeknummer. */
-function weekNumber(iso: string): number {
-  const d = new Date(`${iso}T12:00:00Z`);
-  const day = (d.getUTCDay() + 6) % 7;
-  d.setUTCDate(d.getUTCDate() - day + 3);
-  const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
-  return 1 + Math.round(((d.getTime() - firstThu.getTime()) / 86_400_000 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
-}
-function weekday(iso: string): string {
-  return new Date(`${iso}T12:00:00Z`).toLocaleDateString("nl-NL", { weekday: "short", timeZone: "UTC" }).replace(".", "");
-}
-function dayMonth(iso: string): string {
-  return new Date(`${iso}T12:00:00Z`).toLocaleDateString("nl-NL", { day: "numeric", month: "long", timeZone: "UTC" });
-}
+const shortDate = (iso: string, withYear = false) =>
+  new Date(`${iso}T12:00:00Z`)
+    .toLocaleDateString("nl-NL", { day: "numeric", month: "short", ...(withYear ? { year: "numeric" } : {}), timeZone: "UTC" })
+    .replace(".", "");
+const monthLabel = (month: string) =>
+  new Date(`${month}-01T12:00:00Z`).toLocaleDateString("nl-NL", { month: "long", year: "numeric", timeZone: "UTC" });
 
-/** Status in klanttaal, afhankelijk van wie publiceert. */
-function statusOf(p: PortalContentPost, weHandle: boolean): { tone: StatusTone; label: string } {
-  if (p.isOnline) return { tone: "green", label: weHandle ? "Online" : "Geplaatst" };
-  if (p.status === "scheduled" || p.status === "ready") return weHandle ? { tone: "blue", label: "Ingepland" } : { tone: "orange", label: "Klaar om te plaatsen" };
-  return { tone: "grey", label: "In voorbereiding" };
-}
-
-function PlatformChips({ platforms }: { platforms: string[] }) {
-  if (platforms.length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {platforms.map((p) => (
-        <span key={p} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--sc-line)] bg-[var(--color-surface)] px-2 py-0.5 text-[11.5px] font-medium text-[var(--color-ink-muted)]">
-          <span className="size-2 rounded-full ring-1 ring-[var(--sc-line)]" style={{ background: PLATFORM[p]?.color ?? "var(--color-ink-faint)" }} />
-          {PLATFORM[p]?.label ?? p}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function PostCard({ post, weHandle, isToday }: { post: PortalContentPost; weHandle: boolean; isToday: boolean }) {
-  const st = statusOf(post, weHandle);
-  return (
-    <article className="flex gap-3.5 rounded-[14px] border border-[var(--sc-line)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
-      <div className={`flex w-12 shrink-0 flex-col items-center justify-center rounded-[12px] py-2 ${isToday ? "bg-[var(--sc-cta)] text-[var(--sc-cta-ink)]" : "bg-[var(--sc-fill)]"}`}>
-        <span className={`text-[11px] font-semibold uppercase ${isToday ? "opacity-80" : "text-[var(--color-ink-muted)]"}`}>{weekday(post.scheduledOn)}</span>
-        <span className="text-[19px] font-bold leading-tight tabular-nums">{new Date(`${post.scheduledOn}T12:00:00Z`).getUTCDate()}</span>
-      </div>
-      {post.coverUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={post.coverUrl} alt="" className="h-[72px] w-[44px] shrink-0 rounded-[8px] object-cover" />
-      ) : null}
-      <div className="min-w-0 flex-1">
-        <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug">{post.title}</h3>
-        <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[12.5px] text-[var(--color-ink-muted)]">
-          <span>{dayMonth(post.scheduledOn)}</span>
-          {post.scheduledAt ? <span className="inline-flex items-center gap-1"><Clock className="size-3" /> {post.scheduledAt} uur</span> : null}
-          {isToday ? <span className="font-semibold text-[var(--sc-accent)]">Vandaag</span> : null}
-        </p>
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          <StatusPill tone={st.tone}>{st.label}</StatusPill>
-          <PlatformChips platforms={post.platforms} />
-        </div>
-      </div>
-    </article>
-  );
-}
-
-export default async function PortalContentPage() {
+/**
+ * Contentplanning in het klantportaal: een vereenvoudigde weergave van exact de
+ * interne contentplanning. Standaard de huidige week, met navigatie per week
+ * (of maand). Geen interne stappen, acties of voortgangsblokken.
+ */
+export default async function PortalContentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ weergave?: string; week?: string; maand?: string }>;
+}) {
   const viewer = await requirePortal();
-  const [data, overview, deadline] = await Promise.all([
-    getPortalContentPlanning(viewer),
-    viewer.clientId ? loadContentPlanningOverview(viewer.clientId) : Promise.resolve(null),
-    // Alleen de eigen klant: clientId komt uit de sessie, nooit uit de URL.
-    viewer.clientId ? loadClientDeadline(viewer.clientId) : Promise.resolve(null),
-  ]);
+  const params = await searchParams;
   const todayIso = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
   const thisMonday = mondayOf(todayIso);
-  const nextMonday = addDays(thisMonday, 7);
-  const weHandle = data.weHandlePosting;
+  const thisMonth = todayIso.slice(0, 7);
 
-  const thisWeek = data.weeks.find((w) => w.weekStart === thisMonday);
-  const upcoming = data.weeks.flatMap((w) => w.posts).filter((p) => p.scheduledOn >= todayIso && !p.isOnline);
+  const view: "week" | "maand" = params.weergave === "maand" ? "maand" : "week";
+  const weekStart = view === "week" && isIsoDate(params.week) ? mondayOf(params.week) : thisMonday;
+  const month = view === "maand" && isIsoMonth(params.maand) ? params.maand : thisMonth;
+
+  const days = view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)) : monthDays(month);
+  const from = days[0]!;
+  const to = days[days.length - 1]!;
+
+  // Vooruitblik: de komende vier weken vanaf de getoonde week (of vanaf nu bij de maand).
+  const aheadStart = view === "week" ? addDays(weekStart, 7) : addDays(thisMonday, 7);
+  const [agenda, ahead] = await Promise.all([
+    getClientAgenda(viewer, from, to),
+    countClientAgendaByWeek(viewer, aheadStart, addDays(aheadStart, 27)),
+  ]);
+
+  const weekHref = (w: string) => (w === thisMonday ? "/portal/content" : `/portal/content?week=${w}`);
+  const monthHref = (m: string) => `/portal/content?weergave=maand&maand=${m}`;
+
+  const isCurrent = view === "week" ? weekStart === thisMonday : month === thisMonth;
+  const prevHref = view === "week" ? weekHref(addDays(weekStart, -7)) : monthHref(shiftMonth(month, -1));
+  const nextHref = view === "week" ? weekHref(addDays(weekStart, 7)) : monthHref(shiftMonth(month, 1));
+  const todayHref = view === "week" ? "/portal/content" : monthHref(thisMonth);
+  // Wisselen houdt de periode vast: week → maand van die week, maand → eerste week van die maand.
+  const toMonthHref = monthHref(addDays(weekStart, 3).slice(0, 7));
+  const toWeekHref = month === thisMonth ? "/portal/content" : weekHref(mondayOf(`${month}-01`));
+
+  const weekName =
+    weekStart === thisMonday ? "Deze week" : weekStart === addDays(thisMonday, 7) ? "Volgende week" : weekStart === addDays(thisMonday, -7) ? "Vorige week" : `Week ${isoWeekNumber(weekStart)}`;
+  const heading = view === "week" ? weekName : monthLabel(month);
+  const subheading =
+    view === "week"
+      ? `${weekName.startsWith("Week") ? "" : `Week ${isoWeekNumber(weekStart)} · `}${shortDate(weekStart)} – ${shortDate(addDays(weekStart, 6), true)}`
+      : null;
+
+  const inView = view === "maand" ? agenda.posts.filter((p) => p.scheduledOn.startsWith(month)) : agenda.posts;
+  const emptyWeek = view === "week" && agenda.posts.length === 0;
+
+  const navBtn =
+    "grid size-10 place-items-center rounded-[10px] border border-[var(--sc-line)] bg-[var(--color-surface)] text-[var(--color-ink)] transition-colors hover:bg-[var(--sc-fill)]";
+  const seg = (active: boolean) =>
+    `rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+      active ? "bg-[var(--sc-cta)] text-[var(--sc-cta-ink)]" : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+    }`;
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[26px] font-bold tracking-tight">Contentplanning</h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Welke video wanneer online komt, en op welke kanalen.</p>
+          <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Welke video&apos;s wanneer online komen, en op welke kanalen.</p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--sc-line)] bg-[var(--color-surface)] px-3 py-1.5 text-[12.5px] text-[var(--color-ink-muted)]">
-          <Radio className="size-3.5 text-[var(--sc-accent)]" />
-          {weHandle ? "Shortclips plaatst je video's" : "Je plaatst de video's zelf"}
-        </span>
+        <ContentPlanningPdfButton href="/api/portal/contentplanning/pdf" />
       </div>
 
-      {/* Afteller: 21 dagen vanaf het delen van de planning (alleen als er een loopt). */}
-      {data.shared && deadline ? <DeadlineCountdown deadline={deadline} /> : null}
-
-      {/* Jouw contentplanning: wat Shortclips geregeld heeft en wat er bij de
-          klant ligt, op basis van de echte status (zelfde bron als de PDF). */}
-      {data.shared && overview ? (
-        <PlanningChecklist
-          checklist={overview.checklist}
-          action={<ContentPlanningPdfButton href="/api/portal/contentplanning/pdf" className="!border-white/25 !bg-white/10 !text-white hover:!bg-white/20" />}
-        />
-      ) : null}
-
-      {!data.shared ? (
-        <section className="sc-glass flex items-start gap-3 p-5">
-          <CalendarDays className="size-5 shrink-0 text-[var(--sc-accent)]" />
-          <div>
-            <p className="text-sm font-semibold">Je contentplanning wordt voorbereid</p>
-            <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">Zodra wij de planning met je delen, zie je hier precies welke video wanneer online komt.</p>
+      {/* Navigatie: periode, vorige/volgende, terug naar nu, week of maand. */}
+      <div className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-[var(--sc-line)] bg-[var(--color-surface)]/95 px-3 py-2.5 shadow-[var(--shadow-card)] backdrop-blur">
+        <div className="flex items-center gap-2">
+          <Link href={prevHref} className={navBtn} aria-label={view === "week" ? "Vorige week" : "Vorige maand"} scroll={false}>
+            <ChevronLeft className="size-5" />
+          </Link>
+          <Link href={nextHref} className={navBtn} aria-label={view === "week" ? "Volgende week" : "Volgende maand"} scroll={false}>
+            <ChevronRight className="size-5" />
+          </Link>
+          <div className="ml-1 min-w-0">
+            <h2 className="text-[17px] font-bold leading-tight tracking-tight first-letter:uppercase">{heading}</h2>
+            {subheading ? <p className="text-[12.5px] text-[var(--color-ink-muted)]">{subheading}</p> : null}
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {!isCurrent ? (
+            <Link href={todayHref} scroll={false} className="rounded-[10px] border border-[var(--sc-line)] px-3 py-2 text-[13px] font-semibold hover:bg-[var(--sc-fill)]">
+              {view === "week" ? "Naar deze week" : "Naar deze maand"}
+            </Link>
+          ) : null}
+          <div className="inline-flex items-center gap-1 rounded-full border border-[var(--sc-line)] bg-[var(--sc-fill)] p-1" role="tablist" aria-label="Weergave">
+            <Link href={view === "week" ? weekHref(weekStart) : toWeekHref} scroll={false} className={seg(view === "week")} aria-selected={view === "week"} role="tab">
+              Week
+            </Link>
+            <Link href={view === "maand" ? monthHref(month) : toMonthHref} scroll={false} className={seg(view === "maand")} aria-selected={view === "maand"} role="tab">
+              Maand
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {emptyWeek ? (
+        <section className="flex items-center gap-3 rounded-[16px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-5">
+          <CalendarDays className="size-5 shrink-0 text-[var(--sc-accent)]" />
+          <p className="text-[14px] font-medium">Er staan deze week nog geen video&apos;s gepland.</p>
         </section>
       ) : (
-        <>
-          {/* Kerncijfers: deze week en wat er nog komt */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="sc-glass p-4">
-              <div className="text-[28px] font-bold leading-none tabular-nums">{thisWeek?.posts.length ?? 0}</div>
-              <div className="mt-1.5 text-[12.5px] text-[var(--color-ink-muted)]">video&apos;s deze week</div>
-            </div>
-            <div className="sc-glass p-4">
-              <div className="text-[28px] font-bold leading-none tabular-nums">{upcoming.length}</div>
-              <div className="mt-1.5 text-[12.5px] text-[var(--color-ink-muted)]">{weHandle ? "nog ingepland" : "nog te plaatsen"}</div>
-            </div>
-            <div className="sc-glass col-span-2 p-4 sm:col-span-1">
-              <div className="text-[15px] font-semibold leading-snug">{upcoming[0] ? `${weekday(upcoming[0].scheduledOn)} ${dayMonth(upcoming[0].scheduledOn)}${upcoming[0].scheduledAt ? ` · ${upcoming[0].scheduledAt}` : ""}` : "Nog niets gepland"}</div>
-              <div className="mt-1.5 text-[12.5px] text-[var(--color-ink-muted)]">eerstvolgende publicatie</div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-5">
-            {data.weeks.map((week) => {
-              const isThis = week.weekStart === thisMonday;
-              const isNext = week.weekStart === nextMonday;
-              const isPast = week.weekStart < thisMonday;
-              const name = isThis ? "Deze week" : isNext ? "Volgende week" : `Week ${weekNumber(week.weekStart)}`;
-              return (
-                <section
-                  key={week.weekStart}
-                  className={`rounded-[18px] p-4 sm:p-5 ${isThis ? "border-2 border-[var(--sc-now-line)] bg-[var(--sc-now-bg)]" : "border border-[var(--sc-line)] bg-[var(--sc-fill)]"} ${isPast ? "opacity-75" : ""}`}
-                  aria-current={isThis ? "date" : undefined}
-                >
-                  <header className="mb-3.5 flex flex-wrap items-baseline justify-between gap-2">
-                    <div className="flex flex-wrap items-baseline gap-x-2.5">
-                      <h2 className={`font-bold tracking-tight ${isThis ? "text-[20px]" : "text-[17px]"}`}>{name}</h2>
-                      <span className="text-[13px] text-[var(--color-ink-muted)]">{isThis || isNext ? `week ${weekNumber(week.weekStart)} · ` : ""}{week.label}</span>
-                    </div>
-                    <span className="text-[12.5px] font-medium text-[var(--color-ink-muted)]">
-                      {week.posts.length === 0 ? "Geen publicaties" : `${week.posts.length} ${week.posts.length === 1 ? "publicatie" : "publicaties"}`}
-                    </span>
-                  </header>
-                  {week.posts.length === 0 ? (
-                    <p className="text-[13px] text-[var(--color-ink-faint)]">Deze week staat er niets gepland.</p>
-                  ) : (
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {week.posts.map((p) => <PostCard key={p.id} post={p} weHandle={weHandle} isToday={p.scheduledOn === todayIso} />)}
-                    </div>
-                  )}
-                </section>
-              );
-            })}
-          </div>
-        </>
+        <ContentAgenda view={view} days={days} month={view === "maand" ? month : undefined} todayIso={todayIso} posts={inView} />
       )}
 
-      <p className="flex items-center gap-1.5 text-xs text-[var(--color-ink-faint)]">
-        <Clock className="size-3.5" />
-        {weHandle ? "Zodra een video online staat, krijg je er automatisch bericht van." : "De video's staan klaar op de geplande dag; plaats ze bij voorkeur op het aangegeven tijdstip."}
-      </p>
+      {/* Komende weken in één oogopslag; klik om naar die week te gaan. */}
+      {ahead.length ? (
+        <section>
+          <h3 className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-muted)]">Komende weken</h3>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {ahead.map((w) => (
+              <Link
+                key={w.weekStart}
+                href={weekHref(w.weekStart)}
+                scroll={false}
+                className="rounded-[12px] border border-[var(--sc-line)] bg-[var(--color-surface)] px-3 py-2.5 transition-colors hover:bg-[var(--sc-fill)]"
+              >
+                <div className="text-[13px] font-semibold">Week {isoWeekNumber(w.weekStart)}</div>
+                <div className="text-[12px] text-[var(--color-ink-muted)]">
+                  {shortDate(w.weekStart)} – {shortDate(addDays(w.weekStart, 6))} ·{" "}
+                  {w.count === 0 ? "nog niets gepland" : `${w.count} ${w.count === 1 ? "video" : "video's"}`}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
