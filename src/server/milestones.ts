@@ -66,7 +66,7 @@ export async function getPortalMilestones(viewer: Viewer): Promise<MilestonesDat
     getPortalCollaboration(viewer),
     db.select({ name: clients.name }).from(clients).where(and(eq(clients.id, clientId), isNull(clients.deletedAt))).limit(1),
     db
-      .select({ at: deliverables.publishedAt })
+      .select({ at: deliverables.publishedAt, frame: deliverables.frameAssetId })
       .from(deliverables)
       .where(and(eq(deliverables.clientId, clientId), isNull(deliverables.deletedAt), eq(deliverables.status, "published")))
       .orderBy(asc(deliverables.publishedAt)),
@@ -86,6 +86,13 @@ export async function getPortalMilestones(viewer: Viewer): Promise<MilestonesDat
   const totalVideos = videoRows.length;
   const videoDates = videoRows.map((r) => (r.at ? amsDay(new Date(r.at)) : null)).filter((d): d is string => !!d);
   const videosUntil = (iso: string) => videoDates.filter((d) => d <= iso).length;
+  // De Ne gepubliceerde video (zelfde volgorde als videoDates) → afspeelbare video uit de bibliotheek.
+  const datedFrames = videoRows.filter((r) => !!r.at).map((r) => r.frame);
+  const libByFrame = new Map(videoLists.library.filter((l) => l.frameFileId).map((l) => [l.frameFileId!, l.id]));
+  const videoForNth = (n: number): string | null => {
+    const frame = datedFrames[n - 1];
+    return frame ? (libByFrame.get(frame) ?? null) : null;
+  };
 
   // Dagelijkse cijfers → totalen en het moment waarop een drempel werd gepasseerd.
   const daily = rowsOf<{ d: string; v: string | number; e: string | number }>(dailyRes).map((r) => ({ d: String(r.d), v: Number(r.v ?? 0), e: Number(r.e ?? 0) }));
@@ -118,6 +125,7 @@ export async function getPortalMilestones(viewer: Viewer): Promise<MilestonesDat
           ? `${nf.format(a.threshold)} views${day && day > 0 ? ` na ${plural(day, "dag", "dagen")} samenwerking` : ""}${vids > 0 ? `, met ${plural(vids, "gepubliceerde video", "gepubliceerde video's")}` : ""}. Inmiddels ${nf.format(totalViews)} views.`
           : null,
         remainingLine: `Nog ${nf.format(a.threshold - totalViews)} views`,
+        videoId: null,
       };
     }
     if (a.category === "content") {
@@ -135,6 +143,7 @@ export async function getPortalMilestones(viewer: Viewer): Promise<MilestonesDat
           ? `${a.threshold}e video gepubliceerd${on ? ` op ${longDateNl(on)}` : ""}${day && day > 0 ? `, dag ${nf.format(day)} van de samenwerking` : ""}. Inmiddels ${plural(totalVideos, "video", "video's")}.`
           : null,
         remainingLine: `Nog ${plural(left, "video", "video's")}`,
+        videoId: achieved ? videoForNth(a.threshold) : null,
       };
     }
     // Samenwerking
@@ -151,6 +160,7 @@ export async function getPortalMilestones(viewer: Viewer): Promise<MilestonesDat
         ? `Samenwerking gestart op ${longDateNl(startedOn)}, ${plural(videosUntil(due), "video", "video's")} gepubliceerd in deze periode.`
         : null,
       remainingLine: due ? `Op ${longDateNl(due)}` : "Startdatum nog niet bekend",
+      videoId: null,
     };
   });
 
