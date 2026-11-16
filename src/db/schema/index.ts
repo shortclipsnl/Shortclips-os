@@ -37,7 +37,6 @@ export * from "./ops-control";
 export * from "./client-app";
 export * from "./editor-database";
 export * from "./video-review";
-export * from "./coach";
 export * from "./result-alerts";
 export * from "./editor-meetings";
 export * from "./client-research";

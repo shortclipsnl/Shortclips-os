@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { runFinanceSyncHealth } from "@/server/jobs/finance-sync";
 import { runPublicationDueCheck } from "@/server/jobs/publication-reminders";
 import { runVermogenAdvies } from "@/server/jobs/vermogen-advies";
-import { runCoachAvond, runCoachOchtend, runCoachWeek } from "@/server/jobs/coach";
 import { timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
 import { runCleaningFridayReminder, runClientsWithoutShootSignal, runContentGapSignal, runDailySignals, runDailyTeamTodoReminder, runNextDayTodoReminder, runEditorDeadlineReminders, runEditorEscalations, recordDeadlinePerformance, runEditorFridayWrapUp, runFinanceMonthReminder, runFinanceWeeklySummary, runHourlySignals, runPostShootReminder, runScriptTodoReminders, runTaskDeadlineReminders, runVrijdagcheckNotification } from "@/server/jobs/maintenance";
@@ -123,10 +122,6 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "publications.due_check": runPublicationDueCheck,
   "publications.metricool_reconcile": runPublishingReconcile,
   "vermogen.advies_maand": runVermogenAdvies,
-  // Coach (alleen eigenaar): ochtendcontrole, avondcontrole en weekrapport.
-  "coach.ochtend": runCoachOchtend,
-  "coach.avond": runCoachAvond,
-  "coach.week": runCoachWeek,
   "signals.hourly": runHourlySignals,
   "frameio.pull_projects": pullFrameProjects,
   "frameio.pull_comments": pullFrameComments,
