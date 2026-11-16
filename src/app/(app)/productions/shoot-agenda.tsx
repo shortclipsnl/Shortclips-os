@@ -57,7 +57,22 @@ function isoWeek(d: Date): number {
   return 1 + Math.round((t.getTime() - first.getTime()) / 6048e5);
 }
 
-export function ShootAgenda({ shoots, initialDate }: { shoots: AgendaShoot[]; initialDate?: string }) {
+export function ShootAgenda({
+  shoots,
+  initialDate,
+  focusDate,
+  availableByDate,
+  availabilityUnconfirmed = false,
+}: {
+  shoots: AgendaShoot[];
+  initialDate?: string;
+  /** Dag die vanuit "Beschikbare dagen" is aangeklikt: wordt gemarkeerd. */
+  focusDate?: string | null;
+  /** Per datum de videografen met ruimte voor een opname (groen). */
+  availableByDate?: Record<string, string[]>;
+  /** Agenda niet recent gesynchroniseerd: beschikbaarheid oranje en gestippeld. */
+  availabilityUnconfirmed?: boolean;
+}) {
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
   const [view, setView] = useState<"week" | "maand">("week");
   // Start op de week van de eerstvolgende opname (initialDate) als die er is —
@@ -130,7 +145,7 @@ export function ShootAgenda({ shoots, initialDate }: { shoots: AgendaShoot[]; in
             const isToday = key === todayIso;
             const items = byDate.get(key) ?? [];
             return (
-              <div key={key} className="min-w-0 bg-[var(--color-surface)]">
+              <div key={key} className={`min-w-0 bg-[var(--color-surface)] ${focusDate === key ? "ring-2 ring-inset ring-[var(--color-good)]" : ""}`}>
                 <div className={`px-2 pt-2 pb-1.5 ${isToday ? "bg-[var(--color-brand-600)] text-white" : ""}`}>
                   <div className="text-sm font-bold capitalize">{WEEKDAYS_LONG[i]}</div>
                   <div className={`text-2xs ${isToday ? "text-white/80" : "text-[var(--color-ink-faint)]"}`}>
@@ -138,18 +153,19 @@ export function ShootAgenda({ shoots, initialDate }: { shoots: AgendaShoot[]; in
                   </div>
                 </div>
                 <div className="min-h-[190px] space-y-2 p-2">
-                  {items.length === 0 ? (
+                  {items.map((s) => <ShootCard key={s.id} s={s} />)}
+                  {availableByDate?.[key] ? (
+                    <FreeMarker names={availableByDate[key]!} unconfirmed={availabilityUnconfirmed} />
+                  ) : items.length === 0 ? (
                     <p className="px-1 py-2 text-2xs text-[var(--color-ink-faint)]">—</p>
-                  ) : (
-                    items.map((s) => <ShootCard key={s.id} s={s} />)
-                  )}
+                  ) : null}
                 </div>
               </div>
             );
           })}
         </div>
       ) : (
-        <MonthGrid anchor={anchor} byDate={byDate} todayIso={todayIso} />
+        <MonthGrid anchor={anchor} byDate={byDate} todayIso={todayIso} focusDate={focusDate ?? null} availableByDate={availableByDate ?? {}} unconfirmed={availabilityUnconfirmed} />
       )}
     </div>
   );
@@ -193,7 +209,21 @@ function ShootCard({ s }: { s: AgendaShoot }) {
   );
 }
 
-function MonthGrid({ anchor, byDate, todayIso }: { anchor: Date; byDate: Map<string, AgendaShoot[]>; todayIso: string }) {
+function MonthGrid({
+  anchor,
+  byDate,
+  todayIso,
+  focusDate,
+  availableByDate,
+  unconfirmed,
+}: {
+  anchor: Date;
+  byDate: Map<string, AgendaShoot[]>;
+  todayIso: string;
+  focusDate: string | null;
+  availableByDate: Record<string, string[]>;
+  unconfirmed: boolean;
+}) {
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const gridStart = mondayOf(first);
   const month = anchor.getMonth();
@@ -215,7 +245,7 @@ function MonthGrid({ anchor, byDate, todayIso }: { anchor: Date; byDate: Map<str
           const isToday = key === todayIso;
           const items = byDate.get(key) ?? [];
           return (
-            <div key={key} className={`min-h-[96px] min-w-0 p-1 ${inMonth ? "bg-[var(--color-surface)]" : "bg-[var(--color-surface-2)]"}`}>
+            <div key={key} className={`min-h-[96px] min-w-0 p-1 ${inMonth ? "bg-[var(--color-surface)]" : "bg-[var(--color-surface-2)]"} ${focusDate === key ? "ring-2 ring-inset ring-[var(--color-good)]" : ""}`}>
               <div className={`mb-0.5 text-2xs font-semibold ${isToday ? "inline-grid size-5 place-items-center rounded-full bg-[var(--color-brand-600)] text-white" : inMonth ? "text-[var(--color-ink)]" : "text-[var(--color-ink-faint)]"}`}>
                 {d.getDate()}
               </div>
@@ -229,11 +259,31 @@ function MonthGrid({ anchor, byDate, todayIso }: { anchor: Date; byDate: Map<str
                   </Link>
                 ))}
                 {items.length > 3 ? <span className="px-1 text-[10px] text-[var(--color-ink-faint)]">+{items.length - 3} meer</span> : null}
+                {inMonth && availableByDate[key] ? (
+                  <span
+                    className={`block truncate rounded-sm px-1 py-0.5 text-[10px] font-semibold ${unconfirmed ? "border border-dashed border-[var(--color-warn)] text-[#8a5300]" : "bg-[var(--color-good-soft)] text-[var(--color-good)]"}`}
+                    title={`Beschikbaar: ${availableByDate[key]!.join(", ")}`}
+                  >
+                    Vrij: {availableByDate[key]!.join(", ")}
+                  </span>
+                ) : null}
               </div>
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function FreeMarker({ names, unconfirmed }: { names: string[]; unconfirmed: boolean }) {
+  return (
+    <div
+      className={`rounded-[var(--radius-sm)] px-2 py-1.5 text-[11px] font-semibold ${unconfirmed ? "border border-dashed border-[var(--color-warn)] text-[#8a5300]" : "bg-[var(--color-good-soft)] text-[var(--color-good)]"}`}
+      title={unconfirmed ? "Onbevestigd: de agenda is niet recent bijgewerkt" : undefined}
+    >
+      Vrij voor opname
+      <span className="block font-normal opacity-80">{names.join(", ")}</span>
     </div>
   );
 }
