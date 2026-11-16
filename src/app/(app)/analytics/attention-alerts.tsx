@@ -279,7 +279,7 @@ function AlertRow({ a, open, actie, onToggle, onPickUp, staff, viewerId }: { a: 
  * Klikvenster: Probleem / Waarom / Doen
  * ------------------------------------------------------------------ */
 
-function Detail({ a, staff, viewerId, startWithAction }: { a: AlertCard; staff: StaffOption[]; viewerId: string; startWithAction: boolean }) {
+export function Detail({ a, staff, viewerId, startWithAction }: { a: AlertCard; staff: StaffOption[]; viewerId: string; startWithAction: boolean }) {
   const [panel, setPanel] = useState<null | "actie" | "oplossen" | "uitleg">(startWithAction ? "actie" : null);
   const lv = LEVEL[a.level];
   const f = a.analysis.findings[0];
@@ -505,9 +505,9 @@ function EffectLine({ a }: { a: AlertCard }) {
   );
 }
 
-function ClosedList({ closed }: { closed: AlertCard[] }) {
+export function ClosedList({ closed }: { closed: AlertCard[] }) {
   return (
-    <details className="group mt-3 rounded-[var(--radius-md)] border border-[var(--color-line)]">
+    <details className="group rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface)]">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-[var(--color-ink-muted)] [&::-webkit-details-marker]:hidden">
         <span>Afgehandeld en effect van onze verbeteracties ({closed.length})</span>
         <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
