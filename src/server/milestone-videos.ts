@@ -67,7 +67,7 @@ export async function getMilestoneVideos(clientId: string): Promise<{ videos: Mi
         and p.status = 'published' and p.published_at is not null`),
     db.execute(sql`
       select distinct on (fa.id) fa.id, fa.name, fa.subfolder_name, fa.duration_seconds, fa.frame_created_at,
-             d.title, d.published_at
+             d.title, d.published_at, d.frame_asset_id::text frame_file
       from deliverables d
       join frame_assets fa on fa.frame_file_id::text = d.frame_asset_id::text
         and fa.client_id = ${clientId} and fa.deleted_at is null
@@ -99,7 +99,7 @@ export async function getMilestoneVideos(clientId: string): Promise<{ videos: Mi
     saves: Number(r.saves),
   }));
 
-  type LibRow = { id: string; name: string; subfolder_name: string | null; duration_seconds: number | null; frame_created_at: string | Date | null; title: string | null; published_at: string | Date | null };
+  type LibRow = { id: string; name: string; subfolder_name: string | null; duration_seconds: number | null; frame_created_at: string | Date | null; title: string | null; published_at: string | Date | null; frame_file: string | null };
   const libRows = rows<LibRow>(libRes);
   const assets: ReelAsset[] = libRows.map((r) => ({
     id: r.id,
@@ -145,6 +145,7 @@ export async function getMilestoneVideos(clientId: string): Promise<{ videos: Mi
       publishedAt: r.published_at ? amsDay(new Date(r.published_at)) : null,
       durationSeconds: r.duration_seconds,
       statsKey: keyByAsset.get(r.id) ?? null,
+      frameFileId: r.frame_file ?? null,
     }))
     .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""));
 

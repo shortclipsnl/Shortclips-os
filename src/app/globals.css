@@ -741,6 +741,25 @@ body {
   0%, 80%, 100% { opacity: 0; transform: scale(0.6) rotate(0deg); }
   88% { opacity: 1; transform: scale(1) rotate(20deg); }
 }
+/* Mijlpalen v3: groen = behaald, goud/navy = nog te behalen */
+.portal-studio { --ms-gold-ink: #8a6519; --ms-gold-bg: #fbf2d9; --ms-navy-ink: #00003b; }
+:root[data-portal-theme="dark"] .portal-studio { --ms-gold-ink: #f5d58a; --ms-gold-bg: rgba(245, 213, 138, 0.12); --ms-navy-ink: #c9cbe6; }
+.portal-studio .ms-next {
+  border-color: color-mix(in srgb, #d2a548 32%, var(--sc-line));
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, #d2a548 13%, transparent), transparent 55%),
+    var(--color-surface);
+  box-shadow: 0 10px 26px -20px rgba(154, 114, 36, 0.6);
+}
+.portal-studio .ms-next:hover { border-color: color-mix(in srgb, #d2a548 60%, var(--sc-line)); box-shadow: 0 16px 32px -18px rgba(154, 114, 36, 0.55); }
+.portal-studio .ms-next-badge svg { filter: grayscale(0.55) saturate(0.8); opacity: 0.78; }
+.portal-studio .ms-done {
+  border-color: color-mix(in srgb, var(--glow) 32%, var(--sc-line));
+  background:
+    radial-gradient(circle at 15% 12%, color-mix(in srgb, var(--glow) 14%, transparent), transparent 55%),
+    var(--color-surface);
+  box-shadow: 0 12px 28px -22px var(--glow);
+}
 @media (prefers-reduced-motion: reduce) {
   .portal-studio [class*="ms-"], .portal-studio [class*="ms-"] * , .portal-studio .ms-ring::before { animation: none !important; transition: none !important; }
 }

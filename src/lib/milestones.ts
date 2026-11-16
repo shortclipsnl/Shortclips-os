@@ -95,6 +95,12 @@ export type AwardState = AwardDef & {
   resultLine: string | null;
   /** "Nog 2 video's" / "Op 20 april 2027" (alleen bij niet behaald). */
   remainingLine: string;
+  /**
+   * Video uit de videobibliotheek waarmee deze mijlpaal werd bereikt (id van
+   * LibraryVideo). Alleen bij contentawards: de Ne gepubliceerde video. Bij
+   * bereik en samenwerking is er geen eenduidige video, dus null.
+   */
+  videoId: string | null;
 };
 
 export type MilestonesYear = {
@@ -139,6 +145,8 @@ export type LibraryVideo = {
   durationSeconds: number | null;
   /** Sleutel van de gekoppelde post met cijfers, als die er zeker is. */
   statsKey: string | null;
+  /** Frame-bestand-id zoals op de deliverable (koppeling naar een contentaward). */
+  frameFileId: string | null;
 };
 
 export type MilestonesData = {

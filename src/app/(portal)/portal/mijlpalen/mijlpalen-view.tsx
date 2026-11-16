@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Copy, Download, Eye, Handshake, Heart, Info, Lock, Play, Share2, Sparkles, Trophy, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarCheck, Check, Copy, Download, Eye, Handshake, Heart, Info, Lock, Play, Share2, Sparkles, Target, Trophy, X } from "lucide-react";
 import { portalBtn } from "@/components/portal/status-pill";
 import { CATEGORIES, METALS, longDateNl, type AwardState, type MilestoneCategory, type MilestonesData } from "@/lib/milestones";
 import { AwardBadge, badgeSvg } from "./award-badge";
 import { CountUp } from "./count-up";
-import { ArchiveModal, InteractionsModal, PlayerModal, TopSix, ViewsModal, type Playable } from "./video-parts";
+import { ArchiveModal, InteractionsModal, PlayerModal, TopSix, ViewsModal, playableFromLibrary, type Playable } from "./video-parts";
 
 const nf = new Intl.NumberFormat("nl-NL");
 const fmt = (n: number) => nf.format(n);
@@ -81,10 +81,11 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
   }, [modal, playing, close]);
 
   const timeline = achieved.filter((a) => a.achievedOn).sort((a, b) => (b.achievedOn ?? "").localeCompare(a.achievedOn ?? ""));
-  const shownTl = allTl ? timeline : timeline.slice(0, 5);
+  const shownTl = allTl ? timeline : timeline.slice(0, 6);
+  const libById = useMemo(() => new Map(data.library.map((l) => [l.id, l])), [data.library]);
+  const statsByKey = useMemo(() => new Map(data.videos.map((v) => [v.key, v])), [data.videos]);
   const avg = data.totals.videos > 0 ? Math.round(data.totals.views / data.totals.videos) : 0;
   const cats = cat === "alle" ? (Object.keys(CATEGORIES) as MilestoneCategory[]) : [cat];
-  const nextMain = data.next[0] ?? null;
 
   return (
     <div className="flex flex-col gap-[22px]">
@@ -140,85 +141,97 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
         <Stat icon={Trophy} label="Behaalde mijlpalen" value={achieved.length} delay={360} sub={`${achieved.length} van ${data.awards.length} awards`} cta="Bekijk de awards" onClick={() => document.getElementById("awards")?.scrollIntoView({ behavior: "smooth", block: "start" })} />
       </section>
 
-      {/* Volgende mijlpaal + jaaroverzicht */}
-      <section className="grid gap-[22px] xl:grid-cols-[1.35fr_1fr]">
-        {nextMain ? (
-          <div className="sc-glass flex flex-col gap-5 p-5 sm:p-6">
-            <div className="flex items-center gap-4">
-              <button type="button" onClick={() => setModal({ kind: "award", key: nextMain.key })} className="ms-lock-soft size-[72px] shrink-0" aria-label={`Bekijk ${nextMain.name}`}>
-                <AwardBadge award={nextMain} className="size-full" />
-              </button>
-              <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Volgende mijlpaal</div>
-                <h2 className="mt-0.5 text-[20px] font-bold leading-snug tracking-tight">{nextTitle(nextMain)}</h2>
-              </div>
+      {/* Jaaroverzicht: volledige breedte */}
+      {data.year ? (
+        <section aria-labelledby="ms-jaar" className="ms-hero relative overflow-hidden rounded-[20px] px-5 py-7 text-white shadow-[var(--shadow-raised)] sm:px-8 sm:py-9">
+          <span aria-hidden className="pointer-events-none absolute -top-6 right-4 hidden text-[170px] font-bold leading-none tracking-tighter text-white/[0.045] md:block">{data.year.year}</span>
+          <div className="relative max-w-2xl">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#f5d58a]">
+              <span className="size-1.5 rounded-full bg-[#f5d58a]" /> Shortclips Jaaroverzicht
             </div>
-            <div>
-              <Bar pct={nextMain.progressPct} />
-              <div className="mt-2.5 flex flex-wrap justify-between gap-2 text-[13px] text-[var(--color-ink-muted)]">
-                <span>Huidig resultaat <b className="font-semibold tabular-nums text-[var(--color-ink)]"><CountUp value={nextMain.current} /> {unitWord(nextMain)}</b></span>
-                <span>Doel <b className="font-semibold tabular-nums text-[var(--color-ink)]">{targetLabel(nextMain)}</b></span>
-              </div>
-              <div className="mt-1 flex flex-wrap justify-between gap-2 text-[12.5px] text-[var(--color-ink-faint)]">
-                <span>{pctNl(nextMain.progressPct)} behaald</span>
-                <span>{nextMain.remainingLine}</span>
-              </div>
-            </div>
-            <p className="border-l-2 border-[var(--sc-accent)] pl-3.5 text-[13.5px] leading-relaxed text-[var(--color-ink-muted)]">
-              Samen bouwen we verder aan jullie online zichtbaarheid.
+            <h2 id="ms-jaar" className="mt-2 text-[24px] font-bold leading-tight tracking-tight sm:text-[30px]">Jullie jaar in short video, {data.year.year}</h2>
+            <p className="mt-2 text-[14px] leading-relaxed text-white/72">
+              Dit hebben jullie van {data.year.periodLabel} samen met Shortclips neergezet. De cijfers worden automatisch bijgewerkt met de nieuwste statistieken.
             </p>
-            {data.next.length > 1 ? (
-              <div className="grid gap-3 border-t border-[var(--sc-line)] pt-4 sm:grid-cols-2">
-                {data.next.slice(1).map((a) => (
-                  <button key={a.key} type="button" onClick={() => setModal({ kind: "award", key: a.key })} className="flex flex-col gap-1.5 text-left text-[12.5px]">
-                    <span className="text-[var(--color-ink-muted)]">{CATEGORIES[a.category].label} · {a.name}</span>
-                    <Bar pct={a.progressPct} thin />
-                    <span className="font-semibold">{a.remainingLine}</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
           </div>
-        ) : (
-          <div className="sc-glass flex flex-col justify-center gap-2 p-6">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--sc-accent)]">Volgende mijlpaal</div>
-            <h2 className="text-[20px] font-bold">Alle mijlpalen behaald</h2>
-            <p className="text-[13.5px] text-[var(--color-ink-muted)]">Samen bouwen we verder aan jullie online zichtbaarheid.</p>
+          <ul className="relative mt-6 grid grid-cols-2 gap-2.5 sm:mt-7 sm:gap-3 lg:grid-cols-4 lg:gap-4">
+            <YearStat icon={Play} n={data.year.videos} l="Gepubliceerde video's" sub="Short video's online gezet" delay={0} />
+            <YearStat icon={Eye} n={data.year.views} l="Totaal aantal views" sub="Op alle kanalen samen" delay={120} />
+            <YearStat icon={Heart} n={data.year.interactions} l="Totaal aantal interacties" sub="Likes, reacties, shares en saves" delay={240} />
+            <YearStat icon={Trophy} n={data.year.awardKeys.length} l="Behaalde awards" sub={`Behaald in ${data.year.year}`} delay={360} gold />
+          </ul>
+          <div className="relative mt-7">
+            <button type="button" onClick={() => setModal({ kind: "year", slide: 0 })} className="inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-[11px] bg-white px-4 text-[14px] sm:px-5 sm:text-[14.5px] font-semibold text-[#00003b] shadow-[0_10px_24px_-12px_rgba(0,0,0,0.5)] transition-colors hover:bg-white/90">
+              Bekijk het volledige jaaroverzicht <ArrowRight className="size-4" />
+            </button>
           </div>
-        )}
+        </section>
+      ) : null}
 
-        {data.year ? (
-          <div className="ms-hero relative flex flex-col gap-4 overflow-hidden rounded-[20px] p-5 text-white shadow-[var(--shadow-raised)] sm:p-6">
-            <span aria-hidden className="pointer-events-none absolute -bottom-8 -right-2 text-[112px] font-bold leading-none tracking-tighter text-white/[0.05]">{data.year.year}</span>
-            <div className="relative">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-white/60">Shortclips Jaaroverzicht</div>
-              <h2 className="mt-1 text-[20px] font-bold">Jullie jaar in short video, {data.year.year}</h2>
-              <p className="mt-1.5 text-[13.5px] leading-relaxed text-white/70">Alle resultaten van dit jaar op een rij, van de beste video tot het grootste groeimoment.</p>
-            </div>
-            <ul className="relative grid grid-cols-2 gap-2.5">
-              <YearTile n={data.year.videos} l="video's gepubliceerd" />
-              <YearTile n={data.year.views} l="views" />
-              <YearTile n={data.year.interactions} l="interacties" />
-              <YearTile n={data.year.awardKeys.length} l="awards behaald" />
-            </ul>
-            <div className="relative">
-              <button type="button" onClick={() => setModal({ kind: "year", slide: 0 })} className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-white px-4 text-[14px] font-semibold text-[#00003b] transition-colors hover:bg-white/90">
-                Bekijk ons jaaroverzicht <ArrowRight className="size-4" />
+      {/* Deze awards kunnen jullie nog behalen */}
+      {data.awards.length > 0 ? (
+        <section aria-labelledby="ms-volgende" className="sc-glass p-5 sm:p-7">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+            <SectionHead id="ms-volgende" tone="gold" kicker="Volgende doelen" title="Deze awards kunnen jullie nog behalen" sub="De eerstvolgende award per categorie. De voortgang beweegt automatisch mee met jullie resultaten." />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--st-green-bg)] px-3 py-1 text-[12.5px] font-semibold text-[var(--st-green)]"><Check className="size-3.5" /> {achieved.length} behaald</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ms-gold-bg)] px-3 py-1 text-[12.5px] font-semibold text-[var(--ms-gold-ink)]"><Target className="size-3.5" /> {data.awards.length - achieved.length} nog te behalen</span>
+              <button type="button" onClick={() => document.getElementById("awards")?.scrollIntoView({ behavior: "smooth", block: "start" })} className={portalBtn.soft + " h-9"}>
+                Bekijk de volledige collectie <ArrowRight className="size-3.5" />
               </button>
             </div>
           </div>
-        ) : null}
-      </section>
+          {data.next.length ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {data.next.map((a) => (
+                <NextAwardCard key={a.key} a={a} onOpen={() => setModal({ kind: "award", key: a.key })} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[16px] border border-[var(--sc-line)] bg-[var(--st-green-bg)] px-5 py-4 text-[14px] font-medium text-[var(--st-green)]">
+              Alle beschikbare awards zijn behaald. Samen bouwen we verder aan jullie online zichtbaarheid.
+            </div>
+          )}
+        </section>
+      ) : null}
 
-      {/* Top 6 */}
-      {data.videos.some((v) => v.views > 0) ? <TopSix videos={data.videos} onPlay={setPlaying} /> : null}
+      {/* Recente mijlpalen */}
+      {timeline.length > 0 ? (
+        <section aria-labelledby="ms-recent" className="sc-glass p-5 sm:p-7">
+          <div className="mb-6">
+            <SectionHead id="ms-recent" tone="green" kicker="Behaalde successen" title="Recente mijlpalen" sub="De nieuwste mijlpalen bovenaan. Elke mijlpaal wordt automatisch vastgelegd op het moment dat hij is behaald." />
+          </div>
+          <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {shownTl.map((a) => {
+              const lib = a.videoId ? libById.get(a.videoId) : undefined;
+              const stats = lib?.statsKey ? (statsByKey.get(lib.statsKey) ?? null) : null;
+              return (
+                <MilestoneCard
+                  key={a.key}
+                  a={a}
+                  onOpen={() => setModal({ kind: "award", key: a.key })}
+                  onPlay={lib ? () => setPlaying(playableFromLibrary(lib, stats)) : undefined}
+                />
+              );
+            })}
+          </ol>
+          {timeline.length > 6 ? (
+            <button type="button" onClick={() => setAllTl((v) => !v)} className={`${portalBtn.soft} mt-5 h-10`}>
+              {allTl ? "Toon minder" : `Toon alle ${timeline.length} mijlpalen`}
+            </button>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* Awards */}
       <section id="awards" className="sc-glass scroll-mt-20 p-5 sm:p-6">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 className="text-[20px] font-bold tracking-tight">Onze behaalde awards</h2>
-            <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">Klik op een award voor de details. Bij elke vergrendelde award zie je wat er nodig is en hoe ver jullie al zijn.</p>
+          <div className="flex flex-col gap-3">
+            <SectionHead tone="navy" kicker="Awardcollectie" title="Jullie volledige awardcollectie" sub="Klik op een award voor de details. Bij elke award die nog openstaat zie je wat er nodig is en hoe ver jullie al zijn." />
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-[var(--color-ink-muted)]">
+              <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[var(--st-green)]" /> Behaald</span>
+              <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-[#d2a548]" /> Nog te behalen</span>
+            </div>
           </div>
           <div role="tablist" aria-label="Categorie" className="flex w-full flex-wrap gap-1 rounded-[12px] border border-[var(--sc-line)] bg-[var(--sc-fill)] p-1 sm:w-auto">
             {([["alle", "Alle"], ...Object.entries(CATEGORIES).map(([k, v]) => [k, v.label])] as Array<[string, string]>).map(([k, label]) => {
@@ -263,6 +276,9 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
         </div>
       </section>
 
+      {/* Top 6 */}
+      {data.videos.some((v) => v.views > 0) ? <TopSix videos={data.videos} onPlay={setPlaying} /> : null}
+
       {/* Fysieke Short Video Award */}
       {data.physicalAward ? (
         <section className="sc-glass grid items-center gap-8 p-5 sm:p-7 lg:grid-cols-[minmax(260px,360px)_1fr]">
@@ -286,36 +302,6 @@ export function MijlpalenView({ data }: { data: MilestonesData }) {
               Resultaten vanaf 1 januari {data.physicalAward.year}, stand per {longDateNl(data.physicalAward.standOn)}. De definitieve cijfers worden vastgelegd bij de uitreiking.
             </p>
           </div>
-        </section>
-      ) : null}
-
-      {/* Tijdlijn */}
-      {timeline.length > 0 ? (
-        <section className="sc-glass p-5 sm:p-6">
-          <h2 className="text-[20px] font-bold tracking-tight">Recente mijlpalen</h2>
-          <p className="mt-1 text-[13.5px] text-[var(--color-ink-muted)]">De nieuwste resultaten bovenaan.</p>
-          <ol className="relative mt-4 before:absolute before:bottom-3 before:left-[17px] before:top-3 before:w-px before:bg-[var(--sc-line)]">
-            {shownTl.map((a) => {
-              const Icon = CAT_ICON[a.category];
-              return (
-                <li key={a.key}>
-                  <button type="button" onClick={() => setModal({ kind: "award", key: a.key })} className="relative grid w-full grid-cols-[36px_1fr] items-center gap-x-3.5 gap-y-0.5 rounded-[12px] py-2 text-left sm:grid-cols-[36px_1fr_auto]">
-                    <span className="z-[1] grid size-9 place-items-center rounded-full border border-[var(--sc-line)] bg-[var(--color-surface)] text-[var(--sc-accent)]"><Icon className="size-4" /></span>
-                    <span className="text-[14px] font-medium">
-                      {timelineText(a)}
-                      <span className="block text-[12px] font-normal text-[var(--color-ink-muted)]">{CATEGORIES[a.category].label} · {METALS[a.metal].label}</span>
-                    </span>
-                    <time dateTime={a.achievedOn!} className="col-start-2 text-[12.5px] text-[var(--color-ink-muted)] sm:col-start-3">{longDateNl(a.achievedOn!)}</time>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-          {timeline.length > 5 ? (
-            <button type="button" onClick={() => setAllTl((v) => !v)} className={`${portalBtn.soft} mt-3`}>
-              {allTl ? "Toon minder" : `Toon alle ${timeline.length} mijlpalen`}
-            </button>
-          ) : null}
         </section>
       ) : null}
 
@@ -374,14 +360,6 @@ function Stat({ icon: Icon, label, value, delay = 0, sub, cta, onClick }: { icon
   );
 }
 
-function YearTile({ n, l }: { n: number; l: string }) {
-  return (
-    <li className="rounded-[12px] border border-white/10 bg-white/[0.06] px-3 py-2.5 text-[11.5px] text-white/65">
-      <b className="block text-[16px] font-semibold tabular-nums text-white"><CountUp value={n} duration={1400} /></b>
-      {l}
-    </li>
-  );
-}
 
 function Bar({ pct, thin = false }: { pct: number; thin?: boolean }) {
   return (
@@ -453,23 +431,14 @@ function AwardTile({ a, index, onOpen }: { a: AwardState; index: number; onOpen:
   );
 }
 
-function unitWord(a: AwardState): string {
-  if (a.category === "bereik") return "views";
-  if (a.category === "content") return "video's";
-  return "dagen";
-}
 function lockedLine(a: AwardState): string {
   const left = Math.max(0, a.threshold - a.current);
   if (a.category === "bereik" && left > 0) return `Nog ${fmt(left)} views te gaan`;
   if (a.category === "content" && left > 0) return `Nog ${fmt(left)} video${left === 1 ? "" : "'s"} te gaan`;
+  if (a.category === "samenwerking" && a.remainingLine.startsWith("Op ")) return `Automatisch behaald op ${a.remainingLine.slice(3)}`;
   return a.remainingLine;
 }
 
-function nextTitle(a: AwardState): string {
-  if (a.category === "bereik") return `Op weg naar ${a.name}`;
-  if (a.category === "content") return `Op weg naar ${a.threshold} gepubliceerde video's`;
-  return `Op weg naar ${a.name}`;
-}
 function currentLabel(a: AwardState): string {
   if (a.category === "bereik") return `${fmt(a.current)} views`;
   if (a.category === "content") return `${fmt(a.current)} video's`;
@@ -483,6 +452,123 @@ function targetLabel(a: AwardState): string {
 function timelineText(a: AwardState): string {
   if (a.category === "bereik") return `${a.name} bereikt`;
   return a.name;
+}
+
+/* ---------- Mijlpalen v3: kopjes, jaarcijfers, volgende awards, mijlpaalkaarten ---------- */
+
+const TONE: Record<"gold" | "green" | "navy", { text: string; dot: string }> = {
+  gold: { text: "text-[var(--ms-gold-ink)]", dot: "bg-[#d2a548]" },
+  green: { text: "text-[var(--st-green)]", dot: "bg-[var(--st-green)]" },
+  navy: { text: "text-[var(--ms-navy-ink)]", dot: "bg-[var(--ms-navy-ink)]" },
+};
+
+function SectionHead({ id, tone, kicker, title, sub }: { id?: string; tone: keyof typeof TONE; kicker: string; title: string; sub: string }) {
+  const t = TONE[tone];
+  return (
+    <div className="min-w-0 max-w-2xl">
+      <div className={`flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] ${t.text}`}>
+        <span className={`size-1.5 rounded-full ${t.dot}`} /> {kicker}
+      </div>
+      <h2 id={id} className="mt-1.5 text-[21px] font-bold leading-tight tracking-tight sm:text-[24px]">{title}</h2>
+      <p className="mt-1.5 text-[13.5px] leading-relaxed text-[var(--color-ink-muted)]">{sub}</p>
+    </div>
+  );
+}
+
+function YearStat({ icon: Icon, n, l, sub, delay, gold = false }: { icon: typeof Eye; n: number; l: string; sub: string; delay: number; gold?: boolean }) {
+  return (
+    <li className="flex min-w-0 flex-col gap-2.5 rounded-[16px] border border-white/10 bg-white/[0.06] p-3.5 sm:gap-3 sm:p-6">
+      <span className={`grid size-9 place-items-center rounded-[11px] sm:size-11 sm:rounded-[12px] ${gold ? "ms-hero-chip text-[#f5d58a]" : "border border-white/15 bg-white/[0.08] text-white"}`}>
+        <Icon className="size-[18px] sm:size-5" />
+      </span>
+      <b className="block text-[24px] min-[420px]:text-[28px] sm:text-[34px] lg:text-[40px] font-bold leading-none tabular-nums tracking-tight"><CountUp value={n} delay={delay} duration={1400} /></b>
+      <span className="leading-snug">
+        <span className="block text-[13px] font-semibold text-white sm:text-[14px]">{l}</span>
+        <span className="block text-[11.5px] text-white/60 sm:text-[12.5px]">{sub}</span>
+      </span>
+    </li>
+  );
+}
+
+function conditionText(a: AwardState): string {
+  if (a.category === "bereik") return `${fmt(a.threshold)} views op alle kanalen samen`;
+  if (a.category === "content") return `${fmt(a.threshold)} gepubliceerde short video's`;
+  return `${a.name.replace(" samenwerking", "")} samenwerking met Shortclips`;
+}
+
+function NextAwardCard({ a, onOpen }: { a: AwardState; onOpen: () => void }) {
+  const Icon = CAT_ICON[a.category];
+  const counted = a.category !== "samenwerking";
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`${a.name}, nog te behalen, ${Math.floor(a.progressPct)} procent`}
+      className="ms-next group flex flex-col gap-5 rounded-[18px] border p-5 text-left transition-all duration-300 hover:-translate-y-0.5 sm:p-6"
+    >
+      <span className="flex items-start gap-4">
+        <span className="relative block size-[84px] shrink-0 sm:size-[96px]">
+          <AwardBadge award={a} className="ms-next-badge size-full" />
+          <span className="absolute -bottom-1 -right-1 grid size-7 place-items-center rounded-full bg-[#00003b] text-[#f5d58a] ring-2 ring-[var(--color-surface)]"><Lock className="size-3.5" /></span>
+        </span>
+        <span className="min-w-0 pt-0.5">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ms-gold-bg)] px-2.5 py-0.5 text-[11.5px] font-semibold text-[var(--ms-gold-ink)]">
+            <Icon className="size-3.5" /> {CATEGORIES[a.category].label}
+          </span>
+          <span className="mt-2 block text-[17px] font-bold leading-snug tracking-tight">{a.name}</span>
+          <span className="mt-1 block text-[12.5px] leading-snug text-[var(--color-ink-muted)]">Voorwaarde: {conditionText(a)}</span>
+        </span>
+      </span>
+      <span className="mt-auto block">
+        <span className="flex items-baseline justify-between gap-2 text-[12.5px] text-[var(--color-ink-muted)]">
+          <span className="tabular-nums">{counted ? `${fmt(a.current)} van ${fmt(a.threshold)}` : `${fmt(a.current)} dagen samen`}</span>
+          <b className="text-[14px] font-bold tabular-nums text-[var(--color-ink)]">{Math.floor(a.progressPct)}%</b>
+        </span>
+        <span className="mt-1.5 block h-2.5 w-full overflow-hidden rounded-full bg-[var(--sc-fill-strong)]" role="progressbar" aria-valuenow={Math.floor(a.progressPct)} aria-valuemin={0} aria-valuemax={100}>
+          <span className="ms-grow ms-gold-bar block h-full rounded-full" style={{ width: `${Math.max(2, a.progressPct)}%` }} />
+        </span>
+        <span className="mt-2.5 flex items-center justify-between gap-2">
+          <span className="text-[13.5px] font-semibold text-[var(--ms-gold-ink)]">{lockedLine(a)}</span>
+          <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)] transition-transform group-hover:translate-x-0.5" />
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function MilestoneCard({ a, onOpen, onPlay }: { a: AwardState; onOpen: () => void; onPlay?: () => void }) {
+  const m = METALS[a.metal];
+  return (
+    <li className="ms-done flex flex-col overflow-hidden rounded-[18px] border" style={{ ["--glow" as string]: m.glow }}>
+      <span aria-hidden className="block h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${m.stops[2]}, ${m.stops[1]}, ${m.stops[0]})` }} />
+      <div className="flex flex-1 flex-col gap-4 p-5 sm:p-6">
+        <div className="flex items-start gap-4">
+          <button type="button" onClick={onOpen} aria-label={`Bekijk ${a.name}`} className="relative block size-[88px] shrink-0 transition-transform hover:scale-[1.03] sm:size-[96px]">
+            <AwardBadge award={a} className="ms-badge-got size-full" />
+            <span className="absolute -bottom-1 -right-1 grid size-7 place-items-center rounded-full bg-[var(--st-green)] text-white ring-2 ring-[var(--color-surface)]"><Check className="size-4" strokeWidth={3} /></span>
+          </button>
+          <div className="min-w-0 pt-0.5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--st-green-bg)] px-2.5 py-0.5 text-[11.5px] font-semibold text-[var(--st-green)]">
+              <Check className="size-3" strokeWidth={3} /> Behaald · {CATEGORIES[a.category].label}
+            </span>
+            <h3 className="mt-2 text-[17px] font-bold leading-snug tracking-tight">{timelineText(a)}</h3>
+            <time dateTime={a.achievedOn!} className="mt-1 flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--color-ink-muted)]">
+              <CalendarCheck className="size-3.5" /> {longDateNl(a.achievedOn!)}
+            </time>
+          </div>
+        </div>
+        {a.resultLine ? <p className="text-[13.5px] leading-relaxed text-[var(--color-ink-muted)]">{a.resultLine}</p> : null}
+        <div className="mt-auto flex flex-wrap gap-2 border-t border-[var(--sc-line)] pt-4">
+          {onPlay ? (
+            <button type="button" onClick={onPlay} className={portalBtn.cta}>
+              <Play className="size-4" fill="currentColor" /> Bekijk de video
+            </button>
+          ) : null}
+          <button type="button" onClick={onOpen} className={portalBtn.soft + " h-10"}>Bekijk award</button>
+        </div>
+      </div>
+    </li>
+  );
 }
 
 /* ---------- Award-venster + LinkedIn ---------- */
