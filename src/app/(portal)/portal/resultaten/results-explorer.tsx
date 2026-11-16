@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Trophy } from "lucide-react";
+import { Film, LayoutGrid, Trophy } from "lucide-react";
 import type { PortalPlatformDetail, PortalVideo } from "@/server/portal";
 import { PlayerModal, type Playable } from "../mijlpalen/video-parts";
 import { BestVideos } from "./best-videos";
 import { PlatformView } from "./platform-view";
 import { VideoResults } from "./video-results";
-import { platColor, platLabel, playableFor, videosFor, type PlatformFilterValue } from "./video-stats";
+import { SectionHead } from "./section-head";
+import { PlatformBadge } from "./platform-badge";
+import { platLabel, playableFor, videosFor, type PlatformFilterValue } from "./video-stats";
 
 /**
  * De drie videosecties van de resultatenpagina met één gedeelde platformfilter:
@@ -47,7 +49,8 @@ export function ResultsExplorer({
     return () => window.removeEventListener("keydown", onKey);
   }, [playing]);
 
-  const best = videosFor(videos, platform).filter((v) => v.platforms.length > 0).slice(0, 20);
+  // Alle video's van de periode (niet beperkt): vier in beeld, de rest via de slider.
+  const best = videosFor(videos, platform).filter((v) => v.platforms.length > 0);
   const play = (v: PortalVideo, p: PlatformFilterValue = platform) => setPlaying(playableFor(v, p));
   const current = platforms.find((p) => p.platform === platform);
 
@@ -55,33 +58,27 @@ export function ResultsExplorer({
     <>
       {/* Best presterende video's */}
       <section className="sc-glass p-5 sm:p-6">
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="grid size-7 place-items-center rounded-lg bg-[var(--st-green-bg)] text-[var(--st-green)]"><Trophy className="size-4" /></span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">Top van deze periode</span>
-            </div>
-            <h2 className="mt-1.5 text-[22px] font-bold tracking-tight">Best presterende video&apos;s van deze periode</h2>
-            <p className="mt-1 text-[13px] text-[var(--color-ink-muted)]">
-              Gesorteerd op weergaven{platform !== "alle" ? ` op ${platLabel(platform)}` : " op alle platforms samen"}. Elke video staat er één keer in, ook als hij op meerdere platforms staat. Klik om af te spelen.
-            </p>
-          </div>
+        <SectionHead
+          icon={Trophy}
+          tone="green"
+          eyebrow="Top van deze periode"
+          title="Best presterende video's"
+          sub={<>Gesorteerd op weergaven{platform !== "alle" ? ` op ${platLabel(platform)}` : " op alle platforms samen"}. Klik op een video om hem te bekijken.</>}
+        >
           <PlatformFilter platforms={platforms} value={platform} onChange={setPlatform} />
-        </div>
+        </SectionHead>
         <BestVideos videos={best} platform={platform} onPlay={(v) => play(v)} />
       </section>
 
       {/* Resultaten per platform */}
       <section>
-        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-[20px] font-bold tracking-tight">Resultaten per platform</h2>
-            <p className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">
-              {current ? `Alle cijfers van ${platLabel(current.platform)} in deze periode.` : "Kies een platform voor alle cijfers, de groei en de beste video's."}
-            </p>
-          </div>
-          <PlatformFilter platforms={platforms} value={platform} onChange={setPlatform} />
-        </div>
+        <SectionHead
+          icon={LayoutGrid}
+          tone="blue"
+          eyebrow="Per kanaal"
+          title="Resultaten per platform"
+          sub={current ? `Alle cijfers van ${platLabel(current.platform)} in deze periode.` : "Hoe Instagram, TikTok, Facebook en YouTube ieder afzonderlijk presteren. Klik op een platform voor alle details."}
+        />
         <PlatformView platforms={platforms} videos={videos} platform={platform} onSelect={setPlatform} onPlay={(v, p) => play(v, p)} />
       </section>
 
@@ -89,8 +86,9 @@ export function ResultsExplorer({
       {videos.length > 0 ? (
         <VideoResults videos={videos} platform={platform} onPlay={(v) => play(v)} />
       ) : (
-        <section className="sc-glass p-5 text-[13.5px] text-[var(--color-ink-muted)]">
-          <span className="font-semibold text-[var(--color-ink)]">Resultaten per video</span> · voor deze periode zijn (nog) geen cijfers per video beschikbaar via de gekoppelde kanalen. De totalen hierboven zijn wel compleet.
+        <section className="sc-glass p-5 sm:p-6">
+          <SectionHead icon={Film} tone="accent" eyebrow="Per video" title="Resultaten per video" />
+          <p className="text-[13.5px] text-[var(--color-ink-muted)]">Voor deze periode zijn (nog) geen cijfers per video beschikbaar via de gekoppelde kanalen. De totalen hierboven zijn wel compleet.</p>
         </section>
       )}
 
@@ -106,7 +104,7 @@ export function ResultsExplorer({
 /** Alle platformen | Instagram | TikTok | YouTube | Facebook */
 function PlatformFilter({ platforms, value, onChange }: { platforms: PortalPlatformDetail[]; value: string; onChange: (p: string) => void }) {
   return (
-    <div role="tablist" aria-label="Platform" className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1 pb-0.5">
+    <div role="tablist" aria-label="Platform" className="-mx-1 flex max-w-full gap-1.5 overflow-x-auto px-1 pb-0.5 sm:flex-wrap sm:overflow-visible">
       {[{ platform: "alle", state: "data" as const }, ...platforms].map((p) => {
         const active = p.platform === value;
         const muted = p.state !== "data";
@@ -124,7 +122,7 @@ function PlatformFilter({ platforms, value, onChange }: { platforms: PortalPlatf
                 : `border border-[var(--sc-line)] bg-[var(--color-surface)] hover:text-[var(--color-ink)] ${muted ? "text-[var(--color-ink-faint)]" : "text-[var(--color-ink-muted)]"}`
             }`}
           >
-            {p.platform !== "alle" ? <span className="size-2 rounded-full ring-1 ring-white/40" style={{ background: platColor(p.platform) }} /> : null}
+            {p.platform !== "alle" ? <PlatformBadge platform={p.platform} size={16} className={muted ? "opacity-50" : ""} /> : null}
             {p.platform === "alle" ? "Alle platformen" : platLabel(p.platform)}
           </button>
         );

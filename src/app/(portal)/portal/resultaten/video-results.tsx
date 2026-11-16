@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowDown, ExternalLink, Play, Trophy } from "lucide-react";
+import { ArrowDown, ExternalLink, Film, Play, Trophy } from "lucide-react";
+import { PlatformBadge } from "./platform-badge";
+import { SectionHead } from "./section-head";
 import type { PortalVideo } from "@/server/portal";
 import { PLATFORM } from "@/lib/statuses";
 import { statsFor, type PlatformFilterValue, type VideoStats } from "./video-stats";
@@ -40,7 +42,7 @@ function Thumb({ v, rank, onPlay }: { v: PortalVideo; rank: number | null; onPla
 function PlatformTag({ p }: { p: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--color-ink-muted)]">
-      <span className="size-2 shrink-0 rounded-full ring-1 ring-[var(--sc-line)]" style={{ background: PLATFORM[p]?.color ?? "#888" }} />
+      <PlatformBadge platform={p} size={16} />
       {PLATFORM[p]?.label ?? p}
     </span>
   );
@@ -76,21 +78,25 @@ export function VideoResults({ videos, platform, onPlay }: { videos: PortalVideo
 
   return (
     <section className="sc-glass overflow-hidden p-0">
-      <div className="flex flex-col gap-3 px-5 pt-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="flex items-center gap-2 text-[18px] font-bold tracking-tight">Resultaten per video</h2>
-          <p className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">{list.length} video&apos;s in deze periode{platform !== "alle" ? ` op ${PLATFORM[platform]?.label ?? platform}` : ""} · top 3 op weergaven gemarkeerd · klik op een video om hem af te spelen</p>
-        </div>
-        <label className="flex items-center gap-2 text-[12.5px] text-[var(--color-ink-muted)]">
-          <ArrowDown className="size-3.5" /> Sorteer op
-          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="sc-input rounded-lg py-1.5 pl-2.5 pr-7 text-[13px] font-medium text-[var(--color-ink)]">
-            {SORTS.filter((s) => (s.k !== "shares" || hasShares) && (s.k !== "saves" || hasSaves)).map((s) => <option key={s.k} value={s.k}>{s.label}</option>)}
-          </select>
-        </label>
+      <div className="px-5 pt-5 sm:px-6 sm:pt-6">
+        <SectionHead
+          icon={Film}
+          tone="accent"
+          eyebrow="Per video"
+          title="Resultaten per video"
+          sub={<>Alle cijfers per video: {list.length} video&apos;s in deze periode{platform !== "alle" ? ` op ${PLATFORM[platform]?.label ?? platform}` : ""}. De top 3 op weergaven is groen gemarkeerd.</>}
+        >
+          <label className="flex items-center gap-2 whitespace-nowrap text-[12.5px] text-[var(--color-ink-muted)]">
+            <ArrowDown className="size-3.5" /> Sorteer op
+            <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="sc-input rounded-lg py-1.5 pl-2.5 pr-7 text-[13px] font-medium text-[var(--color-ink)]">
+              {SORTS.filter((s) => (s.k !== "shares" || hasShares) && (s.k !== "saves" || hasSaves)).map((s) => <option key={s.k} value={s.k}>{s.label}</option>)}
+            </select>
+          </label>
+        </SectionHead>
       </div>
 
       {/* Desktop: tabel */}
-      <div className="mt-4 hidden max-h-[640px] overflow-auto md:block">
+      <div className="hidden max-h-[640px] overflow-auto md:block">
         <table className="w-full text-[13.5px]">
           <thead className="sticky top-0 z-10 bg-[var(--color-surface)]">
             <tr className="text-left text-[11px] uppercase tracking-wider text-[var(--color-ink-faint)]">
@@ -153,7 +159,7 @@ export function VideoResults({ videos, platform, onPlay }: { videos: PortalVideo
               <div className="min-w-0 flex-1">
                 <button type="button" onClick={() => onPlay(v)} className="line-clamp-2 text-left text-[14px] font-semibold leading-snug">{v.title}</button>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2.5">{shown.map((p) => <PlatformTag key={p.platform} p={p.platform} />)}<span className="text-[12px] text-[var(--color-ink-faint)]">{dateNl(v.publishedAt)}</span></div>
-                <div className="mt-2 grid grid-cols-4 gap-1.5">
+                <div className="mt-2 grid grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] gap-1.5">
                   {stats.map(([l, n]) => (
                     <div key={l} className="min-w-0">
                       <div className="truncate text-[14px] font-bold tabular-nums">{n}</div>

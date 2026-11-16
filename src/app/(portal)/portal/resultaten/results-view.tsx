@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, BarChart3, Bookmark, Clock, Eye, Film, Heart, MessageSquare, Share2, Sparkles, Trophy, Users } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BarChart3, Bookmark, Clock, Eye, Film, Heart, MessageSquare, Share2, Trophy, Users } from "lucide-react";
 import { CountUp } from "@/components/portal/count-up";
 import { compact, formatDate, num } from "@/lib/format";
 import { PLATFORM } from "@/lib/statuses";
@@ -7,8 +7,9 @@ import type { PeriodReview } from "@/server/period-review";
 import { capitalize, describePeriod, periodOptions, portalPeriodQuery } from "@/lib/portal-periods";
 import { ResultControls } from "./result-controls";
 import { AnalysisLinks, BusinessImpact, DirectieDownloads, KwartaalRapportLink, ManagementSummary, NextAdvice, QuarterMonths, WhatWorks } from "./period-sections";
-import { TrendChart } from "./trend-chart";
 import { ResultsExplorer } from "./results-explorer";
+import { buildHighlights } from "./highlights";
+import { WatValtOp } from "./wat-valt-op";
 
 /** Groei/daling t.o.v. de vorige periode; alleen als er echt vergelijkbare data is. */
 function Delta({ pct, compact = false, versus = "vorige periode" }: { pct: number | null; compact?: boolean; versus?: string }) {
@@ -51,9 +52,9 @@ const COMPARE_ROWS: Array<{ k: "views" | "reach" | "followerGrowth" | "published
 
 /**
  * De resultatenweergave van het klantportaal, gedeeld met de interne
- * voorbeeldweergave. Volgorde: kerncijfers en mijlpaal → verloop → best
- * presterende video's → per platform → per video → vergelijking. Alleen echte
- * cijfers uit de koppelingen.
+ * voorbeeldweergave. Volgorde: maandresultaten en kerncijfers → mijlpaal →
+ * best presterende video's → resultaten per platform → resultaten per video →
+ * wat valt op → vergelijking. Alleen echte cijfers uit de koppelingen.
  */
 export function PortalResultsView({
   r,
@@ -118,6 +119,8 @@ export function PortalResultsView({
     { key: "watch", icon: <Clock className="size-4" />, label: "Gem. kijktijd", value: fmtWatch(r.avgWatchSeconds), has: r.avgWatchSeconds > 0 },
   ].filter((s) => s.has);
 
+  const highlights = buildHighlights(r);
+
   const compareTable = (
         <section className="sc-glass overflow-hidden p-0">
           <div className="px-5 pt-5">
@@ -150,7 +153,7 @@ export function PortalResultsView({
   );
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="flex flex-col gap-9">
       <div className="flex flex-col gap-4">
         <ResultControls
           basePath={basePath}
@@ -172,8 +175,8 @@ export function PortalResultsView({
         </div>
       </div>
 
-      {/* Welke kanalen leveren cijfers, welke (nog) niet */}
-      {r.platforms.length > 0 ? (
+      {/* Zonder cijfers: welke kanalen (nog) niet leveren. Met cijfers staat dit bij Resultaten per platform. */}
+      {!r.hasData && r.platforms.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
           <span className="text-[var(--color-ink-muted)]">Kanalen:</span>
           {withData.map((p) => (
@@ -212,6 +215,7 @@ export function PortalResultsView({
           {directie && period.mode === "maand" ? <DirectieDownloads pdfHref={pdfHref} query={query} periodKey={r.periodKey} /> : null}
 
           {/* Kerncijfers */}
+          <div className="flex flex-col gap-[14px]">
           <div className="grid grid-cols-2 gap-[14px] lg:grid-cols-5">
             <Kpi hero icon={<Eye className="size-4" />} label="Totale weergaven" value={r.metrics.views} pct={r.deltas.views} versus={versus} />
             <Kpi icon={<BarChart3 className="size-4" />} label="Bereik" value={r.metrics.reach} pct={r.deltas.reach} versus={versusShort} />
@@ -231,29 +235,38 @@ export function PortalResultsView({
               ))}
             </div>
           ) : null}
+          </div>
 
+          {/* Mijlpaal: totaal sinds de start en de volgende drempel */}
           {r.milestone?.reached ? (
-            <div className="flex flex-wrap items-center gap-3 rounded-[14px] border border-[var(--sc-line)] bg-[var(--st-green-bg)] px-4 py-3">
-              <Trophy className="size-5 shrink-0 text-[var(--st-green)]" />
-              <div className="text-[13.5px]">
-                <span className="font-semibold">Mijlpaal: {compact(r.milestone.reached)} weergaven in totaal sinds de start.</span>
-                {r.milestone.next ? <span className="text-[var(--color-ink-muted)]"> Nog {compact(r.milestone.next - r.milestone.lifetimeViews)} tot {compact(r.milestone.next)}.</span> : null}
-                {r.metrics.views > 0 ? <span className="text-[var(--color-ink-muted)]"> In deze periode kwamen er {compact(r.metrics.views)} weergaven bij.</span> : null}
+            <div className="flex flex-col gap-3 rounded-[16px] border border-[color-mix(in_srgb,var(--st-green)_30%,transparent)] bg-[var(--st-green-bg)] px-5 py-4 sm:flex-row sm:items-center sm:gap-5">
+              <span className="grid size-11 shrink-0 place-items-center rounded-[12px] bg-[var(--st-green)] text-white"><Trophy className="size-5" /></span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--st-green)]">Mijlpaal behaald</div>
+                <div className="mt-0.5 text-[16px] font-bold">{compact(r.milestone.reached)} weergaven in totaal sinds de start</div>
+                <div className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">
+                  {r.metrics.views > 0 ? <>In deze periode kwamen er <b className="text-[var(--color-ink)]">{compact(r.metrics.views)}</b> bij. </> : null}
+                  {r.milestone.next ? <>Nog {compact(r.milestone.next - r.milestone.lifetimeViews)} tot {compact(r.milestone.next)}.</> : null}
+                </div>
               </div>
+              {r.milestone.next ? (
+                <div className="w-full sm:w-48">
+                  <div className="flex justify-between text-[11.5px] text-[var(--color-ink-muted)]"><span>Op weg naar {compact(r.milestone.next)}</span><b className="tabular-nums text-[var(--st-green)]">{r.milestone.progressPct}%</b></div>
+                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/60"><div className="h-full rounded-full bg-[var(--st-green)]" style={{ width: `${Math.min(100, r.milestone.progressPct)}%` }} /></div>
+                </div>
+              ) : null}
             </div>
           ) : null}
-
-          {/* Kwartaal: de maanden naast elkaar en de vergelijking met het vorige kwartaal */}
-          {isQuarter && review ? <QuarterMonths review={review} /> : null}
-          {isQuarter ? compareTable : null}
-
-          {/* Verloop over de periode (algemeen) */}
-          <TrendChart series={r.series} />
 
           {/* Best presterende video's → per platform → per video, met één platformfilter */}
           <ResultsExplorer videos={r.videos} platforms={r.platforms} initialPlatform={initialPlatform} />
 
-          {/* Kwartaal: wat werkt, bedrijfsimpact en advies */}
+          {/* Wat valt op? Successen groen, aandachtspunten oranje; alleen uit de echte cijfers */}
+          <WatValtOp items={highlights} />
+
+          {/* Kwartaal: de maanden naast elkaar, vergelijking, wat werkt, bedrijfsimpact en advies */}
+          {isQuarter && review ? <QuarterMonths review={review} /> : null}
+          {isQuarter ? compareTable : null}
           {isQuarter && review ? (
             <>
               <WhatWorks review={review} />
@@ -264,22 +277,6 @@ export function PortalResultsView({
           ) : null}
           {period.mode === "maand" && review?.monthlyReport && analysisHref ? (
             <AnalysisLinks items={[review.monthlyReport]} hrefFor={analysisHref} title="De maandanalyse van deze maand staat klaar" />
-          ) : null}
-
-          {r.insights.length > 0 ? (
-            <section className="sc-glass p-5 sm:p-6">
-              <div className="flex items-center gap-2">
-                <span className="grid size-7 place-items-center rounded-lg bg-[var(--st-blue-bg)] text-[var(--st-blue)]"><Sparkles className="size-4" /></span>
-                <h2 className="text-base font-semibold">Wat valt op?</h2>
-              </div>
-              <ul className="mt-3 flex flex-col gap-2">
-                {r.insights.map((t, i) => (
-                  <li key={i} className="flex gap-2.5 text-[14px] text-[var(--color-ink-muted)]">
-                    <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[var(--sc-accent)]" /> {t}
-                  </li>
-                ))}
-              </ul>
-            </section>
           ) : null}
 
           {!isQuarter ? compareTable : null}
