@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { clients, salesLeads } from "@/db/schema";
+import { clients, leadMailEvents, salesLeads, users } from "@/db/schema";
 import { requireLeadsAccess, ForbiddenError } from "@/server/auth/context";
 import { dispatch } from "@/server/automation";
 import { createClient } from "@/server/actions/clients";
@@ -166,5 +166,59 @@ export async function convertLeadToClient(leadId: string): Promise<ActionResult>
     revalidatePath("/leads");
     revalidatePath("/clients");
     return { ok: true, slug: res.slug };
+  });
+}
+
+const resolveMailSchema = z.object({
+  id: z.string().uuid(),
+  action: z.enum(["create", "attach", "ignore"]),
+});
+
+/**
+ * Een twijfelgeval uit de mail afhandelen (iedereen met toegang tot Leads):
+ *  - create: als nieuwe lead toevoegen;
+ *  - attach: als contactmoment bij de voorgestelde bestaande lead zetten;
+ *  - ignore: niets mee doen (blijft in het register, komt niet terug).
+ */
+export async function resolveLeadMail(input: z.infer<typeof resolveMailSchema>): Promise<ActionResult> {
+  return wrap(async () => {
+    await requireLeadsAccess();
+    const p = resolveMailSchema.safeParse(input);
+    if (!p.success) return { ok: false, message: "Ongeldige keuze." };
+    const [ev] = await db.select().from(leadMailEvents).where(eq(leadMailEvents.id, p.data.id)).limit(1);
+    if (!ev || ev.outcome !== "review") return { ok: false, message: "Deze aanvraag is al afgehandeld." };
+    const { attachMailToLead, createLeadFromMail } = await import("@/server/leads/intake");
+    const receivedAt = ev.receivedAt ?? ev.createdAt;
+    const parsed = {
+      company: ev.company,
+      contactName: ev.contactName,
+      email: ev.email,
+      phone: ev.phone,
+      website: ev.website,
+      formType: ev.formType ?? "Website (contactformulier)",
+      original: ev.originalText ?? "",
+      source: ev.formType === "Rocket Leads" ? "Rocket leads" : "Website contactformulier",
+    };
+
+    if (p.data.action === "ignore") {
+      await db.update(leadMailEvents).set({ outcome: "ignored", resolvedAt: new Date(), updatedAt: new Date() }).where(eq(leadMailEvents.id, ev.id));
+    } else if (p.data.action === "attach") {
+      if (!ev.candidateLeadId) return { ok: false, message: "Er is geen bestaande lead om aan te koppelen." };
+      const ok = await attachMailToLead(ev.candidateLeadId, parsed, receivedAt);
+      if (!ok) return { ok: false, message: "De bestaande lead is niet meer gevonden." };
+      await db.update(leadMailEvents).set({ outcome: "attached", leadId: ev.candidateLeadId, resolvedAt: new Date(), updatedAt: new Date() }).where(eq(leadMailEvents.id, ev.id));
+    } else {
+      const [owner] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.primaryRole, "owner"), eq(users.status, "active"), isNull(users.deletedAt)))
+        .limit(1);
+      // Geen melding: deze lead wordt hier bewust met de hand toegevoegd.
+      const id = await createLeadFromMail(parsed, receivedAt, owner?.id ?? null, ev.messageId, false);
+      if (!id) return { ok: false, message: "Er bestaat al een lead voor deze mail." };
+      await db.update(leadMailEvents).set({ outcome: "created", leadId: id, resolvedAt: new Date(), updatedAt: new Date() }).where(eq(leadMailEvents.id, ev.id));
+    }
+    revalidatePath("/leads");
+    return { ok: true };
   });
 }

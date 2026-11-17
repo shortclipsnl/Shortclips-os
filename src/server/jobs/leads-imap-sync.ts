@@ -1,87 +1,74 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
-import { db } from "@/db/client";
-import { salesLeads, users } from "@/db/schema";
 import { imapLeads } from "@/server/integrations/imap-leads";
-import { parseLeadEmail } from "@/server/leads/mail-parser";
-import { dispatch } from "@/server/automation";
+import { MissingCredentialsError } from "@/server/integrations/types";
+import { knownMessageIds, loadIntakeContext, processLeadMail } from "@/server/leads/intake";
 import { runJob } from "./runner";
 
-/** Hoeveel berichten per run uit de map worden gelezen (dedup voorkomt dubbel). */
-const MAX_PER_RUN = 80;
+/** Hoeveel nog niet verwerkte mails één run maximaal oppakt; de rest volgt in de volgende run. */
+const MAX_NEW_PER_RUN = 60;
 
 /**
- * Leest de IMAP-serverfolder "LEADS - SHORTCLIPS" van info@shortclips.nl
- * (Cloud86/Plesk, mail.shortclips.nl) en zet contactformulier-mails om in leads
- * op de Leads-pagina.
+ * Leest de IMAP-map "LEADS - SHORTCLIPS" van info@shortclips.nl en verwerkt
+ * elke nog niet verwerkte mail precies één keer.
  *
- * - Alleen-lezen: er wordt niets verplaatst, gemarkeerd of verwijderd.
- * - Dubbele import voorkomen via de unieke Message-ID (externalId) + onConflictDoNothing.
- * - Nieuwe leads krijgen status "lead", bron "Website contactformulier" en worden
- *   toegewezen aan de eigenaar. Bestaande leads blijven onaangeroerd.
- * - Verzint niets: ontbrekende velden blijven leeg.
- * - Draait via de cron en via de knop "Nu synchroniseren".
+ * - Alleen-lezen in de mailbox: er wordt niets verplaatst, gemarkeerd of verwijderd.
+ * - De hele map wordt nagelopen (niet alleen de recentste mails), zodat een
+ *   aanvraag nooit buiten beeld raakt als de synchronisatie een tijd stil lag.
+ * - Welke mails al verwerkt zijn staat in het register (lead_mail_events), op
+ *   Message-ID. Opnieuw draaien levert dus nooit dubbele leads op.
+ * - Per mail: nieuwe lead, contactmoment bij een bestaande lead, of twijfelgeval
+ *   voor handmatige beoordeling (zie src/server/leads/intake.ts).
+ * - Ontbreekt de koppeling, dan is dat een fout (status "niet ingesteld") en
+ *   geen geslaagde run. Mislukt één mail, dan telt de run als "gedeeltelijk" en
+ *   wordt die mail de volgende keer opnieuw geprobeerd.
+ * - Draait elk uur via de cron en via de knop "Nu synchroniseren".
  */
 export async function runLeadImapSync() {
   return runJob("gmail", "leads.sync_mailbox", {}, async (ctx) => {
     if (!imapLeads.isConfigured) {
-      ctx.log("IMAP-koppeling niet geconfigureerd (IMAP_HOST/IMAP_USER/IMAP_PASSWORD). Lead-import overgeslagen.");
+      throw new MissingCredentialsError("gmail", ["IMAP_HOST", "IMAP_USER", "IMAP_PASSWORD"]);
+    }
+
+    const all = await imapLeads.listMessageIds();
+    const known = await knownMessageIds(all.map((m) => m.messageId));
+    const todo = all.filter((m) => !known.has(m.messageId));
+    const batch = todo.slice(0, MAX_NEW_PER_RUN);
+    ctx.counters.processed = batch.length;
+
+    if (!batch.length) {
+      ctx.log(`${all.length} mails in map "${imapLeads.folderName}", alles was al verwerkt.`);
       return;
     }
 
-    // Verantwoordelijke voor nieuwe leads = de eigenaar (rolgebaseerd).
-    const [owner] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(and(eq(users.primaryRole, "owner"), eq(users.status, "active"), isNull(users.deletedAt)))
-      .limit(1);
-    const ownerId = owner?.id ?? null;
-
-    const messages = await imapLeads.fetchFolderMessages(MAX_PER_RUN);
-    ctx.counters.processed = messages.length;
+    const messages = await imapLeads.fetchByUids(batch.map((m) => m.uid));
+    const intake = await loadIntakeContext();
+    let attached = 0;
+    let review = 0;
+    let ignored = 0;
 
     for (const msg of messages) {
-      const parsed = parseLeadEmail({ subject: msg.subject, body: msg.body, fromName: msg.fromName, fromEmail: msg.fromEmail });
-
-      // Zonder enig bruikbaar gegeven slaan we het bericht over (geen lege leads).
-      if (!parsed.company && !parsed.email && !parsed.phone && !parsed.contactName) continue;
-
-      const company = (parsed.company ?? parsed.contactName ?? (parsed.email ? parsed.email.split("@")[1] ?? "Onbekende lead" : "Onbekende lead")).slice(0, 200);
-      const contactName = parsed.contactName && parsed.contactName.toLowerCase() !== company.toLowerCase() ? parsed.contactName : null;
-      const firstContactOn = (msg.date && !isNaN(msg.date.getTime()) ? msg.date : new Date()).toISOString().slice(0, 10);
-
-      const inserted = await db
-        .insert(salesLeads)
-        .values({
-          company,
-          contactName,
-          email: parsed.email,
-          phone: parsed.phone,
-          website: parsed.website,
-          source: "Website contactformulier",
-          status: "lead",
-          segment: String(new Date().getFullYear()),
-          note: parsed.message ?? "Automatisch geïmporteerd uit de mailbox (contactformulier).",
-          firstContactOn,
-          ownerId,
-          externalId: msg.messageId,
-        })
-        .onConflictDoNothing()
-        .returning({ id: salesLeads.id });
-
-      // Leeg = al eerder geïmporteerd (dedup op Message-ID) → overslaan.
-      if (!inserted[0]) continue;
-      ctx.counters.created++;
-
-      // Nieuwe lead → melding naar de eigenaar + bovenaan het overzicht.
-      await dispatch({
-        trigger: "lead.created",
-        entityType: "sales_lead",
-        entityId: inserted[0].id,
-        data: { to: "lead", href: "/leads" },
-      }).catch(() => {});
+      try {
+        const outcome = await processLeadMail(
+          { messageId: msg.messageId, from: msg.from, replyTo: msg.replyTo, subject: msg.subject, date: msg.date, body: msg.body },
+          intake,
+        );
+        if (outcome === "created") ctx.counters.created++;
+        else if (outcome === "attached") { attached++; ctx.counters.updated++; }
+        else if (outcome === "review") review++;
+        else if (outcome === "ignored") ignored++;
+      } catch (error) {
+        ctx.counters.failed++;
+        ctx.log(`Mail ${msg.messageId} niet verwerkt: ${error instanceof Error ? error.message : String(error)}`, "error");
+      }
     }
+    // Opgehaald aantal kan lager zijn dan gevraagd (bericht intussen verplaatst).
+    const missing = batch.length - messages.length;
+    if (missing > 0) ctx.log(`${missing} mail(s) konden niet worden opgehaald en volgen in de volgende run.`, "warn");
 
-    ctx.log(`${messages.length} mails bekeken, ${ctx.counters.created} nieuwe lead(s) geïmporteerd uit map "${imapLeads.folderName}".`);
+    ctx.log(
+      `${all.length} mails in map "${imapLeads.folderName}", ${batch.length} nieuw: ${ctx.counters.created} nieuwe lead(s), ` +
+        `${attached} bij bestaande lead, ${review} ter beoordeling, ${ignored} overgeslagen, ${ctx.counters.failed} mislukt` +
+        (todo.length > batch.length ? `. Nog ${todo.length - batch.length} te gaan in de volgende run.` : "."),
+    );
   });
 }
