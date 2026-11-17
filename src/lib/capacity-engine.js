@@ -73,7 +73,7 @@ E.TODAY = new Date().toISOString().slice(0, 10);
     editorDays: 7,        // eerste versie editor: opnamedag + 7 werkdagen
     clientDays: 14,       // oplevering klant: binnen 14 werkdagen
     feedbackHours: 72,    // feedbacktermijn klant
-    includeExpected: true,// verwacht werk uit pakketten meetellen
+    includeExpected: false,// geen verwacht werk uit pakketten: alleen de echte planning telt
     w: { beschikbaar: 1, bezig: 0.5, review: 0.1, bijKlant: 0.25, feedback: 0.25 },
   });
 
@@ -135,8 +135,9 @@ E.TODAY = new Date().toISOString().slice(0, 10);
       merge(daily, spread((c.feedback || 0) * w.feedback, E.TODAY, E.addWorkdays(E.TODAY, 2)).out);
       merge(daily, spread((c.bijKlant || 0) * w.bijKlant, E.addWorkdays(E.TODAY, 3), E.addWorkdays(E.TODAY, 5)).out);
       const open = (c.beschikbaar || 0) + (c.bezig || 0) + (c.review || 0) + (c.feedback || 0);
-      edItems.push({ id: p.id, source: "bevestigd", client: p.client, clientName: client(p.client).name, editor, origEditor: p.editor,
-        date: p.shootDate, videos: Object.values(c).reduce((x, y) => x + y, 0), open, counts: c, daily, editorDue: p.editorDue, clientDue: p.clientDue, overdue });
+      edItems.push({ id: p.id, source: "bevestigd", client: p.client, clientName: p.clientName || client(p.client).name, editor, origEditor: p.editor,
+        date: p.shootDate, videos: Object.values(c).reduce((x, y) => x + y, 0), open, counts: c, daily, editorDue: p.editorDue, clientDue: p.clientDue, overdue,
+        handover: E.addWorkdays(p.shootDate, set.handoverDays), shortsSource: p.shortsSource, videoStatus: p.videoStatus || [] });
     }
 
     // 2. Opnames. Toekomstige opnames geven voorspeld editingwerk, tot er een echt project is.
@@ -165,7 +166,8 @@ E.TODAY = new Date().toISOString().slice(0, 10);
       vgItems.push({ id: s.id, source: s.source, client: s.client, clientName: s.clientName || client(s.client).name, date: s.date, start: s.start, dur: s.dur, travel: s.travel, hours, vg, origVg: s.vg, shorts: s.shorts, simId: s.simId });
       if (s.date < E.TODAY) continue;            // al geschoten: zit (straks) in projecten
       if (shotIds.has(s.id)) continue;            // echt project bestaat al: geen voorspelling
-      const baseEditor = s.editor !== undefined && s.editor !== null ? s.editor : client(s.client).editor;
+      // Alleen de editor die echt op de opname staat; geen aanname uit de vaste klanteditor.
+      const baseEditor = s.editor !== undefined && s.editor !== null ? s.editor : (s.source === "simulatie" || s.source === "verwacht" ? client(s.client).editor : null);
       const editor = st.moves[s.id] !== undefined ? st.moves[s.id] : baseEditor;
       const daily = {};
       merge(daily, spread(s.shorts * w.beschikbaar, E.addWorkdays(s.date, set.handoverDays), E.addWorkdays(s.date, set.editorDays)).out);
@@ -173,7 +175,8 @@ E.TODAY = new Date().toISOString().slice(0, 10);
       merge(daily, spread(s.shorts * w.feedback, fbStart, E.addWorkdays(fbStart, 2)).out);
       edItems.push({ id: s.id, source: s.source === "bevestigd" ? "voorspeld" : s.source, client: s.client, clientName: s.clientName || client(s.client).name,
         editor, origEditor: baseEditor, viaDefault: s.editor == null, date: s.date, videos: s.shorts, open: s.shorts, daily,
-        handover: E.addWorkdays(s.date, set.handoverDays), editorDue: E.addWorkdays(s.date, set.editorDays), clientDue: E.addWorkdays(s.date, set.clientDays), simId: s.simId });
+        handover: E.addWorkdays(s.date, set.handoverDays), editorDue: E.addWorkdays(s.date, set.editorDays), clientDue: s.clientDue || E.addWorkdays(s.date, set.clientDays), simId: s.simId,
+        shortsSource: s.shortsSource, videoStatus: s.videoStatus || [], counts: { gepland: s.shorts } });
     }
     return { vgItems, edItems };
   };
@@ -260,9 +263,11 @@ E.TODAY = new Date().toISOString().slice(0, 10);
 
     // Team-totalen editing
     const edTeam = weeks.map((wk, i) => {
-      let load = edOpen[i].load, cap = 0, known = 0;
-      edRows.forEach((r) => { const c = r.cells[i]; load += c.load; if (c.cap) { cap += c.cap.value; known++; } });
-      return { wk, load: Math.round(load * 10) / 10, cap: Math.round(cap * 10) / 10, ...E.status(load, known ? { value: cap } : null, set) };
+      // Alleen editors met ingestelde capaciteit (plus werk zonder editor) tellen mee in het
+      // teampercentage; werk van editors zonder capaciteit staat apart, anders klopt de verhouding niet.
+      let load = edOpen[i].load, cap = 0, known = 0, unknownLoad = 0;
+      edRows.forEach((r) => { const c = r.cells[i]; if (c.cap) { load += c.load; cap += c.cap.value; known++; } else unknownLoad += c.load; });
+      return { wk, load: Math.round(load * 10) / 10, cap: Math.round(cap * 10) / 10, unknownLoad: Math.round(unknownLoad * 10) / 10, ...E.status(load, known ? { value: cap } : null, set) };
     });
     const vgTeam = weeks.map((wk, i) => {
       let load = vgOpen[i].hours, cap = 0;
@@ -275,6 +280,56 @@ E.TODAY = new Date().toISOString().slice(0, 10);
 
   const fmtN = (x) => (Math.round(x * 10) / 10).toString().replace(".", ",");
   E.fmtN = fmtN;
+
+  /* ---------- detail van één editorcel: wat zorgt voor de bezetting ---------- */
+  // Werk dat al loopt (in edit, review, bij klant, feedback) verplaatsen we niet.
+  const started = (it) => it.source === "bevestigd" && !!(it.counts && (it.counts.bezig || it.counts.review || it.counts.feedback || it.counts.bijKlant));
+  E.isMovable = (it) => !started(it);
+  E.editorCellDetail = (data, st, R, pid, i, extra) => {
+    const row = R.edRows.find((r) => r.person.id === pid);
+    if (!row) return null;
+    const c = row.cells[i]; const wk = c.wk;
+    const capV = c.cap ? c.cap.value : null;
+    // Capaciteit vullen in volgorde van editordeadline: wat niet meer past, veroorzaakt de overbelasting.
+    let room = capV === null ? Infinity : capV;
+    const rows = [...c.parts].sort((a, b) => (a.item.editorDue < b.item.editorDue ? -1 : a.item.editorDue > b.item.editorDue ? 1 : b.amount - a.amount)).map(({ item, amount }) => {
+      const fit = Math.min(amount, Math.max(0, room)); room -= fit;
+      const over = Math.round((amount - fit) * 10) / 10;
+      const share = capV ? Math.round((amount / capV) * 100) : null;
+      const deadlineThisWeek = item.editorDue <= wk.friday;
+      const risk = over > 0.05 && (deadlineThisWeek || item.overdue);
+      return { item, amount, share, over, cause: over > 0.05, risk, movable: E.isMovable(item) };
+    });
+    const excess = capV === null ? null : Math.max(0, Math.round((c.load - capV) * 10) / 10);
+    const others = R.edRows.filter((r) => r.person.id !== pid).map((r) => {
+      const x = r.cells[i];
+      return { person: r.person, pct: x.pct, key: x.key, free: x.cap ? Math.max(0, Math.round((x.cap.value - x.load) * 10) / 10) : null, cap: x.cap ? x.cap.value : null, load: x.load };
+    }).sort((a, b) => (b.free ?? -1) - (a.free ?? -1));
+    // Verschuifopties: één opdracht naar een andere editor, opnieuw doorgerekend. Alleen opties waarbij
+    // de nieuwe editor in alle geraakte weken niet boven de oranje grens komt. Niets wordt uitgevoerd.
+    const moves = [];
+    if (c.key === "rood") {
+      const cands = rows.filter((r) => r.cause && r.movable).map((r) => r.item);
+      // Ook niet-veroorzakers die nog niet gestart zijn, als de veroorzakers zelf al lopen.
+      if (!cands.length) rows.filter((r) => r.movable).forEach((r) => cands.push(r.item));
+      for (const it of cands) for (const o of R.edRows) {
+        if (o.person.id === pid || !o.person.shortsPerWeek) continue;
+        const st2 = { ...st, moves: { ...st.moves, [it.id]: o.person.id }, vgMoves: { ...st.vgMoves } };
+        const R2 = E.compute(data, st2, R.weeks, extra);
+        const tgt = R2.edRows.find((x) => x.person.id === o.person.id);
+        const touched = tgt.cells.filter((x) => x.parts.some((p) => p.item.id === it.id));
+        if (!touched.length || touched.some((x) => x.key === "grijs" || x.key === "rood")) continue;
+        const src = R2.edRows.find((x) => x.person.id === pid).cells[i];
+        moves.push({ item: it, to: o.person, srcPct: src.pct, srcKey: src.key, toPeak: Math.max(...touched.map((x) => x.pct || 0)),
+          toWeeks: touched.map((x) => ({ num: x.wk.num, pct: x.pct, key: x.key })), solves: src.key !== "rood" });
+      }
+      moves.sort((a, b) => (b.solves - a.solves) || a.toPeak - b.toPeak);
+    }
+    const seen = new Set(); const uniq = [];
+    for (const m of moves) { if (seen.has(m.item.id + m.to.id)) continue; seen.add(m.item.id + m.to.id); uniq.push(m); }
+    const missing = rows.filter((r) => r.item.shortsSource === "onbekend" || r.item.shortsSource === "pakket").map((r) => r.item);
+    return { row, cell: c, cap: capV, rows, excess, others, moves: uniq.slice(0, 4), missing };
+  };
 
   /* ---------- signalering: max 3, gesorteerd op urgentie ---------- */
   E.signals = (data, st, R, horizon, extra) => {

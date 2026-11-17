@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Camera, Scissors, Settings2 } from "lucide-react";
 import CapEngine from "@/lib/capacity-engine";
 
@@ -19,10 +20,14 @@ type Drawer =
   | null;
 
 const ST_LABEL: Record<string, string> = { groen: "Gezond", oranje: "Let op", rood: "Probleem" };
-const SRC_LABEL: Record<string, string> = { bevestigd: "Bevestigd", voorspeld: "Voorspeld", verwacht: "Verwacht uit pakket" };
-const STATUS_COLOR: Record<string, string> = { groen: "var(--color-good)", oranje: "var(--color-warn)", rood: "var(--color-bad)", grijs: "#9a98a6", vrij: "#9a98a6" };
+const SRC_LABEL: Record<string, string> = { bevestigd: "Opgenomen", voorspeld: "Ingepland", verwacht: "Verwacht uit pakket", simulatie: "Simulatie" };
+const STATUS_COLOR: Record<string, string> = { groen: "var(--cap-g-fg)", oranje: "var(--cap-o-fg)", rood: "var(--cap-r-solid)", grijs: "var(--cap-grey)", vrij: "var(--cap-grey)" };
 const N = (x: number) => (Math.round(x * 10) / 10).toString().replace(".", ",");
-const pillText = (c: any) => (c.key === "grijs" ? "?" : c.key === "vrij" ? "Vrij" : c.pct === null ? "!" : `${c.pct}%`);
+// Capaciteit onbekend: geen percentage, wel het geplande werk (zo verdwijnt er niets uit beeld).
+const pillText = (c: any, unit?: string) =>
+  c.key === "grijs" ? (c.load > 0.05 ? `${Math.round(c.load)} ${unit === "uur" ? "u" : "v."}` : "?")
+  : c.key === "vrij" ? "Vrij" : c.pct === null ? "!" : `${c.pct}%`;
+const SHORTS_SRC: Record<string, string> = { "video's": "", ingevuld: "", pakket: "aantal uit pakket", onbekend: "aantal onbekend" };
 const SNOOZE_KEY = "cap-snoozed-v1";
 
 export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEdit: boolean }) {
@@ -32,6 +37,22 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [showAll, setShowAll] = useState(false);
   const [snoozed, setSnoozed] = useState<string[]>([]);
+  const router = useRouter();
+  // De radar leest live uit Opnames en Editing. Elke minuut en bij terugkeren
+  // naar het tabblad opnieuw ophalen, zodat een planningswijziging direct zichtbaar is.
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") router.refresh(); };
+    const t = window.setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.clearInterval(t); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [router]);
+  // Esc sluit het zijpaneel.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDrawer(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   // Verbergen geldt alleen deze week; daarna komen meldingen vanzelf terug.
   // Pas na het laden uitlezen, zodat server en browser hetzelfde tonen.
   useEffect(() => {
@@ -194,9 +215,10 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
                       const pk = peaks(kind, p.id, i);
                       return (
                         <td key={i} className={i === 0 ? "now" : ""}>
-                          <button className={`cap-pill ${c.key}`} title={`${p.name} · ${c.wk.label}: ${N(c.load)} van ${c.cap ? N(c.cap.value) : "?"} ${unit}`}
+                          <button className={`cap-pill ${c.key}`} title={`${p.name} · ${c.wk.label}: ${N(c.load)} van ${c.cap ? N(c.cap.value) : "?"} ${unit}. Klik voor de opdrachten.`}
+                            aria-label={`${p.name}, week ${c.wk.num}: ${c.pct === null ? "capaciteit onbekend" : `${c.pct} procent bezet`}. Toon opdrachten.`}
                             onClick={() => setDrawer({ type: "cell", kind, pid: p.id, i, r })}>
-                            {pillText(c)}
+                            {pillText(c, unit)}
                             {exp ? <span className="exp" /> : null}
                             {pk.length && c.key !== "rood" ? <b className="cap-pk" title={`${pk.length} ${pk.length === 1 ? "week" : "weken"} boven 100%`}>!</b> : null}
                           </button>
@@ -228,7 +250,7 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
                 <td className="rl"><div className="cap-who"><span className="cap-av team">∑</span><span className="nm" style={{ fontWeight: 500, color: "var(--color-ink-muted)" }}>Totaal {vg ? "videografie" : "editing"}</span></div></td>
                 {cols.map((i) => (
                   <td key={i} className={i === 0 ? "now" : ""}>
-                    <button className={`cap-pill team ${team[i].key}`} onClick={() => setDrawer({ type: "cell", kind: vg ? "vgteam" : "edteam", i, r })}>{pillText(team[i])}</button>
+                    <button className={`cap-pill team ${team[i].key}`} onClick={() => setDrawer({ type: "cell", kind: vg ? "vgteam" : "edteam", i, r })}>{pillText(team[i], unit)}</button>
                   </td>
                 ))}
               </tr>
@@ -252,6 +274,8 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
         ) : null}
       </div>
 
+      <SourcesBar data={data} R={R} />
+
       {/* Kerncijfers */}
       <div className="cap-kpis">
         <button className={`cap-kpi st-${K.shootsSt.k}`} onClick={() => setDrawer({ type: "kpi", k: "shoots" })}>
@@ -261,7 +285,7 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
         </button>
         <button className={`cap-kpi st-${K.queueSt.k}`} onClick={() => setDrawer({ type: "kpi", k: "queue" })}>
           <div className="cap-l">Editing in wachtrij <span className={`cap-stt ${K.queueSt.k}`}>{ST_LABEL[K.queueSt.k]}</span></div>
-          <div className="cap-v">{K.queue} <small>+{K.fc} verwacht</small></div>
+          <div className="cap-v">{K.queue} <small>+{K.fc} ingepland</small></div>
           <div className="cap-s">{K.queueSt.why}</div>
         </button>
         <button className={`cap-kpi st-${K.capK}`} onClick={() => setDrawer({ type: "kpi", k: "free" })}>
@@ -291,12 +315,11 @@ export function CapacityDashboard({ data, canEdit }: { data: CapacityData; canEd
       {filter !== "videografie" ? block("ed") : null}
       {filter !== "editing" ? block("vg") : null}
       <div className="cap-legend">
-        <span><i style={{ background: "var(--color-good-soft)", border: "1px solid #bfe3d2" }} />Ruimte (&lt;{G}%)</span>
-        <span><i style={{ background: "#fbe6c4" }} />Bijna vol ({G} t/m {O}%)</span>
-        <span><i style={{ background: "var(--color-bad)" }} />Overbelast (&gt;{O}%)</span>
-        <span><i style={{ background: "repeating-linear-gradient(135deg,#f1f0ec 0 3px,#e2e0da 3px 6px)" }} />Capaciteit onbekend</span>
-        {mode === "overzicht" ? <span><b className="cap-pk" style={{ position: "static", display: "inline-grid", marginRight: 6 }}>!</b>Piekweek boven 100% binnen de periode</span> : null}
-        <span><span className="cap-dot" style={{ background: "var(--color-good)", opacity: 0.6, marginRight: 6 }} />Bevat verwacht werk uit pakket</span>
+        <span><i className="lg-groen" />Ruimte (&lt;{G}%)</span>
+        <span><i className="lg-oranje" />Bijna vol ({G} t/m {O}%)</span>
+        <span><i className="lg-rood" />Overbelast (&gt;{O}%)</span>
+        <span><i className="lg-grijs" />Capaciteit niet ingesteld (aantal video&apos;s zichtbaar)</span>
+        <span className="hint">Klik op een percentage voor de opdrachten erachter</span>
       </div>
 
       {/* Signalering */}
@@ -364,6 +387,7 @@ function DrawerBody({ d, R, RP, WMAP, K, P, st, SIG, data, setDrawer, peaks }: a
         </>
       );
     };
+    if (d.kind === "ed" && !per) return <EdPanel pid={d.pid} i={i} R={R} st={st} data={data} head={head} prodLink={prodLink} setDrawer={setDrawer} />;
     if (d.kind === "vg" || d.kind === "ed") {
       const vg = d.kind === "vg";
       const row = (vg ? S.vgRows : S.edRows).find((r: any) => r.person.id === d.pid);
@@ -376,7 +400,7 @@ function DrawerBody({ d, R, RP, WMAP, K, P, st, SIG, data, setDrawer, peaks }: a
           {head(`${p.name} · ${wk.label}`, `${wk.range} · ${vg ? "videografie" : "editing"}`)}
           <div className="cap-db">
             <div className="cap-big">
-              <div className={`p ${c.key}`}>{pillText(c)}</div>
+              <div className={`p ${c.key}`}>{pillText(c, vg ? "uur" : "video's")}</div>
               <div className="nums">
                 <b>{N(c.load)} {vg ? "uur" : "video's"}</b> ingepland{vg ? ` (${c.count} ${c.count === 1 ? "opname" : "opnames"})` : ""}<br />
                 {c.cap ? <><b>{N(c.cap.value)}</b> capaciteit · <b>{N(Math.max(0, c.cap.value - c.load))}</b> vrij</> : "Capaciteit niet vastgelegd"}
@@ -446,7 +470,7 @@ function DrawerBody({ d, R, RP, WMAP, K, P, st, SIG, data, setDrawer, peaks }: a
       <>
         {head(`Totaal ${vg ? "videografie" : "editing"} · ${wk.label}`, wk.range)}
         <div className="cap-db">
-          <div className="cap-big"><div className={`p ${t.key}`}>{pillText(t)}</div><div className="nums"><b>{N(t.load)}</b> ingepland, inclusief niet toegewezen<br /><b>{N(t.cap)}</b> bekende capaciteit{meter(t.pct, t.key)}</div></div>
+          <div className="cap-big"><div className={`p ${t.key}`}>{pillText(t)}</div><div className="nums"><b>{N(t.load)}</b> ingepland, inclusief niet toegewezen<br /><b>{N(t.cap)}</b> bekende capaciteit{!vg && t.unknownLoad ? <><br /><b>{N(t.unknownLoad)}</b> video&apos;s bij editors zonder ingestelde capaciteit (niet in dit percentage)</> : null}{meter(t.pct, t.key)}</div></div>
           <div className="cap-list">
             {rows.map((r: any) => { const c = r.cells[i]; return (
               <div className="cap-li" key={r.person.id}><div className="m"><b>{r.person.name}</b><small>{N(c.load)} van {c.cap ? N(c.cap.value) : "?"}</small></div><span className={`cap-pill ${c.key}`} style={{ width: 64 }}>{pillText(c)}</span></div>
@@ -518,7 +542,7 @@ function DrawerBody({ d, R, RP, WMAP, K, P, st, SIG, data, setDrawer, peaks }: a
               ))}</div>
             </>
           ) : null}
-          <div className="cap-dsec">Verwacht uit geplande opnames ({K.fc} video&apos;s)</div>
+          <div className="cap-dsec">Ingepland, opname nog niet geweest ({K.fc} video&apos;s)</div>
           <div className="cap-list">{fc.map((x: any) => (
             <div className="cap-li" key={x.id}><div className="d">{E.fmtDay(x.handover)}</div><div className="m"><b>{x.clientName}</b><small>{x.videos} video&apos;s · bij editor {E.fmtDayLong(x.handover)}</small></div>{prodLink(x.id)}</div>
           ))}</div>
@@ -560,6 +584,130 @@ function DrawerBody({ d, R, RP, WMAP, K, P, st, SIG, data, setDrawer, peaks }: a
             </div>
           </div>
         ))}</div> : <div className="cap-ok">Geen knelpunten.</div>}
+      </div>
+    </>
+  );
+}
+
+/* ---------------- bronnen en ontbrekende gegevens ---------------- */
+function SourcesBar({ data, R }: { data: CapacityData; R: any }) {
+  const noCap = data.people.filter((p) => p.role === "editor" && !p.shortsPerWeek).map((p) => p.name);
+  const horizonEnd = R.weeks[R.weeks.length - 1].friday;
+  const inH = (x: any) => x.date >= data.today && x.date <= horizonEnd;
+  const pakket = data.shoots.filter((x) => inH(x) && x.shortsSource === "pakket").length
+    + data.projects.filter((x) => x.shortsSource === "pakket").length;
+  const unknown = [...data.shoots.filter((x) => inH(x) && x.shortsSource === "onbekend"), ...data.projects.filter((x) => x.shortsSource === "onbekend")];
+  const noEditor = data.shoots.filter((x) => inH(x) && !x.editor).length;
+  return (
+    <div className="cap-sources">
+      <span className="lbl">Bron</span>
+      <span className="it">Opnames uit Google Agenda</span>
+      <span className="it">Editingplanning (editor en status per video)</span>
+      <span className="it">Ingestelde capaciteit per persoon</span>
+      <span className="it">Vakantie en beschikbaarheid</span>
+      <span className="sync">Live bijgewerkt · {data.generatedAt}</span>
+      {noCap.length || unknown.length || pakket || noEditor ? (
+        <div className="cap-miss">
+          {noCap.length ? <span><b>Capaciteit niet ingesteld:</b> {noCap.join(", ")}. Daar staat geen percentage, alleen het aantal video&apos;s.</span> : null}
+          {unknown.length ? <span><b>Aantal video&apos;s onbekend:</b> {unknown.map((x) => x.clientName).join(", ")}. Telt als 0 tot het op de opname is ingevuld.</span> : null}
+          {pakket ? <span><b>{pakket} {pakket === 1 ? "opname" : "opnames"}</b> zonder ingevuld aantal video&apos;s; het pakket van de klant is gebruikt.</span> : null}
+          {noEditor ? <span><b>{noEditor} {noEditor === 1 ? "opname" : "opnames"}</b> nog zonder editor (rij Nog geen editor).</span> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* ---------------- zijpaneel: één editor in één week ---------------- */
+function EdPanel({ pid, i, R, st, data, head, prodLink, setDrawer }: any) {
+  const engineData = { people: data.people, clients: data.clients, shoots: data.shoots, projects: data.projects };
+  const D = useMemo(() => E.editorCellDetail(engineData, st, R, pid, i, []), [R, pid, i]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!D) return head("Niet gevonden", "");
+  const { cell: c, cap, rows, excess, others, moves, missing } = D;
+  const p = D.row.person; const wk = c.wk;
+  const over = c.key === "rood";
+  const nameOf = (id: string | null) => (id ? data.people.find((x: any) => x.id === id)?.name ?? "Onbekend" : "Nog geen editor");
+  const causes = rows.filter((r: any) => r.cause);
+  const risks = rows.filter((r: any) => r.risk);
+  const total = rows.reduce((a: number, r: any) => a + r.amount, 0);
+  return (
+    <>
+      {head(`${p.name} · week ${wk.num}`, `${wk.range} · editing`)}
+      <div className="cap-db">
+        <div className={`cap-big st-${c.key}`}>
+          <div className={`p ${c.key}`}>{c.pct === null ? (cap === 0 ? "Afwezig" : "?") : `${c.pct}%`}</div>
+          <div className="nums">
+            <b>{N(total)} video&apos;s</b> werk deze week · {rows.length} {rows.length === 1 ? "opdracht" : "opdrachten"}<br />
+            {cap === null ? <>Capaciteit niet ingesteld</>
+              : <><b>{N(cap)}</b> capaciteit deze week · {excess ? <b className="t-bad">{N(excess)} boven capaciteit</b> : <><b>{N(Math.max(0, cap - c.load))}</b> vrij</>}</>}
+            {c.pct !== null ? <div className="cap-meter"><span style={{ width: `${Math.min(100, c.pct)}%`, background: STATUS_COLOR[c.key] }} /></div> : null}
+          </div>
+        </div>
+        {cap === null ? <div className="cap-warn">Voor {p.name} is geen capaciteit ingesteld. Daarom berekenen we geen percentage; het geplande werk staat hieronder wel. Stel de capaciteit in via Capaciteit per persoon instellen.</div> : null}
+        {missing.length ? <div className="cap-warn">Bij {missing.map((x: any) => x.clientName).join(", ")} is het aantal video&apos;s niet op de opname ingevuld. {missing.some((x: any) => x.shortsSource === "onbekend") ? "Waar ook geen pakket bekend is, telt het als 0." : "Het pakket van de klant is gebruikt."}</div> : null}
+
+        <div className="cap-dsec">Opdrachten deze week</div>
+        {rows.length ? (
+          <div className="cap-ops">
+            {rows.map((r: any) => {
+              const x = r.item;
+              const inW = cap ? Math.min(100, ((r.amount - r.over) / cap) * 100) : 0;
+              const ovW = cap ? Math.min(100 - inW, (r.over / cap) * 100) : 0;
+              return (
+                <div className={`cap-op ${r.cause ? "cause" : ""}`} key={x.id}>
+                  <div className="top">
+                    <b className="cl">{x.clientName}</b>
+                    {r.cause ? <span className="tag bad">Veroorzaakt overbelasting</span> : null}
+                    {r.risk ? <span className="tag bad-soft">Deadline in gevaar</span> : null}
+                    {!r.movable ? <span className="tag">Al gestart</span> : x.source === "voorspeld" ? <span className="tag info">Opname {E.fmtDay(x.date)}</span> : null}
+                    <span className="sp" />
+                    {prodLink(x.id)}
+                  </div>
+                  <div className="facts">
+                    <div><span>Video&apos;s</span><b>{x.videos}</b>{SHORTS_SRC[x.shortsSource] ? <em>{SHORTS_SRC[x.shortsSource]}</em> : null}</div>
+                    <div><span>Deze week</span><b>{N(r.amount)}</b><em>{r.share === null ? "capaciteit onbekend" : `${r.share}% van capaciteit`}</em></div>
+                    <div><span>Editing</span><b>{E.fmtDay(x.handover ?? x.date)} – {E.fmtDay(x.editorDue)}</b><em>opname {E.fmtDayLong(x.date)}</em></div>
+                    <div><span>Deadline</span><b className={r.risk ? "t-bad" : ""}>editor {E.fmtDay(x.editorDue)}</b><em>klant {E.fmtDay(x.clientDue)}</em></div>
+                  </div>
+                  {x.videoStatus?.length ? <div className="sts">{x.videoStatus.map((v: any) => <span key={v.label}>{v.n} × {v.label}</span>)}</div> : null}
+                  {cap ? <div className="share"><span className="in" style={{ width: `${inW}%` }} /><span className="ov" style={{ width: `${ovW}%` }} /></div> : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : <div className="cap-ok">Niets ingepland in deze week.</div>}
+
+        {over ? (
+          <>
+            <div className="cap-dsec">Overbelasting</div>
+            <ol className="cap-ovl">
+              <li><b>Veroorzakers</b>{causes.length ? causes.map((r: any) => `${r.item.clientName} (${N(r.over)} van ${N(r.amount)} past niet)`).join(" · ") : cap === 0 ? `${p.name} is deze week afwezig; al het werk valt erbuiten.` : "Al het werk samen; geen enkele opdracht valt erbuiten."}</li>
+              <li><b>Boven capaciteit</b>{excess !== null ? `${N(excess)} video's` : `${N(c.load)} video's (afwezig)`}</li>
+              <li><b>Deadlines in gevaar</b>{risks.length ? risks.map((r: any) => `${r.item.clientName}: editor ${E.fmtDayLong(r.item.editorDue)}, klant ${E.fmtDay(r.item.clientDue)}`).join(" · ") : "Geen editordeadline in deze week; het werk schuift door, let op de week erna."}</li>
+              <li><b>Ruimte bij andere editors (week {wk.num})</b>
+                <span className="cap-chips" style={{ marginTop: 4 }}>{others.map((o: any) => (
+                  <button key={o.person.id} className={`cap-chip st-${o.key}`} onClick={() => setDrawer({ type: "cell", kind: "ed", pid: o.person.id, i, r: "w" })}>
+                    {o.person.name} · {o.free === null ? "capaciteit onbekend" : `${N(o.free)} vrij (${o.pct ?? 0}%)`}
+                  </button>
+                ))}</span>
+              </li>
+              <li><b>Mogelijke verschuivingen</b>
+                {moves.length ? (
+                  <span className="cap-moves">{moves.map((m: any) => (
+                    <span className="mv" key={m.item.id + m.to.id}>
+                      <span>{m.item.clientName} ({m.item.videos} video&apos;s) naar <b>{m.to.name}</b></span>
+                      <small>Daarna {p.name} {m.srcPct === null ? "?" : `${m.srcPct}%`} · {m.to.name} max {m.toPeak}% (wk {m.toWeeks.map((w: any) => w.num).join(", ")}){m.solves ? " · lost het op" : ""}</small>
+                    </span>
+                  ))}</span>
+                ) : <span>Geen verschuiving binnen het team waarbij een andere editor onder de grens blijft. {rows.some((r: any) => !r.movable) ? "Werk dat al gestart is, verplaatsen we niet. " : ""}Overweeg een extra freelance editor of overleg over de deadline.</span>}
+              </li>
+            </ol>
+            <p className="cap-note">Voorstellen worden niet automatisch uitgevoerd. Ben je het eens, wijzig dan de editor op de opname (Openen); de radar werkt zich daarna vanzelf bij.</p>
+          </>
+        ) : null}
+
+        {c.conflicts.length ? <><div className="cap-dsec">Conflicten</div>{c.conflicts.map((x: string) => <div className="cap-conf" key={x}>{x}</div>)}</> : null}
+        <p className="cap-note">Werklast per week: video&apos;s die nog bewerkt moeten worden, verdeeld over de werkdagen tussen beelden bij editor (opname + 1 werkdag) en editordeadline (opname + 7 werkdagen). Video&apos;s die al in edit zijn tellen voor de helft, in review 10%, bij de klant of in feedback 25%. Goedgekeurde en geplaatste video&apos;s tellen niet meer. Elke opname telt één keer. Editor: {nameOf(p.id)}.</p>
       </div>
     </>
   );

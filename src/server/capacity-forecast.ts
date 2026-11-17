@@ -9,6 +9,7 @@ import { firstNameKey } from "@/lib/editors";
 import { nlHolidaySet } from "@/lib/holidays";
 import { addWorkingDays } from "@/lib/workdays";
 import { EDITOR_LEAD_DAYS, CLIENT_LEAD_DAYS } from "@/lib/edit-deadline";
+import { VIDEO_STATUS, type VideoStage } from "@/lib/statuses";
 
 /**
  * Capaciteitsradar: haalt alles wat de rekenmotor (lib/capacity-engine) nodig
@@ -17,11 +18,15 @@ import { EDITOR_LEAD_DAYS, CLIENT_LEAD_DAYS } from "@/lib/edit-deadline";
  *
  *  - Opnames: production_days (uit Google Agenda), met videograaf, editor,
  *    start- en eindtijd, geplande shorts en editingfase.
- *  - Editors: afgeleid uit de editingplanning (drukste week), het teamgemiddelde
- *    en eventueel capacity_people; afwezigheid uit Vakantie en het eigen portaal.
+ *  - Video's per opname: deliverables (status per video, zoals op Editing).
+ *  - Editors: uitsluitend de ingestelde capaciteit (capacity_people, video's per
+ *    4 weken). Niet ingesteld = onbekend: dan geen percentage, wel het werk.
+ *    Afwezigheid uit Vakantie en het eigen portaal gaat eraf.
  *  - Videografen: capacity_people (werkdagen per week, of opnames per 4 weken).
  *  - Verlof: goedgekeurde leave_requests.
- *  - Pakketten: clients.monthly_video_quota en de vaste editor (editor_name).
+ *  - Aantal video's: aantal echte video's, anders het ingevulde aantal op de
+ *    opname, anders het pakket van de klant (gemarkeerd), anders onbekend.
+ *  Er wordt geen werk verwacht of verzonnen voor maanden zonder opname.
  */
 
 export type CapPerson = {
@@ -41,13 +46,18 @@ export type CapPerson = {
   avatarUrl?: string | null;
 };
 
+/** Waar het aantal video's van een opname vandaan komt. */
+export type ShortsSource = "video's" | "ingevuld" | "pakket" | "onbekend";
+/** Actuele status van de video's van een opname, zoals op de Editingpagina. */
+export type VideoStatusCount = { label: string; n: number };
+
 export type CapacityData = {
   today: string;
   holidays: string[];
   people: CapPerson[];
   clients: { id: string; name: string; quota: number; shootsPerMonth: number; editor: string | null; lastVg?: string | null; lastDate?: string | null; lastDur?: number; lastTravel?: number }[];
-  shoots: { id: string; date: string; client: string; clientName: string; start: string | null; dur: number; travel: number; vg: string | null; shorts: number; editor: string | null; estimated: boolean }[];
-  projects: { id: string; shootDate: string; client: string; clientName: string; editor: string | null; c: Record<string, number>; editorDue: string; clientDue: string }[];
+  shoots: { id: string; date: string; client: string; clientName: string; start: string | null; dur: number; travel: number; vg: string | null; shorts: number; editor: string | null; estimated: boolean; shortsSource: ShortsSource; videoStatus: VideoStatusCount[]; clientDue: string }[];
+  projects: { id: string; shootDate: string; client: string; clientName: string; editor: string | null; c: Record<string, number>; editorDue: string; clientDue: string; shortsSource: ShortsSource; videoStatus: VideoStatusCount[] }[];
   settings: { greenBelow: number; orangeMax: number; defaultTravel: number; defaultShootHours: number };
   /** Opnames ruim over de klantdeadline die nog niet op Afgerond staan. */
   stale: { id: string; date: string; clientName: string; editStatus: string }[];
@@ -144,16 +154,18 @@ export async function loadCapacityData(): Promise<CapacityData> {
   ]);
 
   // Video's per opname: de status per video is de bron die het team bijhoudt.
-  const dayIds = pdRows.filter((r) => r.date < todayAms()).map((r) => r.id);
+  const dayIds = pdRows.map((r) => r.id);
   const videoRows = dayIds.length
     ? await db
-        .select({ dayId: deliverables.productionDayId, status: deliverables.status, planned: deliverables.plannedShorts, frame: deliverables.frameAssetId, editor: deliverables.editorId })
+        .select({ id: deliverables.id, dayId: deliverables.productionDayId, status: deliverables.status, planned: deliverables.plannedShorts, frame: deliverables.frameAssetId, editor: deliverables.editorId, dueOn: deliverables.dueOn })
         .from(deliverables)
         .where(and(isNull(deliverables.deletedAt), inArray(deliverables.productionDayId, dayIds)))
     : [];
   const videosByDay = new Map<string, typeof videoRows>();
+  const seenVideo = new Set<string>();
   for (const v of videoRows) {
-    if (!v.dayId) continue;
+    if (!v.dayId || seenVideo.has(v.id)) continue; // elke video één keer
+    seenVideo.add(v.id);
     const arr = videosByDay.get(v.dayId) ?? [];
     arr.push(v);
     videosByDay.set(v.dayId, arr);
@@ -173,71 +185,86 @@ export async function loadCapacityData(): Promise<CapacityData> {
   const stale: CapacityData["stale"] = [];
   const lastByClient = new Map<string, { vg: string | null; date: string; dur: number; travel: number }>();
   const weekStart = mondayOf(today);
-  // Editingplanning: video's per editor per week (op opnamedatum), voor de
-  // afgeleide editorcapaciteit. Alleen opnames die al geweest zijn.
-  const edWeekVideos = new Map<string, Map<string, number>>();
+  const seenDay = new Set<string>();
 
   for (const r of pdRows.sort((a, b) => (a.date < b.date ? -1 : 1))) {
+    if (seenDay.has(r.id)) continue; // elke opname één keer
+    seenDay.add(r.id);
     const durRaw = hoursBetween(r.start as string | null, r.end as string | null);
     const dur = durRaw ?? settings.defaultShootHours;
     const travel = settings.defaultTravel;
-    const planned = num(r.plannedShorts);
-    const shorts = planned ?? (num(r.quota) || 6);
-    const estimated = planned === null;
+    const vids = videosByDay.get(r.id) ?? [];
+    const realVids = vids.filter((v) => v.frame);
+    // Aantal video's: echte video's (Frame.io), anders het aantal dat op de
+    // opname of de video is ingevuld, anders het pakket van de klant. Geen
+    // van drieën: onbekend (telt als 0 en wordt als ontbrekend getoond).
+    const planned = num(r.plannedShorts) ?? (vids.length === 1 ? num(vids[0]!.planned) : null);
+    const quota = num(r.quota);
+    let shorts: number;
+    let shortsSource: ShortsSource;
+    if (realVids.length) { shorts = realVids.length; shortsSource = "video's"; }
+    else if (planned !== null && planned > 0) { shorts = planned; shortsSource = "ingevuld"; }
+    else if (quota !== null && quota > 0) { shorts = quota; shortsSource = "pakket"; }
+    else { shorts = 0; shortsSource = "onbekend"; }
+    const estimated = shortsSource === "pakket" || shortsSource === "onbekend";
     lastByClient.set(r.clientId, { vg: r.vg, date: r.date, dur, travel });
+
+    // Status per video (zelfde labels als de Editingpagina).
+    const statusMap = new Map<string, number>();
+    const useVids = realVids.length ? realVids : vids;
+    for (const v of useVids) {
+      const label = r.date > today && v.status === "recorded"
+        ? "Opname gepland"
+        : VIDEO_STATUS[v.status as VideoStage]?.label ?? v.status;
+      const n = v.frame ? 1 : realVids.length ? 1 : shorts;
+      statusMap.set(label, (statusMap.get(label) ?? 0) + n);
+    }
+    if (!useVids.length) statusMap.set(r.date > today ? "Opname gepland" : "Nog geen video's aangemaakt", shorts);
+    const videoStatus = [...statusMap].map(([label, n]) => ({ label, n }));
+
+    // Klantdeadline: handmatig op de opname, anders de vroegste videodeadline,
+    // anders opname + 14 werkdagen (zelfde regel als de Editingpagina).
+    const vidDue = vids.map((v) => v.dueOn).filter((d): d is string => !!d).sort()[0] ?? null;
+    const clientDue = r.editDueOn ?? vidDue ?? addWorkingDays(r.date, CLIENT_LEAD_DAYS, holidaysSet);
 
     // Videografie: alle opnames vanaf maandag van deze week.
     if (r.date >= weekStart) {
       shoots.push({
         id: r.id, date: r.date, client: r.clientId, clientName: r.clientName,
         start: r.start ? String(r.start).slice(0, 5) : null, dur, travel, vg: r.vg, shorts, editor: r.editor, estimated,
+        shortsSource, videoStatus, clientDue,
       });
     }
-    // Editing: al geschoten en nog niet afgerond → bevestigd project, één toestand per opname.
-    // Fasen per opname bepalen uit de video's; zonder video's terugvallen op de opnamefase.
+    // Editing: al geschoten → bevestigd project met de actuele status per video.
+    if (r.date >= today) continue; // vandaag en later: ingepland, telt via de opname
     let counts: Record<string, number> | null = null;
     let videoEditor: string | null = null;
-    const vids = videosByDay.get(r.id);
-    if (r.date < today && vids && vids.length) {
-      const withFrame = vids.some((v) => v.frame);
+    if (vids.length) {
       counts = {};
-      for (const v of vids) {
-        if (withFrame && !v.frame && VIDEO_STATUS_TO_KEY[v.status] === "beschikbaar") continue; // plaatshouder naast echte video's
+      for (const v of useVids) {
         const key = VIDEO_STATUS_TO_KEY[v.status];
-        if (!key) continue;
-        const n = v.frame ? 1 : num(v.planned) ?? shorts;
+        if (!key) continue; // goedgekeurd, ingepland, live: klaar
+        const n = v.frame ? 1 : realVids.length ? 1 : shorts;
         counts[key] = (counts[key] ?? 0) + n;
         videoEditor = videoEditor ?? v.editor;
       }
       if (!Object.keys(counts).length) continue; // alle video's klaar
+    } else if (r.editStatus === "afgerond") continue;
+
+    // Ruim over de klantdeadline en nog niet afgerond: vrijwel altijd een status
+    // die niet is bijgewerkt. Telt niet als werk, wel apart zichtbaar.
+    if (addWorkingDays(clientDue, STALE_AFTER_WORKDAYS, holidaysSet) < today) {
+      stale.push({ id: r.id, date: r.date, clientName: r.clientName, editStatus: r.editStatus });
+      continue;
     }
-    if (r.date < today) {
-      const ed = r.editor ?? vids?.find((v) => v.editor)?.editor ?? null;
-      if (ed) {
-        // Eén opname is één batch (6 tot 8 video's); geïmporteerde losse video's kunnen meer tonen.
-        const n = Math.min(8, vids && vids.some((v) => v.frame) ? vids.filter((v) => v.frame).length : shorts);
-        const wk = mondayOf(r.date);
-        const m = edWeekVideos.get(ed) ?? new Map<string, number>();
-        m.set(wk, (m.get(wk) ?? 0) + n);
-        edWeekVideos.set(ed, m);
-      }
-    }
-    if (r.date < today && (counts || r.editStatus !== "afgerond")) {
-      const clientDue = r.editDueOn ?? addWorkingDays(r.date, CLIENT_LEAD_DAYS, holidaysSet);
-      // Ruim over de klantdeadline en nog niet afgerond: vrijwel altijd een status
-      // die niet is bijgewerkt. Telt niet als werk, wel apart zichtbaar.
-      if (addWorkingDays(clientDue, STALE_AFTER_WORKDAYS, holidaysSet) < today) {
-        stale.push({ id: r.id, date: r.date, clientName: r.clientName, editStatus: r.editStatus });
-        continue;
-      }
-      const key = PHASE_TO_KEY[r.editStatus] ?? "beschikbaar";
-      projects.push({
-        id: r.id, shootDate: r.date, client: r.clientId, clientName: r.clientName, editor: r.editor ?? videoEditor,
-        c: counts ?? { [key]: shorts },
-        editorDue: addWorkingDays(r.date, EDITOR_LEAD_DAYS, holidaysSet),
-        clientDue,
-      });
-    }
+    const key = PHASE_TO_KEY[r.editStatus] ?? "beschikbaar";
+    projects.push({
+      id: r.id, shootDate: r.date, client: r.clientId, clientName: r.clientName,
+      editor: r.editor ?? videoEditor ?? vids.find((v) => v.editor)?.editor ?? null,
+      c: counts ?? { [key]: shorts },
+      editorDue: addWorkingDays(r.date, EDITOR_LEAD_DAYS, holidaysSet),
+      clientDue, shortsSource, videoStatus,
+    });
   }
 
   // ---------- klanten (pakketverwachting) ----------
@@ -302,23 +329,14 @@ export async function loadCapacityData(): Promise<CapacityData> {
   }
   const capBy = new Map(capRows.filter((c) => c.userId).map((c) => [c.userId!, c]));
 
-  // Editorcapaciteit volgt de data, niet een vast getal: het hoogste van
-  //  - de drukste week die al in de editingplanning voor deze editor stond,
-  //  - het teamgemiddelde (zolang er voor iemand nog weinig is ingepland),
-  //  - een eventueel door de eigenaar ingestelde waarde.
-  const MIN_EDITOR_WEEK = 6; // één batch van een draaidag
-  const manualWeek = (id: string): number | null => {
+  // Editorcapaciteit = de ingestelde capaciteit (video's per 4 weken, 100% is
+  // het plafond). Niets afgeleid of geschat: zonder ingestelde waarde is de
+  // capaciteit onbekend en tonen we het werk zonder percentage.
+  const manual4w = (id: string): number | null => {
     const c = capBy.get(id);
     const v = c?.unit === "shorts_4w" ? num(c?.limitMax) ?? num(c?.limitOrange) ?? num(c?.limitGreen) : null;
-    return v && v > 0 ? v / 4 : null;
+    return v && v > 0 ? v : null;
   };
-  const peakWeek = (id: string): number => Math.max(0, ...(edWeekVideos.get(id)?.values() ?? []));
-  const ownBase = (id: string) => Math.max(manualWeek(id) ?? 0, peakWeek(id));
-  const known = userRows.filter((u) => edIds.has(u.id)).map((u) => ownBase(u.id)).filter((v) => v > 0).sort((a, b) => a - b);
-  const teamStandard = Math.max(
-    MIN_EDITOR_WEEK,
-    known.length ? Math.round((known.length % 2 ? known[(known.length - 1) / 2]! : (known[known.length / 2 - 1]! + known[known.length / 2]!) / 2) * 10) / 10 : MIN_EDITOR_WEEK,
-  );
 
   const people: CapPerson[] = [];
   for (const u of userRows) {
@@ -346,17 +364,13 @@ export async function loadCapacityData(): Promise<CapacityData> {
       });
     }
     if (edIds.has(u.id) && !(vgIds.has(u.id) && !capRows.some((c) => c.userId === u.id && c.unit === "shorts_4w"))) {
-      // 100% = het plafond. De capaciteit groeit vanzelf mee met wat er werkelijk
-      // voor deze editor wordt ingepland; afwezigheid uit het portaal gaat eraf.
-      const peak = peakWeek(u.id);
-      const manual = manualWeek(u.id);
-      const raw = Math.max(peak, manual ?? 0, teamStandard);
-      const perWeek = Math.round(raw * 10) / 10;
-      const src = peak >= raw ? "drukste week tot nu toe" : manual && manual >= raw ? "ingesteld" : "teamgemiddelde, groeit mee met de planning";
+      // 100% = het ingestelde plafond; afwezigheid uit het portaal gaat eraf.
+      const per4w = manual4w(u.id);
+      const perWeek = per4w ? Math.round((per4w / 4) * 100) / 100 : null;
       people.push({
         id: u.id, name: first, role: "editor", employment: explicit ?? "freelance",
         shortsPerWeek: perWeek, pattern: [1, 2, 3, 4, 5], leave,
-        capacityNote: `${String(perWeek).replace(".", ",")} video's per week (${src})`,
+        capacityNote: per4w ? `${String(per4w).replace(".", ",")} video's per 4 weken (ingesteld)` : "Capaciteit niet ingesteld",
         avatarUrl: teamPhotoSrc(u.name, u.avatarUrl),
       });
     }
