@@ -5,14 +5,13 @@ import {
   captionSets,
   clientReports,
   clients,
-  contentResearchRuns,
   videoAnalyses,
 } from "@/db/schema";
 import { scopeToClients, type Viewer } from "@/server/auth/context";
 
 /**
  * Uniforme status van de AI-taken die NU op de achtergrond draaien, verzameld uit
- * alle AI-functies (Content Research, Video Intelligence, Captions, Maandrapportages). Elk van die functies draait al server-side (via `after()`/cron) met
+ * alle AI-functies (Video Intelligence, Captions, Maandrapportages). Elk van die functies draait al server-side (via `after()`/cron) met
  * een eigen afrondmelding; dit geeft het team één overzicht van wat er loopt —
  * los van de pagina of browsersessie waar het gestart is.
  *
@@ -21,7 +20,7 @@ import { scopeToClients, type Viewer } from "@/server/auth/context";
  * vastgelopen rij niet eeuwig als "bezig" staan.
  */
 export type ActiveAiTask = {
-  kind: "content_research" | "video_intelligence" | "captions" | "maandrapport";
+  kind: "video_intelligence" | "captions" | "maandrapport";
   label: string;
   sub: string | null;
   href: string;
@@ -38,19 +37,11 @@ export async function getActiveAiTasks(viewer: Viewer): Promise<ActiveAiTasks> {
   if (viewer.isPortalUser) return { count: 0, items: [] };
 
   const since = new Date(Date.now() - FRESH_MINUTES * 60_000);
-  const crScope = scopeToClients(viewer, contentResearchRuns.clientId);
   const viScope = scopeToClients(viewer, videoAnalyses.clientId);
   const csScope = scopeToClients(viewer, captionSets.clientId);
   const mrScope = scopeToClients(viewer, clientReports.clientId);
 
-  const [cr, vi, cs, mr] = await Promise.all([
-    db
-      .select({ id: contentResearchRuns.id, clientId: contentResearchRuns.clientId, name: clients.name, startedAt: contentResearchRuns.startedAt, updatedAt: contentResearchRuns.updatedAt })
-      .from(contentResearchRuns)
-      .leftJoin(clients, eq(clients.id, contentResearchRuns.clientId))
-      .where(and(eq(contentResearchRuns.status, "bezig"), isNull(contentResearchRuns.deletedAt), gte(contentResearchRuns.updatedAt, since), crScope ?? undefined))
-      .orderBy(desc(contentResearchRuns.updatedAt))
-      .limit(PER_SOURCE),
+  const [vi, cs, mr] = await Promise.all([
     db
       .select({ id: videoAnalyses.id, clientId: videoAnalyses.clientId, name: clients.name, title: videoAnalyses.title, updatedAt: videoAnalyses.updatedAt })
       .from(videoAnalyses)
@@ -76,7 +67,6 @@ export async function getActiveAiTasks(viewer: Viewer): Promise<ActiveAiTasks> {
 
   const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
   const items: ActiveAiTask[] = [
-    ...cr.map((r) => ({ kind: "content_research" as const, label: "Content Research", sub: r.name ?? null, href: `/ai/content-research/${r.clientId}`, startedAt: iso(r.startedAt ?? r.updatedAt) })),
     ...vi.map((r) => ({ kind: "video_intelligence" as const, label: "Video-analyse", sub: r.title || r.name || null, href: "/video-intelligence", startedAt: iso(r.updatedAt) })),
     ...cs.map((r) => ({ kind: "captions" as const, label: "Captions", sub: r.name ?? null, href: "/ai/caption", startedAt: iso(r.updatedAt) })),
     ...mr.map((r) => ({ kind: "maandrapport" as const, label: "Maandrapport", sub: r.name ? `${r.name} · ${r.period}` : r.period, href: "/analytics/maandrapportages", startedAt: iso(r.updatedAt) })),

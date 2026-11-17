@@ -43,9 +43,8 @@ import { runCaptionDriveLink } from "@/server/jobs/caption-drive-link";
 import { runBriefingAutoGenerate } from "@/server/jobs/briefing-autogen";
 import { runContentMemoryRefresh, runContentMemoryStrategy } from "@/server/content-memory";
 import { runContentAdvice } from "@/server/content-memory/advice-store";
-import { runContentResearchAdvance, runContentResearchWeekly } from "@/server/jobs/content-research-autogen";
+import { runStyleProfileRefresh } from "@/server/jobs/style-profile-refresh";
 import { runClientResearchAdvance } from "@/server/jobs/client-research";
-import { runContentResearchNotify } from "@/server/jobs/content-research-notify";
 import { runMonthlyReports, runReportQueue } from "@/server/jobs/report-monthly";
 import { runReportTeamNotifications } from "@/server/reports/team";
 import { runQuarterlyPlanner, runQuarterlyQueue, sendQuarterlyDigest } from "@/server/quarterly/workflow";
@@ -188,10 +187,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "captions.auto_generate": runCaptionsAutoGenerate,
   "captions.link_drive_scripts": runCaptionDriveLink,
   "briefing.auto_generate": runBriefingAutoGenerate,
-  // Maandagochtend elke 5 min: per aanroep precies één fase (blijft binnen 5 min).
-  "content_research.weekly": runContentResearchWeekly,
-  // Overdag elke 5 min: handmatig gestarte rondes afmaken (licht als er niets loopt).
-  "content_research.advance": runContentResearchAdvance,
+  // Stijlprofiel per klant (uit de scripts in Drive) actueel houden voor het Contentgeheugen.
+  "style_profile.refresh": runStyleProfileRefresh,
   // Klantonderzoek: lopende onderzoeken afmaken, nulmeting voor nieuwe klanten, hercontrole na 90 dagen.
   "client_research.advance": runClientResearchAdvance,
   "content_memory.refresh": runContentMemoryRefresh,
@@ -200,7 +197,6 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "content_memory.advice": runContentAdvice,
   // Klanten die aandacht nodig hebben: dagelijks na Metricool en het Contentgeheugen.
   "result_alerts.detect": runResultAlertsJob,
-  "content_research.notify": runContentResearchNotify,
   "reports.generate_monthly": runMonthlyReports,
   "reports.review_reminders": runReportReviewReminders,
   "reports.process_queue": runReportQueue,

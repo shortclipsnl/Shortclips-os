@@ -160,7 +160,7 @@ export function BriefingForm({ clientId, slug, initial, canEdit }: Ref & { initi
   return (
     <div className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--color-line)] bg-[var(--color-surface-sunken)] p-3">
       <p className="mb-2 text-xs text-[var(--color-ink-muted)]">
-        Komt in het klantgeheugen. De Scriptgenerator en Content Research gebruiken het automatisch. Doelstellingen en doelgroep zijn verplicht.
+        Komt in het klantgeheugen. De Scriptgenerator en het Contentgeheugen gebruiken het automatisch. Doelstellingen en doelgroep zijn verplicht.
       </p>
       <div className="grid gap-3 md:grid-cols-2">
         {BRIEFING_FIELDS.map((f) => (

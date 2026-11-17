@@ -1,10 +1,17 @@
 import "server-only";
 import { aiModelStrong, runStructured } from "@/server/ai/client";
-import { wellFormed } from "./generate";
 import type { PostAnalysis } from "./post-performance";
 import { normalizeStyle, type StyleProfile } from "./style-core";
 
 /** Eén uitgelezen scriptdocument. */
+/**
+ * Verwijdert losse UTF-16-surrogaten (halve emoji's door het afknippen van
+ * teksten). Die maken het verzoek aan de AI ongeldige JSON.
+ */
+export function wellFormed(text: string): string {
+  return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+}
+
 export type ScriptDoc = { name: string; modifiedAt: string | null; text: string };
 
 /* ------------------------------- AI: profiel maken ------------------------------- */

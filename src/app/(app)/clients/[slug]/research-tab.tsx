@@ -185,7 +185,7 @@ function Summary({
           </div>
           <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
             {run.status === "controle"
-              ? "Controleer de bevindingen en corrigeer waar nodig. Na goedkeuring gebruikt het portaal dit dossier bij scripts, captions en Content Research."
+              ? "Controleer de bevindingen en corrigeer waar nodig. Na goedkeuring gebruikt het portaal dit dossier bij scripts, captions en het Contentgeheugen."
               : `Goedgekeurd${run.approvedBy ? ` door ${run.approvedBy}` : ""} op ${nlDate(run.approvedAt)}. De klantkennis is hieraan gekoppeld.`}
           </p>
         </div>

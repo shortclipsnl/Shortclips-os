@@ -31,6 +31,14 @@ const nextConfig: NextConfig = {
     // hebben; grote uploads landen pas als het hostingplan dat toelaat.)
     serverActions: { bodySizeLimit: "20mb" },
   },
+  // Content Research is opgegaan in het Contentgeheugen (nov 2026): oude links
+  // (meldingen, bladwijzers) komen daar terecht.
+  async redirects() {
+    return [
+      { source: "/ai/content-research", destination: "/contentgeheugen", permanent: false },
+      { source: "/ai/content-research/:path*", destination: "/contentgeheugen", permanent: false },
+    ];
+  },
   async headers() {
     return [
       {

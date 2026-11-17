@@ -69,7 +69,7 @@ export function ApproveResearchButton({ runId }: { runId: string }) {
   }
   return (
     <div className="flex flex-col items-end gap-1.5">
-      <p className="max-w-[300px] text-right text-xs text-[var(--color-ink-muted)]">Feiten en het strategieadvies gaan naar de klantkennis. Scripts, captions en Content Research gebruiken die daarna automatisch.</p>
+      <p className="max-w-[300px] text-right text-xs text-[var(--color-ink-muted)]">Feiten en het strategieadvies gaan naar de klantkennis. Scripts, captions en het Contentgeheugen gebruiken die daarna automatisch.</p>
       <div className="flex gap-2">
         <button type="button" className={buttonClass({ variant: "ghost", size: "sm" })} onClick={() => setConfirm(false)}>Annuleren</button>
         <button type="button" disabled={pending} className={buttonClass({ variant: "primary", size: "sm" })} onClick={() => run(() => approveClientResearchAction(runId), () => setConfirm(false))}>
