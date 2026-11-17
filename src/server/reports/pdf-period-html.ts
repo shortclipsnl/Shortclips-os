@@ -2,7 +2,7 @@ import "server-only";
 import type { PortalResults } from "@/server/portal";
 import type { PeriodReview } from "@/server/period-review";
 import { capitalize } from "@/lib/portal-periods";
-import { docShell, esc, LOGO, nf, signed, topBar } from "./pdf-shared";
+import { docShell, esc, escNum, LOGO, nf, signed, topBar } from "./pdf-shared";
 
 /**
  * PDF van een periodeoverzicht (kwartaaloverzicht, maandoverzicht of een vrije
@@ -131,7 +131,7 @@ export function renderPeriodReportHtml({ clientName, r, review }: PeriodPdfInput
     [review.mode === "kwartaal" ? "Wat heeft Shortclips dit kwartaal bereikt?" : "Wat heeft Shortclips bereikt?", s.bereikt],
     ["Welke waarde heeft dit opgeleverd?", s.waarde],
     [review.mode === "kwartaal" ? "Wat gaan we volgend kwartaal verbeteren?" : "Wat gaan we verbeteren?", s.verbeteren],
-  ].map(([q, a], i) => `<div class="msc"><div class="q"><b>${i + 1}</b><span>${esc(q)}</span></div>${esc(a)}</div>`).join("");
+  ].map(([q, a], i) => `<div class="msc"><div class="q"><b>${i + 1}</b><span>${esc(q)}</span></div>${escNum(a)}</div>`).join("");
 
   const kpis = [
     ["Weergaven", nf(r.metrics.views), pill(r.deltas.views, versus)],
@@ -164,20 +164,20 @@ export function renderPeriodReportHtml({ clientName, r, review }: PeriodPdfInput
 
   const works = review.works.length
     ? `<div class="wk">${review.works.slice(0, 4).map((w) => `<div class="wkc"><div class="h"><span>${esc(w.label)}</span><span class="tag ${w.status === "bewezen" ? "g" : "a"}">${w.status === "bewezen" ? "Bewezen" : "Veelbelovend"}</span></div><div class="v">${esc(w.value)}</div>${w.quote ? `<div class="q">“${esc(w.quote)}”</div>` : ""}<div class="d">${esc(w.detail)}</div></div>`).join("")}</div>`
-    : `<div class="empty">${esc(review.worksNote ?? "Nog geen conclusies beschikbaar.")}</div>`;
+    : `<div class="empty">${escNum(review.worksNote ?? "Nog geen conclusies beschikbaar.")}</div>`;
 
   const gemeten = review.impact.gemeten.slice(0, 6);
   const impactRows = [
     gemeten.length
       ? `<div class="rw" style="padding-bottom:1px"><span class="tag g">Gemeten</span><span>Rechtstreeks uit de kanalen:</span></div><div class="gm">${gemeten.map((g) => `<div class="gmc"><b>${esc(g.value)}</b><span>${esc(g.label)}</span></div>`).join("")}</div>`
       : "",
-    ...review.impact.afgeleid.slice(0, 2).map((t) => `<div class="rw"><span class="tag a">Afgeleid</span><span>${esc(t)}</span></div>`),
+    ...review.impact.afgeleid.slice(0, 2).map((t) => `<div class="rw"><span class="tag a">Afgeleid</span><span>${escNum(t)}</span></div>`),
     `<div class="rw"><span class="tag n">Niet gemeten</span><span>${esc(review.impact.nietGemeten.map((n) => n.label).join(", "))}. Deze gegevens komen niet uit de social kanalen.</span></div>`,
   ].join("");
 
   const KIND: Record<string, string> = { behouden: "Behouden", verbeteren: "Verbeteren", testen: "Anders aanpakken" };
   const advice = review.advice.length
-    ? `<div class="adv">${review.advice.slice(0, 3).map((a) => `<div class="adc"><div class="n">${KIND[a.kind]}</div><div class="t">${esc(a.title)}</div><div class="w">${esc(a.text)}</div></div>`).join("")}</div>`
+    ? `<div class="adv">${review.advice.slice(0, 3).map((a) => `<div class="adc"><div class="n">${KIND[a.kind]}</div><div class="t">${esc(a.title)}</div><div class="w">${escNum(a.text)}</div></div>`).join("")}</div>`
     : `<div class="empty">Het advies voor ${esc(next)} volgt zodra er genoeg video's met resultaten zijn, of staat bij de meest recente periode.</div>`;
 
   const page1 = `
@@ -211,7 +211,7 @@ export function renderPeriodReportHtml({ clientName, r, review }: PeriodPdfInput
   const videoTable = top.length
     ? `<table><tr><th>#</th><th>Video</th><th>Geplaatst</th><th>Platforms</th><th class="n">Weergaven</th><th class="n">Likes</th><th class="n">Reacties</th><th class="n">Shares</th></tr>${top.map((v, i) => `<tr><td>${i + 1}</td><td><b>${esc(v.title)}</b></td><td>${esc(nlDate(v.publishedAt))}</td><td>${esc(v.platforms.map((x) => PLAT[x.platform] ?? x.platform).join(", "))}</td><td class="n">${nf(v.views)}</td><td class="n">${nf(v.likes)}</td><td class="n">${nf(v.comments)}</td><td class="n">${nf(v.shares)}</td></tr>`).join("")}</table>`
     : `<div class="empty">Voor deze periode zijn er geen cijfers per video beschikbaar via de gekoppelde kanalen.</div>`;
-  const highlights = review.highlights.length ? `<h2>Opvallend in deze periode</h2><ul>${review.highlights.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : "";
+  const highlights = review.highlights.length ? `<h2>Opvallend in deze periode</h2><ul>${review.highlights.map((t) => `<li>${escNum(t)}</li>`).join("")}</ul>` : "";
 
   const page2 = `
   <div class="page p2">

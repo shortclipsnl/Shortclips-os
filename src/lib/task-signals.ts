@@ -12,7 +12,11 @@ import { parseQuarterTaskKey } from "@/lib/kwartaal";
  */
 export type TaskSignal =
   | { kind: "feedback"; title: string; text: string; meta: string | null; message: string }
-  | { kind: "maandrapport"; title: string; text: string; meta: string | null; actionHref: string; status?: string | null }
+  | {
+      kind: "maandrapport"; title: string; text: string; meta: string | null; actionHref: string; status?: string | null;
+      /** Directe link naar de rapportage zelf (klantversie als PDF). Ontbreekt die, dan opent de knop de controlepagina. */
+      viewHref?: string | null;
+    }
   | { kind: "klantmoment"; title: string; text: string; meta: string | null; actionHref: string | null };
 
 type TaskLike = {
@@ -101,6 +105,8 @@ export function taskSignal(t: TaskLike): TaskSignal | null {
       meta: null,
       status: t.description?.split("\n")[0]?.trim() || null,
       actionHref: t.entityId ? `/analytics/maandrapportages/${t.entityId}` : "/analytics/maandrapportages",
+      // "Bekijk rapportage" opent de rapportage zelf; de controlepagina blijft bereikbaar via de tweede knop.
+      viewHref: t.entityId ? `/api/reports/monthly/${t.entityId}/pdf?versie=klant` : null,
     };
   }
 

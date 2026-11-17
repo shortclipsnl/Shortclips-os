@@ -1,7 +1,8 @@
 import "server-only";
 import type { MonthlyAnalysis, ReportMetrics } from "./analysis";
 import type { MaandCijfers } from "./metrics";
-import { docShell, esc, LOGO, nf, pctText, shortMonth, signed, topBar } from "./pdf-shared";
+import { weergavenPerVideo } from "@/lib/cijfers";
+import { docShell, esc, escNum, LOGO, nf, pctText, shortMonth, signed, topBar } from "./pdf-shared";
 
 export type ReportPdfInput = {
   clientName: string;
@@ -169,7 +170,7 @@ export function videoPages(videos: NonNullable<ReportPdfInput["videos"]>, maand:
   const row = (v: (typeof videos)[number], i: number) => {
     const date = v.datum ? new Date(`${v.datum}T12:00:00Z`).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }).replace(".", "") : "";
     const thumb = v.thumb ? `<div class="th" style="background-image:url('${v.thumb}')"></div>` : `<div class="th">▶</div>`;
-    return `<div class="vr${i < 3 ? " top" : ""}">${thumb}<div style="min-width:0"><div class="vt">${i < 3 ? `<span style="color:${GREEN}">#${i + 1}</span> ` : ""}${esc(v.titel || "Video")}</div><div class="vm">${esc([v.platform ? PLATFORM[v.platform] ?? v.platform : "", date].filter(Boolean).join(" · "))}</div>${v.inzicht ? `<div class="vi">${esc(v.inzicht)}</div>` : ""}</div><div class="vs"><div><b>${nf(v.views)}</b><span>weergaven</span></div><div><b>${nf(v.likes)}</b><span>likes</span></div><div><b>${nf(v.reacties)}</b><span>reacties</span></div><div><b>${nf(v.shares)}</b><span>shares</span></div><div><b>${nf(v.saves)}</b><span>saves</span></div></div></div>`;
+    return `<div class="vr${i < 3 ? " top" : ""}">${thumb}<div style="min-width:0"><div class="vt">${i < 3 ? `<span style="color:${GREEN}">#${i + 1}</span> ` : ""}${esc(v.titel || "Video")}</div><div class="vm">${esc([v.platform ? PLATFORM[v.platform] ?? v.platform : "", date].filter(Boolean).join(" · "))}</div>${v.inzicht ? `<div class="vi">${escNum(v.inzicht)}</div>` : ""}</div><div class="vs"><div><b>${nf(v.views)}</b><span>weergaven</span></div><div><b>${nf(v.likes)}</b><span>likes</span></div><div><b>${nf(v.reacties)}</b><span>reacties</span></div><div><b>${nf(v.shares)}</b><span>shares</span></div><div><b>${nf(v.saves)}</b><span>saves</span></div></div></div>`;
   };
   const pages: string[] = [];
   for (let start = 0; start < videos.length; start += VIDEOS_PER_PAGE) {
@@ -222,7 +223,7 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
     `<div class="kt"><div class="v">${value}</div><div class="l">${esc(label)}</div>${showDelta ? deltaPill(delta, "pill", ` vs ${vorige}`) : ""}</div>`;
 
   const persoonlijk = klanttekst.trim()
-    ? klanttekst.trim().split(/\n{2,}/).map((p) => `<p>${esc(p)}</p>`).join("")
+    ? klanttekst.trim().split(/\n{2,}/).map((p) => `<p>${escNum(p)}</p>`).join("")
     : `<p>${esc("We hebben de resultaten van deze maand bekeken en onze aanpak voor volgende maand bepaald.")}</p>`;
 
   // Hoogtepunten: alleen de positieve signalen. Dalingen staan feitelijk in de
@@ -238,7 +239,7 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
       return !all.slice(0, i).some((prev) => { const p = nums(prev); return [...mine].filter((n) => p.has(n)).length >= 2; });
     })
     .slice(0, 3)
-    .map((tekst) => `<div class="hlc pos"><div class="ic" style="color:${GREEN}">▲</div><div>${esc(tekst)}</div></div>`).join("");
+    .map((tekst) => `<div class="hlc pos"><div class="ic" style="color:${GREEN}">▲</div><div>${escNum(tekst)}</div></div>`).join("");
 
   // Vergelijking met de vorige maand, rij voor rij.
   const cmpRows = cur && prevOk ? ([
@@ -246,7 +247,7 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
     ["Bereik", prevOk.reach, cur.reach, vm?.reach, nf],
     ["Interacties", prevOk.engagements, cur.engagements, vm?.engagements, nf],
     ["Gepubliceerde video's", prevOk.videos, cur.videos, null, nf],
-    ["Weergaven per video", prevOk.videos ? prevOk.views / prevOk.videos : null, cur.videos ? cur.views / cur.videos : null, vm?.viewsPerVideo, nf],
+    ["Weergaven per video", weergavenPerVideo(prevOk), weergavenPerVideo(cur), vm?.viewsPerVideo, nf],
     ["Volgersgroei", prevOk.followerGrowth, cur.followerGrowth, null, signed],
   ] as Array<[string, number | null, number | null, number | null | undefined, (n: unknown) => string]>).map(([l, p, c, d, f]) => {
     const diff = l === "Gepubliceerde video's" || l === "Volgersgroei"
@@ -267,27 +268,27 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
     : "";
 
   const ontwikkelingen = [...(a?.analysis?.ontwikkelingen ?? []), ...(a?.maandvergelijking ?? [])].filter(Boolean).filter(geenDoel).slice(0, 3)
-    .map((x, i) => `<div class="devc"><div class="n">${i + 1}</div><div>${esc(x)}</div></div>`).join("");
+    .map((x, i) => `<div class="devc"><div class="n">${i + 1}</div><div>${escNum(x)}</div></div>`).join("");
 
   const topVideos = (a?.topVideos ?? []).slice(0, 3).map((x, i) => {
     const chips = (x.cijfers ?? "").split(/,\s*/).map((c) => c.trim()).filter(Boolean).slice(0, 6)
       .map((c, j) => `<span class="chip2${j === 0 ? "" : " g"}">${esc(c)}</span>`).join("");
-    return `<div class="vid${i === 0 ? " first" : ""}"><div class="rk">${i + 1}</div><div style="min-width:0"><div class="t">${esc(x.titel)}</div>${chips ? `<div class="chips">${chips}</div>` : ""}<div class="w">${esc(x.waarom)}</div></div></div>`;
+    return `<div class="vid${i === 0 ? " first" : ""}"><div class="rk">${i + 1}</div><div style="min-width:0"><div class="t">${esc(x.titel)}</div>${chips ? `<div class="chips">${chips}</div>` : ""}<div class="w">${escNum(x.waarom)}</div></div></div>`;
   }).join("");
-  const watWerkt = (a?.analysis?.watWerkt ?? []).slice(0, 4).map((f) => `<li>${esc(f.punt)}</li>`).join("");
+  const watWerkt = (a?.analysis?.watWerkt ?? []).slice(0, 4).map((f) => `<li>${escNum(f.punt)}</li>`).join("");
 
-  const conclusies = (a?.conclusies ?? []).filter(geenDoel).slice(0, 4).map((c) => `<li>${esc(c)}</li>`).join("");
+  const conclusies = (a?.conclusies ?? []).filter(geenDoel).slice(0, 4).map((c) => `<li>${escNum(c)}</li>`).join("");
   const steps = (a?.strategischeActies ?? []).filter((x) => geenDoel(`${x.titel} ${x.waarom ?? ""}`)).slice(0, 3).map((x, i) =>
-    `<div class="step"><div class="sn">Stap ${i + 1}</div><div class="st">${esc(x.titel)}</div>${x.waarom ? `<div class="sw">${esc(x.waarom)}</div>` : ""}</div>`).join("");
-  const kansen = (a?.kansen ?? []).filter((k) => geenDoel(`${k.titel} ${k.toelichting}`)).slice(0, 3).map((k) => `<div class="kans"><div class="t">${esc(k.titel)}</div><div class="s">${esc(k.toelichting)}</div></div>`).join("");
+    `<div class="step"><div class="sn">Stap ${i + 1}</div><div class="st">${esc(x.titel)}</div>${x.waarom ? `<div class="sw">${escNum(x.waarom)}</div>` : ""}</div>`).join("");
+  const kansen = (a?.kansen ?? []).filter((k) => geenDoel(`${k.titel} ${k.toelichting}`)).slice(0, 3).map((k) => `<div class="kans"><div class="t">${esc(k.titel)}</div><div class="s">${escNum(k.toelichting)}</div></div>`).join("");
 
   // Sectie 3 — "Dit hebben we geleerd": expliciet wat ging goed / kan beter / nemen we mee.
-  const watMinder = (a?.analysis?.watMinder ?? []).filter((f) => geenDoel(f.punt)).slice(0, 4).map((f) => `<li>${esc(f.punt)}</li>`).join("");
+  const watMinder = (a?.analysis?.watMinder ?? []).filter((f) => geenDoel(f.punt)).slice(0, 4).map((f) => `<li>${escNum(f.punt)}</li>`).join("");
   const geleerdPage = (watWerkt || watMinder || conclusies) ? `
   <section class="page">
     ${topBar(meta)}
     <h1>Dit hebben we geleerd van jullie content</h1>
-    <p class="lead">Wat deze maand opviel — en wat we meenemen naar de nieuwe video's.</p>
+    <p class="lead">Wat deze maand opviel en wat we meenemen naar de nieuwe video's.</p>
     ${watWerkt ? `<h2>Wat ging goed</h2><ul class="checks">${watWerkt}</ul>` : ""}
     ${watMinder ? `<h2>Wat kan beter</h2><ul class="checks min">${watMinder}</ul>` : ""}
     ${conclusies ? `<h2>Wat we meenemen</h2><div class="concl"><ul>${conclusies}</ul></div>` : ""}
@@ -305,7 +306,7 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
   <section class="page">
     ${topBar(meta)}
     <h1>Dit hebben we in ${esc(maand)} gerealiseerd</h1>
-    <p class="lead">Van opname tot publicatie — concreet wat we deze maand voor jullie hebben gedaan.</p>
+    <p class="lead">Van opname tot publicatie: concreet wat we deze maand voor jullie hebben gedaan.</p>
     <div class="kpis">
       <div class="kt"><div class="v">${g.opnamedagen.aantal}</div><div class="l">Opnamedag${g.opnamedagen.aantal === 1 ? "" : "en"}</div></div>
       <div class="kt"><div class="v">${nf(g.geproduceerd)}</div><div class="l">Video's geproduceerd</div></div>
@@ -332,7 +333,7 @@ export function renderMonthlyReportHtml(input: ReportPdfInput): string {
     <p class="lead">Zo werken we alvast vooruit voor jullie.</p>
     ${vb.volgendeOpnamedag
       ? `<h2>Volgende opnamedag</h2><div class="concl"><div class="h">${esc(fmtDag(vb.volgendeOpnamedag.datum))}</div><div style="font-weight:700;font-size:13px">${esc(vb.volgendeOpnamedag.titel)}</div><div style="opacity:.8;font-size:10px;margin-top:4px">Script: ${esc(vb.volgendeOpnamedag.scriptStatusLabel)}</div></div>`
-      : `<p class="lead">De volgende opnamedag is nog niet ingepland — die stemmen we binnenkort met jullie af.</p>`}
+      : `<p class="lead">De volgende opnamedag is nog niet ingepland. Die stemmen we binnenkort met jullie af.</p>`}
     ${vb.publicaties.length ? `<h2>Geplande publicaties</h2><div class="soft">${vb.publicaties.slice(0, 12).map((p) => `<p><b>${esc([p.datum ? fmtDag(p.datum) : "", p.tijd ? `${p.tijd} uur` : ""].filter(Boolean).join(" · "))}</b> — ${esc(p.titel)}${p.platforms.length ? ` <span style="color:#5d5d78">(${esc(p.platforms.map(platLabel).join(", "))})</span>` : ""}</p>`).join("")}${vb.publicaties.length > 12 ? `<p style="color:#5d5d78">+ ${vb.publicaties.length - 12} meer</p>` : ""}</div>` : ""}
     ${vb.klantacties.length ? `<h2>Wat we nog van jullie nodig hebben</h2><div class="soft">${vb.klantacties.map((a) => `<p>• <b>${esc(a.titel)}</b> — ${esc(a.detail)}</p>`).join("")}</div>` : ""}
   </section>` : "";

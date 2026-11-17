@@ -1,5 +1,5 @@
 import "server-only";
-import { docShell, esc, LOGO, nf, signed, topBar, viewsBars, NAVY, MUTED, LINE, SOFT } from "./pdf-shared";
+import { docShell, esc, escNum, LOGO, nf, signed, topBar, viewsBars, NAVY, MUTED, LINE, SOFT } from "./pdf-shared";
 import { platformNaam, werkzaamheden, type DirectieData, type DirectieVariant } from "./directie";
 
 /**
@@ -102,9 +102,9 @@ function blokken(d: DirectieData) {
 
   const werkt = review.works.length
     ? `<ul>${review.works.slice(0, 4).map((w) => `<li><b>${esc(w.label)}: ${esc(w.value)}</b>${w.quote ? ` (“${esc(w.quote)}”)` : ""}. ${esc(w.detail)} <span class="tg ${w.status === "bewezen" ? "m" : "a"}">${w.status === "bewezen" ? "Bewezen" : "Veelbelovend"}</span></li>`).join("")}</ul>`
-    : `<p>${esc(review.worksNote ?? "Er zijn nog geen conclusies beschikbaar.")}</p>`;
+    : `<p>${escNum(review.worksNote ?? "Er zijn nog geen conclusies beschikbaar.")}</p>`;
   const metViews = r.videos.filter((v) => v.views > 0);
-  const opvallend: string[] = review.highlights.map((t) => `${esc(t)} ${M}`);
+  const opvallend: string[] = review.highlights.map((t) => `${escNum(t)} ${M}`);
   if (metViews.length >= 4) {
     const laag = metViews[metViews.length - 1]!;
     opvallend.push(`De minst bekeken video haalde ${nf(laag.views)} weergaven, de best bekeken ${nf(metViews[0]!.views)}. ${M}`);
@@ -119,10 +119,10 @@ function blokken(d: DirectieData) {
   const gemeten = review.impact.gemeten.length
     ? `<ul>${review.impact.gemeten.slice(0, 6).map((g) => `<li><b>${esc(g.label)}: ${esc(g.value)}.</b> ${esc(g.note)}</li>`).join("")}</ul>`
     : `<p>Er zijn geen gemeten resultaten in deze periode.</p>`;
-  const mogelijk = review.impact.afgeleid.length ? `<ul>${review.impact.afgeleid.slice(0, 3).map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : `<p>Geen afgeleide effecten voor deze periode.</p>`;
+  const mogelijk = review.impact.afgeleid.length ? `<ul>${review.impact.afgeleid.slice(0, 3).map((t) => `<li>${escNum(t)}</li>`).join("")}</ul>` : `<p>Geen afgeleide effecten voor deze periode.</p>`;
   const nietGemeten = review.impact.nietGemeten.map((n) => n.label.toLowerCase());
 
-  const conclusie = d.conclusie.map((c, i) => `<div class="row"><span class="num">${i + 1}</span><div><b>${esc(c.kop)}.</b> ${esc(c.tekst)}</div></div>`).join("");
+  const conclusie = d.conclusie.map((c, i) => `<div class="row"><span class="num">${i + 1}</span><div><b>${esc(c.kop)}.</b> ${escNum(c.tekst)}</div></div>`).join("");
   const grafiek = d.historie.filter((m) => m.meetdagen > 0).length >= 2 ? viewsBars(d.historie) : "";
 
   return { bereik, betrokken, zakelijk, uitgevoerd, werkt, periodeLes, acties, gemeten, mogelijk, nietGemeten, conclusie, grafiek, kanalen, u };
@@ -169,13 +169,13 @@ export function renderDirectieHtml(d: DirectieData, variant: DirectieVariant, op
       </div>
       <div class="two" style="margin-top:10px">
         <div class="box"><h2>Wat hebben we gedaan</h2>${esc(lijst(gedaan))}.</div>
-        <div class="box"><h2>Wat hebben we bereikt</h2>${esc(d.review.summary.bereikt)}</div>
+        <div class="box"><h2>Wat hebben we bereikt</h2>${escNum(d.review.summary.bereikt)}</div>
         <div class="box"><h2>Wat hebben we geleerd</h2>${top ? `${esc(top.label)}: ${esc(top.value)} werkt bij dit account het best (${esc(top.detail)}).` : esc(d.review.worksNote ?? "Er zijn nog geen conclusies beschikbaar.")}</div>
-        <div class="box"><h2>Wat gaan we veranderen</h2>${esc(d.review.summary.verbeteren)}</div>
+        <div class="box"><h2>Wat gaan we veranderen</h2>${escNum(d.review.summary.verbeteren)}</div>
       </div>
       ${b.grafiek ? `<h2>Weergaven per maand</h2>${b.grafiek}` : ""}
       <h2>Belangrijkste conclusie</h2>
-      <div class="navybox"><p class="big">${esc(d.conclusie[1]!.tekst)}</p><p>${esc(d.conclusie[4]!.kop)}: ${esc(d.conclusie[4]!.tekst)}</p></div>
+      <div class="navybox"><p class="big">${escNum(d.conclusie[1]!.tekst)}</p><p>${esc(d.conclusie[4]!.kop)}: ${escNum(d.conclusie[4]!.tekst)}</p></div>
       <p class="note">Bereik en weergaven zijn gemeten in de gekoppelde kanalen. ${esc(capitalize(lijst(b.nietGemeten)))} ${b.nietGemeten.length === 1 ? "is" : "zijn"} niet gemeten; daarover doet dit rapport geen uitspraak.</p>
       <div class="pf"><span>Shortclips · ${esc(title)} · ${esc(d.clientName)}</span><span>${esc(periode)}</span></div>
     </section>`);
@@ -250,7 +250,7 @@ export function renderDirectieHtml(d: DirectieData, variant: DirectieVariant, op
     </div>
     <h2>Conclusie voor de directie</h2>
     <div>${b.conclusie}</div>
-    <div class="navybox" style="margin-top:8px"><h2>Stand van de samenwerking</h2><p class="big">${esc(d.review.summary.bereikt)}</p><p>${esc(d.review.summary.verbeteren)}</p></div>
+    <div class="navybox" style="margin-top:8px"><h2>Stand van de samenwerking</h2><p class="big">${escNum(d.review.summary.bereikt)}</p><p>${escNum(d.review.summary.verbeteren)}</p></div>
     ${foot(TOT, TOT)}
   </section>`);
 

@@ -1,4 +1,5 @@
 import { PortalDownloadButton } from "@/components/portal/download-button";
+import { Cijfers } from "@/components/portal/cijfers";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -71,7 +72,7 @@ export default async function PortalAnalysisDetailPage({ params }: { params: Pro
       {/* Samenvatting (persoonlijke klanttekst). */}
       {report.klanttekst.trim() ? (
         <div className="mt-5 rounded-2xl border border-[var(--sc-line,#243044)] bg-[var(--sc-glass,#111827)] p-5 text-sm leading-relaxed whitespace-pre-line text-[var(--sc-ink-muted,#c3cad6)]">
-          {report.klanttekst.trim()}
+          <Cijfers text={report.klanttekst.trim()} />
         </div>
       ) : null}
 
@@ -136,7 +137,7 @@ export default async function PortalAnalysisDetailPage({ params }: { params: Pro
       {heeftGeleerd ? (
         <section className="mt-8">
           <h2 className="text-lg font-semibold text-[var(--sc-ink,#fff)]">Dit hebben we geleerd</h2>
-          <p className="mt-1 text-sm text-[var(--sc-ink-muted,#9aa3b2)]">Wat deze maand opviel — en wat we meenemen naar de nieuwe video&apos;s.</p>
+          <p className="mt-1 text-sm text-[var(--sc-ink-muted,#9aa3b2)]">Wat deze maand opviel en wat we meenemen naar de nieuwe video&apos;s.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             {[
               { titel: "Wat ging goed", punten: leerGoed, kleur: "#12a150" },
@@ -146,7 +147,7 @@ export default async function PortalAnalysisDetailPage({ params }: { params: Pro
               <div key={b.titel} className="rounded-2xl border border-[var(--sc-line,#243044)] bg-[var(--sc-glass,#111827)] p-4">
                 <h3 className="text-sm font-semibold" style={{ color: b.kleur }}>{b.titel}</h3>
                 <ul className="mt-2 space-y-1.5 text-sm text-[var(--sc-ink-muted,#c3cad6)]">
-                  {b.punten.slice(0, 4).map((p, i) => <li key={i}>{p}</li>)}
+                  {b.punten.slice(0, 4).map((p, i) => <li key={i}><Cijfers text={p} /></li>)}
                 </ul>
               </div>
             ))}
@@ -167,7 +168,7 @@ export default async function PortalAnalysisDetailPage({ params }: { params: Pro
               <p className="mt-0.5 text-sm text-[var(--sc-ink-muted,#9aa3b2)]">Script: {vb.volgendeOpnamedag.scriptStatusLabel}</p>
             </div>
           ) : (
-            <p className="mt-4 text-sm text-[var(--sc-ink-muted,#9aa3b2)]">De volgende opnamedag is nog niet ingepland — die stemmen we binnenkort met jullie af.</p>
+            <p className="mt-4 text-sm text-[var(--sc-ink-muted,#9aa3b2)]">De volgende opnamedag is nog niet ingepland. Die stemmen we binnenkort met jullie af.</p>
           )}
 
           {vb.publicaties.length ? (

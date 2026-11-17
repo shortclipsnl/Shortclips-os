@@ -1,6 +1,7 @@
 import "server-only";
 import type { MaandCijfers, Vergelijking } from "./metrics";
 import { LOGO_ONDARK, LOGO_ONLIGHT } from "./brand-assets";
+import { splitNumbers, weergavenPerVideo } from "@/lib/cijfers";
 
 /** Gedeelde opmaak voor de klant- en de interne PDF (Shortclips-huisstijl: donkerblauw, wit, Poppins). */
 
@@ -11,6 +12,11 @@ export const LINE = "#e3e4ee";
 export const SOFT = "#f4f5f9";
 
 export const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+/**
+ * Zoals `esc`, maar met elk getal in de zin dikgedrukt (<b class="cijfer">), zodat
+ * cijfers in lopende tekst direct opvallen. Alleen voor zinnen, niet voor titels.
+ */
+export const escNum = (s: unknown) => splitNumbers(s).map((p) => (p.num ? `<b class="cijfer">${esc(p.text)}</b>` : esc(p.text))).join("");
 export const nf = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? Math.round(n).toLocaleString("nl-NL") : "–");
 export const signed = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? `${n >= 0 ? "+" : ""}${Math.round(n).toLocaleString("nl-NL")}` : "–");
 
@@ -62,6 +68,9 @@ export const BASE_CSS = `
   td { border-bottom: 1px solid ${LINE}; padding: 5px 6px; vertical-align: top; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
   ul { margin: 0; padding-left: 16px; } li { margin: 2px 0; }
+  /* Getallen in lopende tekst: dikgedrukt, zodat ze direct opvallen. De kleur volgt het vlak (ook op donkerblauw); in grijze toelichtingen donkerblauw. */
+  .cijfer { font-weight: 700; color: inherit; white-space: nowrap; }
+  .vid .w .cijfer, .kans .s .cijfer, .box .s .cijfer, .lead .cijfer { color: ${NAVY}; }
   .num { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; background: ${NAVY}; color: #fff; font-weight: 700; font-size: 10px; align-items: center; justify-content: center; margin-right: 8px; flex: 0 0 auto; }
   .row { display: flex; align-items: flex-start; margin-bottom: 9px; }
   .note { font-size: 8.5px; color: ${MUTED}; margin-top: 10px; }
@@ -97,7 +106,7 @@ export function historyTable(historie: MaandCijfers[], withEngagementDetail = fa
   const list = historie.filter((m) => m.meetdagen > 0 || m.videos > 0);
   if (list.length === 0) return "";
   const head = `<tr><th>Maand</th><th class="n">Weergaven</th><th class="n">Bereik</th><th class="n">Interacties</th>${withEngagementDetail ? `<th class="n">Likes</th><th class="n">Reacties</th><th class="n">Shares</th><th class="n">Saves</th>` : ""}<th class="n">Volgers</th><th class="n">Video's</th><th class="n">Weergaven per video</th></tr>`;
-  const body = list.map((m) => `<tr><td>${esc(shortMonth(m.maand))} ${esc(m.maand.slice(0, 4))}</td><td class="n">${m.meetdagen ? nf(m.views) : "–"}</td><td class="n">${m.meetdagen ? nf(m.reach) : "–"}</td><td class="n">${m.meetdagen ? nf(m.engagements) : "–"}</td>${withEngagementDetail ? `<td class="n">${m.meetdagen ? nf(m.likes) : "–"}</td><td class="n">${m.meetdagen ? nf(m.comments) : "–"}</td><td class="n">${m.meetdagen ? nf(m.shares) : "–"}</td><td class="n">${m.meetdagen ? nf(m.saves) : "–"}</td>` : ""}<td class="n">${m.meetdagen ? signed(m.followerGrowth) : "–"}</td><td class="n">${nf(m.videos)}</td><td class="n">${m.meetdagen && m.videos ? nf(m.views / m.videos) : "–"}</td></tr>`).join("");
+  const body = list.map((m) => `<tr><td>${esc(shortMonth(m.maand))} ${esc(m.maand.slice(0, 4))}</td><td class="n">${m.meetdagen ? nf(m.views) : "–"}</td><td class="n">${m.meetdagen ? nf(m.reach) : "–"}</td><td class="n">${m.meetdagen ? nf(m.engagements) : "–"}</td>${withEngagementDetail ? `<td class="n">${m.meetdagen ? nf(m.likes) : "–"}</td><td class="n">${m.meetdagen ? nf(m.comments) : "–"}</td><td class="n">${m.meetdagen ? nf(m.shares) : "–"}</td><td class="n">${m.meetdagen ? nf(m.saves) : "–"}</td>` : ""}<td class="n">${m.meetdagen ? signed(m.followerGrowth) : "–"}</td><td class="n">${nf(m.videos)}</td><td class="n">${nf(weergavenPerVideo(m))}</td></tr>`).join("");
   return `<table>${head}${body}</table>`;
 }
 

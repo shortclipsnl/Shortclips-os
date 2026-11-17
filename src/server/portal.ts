@@ -1,6 +1,7 @@
 import "server-only";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { isVideoSql } from "@/server/reports/video-filter";
 import { db } from "@/db/client";
 import {
   activityEvents,
@@ -532,10 +533,12 @@ async function computePortalResults(clientId: string, opts: PortalResultsOpts): 
         select count(distinct coalesce(deliverable_id, id))::int c from publications
         where client_id = ${clientId} and status = 'published' and published_at is not null
           and published_at::date between ${startIso} and ${endIso}
+          and ${isVideoSql()}
       ), pubprev as (
         select count(distinct coalesce(deliverable_id, id))::int c from publications
         where client_id = ${clientId} and status = 'published' and published_at is not null
           and published_at::date between ${prevStartIso} and ${prevEndIso}
+          and ${isVideoSql()}
       )
       select cur.v cv, cur.r cr, cur.e ce, cur.f cf, cur.lk clk, cur.cm ccm, cur.sh csh, cur.sv csv, cur.ws cws, cur.vv cvv,
              prev.v pv, prev.r pr, prev.e pe, prev.f pf, prev.pdays ppd, pubcur.c pubc, pubprev.c pubp

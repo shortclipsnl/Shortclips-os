@@ -3,9 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpRight, BarChart3, BellRing, CalendarClock, Gift, Check, Copy, Loader2, Lock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import { ArrowUpRight, BarChart3, BellRing, CalendarClock, Gift, Check, ClipboardCheck, Copy, Loader2, Lock, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { createTask, createTasksBulk, deleteTask, setTaskStatus, updateTask } from "@/server/actions/tasks";
-import { Button, ClientLogo, ErrorNote, LinkButton, TeamAvatar } from "@/components/ui";
+import { Button, buttonClass, ClientLogo, ErrorNote, LinkButton, TeamAvatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { TaskSignal } from "@/lib/task-signals";
 
@@ -522,9 +522,20 @@ export function TaskItem({
         )
       ) : null}
       {!done && signal?.kind === "maandrapport" ? (
-        <LinkButton size="sm" href={signal.actionHref}>
-          <BarChart3 className="size-4" /> Bekijk rapportage
-        </LinkButton>
+        signal.viewHref ? (
+          <span className="flex shrink-0 flex-wrap items-center gap-2">
+            <a href={signal.viewHref} target="_blank" rel="noopener noreferrer" className={buttonClass({ size: "sm" })} title="Opent de rapportage (klantversie) in een nieuw tabblad">
+              <BarChart3 className="size-4" /> Bekijk rapportage
+            </a>
+            <LinkButton size="sm" variant="secondary" href={signal.actionHref}>
+              <ClipboardCheck className="size-4" /> Controleren
+            </LinkButton>
+          </span>
+        ) : (
+          <LinkButton size="sm" href={signal.actionHref}>
+            <BarChart3 className="size-4" /> Bekijk rapportage
+          </LinkButton>
+        )
       ) : null}
       {!done && signal?.kind === "klantmoment" && signal.actionHref ? (
         <LinkButton size="sm" variant="secondary" href={signal.actionHref}>

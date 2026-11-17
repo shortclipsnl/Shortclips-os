@@ -1,5 +1,7 @@
 import "server-only";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { isVideoSql } from "./video-filter";
+import { weergavenPerVideo } from "@/lib/cijfers";
 import { db } from "@/db/client";
 import { clients } from "@/db/schema";
 import { aiConfigured, runJsonPrompt } from "@/server/ai/client";
@@ -228,6 +230,7 @@ export async function generateMonthlyAnalysis(
     where p.client_id = ${client.id} and p.deleted_at is null
       and coalesce(p.published_at, d.published_at)::date >= ${win.from}
       and coalesce(p.published_at, d.published_at)::date <= ${win.to}
+      and ${isVideoSql("p")}
     order by views desc nulls last, p.published_at desc nulls last
   `);
   const pvRows = ((pvRes as { rows?: unknown[] }).rows ?? (pvRes as unknown as unknown[])) as Array<Record<string, unknown>>;
@@ -255,7 +258,8 @@ export async function generateMonthlyAnalysis(
   const totals: ReportMetrics = { ...report.totals };
   if (totals.posts === 0 && huidig.videos > 0) {
     totals.posts = huidig.videos;
-    totals.avgPerPost = Math.round(totals.views / huidig.videos);
+    const perVideo = weergavenPerVideo(huidig);
+    totals.avgPerPost = perVideo === null ? null : Math.round(perVideo);
     totals.videoBron = "publicaties";
   } else {
     totals.videoBron = "dagcijfers";
