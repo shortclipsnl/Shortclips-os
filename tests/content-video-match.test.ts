@@ -16,6 +16,17 @@ describe("contentplanning ↔ Frame-video", () => {
     expect(videoKey("3. WAT KIES JIJ - Shortclips_1.mp4")).toBe("wat kies jij");
     expect(videoKey("V2 2. Is een audi een dure volkswagen Luxewagen - ShortClips.mp4", "Luxewagen")).toBe("is een audi een dure volkswagen");
     expect(videoKey("4. 24.000 EURO OP JEZELF WONEN - Shortclips.mp4")).toBe("24000 euro op jezelf wonen");
+    // Nummering met underscore en versie vooraan (Marco van Beek, sessie 15).
+    expect(videoKey("1._V2 ONDERHOUD.mp4")).toBe("onderhoud");
+    expect(videoKey("4._V5 AUTO'S VAN PERSONEEL.mp4")).toBe("auto s van personeel");
+    expect(videoKey("4V2 - Target blue eye - Shortclips.mp4")).toBe("target blue eye");
+    expect(videoKey("24.000 views in een week.mp4")).toBe("24000 views in een week");
+  });
+
+  it("koppelt een onderwerp aan een video met underscore-nummering", () => {
+    const vids = [v("o", "1._V2 ONDERHOUD.mp4", "s15"), v("p", "2._V2 C63S AMG.mp4", "s15")];
+    const m = autoMatch({ title: "Marco van beek short online > 16:00 - onderhoud", scheduledOn: "2026-11-06" }, latestVersions(vids, "Marco van Beek Premium Cars"), "Marco van Beek Premium Cars");
+    expect(m?.id).toBe("o");
   });
 
   it("herkent versies in naam en submap", () => {

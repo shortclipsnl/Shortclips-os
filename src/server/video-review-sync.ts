@@ -335,10 +335,21 @@ export async function runVideoReviewSync(): Promise<{ ok: boolean; retried: numb
  * versie. Ook de eerste keer, wanneer Frame van een los bestand een stack
  * maakt met een nieuw id, koppelen we via de versies in de stack terug.
  */
-export async function applyNewVersion(fileId: string): Promise<{ updated: boolean }> {
+export async function applyNewVersion(resourceId: string, resourceType?: string): Promise<{ updated: boolean }> {
   if (!frameio.isConfigured) return { updated: false };
-  const file = await frameio.getFile(fileId);
-  const stackId = file.parent_id;
+  // Frame.io V4 stuurt bij file.versioned de version stack zelf mee
+  // (resource.type "version_stack"); bij een upload is het een bestand.
+  let stackId: string | null = null;
+  if (resourceType === "version_stack") {
+    stackId = resourceId;
+  } else {
+    try {
+      const file = await frameio.getFile(resourceId);
+      stackId = file.parent_id ?? null;
+    } catch {
+      stackId = resourceId; // geen bestand: mogelijk zelf een version stack
+    }
+  }
   if (!stackId) return { updated: false };
   let children: Awaited<ReturnType<typeof frameio.listVersionStackChildren>>;
   try {

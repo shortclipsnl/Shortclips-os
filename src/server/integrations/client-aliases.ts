@@ -13,7 +13,7 @@ export const CLIENT_ALIASES: Record<string, string[]> = {
   "benz-collector-sneek": ["benz collector museum", "benz collector", "benzcollector"],
   "donker-groep": ["donkergroen", "donker groen"],
   "kavel-10": ["kavel 10 | hetbestebeeld.nl", "hetbestebeeld"],
-  hegro: ["hegro wolvega"],
+  hegro: ["hegro wolvega", "hegrowolvegabv", "hegro wolvega bv"],
   kubo: ["kubo interieur"],
   bowt: ["bowt watersport"],
   "de-goede-financieel": ["de goede"],

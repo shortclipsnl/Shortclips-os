@@ -24,7 +24,8 @@ import { runScriptingTaskSync } from "@/server/scripting-tasks";
 import { runKlantmomentenSync } from "@/server/klantmomenten";
 import { runEditorMeetingsSync } from "@/server/editor-meetings";
 import { runScriptVersionSync } from "@/server/script-versions";
-import { runFrequentSync, runNightlyExternalSync, runNightlySync } from "@/server/jobs/orchestrator";
+import { runFrameLibraryFull, runFrequentSync, runNightlyExternalSync, runNightlySync } from "@/server/jobs/orchestrator";
+import { ensureFrameWebhook } from "@/server/integrations/frameio-webhook";
 import { runMonthlyReportDrafts } from "@/server/jobs/report-drafts";
 import { runContentOnlineNotifications } from "@/server/jobs/content-online-notify";
 import { runMonthlyInsightTasks } from "@/server/jobs/insight-tasks";
@@ -129,6 +130,10 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "frameio.normalize_imported": normalizeImportedFrameDeliverables,
   "frameio.list_projects": listFrameProjects,
   "frameio.sync_library": syncFrameLibrary,
+  // Volledige bibliotheekcontrole (ook ongewijzigde sessies), 's nachts los.
+  "frameio.sync_library_full": runFrameLibraryFull,
+  // Frame.io-webhook controleren en aanvullen met ontbrekende gebeurtenissen.
+  "frameio.ensure_webhook": ensureFrameWebhook,
   // Videobeoordeling klantportaal: mislukte opmerkingen opnieuw naar Frame.io en
   // afgevinkte opmerkingen/reacties uit Frame.io terug (vangnet naast webhooks).
   "video_review.sync": runVideoReviewSync,

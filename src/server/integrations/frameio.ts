@@ -419,6 +419,18 @@ export class FrameService {
     return res.data ?? (res as unknown as { id: string; secret?: string });
   }
 
+  /** V4: gebeurtenissen van een bestaande webhook bijwerken. */
+  async updateWebhookEvents(webhookId: string, events: string[]): Promise<void> {
+    const body = { data: { events } };
+    try {
+      await this.request(`/accounts/${this.requireAccount()}/webhooks/${webhookId}`, { method: "PATCH", body });
+    } catch (error) {
+      // Sommige V4-omgevingen gebruiken het kortere pad zonder account.
+      if ((error as { status?: number }).status !== 404) throw error;
+      await this.request(`/webhooks/${webhookId}`, { method: "PATCH", body });
+    }
+  }
+
   async listWebhooks(): Promise<Array<{ id: string; url: string; events: string[] }>> {
     const result = await this.request<Page<{ id: string; url: string; events: string[] }>>(
       `/accounts/${this.requireAccount()}/webhooks`,

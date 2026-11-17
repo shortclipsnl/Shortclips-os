@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { NextResponse, after } from "next/server";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { deliverables, reviewComments, reviewThreads, videoVersions } from "@/db/schema";
 import { env } from "@/lib/env";
@@ -9,6 +9,7 @@ import { recordActivity } from "@/server/audit";
 import { getStringSetting } from "@/server/app-settings";
 import { applyNewVersion, assetIdForFrameComment, pullFrameUpdates } from "@/server/video-review-sync";
 import { FRAMEIO_WEBHOOK_SECRET_KEY, verifyFrameV4 } from "@/server/integrations/frameio-webhook";
+import { syncFrameLibrary } from "@/server/jobs/frameio-library";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,8 +86,19 @@ async function handleFrameEvent(eventType: string, payload: FramePayload): Promi
   }
 
   // Nieuwe versie: portaal toont direct de nieuwste versie van dezelfde video.
-  if (eventType === "file.versioned" || eventType === "file.upload.completed") {
-    const r = await applyNewVersion(resourceId).catch(() => ({ updated: false }));
+  if (eventType === "file.versioned" || eventType === "file.upload.completed" || eventType === "file.ready") {
+    const r = await applyNewVersion(resourceId, payload.resource?.type).catch(() => ({ updated: false }));
+    // Nieuwe video of nieuwe versie: het project van deze klant direct
+    // bijwerken (na het antwoord aan Frame.io), zodat de video, de omslag en de
+    // versieteller zonder wachten op de geplande sync in het portaal staan.
+    const projectId = payload.project?.id;
+    if (projectId) {
+      // Meerdere uploads tegelijk (een hele sessie): één projectsync is genoeg.
+      if (!(await projectSyncJustStarted(projectId))) {
+        after(() => syncFrameLibrary(undefined, undefined, { projectIds: [projectId] }).then(() => undefined).catch(() => undefined));
+      }
+      return {};
+    }
     if (r.updated) return {};
   }
 
@@ -163,4 +175,15 @@ async function handleFrameEvent(eventType: string, payload: FramePayload): Promi
   }
 
   return { skipped: true };
+}
+
+/** Loopt er voor dit project al een sync die minder dan 20 seconden geleden startte? */
+async function projectSyncJustStarted(projectId: string): Promise<boolean> {
+  const r = await db.execute(sql`
+    select 1 from sync_jobs
+    where job_type = 'frameio.sync_library' and status = 'running'
+      and started_at > now() - interval '20 seconds'
+      and params::text like ${`%${projectId}%`}
+    limit 1`);
+  return (((r as { rows?: unknown[] }).rows ?? (r as unknown as unknown[])) as unknown[]).length > 0;
 }
