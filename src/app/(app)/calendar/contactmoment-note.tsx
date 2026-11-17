@@ -2,24 +2,20 @@ import Link from "next/link";
 import { ArrowRight, Download, LayoutDashboard, Send } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 
-/** WhatsApp-groen, iets donkerder dan het logo zodat witte tekst goed leesbaar blijft. */
+/** WhatsApp-groen voor de knop, iets donkerder dan het logo zodat witte tekst goed leesbaar blijft. */
 const WA_GREEN = "#138a43";
-const WA_TINT = "#eef8f1";
-/** Klantportaal: subtiel Shortclips-donkerblauw. */
-const PORTAL_TINT = "#f1f1f7";
 
 /** Genummerde stap in een instructieblok. */
-function Step({ n, color, children }: { n: number; color: string; children: React.ReactNode }) {
+function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
     <li className="flex gap-2.5">
       <span
-        className="mt-px flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold text-white"
-        style={{ background: color }}
+        className="cm-solid mt-px flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold"
         aria-hidden
       >
         {n}
       </span>
-      <span className="min-w-0 text-[var(--color-ink-muted)]">{children}</span>
+      <span className="cm-text min-w-0 leading-5">{children}</span>
     </li>
   );
 }
@@ -34,7 +30,7 @@ export function ContactmomentNote() {
   return (
     <section
       aria-label="Werkafspraak contentplanning delen"
-      className="sc-card mb-4 overflow-hidden"
+      className="sc-card cm-share mb-4 overflow-hidden"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="min-w-0 flex-1">
@@ -58,54 +54,48 @@ export function ContactmomentNote() {
 
       <div className="grid gap-3 border-t border-[var(--color-line)] p-3 sm:grid-cols-2">
         {/* Optie 1: WhatsApp */}
-        <div
-          className="rounded-[var(--radius-sm)] px-3.5 py-3 text-sm"
-          style={{ background: WA_TINT, boxShadow: `inset 3px 0 0 ${WA_GREEN}` }}
-        >
-          <p className="flex items-center gap-2 font-semibold text-[var(--color-ink)]">
-            <span className="flex size-6 items-center justify-center rounded-full text-white" style={{ background: WA_GREEN }}>
+        <div className="cm-option cm-option--wa py-3 pl-4 pr-3.5 text-sm">
+          <p className="cm-title flex items-center gap-2 font-semibold">
+            <span className="cm-solid flex size-6 items-center justify-center rounded-full">
               <WhatsAppIcon className="size-3.5" />
             </span>
             Via WhatsApp
-            <span className="font-normal text-[var(--color-ink-muted)]">videolink + PDF</span>
+            <span className="cm-sub text-xs font-medium">videolink + PDF</span>
           </p>
           <ol className="mt-2.5 space-y-1.5">
-            <Step n={1} color={WA_GREEN}>
-              <span className="inline-flex items-center gap-1 font-semibold text-[var(--color-ink)]"><Download className="size-3.5" />Download de contentplanning als PDF</span> (knop hieronder).
+            <Step n={1}>
+              <span className="cm-strong inline-flex items-center gap-1 font-semibold"><Download className="size-3.5" />Download de contentplanning als PDF</span> (knop hieronder).
             </Step>
-            <Step n={2} color={WA_GREEN}>
-              Kopieer op Editing bij de opname het bericht <strong className="font-semibold text-[var(--color-ink)]">Link + PDF</strong>.
+            <Step n={2}>
+              Kopieer op Editing bij de opname het bericht <strong className="font-semibold">Link + PDF</strong>.
             </Step>
-            <Step n={3} color={WA_GREEN}>
-              Stuur bericht én PDF samen in <strong className="font-semibold text-[var(--color-ink)]">één</strong> WhatsApp-bericht.
+            <Step n={3}>
+              Stuur bericht én PDF samen in <strong className="font-semibold">één</strong> WhatsApp-bericht.
             </Step>
           </ol>
         </div>
 
         {/* Optie 2: Klantportaal */}
-        <div
-          className="rounded-[var(--radius-sm)] px-3.5 py-3 text-sm"
-          style={{ background: PORTAL_TINT, boxShadow: "inset 3px 0 0 var(--color-indigo-ink)" }}
-        >
-          <p className="flex items-center gap-2 font-semibold text-[var(--color-ink)]">
-            <span className="flex size-6 items-center justify-center rounded-full bg-[var(--color-indigo-ink)] text-white">
+        <div className="cm-option cm-option--portal py-3 pl-4 pr-3.5 text-sm">
+          <p className="cm-title flex items-center gap-2 font-semibold">
+            <span className="cm-solid flex size-6 items-center justify-center rounded-full">
               <LayoutDashboard className="size-3.5" />
             </span>
             Via het klantportaal
           </p>
           <ol className="mt-2.5 space-y-1.5">
-            <Step n={1} color="var(--color-indigo-ink)">
+            <Step n={1}>
               Kies de klant en klik op{" "}
-              <span className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-1.5 py-0.5 text-xs font-semibold text-white">
+              <span className="cm-solid inline-flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-0.5 text-xs font-semibold">
                 <Send className="size-3" />
                 Goedkeuren en delen met klant
               </span>
             </Step>
-            <Step n={2} color="var(--color-indigo-ink)">
+            <Step n={2}>
               De planning staat dan direct in het portaal van de klant.
             </Step>
-            <Step n={3} color="var(--color-indigo-ink)">
-              Kopieer op Editing bij de opname het bericht <strong className="font-semibold text-[var(--color-ink)]">Portaal</strong>.
+            <Step n={3}>
+              Kopieer op Editing bij de opname het bericht <strong className="font-semibold">Portaal</strong>.
             </Step>
           </ol>
         </div>

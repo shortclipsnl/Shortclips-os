@@ -814,3 +814,60 @@ body {
   --cg-cta: #f08a5a;
   --cg-advice: #a6cf2e;
 }
+
+/* =========================================================================
+   Contentplanning: werkafspraak "contentplanning en video's in één
+   contactmoment" (contactmoment-note.tsx). Eigen kleurtokens per thema, zodat
+   beide deelopties in licht én donker goed leesbaar zijn. WhatsApp = groen,
+   klantportaal = indigo/paars.
+   ========================================================================= */
+.cm-share {
+  --cm-wa-bg: #eef8f1;
+  --cm-wa-line: #cfe8d8;
+  --cm-wa-accent: #138a43;
+  --cm-wa-solid: #138a43;
+  --cm-wa-label: #0e6e35;
+  --cm-pt-bg: #f1f1f8;
+  --cm-pt-line: #d9d9ea;
+  --cm-pt-accent: #00003b;
+  --cm-pt-solid: #00003b;
+  --cm-pt-label: #00003b;
+  --cm-text: var(--color-ink-muted);
+  --cm-strong: var(--color-ink);
+}
+:root[data-theme="dark"] .cm-share {
+  --cm-wa-bg: #0f241b;
+  --cm-wa-line: #1f4a33;
+  --cm-wa-accent: #34c46e;
+  --cm-wa-solid: #168f47;
+  --cm-wa-label: #6fe09c;
+  --cm-pt-bg: #181a3a;
+  --cm-pt-line: #33376e;
+  --cm-pt-accent: #8f94ff;
+  --cm-pt-solid: #5359d6;
+  --cm-pt-label: #b4b7ff;
+  --cm-text: #c3c5dc;
+  --cm-strong: #f3f2fb;
+}
+.cm-option {
+  position: relative;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--cm-line);
+  background: var(--cm-bg);
+  box-shadow: inset 4px 0 0 var(--cm-accent);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.cm-option:hover,
+.cm-option:focus-within {
+  border-color: var(--cm-accent);
+  box-shadow: inset 4px 0 0 var(--cm-accent), 0 0 0 1px var(--cm-accent), var(--shadow-card);
+}
+.cm-option--wa { --cm-bg: var(--cm-wa-bg); --cm-line: var(--cm-wa-line); --cm-accent: var(--cm-wa-accent); --cm-solid: var(--cm-wa-solid); --cm-label: var(--cm-wa-label); }
+.cm-option--portal { --cm-bg: var(--cm-pt-bg); --cm-line: var(--cm-pt-line); --cm-accent: var(--cm-pt-accent); --cm-solid: var(--cm-pt-solid); --cm-label: var(--cm-pt-label); }
+.cm-option .cm-title { color: var(--cm-strong); }
+.cm-option .cm-sub { color: var(--cm-label); }
+.cm-option .cm-text { color: var(--cm-text); }
+.cm-option strong,
+.cm-option .cm-strong { color: var(--cm-strong); }
+.cm-option .cm-solid { background: var(--cm-solid); color: #fff; }
+@media (prefers-reduced-motion: reduce) { .cm-option { transition: none; } }
