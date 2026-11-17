@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/server/auth/context";
+import { safePortalPath } from "@/lib/access-link";
 import { Logo } from "@/components/logo";
 import { LoginForm } from "./login-form";
 import { TeamMarquee } from "./team-marquee";
@@ -13,9 +14,9 @@ export default async function LoginPage({
   searchParams: Promise<{ verder?: string; reden?: string }>;
 }) {
   const viewer = await getViewer();
-  if (viewer) redirect(viewer.isPortalUser ? "/portal" : "/dashboard");
-
   const params = await searchParams;
+  // Al ingelogd: klant direct naar de pagina uit de link, team naar het dashboard.
+  if (viewer) redirect(viewer.isPortalUser ? safePortalPath(params.verder) : "/dashboard");
 
   return (
     <main className="grid min-h-screen lg:grid-cols-[1fr_460px]">
@@ -86,6 +87,12 @@ export default async function LoginPage({
             <p className="mt-4 rounded-[var(--radius-sm)] bg-[var(--color-warn-soft)] px-3 py-2 text-sm text-[#8a5300]">
               Aan dit account is nog geen klantomgeving gekoppeld. Neem contact
               op met je contactpersoon bij ShortClips.
+            </p>
+          ) : null}
+
+          {params.reden === "code" ? (
+            <p className="mt-4 rounded-[var(--radius-sm)] bg-[var(--color-surface-sunken)] px-3 py-2 text-sm text-[var(--color-ink-muted)]">
+              Voor je account is op een nieuw apparaat een extra controle ingesteld. Log één keer in; daarna onthoudt dit apparaat je.
             </p>
           ) : null}
 

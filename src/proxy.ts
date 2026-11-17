@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { ACCESS_PARAM, isAccessToken, stripAccessParam } from "@/lib/access-link";
 
 /**
  * Eerste, goedkope poortwachter (heette vóór Next 16 `middleware`).
@@ -39,6 +40,8 @@ const PUBLIC_PATHS = [
   "/d/",
   "/api/d/",
   "/offerte/",
+  // Persoonlijke inloglink voor klanten (token van 32 random bytes, server-side gecontroleerd).
+  "/toegang/",
 ];
 
 /** Publieke offerte-PDF via het deeltoken; /api/offertes/file en de rest blijven achter de sessie. */
@@ -46,6 +49,18 @@ const PUBLIC_PATTERNS = [/^\/api\/offertes\/[A-Za-z0-9_-]{20,}\/pdf$/];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Portaallink met een persoonlijk inlogtoken (?t=…), bijv. vanuit WhatsApp:
+  // altijd via /toegang laten lopen, ook met een bestaande sessie. Die pagina
+  // controleert het token, logt pas in na een tik (linkvoorbeelden verbruiken
+  // hem dus niet) en haalt het token uit de adresbalk.
+  const accessToken = request.nextUrl.searchParams.get(ACCESS_PARAM);
+  if ((pathname === "/portal" || pathname.startsWith("/portal/")) && isAccessToken(accessToken)) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/toegang/${accessToken}`;
+    url.search = `?naar=${encodeURIComponent(stripAccessParam(pathname, request.nextUrl.search))}`;
+    return NextResponse.redirect(url);
+  }
 
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p)) || PUBLIC_PATTERNS.some((re) => re.test(pathname))) {
     return NextResponse.next();

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type Dispatch, type SetStateAction } from "react";
-import { AlertTriangle, Check, CheckCircle2, Copy, FileText, LayoutDashboard, Link2, Loader2, MessageCircle, Pencil, RotateCcw, Settings2, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Copy, FileText, KeyRound, LayoutDashboard, Link2, Loader2, MessageCircle, Pencil, RotateCcw, Settings2, X } from "lucide-react";
 import { Button, ClientLogo } from "@/components/ui";
 import {
   DEFAULT_TEMPLATES,
@@ -25,6 +25,8 @@ import {
   type TermijnContext,
 } from "@/lib/scriptbericht";
 import { resetScriptberichtTemplates, resetScriptberichtText, saveScriptbericht, saveScriptberichtTemplates } from "@/server/actions/scriptbericht";
+import { createPersonalPortalLink, type PortalLinkUserOption } from "@/server/actions/portal-access-links";
+import { ACCESS_LINK_TTL_DAYS } from "@/lib/access-link";
 
 /** Eén opname zoals het scriptbericht die nodig heeft. */
 export type ScriptberichtRow = {
@@ -187,7 +189,7 @@ type EditorState = {
   methode: ScriptberichtMethode;
   link: string;
   linkDraft: string;
-  linkSource: "portaal" | "opgeslagen" | null;
+  linkSource: "portaal" | "opgeslagen" | "persoonlijk" | null;
   text: string;
   /** Wat er nu op de plek van de link in de tekst staat. */
   inserted: string;
@@ -257,6 +259,15 @@ function ScriptberichtDialog({
 
   const row = rows.find((r) => r.id === dayId) ?? null;
 
+  // Persoonlijke inloglink: de klant opent de scripts vanuit WhatsApp zonder
+  // in te loggen. Staat standaard aan bij het portaalbericht.
+  const [personalOff, setPersonalOff] = useState(false);
+  const [personalUser, setPersonalUser] = useState<string | null>(null);
+  const [personal, setPersonal] = useState<{ key: string; userName: string; users: PortalLinkUserOption[]; userId: string } | null>(null);
+  const [personalNote, setPersonalNote] = useState<string | null>(null);
+  const [personalBusy, setPersonalBusy] = useState(false);
+  const personalKey = row && editor?.methode === "portal" && row.reviewId ? `${row.id}:${personalUser ?? ""}` : null;
+
   // Focus bij openen direct op de kopieerknop: Enter kopieert meteen.
   useEffect(() => {
     copyRef.current?.focus();
@@ -281,9 +292,68 @@ function ScriptberichtDialog({
     return out;
   }, [rows, row, savedById]);
 
+  // Portaalbericht met scripts in het portaal: persoonlijke link ophalen en in
+  // het bericht zetten (vervangt de gewone portaallink op dezelfde plek).
+  useEffect(() => {
+    if (!canWrite || personalOff || !personalKey || !row?.reviewId || !editor) return;
+    if (personal?.key === personalKey && editor.linkSource === "persoonlijk") return;
+    if (editor.linkSource !== "portaal" && editor.linkSource !== "persoonlijk") return;
+    let alive = true;
+    queueMicrotask(() => {
+      if (!alive) return;
+      setPersonalBusy(true);
+      setPersonalNote(null);
+    });
+    createPersonalPortalLink({ clientId: row.clientId, targetPath: `/portal/scripts/${row.reviewId}`, userId: personalUser })
+      .then((res) => {
+        if (!alive) return;
+        if (!res.ok) {
+          setPersonal(null);
+          setPersonalNote(res.message);
+          return;
+        }
+        setPersonal({ key: personalKey, userName: res.userName, users: res.users, userId: res.userId });
+        setEditor((cur) => {
+          if (!cur || cur.methode !== "portal") return cur;
+          const nextInserted = insertedValue("portal", res.url);
+          const swapped = swapLink(cur.text, cur.inserted, nextInserted);
+          if (!swapped.replaced) return cur;
+          return { ...cur, link: res.url, linkDraft: res.url, linkSource: "persoonlijk", text: swapped.text, inserted: nextInserted };
+        });
+        setCopied(false);
+      })
+      .catch(() => alive && setPersonalNote("De persoonlijke link kon niet worden gemaakt. De gewone portaallink blijft staan."))
+      .finally(() => alive && setPersonalBusy(false));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personalKey, personalOff, editor?.linkSource, canWrite]);
+
+  /** Terug naar de gewone portaallink (klant logt dan zelf in). */
+  function switchToPlainLink() {
+    setPersonalOff(true);
+    setPersonal(null);
+    if (!editor || !row?.portalLink) return;
+    const nextInserted = insertedValue(editor.methode, row.portalLink);
+    const swapped = swapLink(editor.text, editor.inserted, nextInserted);
+    setEditor({
+      ...editor,
+      link: row.portalLink,
+      linkDraft: row.portalLink,
+      linkSource: "portaal",
+      text: swapped.replaced ? swapped.text : editor.text,
+      inserted: swapped.replaced ? nextInserted : editor.inserted,
+    });
+    setCopied(false);
+  }
+
   // Andere opname gekozen: editor leeg, zodat er nooit een bericht van de vorige klant blijft staan.
   function selectDay(id: string) {
     setDayId(id);
+    setPersonalUser(null);
+    setPersonal(null);
+    setPersonalNote(null);
     setCopied(false);
     setStatusNote(null);
     setSaveErr(null);
@@ -400,7 +470,16 @@ function ScriptberichtDialog({
     setCopied(true);
     if (copiedTimer.current) clearTimeout(copiedTimer.current);
     copiedTimer.current = setTimeout(() => setCopied(false), 3000);
-    void persist({ link: editor.link, text: editor.text, copied: true }, editor.methode, row);
+    // Een persoonlijke link (met inlogtoken) wordt niet als vaste link bij de
+    // opname bewaard; collega's maken zelf een nieuwe.
+    const isPersonalLink = editor.linkSource === "persoonlijk" && !!row.portalLink;
+    void persist(
+      isPersonalLink
+        ? { link: row.portalLink!, text: editor.text.split(editor.link).join(row.portalLink!), copied: true }
+        : { link: editor.link, text: editor.text, copied: true },
+      editor.methode,
+      row,
+    );
   }
 
   return (
@@ -503,7 +582,7 @@ function ScriptberichtDialog({
                   {editor.link && !linkBewerken && !linkPending ? (
                     <p className="flex min-w-0 items-center gap-1.5 text-2xs text-[var(--color-ink-muted)]">
                       <Link2 className="size-3.5 shrink-0" />
-                      <span className="shrink-0">{editor.linkSource === "portaal" ? "Portaallink automatisch ingevuld:" : "Link:"}</span>
+                      <span className="shrink-0">{editor.linkSource === "persoonlijk" ? "Persoonlijke inloglink:" : editor.linkSource === "portaal" ? "Portaallink automatisch ingevuld:" : "Link:"}</span>
                       <span className="min-w-0 truncate font-medium text-[var(--color-ink)]">{editor.link}</span>
                       <button type="button" onClick={() => setLinkBewerken(true)} className="inline-flex shrink-0 items-center gap-1 rounded px-1 py-0.5 hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]">
                         <Pencil className="size-3" /> Wijzigen
@@ -547,6 +626,39 @@ function ScriptberichtDialog({
                       </p>
                     </div>
                   )}
+
+                  {editor.methode === "portal" && row.reviewId && canWrite ? (
+                    editor.linkSource === "persoonlijk" && personal ? (
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[var(--radius-sm)] bg-[var(--color-good-soft,rgba(16,163,74,0.08))] px-3 py-2 text-2xs text-[var(--color-ink)]">
+                        <KeyRound className="size-3.5 shrink-0 text-[var(--color-good)]" />
+                        <span className="min-w-0 flex-1">
+                          <span className="font-semibold">Persoonlijke link voor {personal.userName}.</span>{" "}
+                          De klant opent de scripts zonder in te loggen ({ACCESS_LINK_TTL_DAYS} dagen geldig).
+                        </span>
+                        {personal.users.length > 1 ? (
+                          <select
+                            aria-label="Voor wie is de link?"
+                            value={personal.userId}
+                            onChange={(e) => setPersonalUser(e.target.value)}
+                            className="h-7 rounded border border-[var(--color-line-strong)] bg-[var(--color-surface)] px-1.5 text-2xs"
+                          >
+                            {personal.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                          </select>
+                        ) : null}
+                        <button type="button" onClick={switchToPlainLink} className="font-medium text-[var(--color-ink-muted)] underline-offset-2 hover:text-[var(--color-ink)] hover:underline">
+                          Gewone link gebruiken
+                        </button>
+                      </div>
+                    ) : personalBusy ? (
+                      <p className="flex items-center gap-1.5 text-2xs text-[var(--color-ink-muted)]"><Loader2 className="size-3.5 animate-spin" /> Persoonlijke inloglink maken…</p>
+                    ) : personalOff ? (
+                      <button type="button" onClick={() => setPersonalOff(false)} className="inline-flex items-center gap-1.5 text-2xs font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:underline">
+                        <KeyRound className="size-3.5" /> Persoonlijke inloglink gebruiken (klant hoeft niet in te loggen)
+                      </button>
+                    ) : personalNote ? (
+                      <p className="flex items-start gap-1.5 text-2xs text-[#8a5300]"><AlertTriangle className="mt-px size-3.5 shrink-0" /> {personalNote} De gewone portaallink blijft staan.</p>
+                    ) : null
+                  ) : null}
 
                   <div>
                     <div className="mb-1 flex flex-wrap items-center justify-between gap-2">

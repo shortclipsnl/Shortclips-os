@@ -7,6 +7,7 @@ import {
   sendManualClientNotification,
   setClientLoginCodeRequired,
 } from "@/server/actions/client-app";
+import { PersonalLinkBox } from "./personal-link-box";
 
 type Status = Extract<Awaited<ReturnType<typeof loadClientAppStatus>>, { ok: true }>;
 
@@ -159,6 +160,9 @@ export function ClientAppPanel({ clientId, name }: { clientId: string; name: str
                   </>
                 ) : null}
               </div>
+
+              {/* Persoonlijke inloglink (één tik vanuit WhatsApp) */}
+              <PersonalLinkBox clientId={clientId} name={name} />
 
               {/* Handmatige melding */}
               <div className="rounded-[var(--radius-sm)] bg-[var(--color-surface)] p-2.5 ring-1 ring-[var(--color-line)]">

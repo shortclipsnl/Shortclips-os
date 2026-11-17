@@ -169,3 +169,39 @@ export const webauthnChallenges = pgTable(
   },
   (t) => [index("webauthn_challenges_expires_idx").on(t.expiresAt)],
 );
+
+/* ------------------------------------------------------------------ *
+ * Persoonlijke inloglinks (één tik vanuit WhatsApp)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Persoonlijke inloglink voor één klantgebruiker, naar één pagina in het
+ * portaal (bijv. de scripts van een opname). Alleen de SHA-256 van het token
+ * staat hier; het token zelf zit uitsluitend in de link. Kort geldig, een
+ * beperkt aantal keer te gebruiken en ingetrokken bij een gepauzeerde of
+ * beëindigde klant.
+ */
+export const portalAccessLinks = pgTable(
+  "portal_access_links",
+  {
+    id: pk(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    /** Portaalpagina waar de link naartoe gaat (altijd /portal...). */
+    targetPath: varchar("target_path", { length: 300 }).notNull(),
+    createdById: uuid("created_by_id").references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    useCount: integer("use_count").notNull().default(0),
+    maxUses: integer("max_uses").notNull().default(10),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    unique("portal_access_links_token_unique").on(t.tokenHash),
+    index("portal_access_links_user_idx").on(t.userId, t.revokedAt),
+  ],
+);

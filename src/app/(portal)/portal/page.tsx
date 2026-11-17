@@ -154,7 +154,9 @@ function QuickGlance({
   shootTime,
   nextPub,
   views,
+  contact,
 }: {
+  contact: { name: string; phone: string; avatarUrl: string | null } | null;
   videos: number;
   scripts: number;
   shootDate: Date | null;
@@ -167,18 +169,18 @@ function QuickGlance({
   const act = "border-transparent bg-[var(--sc-act)] text-[var(--sc-act-ink)]";
   return (
     <div className="grid grid-cols-2 gap-2.5 sm:hidden">
-      <Link href="/portal/videos" className={`${tile} ${videos > 0 ? act : calm}`}>
-        <Film className="size-5" strokeWidth={1.9} />
-        <div>
-          <div className="text-[22px] font-bold leading-none tabular-nums">{videos}</div>
-          <div className="mt-1 text-[12px] font-semibold leading-tight">{videos === 1 ? "video wacht op feedback" : "video's wachten op feedback"}</div>
-        </div>
-      </Link>
       <Link href="/portal/scripts" className={`${tile} ${scripts > 0 ? act : calm}`}>
         <FileText className="size-5" strokeWidth={1.9} />
         <div>
           <div className="text-[22px] font-bold leading-none tabular-nums">{scripts}</div>
           <div className="mt-1 text-[12px] font-semibold leading-tight">{scripts === 1 ? "script om goed te keuren" : "scripts om goed te keuren"}</div>
+        </div>
+      </Link>
+      <Link href="/portal/videos" className={`${tile} ${videos > 0 ? act : calm}`}>
+        <Film className="size-5" strokeWidth={1.9} />
+        <div>
+          <div className="text-[22px] font-bold leading-none tabular-nums">{videos}</div>
+          <div className="mt-1 text-[12px] font-semibold leading-tight">{videos === 1 ? "video wacht op feedback" : "video's wachten op feedback"}</div>
         </div>
       </Link>
       <Link href="/portal/planning" className={`${tile} ${calm}`}>
@@ -205,6 +207,24 @@ function QuickGlance({
           </span>
           <ArrowRight className="size-4 shrink-0 text-[var(--color-ink-faint)]" />
         </Link>
+      ) : null}
+      {/* 5 — Direct contact: één tik naar WhatsApp met de vaste contactpersoon */}
+      {contact ? (
+        <a
+          href={`https://wa.me/${waNumber(contact.phone)}`}
+          target="_blank"
+          rel="noreferrer"
+          className={`col-span-2 flex min-h-[56px] items-center gap-3 rounded-[16px] border p-3 ${calm}`}
+        >
+          <TeamAvatar name={contact.name} avatarUrl={contact.avatarUrl} size={36} />
+          <span className="min-w-0 flex-1 text-[13.5px] leading-tight">
+            <span className="block font-semibold">Vraag? App {contact.name.split(/\s+/)[0]}</span>
+            <span className="block text-[12px] text-[var(--color-ink-muted)]">Je vaste contactpersoon bij Shortclips</span>
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#25D366] px-3 py-2 text-[12.5px] font-semibold text-white">
+            <MessageCircle className="size-4" /> WhatsApp
+          </span>
+        </a>
       ) : null}
     </div>
   );
@@ -304,6 +324,7 @@ export default async function PortalPage() {
         shootTime={shootTime}
         nextPub={nextPub ? { date: dateFromIso(nextPub.scheduledOn), title: nextPub.title } : null}
         views={hasMetrics ? m.views : null}
+        contact={coordinator?.phone ? { name: coordinator.name, phone: coordinator.phone, avatarUrl: coordinator.avatarUrl ?? null } : null}
       />
 
       {/* Klantroadmap: wat gebeurt er nu, en waar staat elke productie? */}

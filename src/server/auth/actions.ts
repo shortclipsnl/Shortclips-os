@@ -12,6 +12,7 @@ import { dummyVerify, hashPassword, verifyPassword } from "./password";
 import { createSession, destroySession, readSession, revokeAllSessions } from "./session";
 import { loginCodeRequired, startLoginChallenge, trustThisDevice, verifyLoginChallenge } from "./login-code";
 import { forgetThisDevicePush } from "@/server/client-app";
+import { safePortalPath } from "@/lib/access-link";
 import { requireOwner, requireViewer, ForbiddenError } from "@/server/auth/context";
 
 const loginSchema = z.object({
@@ -173,9 +174,11 @@ export async function loginAction(
   // met "/" maar leidt naar een externe site — die weigeren we (open-redirect).
   const nextParam = parsed.data.next ?? "";
   const safeNext = nextParam.startsWith("/") && !nextParam.startsWith("//") && !nextParam.includes("\\");
+  // Klanten: alleen naar een pagina binnen het portaal (bijv. het script uit
+  // een WhatsApp-link); anders het overzicht.
   const target =
     user.primaryRole === "client"
-      ? "/portal"
+      ? safePortalPath(nextParam)
       : safeNext
         ? nextParam
         : "/dashboard";
@@ -212,7 +215,8 @@ export async function verifyLoginCodeAction(_prev: LoginState, formData: FormDat
   await trustThisDevice(result.userId, h.get("user-agent"));
   await auditLog({ action: "auth.login_code_verified", entityType: "user", entityId: result.userId });
   const [who] = await db.select({ role: users.primaryRole }).from(users).where(eq(users.id, result.userId)).limit(1);
-  redirect(who?.role === "client" ? "/portal" : "/dashboard");
+  const nextParam = String(formData.get("next") ?? "");
+  redirect(who?.role === "client" ? safePortalPath(nextParam) : "/dashboard");
 }
 
 export async function logoutAction() {
