@@ -6,6 +6,7 @@ import { videographerMayOpenPath } from "@/lib/videographer-routes";
 import { NAVIGATION } from "@/components/layout/nav-config";
 import { heeftVerantwoordelijkhedenPagina } from "@/lib/verantwoordelijkheden/data";
 import { canUseTeamView } from "@/server/editor-meetings";
+import { canUseFreelanceVideographers } from "@/server/freelance-videographers-access";
 import { getVisieVoor } from "@/server/visie";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SectionTabs } from "@/components/layout/section-tabs";
@@ -81,6 +82,10 @@ export default async function AppLayout({
       // Draaiboek: alleen voor de videograaf (Rutger, freelance videografen) en Jarno.
       // Milou en Jiska werken met draaiboeken vanuit Scripting (controle en versturen).
       if (item.videographerOnly && !owner && viewer.primaryRole !== "videographer" && (viewer.email ?? "").toLowerCase() !== "rutger@shortclips.nl") {
+        return false;
+      }
+      // Freelance videografen: alleen eigenaar en vast kantoorteam (bevat contactgegevens en tarieven).
+      if (item.freelanceVideographersAccess && !canUseFreelanceVideographers(viewer)) {
         return false;
       }
       // Editor Meetings (teamweergave): Milou, Jiska en het management.

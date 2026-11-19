@@ -37,6 +37,9 @@ export type NavItem = {
    *  Milou en Jiska controleren en versturen draaiboeken vanuit Scripting en hebben
    *  deze pagina niet nodig. */
   videographerOnly?: boolean;
+  /** Freelance videografen (contact, tarief, beschikbaarheid): alleen de eigenaar en het
+   *  vaste kantoorteam (Milou, Jiska, Rutger). */
+  freelanceVideographersAccess?: boolean;
   /** Editor Meetings: editors (eigen meetings) en wie ze voert of bewaakt
    *  (Milou, Jiska, management). */
   editorMeetingsAccess?: boolean;
@@ -88,6 +91,8 @@ export const NAVIGATION: NavGroup[] = [
       { href: "/calendar", label: "Contentplanning", icon: "CalendarDays", permissions: ["calendar:read"], match: "/calendar" },
       { href: "/productions", label: "Opnames", icon: "Camera", permissions: ["productions:read"], match: "/productions" },
       { href: "/draaiboek", label: "Draaiboek", icon: "ClipboardList", permissions: ["productions:read"], match: "/draaiboek", videographerOnly: true },
+      // Wie we kunnen inschakelen voor opnames als de vaste videograaf niet kan of er meerdere opnames op één dag zijn.
+      { href: "/freelance-videografen", label: "Freelance videografen", icon: "Video", match: "/freelance-videografen", freelanceVideographersAccess: true },
       // Editor Meetings hoort bij Editing: het team opent het via de knop bovenaan
       // de Editing-pagina, dus Editing blijft in het menu actief op /editor-meetings.
       { href: "/videos", label: "Editing", editorLabel: "Editing Planning", icon: "Scissors", permissions: ["videos:read"], match: "/videos", alsoMatch: ["/editor-meetings"] },
