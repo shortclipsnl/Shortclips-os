@@ -8,9 +8,9 @@ import { amsterdamToday, deltaPct, parsePeriodKey, PERIODS, rankByCategory, reso
 import { loadResultsOverview, type ClientResult } from "@/server/resultaten-overzicht";
 import { TopVideos } from "./top-videos";
 import { AutoRefresh } from "./auto-refresh";
-import { GroeiDaling } from "./groei-daling";
+import { Klantgezondheid } from "./klantgezondheid";
 import { listResultAlerts } from "@/server/result-alerts";
-import { loadGroeiDaling } from "@/server/groei-daling";
+import { loadKlantgezondheid } from "@/server/klantgezondheid";
 
 export const metadata: Metadata = { title: "Resultaten" };
 export const dynamic = "force-dynamic";
@@ -167,8 +167,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     loadResultsOverview(period),
     listResultAlerts(viewer).catch(() => null),
   ]);
-  const trends = await loadGroeiDaling(period, data.clients, data.videos).catch((e) => {
-    console.error("[groei-daling]", e);
+  const gezondheid = await loadKlantgezondheid(viewer).catch((e) => {
+    console.error("[klantgezondheid]", e);
     return null;
   });
   const { totals } = data;
@@ -230,22 +230,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         </div>
       </div>
 
-      {/* 0. Klanten met daling (links) en klanten met groei (rechts), zelfde periode als de pagina */}
-      {trends && alerts ? (
-        <GroeiDaling
-          daling={trends.daling}
-          groei={trends.groei}
-          onvoldoende={trends.onvoldoende}
-          coordinatorBySlug={trends.coordinatorBySlug}
-          active={alerts.active}
-          closed={alerts.closed}
-          lastRun={alerts.lastRun}
-          staff={alerts.staff}
-          viewerId={viewer.id}
-          periodLabel={period.label}
-          prevLabel={prevLabel}
-        />
-      ) : null}
+      {/* 0. Klantgezondheid: actiestatus per klant, vaste vensters (volgt de periodekeuze niet) */}
+      {gezondheid && alerts ? <Klantgezondheid rows={gezondheid} staff={alerts.staff} viewerId={viewer.id} /> : null}
 
       {/* 1. Totaalresultaten */}
       <section className="mb-5 rounded-[var(--radius-lg)] bg-[var(--color-indigo-ink)] p-4 text-white sm:p-5">
