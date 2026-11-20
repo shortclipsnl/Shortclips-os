@@ -6,6 +6,8 @@ import { AlarmClock, Check, FolderOpen, Loader2, Plus, Search, Trophy, Users, XC
 import { createLead, setLeadFollowUp, setLeadSource, setLeadStatus } from "@/server/actions/leads";
 import type { LeadRow } from "@/server/leads";
 import type { LeadQuoteSummary } from "@/server/quotes";
+import type { LeadPhaseSummary } from "@/server/lead-journey";
+import { PHASES, STATUS_LABEL } from "@/lib/lead-journey";
 import Link from "next/link";
 import { LEAD_STATUS } from "@/lib/statuses";
 import { Stat } from "@/components/ui";
@@ -118,7 +120,7 @@ function fmtDate(d: string | null) {
 
 const OPEN_SET = new Set(["lead", "offerte", "onderhandeling"]);
 
-export function LeadsBoard({ rows, sources, quotes = {}, focusId = null, showAmounts = true, canOpenQuotes = true }: { rows: LeadRow[]; sources: string[]; quotes?: Record<string, LeadQuoteSummary>; focusId?: string | null; showAmounts?: boolean; canOpenQuotes?: boolean }) {
+export function LeadsBoard({ rows, sources, quotes = {}, phases = {}, focusId = null, showAmounts = true, canOpenQuotes = true }: { rows: LeadRow[]; sources: string[]; quotes?: Record<string, LeadQuoteSummary>; phases?: Record<string, LeadPhaseSummary | null>; focusId?: string | null; showAmounts?: boolean; canOpenQuotes?: boolean }) {
   const focused = focusId ? rows.find((r) => r.id === focusId) ?? null : null;
   const today = new Date().toISOString().slice(0, 10);
   const currentYear = String(new Date().getFullYear());
@@ -240,11 +242,12 @@ export function LeadsBoard({ rows, sources, quotes = {}, focusId = null, showAmo
       <div className="mb-2 text-xs text-[var(--color-ink-faint)]">{filtered.length} van {yearRows.length} leads{year === "alle" ? "" : ` in ${year}`}</div>
 
       <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-line)]">
-        <table className="w-full min-w-[1080px] text-sm">
+        <table className="w-full min-w-[1240px] text-sm">
           <thead>
             <tr className="border-b border-[var(--color-line)] bg-[var(--color-surface-sunken)] text-left text-xs text-[var(--color-ink-faint)]">
               <th className="px-3 py-2 font-medium">Lead</th>
               <th className="px-2 py-2 font-medium">Status</th>
+              <th className="px-2 py-2 font-medium">Fase</th>
               <th className="px-2 py-2 font-medium">Offerte</th>
               <th className="px-2 py-2 font-medium">Bron</th>
               <th className="px-2 py-2 text-center font-medium">Score</th>
@@ -255,9 +258,9 @@ export function LeadsBoard({ rows, sources, quotes = {}, focusId = null, showAmo
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r) => <LeadRowView key={r.id} r={r} today={today} quote={quotes[r.id] ?? null} focused={r.id === focusId} showAmounts={showAmounts} canOpenQuotes={canOpenQuotes} />)}
+            {filtered.map((r) => <LeadRowView key={r.id} r={r} today={today} quote={quotes[r.id] ?? null} phase={phases[r.id] ?? null} focused={r.id === focusId} showAmounts={showAmounts} canOpenQuotes={canOpenQuotes} />)}
             {filtered.length === 0 ? (
-              <tr><td colSpan={9} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen leads met deze filters.</td></tr>
+              <tr><td colSpan={10} className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">Geen leads met deze filters.</td></tr>
             ) : null}
           </tbody>
         </table>
@@ -266,7 +269,7 @@ export function LeadsBoard({ rows, sources, quotes = {}, focusId = null, showAmo
   );
 }
 
-function LeadRowView({ r, today, quote, focused, showAmounts = true, canOpenQuotes = true }: { r: LeadRow; today: string; quote: LeadQuoteSummary | null; focused?: boolean; showAmounts?: boolean; canOpenQuotes?: boolean }) {
+function LeadRowView({ r, today, quote, phase, focused, showAmounts = true, canOpenQuotes = true }: { r: LeadRow; today: string; quote: LeadQuoteSummary | null; phase?: LeadPhaseSummary | null; focused?: boolean; showAmounts?: boolean; canOpenQuotes?: boolean }) {
   const [status, setStatusLocal] = useState(r.status as Status);
   const [followUp, setFollowUp] = useState(r.followUpOn ?? "");
   const [pending, start] = useTransition();
@@ -287,7 +290,7 @@ function LeadRowView({ r, today, quote, focused, showAmounts = true, canOpenQuot
     <tr className={`border-b border-[var(--color-line)] last:border-0 hover:bg-[var(--color-surface-sunken)]/40 ${focused ? "bg-[var(--color-info-soft)]" : ""}`}
       style={{ boxShadow: `inset 3px 0 0 ${overdue ? "var(--color-bad)" : LEAD_STATUS[status]?.dot ?? "transparent"}` }}>
       <td className="px-3 py-2">
-        <div className="font-medium text-[var(--color-ink)]">{r.company}</div>
+        <Link href={`/leads/${r.id}`} className="font-medium text-[var(--color-ink)] hover:underline">{r.company}</Link>
         <div className="text-2xs text-[var(--color-ink-faint)]">
           {r.contactName ? `${r.contactName} · ` : ""}{r.segment ?? ""}
         </div>
@@ -301,6 +304,7 @@ function LeadRowView({ r, today, quote, focused, showAmounts = true, canOpenQuot
           {pending ? <Loader2 className="pointer-events-none absolute right-1.5 size-3 animate-spin opacity-60" /> : null}
         </div>
       </td>
+      <td className="px-2 py-2"><PhaseCell id={r.id} phase={phase ?? null} /></td>
       <td className="px-2 py-2"><QuoteCell q={quote} showAmount={showAmounts} linkable={canOpenQuotes} /></td>
       <td className="px-2 py-2"><SourceCell id={r.id} source={r.source} /></td>
       <td className="px-2 py-2 text-center">
@@ -353,6 +357,21 @@ function SourceCell({ id, source }: { id: string; source: string | null }) {
       </select>
       {pending ? <Loader2 className="pointer-events-none absolute right-1 size-3 animate-spin opacity-60" /> : null}
     </span>
+  );
+}
+
+/** Fase van de leadreis met voortgangsbalk; klik opent het detail. */
+function PhaseCell({ id, phase }: { id: string; phase: LeadPhaseSummary | null }) {
+  if (!phase) return <span className="text-xs text-[var(--color-ink-faint)]">–</span>;
+  const pct = Math.round(((phase.status === "klaar" ? phase.nr : phase.nr - 1) / PHASES.length) * 100);
+  return (
+    <Link href={`/leads/${id}`} className="group block min-w-[170px]" title="Open de leadreis">
+      <span className="block text-xs font-semibold text-[var(--color-ink)] group-hover:underline">Fase {phase.nr}: {phase.title}</span>
+      <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-[var(--color-neutral-soft)]">
+        <span className="block h-full rounded-full bg-[var(--color-indigo-ink)]" style={{ width: `${pct}%` }} />
+      </span>
+      <span className="block text-2xs text-[var(--color-ink-faint)]">{phase.started ? STATUS_LABEL[phase.status] : "Nog niet gestart"}</span>
+    </Link>
   );
 }
 
