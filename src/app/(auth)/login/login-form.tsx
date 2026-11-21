@@ -16,7 +16,7 @@ function SubmitButton({ idle, busy }: { idle: string; busy: string }) {
 }
 
 /** Tweede stap: de code uit de e-mail (interne accounts en klanten waar dit aanstaat). */
-function CodeForm({ maskedEmail }: { maskedEmail?: string }) {
+function CodeForm({ maskedEmail, next }: { maskedEmail?: string; next?: string }) {
   const [state, formAction] = useActionState<LoginState, FormData>(verifyLoginCodeAction, { step: "code" });
 
   // Code verlopen of te vaak fout: terug naar wachtwoord.
@@ -33,6 +33,7 @@ function CodeForm({ maskedEmail }: { maskedEmail?: string }) {
 
   return (
     <form action={formAction} className="mt-6 space-y-4">
+      {next ? <input type="hidden" name="next" value={next} /> : null}
       <p className="text-sm text-[var(--color-ink-muted)]">
         We hebben een inlogcode van 6 cijfers gestuurd naar <strong className="text-[var(--color-ink)]">{maskedEmail ?? "je e-mailadres"}</strong>.
         Op dit apparaat vragen we hem daarna niet meer.
@@ -69,7 +70,7 @@ function CodeForm({ maskedEmail }: { maskedEmail?: string }) {
 export function LoginForm({ next }: { next?: string }) {
   const [state, formAction] = useActionState<LoginState, FormData>(loginAction, {});
 
-  if (state.step === "code") return <CodeForm maskedEmail={state.maskedEmail} />;
+  if (state.step === "code") return <CodeForm maskedEmail={state.maskedEmail} next={next} />;
 
   return (
     <form action={formAction} className="mt-6 space-y-4">
@@ -109,7 +110,7 @@ export function LoginForm({ next }: { next?: string }) {
       {state.error ? <ErrorNote>{state.error}</ErrorNote> : null}
 
       <SubmitButton idle="Inloggen" busy="Bezig met inloggen…" />
-      <PasskeyLoginButton />
+      <PasskeyLoginButton next={next} />
     </form>
   );
 }

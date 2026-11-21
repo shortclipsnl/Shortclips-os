@@ -1,5 +1,6 @@
 "use client";
 
+import { safePortalPath } from "@/lib/access-link";
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Fingerprint, ScanFace, Trash2 } from "lucide-react";
@@ -47,7 +48,7 @@ function useBiometricLabel() {
 }
 
 /** Knop op het inlogscherm. */
-export function PasskeyLoginButton() {
+export function PasskeyLoginButton({ next }: { next?: string } = {}) {
   const supported = useSupported();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -63,7 +64,8 @@ export function PasskeyLoginButton() {
       const response = await startAuthentication({ optionsJSON: options });
       const result = await finishPasskeyLogin({ challengeId, response });
       if (result.ok) {
-        window.location.assign(result.target);
+        // Klant met een portaallink (bijv. vanuit WhatsApp): direct naar die pagina.
+        window.location.assign(result.target === "/portal" && next ? safePortalPath(next) : result.target);
         return;
       }
       setError(result.message);

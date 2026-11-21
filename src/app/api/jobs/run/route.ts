@@ -78,6 +78,7 @@ import { runClientNotifications } from "@/server/jobs/notifications";
 import { flushPendingPush } from "@/server/push";
 import { pruneSessions } from "@/server/auth/session";
 import { pruneLoginChallenges } from "@/server/auth/login-code";
+import { pruneAccessLinks } from "@/server/auth/access-links";
 import { runVideoReviewSync } from "@/server/video-review-sync";
 
 export const runtime = "nodejs";
@@ -227,6 +228,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   "bootstrap.production": bootstrapProduction,
   "maintenance.prune_sessions": async () => {
     await pruneLoginChallenges();
+    await pruneAccessLinks();
     return { removed: await pruneSessions() };
   },
 };
