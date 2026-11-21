@@ -1,6 +1,6 @@
 import "server-only";
 import { CLIENT_CSS } from "@/server/reports/pdf-html";
-import { docShell, esc, LOGO, nf, pctText, signed, topBar } from "@/server/reports/pdf-shared";
+import { docShell, esc, escNum, LOGO, nf, pctText, signed, topBar } from "@/server/reports/pdf-shared";
 import { PAKKET_LABEL, QUARTER_STATUS_META, kortDatum, langDatum, type HealthCriterium, type QuarterStatus } from "@/lib/kwartaal";
 import type { Inzicht, QuarterIntern, QuarterKlant } from "@/lib/kwartaal-inhoud";
 import type { KlantMetrics, KlantRapport } from "@/lib/kwartaal-klant";
@@ -16,7 +16,7 @@ import type { QuarterMetrics, SegmentCijfers } from "./metrics";
 const PLATFORM: Record<string, string> = { instagram: "Instagram", tiktok: "TikTok", facebook: "Facebook", youtube: "YouTube Shorts", linkedin: "LinkedIn", totaal: "Alle kanalen" };
 const plat = (p: string) => PLATFORM[p] ?? p;
 const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-const p = (t: string) => (t ? `<p>${esc(t)}</p>` : "");
+const p = (t: string) => (t ? `<p>${escNum(t)}</p>` : "");
 const ZEK: Record<string, string> = { bewezen: "Volgt uit de cijfers", waarschijnlijk: "Waarschijnlijk", hypothese: "Vermoeden, nog te toetsen" };
 
 const EXTRA_CSS = `
@@ -67,7 +67,7 @@ function barChart(segs: SegmentCijfers[], value: (s: SegmentCijfers) => number |
   return `<div class="chart">${cols}</div><div class="labels">${segs.map((s) => `<div>${esc(s.label)}</div>`).join("")}</div>`;
 }
 
-const inz = (list: Inzicht[]) => list.map((i) => `<div class="i"><b>${esc(i.punt)}</b>${i.zekerheid !== "bewezen" ? `<span class="tag">${esc(ZEK[i.zekerheid] ?? i.zekerheid)}</span>` : ""}${i.onderbouwing ? `<br><span>${esc(i.onderbouwing)}</span>` : ""}</div>`).join("");
+const inz = (list: Inzicht[]) => list.map((i) => `<div class="i"><b>${esc(i.punt)}</b>${i.zekerheid !== "bewezen" ? `<span class="tag">${esc(ZEK[i.zekerheid] ?? i.zekerheid)}</span>` : ""}${i.onderbouwing ? `<br><span>${escNum(i.onderbouwing)}</span>` : ""}</div>`).join("");
 const lrn = (titel: string, list: Inzicht[]) => (list.length ? `<div class="lrn"><div class="h">${esc(titel)}</div>${inz(list)}</div>` : "");
 
 /* ------------------------------------------------------------------ *
@@ -121,8 +121,8 @@ function videoCards(klant: QuarterKlant, m: KlantMetrics, thumbs: Record<string,
       <div class="t">${i + 1}. ${esc(v.titel)}</div>
       <div class="m">${v.datum ? esc(langDatum(v.datum)) : ""}${v.platforms.length ? ` · ${esc(v.platforms.map(plat).join(", "))}` : ""} · ${nf(v.likes)} likes · ${nf(v.reacties)} reacties · ${nf(v.shares)} shares · ${nf(v.saves)} saves</div>
       <div class="chips">${chips}</div>
-      ${t.waarom ? `<div class="w"><b>Waarom dit werkte:</b> ${esc(t.waarom)}${t.zekerheid !== "bewezen" ? `<span class="tag">${esc(ZEK[t.zekerheid] ?? "")}</span>` : ""}</div>` : ""}
-      ${t.meenemen ? `<div class="w"><b>Dit nemen we mee:</b> ${esc(t.meenemen)}</div>` : ""}
+      ${t.waarom ? `<div class="w"><b>Waarom dit werkte:</b> ${escNum(t.waarom)}${t.zekerheid !== "bewezen" ? `<span class="tag">${esc(ZEK[t.zekerheid] ?? "")}</span>` : ""}</div>` : ""}
+      ${t.meenemen ? `<div class="w"><b>Dit nemen we mee:</b> ${escNum(t.meenemen)}</div>` : ""}
     </div></div>`;
   }).join("");
 }
@@ -176,11 +176,11 @@ export function renderQuarterKlantHtml(r: KlantRapport): string {
     <h1>Managementsamenvatting</h1>
     <p class="lead">Het kwartaal in één minuut.</p>
     <div class="navybox">${p(s.kern)}</div>
-    ${s.resultaten.length ? `<h2>Belangrijkste resultaten</h2><ul class="checks">${s.resultaten.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-    ${s.positief ? `<h2>Grootste positieve ontwikkeling</h2><div class="hl"><div class="hlc pos"><div>${esc(s.positief)}</div></div></div>` : ""}
-    ${s.inzichten.length ? `<h2>Belangrijkste inzichten uit de content</h2><ul class="checks min">${s.inzichten.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${s.resultaten.length ? `<h2>Belangrijkste resultaten</h2><ul class="checks">${s.resultaten.map((x) => `<li>${escNum(x)}</li>`).join("")}</ul>` : ""}
+    ${s.positief ? `<h2>Grootste positieve ontwikkeling</h2><div class="hl"><div class="hlc pos"><div>${escNum(s.positief)}</div></div></div>` : ""}
+    ${s.inzichten.length ? `<h2>Belangrijkste inzichten uit de content</h2><ul class="checks min">${s.inzichten.map((x) => `<li>${escNum(x)}</li>`).join("")}</ul>` : ""}
     ${tegen ? `<h2>Wat tegenviel en waarom</h2><div class="hl">${tegen}</div>` : ""}
-    ${s.verbeterd.length ? `<h2>Wat Shortclips heeft verbeterd</h2><ul class="checks">${s.verbeterd.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${s.verbeterd.length ? `<h2>Wat Shortclips heeft verbeterd</h2><ul class="checks">${s.verbeterd.map((x) => `<li>${escNum(x)}</li>`).join("")}</ul>` : ""}
     ${s.kans ? `<h2>Belangrijkste kans voor het volgende kwartaal</h2><div class="kans"><div class="t">${esc(s.kans)}</div></div>` : ""}
     ${s.advies ? `<h2>Ons advies voor de komende drie maanden</h2><div class="soft">${p(s.advies)}</div>` : ""}
   </section>
@@ -234,8 +234,8 @@ export function renderQuarterKlantHtml(r: KlantRapport): string {
     ${lrn("Presentatoren", k.geleerd.presentatoren)}
     ${lrn("Vragen en reacties van de doelgroep", k.geleerd.doelgroep)}
     <div class="two" style="margin-top:10px">
-      ${k.geleerd.vaker.length ? `<div><h2>Dit maken we vaker</h2><ul class="checks">${k.geleerd.vaker.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "<div></div>"}
-      ${k.geleerd.minder.length ? `<div><h2>Dit maken we minder vaak</h2><ul class="checks min">${k.geleerd.minder.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "<div></div>"}
+      ${k.geleerd.vaker.length ? `<div><h2>Dit maken we vaker</h2><ul class="checks">${k.geleerd.vaker.map((x) => `<li>${escNum(x)}</li>`).join("")}</ul></div>` : "<div></div>"}
+      ${k.geleerd.minder.length ? `<div><h2>Dit maken we minder vaak</h2><ul class="checks min">${k.geleerd.minder.map((x) => `<li>${escNum(x)}</li>`).join("")}</ul></div>` : "<div></div>"}
     </div>
   </section>` : ""}
 
@@ -243,9 +243,9 @@ export function renderQuarterKlantHtml(r: KlantRapport): string {
     ${topBar(meta)}
     <h1>Zakelijke impact</h1>
     <p class="lead">Wat aantoonbaar is, wat een indicatie is en wat niet gemeten kan worden.</p>
-    ${k.impact.direct.length ? `<h2>Direct meetbare resultaten</h2><ul class="checks">${k.impact.direct.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-    ${k.impact.indirect.length ? `<h2>Indirecte indicatoren</h2><ul class="checks min">${k.impact.indirect.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-    ${k.impact.kwalitatief.length ? `<h2>Kwalitatieve inzichten</h2><ul class="checks min">${k.impact.kwalitatief.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${k.impact.direct.length ? `<h2>Direct meetbare resultaten</h2><ul class="checks">${k.impact.direct.map((x) => `<li>${escNum(x)}</li>`).join("")}</ul>` : ""}
+    ${k.impact.indirect.length ? `<h2>Indirecte indicatoren</h2><ul class="checks min">${k.impact.indirect.map((x) => `<li>${escNum(x)}</li>`).join("")}</ul>` : ""}
+    ${k.impact.kwalitatief.length ? `<h2>Kwalitatieve inzichten</h2><ul class="checks min">${k.impact.kwalitatief.map((x) => `<li>${escNum(x)}</li>`).join("")}</ul>` : ""}
     ${k.impact.nietMeetbaar ? `<h2>Wat we niet kunnen meten</h2><div class="soft">${p(k.impact.nietMeetbaar)}</div>` : ""}
     ${k.verbeterpunten.length ? `<h2>Verbeterpunten en kansen</h2>${k.verbeterpunten.map((v, i) => `<div class="imp"><div class="t">${i + 1}. ${esc(v.constatering)}</div><dl><dt>Waarom belangrijk</dt><dd>${esc(v.belang)}</dd><dt>Actie van Shortclips</dt><dd>${esc(v.actie)}</dd><dt>Verwacht resultaat</dt><dd>${esc(v.verwachtResultaat)}</dd>${v.verantwoordelijke ? `<dt>Verantwoordelijke</dt><dd>${esc(cap(v.verantwoordelijke))}</dd>` : ""}</dl></div>`).join("")}` : ""}
   </section>
@@ -282,10 +282,10 @@ export function renderQuarterDirectieHtml(r: KlantRapport): string {
     ${kpiSection(m)}
     <h2>In vier antwoorden</h2>
     <div class="dir">
-      <div class="dirc"><div class="h">Wat hebben we bereikt?</div>${esc(d.bereikt)}</div>
-      <div class="dirc"><div class="h">Wat heeft het opgeleverd?</div>${esc(d.opgeleverd)}</div>
-      <div class="dirc"><div class="h">Wat hebben we geleerd?</div>${esc(d.geleerd)}</div>
-      <div class="dirc"><div class="h">Wat doen we volgend kwartaal?</div>${esc(d.volgend)}</div>
+      <div class="dirc"><div class="h">Wat hebben we bereikt?</div>${escNum(d.bereikt)}</div>
+      <div class="dirc"><div class="h">Wat heeft het opgeleverd?</div>${escNum(d.opgeleverd)}</div>
+      <div class="dirc"><div class="h">Wat hebben we geleerd?</div>${escNum(d.geleerd)}</div>
+      <div class="dirc"><div class="h">Wat doen we volgend kwartaal?</div>${escNum(d.volgend)}</div>
     </div>
     <div class="bron">Volledige onderbouwing in de kwartaalrapportage. Alle cijfers zijn gemeten, niets is geschat.</div>
   </section>`;

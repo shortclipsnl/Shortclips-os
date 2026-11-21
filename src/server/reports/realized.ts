@@ -1,5 +1,6 @@
 import "server-only";
 import { sql } from "drizzle-orm";
+import { isVideoSql } from "./video-filter";
 import { db } from "@/db/client";
 
 /**
@@ -99,6 +100,7 @@ export async function getGerealiseerd(clientId: string, period: string): Promise
     where p.client_id = ${clientId} and p.deleted_at is null and p.status = 'published'
       and coalesce(p.published_at, d.published_at)::date >= ${from}
       and coalesce(p.published_at, d.published_at)::date <= ${to}
+      and ${isVideoSql("p")}
     order by coalesce(p.published_at, d.published_at)
   `);
   const pubRows = rowsOf(pubRes);

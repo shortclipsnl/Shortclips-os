@@ -16,6 +16,7 @@ import { STATUS_META } from "../report-list";
 import { VideoInsights, type ReviewVideo } from "./video-insights";
 import { SharePdfButton } from "./share-pdf";
 import { DictateButton } from "./dictate";
+import { weergavenPerVideo } from "@/lib/cijfers";
 
 type Rec = { titel: string; waarom?: string; wat?: string; hoeMeten?: string; zekerheid?: string };
 type Actie = { titel: string; waarom?: string };
@@ -363,7 +364,7 @@ export function ReviewUI({
                           <td className="sc-td text-right tabular-nums">{h.cijfers.meetdagen ? nf(h.cijfers.engagements) : "–"}</td>
                           <td className="sc-td text-right tabular-nums">{h.cijfers.meetdagen ? `${h.cijfers.followerGrowth >= 0 ? "+" : ""}${nf(h.cijfers.followerGrowth)}` : "–"}</td>
                           <td className="sc-td text-right tabular-nums">{nf(h.cijfers.videos)}</td>
-                          <td className="sc-td text-right tabular-nums">{h.cijfers.meetdagen && h.cijfers.videos ? nf(h.cijfers.views / h.cijfers.videos) : "–"}</td>
+                          <td className="sc-td text-right tabular-nums">{nf(weergavenPerVideo(h.cijfers))}</td>
                           <td className="sc-td">{h.id && h.period !== report.period ? <Link href={`/analytics/maandrapportages/${h.id}`} className="text-[var(--color-ink)] hover:underline">{STATUS_META[h.status ?? ""]?.label ?? "Openen"}</Link> : h.period === report.period ? <span className="text-[var(--color-ink-faint)]">dit rapport</span> : <span className="text-[var(--color-ink-faint)]">geen</span>}</td>
                         </tr>
                       ))}</tbody>

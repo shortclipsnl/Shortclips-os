@@ -1,6 +1,8 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { isVideoSql } from "./video-filter";
+import { weergavenPerVideo } from "@/lib/cijfers";
 
 /**
  * Deterministische maandcijfers voor AI Maandrapportages.
@@ -24,8 +26,10 @@ export type MaandCijfers = {
   shares: number;
   saves: number;
   followerGrowth: number;
-  /** Gepubliceerde video's volgens de publicatielijst (bron: Metricool-posts). */
+  /** Gepubliceerde video's volgens de publicatielijst (bron: Metricool-posts). Fotoposts en carrousels tellen niet mee. */
   videos: number;
+  /** Weergaven van die video's zelf (laatste meting per video). 0 = geen cijfers per video voor deze maand. */
+  videoViews?: number;
   /** Aantal dagen met cijfers in deze maand (0 = geen meting). */
   meetdagen: number;
 };
@@ -72,14 +76,18 @@ export async function monthSeries(clientId: string, period: string, back = 6): P
       where client_id = ${clientId} and measured_on >= ${from} and measured_on <= ${to}
       group by 1`),
     db.execute(sql`
-      select to_char(published_at at time zone 'Europe/Amsterdam', 'YYYY-MM') maand, count(*)::int videos
-      from publications
-      where client_id = ${clientId} and deleted_at is null and status = 'published' and published_at is not null
-        and published_at >= ${from}::date and published_at < (${to}::date + 1)
+      with pm as (select publication_id, max(views) views from social_metrics where client_id = ${clientId} group by publication_id)
+      select to_char(p.published_at at time zone 'Europe/Amsterdam', 'YYYY-MM') maand, count(*)::int videos,
+             coalesce(sum(pm.views),0)::bigint video_views
+      from publications p
+      left join pm on pm.publication_id = p.id
+      where p.client_id = ${clientId} and p.deleted_at is null and p.status = 'published' and p.published_at is not null
+        and p.published_at >= ${from}::date and p.published_at < (${to}::date + 1)
+        and ${isVideoSql("p")}
       group by 1`),
   ]);
   const dm = new Map(rows<Record<string, unknown>>(dmRes).map((r) => [String(r.maand), r]));
-  const pubs = new Map(rows<Record<string, unknown>>(pubRes).map((r) => [String(r.maand), n(r.videos)]));
+  const pubs = new Map(rows<Record<string, unknown>>(pubRes).map((r) => [String(r.maand), { videos: n(r.videos), videoViews: n(r.video_views) }]));
 
   const out: MaandCijfers[] = [];
   for (let i = back; i >= 0; i--) {
@@ -95,7 +103,8 @@ export async function monthSeries(clientId: string, period: string, back = 6): P
       shares: n(r?.shares),
       saves: n(r?.saves),
       followerGrowth: n(r?.follower_growth),
-      videos: pubs.get(maand) ?? 0,
+      videos: pubs.get(maand)?.videos ?? 0,
+      videoViews: pubs.get(maand)?.videoViews ?? 0,
       meetdagen: n(r?.meetdagen),
     });
   }
@@ -119,7 +128,8 @@ export function buildVergelijking(series: MaandCijfers[]): Vergelijking {
   const prevMeasured = prev && prev.meetdagen > 0 ? prev : null;
   const last3 = prior.slice(-3);
   const last6 = prior.slice(-6);
-  const vpv = (m: MaandCijfers | null) => (m && m.videos > 0 ? m.views / m.videos : null);
+  // Echte weergaven per video (zonder fotocontent); zie weergavenPerVideo.
+  const vpv = (m: MaandCijfers | null) => weergavenPerVideo(m);
   // Volgersgroei kan negatief zijn: dan geen procentuele wijziging.
   const fg = prevMeasured && prevMeasured.followerGrowth > 0 ? pct(cur.followerGrowth, prevMeasured.followerGrowth) : null;
   return {
@@ -131,7 +141,7 @@ export function buildVergelijking(series: MaandCijfers[]): Vergelijking {
       videos: pct(cur.videos, prev ? prev.videos : null),
       viewsPerVideo: (() => {
         const c = vpv(cur);
-        const p = vpv(prevMeasured);
+        const p = vpv(prev ?? null);
         return c === null ? null : pct(c, p);
       })(),
     },
@@ -258,6 +268,7 @@ export async function monthVideos(clientId: string, period: string, limit = 40):
       and coalesce(p.published_at, d.published_at)::date >= ${from}
       and coalesce(p.published_at, d.published_at)::date <= ${to}
       and coalesce(pm.views,0) > 0
+      and ${isVideoSql("p")}
     order by views desc
     limit ${limit}`);
   return rows<Record<string, unknown>>(res).map((v, i) => ({
@@ -307,6 +318,7 @@ export async function platformSplit(clientId: string, period: string): Promise<P
       select platform::text platform, count(*)::int videos from publications
       where client_id = ${clientId} and deleted_at is null and status = 'published' and published_at is not null
         and published_at >= ${from}::date and published_at < (${to}::date + 1)
+        and ${isVideoSql()}
       group by 1`),
     // Weergaven uit de cijfers per video (voor platforms zonder accountweergaven, zoals Facebook).
     db.execute(sql`
@@ -314,6 +326,7 @@ export async function platformSplit(clientId: string, period: string): Promise<P
       select p.platform::text platform, coalesce(sum(pm.views),0)::bigint views
       from publications p join pm on pm.publication_id = p.id
       where p.client_id = ${clientId} and p.deleted_at is null and p.published_at >= ${from}::date and p.published_at < (${to}::date + 1)
+        and ${isVideoSql("p")}
       group by 1`),
   ]);
   const vidMap = new Map(rows<Record<string, unknown>>(vidViews).map((r) => [String(r.platform), n(r.views)]));

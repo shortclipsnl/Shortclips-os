@@ -1,5 +1,6 @@
 import "server-only";
 import { sql } from "drizzle-orm";
+import { isVideoSql } from "@/server/reports/video-filter";
 import { db } from "@/db/client";
 import { captionKey } from "@/server/content-memory/analyze";
 import {
@@ -177,7 +178,8 @@ async function pubRows(clientId: string, from: string, to: string): Promise<PubR
     left join scripts sc on sc.id = d.script_id and sc.deleted_at is null
     where p.client_id = ${clientId} and p.deleted_at is null and p.status = 'published'
       and (coalesce(p.published_at, d.published_at) at time zone 'Europe/Amsterdam')::date >= ${from}::date
-      and (coalesce(p.published_at, d.published_at) at time zone 'Europe/Amsterdam')::date <= ${to}::date`);
+      and (coalesce(p.published_at, d.published_at) at time zone 'Europe/Amsterdam')::date <= ${to}::date
+      and ${isVideoSql("p")}`);
   return rowsOf<Record<string, unknown>>(res).map((r) => ({
     id: String(r.id), deliverableId: r.deliverable_id ? String(r.deliverable_id) : null, platform: String(r.platform),
     datum: r.datum ? String(r.datum) : null, titel: String(r.titel ?? "Video"), url: r.url ? String(r.url) : null,

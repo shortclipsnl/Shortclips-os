@@ -1,6 +1,7 @@
 import "server-only";
 import type { MonthlyAnalysis, ReportMetrics, VideoAnalyse, VideoPunt } from "./analysis";
 import type { MaandCijfers } from "./metrics";
+import { weergavenPerVideo } from "@/lib/cijfers";
 import type { Beoordeling } from "./quality";
 import { docShell, esc, LOGO, nf, pctText, shortMonth, signed, topBar } from "./pdf-shared";
 import { barChart, CLIENT_CSS, deltaPill, PLATFORM, platformBlock } from "./pdf-html";
@@ -341,7 +342,8 @@ function maandKaarten(historie: MaandCijfers[]): string {
   const cards = data.map((m, i) => {
     const prev = i > 0 ? data[i - 1] : undefined;
     const d = prev && prev.views > 0 ? ((m.views - prev.views) / prev.views) * 100 : null;
-    const perVideo = m.videos > 0 ? Math.round(m.views / m.videos) : null;
+    const pv = weergavenPerVideo(m);
+    const perVideo = pv === null ? null : Math.round(pv);
     const cur = i === data.length - 1;
     return `<div class="mkc${cur ? " cur" : ""}"><div class="m">${esc(shortMonth(m.maand))}</div><div class="v">${nf(m.views)}</div><div class="s">weergaven</div>
       <div class="r"><span>Interacties</span><b>${nf(m.engagements)}</b></div>
