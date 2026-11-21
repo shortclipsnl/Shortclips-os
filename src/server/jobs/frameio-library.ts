@@ -299,13 +299,19 @@ async function linkSessionsToShoots(clientId: string, sessions: Array<{ id: stri
   return result;
 }
 
-export async function syncFrameLibrary(triggeredById?: string, rawSource: FrameLibrarySource = frameio, opts: { full?: boolean } = {}) {
+export async function syncFrameLibrary(
+  triggeredById?: string,
+  rawSource: FrameLibrarySource = frameio,
+  /** projectIds: alleen deze Frame.io-projecten (webhook bij een nieuwe upload/versie). */
+  opts: { full?: boolean; projectIds?: string[] } = {},
+) {
   const source = throttled(rawSource);
   const full = opts.full ?? false;
+  const only = opts.projectIds?.length ? new Set(opts.projectIds) : null;
   return runJob(
     "frameio",
     "frameio.sync_library",
-    { full },
+    only ? { full, projectIds: [...only] } : { full },
     async (ctx) => {
       const projects = await linkProjects(source, ctx);
       const byId = new Map(projects.map((p) => [p.id, p]));
@@ -314,7 +320,7 @@ export async function syncFrameLibrary(triggeredById?: string, rawSource: FrameL
         .from(clientIntegrations)
         .where(and(eq(clientIntegrations.provider, "frameio"), eq(clientIntegrations.isActive, true)));
 
-      await pool(links, 4, async (link) => {
+      await pool(only ? links.filter((l) => only.has(l.projectId)) : links, 4, async (link) => {
         const project = byId.get(link.projectId);
         const root = project?.root_folder_id ?? ((link.config ?? {}) as { rootFolderId?: string | null }).rootFolderId ?? null;
         if (!root) {

@@ -9,7 +9,12 @@ export const FRAMEIO_WEBHOOK_SECRET_KEY = "frameio.webhook_secret";
 export const FRAMEIO_WEBHOOK_ID_KEY = "frameio.webhook_id";
 
 /** Gebeurtenissen die de videobeoordeling nodig heeft. */
-export const FRAMEIO_REVIEW_EVENTS = ["comment.created", "comment.updated", "comment.deleted", "comment.completed", "comment.uncompleted", "file.versioned"];
+export const FRAMEIO_REVIEW_EVENTS = [
+  "comment.created", "comment.updated", "comment.deleted", "comment.completed", "comment.uncompleted",
+  "file.versioned",
+  // Nieuwe video's direct in het portaal (niet pas bij de geplande sync).
+  "file.upload.completed", "file.ready",
+];
 
 /**
  * Frame.io V4-handtekening: HMAC-SHA256 over `v0:{timestamp}:{body}`, header
@@ -42,7 +47,15 @@ export async function ensureFrameWebhook(): Promise<{ ok: boolean; message: stri
     const hit = hooks.find((h) => h.url === url);
     if (hit) {
       const secret = await getStringSetting(FRAMEIO_WEBHOOK_SECRET_KEY, "");
-      if (secret) return { ok: true, message: `Webhook bestaat al (${hit.id}).` };
+      if (secret) {
+        // Bestaande webhook aanvullen met ontbrekende gebeurtenissen (secret blijft gelijk).
+        const missing = FRAMEIO_REVIEW_EVENTS.filter((e) => !(hit.events ?? []).includes(e));
+        if (missing.length) {
+          await frameio.updateWebhookEvents(hit.id, [...new Set([...(hit.events ?? []), ...FRAMEIO_REVIEW_EVENTS])]);
+          return { ok: true, message: `Webhook ${hit.id} aangevuld met: ${missing.join(", ")}.` };
+        }
+        return { ok: true, message: `Webhook bestaat al (${hit.id}).` };
+      }
       return { ok: false, message: `Er staat al een webhook naar ${url} (${hit.id}), maar het secret is hier niet bekend. Verwijder die in Frame.io en registreer opnieuw.` };
     }
   }

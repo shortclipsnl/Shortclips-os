@@ -172,6 +172,11 @@ export function PortalResultsView({
             {periodLabel}
             {r.lastUpdated ? <span className="text-[var(--color-ink-faint)]"> · bijgewerkt op {formatDate(r.lastUpdated)}</span> : null}
           </p>
+          {r.lastUpdated && staleDays(r.lastUpdated) >= 3 ? (
+            <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-[var(--st-blue-bg)] px-3 py-1 text-[12.5px] font-medium text-[var(--st-blue)]">
+              <span className="size-1.5 rounded-full bg-current" /> Je ziet de laatst opgehaalde cijfers. Nieuwe cijfers worden automatisch bijgewerkt.
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -288,4 +293,11 @@ export function PortalResultsView({
       )}
     </div>
   );
+}
+
+/** Aantal dagen tussen de laatste meetdag en vandaag (cijfers lopen normaal één dag achter). */
+function staleDays(lastUpdated: string): number {
+  const last = Date.parse(`${lastUpdated.slice(0, 10)}T00:00:00Z`);
+  if (!Number.isFinite(last)) return 0;
+  return Math.floor((Date.now() - last) / 86_400_000);
 }

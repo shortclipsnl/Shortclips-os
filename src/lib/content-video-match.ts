@@ -67,7 +67,9 @@ export function videoKey(name: string, clientName?: string | null): string {
     .replace(/(_\d+|\s*\(\d+\))$/i, "") // "_1", " (1)": kopieën van dezelfde export
     .replace(/^\s*v\d{1,2}\b\s*/i, "") // "V2 4. ..."
     .replace(/^\s*video\s*\d{1,3}\b\s*/i, "") // "Video 5 ..."
-    .replace(/^\s*\d{1,3}(?:\.\d{1,2})?\s*[.)-]?\s+/, "") // "3. ", "2.2 ", "1.2 "
+    .replace(/^\s*\d{1,3}v\d{1,2}\b[\s._-]*/i, "") // "4V2 - Titel"
+    // "3. ", "2.2 ", "1 - ", "1._V2 ", "4._V5 ": nummering (+ eventuele versie) vooraan.
+    .replace(/^\s*\d{1,3}(?:\.\d{1,2})?(?:\s*[._)-]+\s*|\s+)(?!\d)(?:_?v\d{1,2}\b[\s._-]*)?/i, "")
     .replace(/[\s-]*shortclips\b.*$/i, ""); // "- Shortclips" en alles erachter
   return tokens(t, clientName).filter((w) => !/^v\d{1,2}$/.test(w)).join(" ");
 }

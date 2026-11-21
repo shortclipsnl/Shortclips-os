@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clientIntegrations, clients, dailyMetrics, publications, socialMetrics } from "@/db/schema";
 import { normalizeName } from "@/server/import";
@@ -224,22 +224,33 @@ export async function pullMetricoolMetrics(
         type Row = typeof dailyMetrics.$inferInsert;
         const rows: Row[] = [];
 
+        // Platforms waarvan alle cijfers volledig binnenkwamen. Alleen die worden
+        // vervangen; bij een tijdelijke storing blijven de laatst opgehaalde
+        // cijfers staan, zodat niets "op nul springt".
+        const refreshed = new Set<NonNullable<Row["platform"]>>();
         for (const network of METRICOOL_NETWORKS) {
+          const platform = NETWORK_PLATFORM[network];
           const perDay = new Map<string, DayAgg>();
           const add = (date: string, field: keyof DayAgg, value: number) => {
             const r = perDay.get(date) ?? EMPTY_AGG();
             r[field] += value;
             perDay.set(date, r);
           };
-          for (const { field, subject, metric, sign } of METRIC_MAP[network] ?? []) {
-            const raw = await source.timeline(blogId, userId, network, subject, metric, fromISO, toISO);
-            // Sommige TikTok-accounts leveren de oplopende totaalstand i.p.v. dagcijfers;
-            // die zetten we om naar per dag, anders tellen we elke dag alle likes opnieuw.
-            const points = network === "Tiktok" && field !== "followers" && field !== "followerDelta" ? toDailySeries(raw) : raw;
-            for (const p of points) add(p.date, field as keyof DayAgg, p.value * (sign ?? 1));
+          try {
+            for (const { field, subject, metric, sign } of METRIC_MAP[network] ?? []) {
+              const raw = await source.timeline(blogId, userId, network, subject, metric, fromISO, toISO);
+              // Sommige TikTok-accounts leveren de oplopende totaalstand i.p.v. dagcijfers;
+              // die zetten we om naar per dag, anders tellen we elke dag alle likes opnieuw.
+              const points = network === "Tiktok" && field !== "followers" && field !== "followerDelta" ? toDailySeries(raw) : raw;
+              for (const p of points) add(p.date, field as keyof DayAgg, p.value * (sign ?? 1));
+            }
+          } catch (error) {
+            ctx.counters.failed++;
+            ctx.log(`Merk ${link.blogId}: ${network} tijdelijk niet bereikbaar (${String((error as Error)?.message ?? error).slice(0, 120)}); laatst opgehaalde cijfers blijven staan.`, "warn");
+            continue;
           }
-          if (perDay.size === 0) continue;
-          const platform = NETWORK_PLATFORM[network];
+          if (perDay.size === 0 || !platform) continue;
+          refreshed.add(platform);
           for (const [date, a] of perDay) {
             rows.push({
               clientId: link.clientId,
@@ -266,21 +277,25 @@ export async function pullMetricoolMetrics(
           continue;
         }
 
-        // Vervang de bestaande Metricool-rijen in het venster.
-        await db
-          .delete(dailyMetrics)
-          .where(
-            and(
-              eq(dailyMetrics.clientId, link.clientId),
-              eq(dailyMetrics.source, "metricool"),
-              gte(dailyMetrics.measuredOn, fromDate),
-            ),
-          );
-
-        // In blokken invoegen (PGlite/Postgres-parametergrens).
-        for (let i = 0; i < rows.length; i += 200) {
-          await db.insert(dailyMetrics).values(rows.slice(i, i + 200));
-        }
+        // Vervang de bestaande Metricool-rijen in het venster, alleen voor de
+        // platforms die volledig zijn opgehaald, en in één transactie: lukt het
+        // invoegen niet, dan blijven de oude cijfers ongewijzigd staan.
+        await db.transaction(async (tx) => {
+          await tx
+            .delete(dailyMetrics)
+            .where(
+              and(
+                eq(dailyMetrics.clientId, link.clientId),
+                eq(dailyMetrics.source, "metricool"),
+                gte(dailyMetrics.measuredOn, fromDate),
+                inArray(dailyMetrics.platform, [...refreshed]),
+              ),
+            );
+          // In blokken invoegen (PGlite/Postgres-parametergrens).
+          for (let i = 0; i < rows.length; i += 200) {
+            await tx.insert(dailyMetrics).values(rows.slice(i, i + 200));
+          }
+        });
 
         ctx.counters.processed++;
         ctx.counters.created += rows.length;
@@ -425,13 +440,14 @@ export async function linkPublicationsToPlanning(clientId: string): Promise<numb
   const res = await db.execute(sql`
     with pub as (
       select id, published_at,
-             left(lower(regexp_replace(normalize(caption, NFKC), '[^a-zA-Z0-9]', '', 'g')), 30) as k
+             left(lower(regexp_replace(normalize(regexp_replace(regexp_replace(caption, '<[^>]+>', ' ', 'g'), '&[a-zA-Z#0-9]+;', ' ', 'g'), NFKC), '[^a-zA-Z0-9]', '', 'g')), 30) as k
       from publications
       where client_id = ${clientId} and deleted_at is null and calendar_item_id is null and caption is not null
     ),
     cal as (
       select id, scheduled_on,
-             left(lower(regexp_replace(normalize(caption, NFKC), '[^a-zA-Z0-9]', '', 'g')), 30) as k
+             -- De planning bewaart captions als HTML (<p>...</p>): eerst tags en entiteiten weg.
+             left(lower(regexp_replace(normalize(regexp_replace(regexp_replace(caption, '<[^>]+>', ' ', 'g'), '&[a-zA-Z#0-9]+;', ' ', 'g'), NFKC), '[^a-zA-Z0-9]', '', 'g')), 30) as k
       from content_calendar
       where client_id = ${clientId} and deleted_at is null and caption is not null
     ),

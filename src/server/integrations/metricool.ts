@@ -1,6 +1,7 @@
 import "server-only";
 import { env } from "@/lib/env";
 import { apiFetch } from "./http";
+import { IntegrationError } from "./types";
 
 /**
  * Metricool — v2 API.
@@ -88,14 +89,18 @@ export class MetricoolService {
         `${BASE}/analytics/timelines`,
         {
           headers: this.headers,
-          retries: 0,
+          retries: 1,
           query: { from: fromISO, to: toISO, network, subject, metric, blogId, userId },
         },
       );
       const values = res.data?.[0]?.values ?? [];
       return values.map((v) => ({ date: String(v.dateTime).slice(0, 10), value: Number(v.value) || 0 }));
-    } catch {
-      return [];
+    } catch (error) {
+      // Netwerk of metric niet beschikbaar voor dit merk (400/403/404/422): geen cijfers.
+      if (isNotAvailable(error)) return [];
+      // Tijdelijke storing (time-out, 429, 5xx): doorgeven. De sync laat dan de
+      // laatst opgehaalde cijfers staan in plaats van ze door nullen te vervangen.
+      throw error;
     }
   }
 
@@ -190,4 +195,15 @@ export function metricoolDate(d: Date, endOfDay = false): string {
   const p = (n: number) => String(n).padStart(2, "0");
   const t = endOfDay ? "23:59:59" : "00:00:00";
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${t}`;
+}
+
+
+/** Fout die betekent "dit netwerk/deze metric bestaat hier niet", geen storing. */
+export function isNotAvailable(error: unknown): boolean {
+  return (
+    error instanceof IntegrationError &&
+    !error.retryable &&
+    typeof error.status === "number" &&
+    [400, 403, 404, 422].includes(error.status)
+  );
 }

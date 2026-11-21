@@ -1,6 +1,7 @@
 import { sweepInactiveClients } from "@/server/client-status-transition";
 import { syncFrameLibrary } from "./frameio-library";
 import "server-only";
+import { ensureFrameWebhook } from "@/server/integrations/frameio-webhook";
 import { runProductionPhaseAdvance } from "./production-phases";
 import { runLinkSuggestions } from "./link-suggestions";
 import { runContentSync } from "./content-sync";
@@ -11,10 +12,8 @@ import { syncOpenOnboardings } from "@/server/onboarding";
 import { runMonthlyReportDrafts } from "./report-drafts";
 import { runContentOnlineNotifications } from "./content-online-notify";
 import { runMonthlyInsightTasks } from "./insight-tasks";
-import { runIntegrationHealthCheck } from "./integration-health";
 import { runDriveSync } from "./drive-sync";
 import { runCaptionDriveLink } from "./caption-drive-link";
-import { runMetricoolSync } from "./metricool-sync";
 import { snapshotFinanceMonth } from "./finance-snapshot";
 import { runProfitabilitySignals } from "./profitability-signals";
 import { runContentHealthSignals } from "./content-health-signals";
@@ -127,23 +126,35 @@ export async function runNightlySync() {
  * signalen, herinneringen, klantbehoud-taken en backups van de nachtrun meeneemt.
  */
 export async function runNightlyExternalSync() {
+  // Agenda (elk uur), Metricool (04:10-04:25 en 10:15), de Frame.io-bibliotheek
+  // (overdag elke 2 uur + volledig om 01:30) en de koppelingsbewaking (elk
+  // kwartier) hebben een eigen geplande taak. Hier staan alleen de stappen die
+  // nergens anders draaien, met een tijdsbudget: wat niet meer past binnen de
+  // 300 seconden schuift door naar de volgende nacht in plaats van dat de hele
+  // run halverwege wordt afgebroken (dat gebeurde sinds 31 okt elke nacht).
+  const started = Date.now();
+  const BUDGET_MS = 240_000;
   const results: StepResult[] = [];
-  results.push(await step("drive.sync_all", () => runDriveSync()));
-  // Direct ná de Drive-sync: koppel nieuwe script-PDF's automatisch aan de juiste
-  // opname en bereid de captions voor (de files-tabel is nu vers).
-  results.push(await step("captions.link_drive_scripts", () => runCaptionDriveLink()));
-  results.push(await step("frameio.pull_projects", () => pullFrameProjects()));
-  results.push(await step("frameio.pull_deliverables", () => pullFrameDeliverables()));
-  // Frame.io-bibliotheek voor het klantportaal (sessiemappen, video's, thumbnails).
-  results.push(await step("frameio.sync_library", () => syncFrameLibrary(undefined, undefined, { full: true })));
-  results.push(await step("calendar.sync", () => runCalendarSync()));
-  // Direct ná de agenda-sync: controleer of alle opnames ook echt in de planning
-  // staan en meld afwijkingen (opname zonder klant / mogelijk gemiste opname).
-  // shoots.reconcile draait via een eigen cron (05:20): achteraan deze lange
-  // keten haalde hij door time-outs sinds 5 november de beurt niet meer.
-  results.push(await step("metricool.sync", () => runMetricoolSync()));
-  // Na alle externe syncs: controleer de gezondheid van de koppelingen en meld
-  // proactief verouderde/nooit-geslaagde koppelingen aan de verantwoordelijke.
-  results.push(await step("integrations.health_check", () => runIntegrationHealthCheck()));
+  const steps: Array<[string, () => Promise<unknown>]> = [
+    ["drive.sync_all", () => runDriveSync()],
+    // Direct ná de Drive-sync: nieuwe script-PDF's koppelen aan de juiste opname.
+    ["captions.link_drive_scripts", () => runCaptionDriveLink()],
+    ["frameio.pull_projects", () => pullFrameProjects()],
+    // Webhook in Frame.io controleren en zo nodig aanvullen (nieuwe uploads/versies).
+    ["frameio.ensure_webhook", () => ensureFrameWebhook()],
+    ["frameio.pull_deliverables", () => pullFrameDeliverables()],
+  ];
+  for (const [job, fn] of steps) {
+    if (Date.now() - started > BUDGET_MS) {
+      results.push({ job, ok: true, error: "uitgesteld: tijdsbudget op" });
+      continue;
+    }
+    results.push(await step(job, fn));
+  }
   return { ok: results.every((r) => r.ok), results };
+}
+
+/** Volledige controle van de Frame.io-bibliotheek (ook ongewijzigde sessies), eigen cron. */
+export async function runFrameLibraryFull() {
+  return syncFrameLibrary(undefined, undefined, { full: true });
 }
