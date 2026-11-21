@@ -546,7 +546,7 @@ export async function runTaskStep(clientId: string): Promise<{ created: number }
     ].join("\n"),
     portaal: `Controleer het e-mailadres${contact?.email ? ` (${contact.email})` : ""} en maak de login aan via Beheer van deze klant.`,
     kickoff: `Plan de kickoff (ca. 45 minuten) in de agenda Team Shortclips met "Kickoff" en de klantnaam in de titel, bijvoorbeeld "Kickoff | ${client.name}". De Hub herkent het event en zet de stap vanzelf op klaar.`,
-    briefing: "Vul tijdens of direct na de kickoff de klantbriefing in op het tabblad Onboarding. Die komt in het klantgeheugen, zodat de Scriptgenerator en Content Research hem gebruiken.",
+    briefing: "Vul tijdens of direct na de kickoff de klantbriefing in op het tabblad Onboarding. Die komt in het klantgeheugen, zodat de Scriptgenerator en het Contentgeheugen hem gebruiken.",
     opnamedag: `Leg in de kickoff de eerste ${FIRST_SHOOTS_REQUIRED} opnamedagen vast. Staan ze in Google Agenda, dan gaat deze taak vanzelf op klaar.`,
   };
 

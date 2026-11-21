@@ -75,8 +75,8 @@ export const PERMISSIONS = {
   "video_intelligence:run": "Video's toevoegen en laten analyseren",
 
   // Content Research
-  "content_research:read": "AI Content Research bekijken (ideeën per klant)",
-  "content_research:write": "Onderzoek starten en ideeën beheren",
+  "content_research:read": "Klantonderzoek en contentbronnen bekijken",
+  "content_research:write": "Klantonderzoek starten",
 
   // Beheer
   "integrations:read": "Koppelingen en hun status bekijken",

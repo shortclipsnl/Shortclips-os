@@ -9,7 +9,6 @@ import type { ActiveAiTask, ActiveAiTasks } from "@/server/ai-tasks";
 const POLL_MS = 15_000;
 
 const KIND_LABEL: Record<ActiveAiTask["kind"], string> = {
-  content_research: "Content Research",
   video_intelligence: "Video-analyse",
   captions: "Captions",
   maandrapport: "Maandrapportage",
