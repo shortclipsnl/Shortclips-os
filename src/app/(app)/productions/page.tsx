@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarCheck } from "lucide-react";
+import { CalendarCheck, Users } from "lucide-react";
 import { asc, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clients as clientsTable } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
+import { canUseFreelanceVideographers } from "@/server/freelance-videographers-access";
 import { getDefaultVideographer, getShootOverview, nextShootPerClient, shootsInRange } from "@/server/productions";
 import {
   getCalendarFreshness,
@@ -134,7 +135,21 @@ export default async function ProductionsPage({ searchParams }: { searchParams: 
 
   return (
     <div className="mx-auto max-w-[1200px]">
-      <PageHeader title="Opnameplanning" description="Agenda — gesynchroniseerd vanuit Google Agenda" />
+      <PageHeader
+        title="Opnameplanning"
+        description="Agenda — gesynchroniseerd vanuit Google Agenda"
+        actions={
+          // Freelance videografen: wie we kunnen inschakelen als de vaste videograaf niet kan. Alleen intern kernteam.
+          canUseFreelanceVideographers(viewer) ? (
+            <Link
+              href="/freelance-videografen"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-[var(--radius-sm)] bg-[var(--color-indigo-ink)] px-4 text-sm font-semibold text-white shadow-[var(--shadow-card)] transition hover:bg-[var(--color-indigo-soft)]"
+            >
+              <Users className="size-4" strokeWidth={2} /> Freelance videografen
+            </Link>
+          ) : undefined
+        }
+      />
 
       {/* Statusblokken: alle cijfers uit dezelfde centrale opnamegegevens. */}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">

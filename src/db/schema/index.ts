@@ -43,3 +43,4 @@ export * from "./client-research";
 export * from "./quarterly";
 export * from "./content-advice";
 export * from "./lead-mail";
+export * from "./freelance-videographers";
