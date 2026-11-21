@@ -54,7 +54,7 @@ export function SyncLeadsButton({ lastSyncAt, configured }: { lastSyncAt: string
           <p className="font-medium text-[var(--color-ink)]">Leads komen binnen via de mail</p>
           <p className="text-xs text-[var(--color-ink-muted)]">
             Nieuwe aanvragen worden automatisch uit de mailmap &apos;Leads - Shortclips&apos; opgehaald.{" "}
-            {configured ? `Automatisch bijgewerkt terwijl je hier bent · laatste synchronisatie: ${relative(lastSyncAt)}.` : "Mailkoppeling nog niet ingesteld."}
+            {configured ? `Automatisch bijgewerkt terwijl je hier bent · laatste synchronisatie: ${relative(lastSyncAt)}.` : "Let op: de mailkoppeling is niet ingesteld, nieuwe aanvragen komen nu niet automatisch binnen."}
             {msg ? <span className="ml-1 font-medium text-[var(--color-good)]">{msg}</span> : null}
           </p>
         </div>

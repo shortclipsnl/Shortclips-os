@@ -21,6 +21,7 @@ export type ImapLeadMessage = {
   from: string | null;
   fromName: string | null;
   fromEmail: string | null;
+  replyTo: string | null;
   subject: string | null;
   date: Date | null;
   body: string;
@@ -111,6 +112,80 @@ export class ImapLeadsService {
     }
   }
 
+  /**
+   * Alle berichten in de leadsmap, alleen de kop (UID + Message-ID). Goedkoop,
+   * ook bij een volle map, zodat de synchronisatie de hele historie kan nalopen
+   * en alleen de nog niet verwerkte mails volledig ophaalt.
+   */
+  async listMessageIds(): Promise<{ uid: number; messageId: string }[]> {
+    if (!this.isConfigured) {
+      throw new MissingCredentialsError("gmail", ["IMAP_HOST", "IMAP_USER", "IMAP_PASSWORD"]);
+    }
+    const client = this.newClient();
+    const out: { uid: number; messageId: string }[] = [];
+    try {
+      await client.connect();
+      const { path } = await this.resolveFolder(client);
+      if (!path) {
+        throw new IntegrationError("gmail", `Map "${this.folderName}" niet gevonden in de mailbox.`, 404, false);
+      }
+      const lock = await client.getMailboxLock(path);
+      try {
+        const total = typeof client.mailbox === "object" ? client.mailbox.exists : 0;
+        if (!total) return [];
+        for await (const msg of client.fetch("1:*", { uid: true, envelope: true })) {
+          const id = (msg.envelope?.messageId ?? `imap:${path}:uid${msg.uid}`).trim();
+          out.push({ uid: msg.uid, messageId: id });
+        }
+      } finally {
+        lock.release();
+      }
+    } finally {
+      await client.logout().catch(() => {});
+    }
+    return out;
+  }
+
+  /** Haalt de opgegeven berichten (op UID) volledig op, oudste eerst. */
+  async fetchByUids(uids: number[]): Promise<ImapLeadMessage[]> {
+    if (!uids.length) return [];
+    const client = this.newClient();
+    const out: (ImapLeadMessage & { uid: number })[] = [];
+    try {
+      await client.connect();
+      const { path } = await this.resolveFolder(client);
+      if (!path) {
+        throw new IntegrationError("gmail", `Map "${this.folderName}" niet gevonden in de mailbox.`, 404, false);
+      }
+      const lock = await client.getMailboxLock(path);
+      try {
+        for await (const msg of client.fetch(uids.join(","), { source: true, uid: true }, { uid: true })) {
+          if (!msg.source) continue;
+          const parsed = await simpleParser(msg.source);
+          const addr = parsed.from?.value?.[0];
+          const body = parsed.text && parsed.text.trim() ? parsed.text : parsed.html ? stripHtml(parsed.html) : "";
+          out.push({
+            uid: msg.uid,
+            messageId: (parsed.messageId ?? `imap:${path}:uid${msg.uid}`).trim(),
+            from: parsed.from?.text ?? null,
+            fromName: addr?.name || null,
+            fromEmail: addr?.address || null,
+            replyTo: parsed.replyTo?.text ?? null,
+            subject: parsed.subject ?? null,
+            date: parsed.date ?? null,
+            body,
+          });
+        }
+      } finally {
+        lock.release();
+      }
+    } finally {
+      await client.logout().catch(() => {});
+    }
+    out.sort((a, b) => a.uid - b.uid);
+    return out;
+  }
+
   /** De recentste berichten uit de leadsmap (nieuwste eerst), als platte tekst. */
   async fetchFolderMessages(max = 80): Promise<ImapLeadMessage[]> {
     if (!this.isConfigured) {
@@ -140,6 +215,7 @@ export class ImapLeadsService {
             from: parsed.from?.text ?? null,
             fromName: addr?.name || null,
             fromEmail: addr?.address || null,
+            replyTo: parsed.replyTo?.text ?? null,
             subject: parsed.subject ?? null,
             date: parsed.date ?? null,
             body,

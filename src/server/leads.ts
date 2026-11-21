@@ -1,8 +1,8 @@
 import "server-only";
-import { desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
-import { clients, salesLeads, users } from "@/db/schema";
+import { clients, leadMailEvents, salesLeads, users } from "@/db/schema";
 import { requireInternal } from "@/server/auth/context";
 
 export const LEAD_STATUSES = ["lead", "offerte", "onderhandeling", "gewonnen", "verloren"] as const;
@@ -74,4 +74,59 @@ export async function listLeads() {
   const sources = [...new Set(rows.map((r) => r.source).filter(Boolean))] as string[];
 
   return { rows: rows as LeadRow[], summary: { total, open, won, lost, overdue }, segments, sources };
+}
+
+export type LeadMailItem = {
+  id: string;
+  receivedAt: string | null;
+  formType: string | null;
+  company: string | null;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  originalText: string | null;
+  reason: string | null;
+  leadId: string | null;
+  leadCompany: string | null;
+  leadStatus: string | null;
+};
+
+/**
+ * Aanvragen uit de mail die aandacht vragen op de Leads-pagina:
+ *  - review: twijfelgevallen die iemand moet beoordelen;
+ *  - recent: aanvragen van de laatste 14 dagen die bij een bestaande lead zijn
+ *    gezet, zodat een nieuwe vraag van een bestaande relatie niet ongezien blijft.
+ */
+export async function listLeadMailAttention(): Promise<{ review: LeadMailItem[]; recent: LeadMailItem[] }> {
+  await requireInternal();
+  const candidate = alias(salesLeads, "candidate_lead");
+  const linked = alias(salesLeads, "linked_lead");
+  const cols = {
+    id: leadMailEvents.id,
+    receivedAt: leadMailEvents.receivedAt,
+    formType: leadMailEvents.formType,
+    company: leadMailEvents.company,
+    contactName: leadMailEvents.contactName,
+    email: leadMailEvents.email,
+    phone: leadMailEvents.phone,
+    originalText: leadMailEvents.originalText,
+    reason: leadMailEvents.matchReason,
+  };
+  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  const [review, recent] = await Promise.all([
+    db
+      .select({ ...cols, leadId: candidate.id, leadCompany: candidate.company, leadStatus: candidate.status })
+      .from(leadMailEvents)
+      .leftJoin(candidate, eq(candidate.id, leadMailEvents.candidateLeadId))
+      .where(eq(leadMailEvents.outcome, "review"))
+      .orderBy(desc(leadMailEvents.receivedAt)),
+    db
+      .select({ ...cols, leadId: linked.id, leadCompany: linked.company, leadStatus: linked.status })
+      .from(leadMailEvents)
+      .innerJoin(linked, eq(linked.id, leadMailEvents.leadId))
+      .where(and(eq(leadMailEvents.outcome, "attached"), gte(leadMailEvents.receivedAt, since)))
+      .orderBy(desc(leadMailEvents.receivedAt)),
+  ]);
+  const iso = <T extends { receivedAt: Date | null }>(r: T) => ({ ...r, receivedAt: r.receivedAt ? new Date(r.receivedAt).toISOString() : null });
+  return { review: review.map(iso), recent: recent.map(iso) };
 }
